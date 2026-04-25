@@ -1,0 +1,155 @@
+"""Native auth: signup, signin, signout, session me."""
+from __future__ import annotations
+
+import logging
+import secrets
+import string
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db import get_session
+from app.models import User
+from app.services.session import (
+    SESSION_COOKIE,
+    hash_password,
+    issue_session_token,
+    session_cookie_kwargs,
+    verify_password,
+    verify_session_token,
+)
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+class SignupBody(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=200)
+    name: str | None = Field(None, max_length=120)
+    ref: str | None = Field(None, max_length=20)  # referral code from URL
+
+
+class SigninBody(BaseModel):
+    email: EmailStr
+    password: str
+
+
+def _user_out(u: User) -> dict:
+    return {
+        "id": u.id, "email": u.email, "name": u.name, "tier": u.tier,
+        "is_admin": u.is_admin,
+        "is_lifetime": u.is_lifetime,
+        "trial_ends_at": u.trial_ends_at.isoformat() if u.trial_ends_at else None,
+        "referral_code": u.referral_code,
+        "created_at": u.created_at.isoformat() if u.created_at else None,
+    }
+
+
+def _generate_referral_code() -> str:
+    """Short, human-readable code. Collision chance <1 per 10k users."""
+    alphabet = string.ascii_uppercase + string.digits
+    # Exclude 0/O, 1/I/L to reduce confusion
+    alphabet = alphabet.replace("0", "").replace("O", "").replace("1", "").replace("I", "").replace("L", "")
+    return "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+@router.post("/signup")
+async def signup(
+    body: SignupBody,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    email = body.email.lower().strip()
+    existing = await session.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(409, "An account already exists for that email")
+
+    try:
+        pw = hash_password(body.password)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    # Resolve referral code -> referring user's id
+    referred_by_id: str | None = None
+    if body.ref:
+        ref_q = await session.execute(select(User).where(User.referral_code == body.ref.upper()))
+        referrer = ref_q.scalar_one_or_none()
+        if referrer:
+            referred_by_id = referrer.id
+
+    # Every new user starts a 14-day Pro trial automatically
+    trial_ends = datetime.now(UTC) + timedelta(days=14)
+
+    # Generate a unique referral code for the new user
+    ref_code = _generate_referral_code()
+    for _ in range(5):  # retry on unlikely collision
+        conflict = await session.execute(select(User).where(User.referral_code == ref_code))
+        if conflict.scalar_one_or_none() is None:
+            break
+        ref_code = _generate_referral_code()
+
+    user = User(
+        id=f"u_{uuid.uuid4().hex}",
+        email=email,
+        name=(body.name or "").strip() or None,
+        tier="pro",  # trialing Pro for 14 days
+        password_hash=pw,
+        trial_ends_at=trial_ends,
+        referral_code=ref_code,
+        referred_by=referred_by_id,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    token = issue_session_token(user.id)
+    response.set_cookie(value=token, **session_cookie_kwargs())
+    logger.info("auth.signup user=%s referred_by=%s", user.id, referred_by_id or "none")
+    return {"user": _user_out(user)}
+
+
+@router.post("/signin")
+async def signin(
+    body: SigninBody,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    email = body.email.lower().strip()
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None or not verify_password(body.password, user.password_hash):
+        # Identical error message for both branches = no account enumeration
+        raise HTTPException(401, "Invalid email or password")
+
+    token = issue_session_token(user.id)
+    response.set_cookie(value=token, **session_cookie_kwargs())
+    logger.info("auth.signin user=%s", user.id)
+    return {"user": _user_out(user)}
+
+
+@router.post("/signout")
+async def signout(response: Response) -> dict:
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+@router.get("/session")
+async def get_session_user(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Frontend hits this on boot to restore auth state. Returns null user if not logged in."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return {"user": None}
+    user_id = verify_session_token(token)
+    if not user_id:
+        return {"user": None}
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    return {"user": _user_out(user) if user else None}

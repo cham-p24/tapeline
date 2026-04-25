@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets & env
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# DB / data dumps
+*.sqlite
+*.sqlite3
+*.db
+dumps/
+*.csv.bak
+*.xlsx.bak
+
+# Logs
+logs/
+*.log
+latest_run.log
+latest_live_monitor.log
+
+# Build artifacts
+*.pid
+*.sock

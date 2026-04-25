@@ -1,0 +1,121 @@
+import Link from "next/link";
+
+export const metadata = { title: "How it works — Tapeline" };
+
+const FACTORS = [
+  { name: "Trend",               weight: 25, desc: "Slope of 20/50/200-day moving averages, MACD direction, distance from 200DMA." },
+  { name: "Relative strength",   weight: 20, desc: "Price performance vs SPY and sector ETF over 3M, 6M, 1Y." },
+  { name: "Fundamentals",        weight: 15, desc: "Revenue growth, margin trend, P/E, debt/equity, ROE, EPS surprises." },
+  { name: "Smart money",         weight: 15, desc: "Insider net buying, institutional holdings change, Congressional activity." },
+  { name: "Macro",               weight: 15, desc: "Current market regime, sector rotation, rate direction, VIX level." },
+  { name: "Momentum",            weight: 10, desc: "RSI, Bollinger Band width percentile, volume expansion, breakout proximity." },
+];
+
+const SIGNALS = [
+  { label: "HIGH CONVICTION", range: "85–100", tone: "text-up",            desc: "All six factors aligned positive." },
+  { label: "STRONG SETUP",    range: "70–84",  tone: "text-up/80",         desc: "Most factors favourable." },
+  { label: "CONSTRUCTIVE",    range: "55–69",  tone: "text-accent",        desc: "Net positive, not decisive." },
+  { label: "NEUTRAL",         range: "40–54",  tone: "text-muted",         desc: "Factors cancel out." },
+  { label: "CAUTION",         range: "25–39",  tone: "text-yellow-400",    desc: "More factors negative." },
+  { label: "WEAK",            range: "0–24",   tone: "text-down",          desc: "Broadly negative." },
+];
+
+export default function HowItWorksPage() {
+  return (
+    <main className="min-h-screen">
+      <div className="section pt-10 pb-4">
+        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg transition-colors">
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none"><path d="M10 4l-4 4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          Home
+        </Link>
+      </div>
+
+      {/* Hero */}
+      <section className="relative section py-20">
+        <div className="pointer-events-none absolute inset-0 bg-hero opacity-60" />
+        <div className="relative mx-auto max-w-3xl text-center">
+          <p className="eyebrow">Methodology</p>
+          <h1 className="mt-3 text-5xl font-bold sm:text-6xl">No black box. No mystery AI.</h1>
+          <p className="mt-6 text-lg text-muted">
+            Every score is a transparent weighted blend of six published factors.
+            You can see each contribution on every ticker.
+          </p>
+        </div>
+      </section>
+
+      {/* Factors */}
+      <section className="section py-20">
+        <div className="mx-auto max-w-4xl">
+          <p className="eyebrow">The six factors</p>
+          <h2 className="mt-3 text-3xl font-semibold">Composite = weighted sum of 6 sub-scores</h2>
+
+          <div className="mt-12 space-y-3">
+            {FACTORS.map((f) => (
+              <div key={f.name} className="flex items-start gap-6 rounded-xl border border-border bg-panel p-6 transition-colors hover:border-border2">
+                <div className="font-mono text-xl font-semibold text-accent nums w-14">{f.weight}%</div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">{f.name}</h3>
+                  <p className="mt-1.5 text-sm text-muted leading-relaxed">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 rounded-xl border border-border bg-background p-6">
+            <p className="text-xs uppercase tracking-wider text-subtle">The formula</p>
+            <pre className="mt-3 overflow-x-auto text-sm text-muted nums leading-relaxed">
+{`score = 0.25 × trend
+      + 0.20 × relative_strength
+      + 0.15 × fundamentals
+      + 0.15 × smart_money
+      + 0.15 × macro
+      + 0.10 × momentum`}
+            </pre>
+            <p className="mt-4 text-xs text-subtle leading-relaxed">
+              Each sub-score is normalised to 0–100 using factor-specific rules. Weights are
+              fixed and visible. We publish changes before rolling them out, tracked on the{" "}
+              <Link href="/scorecard" className="link">public scorecard</Link>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Signals */}
+      <section className="border-t border-border/60 bg-panel/20">
+        <div className="section py-20">
+          <div className="mx-auto max-w-3xl">
+            <p className="eyebrow">Signal labels</p>
+            <h2 className="mt-3 text-3xl font-semibold">Descriptive, not prescriptive.</h2>
+            <p className="mt-4 text-muted">
+              Each score maps to a label that describes the state of factor data.
+              We never tell you what to do with it.
+            </p>
+
+            <div className="mt-10 space-y-2">
+              {SIGNALS.map((s) => (
+                <div key={s.label} className="flex items-center justify-between gap-6 border-b border-border py-4 last:border-b-0">
+                  <div className="flex items-center gap-4">
+                    <span className={`font-mono text-sm font-medium ${s.tone}`}>{s.label}</span>
+                  </div>
+                  <div className="flex items-center gap-6 text-sm">
+                    <span className="text-muted">{s.desc}</span>
+                    <span className="font-mono text-muted nums w-16 text-right">{s.range}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="section py-24 text-center">
+        <h2 className="text-3xl font-semibold">See the scores live.</h2>
+        <p className="mt-3 text-muted">14-day Pro trial. No credit card.</p>
+        <Link href="/signup" className="btn-accent mt-8 inline-flex h-11 px-6 text-base">
+          Start free trial &rarr;
+        </Link>
+      </section>
+    </main>
+  );
+}

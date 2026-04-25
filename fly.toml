@@ -1,0 +1,69 @@
+# Fly.io configuration for Tapeline backend (API + worker).
+# Deploy with:  cd C:\Project 1; fly launch --copy-config  (first time)  or  fly deploy
+app = "tapeline-backend"
+primary_region = "syd"              # Sydney — lowest latency for Melbourne founder
+
+[build]
+  dockerfile = "infra/Dockerfile"
+  build-target = "runtime"
+
+[env]
+  APP_ENV = "production"
+  APP_URL = "https://tapeline.io"
+  API_URL = "https://api.tapeline.io"
+  SCORE_REFRESH_SECONDS = "60"
+  SNAPSHOT_REFRESH_SECONDS = "30"
+
+# Secrets set via:  fly secrets set POLYGON_API_KEY=xxx ...
+# Required secrets (set before deploy):
+#   DATABASE_URL (from Supabase or Neon)
+#   POLYGON_API_KEY
+#   CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, CLERK_WEBHOOK_SECRET, CLERK_ISSUER_URL
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PREMIUM_MONTHLY
+#   RESEND_API_KEY
+#   ADMIN_API_KEY
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8000
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 200
+    soft_limit = 100
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    method = "get"
+    path = "/api/health"
+    grace_period = "10s"
+
+# Two processes: API and worker share the same image
+[processes]
+  api = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+  worker = "python -m app.workers.signal_publisher"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["api"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["worker"]
+
+[deploy]
+  release_command = "alembic upgrade head"

@@ -1,0 +1,93 @@
+"""
+Tier gating — three-tier model (Free / Pro / Premium).
+
+- Free: preview only (top 10 tickers, 15-min delayed)
+- Pro $29/mo: live scanner, full universe, squeeze + regime + heatmap,
+  watchlist with smart alerts, email alerts, CSV export
+- Premium $49/mo: everything in Pro + Congressional trades, unlimited
+  Telegram alerts, unlimited email alerts, public API (1,000/day),
+  priority support
+
+Team / Enterprise / Lifetime sales map to 'premium' in the DB; per-account
+overrides handle larger seat counts or API caps if needed.
+"""
+from __future__ import annotations
+
+from enum import Enum
+
+
+class Tier(str, Enum):
+    FREE = "free"
+    PRO = "pro"
+    PREMIUM = "premium"
+
+
+# Feature -> minimum tier required.
+FEATURES: dict[str, Tier] = {
+    # Pro tier features
+    "scanner.full_universe": Tier.PRO,
+    "scanner.live_updates": Tier.PRO,
+    "regime.full": Tier.PRO,
+    "squeeze.full": Tier.PRO,
+    "watchlist": Tier.PRO,
+    "ticker.full_detail": Tier.PRO,
+    "news.full": Tier.PRO,
+    "ipos.full": Tier.PRO,
+    "earnings.full": Tier.PRO,
+    "heatmap": Tier.PRO,
+    "alerts.email": Tier.PRO,
+    "briefing.daily": Tier.PRO,
+    "export.csv": Tier.PRO,
+    # Premium-only features
+    "congress.feed": Tier.PREMIUM,
+    "alerts.telegram": Tier.PREMIUM,
+    "api.access": Tier.PREMIUM,
+}
+
+
+_ORDER = {Tier.FREE: 0, Tier.PRO: 1, Tier.PREMIUM: 2}
+
+
+def has_feature(user_tier: Tier | str, feature: str) -> bool:
+    if feature not in FEATURES:
+        return True
+    required = FEATURES[feature]
+    actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
+    return _ORDER[actual] >= _ORDER[required]
+
+
+# Usage caps — aligned with docs/PRICING.md.
+TIER_LIMITS: dict[Tier, dict[str, int]] = {
+    Tier.FREE: {
+        "scanner_rows": 10,
+        "watchlist_tickers": 0,
+        "email_alerts_per_day": 0,
+        "telegram_alerts_per_day": 0,
+        "api_requests_per_day": 0,
+        "saved_scans": 0,
+        "data_delay_minutes": 15,
+    },
+    Tier.PRO: {
+        "scanner_rows": 1000,
+        "watchlist_tickers": 50,
+        "email_alerts_per_day": 10,
+        "telegram_alerts_per_day": 0,
+        "api_requests_per_day": 0,
+        "saved_scans": 10,
+        "data_delay_minutes": 0,
+    },
+    Tier.PREMIUM: {
+        "scanner_rows": 1000,
+        "watchlist_tickers": 200,
+        "email_alerts_per_day": 10_000,    # effectively unlimited
+        "telegram_alerts_per_day": 10_000, # effectively unlimited
+        "api_requests_per_day": 1_000,
+        "saved_scans": 100,
+        "data_delay_minutes": 0,
+    },
+}
+
+
+def limit(user_tier: Tier | str, key: str) -> int:
+    actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
+    return TIER_LIMITS[actual].get(key, 0)
