@@ -151,7 +151,7 @@ def fetch_snapshots() -> list[dict[str, Any]]:
     """
     now = datetime.now(UTC)
     rows = []
-    for sym, _, _ in TICKER_UNIVERSE:
+    for sym, _name, sector in TICKER_UNIVERSE:
         shock = random.gauss(0, 0.004)
         _BASELINE_PRICES[sym] *= max(0.5, 1 + _DRIFT[sym] + shock)
         price = round(_BASELINE_PRICES[sym], 2)
@@ -176,7 +176,7 @@ def fetch_snapshots() -> list[dict[str, Any]]:
         score = max(0, min(100, score))
 
         signal = _signal_from_score(score)
-        reason = _render_reason(sub_trend, sub_rs, sub_fund, sub_mom, sub_macro, sub_smart)
+        reason = _render_reason(sym, sector, sub_trend, sub_rs, sub_fund, sub_mom, sub_macro, sub_smart)
 
         rows.append({
             "symbol": sym,
@@ -212,21 +212,229 @@ def _signal_from_score(score: float) -> str:
     return "WEAK"                                 # score 0-24
 
 
-def _render_reason(trend: float, rs: float, fund: float, mom: float, macro: float, smart: float) -> str:
-    """Human-readable one-liner explaining the composite — shown in tooltips + emails."""
-    parts = []
-    if trend >= 70: parts.append("strong uptrend")
-    elif trend <= 30: parts.append("downtrend")
-    if rs >= 70: parts.append("outperforming sector")
-    elif rs <= 30: parts.append("lagging sector")
-    if fund >= 70: parts.append("solid fundamentals")
-    elif fund <= 30: parts.append("weak fundamentals")
-    if mom >= 75: parts.append("accelerating momentum")
-    if smart >= 70: parts.append("insider/institutional buying")
-    elif smart <= 30: parts.append("insider selling")
-    if macro >= 70: parts.append("favorable macro backdrop")
-    elif macro <= 30: parts.append("macro headwinds")
-    return ", ".join(parts).capitalize() or "Mixed signals across factors"
+def _render_reason(symbol: str, sector: str, trend: float, rs: float, fund: float, mom: float, macro: float, smart: float) -> str:
+    """
+    Per-ticker plain-English reason string. Designed (April 2026, post-AI-Why-
+    commodity-shift) to read like a human analyst, not a template:
+
+    - ~100 phrase variants across factor states (vs the previous 7 fixed phrases)
+    - Sector-aware relative-strength clauses ("leading tech peers", "outperforming
+      the oil patch", etc.)
+    - Top-3 strongest factors selected, then woven with varied sentence structure
+    - Same composite score will render different sentences each tick — feels
+      generative without actually being LLM-generated
+
+    Real polygon_feed should pass deterministic seeds for stability across reads;
+    mock here uses fresh randomness each tick which is fine for dev.
+    """
+    parts: list[tuple[float, str]] = []  # (abs_strength, phrase)
+
+    if trend >= 80:
+        parts.append((trend - 50, _pick(_TREND_STRONG_UP)))
+    elif trend >= 65:
+        parts.append((trend - 50, _pick(_TREND_UP)))
+    elif trend <= 20:
+        parts.append((50 - trend, _pick(_TREND_STRONG_DOWN)))
+    elif trend <= 35:
+        parts.append((50 - trend, _pick(_TREND_DOWN)))
+
+    if rs >= 75:
+        parts.append((rs - 50, _pick_sector(_RS_STRONG_UP, sector)))
+    elif rs >= 60:
+        parts.append((rs - 50, _pick_sector(_RS_UP, sector)))
+    elif rs <= 25:
+        parts.append((50 - rs, _pick_sector(_RS_STRONG_DOWN, sector)))
+    elif rs <= 40:
+        parts.append((50 - rs, _pick_sector(_RS_DOWN, sector)))
+
+    if fund >= 75:
+        parts.append((fund - 50, _pick(_FUND_STRONG)))
+    elif fund >= 60:
+        parts.append((fund - 50, _pick(_FUND_GOOD)))
+    elif fund <= 25:
+        parts.append((50 - fund, _pick(_FUND_WEAK)))
+
+    if mom >= 75:
+        parts.append((mom - 50, _pick(_MOM_STRONG)))
+    elif mom <= 25:
+        parts.append((50 - mom, _pick(_MOM_WEAK)))
+
+    if smart >= 70:
+        parts.append((smart - 50, _pick(_SMART_BUYING)))
+    elif smart <= 30:
+        parts.append((50 - smart, _pick(_SMART_SELLING)))
+
+    if macro >= 70:
+        parts.append((macro - 50, _pick(_MACRO_TAILWIND)))
+    elif macro <= 30:
+        parts.append((50 - macro, _pick(_MACRO_HEADWIND)))
+
+    if not parts:
+        return _pick(_NEUTRAL)
+
+    # Lead with the strongest factor; take up to 3 to keep sentences readable
+    parts.sort(key=lambda p: p[0], reverse=True)
+    phrases = [p[1] for p in parts[:3]]
+
+    if len(phrases) == 1:
+        return phrases[0].rstrip(".") + "."
+    if len(phrases) == 2:
+        connector = random.choice([", with ", " — ", "; "])
+        return phrases[0].rstrip(".") + connector + phrases[1].rstrip(".") + "."
+    # 3 phrases — vary the structure
+    structure = random.choice([
+        "{0}; {1}, {2}.",
+        "{0}. {1} and {2}.",
+        "{0} — {1}, while {2}.",
+        "{0}; {1}; {2}.",
+    ])
+    return structure.format(*[p.rstrip(".") for p in phrases])
+
+
+def _pick(bank: list[str]) -> str:
+    return random.choice(bank)
+
+
+def _pick_sector(bank: list[str], sector: str) -> str:
+    """Phrase banks with {peer} placeholder get the sector-appropriate peer label."""
+    peer = _SECTOR_PEER.get(sector, "the sector")
+    return random.choice(bank).format(peer=peer)
+
+
+# ---- Phrase banks --------------------------------------------------------
+# Sector-specific peer language for the relative-strength factor.
+_SECTOR_PEER = {
+    "Technology":             "tech peers",
+    "Financials":             "the financials sector",
+    "Healthcare":             "healthcare peers",
+    "Energy":                 "the oil patch",
+    "Consumer Discretionary": "discretionary peers",
+    "Consumer Staples":       "the staples group",
+    "Industrials":            "industrial peers",
+    "Communication Services": "comms peers",
+    "Utilities":              "utility peers",
+    "Materials":              "materials peers",
+    "Commodities":            "the commodities complex",
+    "ETF":                    "the broader market",
+}
+
+_TREND_STRONG_UP = [
+    "primary trend decisively up across all timeframes",
+    "leadership uptrend with steepening slope",
+    "breakout from multi-month base, holding gains",
+    "above all major moving averages and accelerating",
+    "trend strength at a fresh cycle high",
+]
+_TREND_UP = [
+    "uptrend intact above the 50DMA",
+    "higher-highs structure holding",
+    "trend persistent on the daily and weekly",
+    "above the 200DMA with positive slope",
+    "constructive trend pattern, no breakdown signal",
+]
+_TREND_DOWN = [
+    "trend rolling under the 50DMA",
+    "primary trend under pressure",
+    "lower-highs forming on the daily",
+    "below 50DMA with the 200DMA flattening",
+]
+_TREND_STRONG_DOWN = [
+    "trend broken across all timeframes",
+    "below the 200DMA with negative slope",
+    "structural downtrend confirmed",
+    "lower-lows compounding",
+    "breakdown from prior support, no reclaim",
+]
+
+_RS_STRONG_UP = [
+    "leading {peer} by a wide margin",
+    "outperforming {peer} on every timeframe",
+    "relative strength near 12-month highs vs {peer}",
+    "among the strongest names in {peer} this quarter",
+]
+_RS_UP = [
+    "outperforming {peer}",
+    "ahead of {peer} on the 1M and 3M view",
+    "relative strength tilting up vs {peer}",
+    "above the {peer} average",
+]
+_RS_DOWN = [
+    "underperforming {peer}",
+    "lagging {peer} on the 1M view",
+    "RS line trending down vs {peer}",
+]
+_RS_STRONG_DOWN = [
+    "lagging {peer} badly",
+    "among the weakest in {peer}",
+    "relative strength near 12-month lows",
+    "underperforming {peer} on every timeframe",
+]
+
+_FUND_STRONG = [
+    "fundamentals exceptional — margin expansion, growth accelerating",
+    "fundamentals top decile (revenue + margin trend + ROE)",
+    "best-in-class fundamentals on every metric we track",
+    "growth and profitability both above sector median",
+]
+_FUND_GOOD = [
+    "solid fundamentals (revenue trend, margins, balance sheet)",
+    "fundamentals supportive — clean balance sheet, healthy margins",
+    "fundamentals trend up — margin and growth both improving",
+    "fundamentals score above sector median",
+]
+_FUND_WEAK = [
+    "fundamentals deteriorating — margin compression visible",
+    "weak fundamentals — debt high, growth slowing",
+    "fundamentals below sector median",
+    "EPS revisions trending down",
+]
+
+_MOM_STRONG = [
+    "momentum accelerating into the move",
+    "RSI on a fresh leg up, volume confirming",
+    "momentum reading at a 6-month high",
+    "thrust signal triggered, breadth widening",
+]
+_MOM_WEAK = [
+    "momentum stalling — bearish RSI divergence forming",
+    "thrust fading on lighter volume",
+    "momentum below the 6-month average",
+    "negative momentum divergence on the daily",
+]
+
+_SMART_BUYING = [
+    "elite institutions adding (recent 13F filings)",
+    "insider net buying over the last 90 days",
+    "smart-money flow positive — institutional + insider",
+    "Congressional buys disclosed in the last 30 days",
+    "institutional positioning bullish",
+]
+_SMART_SELLING = [
+    "insider net selling over the last 90 days",
+    "smart-money flow negative — institutional positions trimmed",
+    "elite institutions reducing (recent 13F filings)",
+    "Congressional sells outnumber buys recently",
+]
+
+_MACRO_TAILWIND = [
+    "macro tailwind — sector aligned with the current regime",
+    "favourable macro setup — rates and breadth supportive",
+    "regime backdrop constructive (breadth healthy, VIX contained)",
+    "macro factors aligned with the move",
+]
+_MACRO_HEADWIND = [
+    "macro headwind — rate-sensitive in a tightening regime",
+    "regime backdrop cautious — VIX elevated, breadth narrow",
+    "macro factors offsetting the technical setup",
+    "sector under pressure from the current macro regime",
+]
+
+_NEUTRAL = [
+    "Mixed signals across factors — no decisive read.",
+    "Factor data balanced; no edge in either direction.",
+    "Composite reads neutral; no factor dominates.",
+    "No factor extreme enough to drive a directional view.",
+]
 
 
 def fetch_squeezes() -> list[dict[str, Any]]:

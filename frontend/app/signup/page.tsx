@@ -14,6 +14,8 @@ export default function SignUpPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Honeypot — bots fill this, humans never see it. Submitted as `company`.
+  const [honeypot, setHoneypot] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -23,7 +25,7 @@ export default function SignUpPage() {
     if (password.length < 8) { setErr("Password must be at least 8 characters."); return; }
     setBusy(true);
     try {
-      await authApi.signup(email, password, name);
+      await authApi.signup(email, password, name, { company: honeypot });
       router.push(next);
       router.refresh();
     } catch (e: any) {
@@ -48,6 +50,20 @@ export default function SignUpPage() {
           <p className="mt-2 text-sm text-muted">No credit card. Cancel anytime.</p>
 
           <form onSubmit={submit} className="mt-8 space-y-4">
+            {/* Honeypot field — offscreen, hidden from real users (and screen readers).
+                Bots that auto-fill every input will populate it; if non-empty, the
+                backend silently rejects the signup. */}
+            <input
+              type="text"
+              name="company"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute left-[-9999px] top-[-9999px] h-0 w-0 opacity-0"
+            />
+
             <Field label="Name" type="text" autoComplete="name" value={name} onChange={setName} />
             <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
             <Field label="Password" type="password" autoComplete="new-password" value={password} onChange={setPassword} required minLength={8} hint="At least 8 characters" />

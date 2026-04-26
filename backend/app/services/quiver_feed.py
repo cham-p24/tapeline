@@ -161,3 +161,45 @@ async def _try_fund_endpoints(client: httpx.AsyncClient, fund: dict) -> list | N
 def get_tracked_funds() -> list[dict[str, str]]:
     """Public accessor for the tracked-funds list (used by /api/holdings router)."""
     return list(TRACKED_FUNDS)
+
+
+def mock_elite_13f_holdings() -> list[dict[str, Any]]:
+    """
+    Plausible mock 13F data for the eight tracked funds.
+
+    Used in dev when QUIVER_API_KEY isn't set so the holdings sheet never
+    goes empty. Deterministic seed (Random(20260427)) so the same mock data
+    appears across worker restarts during a dev session.
+
+    Returns the same shape as fetch_elite_13f_holdings(): a flat list of
+    per-position dicts with fund_name, manager, cik, symbol, value_usd,
+    shares, percent_portfolio.
+    """
+    import random as _r
+
+    rng = _r.Random(20260427)
+    candidate_pool = [
+        "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "BRK.B", "JPM", "V", "MA",
+        "UNH", "LLY", "JNJ", "XOM", "CVX", "WMT", "COST", "HD", "TSLA", "AMD",
+        "AVGO", "ORCL", "BAC", "WFC", "GS", "MRK", "PFE", "ABBV", "CAT", "DE",
+        "GLD", "SLV", "USO", "URA", "GDX",  # commodity ETFs occasionally show up
+    ]
+    rows: list[dict[str, Any]] = []
+    for fund in TRACKED_FUNDS:
+        portfolio_total = rng.uniform(5e9, 200e9)  # $5B–$200B AUM
+        picks = rng.sample(candidate_pool, k=6)
+        for i, sym in enumerate(picks):
+            # Position sizes decay — top pick ~12%, last ~2%
+            pct = max(1.5, rng.uniform(2, 15) * (1 - i * 0.12))
+            value = portfolio_total * pct / 100
+            shares = int(value / rng.uniform(50, 600))
+            rows.append({
+                "fund_name": fund["name"],
+                "manager": fund["manager"],
+                "cik": fund["cik"],
+                "symbol": sym,
+                "value_usd": round(value, 2),
+                "shares": shares,
+                "percent_portfolio": round(pct, 2),
+            })
+    return rows

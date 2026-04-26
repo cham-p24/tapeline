@@ -18,6 +18,7 @@ from app.db import is_sqlite, session_scope
 from app.models import (
     CongressTrade,
     DailyScorecardEntry,
+    InstitutionalHolding,
     NewsItem,
     RegimeState,
     SqueezeSetup,
@@ -43,6 +44,7 @@ _last_backcheck: datetime | None = None
 _last_telegram_digest: datetime | None = None
 _last_calendar_seed: datetime | None = None
 _last_trial_check: datetime | None = None
+_last_holdings_refresh: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -145,6 +147,13 @@ async def tick() -> None:
     if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
         await _downgrade_expired_trials()
         _last_trial_check = started
+
+    # Daily 13F holdings refresh (Quiver, with mock fallback).
+    # 24h cadence is conservative — SEC reporting window is 45 days anyway.
+    global _last_holdings_refresh  # noqa: PLW0603
+    if _last_holdings_refresh is None or (started - _last_holdings_refresh).total_seconds() >= 86400:
+        await _refresh_elite_13f()
+        _last_holdings_refresh = started
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
@@ -257,6 +266,31 @@ async def _downgrade_expired_trials() -> None:
     logger.info("trial.downgraded count=%d", len(candidates))
     for user_id, email, prev_tier in candidates[:5]:
         logger.info("  trial.downgrade user=%s email=%s prev_tier=%s", user_id, email, prev_tier)
+
+
+async def _refresh_elite_13f() -> None:
+    """
+    Daily 24h refresh of elite-fund 13F holdings.
+
+    Tries Quiver first; if QUIVER_API_KEY is unset OR every fund fetch fails,
+    falls back to deterministic mock data so the /api/holdings endpoint
+    never returns empty in dev.
+    """
+    from app.models import InstitutionalHolding
+    from app.services.quiver_feed import fetch_elite_13f_holdings, mock_elite_13f_holdings
+
+    rows = await fetch_elite_13f_holdings()
+    source = "quiver"
+    if rows is None:
+        rows = mock_elite_13f_holdings()
+        source = "mock"
+
+    async with session_scope() as session:
+        await session.execute(delete(InstitutionalHolding))
+        for r in rows:
+            session.add(InstitutionalHolding(**r))
+
+    logger.info("holdings.13f_refreshed source=%s count=%d", source, len(rows))
 
 
 async def _seed_calendar() -> None:

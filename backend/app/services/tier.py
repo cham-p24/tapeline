@@ -42,6 +42,7 @@ FEATURES: dict[str, Tier] = {
     "congress.feed": Tier.PREMIUM,
     "alerts.telegram": Tier.PREMIUM,
     "api.access": Tier.PREMIUM,
+    "holdings.elite": Tier.PREMIUM,  # Quiver elite-fund 13F holdings
 }
 
 
@@ -59,15 +60,18 @@ def has_feature(user_tier: Tier | str, feature: str) -> bool:
 # Usage caps — aligned with docs/PRICING.md.
 TIER_LIMITS: dict[Tier, dict[str, int]] = {
     Tier.FREE: {
-        # Loosened from 10 / 0 / 0 — habit-formation > austerity (Notion / Linear data).
-        # A free user who tracks 5 tickers daily becomes a converter; 10-cap demos don't.
-        "scanner_rows": 25,
+        # Hardened 2026-04-27: 20 tickers, 24-hour delay.
+        # Trial expiry now drops to a meaningfully worse experience (yesterday's
+        # data, narrow universe) so loss aversion does the conversion work.
+        # Watchlist of 5 stays — alerts can't fire on stale data anyway, so this
+        # is a frustration vector that nudges toward upgrade rather than utility.
+        "scanner_rows": 20,
         "watchlist_tickers": 5,
         "email_alerts_per_day": 0,
         "telegram_alerts_per_day": 0,
         "api_requests_per_day": 0,
         "saved_scans": 0,
-        "data_delay_minutes": 15,
+        "data_delay_minutes": 1440,  # 24 hours
     },
     Tier.PRO: {
         "scanner_rows": 1000,

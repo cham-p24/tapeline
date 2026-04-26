@@ -14,6 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import User
+from app.services.bot_protection import (
+    is_disposable_email,
+    is_honeypot_tripped,
+    verify_turnstile,
+)
+from app.services.rate_limit import limit_auth
 from app.services.session import (
     SESSION_COOKIE,
     hash_password,
@@ -32,6 +38,12 @@ class SignupBody(BaseModel):
     password: str = Field(..., min_length=8, max_length=200)
     name: str | None = Field(None, max_length=120)
     ref: str | None = Field(None, max_length=20)  # referral code from URL
+    # Honeypot — must stay empty. Bots fill all visible-looking fields.
+    # The frontend renders this offscreen so humans never see it.
+    company: str | None = Field(None, max_length=200)
+    # Cloudflare Turnstile token. Verified server-side if Turnstile is configured;
+    # ignored otherwise (dev mode pass-through).
+    turnstile_token: str | None = Field(None, max_length=2048)
 
 
 class SigninBody(BaseModel):
@@ -58,13 +70,35 @@ def _generate_referral_code() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(8))
 
 
-@router.post("/signup")
+@router.post("/signup", dependencies=[Depends(limit_auth)])
 async def signup(
     body: SignupBody,
+    request: Request,
     response: Response,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    # ---- Bot/abuse checks (run before any expensive work) -------------------
+    if is_honeypot_tripped(body.company):
+        # Bot tripped the honeypot field. Return a fake-success response so the
+        # bot can't probe whether the honeypot exists, but don't actually create
+        # the account or set a session cookie.
+        logger.warning("auth.honeypot_tripped email=%s", body.email)
+        return {"user": {
+            "id": "u_blocked", "email": body.email, "name": None, "tier": "free",
+            "is_admin": False, "is_lifetime": False, "trial_ends_at": None,
+            "referral_code": None, "created_at": None,
+        }}
+
     email = body.email.lower().strip()
+    if is_disposable_email(email):
+        logger.warning("auth.disposable_email_blocked email=%s", email)
+        raise HTTPException(400, "This email provider isn't supported. Please use a regular email address.")
+
+    client_ip = request.client.host if request.client else None
+    if not await verify_turnstile(body.turnstile_token, client_ip):
+        raise HTTPException(400, "Bot challenge failed. Please refresh and try again.")
+
+    # ---- Normal signup path -------------------------------------------------
     existing = await session.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(409, "An account already exists for that email")
@@ -115,7 +149,7 @@ async def signup(
     return {"user": _user_out(user)}
 
 
-@router.post("/signin")
+@router.post("/signin", dependencies=[Depends(limit_auth)])
 async def signin(
     body: SigninBody,
     response: Response,

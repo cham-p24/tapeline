@@ -6,9 +6,9 @@
  */
 
 const ROWS = [
-  { label: "Ticker universe", free: "Top 25", pro: "~870 US equities, ETFs & commodity ETFs", premium: "~870 US equities, ETFs & commodity ETFs" },
-  { label: "Data freshness", free: "15-minute delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
-  { label: "6-factor score breakdown", free: "Top 25 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
+  { label: "Ticker universe", free: "Top 20", pro: "~870 US equities, ETFs & commodity ETFs", premium: "~870 US equities, ETFs & commodity ETFs" },
+  { label: "Data freshness", free: "24-hour delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
+  { label: "6-factor score breakdown", free: "Top 20 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
   { label: "Plain-English Why column", free: "—", pro: "✓", premium: "✓" },
   { label: "Squeeze Watch", free: "—", pro: "✓", premium: "✓" },
   { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },

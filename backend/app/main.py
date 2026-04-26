@@ -20,6 +20,7 @@ from app.routers import (
     calendar_routes,
     congress,
     heatmap,
+    holdings,
     me,
     news,
     oauth,
@@ -94,6 +95,7 @@ app.include_router(scanner.router, prefix="/api/scanner", tags=["scanner"])
 app.include_router(squeeze.router, prefix="/api/squeeze", tags=["squeeze"])
 app.include_router(regime.router, prefix="/api/regime", tags=["regime"])
 app.include_router(congress.router, prefix="/api/congress", tags=["congress"])
+app.include_router(holdings.router, prefix="/api/holdings", tags=["holdings"])
 app.include_router(stream.router, prefix="/api/stream", tags=["stream"])
 app.include_router(me.router, prefix="/api/me", tags=["me"])
 app.include_router(billing.router, prefix="/api/billing", tags=["billing"])

@@ -61,15 +61,6 @@ async def test_scanner_responds(client):
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_kicks_in(client):
-    """Hammer the API and confirm we get a 429 eventually."""
-    async with client:
-        responses = await asyncio.gather(*[_get(client, "/api/scanner?limit=1") for _ in range(150)])
-        codes = [r.status_code for r in responses]
-        assert 429 in codes, "rate limit should block at least one request"
-
-
-@pytest.mark.asyncio
 async def test_watchlist_requires_auth(client):
     async with client:
         r = await _get(client, "/api/watchlist")
@@ -81,3 +72,14 @@ async def test_legal_404_graceful(client):
     async with client:
         r = await _get(client, "/api/nonexistent")
         assert r.status_code == 404
+
+
+# NOTE: keep this test LAST. The rate-limiter is process-global and stays
+# triggered for ~60s after this test fires; subsequent tests would all 429.
+@pytest.mark.asyncio
+async def test_zz_rate_limit_kicks_in(client):
+    """Hammer the API and confirm we get a 429 eventually."""
+    async with client:
+        responses = await asyncio.gather(*[_get(client, "/api/scanner?limit=1") for _ in range(150)])
+        codes = [r.status_code for r in responses]
+        assert 429 in codes, "rate limit should block at least one request"

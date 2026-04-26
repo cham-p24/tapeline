@@ -31,19 +31,19 @@ export default function LandingPage() {
               Live market scanning
             </div>
             <h1 className="mt-6 text-5xl font-bold tracking-tight sm:text-6xl">
-              Read the tape.
+              A scanner that
               <br />
-              <span className="text-accent">Live.</span>
+              <span className="text-accent">shows its work.</span>
             </h1>
             <p className="mt-6 text-lg text-muted">
-              One composite score per US stock. One sentence explaining why.
-              Public scorecard of every pick. Start the 14-day Pro trial free.
+              Six factors with the exact weights published. One plain-English sentence on every ticker, every row.
+              Every call we make goes on a permanent public record — same day.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/signup" className="btn-primary text-base">Start free &rarr;</Link>
-              <Link href="/scorecard" className="btn-ghost text-base">See public scorecard</Link>
+              <Link href="/signup" className="btn-primary text-base">Start 14-day trial &rarr;</Link>
+              <Link href="/scorecard" className="btn-ghost text-base">See the record</Link>
             </div>
-            <p className="mt-3 text-xs text-muted">No credit card · cancel in one click · 7-day money back</p>
+            <p className="mt-3 text-xs text-muted">14-day Premium trial · no credit card · cancel in one click</p>
           </div>
 
           {/* Right: product preview */}
@@ -71,17 +71,17 @@ export default function LandingPage() {
         <p className="mt-2 text-muted">From data to decision in one glance.</p>
 
         <div className="mt-10 grid gap-6 md:grid-cols-3">
-          <Step n="1" title="We score every ticker">
-            Six factors (trend, relative strength, fundamentals, smart money, macro, momentum)
-            weighted into one 0–100 composite. Updated live on every tick.
+          <Step n="1" title="Six factors, exact weights">
+            Trend 25% · relative strength 20% · fundamentals 15% · smart money 15% · macro 15% · momentum 10%.
+            Weights are public. Every change is announced before it ships.
           </Step>
-          <Step n="2" title="You see the Why">
-            Hover any score for the factor breakdown. Read a plain-English sentence —
-            &ldquo;Strong uptrend, outperforming sector, accelerating momentum&rdquo; — not a Zacks rank.
+          <Step n="2" title="One sentence per ticker">
+            Default plain-English Why on every row — no chat session required, no premium gate.
+            Hover the score for the factor breakdown.
           </Step>
-          <Step n="3" title="We post the receipts">
-            Every day we log our top-10 picks to a <Link href="/scorecard" className="text-accent">public scorecard</Link>
-            {" "}and record the result vs SPY the next day. No cherry-picking.
+          <Step n="3" title="Every call on the public record">
+            Top-10 picks logged daily to the <Link href="/scorecard" className="text-accent">public scorecard</Link>{" "}
+            with the original reasoning preserved. Performance vs SPY recorded next session. No cherry-picking, no hindsight edits.
           </Step>
         </div>
 

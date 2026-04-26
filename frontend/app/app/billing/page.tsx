@@ -84,9 +84,9 @@ export default function BillingPage() {
           price="$0"
           note="Forever free"
           items={[
-            "Top 10 tickers, 15-min delayed",
+            "Top 20 tickers, 24-hour delayed",
             "Public scorecard + basic regime",
-            "No watchlist, no alerts",
+            "Small watchlist (5), no alerts",
           ]}
           highlight={user?.tier === "free"}
         />

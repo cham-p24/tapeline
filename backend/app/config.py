@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # Free tier available; without a key, smart-money enrichment falls back to mock.
     quiver_api_key: str = ""
 
+    # ---- Bot protection (Cloudflare Turnstile, optional) ----
+    # When secret key is unset, Turnstile verification passes through (dev mode).
+    # Honeypot field + disposable-email block always run regardless.
+    cloudflare_turnstile_site_key: str = ""
+    cloudflare_turnstile_secret_key: str = ""
+
     # ---- Worker cadence ----
     score_refresh_seconds: int = 60
     snapshot_refresh_seconds: int = 30

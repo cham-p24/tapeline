@@ -33,12 +33,18 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+type SignupExtras = {
+  ref?: string;
+  company?: string;          // honeypot — must be empty for humans
+  turnstile_token?: string;  // Cloudflare Turnstile token (if configured)
+};
+
 export const authApi = {
   session: () => req<{ user: SessionUser | null }>("/api/auth/session"),
-  signup: (email: string, password: string, name?: string) =>
+  signup: (email: string, password: string, name?: string, extras?: SignupExtras) =>
     req<{ user: SessionUser }>("/api/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, ...extras }),
     }),
   signin: (email: string, password: string) =>
     req<{ user: SessionUser }>("/api/auth/signin", {
@@ -69,6 +75,7 @@ export const FEATURE_TIERS = {
   "alerts.telegram":    "premium" as const,
   "briefing":           "premium" as const,
   "api":                "premium" as const,
+  "holdings.elite":     "premium" as const,
   "csv_export":         "pro" as const,
 };
 

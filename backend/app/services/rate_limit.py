@@ -70,3 +70,16 @@ async def limit_strict(request: Request) -> None:
     ok = await limiter.consume(_client_key(request), 10, 60)
     if not ok:
         raise HTTPException(status_code=429, detail="Too many requests.")
+
+
+async def limit_auth(request: Request) -> None:
+    """
+    Tightest limit for auth endpoints — 10 attempts per minute per IP.
+    Slows down credential-stuffing and trial-account-creation bots.
+    Always IP-keyed (auth has no token yet).
+    """
+    xff = request.headers.get("X-Forwarded-For", "")
+    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "anon")
+    ok = await limiter.consume(f"auth:{ip}", 10, 60)
+    if not ok:
+        raise HTTPException(status_code=429, detail="Too many auth attempts. Wait a minute and try again.")

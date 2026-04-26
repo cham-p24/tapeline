@@ -35,10 +35,10 @@ export default function HowItWorksPage() {
         <div className="pointer-events-none absolute inset-0 bg-hero opacity-60" />
         <div className="relative mx-auto max-w-3xl text-center">
           <p className="eyebrow">Methodology</p>
-          <h1 className="mt-3 text-5xl font-bold sm:text-6xl">No black box. No mystery AI.</h1>
+          <h1 className="mt-3 text-5xl font-bold sm:text-6xl">Six factors. Exact weights. Public record.</h1>
           <p className="mt-6 text-lg text-muted">
-            Every score is a transparent weighted blend of six published factors.
-            You can see each contribution on every ticker.
+            Every score is a transparent weighted blend of six published factors —
+            no black box, no mystery AI, no chat assistant required. You see each contribution on every ticker.
           </p>
         </div>
       </section>

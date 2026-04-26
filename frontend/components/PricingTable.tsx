@@ -11,9 +11,9 @@ const PLANS = [
     tagline: "See what's possible",
     prices: { monthly: 0, annual: 0 },
     highlights: [
-      "Top 10 tickers, 15-min delayed",
+      "Top 20 tickers, 24-hour delayed",
       "Public scorecard + basic regime",
-      "Read-only — no alerts or watchlist",
+      "Watchlist (5 tickers, no alerts)",
     ],
     cta: "Start free",
     ctaHref: "/signup",

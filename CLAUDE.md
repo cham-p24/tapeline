@@ -23,10 +23,10 @@ FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 14 + TypeScript + 
 Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
-**Three tiers** (decided 2026-04-26):
-- **Free** $0 — top 25 tickers, 15-min delayed, watchlist (5, no alerts)
+**Three tiers** (decided 2026-04-26, Free hardened 2026-04-27):
+- **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
 - **Pro** $29/mo or $290/yr — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV
-- **Premium** $49/mo or $490/yr — everything in Pro + Congressional trades, Telegram unlimited, email unlimited, public API (1,000/day), priority support
+- **Premium** $49/mo or $490/yr — everything in Pro + Congressional trades, Telegram unlimited, email unlimited, public API (1,000/day), elite 13F holdings, priority support
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
@@ -60,12 +60,24 @@ score = 0.25*trend + 0.20*relative_strength + 0.15*fundamentals
 ## Universe + commodities
 Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs added 2026-04-26 with sector="Commodities" — gold, silver, oil, gas, ag, copper, uranium, miners. Polygon Starter doesn't include futures contracts, so commodity exposure is via ETFs only. Auto-discovery of new ETFs via Polygon `/v3/reference/tickers` is on the post-launch list (not wired yet).
 
+## Bot / abuse protection — `backend/app/services/bot_protection.py`
+Three application-level layers (Cloudflare Bot Fight Mode is the recommended free baseline once domain is proxied):
+1. **Honeypot field** — invisible `company` input on signup form. Bots fill it; humans don't see it. Tripped → fake-success response (no account created, no session cookie).
+2. **Disposable-email block** — built-in set of ~62 throwaway providers (mailinator, guerrillamail, tempmail, etc.). Rejected with 400.
+3. **Cloudflare Turnstile** — env-gated. `CLOUDFLARE_TURNSTILE_SITE_KEY` + `CLOUDFLARE_TURNSTILE_SECRET_KEY`. Pass-through when unset (dev), enforced when set.
+
+Rate limit: `services/rate_limit.py` `limit_auth` caps `/api/auth/*` at 10 attempts per IP per minute (vs default 120 for /api/*).
+
+## Universe + commodities
+Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs added 2026-04-26 with sector="Commodities" — gold, silver, oil, gas, ag, copper, uranium, miners. Polygon Starter doesn't include futures contracts, so commodity exposure is via ETFs only. Auto-discovery of new ETFs via Polygon `/v3/reference/tickers` is on the post-launch list (not wired yet).
+
+## Smart-money / 13F holdings
+Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer); 24h cache + multi-endpoint fallback. Worker task `_refresh_elite_13f` runs daily; falls back to `mock_elite_13f_holdings()` when no `QUIVER_API_KEY`. Endpoint `/api/holdings` (Premium-only via feature `holdings.elite`). Frontend page not yet built — use existing congress page pattern for `/app/holdings` when ready.
+
 ## Known issues / partially-built
 - **Telegram alert-rule delivery stubbed** — `backend/app/services/alerts.py:89`. The hourly digest works (`services/telegram.py`), but per-rule alert delivery doesn't.
 - **Macro indicators hardcoded** — `backend/app/services/polygon_feed.py:209-212` (DXY, 10Y, breadth).
-- **Quiver 13F service is skeleton-only** — `backend/app/services/quiver_feed.py` has the elite-funds list + 24h cache + graceful-degradation pattern, but isn't wired into the worker or the smart_money sub-score yet. Wiring needs a new `institutional_holdings` model + Alembic migration + `/api/holdings` endpoint.
-- **Why generator is template-grade** — `mock_feed.py:_render_reason` concatenates fixed phrases. With AI-Why now commoditized (TradingView Chart Copilot March 2026), this needs sector-aware + factor-combination-aware phrasing before launch.
-- **Smoke test ordering bug** — `tests/test_smoke.py` runs `test_rate_limit_kicks_in` before `test_watchlist_requires_auth` and `test_legal_404_graceful`; the rate-limit lingers and the last two return 429 instead of 401/404. Pre-existing.
+- **No `/app/holdings` frontend page yet** — the `/api/holdings` endpoint works but no UI. Build using the congress page paywall pattern.
 - **Frontend has zero tests.**
 
 ## Tests
@@ -86,7 +98,8 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/auth.py` — native + Clerk JWT verification + dev-bypass
 - `backend/app/services/mock_feed.py` — fake data generator (112 tickers incl. 32 commodity ETFs)
 - `backend/app/services/polygon_feed.py` — real Polygon adapter (stubbed in places)
-- `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (skeleton, awaits wiring)
+- `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (wired end-to-end with mock fallback)
+- `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/workers/signal_publisher.py` — scoring tick worker
 - `backend/app/scripts/seed_owner.py` — creates/updates the owner account
 - `backend/alembic/versions/` — 7 migrations, run via `alembic upgrade head`
