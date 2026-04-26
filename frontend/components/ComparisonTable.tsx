@@ -6,14 +6,14 @@
  */
 
 const ROWS = [
-  { label: "Ticker universe", free: "Top 10", pro: "~870 US equities & ETFs", premium: "~870 US equities & ETFs" },
+  { label: "Ticker universe", free: "Top 25", pro: "~870 US equities, ETFs & commodity ETFs", premium: "~870 US equities, ETFs & commodity ETFs" },
   { label: "Data freshness", free: "15-minute delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
-  { label: "6-factor score breakdown", free: "Top 10 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
+  { label: "6-factor score breakdown", free: "Top 25 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
   { label: "Plain-English Why column", free: "—", pro: "✓", premium: "✓" },
   { label: "Squeeze Watch", free: "—", pro: "✓", premium: "✓" },
   { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },
   { label: "IPO + Earnings + News calendars", free: "—", pro: "✓", premium: "✓" },
-  { label: "Watchlist", free: "—", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+  { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
   { label: "TradingView charts", free: "—", pro: "On every ticker page", premium: "On every ticker page" },
   { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
   { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },

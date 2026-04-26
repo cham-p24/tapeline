@@ -59,8 +59,10 @@ def has_feature(user_tier: Tier | str, feature: str) -> bool:
 # Usage caps — aligned with docs/PRICING.md.
 TIER_LIMITS: dict[Tier, dict[str, int]] = {
     Tier.FREE: {
-        "scanner_rows": 10,
-        "watchlist_tickers": 0,
+        # Loosened from 10 / 0 / 0 — habit-formation > austerity (Notion / Linear data).
+        # A free user who tracks 5 tickers daily becomes a converter; 10-cap demos don't.
+        "scanner_rows": 25,
+        "watchlist_tickers": 5,
         "email_alerts_per_day": 0,
         "telegram_alerts_per_day": 0,
         "api_requests_per_day": 0,

@@ -13,6 +13,7 @@ export type SessionUser = {
   is_lifetime?: boolean;
   trial_ends_at?: string | null;
   referral_code?: string | null;
+  telegram_chat_id?: string | null;
   created_at: string | null;
 };
 

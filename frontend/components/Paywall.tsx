@@ -23,7 +23,7 @@ export function Paywall({
   if (canUse(user, feature)) return <>{children}</>;
 
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49/mo (Elite)" : "$29/mo (Pro)";
+  const priceLine = requiredTier === "premium" ? "$49/mo (Premium)" : "$29/mo (Pro)";
   const signedIn = !!user;
 
   return (
@@ -34,7 +34,7 @@ export function Paywall({
       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-background via-background/90 to-background/40 p-8">
         <div className="max-w-md text-center">
           <div className="inline-block rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-            {requiredTier === "premium" ? "Elite feature" : "Pro feature"}
+            {requiredTier === "premium" ? "Premium feature" : "Pro feature"}
           </div>
           <h2 className="mt-4 text-2xl font-bold tracking-tight">{title || "Upgrade to unlock"}</h2>
           <p className="mt-2 text-sm text-muted">
@@ -63,7 +63,7 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
   return (
     <div className="mt-4 rounded-lg border border-accent/30 bg-accent/5 p-4 text-sm">
       <strong className="text-accent">
-        {requiredTier === "premium" ? "Elite" : "Pro"} only:
+        {requiredTier === "premium" ? "Premium" : "Pro"} only:
       </strong>{" "}
       <span className="text-muted">
         Upgrade to unlock this data.{" "}
@@ -88,7 +88,7 @@ export function PaywallModal({
 }) {
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49/mo · Elite" : "$29/mo · Pro";
+  const priceLine = requiredTier === "premium" ? "$49/mo · Premium" : "$29/mo · Pro";
   const featureName = {
     "scanner.full": "Full live scanner",
     "watchlist": "Watchlist with smart alerts",
@@ -111,7 +111,7 @@ export function PaywallModal({
           <div className="h-2 w-6 rounded-full bg-accent" />
           <span className="text-sm font-semibold">Tapeline</span>
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight">{featureName} is on {requiredTier === "premium" ? "Elite" : "Pro"}</h2>
+        <h2 className="mt-4 text-2xl font-bold tracking-tight">{featureName} is on {requiredTier === "premium" ? "Premium" : "Pro"}</h2>
         <p className="mt-2 text-sm text-muted">
           Upgrade to {priceLine} to unlock. 14-day trial, no card required. Cancel in one click.
         </p>

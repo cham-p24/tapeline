@@ -38,10 +38,11 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
   if (!data) return <div className="card p-8 text-muted">Loading {symbol}…</div>;
 
   const toneSig =
-    data.signal === "BUY NOW" ? "text-up bg-up/10"
-    : data.signal?.includes("ACCUMULATE") ? "text-up bg-up/5"
-    : data.signal === "HOLD" ? "text-muted bg-muted/10"
-    : data.signal === "WATCH" ? "text-yellow-400 bg-yellow-500/10"
+    data.signal === "HIGH CONVICTION" ? "text-up bg-up/20"
+    : data.signal === "STRONG SETUP" ? "text-up bg-up/10"
+    : data.signal === "CONSTRUCTIVE" ? "text-accent bg-accent/10"
+    : data.signal === "NEUTRAL" ? "text-muted bg-muted/20"
+    : data.signal === "CAUTION" ? "text-yellow-400 bg-yellow-500/10"
     : "text-down bg-down/10";
 
   return (

@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # ---- Telegram ----
     telegram_bot_token: str = ""
 
+    # ---- Quiver QuantData (elite 13F holdings + Congress) ----
+    # Free tier available; without a key, smart-money enrichment falls back to mock.
+    quiver_api_key: str = ""
+
     # ---- Worker cadence ----
     score_refresh_seconds: int = 60
     snapshot_refresh_seconds: int = 30

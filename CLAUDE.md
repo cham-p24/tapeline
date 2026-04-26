@@ -23,14 +23,14 @@ FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 14 + TypeScript + 
 Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
-**Three tiers** (decided 2026-04-26, reverted from earlier Simple/one-paid-tier model):
-- **Free** $0 — top 10 tickers, 15-min delayed, read-only (preview)
+**Three tiers** (decided 2026-04-26):
+- **Free** $0 — top 25 tickers, 15-min delayed, watchlist (5, no alerts)
 - **Pro** $29/mo or $290/yr — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV
 - **Premium** $49/mo or $490/yr — everything in Pro + Congressional trades, Telegram unlimited, email unlimited, public API (1,000/day), priority support
 
-Anchor offerings (custom-sold; all map to `premium` in the DB with per-account overrides): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100 (launch urgency lever).
+Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
-**Trial:** auto-started on signup, **14 days, no card**. `User.trial_ends_at` field holds the expiry. `TrialBanner.tsx` shows the countdown. The actual downgrade-on-expiry mechanism is **not yet implemented** — TODO.
+**Trial:** auto-started on signup gives **PREMIUM** for 14 days, no card. At expiry, hourly worker task `_downgrade_expired_trials` drops users with no `stripe_customer_id` straight to `free` (skip the Pro middle so loss aversion bites hardest). `TrialBanner.tsx` shows the countdown.
 
 ## Pricing source-of-truth (all kept in sync as of 2026-04-26)
 - `backend/app/services/tier.py` — feature gating + caps
@@ -57,12 +57,16 @@ score = 0.25*trend + 0.20*relative_strength + 0.15*fundamentals
 ## Mock-to-real data switch
 **No env flag, no auto-switch.** Currently the worker imports `app.services.mock_feed` directly. To switch to live Polygon data: add `POLYGON_API_KEY` to `.env`, then **manually edit the imports at the top of `backend/app/workers/signal_publisher.py`** (swap `mock_feed` → `polygon_feed`) and restart the worker. See `QUICKSTART.md` lines 40–49 for the exact swap.
 
+## Universe + commodities
+Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs added 2026-04-26 with sector="Commodities" — gold, silver, oil, gas, ag, copper, uranium, miners. Polygon Starter doesn't include futures contracts, so commodity exposure is via ETFs only. Auto-discovery of new ETFs via Polygon `/v3/reference/tickers` is on the post-launch list (not wired yet).
+
 ## Known issues / partially-built
-- **CORS allows only GET/POST/DELETE** (`backend/app/main.py:59`) — PATCH/PUT requests will fail. Watchlist updates and admin tier patches likely affected. Real bug.
-- **Telegram delivery stubbed** — `backend/app/services/alerts.py:89` (`# TODO: implement telegram delivery via Bot API`).
-- **Macro indicators hardcoded** — `backend/app/services/polygon_feed.py:209-212` (DXY=103.5, 10Y=4.25, breadth=55.0).
-- **Trial expiry → downgrade** logic missing. Banner shows countdown but no code drops `tier` from `pro` to `free`.
-- **`docs/PRICING.md` stale** — see "Pricing source-of-truth conflict" above.
+- **Telegram alert-rule delivery stubbed** — `backend/app/services/alerts.py:89`. The hourly digest works (`services/telegram.py`), but per-rule alert delivery doesn't.
+- **Macro indicators hardcoded** — `backend/app/services/polygon_feed.py:209-212` (DXY, 10Y, breadth).
+- **Quiver 13F service is skeleton-only** — `backend/app/services/quiver_feed.py` has the elite-funds list + 24h cache + graceful-degradation pattern, but isn't wired into the worker or the smart_money sub-score yet. Wiring needs a new `institutional_holdings` model + Alembic migration + `/api/holdings` endpoint.
+- **Why generator is template-grade** — `mock_feed.py:_render_reason` concatenates fixed phrases. With AI-Why now commoditized (TradingView Chart Copilot March 2026), this needs sector-aware + factor-combination-aware phrasing before launch.
+- **Smoke test ordering bug** — `tests/test_smoke.py` runs `test_rate_limit_kicks_in` before `test_watchlist_requires_auth` and `test_legal_404_graceful`; the rate-limit lingers and the last two return 429 instead of 401/404. Pre-existing.
+- **Frontend has zero tests.**
 
 ## Tests
 Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backend/pytest.ini`. Run: `pytest` from `backend/`. Frontend: no tests.
@@ -80,8 +84,9 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/config.py` — every env var, Pydantic-typed
 - `backend/app/services/tier.py` — **canonical** tier gating + caps
 - `backend/app/services/auth.py` — native + Clerk JWT verification + dev-bypass
-- `backend/app/services/mock_feed.py` — fake data generator
+- `backend/app/services/mock_feed.py` — fake data generator (112 tickers incl. 32 commodity ETFs)
 - `backend/app/services/polygon_feed.py` — real Polygon adapter (stubbed in places)
+- `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (skeleton, awaits wiring)
 - `backend/app/workers/signal_publisher.py` — scoring tick worker
 - `backend/app/scripts/seed_owner.py` — creates/updates the owner account
 - `backend/alembic/versions/` — 7 migrations, run via `alembic upgrade head`

@@ -22,6 +22,7 @@ from app.models import (
     RegimeState,
     SqueezeSetup,
     Ticker,
+    User,
 )
 from app.services.mock_feed import (
     fetch_congress_trades,
@@ -41,6 +42,7 @@ _last_news_refresh: datetime | None = None
 _last_backcheck: datetime | None = None
 _last_telegram_digest: datetime | None = None
 _last_calendar_seed: datetime | None = None
+_last_trial_check: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -137,6 +139,13 @@ async def tick() -> None:
         await _run_telegram_digest()
         _last_telegram_digest = started
 
+    # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
+    # Without this the trial converts to free Premium forever (zero conversion).
+    global _last_trial_check  # noqa: PLW0603
+    if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
+        await _downgrade_expired_trials()
+        _last_trial_check = started
+
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
         "tick.done snapshots=%d squeezes=%d regime=%s trades_added=%d elapsed=%.2fs",
@@ -199,6 +208,55 @@ async def _run_telegram_digest() -> None:
             await run_hourly_digest(session)
         except Exception:
             logger.exception("telegram.hourly_digest_failed")
+
+
+async def _downgrade_expired_trials() -> None:
+    """
+    End-of-trial enforcement.
+
+    Drops `tier` to 'free' for users whose 14-day trial expired AND who
+    never added a Stripe customer (i.e. never started paying). Without
+    this the trial silently converts to free-Premium-forever, killing
+    conversion entirely.
+
+    Safe to run hourly — it's idempotent (a free user with no trial_ends_at
+    isn't matched by any of the conditions).
+    """
+    from sqlalchemy import update
+    from app.models import User as UserModel
+
+    now = datetime.now(UTC)
+    async with session_scope() as session:
+        # Find candidates first so we can log them
+        candidates = (await session.execute(
+            select(UserModel.id, UserModel.email, UserModel.tier)
+            .where(
+                UserModel.trial_ends_at.isnot(None),
+                UserModel.trial_ends_at < now,
+                UserModel.tier.in_(["pro", "premium"]),
+                UserModel.stripe_customer_id.is_(None),
+                UserModel.is_lifetime.is_(False),
+            )
+        )).all()
+
+        if not candidates:
+            return
+
+        await session.execute(
+            update(UserModel)
+            .where(
+                UserModel.trial_ends_at.isnot(None),
+                UserModel.trial_ends_at < now,
+                UserModel.tier.in_(["pro", "premium"]),
+                UserModel.stripe_customer_id.is_(None),
+                UserModel.is_lifetime.is_(False),
+            )
+            .values(tier="free")
+        )
+
+    logger.info("trial.downgraded count=%d", len(candidates))
+    for user_id, email, prev_tier in candidates[:5]:
+        logger.info("  trial.downgrade user=%s email=%s prev_tier=%s", user_id, email, prev_tier)
 
 
 async def _seed_calendar() -> None:

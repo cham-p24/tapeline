@@ -68,7 +68,7 @@ export default function ScannerPage() {
             <option value="">All sectors</option>
             {["Technology", "Financials", "Healthcare", "Energy", "Consumer Discretionary",
               "Consumer Staples", "Industrials", "Communication Services", "Utilities",
-              "Materials", "ETF"].map((s) => <option key={s} value={s}>{s}</option>)}
+              "Materials", "Commodities", "ETF"].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="card px-3 py-2">

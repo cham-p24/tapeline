@@ -4,12 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type CongressTrade } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { Paywall } from "@/components/Paywall";
 
 export default function CongressPage() {
   const [rows, setRows] = useState<CongressTrade[]>([]);
   const load = useCallback(async () => {
-    const r = await api.congress();
-    setRows(r.items);
+    try {
+      const r = await api.congress();
+      setRows(r.items);
+    } catch {
+      /* paywall hides this for non-Premium anyway */
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
@@ -24,42 +29,44 @@ export default function CongressPage() {
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
-      <div className="card mt-6 overflow-hidden">
-        <table className="w-full text-sm nums">
-          <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
-            <tr>
-              <th className="px-4 py-2 text-left">Disclosed</th>
-              <th className="px-4 py-2 text-left">Politician</th>
-              <th className="px-4 py-2 text-left">Chamber</th>
-              <th className="px-4 py-2 text-left">Ticker</th>
-              <th className="px-4 py-2 text-left">Action</th>
-              <th className="px-4 py-2 text-right">Amount</th>
-              <th className="px-4 py-2 text-left">Trade date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-b border-border/50 hover:bg-black/20">
-                <td className="px-4 py-2 text-muted">{new Date(r.disclosed_at).toLocaleString()}</td>
-                <td className="px-4 py-2 font-medium">{r.politician}
-                  <span className="ml-2 text-xs text-muted">({r.party})</span>
-                </td>
-                <td className="px-4 py-2 text-muted">{r.chamber}</td>
-                <td className="px-4 py-2 font-medium">{r.symbol}</td>
-                <td className="px-4 py-2">
-                  <span className={`rounded px-2 py-0.5 text-xs ${r.direction === "BUY" ? "bg-up/20 text-up" : "bg-down/20 text-down"}`}>
-                    {r.direction}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-right">
-                  ${compact(r.amount_min)}–${compact(r.amount_max)}
-                </td>
-                <td className="px-4 py-2 text-muted">{r.trade_date}</td>
+      <Paywall feature="congress" title="Congressional trades feed">
+        <div className="card mt-6 overflow-hidden">
+          <table className="w-full text-sm nums">
+            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+              <tr>
+                <th className="px-4 py-2 text-left">Disclosed</th>
+                <th className="px-4 py-2 text-left">Politician</th>
+                <th className="px-4 py-2 text-left">Chamber</th>
+                <th className="px-4 py-2 text-left">Ticker</th>
+                <th className="px-4 py-2 text-left">Action</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+                <th className="px-4 py-2 text-left">Trade date</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-border/50 hover:bg-black/20">
+                  <td className="px-4 py-2 text-muted">{new Date(r.disclosed_at).toLocaleString()}</td>
+                  <td className="px-4 py-2 font-medium">{r.politician}
+                    <span className="ml-2 text-xs text-muted">({r.party})</span>
+                  </td>
+                  <td className="px-4 py-2 text-muted">{r.chamber}</td>
+                  <td className="px-4 py-2 font-medium">{r.symbol}</td>
+                  <td className="px-4 py-2">
+                    <span className={`rounded px-2 py-0.5 text-xs ${r.direction === "BUY" ? "bg-up/20 text-up" : "bg-down/20 text-down"}`}>
+                      {r.direction}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    ${compact(r.amount_min)}–${compact(r.amount_max)}
+                  </td>
+                  <td className="px-4 py-2 text-muted">{r.trade_date}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Paywall>
     </div>
   );
 }

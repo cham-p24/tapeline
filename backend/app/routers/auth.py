@@ -97,7 +97,9 @@ async def signup(
         id=f"u_{uuid.uuid4().hex}",
         email=email,
         name=(body.name or "").strip() or None,
-        tier="pro",  # trialing Pro for 14 days
+        # Trial gives PREMIUM (the best tier) so loss aversion bites at expiry.
+        # On day 14 the trial-downgrade task drops un-paid users straight to FREE.
+        tier="premium",
         password_hash=pw,
         trial_ends_at=trial_ends,
         referral_code=ref_code,
