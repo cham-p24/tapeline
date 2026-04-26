@@ -14,6 +14,7 @@ const tabs = [
   { href: "/app/squeeze", label: "Squeeze" },
   { href: "/app/regime", label: "Regime" },
   { href: "/app/congress", label: "Congress" },
+  { href: "/app/holdings", label: "Holdings" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

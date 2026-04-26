@@ -146,6 +146,19 @@ async def signup(
     token = issue_session_token(user.id)
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signup user=%s referred_by=%s", user.id, referred_by_id or "none")
+
+    # Day-0 welcome email. Fire-and-forget — failures don't block signup.
+    # send_email is a no-op if RESEND_API_KEY isn't set, so this is safe in dev.
+    try:
+        from app.services.email import render_welcome_email, send_email
+        await send_email(
+            user.email,
+            "Welcome to Tapeline — your trial is live",
+            render_welcome_email(user.name or "trader"),
+        )
+    except Exception:
+        logger.exception("auth.welcome_email_failed user=%s", user.id)
+
     return {"user": _user_out(user)}
 
 

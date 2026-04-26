@@ -45,6 +45,7 @@ _last_telegram_digest: datetime | None = None
 _last_calendar_seed: datetime | None = None
 _last_trial_check: datetime | None = None
 _last_holdings_refresh: datetime | None = None
+_last_drip_check: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -115,6 +116,17 @@ async def tick() -> None:
     await broker.publish("regime_updated", regime)
     await broker.publish("squeeze_updated", {"count": len(squeezes)})
 
+    # Evaluate alert rules against the freshly-updated state.
+    # Each evaluator is debounced internally (15min), safe to run every tick.
+    async with session_scope() as alert_session:
+        try:
+            from app.services.alerts import evaluate_all_rules
+            fired = await evaluate_all_rules(alert_session)
+            if fired:
+                logger.info("alerts.fired count=%d", fired)
+        except Exception:
+            logger.exception("alerts.eval_failed")
+
     # Snapshot today's top-10 for the public scorecard (once per day)
     await _ensure_daily_scorecard(started.date())
 
@@ -154,6 +166,22 @@ async def tick() -> None:
     if _last_holdings_refresh is None or (started - _last_holdings_refresh).total_seconds() >= 86400:
         await _refresh_elite_13f()
         _last_holdings_refresh = started
+
+    # Daily trial-drip emails (day 3 / 7 / 13). Pure no-op when RESEND_API_KEY
+    # is unset — send_email returns {"skipped": True} and the dispatch loop is
+    # safe to run regardless. May double-send if worker restarts mid-day; add
+    # a User.drip_state column if that becomes a real-user complaint.
+    global _last_drip_check  # noqa: PLW0603
+    if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
+        try:
+            from app.services.email import run_daily_drip
+            async with session_scope() as drip_session:
+                counts = await run_daily_drip(drip_session)
+            if any(counts.values()):
+                logger.info("drip.sent day3=%d day7=%d day13=%d", counts["day3"], counts["day7"], counts["day13"])
+        except Exception:
+            logger.exception("drip.run_failed")
+        _last_drip_check = started
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
@@ -266,6 +294,24 @@ async def _downgrade_expired_trials() -> None:
     logger.info("trial.downgraded count=%d", len(candidates))
     for user_id, email, prev_tier in candidates[:5]:
         logger.info("  trial.downgrade user=%s email=%s prev_tier=%s", user_id, email, prev_tier)
+
+    # Send the "trial ended" soft-reengagement email to each downgraded user.
+    # No-op if Resend isn't configured.
+    try:
+        from app.services.email import render_trial_ended_email, send_email
+        # Need user names — fetch in one round-trip
+        async with session_scope() as session2:
+            for user_id, email, _prev in candidates:
+                user_r = await session2.execute(select(User).where(User.id == user_id))
+                u = user_r.scalar_one_or_none()
+                name = (u.name if u else None) or "trader"
+                await send_email(
+                    email,
+                    "Tapeline — your trial just ended",
+                    render_trial_ended_email(name),
+                )
+    except Exception:
+        logger.exception("trial.downgrade_email_failed")
 
 
 async def _refresh_elite_13f() -> None:

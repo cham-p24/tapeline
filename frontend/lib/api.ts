@@ -137,6 +137,25 @@ export type CongressTrade = {
   disclosed_at: string;
 };
 
+export type HoldingItem = {
+  id: number;
+  fund_name: string;
+  manager: string;
+  cik: string;
+  symbol: string;
+  value_usd: number;
+  shares: number;
+  percent_portfolio: number;
+  fetched_at: string;
+};
+
+export type TrackedFund = {
+  name: string;
+  manager: string;
+  cik: string;
+  slug: string;
+};
+
 async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -193,4 +212,12 @@ export const api = {
   watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
     post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),
   watchlistRemove: (id: number) => del<{ ok: boolean }>(`/api/watchlist/${id}`, DEV_TOKEN),
+  holdings: (params: { symbol?: string; fund?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.symbol) qs.set("symbol", params.symbol);
+    if (params.fund) qs.set("fund", params.fund);
+    if (params.limit) qs.set("limit", String(params.limit));
+    return getAuth<{ count: number; items: HoldingItem[] }>(`/api/holdings?${qs}`, DEV_TOKEN);
+  },
+  holdingsFunds: () => getAuth<{ items: TrackedFund[] }>("/api/holdings/funds", DEV_TOKEN),
 };
