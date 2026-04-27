@@ -46,6 +46,7 @@ _last_calendar_seed: datetime | None = None
 _last_trial_check: datetime | None = None
 _last_holdings_refresh: datetime | None = None
 _last_drip_check: datetime | None = None
+_last_universe_refresh: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -67,6 +68,15 @@ async def tick() -> None:
     squeezes = fetch_squeezes()
     regime = fetch_regime()
     new_trades = fetch_congress_trades()
+
+    # Live breadth: % of universe with sub_trend > 50 (proxy for "above
+    # the 200DMA" since the trend factor incorporates that). Replaces the
+    # last hardcoded macro indicator. Computed from the snapshots we just
+    # fetched — no extra DB round-trip.
+    trends = [s.get("sub_trend") for s in snapshots if s.get("sub_trend") is not None]
+    if trends:
+        above_mid = sum(1 for t in trends if t > 50)
+        regime["breadth_pct"] = round(100 * above_mid / len(trends), 1)
 
     async with session_scope() as session:
         # --- Update ticker snapshots (dialect-neutral upsert) ---
@@ -167,10 +177,9 @@ async def tick() -> None:
         await _refresh_elite_13f()
         _last_holdings_refresh = started
 
-    # Daily trial-drip emails (day 3 / 7 / 13). Pure no-op when RESEND_API_KEY
-    # is unset — send_email returns {"skipped": True} and the dispatch loop is
-    # safe to run regardless. May double-send if worker restarts mid-day; add
-    # a User.drip_state column if that becomes a real-user complaint.
+    # Daily trial-drip emails (day 3 / 7 / 13). Worker-restart-safe — the
+    # User.drip_state column tracks per-user per-stage delivery so the same
+    # user never receives the same drip stage twice.
     global _last_drip_check  # noqa: PLW0603
     if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
         try:
@@ -182,6 +191,17 @@ async def tick() -> None:
         except Exception:
             logger.exception("drip.run_failed")
         _last_drip_check = started
+
+    # Weekly universe refresh from Polygon's reference API.
+    # Only fires when POLYGON_API_KEY is set — discovers new IPOs and ETF
+    # listings without needing manual ticker-list maintenance.
+    global _last_universe_refresh  # noqa: PLW0603
+    if settings.polygon_api_key and (
+        _last_universe_refresh is None
+        or (started - _last_universe_refresh).total_seconds() >= 604800
+    ):
+        await _refresh_universe()
+        _last_universe_refresh = started
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
@@ -312,6 +332,31 @@ async def _downgrade_expired_trials() -> None:
                 )
     except Exception:
         logger.exception("trial.downgrade_email_failed")
+
+
+async def _refresh_universe() -> None:
+    """
+    Weekly universe refresh from Polygon /v3/reference/tickers.
+    Adds newly-listed equities + ETFs to the Ticker table; does NOT
+    delete delistings (delisted tickers just stop receiving snapshot updates).
+    """
+    from app.services.polygon_feed import discover_active_us_tickers
+
+    new_rows = await discover_active_us_tickers()
+    if not new_rows:
+        logger.info("universe.refresh_skipped reason=empty_response")
+        return
+
+    async with session_scope() as session:
+        existing_r = await session.execute(select(Ticker.symbol))
+        existing = {r[0] for r in existing_r.all()}
+        added = 0
+        for row in new_rows:
+            if row["symbol"] not in existing:
+                session.add(Ticker(**row))
+                added += 1
+
+    logger.info("universe.refreshed added=%d total_polygon=%d", added, len(new_rows))
 
 
 async def _refresh_elite_13f() -> None:

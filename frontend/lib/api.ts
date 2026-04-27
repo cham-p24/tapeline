@@ -220,4 +220,9 @@ export const api = {
     return getAuth<{ count: number; items: HoldingItem[] }>(`/api/holdings?${qs}`, DEV_TOKEN);
   },
   holdingsFunds: () => getAuth<{ items: TrackedFund[] }>("/api/holdings/funds", DEV_TOKEN),
+  roadmap: {
+    votes: () => get<{ counts: Record<string, number>; my_votes: string[] }>("/api/roadmap/votes"),
+    vote: (item_slug: string) => post<{ ok: boolean; duplicate?: boolean }>("/api/roadmap/vote", { item_slug }, DEV_TOKEN),
+    unvote: (item_slug: string) => del<{ ok: boolean }>(`/api/roadmap/vote?item_slug=${encodeURIComponent(item_slug)}`, DEV_TOKEN),
+  },
 };

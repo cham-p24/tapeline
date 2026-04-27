@@ -75,10 +75,19 @@ Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs a
 Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer); 24h cache + multi-endpoint fallback. Worker task `_refresh_elite_13f` runs daily; falls back to `mock_elite_13f_holdings()` when no `QUIVER_API_KEY`. Endpoint `/api/holdings` (Premium-only via feature `holdings.elite`). Frontend page not yet built — use existing congress page pattern for `/app/holdings` when ready.
 
 ## Known issues / partially-built
-- **Macro indicator: breadth_pct hardcoded** — `polygon_feed.py:fetch_regime` now uses FRED for DXY + 10Y + VIX (with hardcoded fallbacks if no FRED key). Breadth_pct still hardcoded at 55.0; needs constituent-walk job.
-- **Auto-discover universe via Polygon `/v3/reference/tickers`** — not wired (depends on Polygon being live).
-- **Per-rule SMS alerts** — only email + Telegram supported. SMS would need Twilio.
-- **Frontend tests are minimal** — Vitest scaffold + 4 sample tests cover Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels. Need to grow coverage.
+- **`sector_leaders` + `rate_direction` in regime are placeholders** — `polygon_feed.py:fetch_regime` returns hardcoded values for these two fields. Breadth_pct now computed live from the Ticker table (% with sub_trend > 50). DXY/10Y/VIX use FRED when configured.
+- **No `/v3/reference/tickers/{sym}` sector backfill** — universe auto-discovery from Polygon adds new tickers with `sector="Unknown"`. Worker should backfill sectors lazily for tickers users actually look at.
+- **Frontend tests cover ~6 surfaces** — Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels, BillingToggle, HoldingsPage. Grow with billing flow + alerts CRUD + scanner page next.
+- **No E2E tests** — Playwright would land later. Unit tests catch most regressions.
+
+## Notification channels
+Three delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
+- **Email** (Pro+) — Resend, no extra cost. Default channel for most rules.
+- **Telegram** (Premium) — free, hourly digest + per-rule alerts. Customer adds their chat_id at `/app/billing` (Notifications card).
+- **SMS** (Premium) — Twilio (~$0.008/msg US, more elsewhere). Customer adds their phone at `/app/billing` (SMS card). Reserve for high-conviction rules — every send is billed.
+
+## Webhook idempotency
+`stripe_webhook_events` table logs every processed event id. Replay attacks and Stripe redeliveries return `{ok: true, replay: true}` instead of double-processing. Migration 0010.
 
 ## Tests
 Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backend/pytest.ini`. Run: `pytest` from `backend/`. Frontend: no tests.
@@ -101,7 +110,9 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (wired end-to-end with mock fallback)
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
-- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress)
+- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with email + telegram + SMS delivery
+- `backend/app/services/sms.py` — Twilio SMS (no-op when not configured)
+- `backend/app/routers/roadmap.py` — public roadmap voting (Premium-gated)
 - `frontend/__tests__/` — Vitest + RTL scaffold (run `npm test` after `npm install`)
 - `backend/app/workers/signal_publisher.py` — scoring tick worker
 - `backend/app/scripts/seed_owner.py` — creates/updates the owner account

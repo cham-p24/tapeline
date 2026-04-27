@@ -249,3 +249,70 @@ def universe() -> list[dict[str, str]]:
         {"symbol": sym, "name": sym, "sector": "Unknown", "asset_class": "equity"}
         for sym in DEFAULT_UNIVERSE
     ]
+
+
+async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, str]]:
+    """
+    Walk Polygon's `/v3/reference/tickers` and return active US common stocks
+    plus ETFs, capped at `max_tickers` for sanity. Used by the worker's weekly
+    universe-refresh task to discover new IPOs and new ETF launches.
+
+    Returns rows in the same shape as `universe()` — drop-in replacement for
+    the static seed list.
+    """
+    if not settings.polygon_api_key:
+        return []
+
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        next_url: str | None = f"{BASE_URL}/v3/reference/tickers"
+        params: dict[str, Any] | None = {
+            "market": "stocks",
+            "active": "true",
+            "limit": 1000,
+            "apiKey": settings.polygon_api_key,
+        }
+        while next_url and len(rows) < max_tickers:
+            try:
+                r = await client.get(next_url, params=params)
+                r.raise_for_status()
+                data = r.json()
+            except (httpx.HTTPError, ValueError):
+                logger.exception("polygon.reference_tickers_failed url=%s", next_url)
+                break
+
+            for t in data.get("results", []):
+                ttype = t.get("type") or ""
+                # CS = Common Stock, ETF = exchange-traded fund. Skip warrants,
+                # rights, units, OTC, etc. — we don't score those.
+                if ttype not in ("CS", "ETF"):
+                    continue
+                sym = (t.get("ticker") or "").upper()
+                if not sym or sym in seen:
+                    continue
+                seen.add(sym)
+                rows.append({
+                    "symbol": sym,
+                    "name": t.get("name") or sym,
+                    # Sector requires a per-ticker /v3/reference/tickers/{sym}
+                    # call — too rate-limited on Starter to do for every name.
+                    # Worker can backfill sectors lazily for tickers users actually look at.
+                    "sector": "Unknown",
+                    "asset_class": "etf" if ttype == "ETF" else "equity",
+                })
+
+            cursor = data.get("next_url")
+            # Polygon's next_url omits the apiKey — re-add it
+            if cursor:
+                if "apiKey=" not in cursor:
+                    sep = "&" if "?" in cursor else "?"
+                    cursor = f"{cursor}{sep}apiKey={settings.polygon_api_key}"
+                next_url = cursor
+                params = None  # next_url already encodes everything
+            else:
+                next_url = None
+
+    logger.info("polygon.universe_discovered count=%d", len(rows))
+    return rows

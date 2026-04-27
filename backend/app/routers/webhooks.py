@@ -11,7 +11,7 @@ from svix.webhooks import Webhook, WebhookVerificationError
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import Subscription, User
+from app.models import StripeWebhookEvent, Subscription, User
 from app.services.billing import parse_webhook, subscription_payload
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,18 @@ async def stripe_webhook(
     evt_type = event["type"]
     obj = event["data"]["object"]
 
+    # Idempotency: Stripe redelivers events on our 5xx, and a leaked signing
+    # secret would let attackers replay events. Both are blocked by checking
+    # the event id against our processed-events log.
+    event_id = event.get("id")
+    if event_id:
+        existing = await session.execute(
+            select(StripeWebhookEvent).where(StripeWebhookEvent.id == event_id)
+        )
+        if existing.scalar_one_or_none() is not None:
+            logger.info("stripe.webhook_replay event=%s type=%s", event_id, evt_type)
+            return {"ok": True, "replay": True}
+
     if evt_type == "checkout.session.completed":
         user_id = obj.get("client_reference_id")
         customer_id = obj.get("customer")
@@ -134,5 +146,14 @@ async def stripe_webhook(
             user.tier = "free"
             await session.commit()
             logger.info("stripe.subscription_cancelled user=%s", user.id)
+
+    # Mark event as processed so the next delivery is treated as a replay
+    if event_id:
+        try:
+            session.add(StripeWebhookEvent(id=event_id, event_type=evt_type))
+            await session.commit()
+        except Exception:
+            # Concurrent delivery already inserted it — fine
+            await session.rollback()
 
     return {"ok": True}

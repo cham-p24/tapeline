@@ -25,6 +25,7 @@ from app.routers import (
     news,
     oauth,
     regime,
+    roadmap,
     scanner,
     scorecard,
     squeeze,
@@ -117,3 +118,4 @@ from app.routers import referrals  # noqa: E402
 app.include_router(referrals.router, prefix="/api/referrals", tags=["referrals"])
 from app.routers import usage  # noqa: E402
 app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
+app.include_router(roadmap.router, prefix="/api/roadmap", tags=["roadmap"])

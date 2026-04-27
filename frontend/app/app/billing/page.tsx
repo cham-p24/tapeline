@@ -150,13 +150,16 @@ export default function BillingPage() {
         />
       </div>
 
-      {/* Notifications — Telegram chat-id management. Paywalled to Premium. */}
+      {/* Notifications — Telegram + SMS. Both paywalled to Premium. */}
       <h2 className="mt-12 text-xl font-semibold">Notifications</h2>
-      <p className="mt-2 text-sm text-muted">Receive watchlist alerts and the hourly market digest on Telegram.</p>
+      <p className="mt-2 text-sm text-muted">Receive watchlist alerts, the hourly market digest, and per-rule alerts.</p>
 
-      <div className="mt-6">
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Paywall feature="alerts.telegram" title="Telegram alerts">
           <NotificationsCard />
+        </Paywall>
+        <Paywall feature="alerts.sms" title="SMS alerts">
+          <SMSCard />
         </Paywall>
       </div>
 
@@ -261,6 +264,124 @@ function NotificationsCard() {
           className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy === "test" ? "Sending…" : "Send test message"}
+        </button>
+        {connected && (
+          <button
+            onClick={clear}
+            disabled={busy !== null}
+            className="btn-ghost text-sm text-down hover:text-down disabled:opacity-50"
+          >
+            {busy === "clear" ? "Disconnecting…" : "Disconnect"}
+          </button>
+        )}
+      </div>
+
+      {msg && (
+        <div className={`mt-4 rounded-md border p-3 text-sm ${
+          msg.kind === "ok"
+            ? "border-up/30 bg-up/5 text-up"
+            : "border-down/30 bg-down/5 text-down"
+        }`}>
+          {msg.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SMSCard() {
+  const { user, refresh } = useUser();
+  const [phone, setPhone] = useState((user as any)?.phone_number ?? "");
+  const [busy, setBusy] = useState<"save" | "test" | "clear" | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  async function save() {
+    setBusy("save"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/phone`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone_number: phone.trim() }),
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.detail || `Save failed (${r.status})`);
+      setMsg({ kind: "ok", text: `Saved as ${body.phone_number}. Hit Test to verify.` });
+      await refresh();
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
+
+  async function test() {
+    setBusy("test"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/phone/test`, {
+        method: "POST", credentials: "include",
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.detail || `Test failed (${r.status})`);
+      setMsg({ kind: "ok", text: "Sent. Check your phone." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
+
+  async function clear() {
+    setBusy("clear"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/phone`, {
+        method: "DELETE", credentials: "include",
+      });
+      if (!r.ok) throw new Error("Disconnect failed");
+      setPhone("");
+      setMsg({ kind: "ok", text: "Disconnected. SMS alerts off." });
+      await refresh();
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
+
+  const connected = !!(user as any)?.phone_number;
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">SMS</h3>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${connected ? "bg-up/10 text-up" : "bg-muted/20 text-muted"}`}>
+          {connected ? "Connected" : "Not connected"}
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-xs font-medium text-muted">Phone number (E.164)</label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="+1 555 123 4567"
+          className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums"
+        />
+        <p className="mt-2 text-xs text-subtle">
+          Twilio-delivered. Reserve SMS for high-conviction rules — every message is billed
+          (~$0.008 US, more elsewhere). Email and Telegram are free per-message.
+        </p>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          onClick={save}
+          disabled={busy !== null || !phone.trim() || phone.trim() === (user as any)?.phone_number}
+          className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "save" ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={test}
+          disabled={busy !== null || !connected}
+          className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "test" ? "Sending…" : "Send test SMS"}
         </button>
         {connected && (
           <button

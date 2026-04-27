@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 export const metadata: Metadata = {
   title: {
@@ -38,6 +41,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <UserProvider>{children}</UserProvider>
+        {/* Cloudflare Turnstile — only loaded when a site key is configured.
+            The widget is rendered by the signup form (and any other gated form)
+            via <div className="cf-turnstile">. The script self-discovers them. */}
+        {TURNSTILE_SITE_KEY && (
+          <Script
+            src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+            strategy="afterInteractive"
+            async
+            defer
+          />
+        )}
       </body>
     </html>
   );

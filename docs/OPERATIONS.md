@@ -98,6 +98,25 @@ worker's daily task once Resend is live. No additional wiring needed.
 4. Test: sign in as a Premium user, go to `/app/billing` → Notifications card,
    paste your own chat_id (DM `/start` to your bot, it'll reply with your numeric id), hit "Save" then "Send test message"
 
+### Step 5a — Twilio SMS (Optional, ~$0.008/msg US, 15 minutes)
+
+Skip this if you don't want SMS as a third alert channel. Email + Telegram cover most use cases.
+
+1. Sign up at https://www.twilio.com (free trial gives ~$15 credit)
+2. Buy a phone number (~$1.15/mo for a US number)
+3. Get the Account SID + Auth Token from the dashboard
+4. Paste into `.env`:
+   ```
+   TWILIO_ACCOUNT_SID=AC...
+   TWILIO_AUTH_TOKEN=...
+   TWILIO_FROM_NUMBER=+15551234567
+   ```
+5. Test: sign in as a Premium user, go to `/app/billing` → SMS card, enter your number, hit "Save" then "Send test SMS"
+
+**Cost discipline**: SMS rules should be reserved for high-conviction events
+(HIGH CONVICTION crossings, regime flips, big congress trades). Don't enable
+SMS on a high-frequency rule — every message is billed.
+
 ### Step 6 — Quiver QuantData (Free tier, 5 minutes)
 
 1. Sign up at https://api.quiverquant.com/

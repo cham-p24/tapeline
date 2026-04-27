@@ -41,8 +41,9 @@ FEATURES: dict[str, Tier] = {
     # Premium-only features
     "congress.feed": Tier.PREMIUM,
     "alerts.telegram": Tier.PREMIUM,
+    "alerts.sms": Tier.PREMIUM,       # Twilio SMS delivery
     "api.access": Tier.PREMIUM,
-    "holdings.elite": Tier.PREMIUM,  # Quiver elite-fund 13F holdings
+    "holdings.elite": Tier.PREMIUM,   # Quiver elite-fund 13F holdings
 }
 
 

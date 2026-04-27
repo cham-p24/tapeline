@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     # ---- Telegram ----
     telegram_bot_token: str = ""
 
+    # ---- SMS (Twilio, optional) ----
+    # Without Twilio configured, the SMS alert channel is a no-op (alerts
+    # configured for SMS log a "skipped" line and don't deliver).
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+
     # ---- Quiver QuantData (elite 13F holdings + Congress) ----
     # Free tier available; without a key, smart-money enrichment falls back to mock.
     quiver_api_key: str = ""

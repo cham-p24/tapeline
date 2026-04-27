@@ -248,6 +248,15 @@ async def _fire(
             event.delivered = ok
         except Exception:
             logger.exception("alert.telegram_failed user=%s rule=%s", user.id, rule.id)
+    elif rule.channel == "sms" and user.phone_number:
+        try:
+            from app.services.sms import send_sms
+            # SMS char limit + cost — keep terse
+            text = f"Tapeline {rule.name}: {message}"
+            ok = await send_sms(user.phone_number, text)
+            event.delivered = ok
+        except Exception:
+            logger.exception("alert.sms_failed user=%s rule=%s", user.id, rule.id)
 
     logger.info(
         "alert.fired user=%s rule=%s type=%s symbol=%s channel=%s delivered=%s",

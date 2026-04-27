@@ -2,9 +2,17 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authApi } from "@/lib/auth";
 import { OAuthButtons } from "@/components/OAuthButtons";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+declare global {
+  interface Window {
+    onTapelineTurnstile?: (token: string) => void;
+  }
+}
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -16,16 +24,34 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   // Honeypot — bots fill this, humans never see it. Submitted as `company`.
   const [honeypot, setHoneypot] = useState("");
+  // Turnstile token — populated by Cloudflare's widget callback. Empty until solved.
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const turnstileRef = useRef<HTMLDivElement | null>(null);
+
+  // Bridge Cloudflare's data-callback into React state. The widget calls
+  // window.onTapelineTurnstile(token) when the user solves the challenge.
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return;
+    window.onTapelineTurnstile = (token: string) => setTurnstileToken(token);
+    return () => { delete window.onTapelineTurnstile; };
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     if (password.length < 8) { setErr("Password must be at least 8 characters."); return; }
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setErr("Please complete the bot check above.");
+      return;
+    }
     setBusy(true);
     try {
-      await authApi.signup(email, password, name, { company: honeypot });
+      await authApi.signup(email, password, name, {
+        company: honeypot,
+        turnstile_token: turnstileToken || undefined,
+      });
       router.push(next);
       router.refresh();
     } catch (e: any) {
@@ -67,6 +93,19 @@ export default function SignUpPage() {
             <Field label="Name" type="text" autoComplete="name" value={name} onChange={setName} />
             <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
             <Field label="Password" type="password" autoComplete="new-password" value={password} onChange={setPassword} required minLength={8} hint="At least 8 characters" />
+
+            {/* Cloudflare Turnstile widget — auto-rendered by the script tag in
+                root layout. data-callback names a window function that receives
+                the token. Hidden entirely if no site key is configured. */}
+            {TURNSTILE_SITE_KEY && (
+              <div
+                ref={turnstileRef}
+                className="cf-turnstile"
+                data-sitekey={TURNSTILE_SITE_KEY}
+                data-callback="onTapelineTurnstile"
+                data-theme="dark"
+              />
+            )}
 
             {err && (
               <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
