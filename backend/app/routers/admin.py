@@ -1,9 +1,10 @@
-"""Admin-only endpoints: tier adjustments, user lookup."""
+"""Admin-only endpoints: tier adjustments, user lookup, expiring trials."""
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,13 +44,74 @@ class TierPatch(BaseModel):
 async def list_users(
     _: None = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
-    limit: int = 50,
+    limit: int = 100,
 ) -> dict:
-    result = await session.execute(select(User).limit(limit))
+    result = await session.execute(
+        select(User).order_by(User.created_at.desc()).limit(limit)
+    )
+    users = result.scalars().all()
+    now = datetime.now(UTC)
+    return {
+        "count": len(users),
+        "items": [{
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "tier": u.tier,
+            "is_admin": u.is_admin,
+            "is_lifetime": u.is_lifetime,
+            "trial_ends_at": u.trial_ends_at.isoformat() if u.trial_ends_at else None,
+            "trial_days_left": (
+                max(0, (u.trial_ends_at - now).days) if u.trial_ends_at and u.trial_ends_at > now
+                else None
+            ),
+            "has_stripe": bool(u.stripe_customer_id),
+            "has_telegram": bool(u.telegram_chat_id),
+            "drip_state": u.drip_state,
+            "created_at": u.created_at.isoformat(),
+        } for u in users],
+    }
+
+
+@router.get("/users/expiring")
+async def list_expiring_trials(
+    _: None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+    days: int = Query(7, ge=1, le=30, description="Look-ahead window"),
+) -> dict:
+    """
+    Users on a paid tier whose trial expires within `days` days AND who haven't
+    added a card. These are the conversion-priority users — manual outreach
+    here moves the needle the most in the first 100 customers.
+    """
+    now = datetime.now(UTC)
+    cutoff = now + timedelta(days=days)
+    result = await session.execute(
+        select(User)
+        .where(
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at >= now,
+            User.trial_ends_at < cutoff,
+            User.tier.in_(["pro", "premium"]),
+            User.stripe_customer_id.is_(None),
+            User.is_lifetime.is_(False),
+        )
+        .order_by(User.trial_ends_at)
+    )
     users = result.scalars().all()
     return {
         "count": len(users),
-        "items": [{"id": u.id, "email": u.email, "tier": u.tier, "created_at": u.created_at.isoformat()} for u in users],
+        "window_days": days,
+        "items": [{
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "tier": u.tier,
+            "trial_ends_at": u.trial_ends_at.isoformat(),
+            "days_left": (u.trial_ends_at - now).days,
+            "drip_state": u.drip_state,
+            "has_telegram": bool(u.telegram_chat_id),
+        } for u in users],
     }
 
 
@@ -77,6 +139,7 @@ async def platform_stats(
     _: None = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    now = datetime.now(UTC)
     users_total = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
     pro_count = (await session.execute(select(func.count()).select_from(User).where(User.tier == "pro"))).scalar() or 0
     premium_count = (await session.execute(select(func.count()).select_from(User).where(User.tier == "premium"))).scalar() or 0
@@ -86,10 +149,31 @@ async def platform_stats(
     alerts_delivered = (await session.execute(
         select(func.count()).select_from(AlertEvent).where(AlertEvent.delivered.is_(True))
     )).scalar() or 0
+
+    # Trial cohort visibility — who's at conversion risk
+    trials_active = (await session.execute(
+        select(func.count()).select_from(User).where(
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at >= now,
+            User.tier.in_(["pro", "premium"]),
+            User.stripe_customer_id.is_(None),
+        )
+    )).scalar() or 0
+    trials_expiring_7d = (await session.execute(
+        select(func.count()).select_from(User).where(
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at >= now,
+            User.trial_ends_at < now + timedelta(days=7),
+            User.tier.in_(["pro", "premium"]),
+            User.stripe_customer_id.is_(None),
+        )
+    )).scalar() or 0
     return {
         "users_total": users_total,
         "users_pro": pro_count,
         "users_premium": premium_count,
+        "trials_active": trials_active,
+        "trials_expiring_7d": trials_expiring_7d,
         "active_subscriptions": active_subs,
         "alerts_delivered": alerts_delivered,
         "mrr_usd": pro_count * 29 + premium_count * 49,

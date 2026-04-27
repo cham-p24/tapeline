@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_pro_monthly: str = ""
+    stripe_price_pro_annual: str = ""
     stripe_price_premium_monthly: str = ""
+    stripe_price_premium_annual: str = ""
 
     # ---- Email (Resend) ----
     resend_api_key: str = ""
@@ -70,6 +72,11 @@ class Settings(BaseSettings):
     # Honeypot field + disposable-email block always run regardless.
     cloudflare_turnstile_site_key: str = ""
     cloudflare_turnstile_secret_key: str = ""
+
+    # ---- FRED (Federal Reserve Economic Data) — free macro indicators ----
+    # Free key at https://fred.stlouisfed.org/docs/api/api_key.html
+    # Without a key, fetch_regime falls back to polygon-only / hardcoded values.
+    fred_api_key: str = ""
 
     # ---- Worker cadence ----
     score_refresh_seconds: int = 60

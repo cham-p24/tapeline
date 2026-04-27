@@ -199,13 +199,17 @@ def render_trial_ended_email(user_name: str) -> str:
 
 async def run_daily_drip(session) -> dict[str, int]:
     """
-    Send the day-3, day-7, day-13 emails to users whose trial-end date
-    matches the corresponding window. Returns counts per stage.
+    Send day-3 / day-7 / day-13 trial emails. Returns per-stage counts.
 
-    Day calculation: trial is 14 days, so:
-      - Day 3 email: trial_ends_at is between (now+10d, now+11d)
-      - Day 7 email: trial_ends_at is between (now+6d,  now+7d)
-      - Day 13 email: trial_ends_at is between (now+0d, now+1d)
+    Dedup mechanism: each user has a `drip_state` string of comma-separated
+    day tokens already sent ("3,7,13"). We skip a user if their token is
+    already in their drip_state, and append it after a successful send.
+    Worker restarts within the same day no longer double-send.
+
+    Day calculation (14-day trial):
+      - Day 3 email:  trial_ends_at is between (now+10d, now+11d)
+      - Day 7 email:  trial_ends_at is between (now+6d,  now+7d)
+      - Day 13 email: trial_ends_at is between (now+0d,  now+1d)
     """
     from datetime import UTC, datetime, timedelta
     from sqlalchemy import select
@@ -215,11 +219,15 @@ async def run_daily_drip(session) -> dict[str, int]:
     counts = {"day3": 0, "day7": 0, "day13": 0}
 
     windows = [
-        ("day3",  now + timedelta(days=10), now + timedelta(days=11), render_trial_day3_email),
-        ("day7",  now + timedelta(days=6),  now + timedelta(days=7),  render_trial_day7_email),
-        ("day13", now,                       now + timedelta(days=1),  render_trial_day13_email),
+        ("3",  "day3",  now + timedelta(days=10), now + timedelta(days=11),
+         render_trial_day3_email,  "Tapeline — three days in"),
+        ("7",  "day7",  now + timedelta(days=6),  now + timedelta(days=7),
+         render_trial_day7_email,  "Tapeline — halfway through your trial"),
+        ("13", "day13", now,                       now + timedelta(days=1),
+         render_trial_day13_email, "Tapeline — your trial ends tomorrow"),
     ]
-    for label, lower, upper, renderer in windows:
+    any_sent = False
+    for token, label, lower, upper, renderer, subject in windows:
         result = await session.execute(
             select(User).where(
                 User.trial_ends_at.isnot(None),
@@ -231,16 +239,20 @@ async def run_daily_drip(session) -> dict[str, int]:
         )
         users = result.scalars().all()
         for user in users:
-            html = renderer(user.name or "trader")
-            subject_map = {
-                "day3":  "Tapeline — three days in",
-                "day7":  "Tapeline — halfway through your trial",
-                "day13": "Tapeline — your trial ends tomorrow",
-            }
+            sent_tokens = set((user.drip_state or "").split(",")) - {""}
+            if token in sent_tokens:
+                continue  # already sent this stage to this user
             try:
-                await send_email(user.email, subject_map[label], html)
-                counts[label] += 1
+                res = await send_email(user.email, subject, renderer(user.name or "trader"))
+                # Only mark as sent if Resend actually delivered (not skipped)
+                if not res.get("skipped", False):
+                    sent_tokens.add(token)
+                    user.drip_state = ",".join(sorted(sent_tokens))
+                    counts[label] += 1
+                    any_sent = True
             except Exception:
                 logger.exception("drip.send_failed user=%s stage=%s", user.id, label)
 
+    if any_sent:
+        await session.commit()
     return counts

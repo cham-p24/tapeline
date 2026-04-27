@@ -18,10 +18,10 @@ if settings.stripe_secret_key:
 
 
 def _tier_from_price(price_id: str) -> str:
-    """Map Stripe price ID to Tapeline tier."""
-    if price_id == settings.stripe_price_pro_monthly:
+    """Map Stripe price ID to Tapeline tier (handles both monthly + annual)."""
+    if price_id in (settings.stripe_price_pro_monthly, settings.stripe_price_pro_annual):
         return "pro"
-    if price_id == settings.stripe_price_premium_monthly:
+    if price_id in (settings.stripe_price_premium_monthly, settings.stripe_price_premium_annual):
         return "premium"
     return "free"
 
@@ -30,17 +30,27 @@ async def create_checkout_session(
     user_id: str,
     user_email: str,
     tier: str,
+    billing_period: str,
     success_url: str,
     cancel_url: str,
 ) -> str:
-    """Create a Stripe Checkout session and return the URL."""
-    price_id = (
-        settings.stripe_price_pro_monthly if tier == "pro"
-        else settings.stripe_price_premium_monthly if tier == "premium"
-        else None
-    )
+    """Create a Stripe Checkout session and return the URL.
+
+    `tier` is "pro" or "premium"; `billing_period` is "monthly" or "annual".
+    """
+    price_map = {
+        ("pro", "monthly"):     settings.stripe_price_pro_monthly,
+        ("pro", "annual"):      settings.stripe_price_pro_annual,
+        ("premium", "monthly"): settings.stripe_price_premium_monthly,
+        ("premium", "annual"):  settings.stripe_price_premium_annual,
+    }
+    price_id = price_map.get((tier, billing_period))
     if not price_id:
-        raise HTTPException(400, f"Unknown tier: {tier}")
+        raise HTTPException(
+            400,
+            f"No Stripe Price ID configured for {tier}/{billing_period}. "
+            f"Set STRIPE_PRICE_{tier.upper()}_{billing_period.upper()} in .env.",
+        )
 
     try:
         session = stripe.checkout.Session.create(
@@ -51,7 +61,7 @@ async def create_checkout_session(
             client_reference_id=user_id,
             success_url=success_url,
             cancel_url=cancel_url,
-            subscription_data={"metadata": {"user_id": user_id, "tier": tier}},
+            subscription_data={"metadata": {"user_id": user_id, "tier": tier, "billing_period": billing_period}},
             allow_promotion_codes=True,
         )
         return session.url  # type: ignore[return-value]

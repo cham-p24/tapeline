@@ -75,10 +75,10 @@ Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs a
 Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer); 24h cache + multi-endpoint fallback. Worker task `_refresh_elite_13f` runs daily; falls back to `mock_elite_13f_holdings()` when no `QUIVER_API_KEY`. Endpoint `/api/holdings` (Premium-only via feature `holdings.elite`). Frontend page not yet built — use existing congress page pattern for `/app/holdings` when ready.
 
 ## Known issues / partially-built
-- **Telegram alert-rule delivery stubbed** — `backend/app/services/alerts.py:89`. The hourly digest works (`services/telegram.py`), but per-rule alert delivery doesn't.
-- **Macro indicators hardcoded** — `backend/app/services/polygon_feed.py:209-212` (DXY, 10Y, breadth).
-- **No `/app/holdings` frontend page yet** — the `/api/holdings` endpoint works but no UI. Build using the congress page paywall pattern.
-- **Frontend has zero tests.**
+- **Macro indicator: breadth_pct hardcoded** — `polygon_feed.py:fetch_regime` now uses FRED for DXY + 10Y + VIX (with hardcoded fallbacks if no FRED key). Breadth_pct still hardcoded at 55.0; needs constituent-walk job.
+- **Auto-discover universe via Polygon `/v3/reference/tickers`** — not wired (depends on Polygon being live).
+- **Per-rule SMS alerts** — only email + Telegram supported. SMS would need Twilio.
+- **Frontend tests are minimal** — Vitest scaffold + 4 sample tests cover Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels. Need to grow coverage.
 
 ## Tests
 Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backend/pytest.ini`. Run: `pytest` from `backend/`. Frontend: no tests.
@@ -100,6 +100,9 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/polygon_feed.py` — real Polygon adapter (stubbed in places)
 - `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (wired end-to-end with mock fallback)
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
+- `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
+- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress)
+- `frontend/__tests__/` — Vitest + RTL scaffold (run `npm test` after `npm install`)
 - `backend/app/workers/signal_publisher.py` — scoring tick worker
 - `backend/app/scripts/seed_owner.py` — creates/updates the owner account
 - `backend/alembic/versions/` — 7 migrations, run via `alembic upgrade head`
@@ -112,16 +115,19 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `docs/DATA_SOURCES.md` — what's licensed vs not
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
-1. Init git repo and push to GitHub (no version control today)
-2. Register `tapeline.io` domain at Cloudflare (~$35/yr)
-3. Polygon.io Starter ($29/mo) → key in `.env`
-4. Stripe account → secret/publishable/webhook keys + create Pro $29 Price
-5. Resend account → API key
-6. Clerk (optional, native auth works without it) — for OAuth
-7. Google + Microsoft OAuth client IDs — buttons auto-appear when env vars set
-8. Telegram bot via BotFather → activates hourly digest
-9. Fly.io + Vercel accounts → `fly deploy` / `vercel`
-10. Update `docs/PRICING.md` to match the Simple model
+Full step-by-step in `docs/OPERATIONS.md`. Short list:
+1. Push the git repo to GitHub (init done, no remote yet)
+2. Register `tapeline.io` at Cloudflare (~$35/yr) + Turnstile keys
+3. Polygon.io Starter ($29/mo) → key in `.env` + manual import swap in `signal_publisher.py`
+4. Stripe account → 4 Price IDs (Pro/Premium × monthly/annual) + webhook secret
+5. Resend → API key (activates: alerts, welcome, day-3/7/13 drip, trial-ended)
+6. Telegram BotFather → `@TapelineBot` (activates customer Notifications card)
+7. Quiver QuantData free key (activates real 13F holdings)
+8. FRED API free key (activates live DXY / 10Y / VIX in regime endpoint)
+9. Google + Microsoft OAuth client IDs (buttons auto-appear when env vars set)
+10. Fly.io + Vercel deploy
+11. Postgres (Supabase Pro $25/mo or Neon $19/mo) for prod DB
+12. Lawyer consult — Holley Nethercote Melbourne ($400-800)
 
 ## Communication style
 - The user prefers tight, factual responses over long narration.

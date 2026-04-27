@@ -118,6 +118,8 @@ export default function LandingPage() {
               <Link href="/how-it-works" className="hover:text-fg">How it works</Link>
               <Link href="/pricing" className="hover:text-fg">Pricing</Link>
               <Link href="/scorecard" className="hover:text-fg">Scorecard</Link>
+              <Link href="/changelog" className="hover:text-fg">Changelog</Link>
+              <Link href="/roadmap" className="hover:text-fg">Roadmap</Link>
               <Link href="/legal/terms" className="hover:text-fg">Terms</Link>
               <Link href="/legal/privacy" className="hover:text-fg">Privacy</Link>
               <Link href="/legal/risk" className="hover:text-fg">Risk</Link>

@@ -6,10 +6,24 @@ import { useUser } from "@/components/UserContext";
 
 type Stats = {
   users_total: number; users_pro: number; users_premium: number;
+  trials_active: number; trials_expiring_7d: number;
   active_subscriptions: number; alerts_delivered: number; mrr_usd: number;
 };
 
-type UserRow = { id: string; email: string; tier: string; created_at: string };
+type UserRow = {
+  id: string; email: string; name: string | null; tier: string;
+  is_admin: boolean; is_lifetime: boolean;
+  trial_ends_at: string | null; trial_days_left: number | null;
+  has_stripe: boolean; has_telegram: boolean;
+  drip_state: string;
+  created_at: string;
+};
+
+type ExpiringRow = {
+  id: string; email: string; name: string | null; tier: string;
+  trial_ends_at: string; days_left: number;
+  drip_state: string; has_telegram: boolean;
+};
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -34,16 +48,17 @@ export default function AdminPage() {
   const { user, loading } = useUser();
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [expiring, setExpiring] = useState<ExpiringRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push("/signin?next=/app/admin"); return; }
-    // Backend returns 401 if not admin — catch and show a message
     Promise.all([
       adminGet<Stats>("/api/admin/stats"),
       adminGet<{ items: UserRow[] }>("/api/admin/users"),
-    ]).then(([s, u]) => { setStats(s); setUsers(u.items); })
+      adminGet<{ items: ExpiringRow[] }>("/api/admin/users/expiring?days=7"),
+    ]).then(([s, u, e]) => { setStats(s); setUsers(u.items); setExpiring(e.items); })
       .catch((e) => setErr(e.message));
   }, [user, loading, router]);
 
@@ -71,24 +86,65 @@ export default function AdminPage() {
       <p className="text-sm text-muted">Owner-only operational dashboard.</p>
 
       {stats && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Users (total)" value={String(stats.users_total)} />
+        <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-8">
+          <Stat label="Users" value={String(stats.users_total)} />
           <Stat label="Pro" value={String(stats.users_pro)} />
-          <Stat label="Premium" value={String(stats.users_premium)} />
+          <Stat label="Premium" value={String(stats.users_premium)} tone="up" />
           <Stat label="Active subs" value={String(stats.active_subscriptions)} />
+          <Stat label="Trials active" value={String(stats.trials_active)} tone="accent" />
+          <Stat label="Trials end ≤7d" value={String(stats.trials_expiring_7d)} tone={stats.trials_expiring_7d > 0 ? "warn" : undefined} />
           <Stat label="Alerts sent" value={String(stats.alerts_delivered)} />
           <Stat label="MRR (est)" value={`$${stats.mrr_usd}`} tone="up" />
         </div>
       )}
 
-      <h2 className="mt-10 text-xl font-semibold">Users</h2>
+      {/* Conversion-priority users */}
+      {expiring.length > 0 && (
+        <>
+          <h2 className="mt-10 text-xl font-semibold">Trials expiring in next 7 days</h2>
+          <p className="text-xs text-muted">No card on file. These are the highest-leverage outreach targets in the first 100 customers.</p>
+          <div className="card mt-4 overflow-x-auto border-yellow-500/30">
+            <table className="w-full text-sm nums">
+              <thead className="border-b border-border bg-yellow-500/5 text-xs uppercase text-muted">
+                <tr>
+                  <th className="px-4 py-2 text-left">Email</th>
+                  <th className="px-4 py-2 text-left">Name</th>
+                  <th className="px-4 py-2 text-left">Tier</th>
+                  <th className="px-4 py-2 text-right">Days left</th>
+                  <th className="px-4 py-2 text-left">Drip sent</th>
+                  <th className="px-4 py-2 text-center">Telegram?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiring.map((u) => (
+                  <tr key={u.id} className="border-b border-border/50">
+                    <td className="px-4 py-2 font-medium">{u.email}</td>
+                    <td className="px-4 py-2 text-muted">{u.name || "—"}</td>
+                    <td className="px-4 py-2"><TierBadge tier={u.tier} /></td>
+                    <td className={`px-4 py-2 text-right font-semibold ${u.days_left <= 1 ? "text-down" : u.days_left <= 3 ? "text-yellow-400" : ""}`}>
+                      {u.days_left}d
+                    </td>
+                    <td className="px-4 py-2 text-xs text-muted nums">{u.drip_state || "—"}</td>
+                    <td className="px-4 py-2 text-center">{u.has_telegram ? "✓" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <h2 className="mt-10 text-xl font-semibold">All users</h2>
       <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-sm nums">
           <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Email</th>
-              <th className="px-4 py-2 text-left">User ID</th>
+              <th className="px-4 py-2 text-left">Name</th>
               <th className="px-4 py-2 text-left">Tier</th>
+              <th className="px-4 py-2 text-right">Trial</th>
+              <th className="px-4 py-2 text-center">Card</th>
+              <th className="px-4 py-2 text-center">TG</th>
               <th className="px-4 py-2 text-left">Created</th>
               <th className="px-4 py-2 text-right">Actions</th>
             </tr>
@@ -96,9 +152,20 @@ export default function AdminPage() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-b border-border/50 hover:bg-black/20">
-                <td className="px-4 py-2 font-medium">{u.email}</td>
-                <td className="px-4 py-2 text-muted text-xs font-mono">{u.id}</td>
-                <td className="px-4 py-2"><span className="rounded bg-panel px-2 py-0.5 text-xs uppercase">{u.tier}</span></td>
+                <td className="px-4 py-2 font-medium">
+                  {u.email}
+                  {u.is_admin && <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] uppercase text-accent">admin</span>}
+                  {u.is_lifetime && <span className="ml-2 rounded bg-up/20 px-1.5 py-0.5 text-[10px] uppercase text-up">lifetime</span>}
+                </td>
+                <td className="px-4 py-2 text-muted">{u.name || "—"}</td>
+                <td className="px-4 py-2"><TierBadge tier={u.tier} /></td>
+                <td className="px-4 py-2 text-right text-xs">
+                  {u.trial_days_left !== null
+                    ? <span className={u.trial_days_left <= 1 ? "text-down" : u.trial_days_left <= 3 ? "text-yellow-400" : "text-muted"}>{u.trial_days_left}d</span>
+                    : <span className="text-subtle">—</span>}
+                </td>
+                <td className="px-4 py-2 text-center text-xs">{u.has_stripe ? "✓" : "—"}</td>
+                <td className="px-4 py-2 text-center text-xs">{u.has_telegram ? "✓" : "—"}</td>
                 <td className="px-4 py-2 text-xs text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
                 <td className="px-4 py-2 text-right">
                   <select
@@ -120,11 +187,24 @@ export default function AdminPage() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "accent" | "warn" }) {
+  const cls =
+    tone === "up" ? "text-up"
+    : tone === "accent" ? "text-accent"
+    : tone === "warn" ? "text-yellow-400"
+    : "";
   return (
     <div className="card p-4">
       <div className="text-xs uppercase text-muted">{label}</div>
-      <div className={`mt-1 text-2xl font-bold nums ${tone === "up" ? "text-up" : ""}`}>{value}</div>
+      <div className={`mt-1 text-2xl font-bold nums ${cls}`}>{value}</div>
     </div>
   );
+}
+
+function TierBadge({ tier }: { tier: string }) {
+  const cls =
+    tier === "premium" ? "bg-accent/20 text-accent"
+    : tier === "pro" ? "bg-up/20 text-up"
+    : "bg-panel text-muted";
+  return <span className={`rounded px-2 py-0.5 text-xs uppercase ${cls}`}>{tier}</span>;
 }

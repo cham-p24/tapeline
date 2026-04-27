@@ -37,6 +37,12 @@ class User(Base):
 
     stripe_customer_id: Mapped[str | None] = mapped_column(String(60), nullable=True, unique=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    # Drip-email dedupe — comma-separated day tokens already sent ("3,7,13,end").
+    # The daily worker checks this before sending so a worker restart mid-day
+    # doesn't double-send. Welcome (day 0) is fire-once on signup, not tracked here.
+    drip_state: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

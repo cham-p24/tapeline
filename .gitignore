@@ -59,3 +59,10 @@ latest_live_monitor.log
 # Build artifacts
 *.pid
 *.sock
+
+# Test coverage
+coverage/
+.vitest-cache/
+
+# Worker caches
+backend/.cache/

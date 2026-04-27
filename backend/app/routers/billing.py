@@ -16,7 +16,8 @@ settings = get_settings()
 
 
 class CheckoutRequest(BaseModel):
-    tier: str  # "pro" or "premium"
+    tier: str = "pro"                     # "pro" or "premium"
+    billing_period: str = "monthly"        # "monthly" or "annual"
 
 
 @router.post("/checkout")
@@ -24,10 +25,15 @@ async def create_checkout(
     body: CheckoutRequest,
     user: User = Depends(current_user_required),
 ) -> dict:
+    if body.tier not in ("pro", "premium"):
+        raise HTTPException(400, "tier must be 'pro' or 'premium'")
+    if body.billing_period not in ("monthly", "annual"):
+        raise HTTPException(400, "billing_period must be 'monthly' or 'annual'")
     url = await create_checkout_session(
         user_id=user.id,
         user_email=user.email,
         tier=body.tier,
+        billing_period=body.billing_period,
         success_url=f"{settings.app_url}/app/billing?success=1",
         cancel_url=f"{settings.app_url}/app/billing?cancelled=1",
     )

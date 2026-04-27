@@ -10,6 +10,7 @@ export default function BillingPage() {
   const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
 
   async function startCheckout(tier: "pro" | "premium") {
     setBusy(tier);
@@ -19,7 +20,7 @@ export default function BillingPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ tier, billing_period: billingPeriod }),
       });
       const body = await res.json();
       if (res.ok && body.url) {
@@ -78,6 +79,25 @@ export default function BillingPage() {
       <h2 className="mt-10 text-xl font-semibold">Upgrade</h2>
       <p className="mt-2 text-sm text-muted">7-day money-back guarantee. Cancel in one click, anytime.</p>
 
+      {/* Billing period toggle */}
+      <div className="mt-5 inline-flex rounded-full border border-border bg-panel p-1">
+        {(["monthly", "annual"] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => setBillingPeriod(p)}
+            className={`relative rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+              billingPeriod === p ? "bg-fg text-background" : "text-muted hover:text-fg"
+            }`}
+          >
+            {p === "annual" ? "Annual" : "Monthly"}
+            {p === "annual" && billingPeriod !== "annual" && (
+              <span className="absolute -right-2 -top-2 rounded-full bg-up px-1.5 py-0.5 text-[9px] font-bold text-background">−17%</span>
+            )}
+          </button>
+        ))}
+      </div>
+      {billingPeriod === "annual" && <p className="mt-2 text-xs text-up">Save 2 months with annual · price locked forever</p>}
+
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Plan
           name="Free"
@@ -92,7 +112,8 @@ export default function BillingPage() {
         />
         <Plan
           name="Pro"
-          price="$29"
+          price={billingPeriod === "annual" ? "$24" : "$29"}
+          note={billingPeriod === "annual" ? "$290/yr · billed annually" : undefined}
           items={[
             "Full ~870 ticker universe, live",
             "Score breakdown + Why on every row",
@@ -110,13 +131,15 @@ export default function BillingPage() {
         />
         <Plan
           name="Premium"
-          price="$49"
+          price={billingPeriod === "annual" ? "$41" : "$49"}
+          note={billingPeriod === "annual" ? "$490/yr · billed annually" : undefined}
           items={[
             "Everything in Pro",
             "Congressional trades feed",
             "Telegram alerts (unlimited)",
             "Email alerts (unlimited)",
             "API access (1,000 req/day)",
+            "Elite 13F holdings",
             "Priority support",
           ]}
           cta="Upgrade to Premium"

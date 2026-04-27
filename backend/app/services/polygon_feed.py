@@ -188,15 +188,34 @@ async def fetch_regime() -> dict[str, Any]:
     """
     Classify market regime from VIX, breadth (% of S&P above 200DMA),
     rate direction (10Y yield slope), and sector leader rotation.
-    """
-    # Fetch VIX + 10Y via index tickers
-    async with httpx.AsyncClient() as client:
-        vix_snap = await _request(
-            client, "/v2/snapshot/locale/us/markets/indices/tickers/I:VIX",
-        )
-    vix = vix_snap.get("ticker", {}).get("value", 20.0)
 
-    # Placeholder — real implementation computes breadth from constituent snapshots
+    Macro indicators come from FRED when FRED_API_KEY is set; falls back
+    to hardcoded values otherwise. Polygon is used for the live VIX index.
+    """
+    # Try FRED first (free + reliable for daily series)
+    from app.services.fred_feed import fetch_macro_indicators
+    fred_data = await fetch_macro_indicators()
+
+    # Live VIX from Polygon — preferred over FRED's daily close for intraday
+    vix = fred_data.get("vix") or 20.0
+    try:
+        async with httpx.AsyncClient() as client:
+            vix_snap = await _request(
+                client, "/v2/snapshot/locale/us/markets/indices/tickers/I:VIX",
+            )
+        vix_live = vix_snap.get("ticker", {}).get("value")
+        if vix_live:
+            vix = float(vix_live)
+    except Exception:
+        logger.warning("polygon.vix_fetch_failed using_fallback=%.2f", vix)
+
+    dxy = fred_data.get("dxy") or 103.5
+    y10 = fred_data.get("yield_10y") or 4.25
+
+    # Placeholder — breadth requires sector-constituent walk; on Starter tier
+    # this is expensive. Schedule it as a hourly job rather than per-tick.
+    breadth_pct = 55.0
+
     regime = (
         "BULL" if vix < 15
         else "NEUTRAL" if vix < 20
@@ -206,10 +225,10 @@ async def fetch_regime() -> dict[str, Any]:
     return {
         "regime": regime,
         "vix": round(vix, 2),
-        "dxy": 103.5,  # TODO: fetch DXY
-        "yield_10y": 4.25,  # TODO: fetch from FRED or Polygon
-        "rate_direction": "SIDEWAYS",
-        "breadth_pct": 55.0,  # TODO: compute
+        "dxy": round(dxy, 2),
+        "yield_10y": round(y10, 3),
+        "rate_direction": "SIDEWAYS",  # TODO: 10Y slope vs 30d back
+        "breadth_pct": round(breadth_pct, 1),
         "sector_leaders": "Technology, Industrials, Financials",
     }
 
