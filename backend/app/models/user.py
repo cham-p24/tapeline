@@ -39,6 +39,9 @@ class User(Base):
     telegram_chat_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     # E.164-format phone for SMS alerts. Premium-only feature; Twilio-delivered.
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Discord webhook URL for posting alerts into the user's own server.
+    # Pro+ feature, free to deliver — just an HTTP POST to the user's Discord URL.
+    discord_webhook_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     # Drip-email dedupe — comma-separated day tokens already sent ("3,7,13,end").
     # The daily worker checks this before sending so a worker restart mid-day

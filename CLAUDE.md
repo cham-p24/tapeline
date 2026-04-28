@@ -75,16 +75,24 @@ Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs a
 Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer); 24h cache + multi-endpoint fallback. Worker task `_refresh_elite_13f` runs daily; falls back to `mock_elite_13f_holdings()` when no `QUIVER_API_KEY`. Endpoint `/api/holdings` (Premium-only via feature `holdings.elite`). Frontend page not yet built — use existing congress page pattern for `/app/holdings` when ready.
 
 ## Known issues / partially-built
-- **`sector_leaders` + `rate_direction` in regime are placeholders** — `polygon_feed.py:fetch_regime` returns hardcoded values for these two fields. Breadth_pct now computed live from the Ticker table (% with sub_trend > 50). DXY/10Y/VIX use FRED when configured.
+- **`rate_direction` in regime is a placeholder** — `polygon_feed.py:fetch_regime` still returns hardcoded value. Breadth_pct + sector_leaders now computed live from the snapshot universe each tick. DXY/10Y/VIX use FRED when configured.
 - **No `/v3/reference/tickers/{sym}` sector backfill** — universe auto-discovery from Polygon adds new tickers with `sector="Unknown"`. Worker should backfill sectors lazily for tickers users actually look at.
+- **Web push send needs `pywebpush`** — `services/web_push.py` imports it conditionally; if not installed, the channel logs a skip and continues. Run `pip install pywebpush` in the backend venv to activate.
 - **Frontend tests cover ~6 surfaces** — Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels, BillingToggle, HoldingsPage. Grow with billing flow + alerts CRUD + scanner page next.
 - **No E2E tests** — Playwright would land later. Unit tests catch most regressions.
 
 ## Notification channels
-Three delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
-- **Email** (Pro+) — Resend, no extra cost. Default channel for most rules.
-- **Telegram** (Premium) — free, hourly digest + per-rule alerts. Customer adds their chat_id at `/app/billing` (Notifications card).
-- **SMS** (Premium) — Twilio (~$0.008/msg US, more elsewhere). Customer adds their phone at `/app/billing` (SMS card). Reserve for high-conviction rules — every send is billed.
+Five delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
+- **Email** (Pro+) — Resend, no extra cost. Default channel for every rule. Always on.
+- **Browser push / Web Push** (Pro+) — VAPID + Service Worker (`frontend/public/sw.js`). Free. One-click enable on Chrome/Firefox/Edge desktop + Android. iOS requires PWA install.
+- **Discord** (Pro+) — webhook URL the user creates in their server. Free. Posts rich embeds.
+- **Telegram** (Premium) — free, hourly digest + per-rule alerts. Customer adds their chat_id at `/app/billing` (Telegram card).
+- **SMS** (Premium) — Twilio (~$0.008/msg US, more elsewhere). Reserve for high-conviction rules — every send is billed.
+
+End-of-day watchlist email digest fires daily ~21:00 UTC for every Pro+ user with watchlist items (`services/email.py:run_eod_watchlist_digest`).
+
+## Per-ticker confidence
+Each Ticker row carries a `confidence_pct` (0-100) that varies with which underlying data feeds returned data for that symbol. Mega-caps with full Quiver/Finnhub/FINRA coverage land 88-96, ETFs without traditional fundamentals land 45-70, the typical liquid stock lands 60-85. Surfaced as a column on the scanner table + as an inline pill on the ticker page. Documented on `/how-it-works`. Pattern ported from the personal signal-system. Mock value via `mock_feed._compute_mock_confidence(symbol)` (deterministic per symbol). Real polygon_feed should compute from actual data-feed presence.
 
 ## Webhook idempotency
 `stripe_webhook_events` table logs every processed event id. Replay attacks and Stripe redeliveries return `{ok: true, replay: true}` instead of double-processing. Migration 0010.
@@ -110,8 +118,12 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (wired end-to-end with mock fallback)
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
-- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with email + telegram + SMS delivery
+- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with five-channel delivery (email / web push / Discord / Telegram / SMS)
 - `backend/app/services/sms.py` — Twilio SMS (no-op when not configured)
+- `backend/app/services/discord.py` — Discord webhook delivery (no-op when no webhook saved)
+- `backend/app/services/web_push.py` — Web Push via VAPID + pywebpush (no-op when either is missing)
+- `frontend/public/sw.js` — Service Worker for Web Push notification handling
+- `frontend/lib/webPush.ts` — client-side subscribe/unsubscribe/test helpers
 - `backend/app/routers/roadmap.py` — public roadmap voting (Premium-gated)
 - `frontend/__tests__/` — Vitest + RTL scaffold (run `npm test` after `npm install`)
 - `backend/app/workers/signal_publisher.py` — scoring tick worker

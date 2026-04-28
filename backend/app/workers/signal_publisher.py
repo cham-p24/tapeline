@@ -47,6 +47,7 @@ _last_trial_check: datetime | None = None
 _last_holdings_refresh: datetime | None = None
 _last_drip_check: datetime | None = None
 _last_universe_refresh: datetime | None = None
+_last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 
 
 async def seed_universe() -> None:
@@ -78,6 +79,28 @@ async def tick() -> None:
         above_mid = sum(1 for t in trends if t > 50)
         regime["breadth_pct"] = round(100 * above_mid / len(trends), 1)
 
+    # Live sector_leaders: top 3 sectors ranked by average composite score.
+    # Replaces the second hardcoded regime placeholder. Joins each snapshot to
+    # its Ticker.sector by walking the universe() helper rather than hitting DB.
+    try:
+        sector_map = {row["symbol"]: row.get("sector") for row in universe()}
+        sector_scores: dict[str, list[float]] = {}
+        for s in snapshots:
+            sec = sector_map.get(s["symbol"])
+            score = s.get("score")
+            if sec and score is not None and sec != "Unknown":
+                sector_scores.setdefault(sec, []).append(score)
+        if sector_scores:
+            ranked = sorted(
+                ((sec, sum(vals) / len(vals)) for sec, vals in sector_scores.items() if vals),
+                key=lambda kv: kv[1],
+                reverse=True,
+            )
+            regime["sector_leaders"] = ", ".join(sec for sec, _ in ranked[:3])
+    except Exception:
+        # Don't let regime breakage propagate — keep whatever fetch_regime returned
+        logger.exception("regime.sector_leaders_compute_failed")
+
     async with session_scope() as session:
         # --- Update ticker snapshots (dialect-neutral upsert) ---
         existing = {
@@ -100,6 +123,7 @@ async def tick() -> None:
                 "sub_momentum": snap["sub_momentum"],
                 "sub_macro": snap["sub_macro"],
                 "sub_smart_money": snap["sub_smart_money"],
+                "confidence_pct": snap.get("confidence_pct"),
                 "reason": snap["reason"],
             }
             if row is None:
@@ -202,6 +226,23 @@ async def tick() -> None:
     ):
         await _refresh_universe()
         _last_universe_refresh = started
+
+    # End-of-day watchlist email digest. Fires once per UTC day shortly after
+    # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
+    # process memory to avoid double-fires within the same day. Worker restart
+    # mid-day will re-fire — acceptable since users would rather get two than zero.
+    global _last_eod_digest_date  # noqa: PLW0603
+    today_str = started.strftime("%Y-%m-%d")
+    if started.hour >= 21 and _last_eod_digest_date != today_str:
+        try:
+            from app.services.email import run_eod_watchlist_digest
+            async with session_scope() as eod_session:
+                count = await run_eod_watchlist_digest(eod_session)
+            if count:
+                logger.info("eod_digest.sent count=%d", count)
+        except Exception:
+            logger.exception("eod_digest.run_failed")
+        _last_eod_digest_date = today_str
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(

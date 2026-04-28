@@ -53,6 +53,7 @@ async def ticker_detail(
         "price": t.price,
         "score": t.score,
         "signal": t.signal,
+        "confidence_pct": t.confidence_pct,
         "change_pct_1d": t.change_pct_1d,
         "change_pct_5d": t.change_pct_5d,
         "change_pct_1m": t.change_pct_1m,

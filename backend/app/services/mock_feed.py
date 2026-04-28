@@ -193,10 +193,61 @@ def fetch_snapshots() -> list[dict[str, Any]]:
             "sub_momentum": round(sub_mom, 1),
             "sub_macro": round(sub_macro, 1),
             "sub_smart_money": round(sub_smart, 1),
+            "confidence_pct": _compute_mock_confidence(sym),
             "reason": reason,
             "last_timestamp": now.isoformat(),
         })
     return rows
+
+
+def _compute_mock_confidence(symbol: str) -> float:
+    """
+    Per-ticker confidence — deterministic per symbol so the same ticker always
+    shows the same confidence band across worker restarts. Real polygon_feed
+    should compute this from actual data-feed presence (% of optional features
+    that returned non-null data).
+
+    Bands (matching the personal signal-system layout the user already validated):
+    - 95%+:  full data on every signal feature (premium + Quiver + Finnhub + FINRA)
+    - 80-95%: most features, missing 1-3 minor data points
+    - 60-80%: core scoring data + most fundamentals — typical liquid stock
+    - 40-60%: only basic price/trend data (typical for ETFs without P/E)
+    - <40%:  sparse data, deprioritise (rare in mock — used for plausibility)
+    """
+    seed = sum(ord(c) for c in symbol) * 7919  # arbitrary prime mixer
+    rng = random.Random(seed)
+
+    # Mega-caps — every data provider covers these, Quiver elites hold them,
+    # Finnhub fundamentals fully populated, news volume high.
+    if symbol in _MEGA_CAP_SET:
+        return round(rng.uniform(88, 96), 1)
+
+    # ETFs and commodity ETFs have no traditional fundamentals (no P/E, no margins).
+    # Score still works (trend/rs/momentum/macro all apply) but confidence drops.
+    if symbol in _ETF_SET:
+        return round(rng.uniform(45, 70), 1)
+
+    # The long tail of liquid US equities — typical band.
+    return round(rng.uniform(60, 85), 1)
+
+
+# Confidence-band universes — kept here to avoid recomputing per-tick
+_MEGA_CAP_SET = {
+    "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "BRK.B",
+    "JPM", "V", "MA", "WMT", "COST", "UNH", "LLY", "AVGO", "ORCL",
+    "JNJ", "PG", "HD", "BAC", "XOM", "CVX",
+}
+_ETF_SET = {
+    # Index / sector ETFs
+    "SPY", "QQQ", "IWM", "DIA", "VTI", "ARKK", "SMH",
+    "XLK", "XLF", "XLE", "XLV", "TLT", "HYG", "VXX",
+    # Commodity ETFs
+    "GLD", "IAU", "SLV", "AGQ", "PALL", "PPLT",
+    "USO", "BNO", "UCO", "SCO", "DBO", "UNG", "BOIL", "KOLD",
+    "DBA", "DBC", "CORN", "WEAT", "SOYB", "CANE", "MOO", "WOOD",
+    "CPER", "COPX", "GDX", "GDXJ", "URA", "URNM", "XME", "PICK",
+    "LIT", "REMX",
+}
 
 
 def _signal_from_score(score: float) -> str:

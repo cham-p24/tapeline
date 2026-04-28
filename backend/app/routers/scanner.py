@@ -76,6 +76,7 @@ async def list_scanner(
                 "sub_momentum": r.sub_momentum,
                 "sub_macro": r.sub_macro,
                 "sub_smart_money": r.sub_smart_money,
+                "confidence_pct": r.confidence_pct,
                 "reason": r.reason,
                 "updated_at": (
                     (r.updated_at - timedelta(minutes=delay_minutes)).isoformat()

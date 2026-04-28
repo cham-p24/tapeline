@@ -33,7 +33,16 @@ class Ticker(Base):
     sub_momentum: Mapped[float | None] = mapped_column(Float, nullable=True)
     sub_macro: Mapped[float | None] = mapped_column(Float, nullable=True)
     sub_smart_money: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Per-ticker confidence (0-100) — varies with which underlying data feeds
+    # returned data. Mega-caps with full Quiver/Finnhub/FINRA coverage hit ~90+;
+    # less-followed names where fundamentals or institutional data is sparse
+    # land in the 40-60 band. Surfaced in the scanner so users can deprioritise
+    # signals built on thin data. Pattern ported from the personal signal-system.
+    confidence_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    # Discord webhook deliveries also need sector_leaders/rate_direction,
+    # both still coming from the regime row — left here because it's the
+    # ticker-level data that drives them.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

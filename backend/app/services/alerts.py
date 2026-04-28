@@ -257,6 +257,38 @@ async def _fire(
             event.delivered = ok
         except Exception:
             logger.exception("alert.sms_failed user=%s rule=%s", user.id, rule.id)
+    elif rule.channel == "discord" and user.discord_webhook_url:
+        try:
+            from app.services.discord import send_discord_alert
+            ok = await send_discord_alert(
+                user.discord_webhook_url,
+                title=f"[{rule.name}] {symbol}",
+                description=message + "\n\nOpen: https://tapeline.io/app/scanner",
+            )
+            event.delivered = ok
+        except Exception:
+            logger.exception("alert.discord_failed user=%s rule=%s", user.id, rule.id)
+    elif rule.channel == "web_push":
+        try:
+            from sqlalchemy import select as _sel
+            from app.models import WebPushSubscription
+            from app.services.web_push import send_web_push
+            subs_r = await session.execute(
+                _sel(WebPushSubscription).where(WebPushSubscription.user_id == user.id)
+            )
+            subs = subs_r.scalars().all()
+            any_delivered = False
+            for sub in subs:
+                ok = await send_web_push(
+                    {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh_key, "auth": sub.auth_key}},
+                    title=f"Tapeline · {rule.name}",
+                    body=message,
+                    url=f"/app/ticker/{symbol}" if symbol != "MARKET" else "/app/scanner",
+                )
+                any_delivered = any_delivered or ok
+            event.delivered = any_delivered
+        except Exception:
+            logger.exception("alert.web_push_failed user=%s rule=%s", user.id, rule.id)
 
     logger.info(
         "alert.fired user=%s rule=%s type=%s symbol=%s channel=%s delivered=%s",

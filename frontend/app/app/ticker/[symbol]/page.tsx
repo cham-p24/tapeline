@@ -68,7 +68,15 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
       {/* Top row: score + signal + actions */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="card p-5">
-          <div className="text-xs uppercase text-muted">Composite score</div>
+          <div className="flex items-baseline justify-between">
+            <div className="text-xs uppercase text-muted">Composite score</div>
+            {data.confidence_pct != null && (
+              <span className={`text-xs nums ${confColor(data.confidence_pct)}`}
+                    title={confLabel(data.confidence_pct)}>
+                conf {data.confidence_pct.toFixed(0)}%
+              </span>
+            )}
+          </div>
           <div className="mt-1 text-4xl font-bold">{data.score?.toFixed(1)}</div>
           <div className={`mt-2 inline-block rounded px-2 py-0.5 text-xs ${toneSig}`}>
             {data.signal}
@@ -200,4 +208,17 @@ function compact(n: number) {
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
   return String(n);
+}
+function confColor(c: number) {
+  if (c >= 80) return "text-up";
+  if (c >= 60) return "text-fg";
+  if (c >= 40) return "text-yellow-400";
+  return "text-down";
+}
+function confLabel(c: number) {
+  if (c >= 95) return "Full data on every signal feature — strongest evidence";
+  if (c >= 80) return "Most features present, missing 1–3 minor data points";
+  if (c >= 60) return "Core scoring data + most fundamentals — typical liquid stock";
+  if (c >= 40) return "Only basic price/trend data — caution";
+  return "Sparse data — unreliable signals, deprioritise";
 }

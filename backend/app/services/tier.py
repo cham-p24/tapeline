@@ -38,6 +38,9 @@ FEATURES: dict[str, Tier] = {
     "alerts.email": Tier.PRO,
     "briefing.daily": Tier.PRO,
     "export.csv": Tier.PRO,
+    # Pro-tier alert channels (free to deliver, low friction)
+    "alerts.discord": Tier.PRO,       # Discord webhook (free, medium setup)
+    "alerts.web_push": Tier.PRO,      # Browser push notifications (free, one click)
     # Premium-only features
     "congress.feed": Tier.PREMIUM,
     "alerts.telegram": Tier.PREMIUM,

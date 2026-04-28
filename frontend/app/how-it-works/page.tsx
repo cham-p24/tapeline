@@ -77,6 +77,39 @@ export default function HowItWorksPage() {
               <Link href="/scorecard" className="link">public scorecard</Link>.
             </p>
           </div>
+
+          {/* Confidence band — explains the per-ticker confidence column */}
+          <div className="mt-6 rounded-xl border border-border bg-background p-6">
+            <p className="text-xs uppercase tracking-wider text-subtle">Per-ticker confidence</p>
+            <h3 className="mt-2 text-lg font-semibold">Not every signal has the same evidence behind it.</h3>
+            <p className="mt-3 text-sm text-muted leading-relaxed">
+              We surface a confidence percentage on every row. It varies based on which underlying
+              data feeds returned data for that ticker — not every name has Quiver 13F coverage,
+              not every ETF has a P/E, not every stock has recent insider filings.
+            </p>
+            <div className="mt-4 grid gap-2 text-sm">
+              <div className="flex justify-between border-b border-border py-2">
+                <span className="text-up font-medium">95%+</span>
+                <span className="text-muted">Full data on every signal feature — strongest evidence</span>
+              </div>
+              <div className="flex justify-between border-b border-border py-2">
+                <span className="text-up font-medium">80–95%</span>
+                <span className="text-muted">Most features present, missing 1–3 minor data points</span>
+              </div>
+              <div className="flex justify-between border-b border-border py-2">
+                <span className="font-medium">60–80%</span>
+                <span className="text-muted">Core scoring data + most fundamentals — typical liquid stock</span>
+              </div>
+              <div className="flex justify-between border-b border-border py-2">
+                <span className="text-yellow-400 font-medium">40–60%</span>
+                <span className="text-muted">Only basic price/trend data — caution</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-down font-medium">&lt;40%</span>
+                <span className="text-muted">Sparse data — unreliable signals, deprioritise</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

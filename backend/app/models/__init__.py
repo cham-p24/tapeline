@@ -10,6 +10,7 @@ from app.models.squeeze import SqueezeSetup
 from app.models.ticker import Ticker
 from app.models.user import AlertEvent, AlertRule, Subscription, User
 from app.models.watchlist import WatchlistItem
+from app.models.web_push import WebPushSubscription
 from app.models.webhook_event import StripeWebhookEvent
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "Ticker",
     "User",
     "WatchlistItem",
+    "WebPushSubscription",
 ]

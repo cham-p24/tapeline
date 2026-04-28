@@ -16,6 +16,20 @@ type Entry = {
 // Newest first. Edit at the top when shipping; never edit historical entries.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-04-29",
+    version: "0.1.5",
+    tag: "shipped",
+    title: "Per-ticker confidence + browser push + Discord + EOD digest",
+    body: [
+      "Per-ticker confidence column on the scanner — varies based on which underlying data feeds returned data. Mega-caps land 90+, ETFs 45–70, the long tail 60–85. Tooltip explains the band.",
+      "Browser push notifications via Web Push — desktop lock-screen alerts. Free, one click to enable. iOS requires PWA install. Pro+.",
+      "Discord webhook alert channel — paste any Discord webhook URL on /app/billing → posts rich-embed alerts to your server. Pro+.",
+      "End-of-day watchlist email digest — fires daily after market close to every Pro+ user with watchlist items.",
+      "Notifications card repositioned to 'Real-time channels' with five equal-weight options: web push, Discord, Telegram, SMS, plus the always-on email default.",
+      "Live `sector_leaders` in the regime row, computed from the snapshot universe each tick (was hardcoded).",
+    ],
+  },
+  {
     date: "2026-04-27",
     version: "0.1.4",
     tag: "shipped",

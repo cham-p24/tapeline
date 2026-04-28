@@ -15,6 +15,7 @@ export type SessionUser = {
   referral_code?: string | null;
   telegram_chat_id?: string | null;
   phone_number?: string | null;
+  discord_webhook_url?: string | null;
   created_at: string | null;
 };
 
@@ -75,6 +76,8 @@ export const FEATURE_TIERS = {
   "congress":           "premium" as const,
   "alerts.telegram":    "premium" as const,
   "alerts.sms":         "premium" as const,
+  "alerts.discord":     "pro" as const,
+  "alerts.web_push":    "pro" as const,
   "briefing":           "premium" as const,
   "api":                "premium" as const,
   "holdings.elite":     "premium" as const,

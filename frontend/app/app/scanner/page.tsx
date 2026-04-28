@@ -105,6 +105,7 @@ export default function ScannerPage() {
               <th className="px-4 py-2 text-left">Ticker</th>
               <th className="px-4 py-2 text-left">Sector</th>
               <th className="px-4 py-2 text-right">Score</th>
+              <th className="px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
               <th className="px-4 py-2 text-left">Signal</th>
               <th className="px-4 py-2 text-right">Price</th>
               <th className="px-4 py-2 text-right">1D</th>
@@ -116,9 +117,9 @@ export default function ScannerPage() {
           </thead>
           <tbody>
             {loading && rows.length === 0 ? (
-              <tr><td colSpan={10}><TableSkeleton cols={10} rows={8} /></td></tr>
+              <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-8 text-center text-muted">
+              <tr><td colSpan={11} className="px-4 py-8 text-center text-muted">
                 No tickers match. Lower the min score or clear the sector filter.
               </td></tr>
             ) : rows.map((r) => (
@@ -143,6 +144,10 @@ export default function ScannerPage() {
                       />
                     }
                   />
+                </td>
+                <td className={`px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
+                    title={confidenceLabel(r.confidence_pct)}>
+                  {r.confidence_pct == null ? "—" : `${r.confidence_pct.toFixed(0)}%`}
                 </td>
                 <td className="px-4 py-2"><SignalPill v={r.signal} /></td>
                 <td className="px-4 py-2 text-right">${r.price?.toFixed(2)}</td>
@@ -182,6 +187,21 @@ function scoreColor(s: number | null) {
 function pctColor(n: number | null) {
   if (n == null) return "text-muted";
   return n > 0 ? "text-up" : n < 0 ? "text-down" : "text-muted";
+}
+function confidenceColor(c: number | null | undefined) {
+  if (c == null) return "text-muted";
+  if (c >= 80) return "text-up";
+  if (c >= 60) return "text-fg";
+  if (c >= 40) return "text-yellow-400";
+  return "text-down";
+}
+function confidenceLabel(c: number | null | undefined) {
+  if (c == null) return "Confidence not yet computed";
+  if (c >= 95) return `${c.toFixed(0)}% — full data on every signal feature`;
+  if (c >= 80) return `${c.toFixed(0)}% — most features present, missing 1–3 data points`;
+  if (c >= 60) return `${c.toFixed(0)}% — typical liquid stock, core data present`;
+  if (c >= 40) return `${c.toFixed(0)}% — only basic price/trend data`;
+  return `${c.toFixed(0)}% — sparse data, deprioritise`;
 }
 function fmt(n: number | null) { return n == null ? "—" : (n >= 0 ? "+" : "") + n.toFixed(2); }
 function compactNum(n: number | null) {

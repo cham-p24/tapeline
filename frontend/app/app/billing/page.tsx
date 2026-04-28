@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
+import {
+  getWebPushStatus,
+  subscribeToWebPush,
+  testWebPush,
+  unsubscribeFromWebPush,
+} from "@/lib/webPush";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -150,15 +156,23 @@ export default function BillingPage() {
         />
       </div>
 
-      {/* Notifications — Telegram + SMS. Both paywalled to Premium. */}
-      <h2 className="mt-12 text-xl font-semibold">Notifications</h2>
-      <p className="mt-2 text-sm text-muted">Receive watchlist alerts, the hourly market digest, and per-rule alerts.</p>
+      {/* Real-time channels — email is on by default. Each card below is opt-in. */}
+      <h2 className="mt-12 text-xl font-semibold">Real-time channels</h2>
+      <p className="mt-2 text-sm text-muted">
+        Email is the default for every alert. Enable any of the channels below for richer / faster delivery.
+      </p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Paywall feature="alerts.telegram" title="Telegram alerts">
+        <Paywall feature="alerts.web_push" title="Browser push">
+          <WebPushCard />
+        </Paywall>
+        <Paywall feature="alerts.discord" title="Discord">
+          <DiscordCard />
+        </Paywall>
+        <Paywall feature="alerts.telegram" title="Telegram">
           <NotificationsCard />
         </Paywall>
-        <Paywall feature="alerts.sms" title="SMS alerts">
+        <Paywall feature="alerts.sms" title="SMS">
           <SMSCard />
         </Paywall>
       </div>
@@ -281,6 +295,225 @@ function NotificationsCard() {
           msg.kind === "ok"
             ? "border-up/30 bg-up/5 text-up"
             : "border-down/30 bg-down/5 text-down"
+        }`}>
+          {msg.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebPushCard() {
+  const [status, setStatus] = useState<"loading" | "granted" | "denied" | "default" | "unsupported">("loading");
+  const [busy, setBusy] = useState<"enable" | "test" | "disable" | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  useEffect(() => {
+    getWebPushStatus().then((s) => setStatus(s as any));
+  }, []);
+
+  async function enable() {
+    setBusy("enable"); setMsg(null);
+    const r = await subscribeToWebPush();
+    if (r.ok) {
+      setStatus("granted");
+      setMsg({ kind: "ok", text: "Subscribed. Hit Test to verify." });
+    } else {
+      setMsg({ kind: "err", text: r.reason });
+    }
+    setBusy(null);
+  }
+
+  async function test() {
+    setBusy("test"); setMsg(null);
+    const r = await testWebPush();
+    if (r.ok) setMsg({ kind: "ok", text: `Sent to ${r.delivered}/${r.total} subscribed device${r.total === 1 ? "" : "s"}.` });
+    else setMsg({ kind: "err", text: r.reason });
+    setBusy(null);
+  }
+
+  async function disable() {
+    setBusy("disable"); setMsg(null);
+    await unsubscribeFromWebPush();
+    setStatus("default");
+    setMsg({ kind: "ok", text: "Disabled on this browser." });
+    setBusy(null);
+  }
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Browser push</h3>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${
+          status === "granted" ? "bg-up/10 text-up"
+          : status === "denied" ? "bg-down/10 text-down"
+          : status === "unsupported" ? "bg-muted/20 text-muted"
+          : "bg-muted/20 text-muted"
+        }`}>
+          {status === "granted" ? "Connected" : status === "denied" ? "Blocked" : status === "unsupported" ? "Unsupported" : "Not connected"}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm text-muted leading-relaxed">
+        Lock-screen notifications on desktop and Android. iOS requires the PWA to be installed.
+        Free at any volume, one click to enable.
+      </p>
+
+      {status === "denied" && (
+        <p className="mt-3 text-xs text-down">
+          You blocked notifications for this site. Re-enable in browser settings (lock icon → Permissions → Notifications → Allow), then refresh.
+        </p>
+      )}
+      {status === "unsupported" && (
+        <p className="mt-3 text-xs text-subtle">
+          Your browser doesn't support Web Push. Try Chrome, Firefox, or Edge on desktop.
+        </p>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {status !== "granted" && status !== "unsupported" && (
+          <button
+            onClick={enable}
+            disabled={busy !== null || status === "denied"}
+            className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy === "enable" ? "Subscribing…" : "Enable browser push"}
+          </button>
+        )}
+        {status === "granted" && (
+          <>
+            <button
+              onClick={test}
+              disabled={busy !== null}
+              className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy === "test" ? "Sending…" : "Send test notification"}
+            </button>
+            <button
+              onClick={disable}
+              disabled={busy !== null}
+              className="btn-ghost text-sm text-down hover:text-down disabled:opacity-50"
+            >
+              {busy === "disable" ? "Disabling…" : "Disable on this browser"}
+            </button>
+          </>
+        )}
+      </div>
+
+      {msg && (
+        <div className={`mt-4 rounded-md border p-3 text-sm ${
+          msg.kind === "ok" ? "border-up/30 bg-up/5 text-up" : "border-down/30 bg-down/5 text-down"
+        }`}>
+          {msg.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscordCard() {
+  const { user, refresh } = useUser();
+  const [url, setUrl] = useState((user as any)?.discord_webhook_url ?? "");
+  const [busy, setBusy] = useState<"save" | "test" | "clear" | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  async function save() {
+    setBusy("save"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/discord`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ webhook_url: url.trim() }),
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.detail || `Save failed (${r.status})`);
+      setMsg({ kind: "ok", text: "Saved. Hit Test to verify." });
+      await refresh();
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
+
+  async function test() {
+    setBusy("test"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/discord/test`, { method: "POST", credentials: "include" });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.detail || `Test failed (${r.status})`);
+      setMsg({ kind: "ok", text: "Sent. Check your Discord channel." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
+
+  async function clear() {
+    setBusy("clear"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/discord`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error("Disconnect failed");
+      setUrl("");
+      setMsg({ kind: "ok", text: "Disconnected." });
+      await refresh();
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
+
+  const connected = !!(user as any)?.discord_webhook_url;
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Discord</h3>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${connected ? "bg-up/10 text-up" : "bg-muted/20 text-muted"}`}>
+          {connected ? "Connected" : "Not connected"}
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-xs font-medium text-muted">Webhook URL</label>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://discord.com/api/webhooks/…"
+          className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-xs focus:border-accent focus:outline-none"
+        />
+        <p className="mt-2 text-xs text-subtle">
+          In your Discord server: Settings → Integrations → Webhooks → New Webhook → Copy URL. Paste here.
+        </p>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          onClick={save}
+          disabled={busy !== null || !url.trim() || url.trim() === (user as any)?.discord_webhook_url}
+          className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "save" ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={test}
+          disabled={busy !== null || !connected}
+          className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "test" ? "Sending…" : "Send test message"}
+        </button>
+        {connected && (
+          <button
+            onClick={clear}
+            disabled={busy !== null}
+            className="btn-ghost text-sm text-down hover:text-down disabled:opacity-50"
+          >
+            {busy === "clear" ? "Disconnecting…" : "Disconnect"}
+          </button>
+        )}
+      </div>
+
+      {msg && (
+        <div className={`mt-4 rounded-md border p-3 text-sm ${
+          msg.kind === "ok" ? "border-up/30 bg-up/5 text-up" : "border-down/30 bg-down/5 text-down"
         }`}>
           {msg.text}
         </div>

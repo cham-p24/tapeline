@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
 
+    # ---- Web Push (VAPID) ----
+    # Generate keys with `python -c "from py_vapid import Vapid; v = Vapid(); v.generate_keys(); print(v.public_key, v.private_key)"`
+    # or https://vapidkeys.com/. Frontend also needs NEXT_PUBLIC_VAPID_PUBLIC_KEY.
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:owner@tapeline.io"
+
     # ---- Quiver QuantData (elite 13F holdings + Congress) ----
     # Free tier available; without a key, smart-money enrichment falls back to mock.
     quiver_api_key: str = ""

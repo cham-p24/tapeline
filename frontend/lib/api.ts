@@ -24,6 +24,7 @@ export type ScannerRow = {
   sub_momentum?: number | null;
   sub_macro?: number | null;
   sub_smart_money?: number | null;
+  confidence_pct?: number | null;
   reason?: string | null;
   updated_at: string | null;
 };
@@ -36,6 +37,7 @@ export type TickerDetail = {
   price: number;
   score: number;
   signal: string;
+  confidence_pct: number | null;
   change_pct_1d: number;
   change_pct_5d: number;
   change_pct_1m: number;
