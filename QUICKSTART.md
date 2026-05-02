@@ -38,15 +38,17 @@ Watch the live badge in the top-right of any dashboard page — it pulses green 
 
 ## It's using mock data right now
 
-The scoring worker writes plausible fake data every 60 seconds so you can see the whole pipeline work before you have a Polygon.io API key. When you subscribe to Polygon:
+The scoring worker writes plausible fake data every 60 seconds so you can see the whole pipeline work before you have a market-data API key. When you subscribe to Massive (Stocks Starter $29/mo at https://massive.com/pricing):
 
-1. Put your API key in `.env`: `POLYGON_API_KEY=your_key_here`
+1. Put your API key in `.env`: `MASSIVE_API_KEY=your_key_here` (`POLYGON_API_KEY` also works — Massive accepts legacy Polygon keys)
 2. Swap the import in `backend/app/workers/signal_publisher.py`:
    ```python
    # from app.services.mock_feed import fetch_snapshots, fetch_squeezes, fetch_regime, fetch_congress_trades, universe
-   from app.services.polygon_feed import fetch_snapshots  # flesh out other fns
+   from app.services.polygon_feed import fetch_snapshots  # adapter calls api.massive.com
    ```
 3. Restart the worker. Real scores.
+
+(Polygon.io rebranded to Massive on 2025-10-30. The adapter file is still named `polygon_feed.py` but `BASE_URL` points at `api.massive.com`. The legacy `api.polygon.io` host still works for an extended grace period.)
 
 ## Troubleshooting
 

@@ -55,7 +55,9 @@ score = 0.25*trend + 0.20*relative_strength + 0.15*fundamentals
 ```
 
 ## Mock-to-real data switch
-**No env flag, no auto-switch.** Currently the worker imports `app.services.mock_feed` directly. To switch to live Polygon data: add `POLYGON_API_KEY` to `.env`, then **manually edit the imports at the top of `backend/app/workers/signal_publisher.py`** (swap `mock_feed` → `polygon_feed`) and restart the worker. See `QUICKSTART.md` lines 40–49 for the exact swap.
+**No env flag, no auto-switch.** Currently the worker imports `app.services.mock_feed` directly. To switch to live data: add `MASSIVE_API_KEY` to `.env` (sign up at https://massive.com/pricing — Stocks Starter $29/mo), then **manually edit the imports at the top of `backend/app/workers/signal_publisher.py`** (swap `mock_feed` → `polygon_feed`) and restart the worker. See `QUICKSTART.md` lines 40–49 for the exact swap.
+
+The adapter file is still named `polygon_feed.py` because Polygon.io rebranded to Massive on 2025-10-30 — same API, same auth, same endpoint shapes, only the hostname changed (`api.polygon.io` → `api.massive.com`). Massive also accepts the legacy `POLYGON_API_KEY` env var for an extended grace period.
 
 ## Universe + commodities
 Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs added 2026-04-26 with sector="Commodities" — gold, silver, oil, gas, ag, copper, uranium, miners. Polygon Starter doesn't include futures contracts, so commodity exposure is via ETFs only. Auto-discovery of new ETFs via Polygon `/v3/reference/tickers` is on the post-launch list (not wired yet).

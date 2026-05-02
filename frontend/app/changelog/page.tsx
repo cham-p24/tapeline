@@ -16,6 +16,21 @@ type Entry = {
 // Newest first. Edit at the top when shipping; never edit historical entries.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-02",
+    version: "0.1.6",
+    tag: "shipped",
+    title: "Live data via Massive (Polygon rebrand) + Resend + FRED + Google OAuth",
+    body: [
+      "Migrated market-data adapter from Polygon.io to Massive (Polygon rebranded 2025-10-30 — same API, same auth, only hostname changed). `BASE_URL` now points at api.massive.com. Adapter accepts both `MASSIVE_API_KEY` and the legacy `POLYGON_API_KEY` for transition.",
+      "Live API call against api.massive.com confirmed working with real ticker data (Agilent, Alcoa, AAA ETF returned).",
+      "Resend domain verified for tapeline.io — emails now send FROM alerts@tapeline.io instead of the sandbox sender.",
+      "FRED API key wired — DXY, 10Y yield, VIX now pull live from FRED instead of hardcoded fallbacks.",
+      "Google OAuth client wired — 'Continue with Google' button auto-appears on /signin and /signup.",
+      "Cloudflare Turnstile widget created (keys still need manual paste from dashboard).",
+      "Vercel + Fly.io accounts provisioned for deploy day.",
+    ],
+  },
+  {
     date: "2026-04-29",
     version: "0.1.5",
     tag: "shipped",

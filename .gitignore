@@ -21,6 +21,8 @@ htmlcov/
 .env.*.local
 *.key
 *.pem
+.credentials.local.txt
+.credentials.*.txt
 
 # Node / Next.js
 node_modules/

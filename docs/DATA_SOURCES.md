@@ -4,10 +4,11 @@ Every data source used in production must be documented here with license terms,
 
 ## Production-approved sources
 
-### Polygon.io — Primary market data
-- **Tier:** Starter ($29/mo) minimum; Developer ($79/mo) or Advanced ($199/mo) for more features
+### Massive (formerly Polygon.io) — Primary market data
+- **Tier:** Stocks Starter ($29/mo) minimum; Developer ($79/mo) or Advanced ($199/mo) for more features
 - **License:** Commercial redistribution rights included on paid tiers (verify at signup)
-- **URL:** https://polygon.io/pricing
+- **URL:** https://massive.com/pricing
+- **Note:** Polygon.io rebranded to Massive on 2025-10-30. Same API, same auth, same endpoint shapes — adapter `polygon_feed.py` only needed a hostname change to `api.massive.com`. Legacy `api.polygon.io` still resolves during grace period.
 - **Feeds used:**
   - Snapshot API (`/v2/snapshot/locale/us/markets/stocks/tickers`) — real-time prices
   - Aggregates API (`/v2/aggs/ticker/{symbol}/range/...`) — historical bars for scoring

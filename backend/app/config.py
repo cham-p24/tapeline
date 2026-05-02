@@ -28,10 +28,13 @@ class Settings(BaseSettings):
     # ---- Database ----
     database_url: str = Field(..., description="Postgres connection string")
 
-    # ---- Market data (Polygon) ----
-    polygon_api_key: str = Field("", description="Polygon.io API key")
+    # ---- Market data (Polygon — being migrated to Massive) ----
+    polygon_api_key: str = Field("", description="Polygon.io API key (legacy)")
     polygon_tier: Literal["starter", "developer", "advanced"] = "starter"
     polygon_feed: str = "sip"
+
+    # ---- Market data (Massive — replaces Polygon for Tapeline) ----
+    massive_api_key: str = Field("", description="Massive.com API key")
 
     # ---- Auth (Clerk) ----
     clerk_secret_key: str = ""

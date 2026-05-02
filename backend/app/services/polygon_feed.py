@@ -30,7 +30,16 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-BASE_URL = "https://api.polygon.io"
+# Polygon rebranded to Massive on 2025-10-30. Same API shape, same auth, same
+# endpoints — only the hostname changed. Massive accepts the legacy POLYGON_API_KEY
+# as well as the new MASSIVE_API_KEY for an extended grace period.
+BASE_URL = "https://api.massive.com"
+
+
+def _api_key() -> str:
+    """Returns whichever vendor key is configured. Prefer the new MASSIVE_API_KEY
+    when both are set so accounts created post-rebrand work cleanly."""
+    return settings.massive_api_key or _api_key() or ""
 _RATE_LIMIT_PER_MIN = {"starter": 5, "developer": 1000, "advanced": 10_000}
 
 # Seed universe — list of symbols we score. In production this gets
@@ -49,7 +58,7 @@ DEFAULT_UNIVERSE = [
 
 async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """One GET with retries on 429/5xx."""
-    params = {**(params or {}), "apiKey": settings.polygon_api_key}
+    params = {**(params or {}), "apiKey": _api_key()}
     for attempt in range(5):
         try:
             resp = await client.get(f"{BASE_URL}{path}", params=params, timeout=20.0)
@@ -74,7 +83,7 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     Latest snapshots for a list of symbols. Returns rows compatible with
     the worker's upsert, matching the mock_feed schema.
     """
-    if not settings.polygon_api_key:
+    if not _api_key():
         raise RuntimeError("POLYGON_API_KEY not set — set it in .env and restart the worker")
 
     syms = symbols or DEFAULT_UNIVERSE
@@ -260,7 +269,7 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
     Returns rows in the same shape as `universe()` — drop-in replacement for
     the static seed list.
     """
-    if not settings.polygon_api_key:
+    if not _api_key():
         return []
 
     rows: list[dict[str, str]] = []
@@ -272,7 +281,7 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
             "market": "stocks",
             "active": "true",
             "limit": 1000,
-            "apiKey": settings.polygon_api_key,
+            "apiKey": _api_key(),
         }
         while next_url and len(rows) < max_tickers:
             try:
@@ -308,7 +317,7 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
             if cursor:
                 if "apiKey=" not in cursor:
                     sep = "&" if "?" in cursor else "?"
-                    cursor = f"{cursor}{sep}apiKey={settings.polygon_api_key}"
+                    cursor = f"{cursor}{sep}apiKey={_api_key()}"
                 next_url = cursor
                 params = None  # next_url already encodes everything
             else:

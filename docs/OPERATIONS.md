@@ -38,11 +38,13 @@ depend on earlier ones being live.
 The honeypot field and the disposable-email block are always active regardless
 of Turnstile. Turnstile adds the third layer.
 
-### Step 2 — Polygon Starter ($29/mo, 15 minutes)
+### Step 2 — Massive Stocks Starter ($29/mo, 15 minutes)
 
-1. Sign up at https://polygon.io/pricing (Starter tier, monthly)
+(Polygon.io rebranded to Massive on 2025-10-30. Adapter is already pointed at `api.massive.com` — Massive also accepts legacy Polygon keys.)
+
+1. Sign up at https://massive.com/pricing (Stocks Starter tier, monthly)
 2. Grab the API key from the dashboard
-3. Paste into `.env`: `POLYGON_API_KEY=...`
+3. Paste into `.env`: `MASSIVE_API_KEY=...` (or `POLYGON_API_KEY=...` if migrating an existing Polygon account)
 4. **Manually swap the worker imports** at `backend/app/workers/signal_publisher.py` (top of file):
    ```python
    # FROM:
