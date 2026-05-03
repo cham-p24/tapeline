@@ -17,11 +17,181 @@ export type BlogPost = {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "evaluating-a-stock-scanner",
+    title: "How to evaluate a stock scanner: 5 questions before you pay.",
+    excerpt:
+      "Most scanner sales pages are 50 filters and a screenshot. Here are the five questions that actually predict whether a tool will be useful in six months — and how Finviz, Trade Ideas, Zacks, and Tapeline answer them.",
+    publishedAt: "2026-05-03",
+    author: "Tapeline",
+    body: `
+      <p>I've signed up for almost every prosumer stock scanner since 2018.
+      Most fail the same way: the tool is fine for a week, then you realise
+      you have no way to tell whether the calls it surfaces are actually
+      working. By month three you've added it to the pile of $20-$50/month
+      subscriptions you keep forgetting to cancel.</p>
+
+      <p>If you're shopping for a scanner, these five questions will save you
+      the cycle:</p>
+
+      <h2>1. Can you see the formula?</h2>
+      <p>If the answer is "we use a proprietary blend of signals" you're being
+      sold magic. The two questions you can't answer about magic are "is this
+      working?" and "will this still work next month?" Tipranks, Zacks,
+      Kavout, WallStreetZen all hide theirs. Tapeline publishes the exact
+      6-factor weighted equation on <a href="/how-it-works">/how-it-works</a>.</p>
+
+      <h2>2. Where's the public scorecard?</h2>
+      <p>Newsletter shops have known for 30 years that you should hide your
+      losers. Mark Hulbert built a career being the only neutral grader of
+      newsletter performance because everyone else hid the data. Look for
+      a tool that <em>auto-publishes</em> every call it makes against the
+      next-day market move — not a curated highlight reel. We do this at
+      <a href="/scorecard">/scorecard</a>; almost nobody else does.</p>
+
+      <h2>3. What does the data come from?</h2>
+      <p>"AI-powered signals" usually means "we bought a feed from Polygon
+      and slapped a score on top." Which is fine — that's also our spine.
+      But know it. Bloomberg Terminal at $32k/yr uses similar feeds; the
+      premium is the speed and breadth of their proprietary chat and
+      curated news, not the raw data. Anyone charging $200/month for
+      "exclusive AI signals" is reselling Polygon and Finnhub.</p>
+
+      <h2>4. Is the cheapest tier real?</h2>
+      <p>Test it. If the free or cheapest paid tier strips out so many
+      features the product is unusable, the team is incentivised to
+      upgrade-trap rather than retain. Tapeline Free is hard-capped to
+      20 tickers and 24-hour delayed by design — the real product, just
+      narrower — because that's the most honest preview.</p>
+
+      <h2>5. Can you cancel in one click?</h2>
+      <p>If you have to email support to cancel, that's a tell about how
+      the team treats you generally. Stripe-portal cancel-in-one-click is
+      table stakes; if it's not there, leave. (Yes, ours is.)</p>
+
+      <p>If a tool can't answer questions 1 and 2, walk away regardless of
+      price. They're cheap to ask and predict 80% of the future regret.</p>
+    `,
+  },
+  {
+    slug: "what-signal-labels-mean",
+    title: "What our signal labels mean: HIGH CONVICTION through WEAK.",
+    excerpt:
+      "Six descriptive labels, no buy/sell language. Here's what each one represents in the underlying score, why we picked descriptive words, and what it means when a ticker moves between them.",
+    publishedAt: "2026-05-03",
+    author: "Tapeline",
+    body: `
+      <p>Every Tapeline ticker carries one of six labels. They're not buy
+      signals. They're descriptions of the score's tier — which exists for
+      legal reasons (we are not a registered investment adviser) and for
+      design reasons (you should make the call, we just summarise the data).</p>
+
+      <h2>The mapping</h2>
+      <ul>
+        <li><strong>HIGH CONVICTION</strong> (85-100) — all six factors
+        aligned positive. Trend up, RS strong, fundamentals fine, smart-money
+        net buying, macro supportive, momentum healthy. Rare.</li>
+        <li><strong>STRONG SETUP</strong> (70-84) — most factors favourable,
+        usually 4-5 of 6. The kind of name that shows up in our scorecard
+        most often.</li>
+        <li><strong>CONSTRUCTIVE</strong> (55-69) — net positive but with
+        meaningful trade-offs. Often a great fundamentals story with a weak
+        trend, or a hot trend with stretched valuation.</li>
+        <li><strong>NEUTRAL</strong> (40-54) — factors cancel. The data
+        isn't telling you to do anything.</li>
+        <li><strong>CAUTION</strong> (25-39) — more factors negative than
+        positive. Trend down, RS lagging, smart money distributing.</li>
+        <li><strong>WEAK</strong> (0-24) — broadly negative. Almost always
+        reflects a clear downtrend confirmed by deteriorating fundamentals.</li>
+      </ul>
+
+      <h2>Why descriptive, not prescriptive</h2>
+      <p>The previous version of these labels said BUY NOW, STRONG
+      ACCUMULATE, ACCUMULATE, HOLD, WATCH, AVOID. We changed them on day
+      one. Two reasons:</p>
+      <ul>
+        <li><strong>Legal.</strong> Prescriptive language pushes you toward
+        being classified as an investment adviser in the US, AU, and UK.
+        Descriptive language ("here's what the data says") protects the
+        publisher's exemption.</li>
+        <li><strong>Honest.</strong> A score of 92 doesn't mean you should
+        buy. It means six independent signals are aligned. Whether to act
+        depends on your portfolio, risk tolerance, time horizon, and tax
+        situation — none of which we know.</li>
+      </ul>
+
+      <h2>What a label change means</h2>
+      <p>The most useful watchlist signal isn't an absolute level — it's a
+      transition. CONSTRUCTIVE → STRONG SETUP is a meaningful shift; STRONG
+      SETUP → STRONG SETUP with the score moving from 71 to 84 is also
+      meaningful. We send watchlist alerts when the underlying score moves
+      by your threshold (default 10 points), not just when the label flips,
+      so you don't miss meaningful intra-tier moves.</p>
+
+      <p>If you're new and want to play with this, the public scorecard at
+      <a href="/scorecard">/scorecard</a> shows every top-10 we've published
+      and how each name moved the next day. That's the most honest demo of
+      what the labels actually predict.</p>
+    `,
+  },
+  {
+    slug: "why-we-score-112-not-5000",
+    title: "Why we score 112 tickers, not 5,000.",
+    excerpt:
+      "The Massive feed gives us 5,757 US tickers. We score about 112 of them. Here's why that's a feature, not a limitation — and what changes when we expand.",
+    publishedAt: "2026-05-03",
+    author: "Tapeline",
+    body: `
+      <p>The data feed (Massive, formerly Polygon.io) gives us coverage of
+      every listed US security. About 5,700 tickers, after filtering out
+      OTC. We score roughly 112 of them. Most users notice this within the
+      first day and ask why their favourite micro-cap isn't in the scanner.</p>
+
+      <p>It's deliberate. Here's the reasoning:</p>
+
+      <h2>The filter is liquidity</h2>
+      <p>The 112 are picked by daily dollar-volume — price × volume — and
+      the cutoff lands roughly at the bottom of the S&P MidCap 400.
+      Everything below that has bid-ask spreads wide enough that the
+      "score" stops representing anything actionable. A 90 score on a
+      $0.15 stock that trades 80,000 shares a day is a fiction; you can't
+      get in or out at that price.</p>
+
+      <h2>The factors aren't equally available</h2>
+      <p>Trend, momentum, and macro work fine on any ticker with a year of
+      bars. Fundamentals (Finnhub) and insider Form 4 (also Finnhub) are
+      sparse for sub-$200M caps. Smart-money via Quiver Quantitative tracks
+      8 elite funds — they don't hold $50M-cap micro-caps. Forcing a score
+      across all 5,700 would mean 4,000+ confidence values landing under
+      40%. That's noise, not signal.</p>
+
+      <h2>What you can actually scan</h2>
+      <p>The 112 covers basically every name a retail trader is plausibly
+      considering: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, the rest of
+      the FANG layer, the major financial / energy / industrial / healthcare
+      mega-caps, and 32 commodity / sector ETFs (gold, silver, oil, gas,
+      ag, copper, uranium, miners, plus all the major SPDR sector ETFs and
+      QQQ / SPY / IWM / DIA / VTI / SMH / TLT / GLD).</p>
+
+      <h2>What's on the post-launch list</h2>
+      <p>Universe expansion to ~500 tickers, prioritising names the active
+      user base actually scans. The infrastructure is wired (the 5,700-row
+      universe table is auto-populated from Massive's reference API on a
+      weekly cron). What's missing is the daily scoring pass for the wider
+      slice — that's a Finnhub-rate-limit thing, not a code thing. When
+      enough Premium users put a name like AMD at $200B mcap on their
+      watchlists we'll bump it into the active scoring set.</p>
+
+      <p>If a ticker you care about isn't in the scanner, watch it on the
+      watchlist page anyway — it'll show price + 1d change but no score.
+      We'll likely add it to the active set next universe-refresh cycle.</p>
+    `,
+  },
+  {
     slug: "the-formula-is-public",
     title: "The formula is public. Here's why that matters.",
     excerpt:
       "Every other prosumer score-per-ticker tool hides their methodology as IP. We publish the six factors and the exact weights — because the day the formula stops working, you should know to leave.",
-    publishedAt: "2026-05-03",
+    publishedAt: "2026-05-02",
     author: "Tapeline",
     body: `
       <p>If you ask Tipranks why a stock has a 7/10 Smart Score, you get
