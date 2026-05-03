@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = { title: "Privacy Policy — Tapeline" };
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <Link href="/" className="text-sm text-muted hover:text-fg">&larr; Home</Link>
-      <h1 className="mt-6 text-4xl font-bold tracking-tight">Privacy Policy</h1>
+    <main className="min-h-screen">
+      <MarketingNav />
+      <div className="mx-auto max-w-3xl px-6 py-16">
+      <h1 className="text-4xl font-bold tracking-tight">Privacy Policy</h1>
       <p className="mt-3 text-sm text-muted">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
 
       <div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-400">
@@ -50,6 +53,8 @@ export default function PrivacyPage() {
         <h2 className="mt-6 text-lg font-semibold text-fg">Contact</h2>
         <p><a href="mailto:privacy@tapeline.io" className="text-accent">privacy@tapeline.io</a></p>
       </div>
+      </div>
+      <MarketingFooter />
     </main>
   );
 }

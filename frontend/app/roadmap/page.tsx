@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { RoadmapItems, type RoadmapItem } from "@/components/RoadmapItems";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = {
   title: "Roadmap — Tapeline",
@@ -39,9 +41,7 @@ const ITEMS: RoadmapItem[] = [
 export default function RoadmapPage() {
   return (
     <main className="min-h-screen">
-      <div className="mx-auto max-w-4xl px-6 pt-10 pb-4">
-        <Link href="/" className="text-sm text-muted hover:text-fg">← Home</Link>
-      </div>
+      <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-6 py-12">
         <p className="eyebrow">Roadmap</p>
@@ -62,6 +62,8 @@ export default function RoadmapPage() {
           </Link>
         </div>
       </section>
+
+      <MarketingFooter />
     </main>
   );
 }

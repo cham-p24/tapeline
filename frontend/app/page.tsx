@@ -1,25 +1,12 @@
 import Link from "next/link";
 import { ScannerPreview } from "@/components/ScannerPreview";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen">
-      {/* Nav */}
-      <nav className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-6 rounded-full bg-accent" />
-            <span className="text-lg font-semibold tracking-tight">Tapeline</span>
-          </div>
-          <div className="flex items-center gap-5">
-            <Link href="/how-it-works" className="hidden text-sm text-muted hover:text-fg sm:inline">How it works</Link>
-            <Link href="/scorecard" className="hidden text-sm text-muted hover:text-fg sm:inline">Scorecard</Link>
-            <Link href="/pricing" className="hidden text-sm text-muted hover:text-fg sm:inline">Pricing</Link>
-            <Link href="/signin" className="hidden text-sm text-muted hover:text-fg sm:inline">Sign in</Link>
-            <Link href="/signup" className="btn-primary">Start free</Link>
-          </div>
-        </div>
-      </nav>
+      <MarketingNav />
 
       {/* Hero + product preview in one fold */}
       <section className="mx-auto max-w-6xl px-6 pt-16 pb-12">
@@ -106,36 +93,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-6 py-8">
-          <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-6 rounded-full bg-accent" />
-              <span className="font-semibold">Tapeline</span>
-            </div>
-            <div className="flex flex-wrap gap-5 text-xs text-muted">
-              <Link href="/how-it-works" className="hover:text-fg">How it works</Link>
-              <Link href="/pricing" className="hover:text-fg">Pricing</Link>
-              <Link href="/scorecard" className="hover:text-fg">Scorecard</Link>
-              <Link href="/changelog" className="hover:text-fg">Changelog</Link>
-              <Link href="/roadmap" className="hover:text-fg">Roadmap</Link>
-              <Link href="/legal/terms" className="hover:text-fg">Terms</Link>
-              <Link href="/legal/privacy" className="hover:text-fg">Privacy</Link>
-              <Link href="/legal/risk" className="hover:text-fg">Risk</Link>
-            </div>
-          </div>
-
-          <p className="mt-6 text-xs leading-relaxed text-muted">
-            <strong className="text-fg">⚠ Not investment advice.</strong>{" "}
-            Tapeline is a quantitative data analysis tool. Scores and signals are informational
-            only and do not constitute buy or sell recommendations. Past performance does not
-            indicate future results. Trading securities involves substantial risk of loss.
-            Consult a licensed financial advisor before making investment decisions.
-          </p>
-          <p className="mt-3 text-xs text-muted">&copy; {new Date().getFullYear()} Tapeline. All rights reserved.</p>
-        </div>
-      </footer>
+      <MarketingFooter />
     </main>
   );
 }

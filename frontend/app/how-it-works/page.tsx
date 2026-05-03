@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = { title: "How it works — Tapeline" };
 
@@ -23,12 +25,7 @@ const SIGNALS = [
 export default function HowItWorksPage() {
   return (
     <main className="min-h-screen">
-      <div className="section pt-10 pb-4">
-        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg transition-colors">
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none"><path d="M10 4l-4 4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Home
-        </Link>
-      </div>
+      <MarketingNav />
 
       {/* Hero */}
       <section className="relative section py-20">
@@ -149,6 +146,8 @@ export default function HowItWorksPage() {
           Start free trial &rarr;
         </Link>
       </section>
+
+      <MarketingFooter />
     </main>
   );
 }

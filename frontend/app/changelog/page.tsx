@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = {
   title: "Changelog — Tapeline",
@@ -129,9 +131,7 @@ const TAG_STYLE: Record<Entry["tag"], string> = {
 export default function ChangelogPage() {
   return (
     <main className="min-h-screen">
-      <div className="mx-auto max-w-3xl px-6 pt-10 pb-4">
-        <Link href="/" className="text-sm text-muted hover:text-fg">← Home</Link>
-      </div>
+      <MarketingNav />
 
       <section className="mx-auto max-w-3xl px-6 py-12">
         <p className="eyebrow">Changelog</p>
@@ -173,6 +173,8 @@ export default function ChangelogPage() {
           </Link>
         </div>
       </section>
+
+      <MarketingFooter />
     </main>
   );
 }

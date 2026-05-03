@@ -8,6 +8,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export default function ScorecardPage() {
   const [data, setData] = useState<{
@@ -22,11 +24,12 @@ export default function ScorecardPage() {
   const dates = Object.keys(data.days).sort().reverse();
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="min-h-screen">
+      <MarketingNav />
+      <div className="mx-auto max-w-5xl px-6 py-10">
       <div className="mb-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-sm">
-          <div className="h-2 w-6 rounded-full bg-accent" />
-          <span className="font-semibold">Tapeline</span>
+        <Link href="/pricing" className="text-sm text-muted hover:text-fg">
+          See pricing →
         </Link>
         <Link href="/app/scanner" className="btn-primary text-sm">Open live scanner &rarr;</Link>
       </div>
@@ -93,9 +96,8 @@ export default function ScorecardPage() {
         </div>
       )}
 
-      <footer className="mt-16 border-t border-border pt-6 text-xs text-muted">
-        <p><strong>Not investment advice.</strong> Past performance does not indicate future results. Trading involves substantial risk of loss.</p>
-      </footer>
+      </div>
+      <MarketingFooter />
     </main>
   );
 }

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = {
   title: "Tapeline vs Finviz — fair comparison",
@@ -25,9 +27,7 @@ const ROWS: Array<{ label: string; tapeline: string; competitor: string; advanta
 export default function VsFinvizPage() {
   return (
     <main className="min-h-screen">
-      <div className="mx-auto max-w-4xl px-6 pt-10 pb-4">
-        <Link href="/" className="text-sm text-muted hover:text-fg">← Home</Link>
-      </div>
+      <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-6 py-12">
         <p className="eyebrow">Comparison</p>
@@ -89,6 +89,8 @@ export default function VsFinvizPage() {
           Or read the <Link href="/how-it-works" className="link">methodology</Link> first.
         </p>
       </section>
+
+      <MarketingFooter />
     </main>
   );
 }

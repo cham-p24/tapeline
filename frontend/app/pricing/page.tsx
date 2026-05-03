@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = { title: "Pricing — Tapeline" };
 
 export default function PricingPage() {
   return (
     <main className="min-h-screen">
-      <div className="section pt-10 pb-4 flex items-center justify-between gap-4">
-        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg transition-colors">
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none"><path d="M10 4l-4 4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Back to home
-        </Link>
+      <MarketingNav />
+      <div className="section pt-6 pb-2 flex items-center justify-end gap-4">
         <a href="#compare" className="text-sm text-muted hover:text-fg transition-colors">
           Jump to comparison ↓
         </a>
@@ -72,6 +71,8 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+
+      <MarketingFooter />
     </main>
   );
 }

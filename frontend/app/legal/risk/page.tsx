@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { MarketingNav } from "@/components/MarketingNav";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = { title: "Risk Disclosure — Tapeline" };
 
 export default function RiskPage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <Link href="/" className="text-sm text-muted hover:text-fg">&larr; Home</Link>
-      <h1 className="mt-6 text-4xl font-bold tracking-tight">Risk Disclosure</h1>
+    <main className="min-h-screen">
+      <MarketingNav />
+      <div className="mx-auto max-w-3xl px-6 py-16">
+      <h1 className="text-4xl font-bold tracking-tight">Risk Disclosure</h1>
       <p className="mt-3 text-sm text-muted">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
 
       <div className="mt-8 rounded-lg border border-down/40 bg-down/5 p-6">
@@ -129,6 +132,8 @@ export default function RiskPage() {
           For a full picture, read our <Link href="/legal/terms" className="text-accent">Terms of Service</Link> and <Link href="/legal/privacy" className="text-accent">Privacy Policy</Link>.
         </p>
       </div>
+      </div>
+      <MarketingFooter />
     </main>
   );
 }
