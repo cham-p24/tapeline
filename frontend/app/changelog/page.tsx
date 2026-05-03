@@ -16,6 +16,21 @@ type Entry = {
 // Newest first. Edit at the top when shipping; never edit historical entries.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-03",
+    version: "0.1.7",
+    tag: "shipped",
+    title: "Real earnings + IPO calendars via Finnhub; production DB live",
+    body: [
+      "Finnhub adapter (services/finnhub_feed.py) wired with calendar + fundamentals + insider endpoints. 24h–7d caching, graceful degradation to mock when no key.",
+      "Real earnings calendar replaces mock — 1,500 upcoming events flowing for /app/earnings page.",
+      "Real IPO calendar replaces mock — actual upcoming listings (Rare Earths Americas, HawkEye 360 etc.) on /app/ipos page.",
+      "Worker calendar refresh now runs daily (was first-boot only) so new events appear without restart.",
+      "Telegram bot @Tapeline_Bot wired and verified live.",
+      "Neon production database (tapeline-prod, AWS Sydney, Postgres 17.8) created on Launch tier — all 13 Alembic migrations applied successfully.",
+      "compute_fundamentals_score helper landed (verified AAPL scoring 79.1/100). Per-tick wiring of sub_fundamentals into the composite score is the next batch — needs a pre-fetch worker task to populate the cache.",
+    ],
+  },
+  {
     date: "2026-05-02",
     version: "0.1.6",
     tag: "shipped",

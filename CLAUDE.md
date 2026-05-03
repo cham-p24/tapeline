@@ -78,6 +78,7 @@ Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data fo
 
 ## Known issues / partially-built
 - **`rate_direction` in regime is a placeholder** — `polygon_feed.py:fetch_regime` still returns hardcoded value. Breadth_pct + sector_leaders now computed live from the snapshot universe each tick. DXY/10Y/VIX use FRED when configured.
+- **Finnhub fundamentals not yet wired into per-tick `sub_fundamentals`** — `services/finnhub_feed.py` has `fetch_basic_financials()` + `compute_fundamentals_score()` working live (verified AAPL scored 79.1/100). Calendars (IPO + earnings) already use Finnhub when configured. To wire fundamentals into the score: pre-fetch all 870 tickers weekly, cache results, have `polygon_feed.fetch_snapshots` read from cache instead of generating random.
 - **No `/v3/reference/tickers/{sym}` sector backfill** — universe auto-discovery from Polygon adds new tickers with `sector="Unknown"`. Worker should backfill sectors lazily for tickers users actually look at.
 - **Web push send needs `pywebpush`** — `services/web_push.py` imports it conditionally; if not installed, the channel logs a skip and continues. Run `pip install pywebpush` in the backend venv to activate.
 - **Frontend tests cover ~6 surfaces** — Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels, BillingToggle, HoldingsPage. Grow with billing flow + alerts CRUD + scanner page next.
@@ -118,6 +119,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/mock_feed.py` — fake data generator (112 tickers incl. 32 commodity ETFs)
 - `backend/app/services/polygon_feed.py` — real Polygon adapter (stubbed in places)
 - `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds (wired end-to-end with mock fallback)
+- `backend/app/services/finnhub_feed.py` — Finnhub fundamentals + earnings + IPO calendars + insider Form 4. Calendar replacement wired into `calendar_feed.upcoming_*`; fundamentals → score wiring still TODO.
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
 - `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with five-channel delivery (email / web push / Discord / Telegram / SMS)

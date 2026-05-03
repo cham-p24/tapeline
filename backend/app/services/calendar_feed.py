@@ -1,14 +1,21 @@
 """
 IPO + earnings calendar data.
 
-Production path: Polygon.io IPO + earnings endpoints. Dev path: synthesized
-data so UI works without a Polygon key.
+Production path: Finnhub `/calendar/ipo` and `/calendar/earnings` endpoints
+(free tier covers Tapeline). Dev path: synthesized data so UI works without
+a Finnhub key.
+
+Use `upcoming_ipos()` / `upcoming_earnings()` as the canonical entry points —
+they try Finnhub first and fall back to the mock generators when no key is set.
 """
 from __future__ import annotations
 
+import logging
 import random
 from datetime import date, timedelta
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 # Handful of real upcoming-IPO style names for dev mode (fake dates)
@@ -72,3 +79,47 @@ def mock_upcoming_earnings(days_ahead: int = 14) -> list[dict[str, Any]]:
             "surprise_pct": None,
         })
     return sorted(rows, key=lambda r: r["report_date"])
+
+
+# ---- Canonical entry points (Finnhub-aware, mock fallback) ----------------
+
+async def upcoming_ipos(days_ahead: int = 90) -> list[dict[str, Any]]:
+    """
+    Returns the IPO calendar, preferring real Finnhub data when configured.
+    Falls back to mock if Finnhub is unavailable so the /app/ipos page is
+    never empty.
+    """
+    from app.services.finnhub_feed import fetch_ipo_calendar
+    real = await fetch_ipo_calendar(days_ahead=days_ahead)
+    if real:
+        # Convert ISO date strings (from cache) back to date objects for DB write
+        for r in real:
+            if isinstance(r.get("expected_date"), str):
+                try:
+                    r["expected_date"] = date.fromisoformat(r["expected_date"])
+                except ValueError:
+                    pass
+        logger.info("calendar.ipos source=finnhub count=%d", len(real))
+        return real
+    logger.info("calendar.ipos source=mock")
+    return mock_upcoming_ipos(days_ahead=days_ahead)
+
+
+async def upcoming_earnings(days_ahead: int = 14) -> list[dict[str, Any]]:
+    """
+    Returns the earnings calendar, preferring real Finnhub data when configured.
+    Falls back to mock if Finnhub is unavailable.
+    """
+    from app.services.finnhub_feed import fetch_earnings_calendar
+    real = await fetch_earnings_calendar(days_ahead=days_ahead)
+    if real:
+        for r in real:
+            if isinstance(r.get("report_date"), str):
+                try:
+                    r["report_date"] = date.fromisoformat(r["report_date"])
+                except ValueError:
+                    pass
+        logger.info("calendar.earnings source=finnhub count=%d", len(real))
+        return real
+    logger.info("calendar.earnings source=mock")
+    return mock_upcoming_earnings(days_ahead=days_ahead)

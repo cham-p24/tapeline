@@ -180,9 +180,10 @@ async def tick() -> None:
         await _run_backcheck()
         _last_backcheck = started
 
-    # Seed mock calendar (IPOs + earnings) on first boot
+    # Calendar refresh (IPOs + earnings) — daily cadence. Finnhub-aware
+    # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
     global _last_calendar_seed  # noqa: PLW0603
-    if _last_calendar_seed is None:
+    if _last_calendar_seed is None or (started - _last_calendar_seed).total_seconds() >= 86400:
         await _seed_calendar()
         _last_calendar_seed = started
 
@@ -431,22 +432,30 @@ async def _refresh_elite_13f() -> None:
 
 
 async def _seed_calendar() -> None:
-    """Seed mock IPO + earnings events on first boot (idempotent)."""
+    """
+    Refresh IPO + earnings events daily.
+
+    Uses Finnhub when FINNHUB_API_KEY is set (real upcoming events); falls
+    back to mock generators otherwise. Replaces the existing tables on each
+    refresh so stale events drop off naturally — Finnhub returns the rolling
+    window, no need to track which rows were inserted previously.
+    """
     from app.models import EarningsEvent, IPOEvent
-    from app.services.calendar_feed import mock_upcoming_earnings, mock_upcoming_ipos
+    from app.services.calendar_feed import upcoming_earnings, upcoming_ipos
+    from sqlalchemy import delete
 
     async with session_scope() as session:
-        ipos_r = await session.execute(select(IPOEvent).limit(1))
-        if ipos_r.scalar_one_or_none() is None:
-            for row in mock_upcoming_ipos():
-                session.add(IPOEvent(**row))
-            logger.info("calendar.ipos_seeded")
+        # IPOs — replace whole table with the fresh window
+        await session.execute(delete(IPOEvent))
+        for row in await upcoming_ipos():
+            session.add(IPOEvent(**row))
 
-        earnings_r = await session.execute(select(EarningsEvent).limit(1))
-        if earnings_r.scalar_one_or_none() is None:
-            for row in mock_upcoming_earnings():
-                session.add(EarningsEvent(**row))
-            logger.info("calendar.earnings_seeded")
+        # Earnings — same pattern
+        await session.execute(delete(EarningsEvent))
+        for row in await upcoming_earnings():
+            session.add(EarningsEvent(**row))
+
+    logger.info("calendar.refreshed")
 
 
 async def main() -> None:
