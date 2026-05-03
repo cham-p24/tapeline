@@ -89,7 +89,69 @@ async def unhandled_exception(request: Request, exc: Exception):
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
+    """Bare-bones liveness probe — must stay cheap (no DB, no external calls).
+    Used by Fly.io health checks + uptime monitors that just need a 200."""
     return {"status": "ok", "app": settings.app_name, "env": settings.app_env, "version": "0.1.0"}
+
+
+@app.get("/api/status")
+async def status() -> dict[str, object]:
+    """Richer status check — for the public /status page and external uptime
+    monitors that want feature-level signals (DB reachable, ticker count,
+    last worker tick). Wraps each probe in try/except so a single broken
+    feature doesn't take the whole status response down.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import func, select
+
+    from app.db import session_scope
+    from app.models import NewsItem, RegimeState, Ticker
+
+    out: dict[str, object] = {
+        "status": "ok",
+        "app": settings.app_name,
+        "env": settings.app_env,
+        "version": "0.1.0",
+        "now": datetime.now(UTC).isoformat(),
+        "checks": {},
+    }
+    checks: dict[str, dict[str, object]] = out["checks"]  # type: ignore[assignment]
+
+    try:
+        async with session_scope() as session:
+            n_tickers = (await session.execute(select(func.count(Ticker.id)))).scalar_one()
+            n_news = (await session.execute(select(func.count(NewsItem.id)))).scalar_one()
+            regime_row = (await session.execute(select(RegimeState).where(RegimeState.id == 1))).scalar_one_or_none()
+            checks["database"] = {"status": "ok", "tickers": int(n_tickers or 0), "news_items": int(n_news or 0)}
+            if regime_row is not None and regime_row.updated_at is not None:
+                age = (datetime.now(UTC) - regime_row.updated_at).total_seconds()
+                checks["worker_last_tick"] = {
+                    "status": "ok" if age < 300 else "stale",
+                    "regime": regime_row.regime,
+                    "updated_at": regime_row.updated_at.isoformat(),
+                    "age_seconds": int(age),
+                }
+            else:
+                checks["worker_last_tick"] = {"status": "unknown", "detail": "no regime row yet"}
+    except Exception as exc:
+        checks["database"] = {"status": "error", "detail": str(exc)[:200]}
+        out["status"] = "degraded"
+
+    # Per-vendor configured-ness (truthy presence, not connectivity — keeps this cheap)
+    checks["integrations"] = {
+        "massive": bool(settings.massive_api_key or settings.polygon_api_key),
+        "finnhub": bool(settings.finnhub_api_key),
+        "fred": bool(settings.fred_api_key),
+        "stripe": bool(settings.stripe_secret_key),
+        "resend": bool(settings.resend_api_key),
+    }
+
+    # If any required check is hard-failing, expose 503 so uptime monitors notice.
+    if checks.get("database", {}).get("status") == "error":
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content=out)
+    return out
 
 
 app.include_router(scanner.router, prefix="/api/scanner", tags=["scanner"])
