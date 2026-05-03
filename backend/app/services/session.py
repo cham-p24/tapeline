@@ -71,8 +71,14 @@ def verify_session_token(token: str) -> str | None:
 
 
 def session_cookie_kwargs() -> dict:
-    """Cookie settings safe for both dev (http localhost) and prod (https)."""
-    return {
+    """Cookie settings safe for both dev (http localhost) and prod (https).
+
+    Prod note: explicitly set domain=".tapeline.io" so the cookie is shared
+    between the API subdomain (api.tapeline.io) and the frontend (tapeline.io).
+    Without this, the cookie set by the API would only be visible to api.tapeline.io
+    and the Next.js middleware on tapeline.io couldn't see it for auth checks.
+    """
+    kwargs = {
         "key": SESSION_COOKIE,
         "httponly": True,
         "samesite": "lax",
@@ -80,6 +86,20 @@ def session_cookie_kwargs() -> dict:
         "max_age": SESSION_DAYS * 24 * 3600,
         "path": "/",
     }
+    # In prod, derive the cookie domain from APP_URL host so the cookie is
+    # shared across the apex + api subdomain.
+    if settings.app_env != "development":
+        try:
+            from urllib.parse import urlparse
+            host = urlparse(settings.app_url).hostname or ""
+            # Strip leading "www." if present so we set the eTLD+1 form
+            if host.startswith("www."):
+                host = host[4:]
+            if host:
+                kwargs["domain"] = host  # e.g. "tapeline.io" → covers tapeline.io + *.tapeline.io
+        except Exception:
+            pass
+    return kwargs
 
 
 def constant_time_equals(a: str, b: str) -> bool:

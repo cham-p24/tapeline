@@ -74,10 +74,14 @@ async def tick() -> None:
     """One scoring cycle — refresh all four product tabs."""
     started = datetime.now(UTC)
 
-    snapshots = fetch_snapshots()
-    squeezes = fetch_squeezes()
-    regime = fetch_regime()
-    new_trades = fetch_congress_trades()
+    # polygon_feed.fetch_snapshots / fetch_regime are async (HTTP calls);
+    # mock_feed.fetch_squeezes / fetch_congress_trades are sync.
+    # Await the async ones so we get actual data instead of a coroutine object.
+    import inspect
+    snapshots = await fetch_snapshots() if inspect.iscoroutinefunction(fetch_snapshots) else fetch_snapshots()
+    squeezes = await fetch_squeezes() if inspect.iscoroutinefunction(fetch_squeezes) else fetch_squeezes()
+    regime = await fetch_regime() if inspect.iscoroutinefunction(fetch_regime) else fetch_regime()
+    new_trades = await fetch_congress_trades() if inspect.iscoroutinefunction(fetch_congress_trades) else fetch_congress_trades()
 
     # Live breadth: % of universe with sub_trend > 50 (proxy for "above
     # the 200DMA" since the trend factor incorporates that). Replaces the
