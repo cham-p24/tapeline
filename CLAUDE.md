@@ -4,13 +4,13 @@ SaaS quantitative market scanner for retail stock pickers. Lives at `C:\Project 
 
 **Pitch:** "Every other scanner gives you 500 filters and a blank stare. Tapeline gives you one number, one sentence, and a public track record."
 
-**Domain:** `tapeline.io` (NOT YET REGISTERED).
+**Domain:** `tapeline.io` — **REGISTERED + LIVE** (Cloudflare DNS, Vercel frontend, Fly.io backend at `api.tapeline.io`).
 
 ## Boundary — do not touch
 The personal trading system at `C:\signal-system\` is a separate project. Tapeline reuses the *scoring approach* but does NOT share files with it. Never edit anything outside `C:\Project 1\`.
 
 ## Operational facts
-- **No git repo yet.** Treat file edits as one-way — no rollback, no `git diff`. Initialising git is on the user's TODO list.
+- **Git is live** at https://github.com/cham-p24/tapeline. CI deploys main → Fly.io (backend) + Vercel (frontend). Use normal commit/push flow.
 - **No Docker required for dev.** Run `.\scripts\run_nodocker.ps1` from project root. Uses SQLite, opens browser to `http://localhost:3000`.
 - **Owner login** (already seeded): `owner@tapeline.io` / `TapelineOwner!2026` — premium tier, admin. Re-seed via `python -m app.scripts.seed_owner` from `backend/` (idempotent; reads `OWNER_EMAIL` / `OWNER_PASSWORD` env vars).
 - **Dev auth bypass:** `Authorization: Bearer dev-bypass` returns a premium token in dev. **Strip before production.**
@@ -23,20 +23,22 @@ FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 14 + TypeScript + 
 Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
-**Three tiers** (decided 2026-04-26, Free hardened 2026-04-27):
+**Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
-- **Pro** $29/mo or $290/yr — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV
-- **Premium** $49/mo or $490/yr — everything in Pro + Congressional trades, Telegram unlimited, email unlimited, public API (1,000/day), elite 13F holdings, priority support
+- **Pro** $29/mo OR **$24.99/mo billed annually** ($299/yr · save $49) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push + Discord
+- **Premium** $49/mo OR **$40.99/mo billed annually** ($491/yr · save $97) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, SMS, email unlimited, public API (1,000/day), priority support
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
 **Trial:** auto-started on signup gives **PREMIUM** for 14 days, no card. At expiry, hourly worker task `_downgrade_expired_trials` drops users with no `stripe_customer_id` straight to `free` (skip the Pro middle so loss aversion bites hardest). `TrialBanner.tsx` shows the countdown.
 
-## Pricing source-of-truth (all kept in sync as of 2026-04-26)
-- `backend/app/services/tier.py` — feature gating + caps
-- `frontend/components/PricingTable.tsx` — pricing UI
-- `frontend/components/ComparisonTable.tsx` — comparison table on /pricing
+## Pricing source-of-truth (all kept in sync as of 2026-05-03)
+- `backend/app/services/tier.py` — feature gating + caps (no $ amounts here)
+- `frontend/components/PricingTable.tsx` — pricing UI on /pricing landing
+- `frontend/components/ComparisonTable.tsx` — feature comparison table (used on /pricing AND /app/billing)
+- `frontend/app/app/billing/page.tsx` — in-app upgrade flow with embedded ComparisonTable
 - `docs/PRICING.md` — narrative + unit economics
+- `docs/OPERATIONS.md` — Stripe Price ID setup steps
 
 ## Signal labels — do not change (legal posture)
 Descriptive, NOT prescriptive — protects the publisher's exemption.
@@ -55,9 +57,9 @@ score = 0.25*trend + 0.20*relative_strength + 0.15*fundamentals
 ```
 
 ## Mock-to-real data switch
-**No env flag, no auto-switch.** Currently the worker imports `app.services.mock_feed` directly. To switch to live data: add `MASSIVE_API_KEY` to `.env` (sign up at https://massive.com/pricing — Stocks Starter $29/mo), then **manually edit the imports at the top of `backend/app/workers/signal_publisher.py`** (swap `mock_feed` → `polygon_feed`) and restart the worker. See `QUICKSTART.md` lines 40–49 for the exact swap.
+**Production runs on real data.** The worker imports `app.services.polygon_feed` (Massive-backed). `mock_feed` only fires when no `MASSIVE_API_KEY` / `POLYGON_API_KEY` is set (dev fallback). The adapter file is still named `polygon_feed.py` because Polygon.io rebranded to Massive on 2025-10-30 — same API, same auth, same endpoint shapes, only the hostname changed (`api.polygon.io` → `api.massive.com`). Massive accepts both `MASSIVE_API_KEY` and the legacy `POLYGON_API_KEY` env vars.
 
-The adapter file is still named `polygon_feed.py` because Polygon.io rebranded to Massive on 2025-10-30 — same API, same auth, same endpoint shapes, only the hostname changed (`api.polygon.io` → `api.massive.com`). Massive also accepts the legacy `POLYGON_API_KEY` env var for an extended grace period.
+**Vendor-key gating gotcha (fixed 2026-05-03):** several services originally checked only `settings.polygon_api_key`. With `MASSIVE_API_KEY` set they fell through to mock. Fixed in `news_feed.py` (per-ticker headlines were duplicate-Barrons mock entries), `signal_publisher._refresh_universe` (weekly IPO / ETF discovery never ran). When adding new vendor-key gates, **always check both** — see `polygon_feed._api_key()` for the canonical pattern.
 
 ## Universe + commodities
 Mock universe is 112 tickers (80 equities + 32 commodity ETFs). Commodity ETFs added 2026-04-26 with sector="Commodities" — gold, silver, oil, gas, ag, copper, uranium, miners. Polygon Starter doesn't include futures contracts, so commodity exposure is via ETFs only. Auto-discovery of new ETFs via Polygon `/v3/reference/tickers` is on the post-launch list (not wired yet).

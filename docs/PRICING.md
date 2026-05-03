@@ -4,27 +4,32 @@
 
 ### Free — "Browser"
 **$0/mo**
-- Scanner: top 10 tickers only, **15-min delayed**
+- Scanner: top 20 tickers only, **24-hour delayed**
 - Market regime: basic view (bull/neutral/bear label only)
-- No alerts, no historical data, no exports
-- Purpose: lead magnet + landing-page demo
+- Watchlist: 5 tickers, no alerts
+- Public scorecard access
+- Purpose: lead magnet + landing-page demo + loss-aversion lever at trial expiry
 
 ### Pro — "Scanner"
-**$29/mo** or $290/yr (save 2 months)
-- Scanner: full ~870-ticker universe, **live (30s refresh)**
+**$29/mo** or **$24.99/mo billed annually** ($299/yr · save $49)
+- Scanner: full ~870-ticker universe, **live (sub-60s refresh)**
 - Squeeze Watch: full setup list with windows
 - Market regime: full view with VIX/DXY/10Y/sector leaders
+- Watchlist (50) with smart alerts
 - Email alerts: up to 10 per day
-- CSV export
-- No Congress data, no Telegram, no API
+- Daily briefing email · CSV export
+- Browser push + Discord alerts
+- No Congress data, no Telegram/SMS, no API
 
 ### Premium — "Analyst"
-**$49/mo** or $490/yr (save 2 months)
+**$49/mo** or **$40.99/mo billed annually** ($491/yr · save $97)
 - Everything in Pro
 - **Congressional trade feed** (daily updates, ticker aggregation)
-- **Telegram alerts** (unlimited)
+- **Elite 13F holdings** (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
+- **Telegram alerts** (unlimited) + **SMS alerts** (Twilio)
 - **API access** (1,000 requests/day)
 - Email alerts: unlimited
+- Watchlist (200) · saved scans (100)
 - Priority support
 
 ---
@@ -79,8 +84,8 @@ $105k ARR by month 12 is the stretch goal. Even 25% of that is a validated side 
 
 ## Annual plan pricing math
 
-Monthly → Annual discount is **~16.7%** (2 months free):
-- Pro: $29 × 12 = $348 → $290 annual
-- Premium: $49 × 12 = $588 → $490 annual
+Monthly → Annual discount is **~14% on Pro / ~16.5% on Premium** (close to 2 months free), with charm pricing on the per-month equivalent:
+- Pro: $29 × 12 = $348 → **$299 annual** ($24.99/mo · save $49/yr)
+- Premium: $49 × 12 = $588 → **$491 annual** ($40.99/mo · save $97/yr)
 
 Annual plans should be **≥40% of paid revenue** by month 6 — they dramatically reduce churn.
