@@ -68,6 +68,10 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    # Windows + psycopg async needs SelectorEventLoop (ProactorEventLoop is the
+    # default on Windows but psycopg explicitly errors on it). No-op on Linux/macOS.
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
