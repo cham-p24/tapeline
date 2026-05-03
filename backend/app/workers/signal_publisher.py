@@ -53,6 +53,7 @@ _last_holdings_refresh: datetime | None = None
 _last_drip_check: datetime | None = None
 _last_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
+_last_fundamentals_refresh: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -233,6 +234,17 @@ async def tick() -> None:
         await _refresh_universe()
         _last_universe_refresh = started
 
+    # Daily Finnhub fundamentals pre-fetch — populates the in-memory cache that
+    # polygon_feed.fetch_snapshots reads per tick. Fundamentals don't change
+    # tick-to-tick so once-per-day refresh is plenty.
+    global _last_fundamentals_refresh  # noqa: PLW0603
+    if settings.finnhub_api_key and (
+        _last_fundamentals_refresh is None
+        or (started - _last_fundamentals_refresh).total_seconds() >= 86400
+    ):
+        await _refresh_fundamentals_cache()
+        _last_fundamentals_refresh = started
+
     # End-of-day watchlist email digest. Fires once per UTC day shortly after
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
     # process memory to avoid double-fires within the same day. Worker restart
@@ -379,6 +391,43 @@ async def _downgrade_expired_trials() -> None:
                 )
     except Exception:
         logger.exception("trial.downgrade_email_failed")
+
+
+async def _refresh_fundamentals_cache() -> None:
+    """
+    Daily pre-fetch of Finnhub fundamentals for every ticker in the DB.
+    Populates finnhub_feed._FUND_SCORE_CACHE so polygon_feed.fetch_snapshots
+    can read real sub_fundamentals values per tick (instead of random mock).
+
+    Free-tier safety: 60 calls/min limit; 870 tickers ≈ 14.5 min if all are
+    fresh, ~30 sec if everything is cached (most calls hit the per-symbol
+    7-day disk cache from finnhub_feed.fetch_basic_financials).
+    """
+    from app.services.finnhub_feed import (
+        fetch_basic_financials,
+        compute_fundamentals_score,
+        set_cached_score,
+        fund_cache_size,
+    )
+
+    async with session_scope() as session:
+        result = await session.execute(select(Ticker.symbol))
+        symbols = [row[0] for row in result.all()]
+
+    refreshed = 0
+    for sym in symbols:
+        try:
+            metrics = await fetch_basic_financials(sym)
+            if metrics:
+                score = compute_fundamentals_score(metrics)
+                set_cached_score(sym, score)
+                refreshed += 1
+        except Exception:
+            logger.exception("fundamentals.fetch_failed symbol=%s", sym)
+        # Stay well under 60/min cap — sleep ~1.1s between calls
+        await asyncio.sleep(1.1)
+
+    logger.info("fundamentals.refreshed scored=%d cache_size=%d", refreshed, fund_cache_size())
 
 
 async def _refresh_universe() -> None:

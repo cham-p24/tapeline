@@ -80,31 +80,77 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
 
 async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, Any]]:
     """
-    Latest snapshots for a list of symbols. Returns rows compatible with
-    the worker's upsert, matching the mock_feed schema.
+    Latest snapshots — returns rows in the same schema as mock_feed.fetch_snapshots
+    so the worker's upsert path stays unchanged.
+
+    Strategy (hybrid until the full per-factor pipeline lands):
+    - **Real**: price, change_pct_1d, volume — from Massive snapshot endpoint
+    - **Real**: sub_fundamentals — from Finnhub cache (if pre-fetched), else mock
+    - **Mock**: sub_trend, sub_rs, sub_momentum, sub_macro, sub_smart_money,
+      reason, confidence_pct — until each factor's real source is wired
+
+    The composite `score` gets recomputed after merging so real fundamentals
+    actually move the needle (they're 15% of the total weight).
     """
+    from app.services.mock_feed import fetch_snapshots as _mock_snapshots, _signal_from_score
+    from app.services.finnhub_feed import get_cached_score
+
+    # Start with mock — gives us the full schema (sub_* + reason + confidence_pct)
+    base_rows = _mock_snapshots()
+
     if not _api_key():
-        raise RuntimeError("POLYGON_API_KEY not set — set it in .env and restart the worker")
+        # No Massive key — pure mock fallback
+        return base_rows
 
-    syms = symbols or DEFAULT_UNIVERSE
-    rows = []
+    # Pull real prices + volumes from Massive in one batched call
+    syms = [r["symbol"] for r in base_rows] if symbols is None else symbols
+    real_by_sym: dict[str, dict[str, Any]] = {}
 
-    async with httpx.AsyncClient() as client:
-        # Polygon's batched snapshot: /v2/snapshot/locale/us/markets/stocks/tickers?tickers=...
-        # Limit of tickers per call depends on tier; keep chunks <= 250 to be safe.
-        for i in range(0, len(syms), 250):
-            batch = syms[i : i + 250]
-            body = await _request(
-                client,
-                "/v2/snapshot/locale/us/markets/stocks/tickers",
-                params={"tickers": ",".join(batch)},
-            )
-            for t in body.get("tickers", []):
-                row = _to_scanner_row(t)
-                if row is not None:
-                    rows.append(row)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            for i in range(0, len(syms), 250):
+                batch = syms[i : i + 250]
+                body = await _request(
+                    client,
+                    "/v2/snapshot/locale/us/markets/stocks/tickers",
+                    params={"tickers": ",".join(batch)},
+                )
+                for t in body.get("tickers", []):
+                    naive = _to_scanner_row(t)
+                    if naive is not None:
+                        real_by_sym[naive["symbol"]] = naive
+    except Exception:
+        logger.exception("polygon.fetch_snapshots_failed — returning mock-only rows")
+        return base_rows
 
-    return rows
+    # Merge: real price/volume + real fundamentals + recomputed composite
+    for r in base_rows:
+        sym = r["symbol"]
+        real = real_by_sym.get(sym)
+        if real:
+            r["price"] = real["price"]
+            r["change_pct_1d"] = real["change_pct_1d"]
+            r["volume"] = real["volume"]
+
+        # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
+        fund = get_cached_score(sym)
+        if fund is not None:
+            r["sub_fundamentals"] = fund
+
+        # Recompute composite from updated sub_* — keeps all 6 factors blended.
+        # Weights mirror mock_feed/signal_publisher: trend .25 rs .20 fund .15 smart .15 macro .15 mom .10
+        composite = (
+            r["sub_trend"] * 0.25
+            + r["sub_rs"] * 0.20
+            + r["sub_fundamentals"] * 0.15
+            + r["sub_smart_money"] * 0.15
+            + r["sub_macro"] * 0.15
+            + r["sub_momentum"] * 0.10
+        )
+        r["score"] = round(max(0, min(100, composite)), 1)
+        r["signal"] = _signal_from_score(r["score"])
+
+    return base_rows
 
 
 def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:

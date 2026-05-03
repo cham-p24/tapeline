@@ -75,6 +75,33 @@ def configured() -> bool:
     return bool(_api_key())
 
 
+# ---- In-memory fundamentals score cache --------------------------------
+# Populated by the worker's daily _refresh_fundamentals task. Keyed by
+# uppercase symbol; value is the 0-100 sub_fundamentals score (or None
+# if Finnhub returned no data — typical for ETFs without P/E).
+# polygon_feed.fetch_snapshots reads from this cache per tick — the
+# expensive Finnhub fetches happen once per day, the cheap dict lookup
+# happens 60×/min during market hours.
+_FUND_SCORE_CACHE: dict[str, float] = {}
+
+
+def get_cached_score(symbol: str) -> float | None:
+    """Per-tick lookup. Returns None if the symbol hasn't been refreshed yet
+    or had no Finnhub fundamentals (e.g. ETFs, foreign ADRs)."""
+    return _FUND_SCORE_CACHE.get(symbol.upper())
+
+
+def set_cached_score(symbol: str, score: float | None) -> None:
+    """Worker-side setter — call after each fetch_basic_financials + compute."""
+    if score is not None:
+        _FUND_SCORE_CACHE[symbol.upper()] = score
+
+
+def fund_cache_size() -> int:
+    """For diagnostics."""
+    return len(_FUND_SCORE_CACHE)
+
+
 # ---- Earnings calendar -----------------------------------------------------
 
 async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] | None:
