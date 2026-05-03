@@ -91,7 +91,7 @@ export function PricingTable() {
         {PLANS.map((p) => {
           const price = p.prices[billing];
           // Charm-price the annual per-month display: round up to nearest .99
-          // ($299/yr → $24.99/mo; $491/yr → $40.99/mo). Monthly stays as-is.
+          // ($299/yr → $24.99/mo; $479/yr → $39.99/mo). Monthly stays as-is.
           const rawPerMonth = billing === "annual" ? price / 12 : price;
           const perMonth = billing === "annual" && price > 0
             ? Math.floor(rawPerMonth) + 0.99

@@ -367,16 +367,6 @@ def _naive_score_from_move(move_pct: float) -> float:
     return max(0.0, min(100.0, s))
 
 
-def _signal_from_score(score: float) -> str:
-    """Descriptive labels. See LEGAL_CHECKLIST.md — no prescriptive action words."""
-    if score >= 85: return "HIGH CONVICTION"
-    if score >= 70: return "STRONG SETUP"
-    if score >= 55: return "CONSTRUCTIVE"
-    if score >= 40: return "NEUTRAL"
-    if score >= 25: return "CAUTION"
-    return "WEAK"
-
-
 async def fetch_aggregates(
     symbol: str,
     from_date: date | None = None,

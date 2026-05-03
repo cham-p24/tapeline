@@ -24,8 +24,8 @@ export function TrialBanner() {
   return (
     <div className={`mb-4 flex items-center justify-between rounded-lg border px-4 py-2 text-sm ${tone}`}>
       <span>
-        <strong>{daysLeft} day{daysLeft === 1 ? "" : "s"} left</strong> in your Pro trial.
-        Add a card to keep all features when the trial ends.
+        <strong>{daysLeft} day{daysLeft === 1 ? "" : "s"} left</strong> in your Premium trial.
+        Add a card to keep all features when the trial ends — otherwise your account drops to Free.
       </span>
       <Link href="/app/billing" className="rounded-md bg-fg px-3 py-1 text-xs font-medium text-background hover:opacity-90">
         Upgrade now

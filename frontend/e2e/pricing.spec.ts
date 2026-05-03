@@ -17,9 +17,9 @@ test.describe("Pricing page", () => {
     await expect(page.getByRole("heading", { name: "Pro", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Premium", level: 3 })).toBeVisible();
 
-    // Default is annual — Pro should show $24 effective monthly, Premium $41
-    await expect(page.getByText("$24").first()).toBeVisible();
-    await expect(page.getByText("$41").first()).toBeVisible();
+    // Default is annual — charm-priced Pro at $24.99/mo, Premium at $39.99/mo
+    await expect(page.getByText("$24.99").first()).toBeVisible();
+    await expect(page.getByText("$39.99").first()).toBeVisible();
   });
 
   test("monthly toggle flips to headline prices", async ({ page }) => {
@@ -34,10 +34,10 @@ test.describe("Pricing page", () => {
   test("compare-plans table lists three columns including Premium", async ({ page }) => {
     await page.goto("/pricing");
 
-    // ComparisonTable section
+    // ComparisonTable section — header shows tier name + per-month sub-line
     await expect(page.getByRole("heading", { name: /compare plans/i })).toBeVisible();
-    await expect(page.getByText(/Pro — \$29\/mo/i)).toBeVisible();
-    await expect(page.getByText(/Premium — \$49\/mo/i)).toBeVisible();
+    await expect(page.getByText(/\$29\/mo · \$24\.99\/mo annual/i)).toBeVisible();
+    await expect(page.getByText(/\$49\/mo · \$39\.99\/mo annual/i)).toBeVisible();
 
     // Premium-only feature should show "—" for Pro and "✓" for Premium
     const congressRow = page.getByRole("row", { name: /congressional trades/i });

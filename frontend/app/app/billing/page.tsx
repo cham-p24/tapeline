@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
 import { ComparisonTable } from "@/components/ComparisonTable";
@@ -13,32 +14,76 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-export default function BillingPage() {
-  const { user, refresh } = useUser();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
+// Tier metadata used by the hero + upgrade flow. Single source of truth — when
+// pricing changes, edit here and the comparison/pricing pages stay in sync via
+// the shared ComparisonTable + PricingTable components.
+const TIER_META = {
+  free: {
+    name: "Free",
+    monthly: 0,
+    annual: 0,
+    annualMonthly: 0,
+    blurb: "Top 20 tickers, 24-hour delayed",
+  },
+  pro: {
+    name: "Pro",
+    monthly: 29,
+    annual: 299,
+    annualMonthly: 24.99,
+    blurb: "Live scanner. Daily edge.",
+  },
+  premium: {
+    name: "Premium",
+    monthly: 49,
+    annual: 479,
+    annualMonthly: 39.99,
+    blurb: "Everything, no limits.",
+  },
+} as const;
 
-  async function startCheckout(tier: "pro" | "premium") {
-    setBusy(tier);
+type TierKey = keyof typeof TIER_META;
+
+export default function BillingPage() {
+  const { user } = useUser();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ kind: "info" | "err"; text: string } | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
+  const [showPlans, setShowPlans] = useState(false);
+
+  const tier = (user?.tier || "free") as TierKey;
+  const meta = TIER_META[tier] ?? TIER_META.free;
+  const trialEndsAt = user?.trial_ends_at ? new Date(user.trial_ends_at) : null;
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
+    : 0;
+  const isOnTrial = !!trialEndsAt && trialDaysLeft > 0;
+
+  // Free users see the upgrade picker by default. Paid users see a tucked
+  // "Change plan" button — they're not here to be sold to every visit.
+  useEffect(() => {
+    if (tier === "free") setShowPlans(true);
+  }, [tier]);
+
+  async function startCheckout(target: "pro" | "premium") {
+    setBusy(target);
     setMsg(null);
     try {
       const res = await fetch(`${API_BASE}/api/billing/checkout`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier, billing_period: billingPeriod }),
+        body: JSON.stringify({ tier: target, billing_period: billingPeriod }),
       });
       const body = await res.json();
       if (res.ok && body.url) {
-        window.location.href = body.url;  // Redirect to Stripe Checkout
+        window.location.href = body.url;
       } else if (res.status === 502 || res.status === 503 || body.detail?.includes("not configured")) {
-        setMsg("Stripe checkout isn't live yet — set STRIPE_SECRET_KEY in .env. For now, contact the admin to adjust your tier.");
+        setMsg({ kind: "info", text: "Checkout isn't live yet — Stripe activation pending. Email support@tapeline.io if you want to upgrade in the meantime." });
       } else {
-        setMsg(body.detail || `Checkout failed (${res.status})`);
+        setMsg({ kind: "err", text: body.detail || `Checkout failed (${res.status})` });
       }
     } catch (e: any) {
-      setMsg(e.message || "Checkout failed");
+      setMsg({ kind: "err", text: e.message || "Checkout failed" });
     } finally {
       setBusy(null);
     }
@@ -52,145 +97,352 @@ export default function BillingPage() {
       });
       const body = await res.json();
       if (res.ok && body.url) window.location.href = body.url;
-      else setMsg(body.detail || "Portal not available");
+      else setMsg({ kind: "err", text: body.detail || "Portal not available — Stripe activation pending." });
     } catch (e: any) {
-      setMsg(e.message);
+      setMsg({ kind: "err", text: e.message });
     }
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Billing &amp; plan</h1>
-      <p className="text-sm text-muted">Manage your subscription.</p>
+    <div className="space-y-10">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header>
+        <div className="flex items-center gap-2 text-xs text-subtle">
+          <Link href="/app/scanner" className="hover:text-fg transition-colors">App</Link>
+          <span>›</span>
+          <span className="text-muted">Billing</span>
+        </div>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Billing &amp; plan</h1>
+        <p className="mt-1 text-sm text-muted">
+          Your current subscription, usage at a glance, and how to change it.
+        </p>
+      </header>
 
-      <div className="card mt-6 p-6">
-        <div className="flex items-baseline justify-between">
-          <div>
-            <div className="text-xs uppercase text-muted">Current plan</div>
-            <div className="mt-1 text-2xl font-bold uppercase">{user?.tier || "free"}</div>
+      {msg && (
+        <div className={`rounded-lg border p-4 text-sm ${
+          msg.kind === "err"
+            ? "border-down/40 bg-down/5 text-down"
+            : "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
+        }`}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* ── Hero: current plan + next charge + trial countdown ────────────── */}
+      <section className="grid gap-4 md:grid-cols-5">
+        {/* Plan summary — spans 3 of 5 cols */}
+        <div className={`md:col-span-3 relative overflow-hidden rounded-2xl border p-6 ${
+          tier === "premium"
+            ? "border-accent/40 bg-gradient-to-br from-accent/15 via-panel to-panel"
+            : tier === "pro"
+            ? "border-fg/30 bg-gradient-to-br from-fg/8 via-panel to-panel"
+            : "border-border bg-panel"
+        }`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted">Current plan</div>
+              <div className="mt-1 flex items-baseline gap-3">
+                <span className="text-3xl font-bold tracking-tight">{meta.name}</span>
+                {isOnTrial && (
+                  <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-accent">
+                    Trial · {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} left
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 text-sm text-muted">{meta.blurb}</p>
+            </div>
+            <div className="text-right text-xs">
+              <div className="text-subtle">Signed in as</div>
+              <div className="mt-0.5 text-muted nums break-all">{user?.email}</div>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-muted">Signed in as</div>
-            <div className="text-sm">{user?.email}</div>
+
+          {tier !== "free" && (
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button onClick={openPortal} className="btn-ghost text-xs">
+                Manage payment in Stripe portal →
+              </button>
+              <button
+                onClick={() => setShowPlans((v) => !v)}
+                className="btn-ghost text-xs"
+              >
+                {showPlans ? "Hide plans" : "Change plan"}
+              </button>
+            </div>
+          )}
+          {tier === "free" && (
+            <div className="mt-6">
+              <Link href="/signup" className="btn-accent text-sm">
+                Start 14-day Premium trial →
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Next charge / trial preview — spans 2 of 5 cols */}
+        <div className="md:col-span-2 rounded-2xl border border-border bg-panel p-6">
+          <div className="text-[11px] uppercase tracking-wider text-muted">
+            {isOnTrial ? "When the trial ends" : tier === "free" ? "What you get on Premium" : "Next charge"}
+          </div>
+
+          {isOnTrial ? (
+            <>
+              <div className="mt-2 text-2xl font-bold nums">
+                {trialEndsAt!.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+              </div>
+              <p className="mt-2 text-xs text-muted leading-relaxed">
+                Add a card before then to lock in {meta.name} access. Otherwise your account drops to Free
+                — top 20 tickers, 24-hour delayed.
+              </p>
+              <button onClick={() => setShowPlans(true)} className="mt-4 text-xs text-accent hover:underline">
+                Pick a plan to keep it →
+              </button>
+            </>
+          ) : tier === "free" ? (
+            <>
+              <div className="mt-2 text-2xl font-bold nums">$0 <span className="text-sm font-normal text-muted">today</span></div>
+              <ul className="mt-3 space-y-1 text-xs text-muted">
+                <li>· Full 870-ticker live universe</li>
+                <li>· Watchlist of 200 with smart alerts</li>
+                <li>· Congressional trades + 13F holdings</li>
+                <li>· Telegram + SMS alerts unlimited</li>
+              </ul>
+            </>
+          ) : (
+            <>
+              <div className="mt-2 text-2xl font-bold nums">
+                ${billingPeriod === "annual" ? meta.annual : meta.monthly}
+                <span className="text-sm font-normal text-muted"> / {billingPeriod === "annual" ? "year" : "month"}</span>
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                {billingPeriod === "annual"
+                  ? `Effective $${meta.annualMonthly}/mo · 7-day money-back if you change your mind.`
+                  : "Switch to annual to save ~14-19% and lock the price forever."}
+              </p>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* ── Usage at a glance ─────────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Plan limits</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <UsageTile
+            label="Watchlist tickers"
+            limit={tier === "free" ? 5 : tier === "pro" ? 50 : 200}
+            unit="tickers"
+          />
+          <UsageTile
+            label="Email alerts / day"
+            limit={tier === "free" ? 0 : tier === "pro" ? 10 : 10000}
+            unit={tier === "premium" ? "unlimited" : "per day"}
+            unlimited={tier === "premium"}
+          />
+          <UsageTile
+            label="Saved scans"
+            limit={tier === "free" ? 0 : tier === "pro" ? 10 : 100}
+            unit="scans"
+          />
+          <UsageTile
+            label="Scanner rows"
+            limit={tier === "free" ? 20 : 1000}
+            unit="rows"
+          />
+        </div>
+      </section>
+
+      {/* ── Plan picker (collapsible for paid users) ──────────────────────── */}
+      {showPlans && (
+        <section className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
+              <p className="mt-1 text-sm text-muted">
+                7-day money-back. Cancel in one click. Annual locks the price forever.
+              </p>
+            </div>
+            <div className="inline-flex rounded-full border border-border bg-panel p-1">
+              {(["monthly", "annual"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setBillingPeriod(p)}
+                  className={`relative rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                    billingPeriod === p ? "bg-fg text-background" : "text-muted hover:text-fg"
+                  }`}
+                >
+                  {p === "annual" ? "Annual" : "Monthly"}
+                  {p === "annual" && billingPeriod !== "annual" && (
+                    <span className="absolute -right-2 -top-2 rounded-full bg-up px-1.5 py-0.5 text-[9px] font-bold text-background">save</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Plan
+              name="Free"
+              price="$0"
+              note="Forever free"
+              items={[
+                "Top 20 tickers, 24-hour delayed",
+                "Public scorecard + basic regime",
+                "Watchlist of 5, no alerts",
+              ]}
+              highlight={tier === "free"}
+            />
+            <Plan
+              name="Pro"
+              price={billingPeriod === "annual" ? "$24.99" : "$29"}
+              note={billingPeriod === "annual" ? "$299/yr · billed annually · save $49" : "billed monthly"}
+              items={[
+                "Full ~870 ticker universe, live",
+                "Score breakdown + Why on every row",
+                "Squeeze Watch + Regime + Heatmap",
+                "Watchlist (50) with smart alerts",
+                "TradingView charts + news",
+                "IPO + Earnings calendars",
+                "10 email alerts/day · CSV export",
+              ]}
+              cta={tier === "premium" ? "Switch to Pro" : "Upgrade to Pro"}
+              highlight={tier === "pro"}
+              disabled={tier === "pro"}
+              busy={busy === "pro"}
+              onUpgrade={() => startCheckout("pro")}
+            />
+            <Plan
+              name="Premium"
+              price={billingPeriod === "annual" ? "$39.99" : "$49"}
+              note={billingPeriod === "annual" ? "$479/yr · billed annually · save $109" : "billed monthly"}
+              items={[
+                "Everything in Pro",
+                "Congressional trades feed",
+                "Elite 13F holdings",
+                "Telegram + SMS alerts (unlimited)",
+                "Email alerts (unlimited)",
+                "API access (1,000 req/day)",
+                "Watchlist (200) · saved scans (100)",
+                "Priority support",
+              ]}
+              cta="Upgrade to Premium"
+              highlight={tier === "premium"}
+              disabled={tier === "premium"}
+              busy={busy === "premium"}
+              onUpgrade={() => startCheckout("premium")}
+            />
+          </div>
+
+          <div>
+            <details className="group rounded-xl border border-border bg-panel/40">
+              <summary className="flex cursor-pointer items-center justify-between gap-3 p-5 list-none">
+                <div>
+                  <h3 className="font-semibold">Compare every feature</h3>
+                  <p className="mt-0.5 text-xs text-muted">Six sections · every limit · no asterisks</p>
+                </div>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <div className="border-t border-border/60 p-5 pt-2">
+                <ComparisonTable />
+              </div>
+            </details>
+          </div>
+        </section>
+      )}
+
+      {/* ── Why Tapeline (sales reinforcement only on the change-plan view) ─ */}
+      {showPlans && tier !== "premium" && (
+        <section className="rounded-2xl border border-border bg-panel/30 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Why people pay</h2>
+          <div className="mt-4 grid gap-5 md:grid-cols-3">
+            <Selling
+              title="Bloomberg-grade data"
+              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479/yr."
+            />
+            <Selling
+              title="Public scorecard, day 1"
+              body="Every score we publish is back-checked against next-day prices and shown on /scorecard. No newsletter shop publishes its losses. We do it automatically."
+            />
+            <Selling
+              title="Open formula"
+              body="The 6-factor weights are on /how-it-works. TipRanks, Zacks, Kavout, WallStreetZen all hide theirs. Ours is the only one you can audit."
+            />
+          </div>
+        </section>
+      )}
+
+      {/* ── Alert delivery channels ───────────────────────────────────────── */}
+      <section>
+        <div className="flex items-baseline justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Alert delivery channels</h2>
+            <p className="mt-1 text-sm text-muted">
+              Email is the default. Add any channel below for richer or faster delivery.
+            </p>
           </div>
         </div>
-        {user?.tier !== "free" && (
-          <button onClick={openPortal} className="btn-ghost mt-4 text-sm">
-            Manage billing in Stripe portal →
-          </button>
-        )}
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <Paywall feature="alerts.web_push" title="Browser push">
+            <WebPushCard />
+          </Paywall>
+          <Paywall feature="alerts.discord" title="Discord">
+            <DiscordCard />
+          </Paywall>
+          <Paywall feature="alerts.telegram" title="Telegram">
+            <NotificationsCard />
+          </Paywall>
+          <Paywall feature="alerts.sms" title="SMS">
+            <SMSCard />
+          </Paywall>
+        </div>
+      </section>
+
+      {/* ── Footer ────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-border/60 pt-6 text-xs text-muted">
+        Questions about a charge or want to cancel?
+        Email <a href="mailto:support@tapeline.io" className="text-accent hover:underline">support@tapeline.io</a>
+        — usually replied to within a business day.
+      </footer>
+    </div>
+  );
+}
+
+/**
+ * Single-stat tile — label + the cap allowed on the current tier. We don't
+ * surface live "used" counts yet (would need a per-user usage endpoint); the
+ * limit alone is the most-asked-about question on the billing page anyway.
+ */
+function UsageTile({
+  label,
+  limit,
+  unit,
+  unlimited = false,
+}: {
+  label: string;
+  limit: number;
+  unit: string;
+  unlimited?: boolean;
+}) {
+  const display = unlimited ? "∞" : limit === 0 ? "—" : limit.toLocaleString();
+  return (
+    <div className="rounded-xl border border-border bg-panel p-4">
+      <div className="text-[11px] uppercase tracking-wider text-subtle">{label}</div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className="text-2xl font-bold nums">{display}</span>
+        <span className="text-xs text-muted">{unit}</span>
       </div>
+    </div>
+  );
+}
 
-      {msg && <p className="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm text-yellow-400">{msg}</p>}
-
-      <h2 className="mt-10 text-xl font-semibold">Upgrade</h2>
-      <p className="mt-2 text-sm text-muted">7-day money-back guarantee. Cancel in one click, anytime.</p>
-
-      {/* Billing period toggle */}
-      <div className="mt-5 inline-flex rounded-full border border-border bg-panel p-1">
-        {(["monthly", "annual"] as const).map((p) => (
-          <button
-            key={p}
-            onClick={() => setBillingPeriod(p)}
-            className={`relative rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
-              billingPeriod === p ? "bg-fg text-background" : "text-muted hover:text-fg"
-            }`}
-          >
-            {p === "annual" ? "Annual" : "Monthly"}
-            {p === "annual" && billingPeriod !== "annual" && (
-              <span className="absolute -right-2 -top-2 rounded-full bg-up px-1.5 py-0.5 text-[9px] font-bold text-background">−17%</span>
-            )}
-          </button>
-        ))}
+function Selling({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="h-1 w-6 rounded-full bg-accent" />
+        <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      {billingPeriod === "annual" && <p className="mt-2 text-xs text-up">Save 2 months with annual · price locked forever</p>}
-
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Plan
-          name="Free"
-          price="$0"
-          note="Forever free"
-          items={[
-            "Top 20 tickers, 24-hour delayed",
-            "Public scorecard + basic regime",
-            "Small watchlist (5), no alerts",
-          ]}
-          highlight={user?.tier === "free"}
-        />
-        <Plan
-          name="Pro"
-          price={billingPeriod === "annual" ? "$24.99" : "$29"}
-          note={billingPeriod === "annual" ? "$299/yr · billed annually · save $49" : undefined}
-          items={[
-            "Full ~870 ticker universe, live",
-            "Score breakdown + Why on every row",
-            "Squeeze Watch + Regime",
-            "Watchlist with smart alerts",
-            "TradingView charts + news",
-            "IPO + Earnings calendars",
-            "10 email alerts/day",
-          ]}
-          cta={user?.tier === "premium" ? "Switch to Pro" : "Upgrade to Pro"}
-          highlight={user?.tier === "pro"}
-          disabled={user?.tier === "pro"}
-          busy={busy === "pro"}
-          onUpgrade={() => startCheckout("pro")}
-        />
-        <Plan
-          name="Premium"
-          price={billingPeriod === "annual" ? "$39.99" : "$49"}
-          note={billingPeriod === "annual" ? "$479/yr · billed annually · save $109" : undefined}
-          items={[
-            "Everything in Pro",
-            "Congressional trades feed",
-            "Telegram alerts (unlimited)",
-            "Email alerts (unlimited)",
-            "API access (1,000 req/day)",
-            "Elite 13F holdings",
-            "Priority support",
-          ]}
-          cta="Upgrade to Premium"
-          highlight={user?.tier === "premium"}
-          disabled={user?.tier === "premium"}
-          busy={busy === "premium"}
-          onUpgrade={() => startCheckout("premium")}
-        />
-      </div>
-
-      {/* Side-by-side feature comparison so users see exactly what they get
-          when they upgrade — no asterisks, no surprises. */}
-      <div className="mt-12">
-        <h2 className="text-xl font-semibold">What you get for the money</h2>
-        <p className="mt-2 text-sm text-muted">
-          Every feature, every limit. Compare what changes if you upgrade.
-        </p>
-        <ComparisonTable />
-      </div>
-
-      {/* Real-time channels — email is on by default. Each card below is opt-in. */}
-      <h2 className="mt-12 text-xl font-semibold">Real-time channels</h2>
-      <p className="mt-2 text-sm text-muted">
-        Email is the default for every alert. Enable any of the channels below for richer / faster delivery.
-      </p>
-
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Paywall feature="alerts.web_push" title="Browser push">
-          <WebPushCard />
-        </Paywall>
-        <Paywall feature="alerts.discord" title="Discord">
-          <DiscordCard />
-        </Paywall>
-        <Paywall feature="alerts.telegram" title="Telegram">
-          <NotificationsCard />
-        </Paywall>
-        <Paywall feature="alerts.sms" title="SMS">
-          <SMSCard />
-        </Paywall>
-      </div>
-
-      <div className="mt-10 text-xs text-muted">
-        <p>Questions? Email <a href="mailto:support@tapeline.io" className="text-accent">support@tapeline.io</a></p>
-      </div>
+      <p className="mt-2 text-xs text-muted leading-relaxed">{body}</p>
     </div>
   );
 }

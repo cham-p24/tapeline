@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Three-column comparison: Free / Pro $29 / Premium $49.
- * Mirrors the gating in backend/app/services/tier.py.
+ * Three-column comparison: Free / Pro ($29/mo or $24.99/mo annual) /
+ * Premium ($49/mo or $39.99/mo annual). Mirrors the gating in
+ * backend/app/services/tier.py.
  *
  * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
- * Limits, Support) so the table reads like a spec sheet, not a wall of bullets.
+ * Pro intelligence, Account & support) so the table reads like a spec sheet,
+ * not a wall of bullets.
  */
 
 type Row = { label: string; free: string; pro: string; premium: string };
