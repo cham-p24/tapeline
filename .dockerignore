@@ -1,0 +1,59 @@
+# Reduce Fly build context from 800MB to <10MB.
+# Anything matched here doesn't get sent to the Fly remote builder.
+
+# Local Python venvs and caches
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.cache/
+*.pyc
+*.pyo
+*.pyd
+
+# Node / Next.js — entire frontend isn't needed for the API container
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.playwright/
+
+# Local SQLite DB + cache files
+*.sqlite
+*.sqlite3
+*.db
+backend/tapeline_dev.sqlite
+
+# Secrets — these get set via `fly secrets set`, never baked into the image
+.env
+.env.local
+.env.production
+.env.*.local
+.credentials.local.txt
+.credentials.*.txt
+*.key
+*.pem
+
+# Git + CI
+.git/
+.github/
+.gitignore
+
+# Editor / OS junk
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Memory + claude artifacts
+.claude/

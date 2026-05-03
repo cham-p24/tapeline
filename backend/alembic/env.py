@@ -18,9 +18,17 @@ target_metadata = Base.metadata
 
 
 def _sync_url() -> str:
+    """Sync URL for alembic — psycopg3 (sync mode) for Postgres, plain sqlite:// for SQLite.
+
+    psycopg3 supports both sync and async modes, so by using `postgresql+psycopg://`
+    here AND in app.db._normalize_url(), we only need ONE Postgres driver
+    (`psycopg[binary]` from pyproject.toml) instead of both psycopg2 + psycopg3.
+    """
     url = get_settings().database_url
-    if url.startswith("postgresql+psycopg://"):
-        return url.replace("postgresql+psycopg://", "postgresql://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
     if url.startswith("sqlite+aiosqlite://"):
         return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
     return url
