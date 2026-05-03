@@ -92,20 +92,79 @@ def _shell(body_html: str) -> str:
 </body></html>"""
 
 
-def render_welcome_email(user_name: str) -> str:
-    """Day 0 — sent immediately on signup."""
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:26px;">Welcome, {user_name}.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">Your <strong>14-day Premium trial</strong> is live. Everything's unlocked.</p>
-    <p style="color:#9ca3af;margin:0 0 20px;">Three things to try in the first five minutes:</p>
-    <ol style="color:#d1d5db;line-height:1.7;padding-left:20px;margin:0 0 24px;">
-      <li><strong>Scanner</strong> — see every ticker scored, hover any score for the 6-factor breakdown</li>
-      <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
-      <li><strong>Watchlist</strong> — add 5–10 tickers you're following, get smart alerts when scores shift</li>
-    </ol>
-    <a href="https://tapeline.io/app/scanner" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
-    """)
+def _render_pick_card(symbol: str, score: float | None, signal: str | None, reason: str | None) -> str:
+    """Single ticker row used inside the welcome email's "live picks" block."""
+    score_str = f"{score:.0f}" if score is not None else "—"
+    signal_str = signal or "—"
+    # Score-tier colour matches /how-it-works.
+    if score is None:
+        col = "#a1a1aa"
+    elif score >= 70:
+        col = "#22c55e"
+    elif score >= 55:
+        col = "#14b8a6"
+    elif score >= 40:
+        col = "#a1a1aa"
+    elif score >= 25:
+        col = "#fbbf24"
+    else:
+        col = "#ef4444"
+    why = (reason or "")[:120]
+    return f"""
+    <a href="https://tapeline.io/t/{symbol}"
+       style="display:block;text-decoration:none;background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:14px 16px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:18px;font-weight:700;color:#f4f4f5;">{symbol}</div>
+          <div style="margin-top:4px;color:#9ca3af;font-size:12px;">{why}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:26px;font-weight:700;color:{col};font-family:'JetBrains Mono',ui-monospace,monospace;line-height:1;">{score_str}</div>
+          <div style="margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:{col};">{signal_str}</div>
+        </div>
+      </div>
+    </a>
+    """
+
+
+def render_welcome_email(user_name: str, picks: list[dict[str, Any]] | None = None) -> str:
+    """Day 0 — sent immediately on signup.
+
+    `picks` is an optional list of {symbol, score, signal, reason} dicts the
+    auth handler fetches from the live DB before calling this renderer.
+    Embedding 3 actual scores here lets the user see the product in their
+    inbox, not just a "click here to see scores" CTA. Falls back to the
+    static three-things checklist if picks is empty (worker hasn't ticked
+    yet, etc.).
+    """
+    if picks:
+        picks_html = "".join(
+            _render_pick_card(p.get("symbol", "?"), p.get("score"), p.get("signal"), p.get("reason"))
+            for p in picks[:3]
+        )
+        body = f"""
+        <h1 style="margin:0 0 12px;font-size:26px;">Welcome, {user_name}.</h1>
+        <p style="color:#d1d5db;margin:0 0 24px;">Your <strong>14-day Premium trial</strong> is live. Three live scores from the scanner right now:</p>
+        {picks_html}
+        <a href="https://tapeline.io/app/scanner" style="display:inline-block;margin-top:8px;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the full scanner &rarr;</a>
+        <p style="color:#9ca3af;margin-top:24px;font-size:13px;">Tap any card above to see the 6-factor breakdown for that ticker. The
+        formula is public — see <a href="https://tapeline.io/how-it-works" style="color:#3b82f6;">how it works</a>.</p>
+        <p style="color:#6b7280;margin-top:18px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
+        """
+    else:
+        body = f"""
+        <h1 style="margin:0 0 12px;font-size:26px;">Welcome, {user_name}.</h1>
+        <p style="color:#d1d5db;margin:0 0 16px;">Your <strong>14-day Premium trial</strong> is live. Everything's unlocked.</p>
+        <p style="color:#9ca3af;margin:0 0 20px;">Three things to try in the first five minutes:</p>
+        <ol style="color:#d1d5db;line-height:1.7;padding-left:20px;margin:0 0 24px;">
+          <li><strong>Scanner</strong> — see every ticker scored, hover any score for the 6-factor breakdown</li>
+          <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
+          <li><strong>Watchlist</strong> — add 5-10 tickers you're following, get smart alerts when scores shift</li>
+        </ol>
+        <a href="https://tapeline.io/app/scanner" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
+        <p style="color:#6b7280;margin-top:24px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
+        """
+    return _shell(body)
 
 
 def render_trial_day3_email(user_name: str) -> str:

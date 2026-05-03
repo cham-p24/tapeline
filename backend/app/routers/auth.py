@@ -149,12 +149,28 @@ async def signup(
 
     # Day-0 welcome email. Fire-and-forget — failures don't block signup.
     # send_email is a no-op if RESEND_API_KEY isn't set, so this is safe in dev.
+    # Embeds the live top-3 scores from the scanner so the user sees the actual
+    # product in their inbox instead of "click here to see scores".
     try:
+        from sqlalchemy import desc as _desc
+
+        from app.models import Ticker
         from app.services.email import render_welcome_email, send_email
+
+        top_result = await session.execute(
+            select(Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason)
+            .where(Ticker.score.is_not(None))
+            .order_by(_desc(Ticker.score))
+            .limit(3)
+        )
+        picks = [
+            {"symbol": r[0], "score": r[1], "signal": r[2], "reason": r[3]}
+            for r in top_result.all()
+        ]
         await send_email(
             user.email,
             "Welcome to Tapeline — your trial is live",
-            render_welcome_email(user.name or "trader"),
+            render_welcome_email(user.name or "trader", picks=picks),
         )
     except Exception:
         logger.exception("auth.welcome_email_failed user=%s", user.id)
