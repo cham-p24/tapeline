@@ -102,6 +102,24 @@ async def test_public_top_tickers(client):
 
 
 @pytest.mark.asyncio
+async def test_log_client_error_endpoint(client):
+    """The frontend's error.tsx POSTs here when something crashes client-side.
+    Must always 200 — failures here would prevent the actual error from being
+    surfaced in logs."""
+    async with client:
+        r = await client.post(
+            "/api/log-client-error",
+            json={"message": "test", "stack": "trace", "url": "https://test.dev"},
+        )
+        assert r.status_code == 200
+        assert r.json() == {"ok": True}
+
+        # Empty body is also valid (some browsers strip JSON during unload)
+        r2 = await client.post("/api/log-client-error")
+        assert r2.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_legal_404_graceful(client):
     async with client:
         r = await _get(client, "/api/nonexistent")

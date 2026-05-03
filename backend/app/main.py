@@ -39,6 +39,32 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# ---- Sentry (env-gated) -----------------------------------------------------
+# Initialised before app construction so the FastAPI integration can hook
+# the request lifecycle. No-op when SENTRY_DSN is blank — zero overhead in
+# dev or until the operator opts in.
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.sentry_environment or settings.app_env,
+            traces_sample_rate=settings.sentry_traces_sample_rate,
+            release="tapeline@0.1.0",
+            # Don't accidentally upload PII (emails, watchlist contents, etc.)
+            send_default_pii=False,
+            # Filter the noisy /api/health pings — they don't need APM tracking.
+            traces_sampler=lambda ctx: 0.0
+            if (ctx.get("asgi_scope", {}) or {}).get("path", "").startswith("/api/health")
+            else settings.sentry_traces_sample_rate,
+        )
+        logger.info("sentry.initialized env=%s sample_rate=%.2f",
+                    settings.sentry_environment or settings.app_env,
+                    settings.sentry_traces_sample_rate)
+    except Exception:
+        logger.exception("sentry.init_failed — continuing without error monitoring")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -85,6 +111,43 @@ async def log_and_rate_limit(request: Request, call_next):
 async def unhandled_exception(request: Request, exc: Exception):
     logger.exception("unhandled_error path=%s", request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
+@app.post("/api/log-client-error")
+async def log_client_error(request: Request) -> dict[str, bool]:
+    """Sink for client-side errors caught by the frontend's error.tsx.
+
+    Browsers can't talk to Fly logs directly, so the React error boundary
+    POSTs here when something explodes client-side. We log it with the URL,
+    user agent, and (truncated) stack so it shows up in the same log stream
+    as backend errors. Sentry, when configured, also captures it via the
+    Sentry SDK call below — same event, two destinations.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    msg = str(body.get("message", ""))[:500]
+    stack = str(body.get("stack", ""))[:2000]
+    url = str(body.get("url", ""))[:300]
+    ua = (request.headers.get("user-agent") or "")[:200]
+    logger.warning(
+        "client_error url=%s ua=%s msg=%s stack=%s",
+        url, ua, msg, stack.replace("\n", " | "),
+    )
+    if settings.sentry_dsn:
+        try:
+            import sentry_sdk
+
+            with sentry_sdk.push_scope() as scope:
+                scope.set_tag("source", "client")
+                scope.set_extra("url", url)
+                scope.set_extra("user_agent", ua)
+                scope.set_extra("client_stack", stack)
+                sentry_sdk.capture_message(msg or "client error", level="error")
+        except Exception:
+            logger.exception("client_error.sentry_capture_failed")
+    return {"ok": True}
 
 
 @app.get("/api/public/top-tickers")

@@ -32,6 +32,7 @@ dependencies = [
     "cryptography>=43.0.0",          # JWT signature verification
     "bcrypt>=4.2.0",                 # password hashing
     "pyjwt>=2.10.0",                 # session JWT signing
+    "sentry-sdk[fastapi]>=2.18.0",   # error monitoring (inert until SENTRY_DSN is set)
 ]
 
 [project.optional-dependencies]

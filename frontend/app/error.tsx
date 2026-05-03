@@ -3,8 +3,30 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
 export default function GlobalError({ error, reset }: { error: Error; reset: () => void }) {
-  useEffect(() => { console.error(error); }, [error]);
+  useEffect(() => {
+    console.error(error);
+    // Fire-and-forget: ship the error to the backend so it lands in Fly logs
+    // (and Sentry, if configured). Browsers can't otherwise tell us when
+    // something explodes client-side. Wrapped in try/catch + AbortSignal so
+    // a network failure here can't worsen an already-broken page.
+    try {
+      fetch(`${API_BASE}/api/log-client-error`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: error.message ?? String(error),
+          stack: error.stack ?? "",
+          url: typeof window !== "undefined" ? window.location.href : "",
+        }),
+        keepalive: true,  // request still goes if the page is unloading
+      }).catch(() => { /* swallowed */ });
+    } catch {
+      /* swallowed */
+    }
+  }, [error]);
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="max-w-md text-center">

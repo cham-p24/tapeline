@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     # ---- Worker cadence ----
     score_refresh_seconds: int = 60
 
+    # ---- Error monitoring (Sentry) — env-gated ----
+    # Sign up at https://sentry.io (free 5k events/mo). Drop the DSN in
+    # SENTRY_DSN to activate. Inert when blank.
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.0  # 0=off, 0.05=5% perf traces
+    sentry_environment: str = ""  # defaults to app_env when blank
+
 
 @lru_cache
 def get_settings() -> Settings:
