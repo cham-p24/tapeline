@@ -25,13 +25,18 @@ from app.models import (
     Ticker,
     User,
 )
+# --- DATA-FEED IMPORTS ---
+# Hybrid swap (2026-05-02): real prices + live macro from Massive (api.massive.com).
+# Squeeze detection stays mock for now — running per-ticker /v2/aggs across the full
+# universe each tick burns API calls; revisit once a daily back-fill job is built.
+# Congress trades stay mock — Polygon/Massive don't offer that data; Quiver
+# Commercial tier needed for real (deferred per CLAUDE.md known-issues).
 from app.services.mock_feed import (
     fetch_congress_trades,
-    fetch_regime,
-    fetch_snapshots,
     fetch_squeezes,
     universe,
 )
+from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.news_feed import fetch_latest_news
 from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_yesterday
