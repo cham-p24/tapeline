@@ -38,16 +38,20 @@ const PLANS = [
   },
   {
     name: "Premium",
-    tagline: "Everything, no limits.",
+    tagline: "For the serious operator.",
     prices: { monthly: 49, annual: 479 },
+    // Premium-only additions on top of everything in Pro. Rendered in a
+    // visually distinct block under the price so the upgrade reason is
+    // obvious — not buried in a 7-bullet list that looks like Pro's.
+    proPlus: true,
     highlights: [
-      "Everything in Pro, plus:",
-      "Congressional trades feed",
-      "Telegram alerts (unlimited)",
-      "Email alerts (unlimited)",
-      "Public API (1,000 req/day)",
-      "Watchlist (200) · saved scans (100)",
-      "Priority support",
+      "Congressional trades feed (House + Senate)",
+      "Elite 13F holdings — Buffett, Burry, Tepper, Ackman + 4 more",
+      "Telegram alerts · unlimited (Pro: none)",
+      "Email alerts · unlimited (Pro: 10/day)",
+      "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
+      "Public API · 1,000 requests/day",
+      "Priority support · same-day reply",
     ],
     cta: "Start 14-day trial",
     ctaHref: "/signup?plan=premium",
