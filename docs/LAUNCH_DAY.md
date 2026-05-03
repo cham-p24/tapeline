@@ -91,6 +91,28 @@ Your share previews look professional now. Go.
 
 ---
 
+## Operational tools
+
+When a launch user emails you about their tier — comping a beta user,
+crediting a Founder's Lifetime, demoting a refund — use:
+
+```bash
+# Locally (against the local SQLite or whichever DB DATABASE_URL points at)
+cd backend && .venv/Scripts/python.exe -m app.scripts.set_tier alice@example.com pro
+
+# Premium with the trial countdown cleared (use when comping a paying user)
+.venv/Scripts/python.exe -m app.scripts.set_tier alice@example.com premium --clear-trial
+
+# Founder's Lifetime — Premium that survives webhook downgrades
+.venv/Scripts/python.exe -m app.scripts.set_tier alice@example.com premium --lifetime --clear-trial
+
+# Against the running Fly machine — no local checkout needed
+fly ssh console -a tapeline-backend -C "python -m app.scripts.set_tier alice@example.com pro"
+```
+
+The script prints before/after state so you have a record. Idempotent
+— safe to re-run.
+
 ## Daily during launch week
 
 Quick checks (each <1 min):
