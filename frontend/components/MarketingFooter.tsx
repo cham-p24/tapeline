@@ -26,26 +26,24 @@ export function MarketingFooter() {
           </div>
 
           <FooterCol title="Product">
-            <FooterLink href="/how-it-works">How it works</FooterLink>
-            <FooterLink href="/pricing">Pricing</FooterLink>
-            <FooterLink href="/scorecard">Public scorecard</FooterLink>
-            <FooterLink href="/blog">Blog</FooterLink>
-            <FooterLink href="/changelog">Changelog</FooterLink>
-            <FooterLink href="/roadmap">Roadmap</FooterLink>
+            <FooterLink href="/how-it-works" desc="The 6-factor formula, public weights">How it works</FooterLink>
+            <FooterLink href="/pricing" desc="Three tiers, charm-priced annual">Pricing</FooterLink>
+            <FooterLink href="/scorecard" desc="Every call, back-checked vs SPY">Public scorecard</FooterLink>
+            <FooterLink href="/blog" desc="Methodology + market notes">Blog</FooterLink>
+            <FooterLink href="/changelog" desc="Every release, ordered newest first">Changelog</FooterLink>
           </FooterCol>
 
           <FooterCol title="Compare">
-            <FooterLink href="/compare/finviz">vs Finviz</FooterLink>
-            <FooterLink href="/compare/zacks">vs Zacks</FooterLink>
-            <FooterLink href="/compare/wallstreetzen">vs WallStreetZen</FooterLink>
+            <FooterLink href="/compare/finviz" desc="Why traders switch from Finviz">vs Finviz</FooterLink>
+            <FooterLink href="/compare/zacks" desc="Live scanner vs static rankings">vs Zacks</FooterLink>
+            <FooterLink href="/compare/wallstreetzen" desc="Public formula vs 115-factor letter grade">vs WallStreetZen</FooterLink>
           </FooterCol>
 
           <FooterCol title="Trust">
-            <FooterLink href="/status">System status</FooterLink>
-            <FooterLink href="/legal/terms">Terms</FooterLink>
-            <FooterLink href="/legal/privacy">Privacy</FooterLink>
-            <FooterLink href="/legal/risk">Risk disclosure</FooterLink>
-            <FooterLink href="mailto:support@tapeline.io">Support</FooterLink>
+            <FooterLink href="/status" desc="Live API + worker uptime, refresh every 30s">System status</FooterLink>
+            <FooterLink href="/legal/terms" desc="Subscription terms, cancellation, refunds">Terms</FooterLink>
+            <FooterLink href="/legal/privacy" desc="What we collect + how it's stored">Privacy</FooterLink>
+            <FooterLink href="/legal/risk" desc="Not investment advice — scope of the data">Risk disclosure</FooterLink>
           </FooterCol>
         </div>
 

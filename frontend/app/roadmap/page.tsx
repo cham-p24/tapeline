@@ -10,32 +10,33 @@ export const metadata = {
 
 const ITEMS: RoadmapItem[] = [
   // SHIPPED
-  { slug: "elite-13f-holdings",     title: "Elite 13F holdings",        detail: "Live positions from Buffett/Burry/Tepper/Ackman/Druckenmiller/Laffont/Coleman/Singer", status: "shipped" },
-  { slug: "telegram-customer-ui",   title: "Telegram customer UI",      detail: "Notifications card on billing — paste chat_id, send test, hourly digest",            status: "shipped" },
-  { slug: "bot-protection",         title: "Bot protection",            detail: "Honeypot + disposable-email block + Cloudflare Turnstile (env-gated)",                status: "shipped" },
-  { slug: "per-rule-alerts",        title: "Per-rule alert delivery",   detail: "Score / squeeze / regime / congress alerts now actually fire each tick",              status: "shipped" },
-  { slug: "commodity-etf-universe", title: "Commodity ETF universe",    detail: "32 commodity ETFs added — gold, silver, oil, gas, ag, copper, uranium, miners",       status: "shipped" },
-  { slug: "annual-stripe-prices",   title: "Annual Stripe pricing",     detail: "Monthly + annual checkout flow with billing-period toggle",                            status: "shipped" },
+  { slug: "live-data",              title: "Live market data",          detail: "Real-time prices, volumes, and intraday updates across the universe.",                  status: "shipped" },
+  { slug: "live-macro",             title: "Live macro indicators",     detail: "DXY, 10-year yield, VIX pulled live from the Federal Reserve's FRED feed.",             status: "shipped" },
+  { slug: "elite-13f-holdings",     title: "Elite 13F holdings",        detail: "Live positions from Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer.", status: "shipped" },
+  { slug: "telegram-alerts",        title: "Telegram alerts",           detail: "Per-rule alerts plus the hourly market-regime + watchlist digest. Premium-only.",        status: "shipped" },
+  { slug: "browser-push",           title: "Browser push notifications", detail: "Lock-screen alerts on desktop and Android. Free, one click to enable.",                 status: "shipped" },
+  { slug: "commodity-universe",     title: "Commodity ETF universe",    detail: "32 commodity ETFs (gold, silver, oil, gas, ag, copper, uranium, miners) with their own sector filter.", status: "shipped" },
+  { slug: "annual-pricing",         title: "Annual pricing with savings", detail: "Pro and Premium offered monthly or annually, with the annual price locked forever once subscribed.", status: "shipped" },
+  { slug: "public-share-pages",     title: "Per-ticker share pages",    detail: "Every ticker gets a public /t/[symbol] page with the live score and 6-factor breakdown — shareable on X with a live preview card.", status: "shipped" },
+  { slug: "public-scorecard",       title: "Public scorecard from day one", detail: "Every top-10 we publish back-checked against the next-day price move vs SPY.",     status: "shipped" },
+  { slug: "watchlist-starter",      title: "Watchlist starter pack",    detail: "Empty watchlist? One click adds 8 mega-caps + SPY so smart alerts can fire from day one.", status: "shipped" },
 
   // IN PROGRESS
-  { slug: "polygon-realtime",       title: "Real-time Polygon data",    detail: "Manual code swap from mock_feed → polygon_feed once API key is configured",            status: "in_progress" },
-  { slug: "fred-macro",             title: "Live FRED macro indicators", detail: "DXY, 10Y, VIX from FRED API instead of hardcoded values",                            status: "in_progress" },
-  { slug: "universe-discovery",     title: "Polygon universe auto-discovery", detail: "Weekly /v3/reference/tickers walk to add new IPOs and ETF launches",            status: "in_progress" },
+  { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Smooth one-click upgrade from trial to paid via Stripe Checkout.",                       status: "in_progress" },
+  { slug: "universe-expansion",     title: "Expand to 500-ticker scanning", detail: "Score the top 500 names by daily $-volume rather than the current ~112 mega-caps + ETFs.", status: "in_progress" },
 
   // NEXT
-  { slug: "onboarding-drip-live",   title: "Onboarding email drip live", detail: "Day 0/3/7/13 templates wired (waiting on Resend key)",                                status: "next" },
-  { slug: "mobile-scanner",         title: "Mobile-responsive scanner",  detail: "Tighter rendering on phones for the main scanner table",                              status: "next" },
-  { slug: "roadmap-voting",         title: "Public roadmap voting",      detail: "Premium subscribers vote on what ships next — you're using it now!",                  status: "next" },
-  { slug: "stripe-idempotency",     title: "Stripe webhook idempotency", detail: "Duplicate-event protection on the Stripe webhook",                                    status: "next" },
+  { slug: "fundamentals-in-score",  title: "Fundamentals fully in the composite score", detail: "Earnings revisions, margin trends, valuation ratios moving the score per ticker, per tick.", status: "next" },
+  { slug: "earnings-overlay",       title: "Earnings-week overlay",     detail: "Visual flag on the scanner for tickers reporting in the next 5 days.",                   status: "next" },
+  { slug: "saved-scan-templates",   title: "Saved scan templates",      detail: "Save a filter combination and have it monitored — alerts fire when the result set shifts.", status: "next" },
 
   // LATER
-  { slug: "backtesting",            title: "Backtesting",                detail: "Replay any pick and see how the score evolved before the call",                       status: "later" },
-  { slug: "custom-weights",         title: "Custom scoring weights",     detail: "Pro users override the default 6-factor weights per saved scan",                      status: "later" },
-  { slug: "crypto",                 title: "Crypto coverage",            detail: "BTC + top 50 by liquidity, applying the same scoring framework",                      status: "later" },
-  { slug: "options-flow",           title: "Options flow integration",   detail: "Unusual-options activity overlay on ticker pages (Premium add-on)",                   status: "later" },
-  { slug: "api-v1",                 title: "Tapeline API v1",            detail: "Public REST endpoints for Premium subscribers — pricing/rate-limits TBD",            status: "later" },
-  { slug: "ios-app",                title: "iOS app (PWA → native)",     detail: "Push notifications, watchlist widget, offline scorecard view",                        status: "later" },
-  { slug: "sms-alerts",             title: "SMS alerts via Twilio",      detail: "Third alert channel beyond email + telegram",                                          status: "later" },
+  { slug: "backtesting",            title: "Backtesting",                detail: "Replay any ticker and see how its score evolved before today's call.",                  status: "later" },
+  { slug: "custom-weights",         title: "Custom scoring weights",     detail: "Pro users override the default 6-factor weights per saved scan.",                      status: "later" },
+  { slug: "crypto",                 title: "Crypto coverage",            detail: "BTC + top-50 by liquidity, scored on the same framework.",                              status: "later" },
+  { slug: "options-flow",           title: "Options flow integration",   detail: "Unusual-options activity overlay on ticker pages.",                                     status: "later" },
+  { slug: "api-v1",                 title: "Public API v1",              detail: "REST endpoints for Premium subscribers (1,000 req/day allowance).",                    status: "later" },
+  { slug: "ios-app",                title: "Mobile app",                 detail: "Native iOS + Android with push notifications and watchlist widget.",                    status: "later" },
 ];
 
 export default function RoadmapPage() {
