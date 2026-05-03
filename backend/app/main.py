@@ -120,7 +120,7 @@ async def status() -> dict[str, object]:
 
     try:
         async with session_scope() as session:
-            n_tickers = (await session.execute(select(func.count(Ticker.id)))).scalar_one()
+            n_tickers = (await session.execute(select(func.count(Ticker.symbol)))).scalar_one()
             n_news = (await session.execute(select(func.count(NewsItem.id)))).scalar_one()
             regime_row = (await session.execute(select(RegimeState).where(RegimeState.id == 1))).scalar_one_or_none()
             checks["database"] = {"status": "ok", "tickers": int(n_tickers or 0), "news_items": int(n_news or 0)}
