@@ -93,7 +93,7 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     actually move the needle (they're 15% of the total weight).
     """
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots, _signal_from_score
-    from app.services.finnhub_feed import get_cached_score
+    from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
 
     # Start with mock — gives us the full schema (sub_* + reason + confidence_pct)
     base_rows = _mock_snapshots()
@@ -136,6 +136,11 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
         fund = get_cached_score(sym)
         if fund is not None:
             r["sub_fundamentals"] = fund
+
+        # Real smart-money from Finnhub insider Form 4 cache
+        sm = get_cached_smart_money_score(sym)
+        if sm is not None:
+            r["sub_smart_money"] = sm
 
         # Recompute composite from updated sub_* — keeps all 6 factors blended.
         # Weights mirror mock_feed/signal_publisher: trend .25 rs .20 fund .15 smart .15 macro .15 mom .10

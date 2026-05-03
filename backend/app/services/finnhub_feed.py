@@ -102,6 +102,60 @@ def fund_cache_size() -> int:
     return len(_FUND_SCORE_CACHE)
 
 
+# ---- In-memory smart-money score cache (insider Form 4) ----------------
+# Same pattern as _FUND_SCORE_CACHE — populated daily by the worker,
+# read per-tick by polygon_feed.fetch_snapshots.
+_SMART_MONEY_SCORE_CACHE: dict[str, float] = {}
+
+
+def get_cached_smart_money_score(symbol: str) -> float | None:
+    return _SMART_MONEY_SCORE_CACHE.get(symbol.upper())
+
+
+def set_cached_smart_money_score(symbol: str, score: float | None) -> None:
+    if score is not None:
+        _SMART_MONEY_SCORE_CACHE[symbol.upper()] = score
+
+
+def smart_money_cache_size() -> int:
+    return len(_SMART_MONEY_SCORE_CACHE)
+
+
+def compute_smart_money_score(transactions: list[dict[str, Any]] | None) -> float | None:
+    """
+    0-100 score from insider Form 4 transactions.
+
+    Net buying (insiders adding to their position) → score above 50.
+    Net selling (insiders dumping) → score below 50.
+    Magnitude scales with the dollar value of the net position change relative
+    to total transaction volume — so a $50M buy by one insider weighs more than
+    50 separate $1M sells, but only if it's net of the activity.
+
+    Returns None for tickers with no transactions in the window — caller falls
+    back to mock or keeps existing value.
+    """
+    if not transactions:
+        return None
+
+    net_value = 0.0
+    total_value = 0.0
+    for t in transactions:
+        change = t.get("share_change") or 0
+        price = t.get("transaction_price") or 0
+        signed = change * price
+        net_value += signed
+        total_value += abs(signed)
+
+    if total_value == 0:
+        return 50.0
+
+    # Net buy ratio: -1 (all selling) to +1 (all buying)
+    ratio = net_value / total_value
+    # Map to 10–90 score band — leave headroom at the extremes for stronger signals
+    score = 50 + (ratio * 40)
+    return round(max(0, min(100, score)), 1)
+
+
 # ---- Earnings calendar -----------------------------------------------------
 
 async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] | None:
@@ -374,6 +428,49 @@ def compute_fundamentals_score(metrics: dict[str, float | None] | None) -> float
     if not components:
         return None
     return round(sum(components) / len(components), 1)
+
+
+async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
+    """
+    Sector + industry + name + market cap for a ticker. Used to backfill
+    Ticker.sector="Unknown" rows after universe auto-discovery.
+
+    Cached 7 days per symbol — sectors don't change.
+    """
+    if not configured():
+        return None
+
+    sym = symbol.upper()
+    cache_key = f"profile_{sym}"
+    cached = _load_cache(cache_key, CACHE_TTL_FUNDAMENTALS_HOURS)
+    if cached is not None:
+        return cached if cached else None  # may be {} for unknown tickers
+
+    params = {"symbol": sym, "token": _api_key()}
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{BASE_URL}/stock/profile2", params=params)
+            if r.status_code != 200:
+                return None
+            data = r.json()
+    except Exception:
+        return None
+
+    if not data:
+        _save_cache(cache_key, {})  # cache the empty so we don't re-poll
+        return None
+
+    profile = {
+        "sector":      data.get("finnhubIndustry") or "Unknown",
+        "industry":    data.get("finnhubIndustry") or "",
+        "name":        data.get("name") or sym,
+        "market_cap":  _f(data.get("marketCapitalization")),
+        "country":     data.get("country") or "",
+        "exchange":    data.get("exchange") or "",
+        "ipo":         data.get("ipo") or "",
+    }
+    _save_cache(cache_key, profile)
+    return profile
 
 
 async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[dict[str, Any]] | None:

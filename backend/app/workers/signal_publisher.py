@@ -54,6 +54,8 @@ _last_drip_check: datetime | None = None
 _last_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_fundamentals_refresh: datetime | None = None
+_last_insider_refresh: datetime | None = None
+_last_sector_backfill: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -245,6 +247,26 @@ async def tick() -> None:
         await _refresh_fundamentals_cache()
         _last_fundamentals_refresh = started
 
+    # Daily Finnhub insider Form 4 pre-fetch — populates the smart-money cache
+    # that polygon_feed.fetch_snapshots reads per tick. Insider trades hit Form 4
+    # within days; daily refresh keeps the signal current.
+    global _last_insider_refresh  # noqa: PLW0603
+    if settings.finnhub_api_key and (
+        _last_insider_refresh is None
+        or (started - _last_insider_refresh).total_seconds() >= 86400
+    ):
+        await _refresh_insider_cache()
+        _last_insider_refresh = started
+
+    # Daily sector backfill — fills in sector="Unknown" rows from Finnhub.
+    global _last_sector_backfill  # noqa: PLW0603
+    if settings.finnhub_api_key and (
+        _last_sector_backfill is None
+        or (started - _last_sector_backfill).total_seconds() >= 86400
+    ):
+        await _backfill_sectors()
+        _last_sector_backfill = started
+
     # End-of-day watchlist email digest. Fires once per UTC day shortly after
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
     # process memory to avoid double-fires within the same day. Worker restart
@@ -428,6 +450,81 @@ async def _refresh_fundamentals_cache() -> None:
         await asyncio.sleep(1.1)
 
     logger.info("fundamentals.refreshed scored=%d cache_size=%d", refreshed, fund_cache_size())
+
+
+async def _refresh_insider_cache() -> None:
+    """
+    Daily pre-fetch of Finnhub insider Form 4 transactions for every ticker.
+    Populates _SMART_MONEY_SCORE_CACHE so polygon_feed reads real values
+    per tick instead of random mock for sub_smart_money.
+
+    Same rate-limit budget as fundamentals (~16 min cold-start across 870
+    tickers, sub-second when warm thanks to per-symbol 24h disk cache).
+    """
+    from app.services.finnhub_feed import (
+        fetch_insider_transactions,
+        compute_smart_money_score,
+        set_cached_smart_money_score,
+        smart_money_cache_size,
+    )
+
+    async with session_scope() as session:
+        result = await session.execute(select(Ticker.symbol))
+        symbols = [row[0] for row in result.all()]
+
+    refreshed = 0
+    for sym in symbols:
+        try:
+            txns = await fetch_insider_transactions(sym, days_back=90)
+            if txns:
+                score = compute_smart_money_score(txns)
+                set_cached_smart_money_score(sym, score)
+                refreshed += 1
+        except Exception:
+            logger.exception("insider.fetch_failed symbol=%s", sym)
+        await asyncio.sleep(1.1)  # stay well under 60/min
+
+    logger.info("insider.refreshed scored=%d cache_size=%d", refreshed, smart_money_cache_size())
+
+
+async def _backfill_sectors() -> None:
+    """
+    Find Tickers with sector="Unknown" or NULL and fetch their sector from
+    Finnhub /stock/profile2. Useful after universe-discovery adds new tickers
+    (which arrive with sector="Unknown" because Finnhub /stock/profile2 is
+    too slow to call inline during discovery).
+    """
+    from sqlalchemy import or_, update
+    from app.services.finnhub_feed import fetch_company_profile
+
+    async with session_scope() as session:
+        result = await session.execute(
+            select(Ticker.symbol).where(
+                or_(Ticker.sector.is_(None), Ticker.sector == "Unknown")
+            ).limit(200)  # cap per-day work to avoid burning rate limits
+        )
+        symbols = [row[0] for row in result.all()]
+
+    if not symbols:
+        logger.info("sector_backfill.no_unknown_tickers")
+        return
+
+    backfilled = 0
+    async with session_scope() as session:
+        for sym in symbols:
+            try:
+                profile = await fetch_company_profile(sym)
+                if profile and profile.get("sector"):
+                    await session.execute(
+                        update(Ticker).where(Ticker.symbol == sym)
+                        .values(sector=profile["sector"])
+                    )
+                    backfilled += 1
+            except Exception:
+                logger.exception("sector_backfill.fetch_failed symbol=%s", sym)
+            await asyncio.sleep(1.1)
+
+    logger.info("sector_backfill.done backfilled=%d candidates=%d", backfilled, len(symbols))
 
 
 async def _refresh_universe() -> None:
