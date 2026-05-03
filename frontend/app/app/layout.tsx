@@ -7,6 +7,7 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
 import { TrialBanner } from "@/components/TrialBanner";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
+import { OnboardingTip } from "@/components/OnboardingTip";
 
 const tabs = [
   { href: "/app/scanner", label: "Scanner" },
@@ -84,6 +85,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto max-w-7xl px-6 py-6">
           <StaleDataBanner />
           <TrialBanner />
+          <OnboardingTip />
           {children}
         </div>
 
