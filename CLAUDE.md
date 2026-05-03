@@ -13,7 +13,7 @@ The personal trading system at `C:\signal-system\` is a separate project. Tapeli
 - **Git is live** at https://github.com/cham-p24/tapeline. CI deploys main → Fly.io (backend) + Vercel (frontend). Use normal commit/push flow.
 - **No Docker required for dev.** Run `.\scripts\run_nodocker.ps1` from project root. Uses SQLite, opens browser to `http://localhost:3000`.
 - **Owner login** (already seeded): `owner@tapeline.io` / `TapelineOwner!2026` — premium tier, admin. Re-seed via `python -m app.scripts.seed_owner` from `backend/` (idempotent; reads `OWNER_EMAIL` / `OWNER_PASSWORD` env vars).
-- **Dev auth bypass:** `Authorization: Bearer dev-bypass` returns a premium token in dev. **Strip before production.**
+- **Dev auth bypass:** `Authorization: Bearer dev-bypass` returns a premium token, but the gate (`auth.py:142`) only fires when `settings.app_env == "development"`. Production has `APP_ENV=production` set in `fly.toml`, so the bypass is inert in prod — verified live: `/api/me` with the bypass token returns `authenticated: false` against api.tapeline.io.
 - **Today's date for relative refs:** see system date.
 
 ## Stack

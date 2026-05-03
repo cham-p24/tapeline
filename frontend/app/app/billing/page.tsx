@@ -130,7 +130,7 @@ export default function BillingPage() {
             "IPO + Earnings calendars",
             "10 email alerts/day",
           ]}
-          cta="Upgrade to Pro"
+          cta={user?.tier === "premium" ? "Switch to Pro" : "Upgrade to Pro"}
           highlight={user?.tier === "pro"}
           disabled={user?.tier === "pro"}
           busy={busy === "pro"}
