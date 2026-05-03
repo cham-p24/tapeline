@@ -167,87 +167,25 @@ export function PricingTable() {
         })}
       </div>
 
-      {/* Anchor row — Team / Enterprise / Lifetime */}
-      <div className="mx-auto mt-16 max-w-5xl">
-        <p className="mb-6 text-center text-xs uppercase tracking-[0.12em] text-subtle">For teams, enterprises &amp; founders</p>
-        <div className="grid gap-4 md:grid-cols-3">
-          <AnchorCard
-            name="Team"
-            tag="B2B"
-            tagline="RIAs, funds, trading desks"
-            price="$149"
-            priceSuffix="/mo · 5 seats"
-            detail="$29/extra · admin panel · shared watchlists"
-            cta="Contact sales"
-            href="mailto:sales@tapeline.io?subject=Team tier"
-          />
-          <AnchorCard
-            name="Enterprise"
-            tag="Custom"
-            tagline="Hedge funds, family offices"
-            price="Custom"
-            priceSuffix=" · from $2k/mo"
-            detail="SSO · SCIM · 10k+ API · SLA · dedicated CSM"
-            cta="Talk to us"
-            href="mailto:enterprise@tapeline.io?subject=Enterprise"
-          />
-          <AnchorCard
-            name="Founder's Lifetime"
-            tag="47 of 100 left"
-            tagline="Pro tier, forever"
-            price="$399"
-            priceSuffix=" once"
-            detail="Never billed · founders wall · early access"
-            cta="Grab a spot"
-            href="/signup?plan=lifetime"
-            highlight
-          />
-        </div>
-      </div>
-
-      {/* Commitments */}
-      <div className="mx-auto mt-12 flex max-w-2xl flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-muted">
-        <span>14-day Pro trial, no card</span>
-        <span className="text-subtle">•</span>
+      {/* Commitments — single tight strip, 4 chips */}
+      <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
+        <span>14-day Premium trial · no card</span>
+        <span className="text-subtle">·</span>
         <span>7-day money back</span>
-        <span className="text-subtle">•</span>
-        <span>Price locked on annual</span>
-        <span className="text-subtle">•</span>
-        <span>Cancel anytime, one click</span>
+        <span className="text-subtle">·</span>
+        <span>Annual price locked forever</span>
+        <span className="text-subtle">·</span>
+        <span>Cancel in one click</span>
       </div>
+
+      {/* B2B / lifetime nudge — one line, no third row of cards.
+          Curious enterprise buyers can email; everyone else stays focused
+          on the three main tiers above. */}
+      <p className="mx-auto mt-8 max-w-3xl text-center text-xs text-subtle">
+        Need 5+ seats, custom SLA, or a one-time founder's lifetime? Email{" "}
+        <a href="mailto:sales@tapeline.io" className="text-accent hover:underline">sales@tapeline.io</a>.
+      </p>
     </div>
   );
 }
 
-function AnchorCard({
-  name, tag, tagline, price, priceSuffix, detail, cta, href, highlight,
-}: {
-  name: string; tag: string; tagline: string; price: string; priceSuffix: string;
-  detail: string; cta: string; href: string; highlight?: boolean;
-}) {
-  return (
-    <div className={`rounded-xl border p-6 transition-all ${
-      highlight ? "border-accent/50 bg-gradient-to-b from-accent/5 to-transparent" : "border-border bg-panel"
-    }`}>
-      <div className="flex items-baseline justify-between">
-        <h3 className="font-semibold">{name}</h3>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
-          highlight ? "bg-accent text-white" : "bg-panel2 text-subtle"
-        }`}>{tag}</span>
-      </div>
-      <p className="mt-1 text-xs text-muted">{tagline}</p>
-      <div className="mt-4 text-2xl font-semibold nums">
-        {price}<span className="text-sm font-normal text-muted">{priceSuffix}</span>
-      </div>
-      <p className="mt-2 text-xs text-muted leading-relaxed">{detail}</p>
-      <Link
-        href={href}
-        className={`mt-5 inline-flex h-9 items-center gap-1 text-sm ${
-          highlight ? "text-accent hover:text-accent/80" : "text-muted hover:text-fg"
-        } transition-colors`}
-      >
-        {cta} &rarr;
-      </Link>
-    </div>
-  );
-}

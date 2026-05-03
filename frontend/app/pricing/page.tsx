@@ -10,64 +10,73 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen">
       <MarketingNav />
-      <div className="section pt-6 pb-2 flex items-center justify-end gap-4">
-        <a href="#compare" className="text-sm text-muted hover:text-fg transition-colors">
-          Jump to comparison ↓
-        </a>
-      </div>
 
-      <section id="top" className="section py-20 scroll-mt-16">
+      {/* Hero — single tight intro, no orphaned scroll links */}
+      <section className="section py-16 sm:py-20">
         <div className="mx-auto max-w-3xl text-center">
           <p className="eyebrow">Pricing</p>
-          <h1 className="mt-3 text-5xl font-bold sm:text-6xl">Pick your tier.</h1>
-          <p className="mt-6 text-lg text-muted">
-            Every signup starts on a 14-day Pro trial. No credit card required.
+          <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
+            Pick your tier.
+          </h1>
+          <p className="mt-4 text-base sm:text-lg text-muted">
+            Every signup starts with a 14-day Premium trial. No credit card.
             Cancel in one click, anytime.
           </p>
         </div>
 
-        <div className="mt-16">
+        <div className="mt-12">
           <PricingTable />
         </div>
       </section>
 
-      {/* Comparison */}
-      <section id="compare" className="border-t border-border/60 bg-panel/20 scroll-mt-16">
-        <div className="section py-24">
+      {/* Comparison — soft section break, tighter heading */}
+      <section className="border-t border-border/60 bg-panel/20">
+        <div className="section py-14 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="eyebrow">Compare</p>
-            <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">Compare plans</h2>
-            <p className="mt-4 text-muted">Every feature, every limit. No asterisks.</p>
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Every feature, every limit.</h2>
+            <p className="mt-2 text-sm text-muted">No asterisks.</p>
           </div>
-          <div className="mt-12">
+          <div className="mt-8">
             <ComparisonTable />
-          </div>
-          <div className="mt-8 text-center">
-            <a href="#top" className="text-sm text-muted hover:text-fg transition-colors">↑ Back to plans</a>
           </div>
         </div>
       </section>
 
-      {/* Billing FAQ */}
-      <section className="section py-24">
-        <div className="mx-auto max-w-3xl">
-          <p className="eyebrow text-center">Billing FAQ</p>
-          <h2 className="mt-3 text-center text-4xl font-semibold">Common questions</h2>
+      {/* FAQ — trimmed to the 4 questions actually asked at sign-up time.
+          Detailed support FAQ lives at /support. */}
+      <section className="section py-14 sm:py-16">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Common questions</h2>
 
-          <div className="mt-12 divide-y divide-border border-y border-border">
-            <Faq q="Can I switch plans later?" a="Yes — any time, prorated automatically. Upgrade takes effect immediately. Downgrade at the end of your billing period. No phone calls." />
-            <Faq q="What happens when my trial ends?" a="Your account drops to Free. Your watchlists and settings stay intact. You only pay when you choose to upgrade." />
-            <Faq q="Refund policy?" a="7-day money back on any paid plan. Email support@tapeline.io in your first week and we refund in full, no forms." />
-            <Faq q="Do you offer annual contracts for teams?" a="Yes. Team and Enterprise plans can be billed annually with custom terms. Email sales@tapeline.io." />
-            <Faq q="What payment methods do you accept?" a="All major credit and debit cards via Stripe. Apple Pay and Google Pay at checkout. Invoicing for Enterprise." />
-            <Faq q="Will prices go up?" a="Possibly. When they do, annual subscribers are grandfathered at their current rate for as long as their subscription is active." />
+          <div className="mt-8 divide-y divide-border border-y border-border">
+            <Faq
+              q="What happens when my trial ends?"
+              a="Your account drops to Free — top 20 tickers, 24-hour delayed. Watchlists and settings stay intact. Add a card any time to keep Premium."
+            />
+            <Faq
+              q="Can I switch plans later?"
+              a="Yes — any time, prorated automatically. Upgrade takes effect immediately. Downgrade at the end of your billing period."
+            />
+            <Faq
+              q="Refund policy?"
+              a="7-day money back on any paid plan. Email support@tapeline.io in your first week, we refund in full — no forms."
+            />
+            <Faq
+              q="Will prices go up?"
+              a="Possibly. When they do, annual subscribers are grandfathered at their current rate for as long as their subscription is active."
+            />
           </div>
 
-          <div className="mt-16 text-center">
+          <div className="mt-10 text-center">
             <Link href="/signup" className="btn-accent inline-flex h-11 px-6 text-base">
               Start 14-day trial &rarr;
             </Link>
-            <p className="mt-3 text-xs text-subtle">No credit card required</p>
+            <p className="mt-3 text-xs text-subtle">
+              No credit card required ·{" "}
+              <Link href="/support" className="hover:text-muted underline-offset-2 hover:underline">
+                more questions
+              </Link>
+            </p>
           </div>
         </div>
       </section>
@@ -79,9 +88,9 @@ export default function PricingPage() {
 
 function Faq({ q, a }: { q: string; a: string }) {
   return (
-    <details className="group py-5">
+    <details className="group py-4">
       <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
-        <h3 className="font-medium">{q}</h3>
+        <h3 className="text-sm font-medium">{q}</h3>
         <span className="text-muted transition-transform group-open:rotate-45">+</span>
       </summary>
       <p className="mt-3 text-sm text-muted leading-relaxed">{a}</p>

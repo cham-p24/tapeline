@@ -15,15 +15,15 @@ describe("PricingTable", () => {
     expect(screen.getByRole("heading", { name: "Premium" })).toBeInTheDocument();
   });
 
-  it("shows the three anchor offerings (Team / Enterprise / Lifetime)", () => {
+  it("shows a sales contact line for B2B / lifetime instead of a third row of cards", () => {
+    // Anchor cards (Team / Enterprise / Lifetime) were retired 2026-05-04
+    // for visual cleanup — sales-curious buyers email instead.
     render(<PricingTable />);
-    expect(screen.getByRole("heading", { name: "Team" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Enterprise" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Founder.s Lifetime/ })).toBeInTheDocument();
+    expect(screen.getByText(/sales@tapeline\.io/i)).toBeInTheDocument();
   });
 
   it("shows the 14-day trial commitment", () => {
     render(<PricingTable />);
-    expect(screen.getByText(/14-day Pro trial/i)).toBeInTheDocument();
+    expect(screen.getByText(/14-day Premium trial/i)).toBeInTheDocument();
   });
 });
