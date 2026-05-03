@@ -40,6 +40,13 @@ def _api_key() -> str:
     """Returns whichever vendor key is configured. Prefer the new MASSIVE_API_KEY
     when both are set so accounts created post-rebrand work cleanly."""
     return settings.massive_api_key or settings.polygon_api_key or ""
+
+
+# Module-level latch — set to True after the first VIX-endpoint failure so we
+# stop hammering an endpoint that requires indices entitlement we don't have.
+# Resets on worker restart, which is fine — the cost of one failed probe per
+# boot is negligible.
+_vix_endpoint_disabled: bool = False
 _RATE_LIMIT_PER_MIN = {"starter": 5, "developer": 1000, "advanced": 10_000}
 
 # Seed universe — list of symbols we score. In production this gets
@@ -416,18 +423,28 @@ async def fetch_regime() -> dict[str, Any]:
     from app.services.fred_feed import fetch_macro_indicators
     fred_data = await fetch_macro_indicators()
 
-    # Live VIX from Polygon — preferred over FRED's daily close for intraday
+    # Live VIX from Massive — preferred over FRED's daily close for intraday.
+    # Massive Stocks Starter does NOT include indices entitlement, so this
+    # endpoint 403s every call. Probe once per worker boot and skip thereafter
+    # so we don't spam the warning log (FRED's daily VIX close is the fallback).
     vix = fred_data.get("vix") or 20.0
-    try:
-        async with httpx.AsyncClient() as client:
-            vix_snap = await _request(
-                client, "/v2/snapshot/locale/us/markets/indices/tickers/I:VIX",
+    global _vix_endpoint_disabled
+    if not _vix_endpoint_disabled:
+        try:
+            async with httpx.AsyncClient() as client:
+                vix_snap = await _request(
+                    client, "/v2/snapshot/locale/us/markets/indices/tickers/I:VIX",
+                )
+            vix_live = vix_snap.get("ticker", {}).get("value")
+            if vix_live:
+                vix = float(vix_live)
+        except Exception:
+            _vix_endpoint_disabled = True
+            logger.info(
+                "polygon.vix_endpoint_disabled — using FRED daily close (%.2f). "
+                "Indices entitlement requires Massive Indices Starter, separate from Stocks.",
+                vix,
             )
-        vix_live = vix_snap.get("ticker", {}).get("value")
-        if vix_live:
-            vix = float(vix_live)
-    except Exception:
-        logger.warning("polygon.vix_fetch_failed using_fallback=%.2f", vix)
 
     dxy = fred_data.get("dxy") or 103.5
     y10 = fred_data.get("yield_10y") or 4.25
