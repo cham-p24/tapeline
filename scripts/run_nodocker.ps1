@@ -27,8 +27,9 @@ APP_ENV=development
 APP_URL=http://localhost:3000
 API_URL=http://localhost:8000
 DATABASE_URL=sqlite:///tapeline_dev.sqlite
+MASSIVE_API_KEY=
+# Legacy Polygon keys still work during the rebrand grace period:
 POLYGON_API_KEY=
-POLYGON_TIER=starter
 CLERK_SECRET_KEY=
 CLERK_PUBLISHABLE_KEY=
 CLERK_WEBHOOK_SECRET=
@@ -37,7 +38,6 @@ STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=
 RESEND_API_KEY=
 SCORE_REFRESH_SECONDS=10
-SNAPSHOT_REFRESH_SECONDS=10
 "@ | Set-Content -Path "$root\.env" -Encoding utf8
 } else {
     Write-Host "[2/5] .env exists"

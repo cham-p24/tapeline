@@ -80,10 +80,10 @@ async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
 
 
 async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dict[str, Any]]:
-    """Massive.com (formerly Polygon.io) reference/news endpoint.
+    """Massive.com reference/news endpoint.
 
-    Same shape as legacy Polygon; the vendor still serves api.polygon.io for
-    the grace period, but the canonical hostname is api.massive.com.
+    Hostname overridable via MASSIVE_BASE_URL env var; api.polygon.io still
+    works during the rebrand grace period.
     """
     params: dict[str, Any] = {
         "apiKey": _vendor_key(),

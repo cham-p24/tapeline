@@ -16,10 +16,10 @@ Built on the same engine that powers a production personal trading bot.
 
 ```
 ┌──────────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│  Polygon.io SIP feed │─────▶│  Scoring worker  │─────▶│  Postgres       │
-│  (commercial data)   │      │  (adapted from   │      │  (scores,       │
-└──────────────────────┘      │   signal-system) │      │   snapshots)    │
-                              └──────────────────┘      └────────┬────────┘
+│  Massive SIP feed    │─────▶│  Scoring worker  │─────▶│  Postgres       │
+│  (Polygon, rebranded │      │  (adapted from   │      │  (scores,       │
+│   2025-10-30)        │      │   signal-system) │      │   snapshots)    │
+└──────────────────────┘      └──────────────────┘      └────────┬────────┘
                                                                  │
                                                                  ▼
 ┌──────────────────────┐      ┌──────────────────┐      ┌─────────────────┐
@@ -41,7 +41,8 @@ Built on the same engine that powers a production personal trading bot.
 - **Frontend:** Next.js 14 + TypeScript + Tailwind + shadcn/ui
 - **Auth:** Clerk
 - **Billing:** Stripe
-- **Data feed:** Polygon.io Starter ($29/mo, commercial redistribution)
+- **Data feed:** Massive Stocks Starter ($29/mo, commercial redistribution) — formerly Polygon.io
+- **Macro / fundamentals / 13F:** FRED · Finnhub · Quiver Quantitative
 - **Deployment:** Fly.io (backend + worker) + Vercel (frontend)
 - **Email:** Resend
 

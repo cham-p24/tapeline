@@ -14,15 +14,10 @@ Cache:
     - 24h per query, written to backend/.cache/quiver_*.json.
     - SEC reporting window for 13Fs is 45 days, so 24h cadence is conservative.
 
-Wiring (still TODO):
-    - signal_publisher.py worker: call fetch_elite_13f_holdings() once per 24h
-      and store results in a new `institutional_holdings` table (migration needed).
-    - smart_money sub-score: when a tracked fund has a recent buy in a ticker,
-      bump that ticker's sub_smart_money toward 100.
-    - /api/holdings endpoint: expose to Premium users (gated via FEATURES dict).
-
-Without that wiring this module is a ready-to-use library; the worker
-integration is on the post-launch list because it requires a new migration.
+Wiring (DONE 2026-04-27):
+    - signal_publisher.py worker: `_refresh_elite_13f` runs daily.
+    - /api/holdings endpoint: live, gated via `holdings.elite` feature flag.
+    - Falls back to `mock_elite_13f_holdings()` when QUIVER_API_KEY is unset.
 """
 from __future__ import annotations
 

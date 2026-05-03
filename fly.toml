@@ -11,15 +11,16 @@ primary_region = "syd"              # Sydney — lowest latency for Melbourne fo
   APP_URL = "https://tapeline.io"
   API_URL = "https://api.tapeline.io"
   SCORE_REFRESH_SECONDS = "60"
-  SNAPSHOT_REFRESH_SECONDS = "30"
 
-# Secrets set via:  fly secrets set POLYGON_API_KEY=xxx ...
+# Secrets set via:  fly secrets set MASSIVE_API_KEY=xxx ...
 # Required secrets (set before deploy):
 #   DATABASE_URL (from Supabase or Neon)
-#   POLYGON_API_KEY
+#   MASSIVE_API_KEY  (or legacy POLYGON_API_KEY during the rebrand grace period)
+#   FINNHUB_API_KEY, FRED_API_KEY  (optional but enable real fundamentals + macro)
 #   CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, CLERK_WEBHOOK_SECRET, CLERK_ISSUER_URL
-#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PREMIUM_MONTHLY
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_PRO_MONTHLY/ANNUAL, STRIPE_PRICE_PREMIUM_MONTHLY/ANNUAL
 #   RESEND_API_KEY
+#   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT  (web push)
 #   ADMIN_API_KEY
 
 [[services]]

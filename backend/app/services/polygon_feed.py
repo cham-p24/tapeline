@@ -32,8 +32,10 @@ settings = get_settings()
 
 # Polygon rebranded to Massive on 2025-10-30. Same API shape, same auth, same
 # endpoints — only the hostname changed. Massive accepts the legacy POLYGON_API_KEY
-# as well as the new MASSIVE_API_KEY for an extended grace period.
-BASE_URL = "https://api.massive.com"
+# as well as the new MASSIVE_API_KEY for an extended grace period. Hostname is
+# overridable via MASSIVE_BASE_URL for sandbox / failover targets.
+import os
+BASE_URL = os.environ.get("MASSIVE_BASE_URL", "https://api.massive.com")
 
 
 def _api_key() -> str:
@@ -47,10 +49,9 @@ def _api_key() -> str:
 # Resets on worker restart, which is fine — the cost of one failed probe per
 # boot is negligible.
 _vix_endpoint_disabled: bool = False
-_RATE_LIMIT_PER_MIN = {"starter": 5, "developer": 1000, "advanced": 10_000}
 
-# Seed universe — list of symbols we score. In production this gets
-# populated from Polygon's ticker reference API, filtered to liquid names.
+# Seed universe — list of symbols we score. In production this gets populated
+# from Massive's ticker reference API, filtered to liquid names.
 DEFAULT_UNIVERSE = [
     # Mega caps + S&P 100 names (edit to taste)
     "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "AVGO", "ORCL", "AMD",

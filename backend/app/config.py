@@ -102,12 +102,6 @@ class Settings(BaseSettings):
 
     # ---- Worker cadence ----
     score_refresh_seconds: int = 60
-    snapshot_refresh_seconds: int = 30
-
-    # ---- Feature flags ----
-    feature_congress_tab: bool = True
-    feature_telegram_alerts: bool = True
-    feature_csv_export: bool = True
 
 
 @lru_cache
