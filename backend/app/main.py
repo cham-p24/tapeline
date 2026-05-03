@@ -88,7 +88,7 @@ async def unhandled_exception(request: Request, exc: Exception):
 
 
 @app.get("/api/public/top-tickers")
-async def public_top_tickers(limit: int = 500) -> dict[str, list[str]]:
+async def public_top_tickers(limit: int = 500) -> dict[str, object]:
     """Public, no-auth, no-tier-gating list of top tickers by score.
 
     Used by the frontend sitemap.ts at sitemap-render time to seed the
