@@ -65,7 +65,9 @@ export async function subscribeToWebPush(): Promise<{ ok: true } | { ok: false; 
   try {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
+      // Cast to BufferSource — newer TS narrows Uint8Array<ArrayBufferLike>
+      // away from the expected BufferSource union here
+      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
     });
   } catch (e: any) {
     return { ok: false, reason: `Push subscribe failed: ${e.message}` };

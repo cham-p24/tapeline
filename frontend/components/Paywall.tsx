@@ -89,8 +89,9 @@ export function PaywallModal({
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$49/mo · Premium" : "$29/mo · Pro";
-  const featureName = {
+  const featureName = ({
     "scanner.full": "Full live scanner",
+    "scanner.live": "Live scanner updates",
     "watchlist": "Watchlist with smart alerts",
     "squeeze": "Squeeze Watch",
     "regime.full": "Full regime dashboard",
@@ -99,10 +100,14 @@ export function PaywallModal({
     "ticker.full": "Full ticker deep-dive",
     "congress": "Congressional trades",
     "alerts.telegram": "Telegram alerts",
+    "alerts.sms": "SMS alerts",
+    "alerts.discord": "Discord alerts",
+    "alerts.web_push": "Browser push alerts",
     "briefing": "Daily briefing email",
     "api": "API access",
+    "holdings.elite": "Elite institutional holdings",
     "csv_export": "CSV export",
-  }[feature] || "This feature";
+  } as Record<string, string>)[feature] || "This feature";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
