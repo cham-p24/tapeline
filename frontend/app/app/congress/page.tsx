@@ -24,23 +24,47 @@ export default function CongressPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Congress Trades</h1>
-          <p className="text-sm text-muted">Recent disclosed trades from US House and Senate members.</p>
+          <p className="text-sm text-muted">Recent disclosed trades from US House and Senate members. Sorted by disclosure date.</p>
         </div>
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
       <Paywall feature="congress" title="Congressional trades feed">
-        <div className="card mt-6 overflow-hidden">
+        {/* Why "trade date" looks stale: the STOCK Act gives politicians up
+            to 45 days to disclose a trade. So a recent disclosure ("today")
+            often reports a trade from weeks ago. The list IS up to date —
+            we sync from Quiver multiple times per day. */}
+        <details className="card mt-4 cursor-pointer p-4 text-sm">
+          <summary className="font-semibold">
+            Why is the trade date weeks ago?{" "}
+            <span className="text-muted text-xs ml-1">(STOCK Act explainer)</span>
+          </summary>
+          <div className="mt-3 space-y-2 text-muted leading-relaxed">
+            <p>
+              US Congress members have <strong>up to 45 days</strong> to disclose a trade
+              under the STOCK Act. So you'll routinely see "trade executed April 14,
+              disclosed today" — that's the law working as designed, not a sync lag on
+              our end.
+            </p>
+            <p>
+              We sort newest-disclosed first because that's the actionable signal:
+              this is when the public (and price discovery) actually finds out.
+              Quiver Quantitative is our source; we sync multiple times per day.
+            </p>
+          </div>
+        </details>
+
+        <div className="card mt-4 overflow-hidden">
           <table className="w-full text-sm nums">
             <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
               <tr>
-                <th className="px-4 py-2 text-left">Disclosed</th>
+                <th className="px-4 py-2 text-left" title="When the trade was publicly disclosed via STOCK Act filing">Disclosed</th>
                 <th className="px-4 py-2 text-left">Politician</th>
                 <th className="px-4 py-2 text-left">Chamber</th>
                 <th className="px-4 py-2 text-left">Ticker</th>
                 <th className="px-4 py-2 text-left">Action</th>
                 <th className="px-4 py-2 text-right">Amount</th>
-                <th className="px-4 py-2 text-left">Trade date</th>
+                <th className="px-4 py-2 text-left" title="When the trade actually happened — up to 45 days before disclosure under the STOCK Act">Trade executed</th>
               </tr>
             </thead>
             <tbody>

@@ -19,16 +19,35 @@ export default function SqueezePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Squeeze Watch</h1>
-          <p className="text-sm text-muted">Bollinger Band compressions and volume expansions.</p>
+          <p className="text-sm text-muted">Stocks where price has gone quiet — historically a setup for a bigger-than-usual move.</p>
         </div>
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
       <details className="card mt-4 cursor-pointer p-4 text-sm">
-        <summary className="font-semibold">What is a squeeze? <span className="text-muted text-xs ml-1">(click to explain)</span></summary>
-        <div className="mt-3 space-y-2 text-muted">
-          <p>When a stock&apos;s Bollinger Bands narrow to historically tight levels, volatility has contracted &mdash; buyers and sellers are in temporary balance. Historically, tight squeezes tend to release into larger-than-average moves (up OR down) once the coil breaks.</p>
-          <p><strong>Spike score</strong> combines BB tightness + squeeze duration + volume trend + OBV direction. 75+ is a meaningful compression worth watching. Direction is not guaranteed &mdash; confirm with fundamentals or catalyst before acting.</p>
+        <summary className="font-semibold">What this list shows <span className="text-muted text-xs ml-1">(click to read · 30 seconds)</span></summary>
+        <div className="mt-3 space-y-2 text-muted leading-relaxed">
+          <p>
+            Each row is a stock whose <strong>Bollinger Bands</strong> (a measure of how
+            wide the price range has been) have compressed to historically tight levels.
+            Volatility has contracted — buyers and sellers are temporarily balanced.
+            Tight squeezes tend to release into larger-than-average moves once the coil breaks.
+            <strong> Direction is not predicted</strong> — these can break up or down.
+          </p>
+          <p>
+            <strong>Score (0-100):</strong> combines BB tightness + how long the squeeze has lasted + volume trend + OBV direction.
+            <strong> 75+ = meaningful compression worth watching.</strong>
+          </p>
+          <p>
+            <strong>OBV</strong> = On-Balance Volume, a running total of up-day vs down-day volume.
+            <span className="text-up">RISING</span> = quiet accumulation (buyers).
+            <span className="text-down ml-2">FALLING</span> = quiet distribution (sellers).
+            <span className="ml-2">FLAT</span> = no edge.
+          </p>
+          <p>
+            <strong>Window</strong> is a rough timing guide based on how compressed the squeeze is now —
+            tighter squeezes tend to resolve faster.
+          </p>
         </div>
       </details>
 
@@ -37,13 +56,13 @@ export default function SqueezePage() {
           <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Ticker</th>
-              <th className="px-4 py-2 text-right">Spike</th>
-              <th className="px-4 py-2 text-right">Squeeze days</th>
-              <th className="px-4 py-2 text-right">Vol x avg</th>
-              <th className="px-4 py-2 text-left">OBV</th>
+              <th className="px-4 py-2 text-right" title="Composite squeeze score, 0-100. 75+ is meaningful.">Score</th>
+              <th className="px-4 py-2 text-right" title="Days the Bollinger Bands have been compressed">Days quiet</th>
+              <th className="px-4 py-2 text-right" title="Today's volume relative to the 20-day average">Volume vs avg</th>
+              <th className="px-4 py-2 text-left" title="On-Balance Volume direction — accumulation vs distribution">OBV</th>
               <th className="px-4 py-2 text-left">Pattern</th>
-              <th className="px-4 py-2 text-left">Window</th>
-              <th className="px-4 py-2 text-left">Reason</th>
+              <th className="px-4 py-2 text-left" title="Rough timing guide for when the squeeze typically resolves">Likely window</th>
+              <th className="px-4 py-2 text-left">Why</th>
             </tr>
           </thead>
           <tbody>
