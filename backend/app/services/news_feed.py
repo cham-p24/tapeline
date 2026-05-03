@@ -43,17 +43,32 @@ _MOCK_HEADLINES = [
 _MOCK_PUBLISHERS = ["Reuters", "Bloomberg", "Seeking Alpha", "Barrons", "WSJ", "CNBC", "MarketWatch"]
 
 
+def _vendor_key() -> str:
+    """Massive (formerly Polygon) accepts either env var. Prefer the new one."""
+    return settings.massive_api_key or settings.polygon_api_key or ""
+
+
 async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, Any]]:
     """Get recent news items mentioning a specific symbol."""
-    if settings.polygon_api_key:
-        return await _fetch_from_polygon([symbol], limit)
+    if _vendor_key():
+        try:
+            rows = await _fetch_from_polygon([symbol], limit)
+            if rows:
+                return rows
+        except Exception:
+            logger.exception("news.ticker_fetch_failed symbol=%s", symbol)
     return _mock_news(symbol, limit)
 
 
 async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
     """Get recent news across the universe."""
-    if settings.polygon_api_key:
-        return await _fetch_from_polygon(None, limit)
+    if _vendor_key():
+        try:
+            rows = await _fetch_from_polygon(None, limit)
+            if rows:
+                return rows
+        except Exception:
+            logger.exception("news.latest_fetch_failed")
     # Mix of tickers for the markets/news landing
     from app.services.mock_feed import TICKER_UNIVERSE
     tickers = random.sample([t[0] for t in TICKER_UNIVERSE], k=min(limit, len(TICKER_UNIVERSE)))
@@ -65,13 +80,22 @@ async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
 
 
 async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dict[str, Any]]:
-    """Polygon.io reference/news endpoint."""
-    params: dict[str, Any] = {"apiKey": settings.polygon_api_key, "limit": limit, "order": "desc", "sort": "published_utc"}
+    """Massive.com (formerly Polygon.io) reference/news endpoint.
+
+    Same shape as legacy Polygon; the vendor still serves api.polygon.io for
+    the grace period, but the canonical hostname is api.massive.com.
+    """
+    params: dict[str, Any] = {
+        "apiKey": _vendor_key(),
+        "limit": limit,
+        "order": "desc",
+        "sort": "published_utc",
+    }
     if tickers and len(tickers) == 1:
         params["ticker"] = tickers[0]
 
     async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get("https://api.polygon.io/v2/reference/news", params=params)
+        r = await c.get("https://api.massive.com/v2/reference/news", params=params)
         r.raise_for_status()
         body = r.json()
 

@@ -330,8 +330,28 @@ async def _ensure_daily_scorecard(today: date) -> None:
         logger.info("scorecard.snapshot saved for %s", today)
 
 
+_news_cache_wiped: bool = False
+
+
 async def _refresh_news() -> None:
-    """Pull latest news into local cache. In dev this is synthetic."""
+    """Pull latest news into local cache. Real source = Massive (formerly Polygon).
+
+    On worker boot we one-shot wipe any leftover mock entries (id starts with
+    'mock-') so the per-ticker page stops serving the stale mock corpus when
+    real news becomes available.
+    """
+    global _news_cache_wiped
+    if not _news_cache_wiped:
+        from sqlalchemy import delete
+        async with session_scope() as session:
+            res = await session.execute(
+                delete(NewsItem).where(NewsItem.id.like("mock-%"))
+            )
+            wiped = res.rowcount or 0
+        if wiped:
+            logger.info("news.mock_wiped count=%d", wiped)
+        _news_cache_wiped = True
+
     try:
         items = await fetch_latest_news(limit=40)
     except Exception:

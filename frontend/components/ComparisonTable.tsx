@@ -3,27 +3,67 @@
 /**
  * Three-column comparison: Free / Pro $29 / Premium $49.
  * Mirrors the gating in backend/app/services/tier.py.
+ *
+ * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
+ * Limits, Support) so the table reads like a spec sheet, not a wall of bullets.
  */
 
-const ROWS = [
-  { label: "Ticker universe", free: "Top 20", pro: "~870 US equities, ETFs & commodity ETFs", premium: "~870 US equities, ETFs & commodity ETFs" },
-  { label: "Data freshness", free: "24-hour delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
-  { label: "6-factor score breakdown", free: "Top 20 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
-  { label: "Plain-English Why column", free: "—", pro: "✓", premium: "✓" },
-  { label: "Squeeze Watch", free: "—", pro: "✓", premium: "✓" },
-  { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },
-  { label: "IPO + Earnings + News calendars", free: "—", pro: "✓", premium: "✓" },
-  { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
-  { label: "TradingView charts", free: "—", pro: "On every ticker page", premium: "On every ticker page" },
-  { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
-  { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
-  { label: "CSV export", free: "—", pro: "✓", premium: "✓" },
-  { label: "Congressional trades feed", free: "—", pro: "—", premium: "✓" },
-  { label: "Telegram alerts", free: "—", pro: "—", premium: "Unlimited · hourly digest" },
-  { label: "Public API access", free: "—", pro: "—", premium: "1,000 req/day" },
-  { label: "Saved scans", free: "—", pro: "10", premium: "100" },
-  { label: "Public scorecard access", free: "✓", pro: "✓", premium: "✓" },
-  { label: "Support", free: "Community", pro: "Email · 48h", premium: "Priority" },
+type Row = { label: string; free: string; pro: string; premium: string };
+type Section = { name: string; rows: Row[] };
+
+const SECTIONS: Section[] = [
+  {
+    name: "Data & coverage",
+    rows: [
+      { label: "Ticker universe", free: "Top 20", pro: "~870 US equities, ETFs & commodity ETFs", premium: "~870 US equities, ETFs & commodity ETFs" },
+      { label: "Data freshness", free: "24-hour delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
+      { label: "News feed", free: "Headlines only", pro: "Real-time Massive + sentiment", premium: "Real-time Massive + sentiment" },
+    ],
+  },
+  {
+    name: "Scoring & analysis",
+    rows: [
+      { label: "6-factor score breakdown", free: "Top 20 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
+      { label: "Plain-English Why column", free: "—", pro: "✓", premium: "✓" },
+      { label: "TradingView charts", free: "—", pro: "On every ticker page", premium: "On every ticker page" },
+    ],
+  },
+  {
+    name: "Discovery tools",
+    rows: [
+      { label: "Squeeze Watch", free: "—", pro: "✓", premium: "✓" },
+      { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },
+      { label: "IPO + Earnings calendars", free: "—", pro: "✓", premium: "✓" },
+      { label: "Saved scans", free: "—", pro: "10", premium: "100" },
+    ],
+  },
+  {
+    name: "Watchlist & alerts",
+    rows: [
+      { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+      { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
+      { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
+      { label: "Browser push + Discord", free: "—", pro: "✓", premium: "✓" },
+      { label: "Telegram alerts", free: "—", pro: "—", premium: "Unlimited · hourly digest" },
+      { label: "SMS alerts", free: "—", pro: "—", premium: "✓" },
+    ],
+  },
+  {
+    name: "Pro intelligence",
+    rows: [
+      { label: "Congressional trades feed", free: "—", pro: "—", premium: "✓" },
+      { label: "Elite 13F holdings", free: "—", pro: "—", premium: "✓" },
+      { label: "Public API access", free: "—", pro: "—", premium: "1,000 req/day" },
+      { label: "CSV export", free: "—", pro: "✓", premium: "✓" },
+    ],
+  },
+  {
+    name: "Account & support",
+    rows: [
+      { label: "Public scorecard access", free: "✓", pro: "✓", premium: "✓" },
+      { label: "Support", free: "Community", pro: "Email · 48h", premium: "Priority" },
+    ],
+  },
 ];
 
 export function ComparisonTable() {
@@ -43,16 +83,31 @@ export function ComparisonTable() {
           </tr>
         </thead>
         <tbody>
-          {ROWS.map((r) => (
-            <tr key={r.label} className="border-b border-border/30">
-              <td className="px-4 py-3 text-muted">{r.label}</td>
-              <td className="px-4 py-3 text-center nums text-xs">{r.free}</td>
-              <td className="px-4 py-3 text-center nums text-xs">{r.pro}</td>
-              <td className="px-4 py-3 text-center nums text-xs font-medium text-accent">{r.premium}</td>
-            </tr>
+          {SECTIONS.map((sec) => (
+            <SectionGroup key={sec.name} section={sec} />
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function SectionGroup({ section }: { section: Section }) {
+  return (
+    <>
+      <tr className="bg-panel/50 border-y border-border/60">
+        <td colSpan={4} className="px-4 py-2.5 text-[11px] uppercase tracking-wider text-accent font-semibold">
+          {section.name}
+        </td>
+      </tr>
+      {section.rows.map((r) => (
+        <tr key={r.label} className="border-b border-border/30">
+          <td className="px-4 py-3 text-fg">{r.label}</td>
+          <td className="px-4 py-3 text-center nums text-xs text-muted">{r.free}</td>
+          <td className="px-4 py-3 text-center nums text-xs">{r.pro}</td>
+          <td className="px-4 py-3 text-center nums text-xs font-medium text-accent">{r.premium}</td>
+        </tr>
+      ))}
+    </>
   );
 }

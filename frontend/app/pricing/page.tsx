@@ -7,14 +7,17 @@ export const metadata = { title: "Pricing — Tapeline" };
 export default function PricingPage() {
   return (
     <main className="min-h-screen">
-      <div className="section pt-10 pb-4">
+      <div className="section pt-10 pb-4 flex items-center justify-between gap-4">
         <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg transition-colors">
           <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none"><path d="M10 4l-4 4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Home
+          Back to home
         </Link>
+        <a href="#compare" className="text-sm text-muted hover:text-fg transition-colors">
+          Jump to comparison ↓
+        </a>
       </div>
 
-      <section className="section py-20">
+      <section id="top" className="section py-20 scroll-mt-16">
         <div className="mx-auto max-w-3xl text-center">
           <p className="eyebrow">Pricing</p>
           <h1 className="mt-3 text-5xl font-bold sm:text-6xl">Pick your tier.</h1>
@@ -30,7 +33,7 @@ export default function PricingPage() {
       </section>
 
       {/* Comparison */}
-      <section className="border-t border-border/60 bg-panel/20">
+      <section id="compare" className="border-t border-border/60 bg-panel/20 scroll-mt-16">
         <div className="section py-24">
           <div className="mx-auto max-w-3xl text-center">
             <p className="eyebrow">Compare</p>
@@ -39,6 +42,9 @@ export default function PricingPage() {
           </div>
           <div className="mt-12">
             <ComparisonTable />
+          </div>
+          <div className="mt-8 text-center">
+            <a href="#top" className="text-sm text-muted hover:text-fg transition-colors">↑ Back to plans</a>
           </div>
         </div>
       </section>
