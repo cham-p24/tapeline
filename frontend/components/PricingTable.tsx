@@ -22,7 +22,7 @@ const PLANS = [
   {
     name: "Pro",
     tagline: "Live scanner. Daily edge.",
-    prices: { monthly: 29, annual: 290 },
+    prices: { monthly: 29, annual: 299 },
     highlights: [
       "Full ~870 ticker universe, live",
       "Score + plain-English Why on every row",
@@ -39,7 +39,7 @@ const PLANS = [
   {
     name: "Premium",
     tagline: "Everything, no limits.",
-    prices: { monthly: 49, annual: 490 },
+    prices: { monthly: 49, annual: 491 },
     highlights: [
       "Everything in Pro, plus:",
       "Congressional trades feed",
@@ -90,7 +90,12 @@ export function PricingTable() {
       <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3 md:gap-6">
         {PLANS.map((p) => {
           const price = p.prices[billing];
-          const perMonth = billing === "annual" ? price / 12 : price;
+          // Charm-price the annual per-month display: round up to nearest .99
+          // ($299/yr → $24.99/mo; $491/yr → $40.99/mo). Monthly stays as-is.
+          const rawPerMonth = billing === "annual" ? price / 12 : price;
+          const perMonth = billing === "annual" && price > 0
+            ? Math.floor(rawPerMonth) + 0.99
+            : rawPerMonth;
           const ctaHref = p.ctaHref.includes("?")
             ? `${p.ctaHref}&billing=${billing}`
             : `${p.ctaHref}?billing=${billing}`;
@@ -113,12 +118,12 @@ export function PricingTable() {
               <div className="mt-6">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-5xl font-bold nums tracking-tight">
-                    {price === 0 ? "$0" : `$${perMonth.toFixed(perMonth % 1 ? 2 : 0)}`}
+                    {price === 0 ? "$0" : `$${perMonth.toFixed(2)}`}
                   </span>
                   <span className="text-muted">/ month</span>
                 </div>
                 {billing === "annual" && price > 0 && (
-                  <p className="mt-1.5 text-xs text-muted">Billed ${price}/yr · save ${(p.prices.monthly * 12) - p.prices.annual}</p>
+                  <p className="mt-1.5 text-xs text-muted">Billed ${price}/yr · save ${(p.prices.monthly * 12) - p.prices.annual}/yr</p>
                 )}
               </div>
               <ul className="mt-6 space-y-2.5 text-sm">

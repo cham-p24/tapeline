@@ -75,10 +75,12 @@ export function ComparisonTable() {
             <th className="px-4 py-3 text-left text-xs uppercase text-muted">Feature</th>
             <th className="px-4 py-3 text-center text-xs uppercase text-muted w-40">Free</th>
             <th className="px-4 py-3 text-center text-xs uppercase w-48">
-              <span className="text-fg">Pro — $29/mo</span>
+              <span className="text-fg block">Pro</span>
+              <span className="text-[10px] normal-case text-muted block mt-0.5">$29/mo · $24.99/mo annual</span>
             </th>
             <th className="px-4 py-3 text-center text-xs uppercase w-48">
-              <span className="text-accent">Premium — $49/mo</span>
+              <span className="text-accent block">Premium</span>
+              <span className="text-[10px] normal-case text-muted block mt-0.5">$49/mo · $40.99/mo annual</span>
             </th>
           </tr>
         </thead>

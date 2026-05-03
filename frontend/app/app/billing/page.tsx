@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
+import { ComparisonTable } from "@/components/ComparisonTable";
 import {
   getWebPushStatus,
   subscribeToWebPush,
@@ -118,8 +119,8 @@ export default function BillingPage() {
         />
         <Plan
           name="Pro"
-          price={billingPeriod === "annual" ? "$24" : "$29"}
-          note={billingPeriod === "annual" ? "$290/yr · billed annually" : undefined}
+          price={billingPeriod === "annual" ? "$24.99" : "$29"}
+          note={billingPeriod === "annual" ? "$299/yr · billed annually · save $49" : undefined}
           items={[
             "Full ~870 ticker universe, live",
             "Score breakdown + Why on every row",
@@ -137,8 +138,8 @@ export default function BillingPage() {
         />
         <Plan
           name="Premium"
-          price={billingPeriod === "annual" ? "$41" : "$49"}
-          note={billingPeriod === "annual" ? "$490/yr · billed annually" : undefined}
+          price={billingPeriod === "annual" ? "$40.99" : "$49"}
+          note={billingPeriod === "annual" ? "$491/yr · billed annually · save $97" : undefined}
           items={[
             "Everything in Pro",
             "Congressional trades feed",
@@ -154,6 +155,16 @@ export default function BillingPage() {
           busy={busy === "premium"}
           onUpgrade={() => startCheckout("premium")}
         />
+      </div>
+
+      {/* Side-by-side feature comparison so users see exactly what they get
+          when they upgrade — no asterisks, no surprises. */}
+      <div className="mt-12">
+        <h2 className="text-xl font-semibold">What you get for the money</h2>
+        <p className="mt-2 text-sm text-muted">
+          Every feature, every limit. Compare what changes if you upgrade.
+        </p>
+        <ComparisonTable />
       </div>
 
       {/* Real-time channels — email is on by default. Each card below is opt-in. */}
