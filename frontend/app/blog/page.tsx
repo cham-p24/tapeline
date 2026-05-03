@@ -7,6 +7,10 @@ export const metadata = {
   title: "Blog — Tapeline",
   description:
     "Notes from building Tapeline. Methodology, market commentary, and the occasional rant about scanner pricing.",
+  alternates: {
+    canonical: "https://tapeline.io/blog",
+    types: { "application/rss+xml": "https://tapeline.io/blog/rss.xml" },
+  },
 };
 
 export default function BlogIndex() {
@@ -24,7 +28,7 @@ export default function BlogIndex() {
         <h1 className="mt-3 text-5xl font-bold tracking-tight">Notes from building.</h1>
         <p className="mt-4 text-lg text-muted">
           Methodology, market commentary, and occasional rants about scanner pricing.
-          Posts are short. Newest first.
+          Posts are short. Newest first. <a href="/blog/rss.xml" className="text-accent hover:underline">RSS</a>.
         </p>
 
         <div className="mt-12 divide-y divide-border border-y border-border">
