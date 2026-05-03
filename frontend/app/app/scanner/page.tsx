@@ -119,8 +119,23 @@ export default function ScannerPage() {
             {loading && rows.length === 0 ? (
               <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-8 text-center text-muted">
-                No tickers match. Lower the min score or clear the sector filter.
+              <tr><td colSpan={11} className="px-4 py-12 text-center">
+                {minScore > 0 || sector ? (
+                  <div className="text-muted">
+                    <p>No tickers match these filters.</p>
+                    <button
+                      onClick={() => { setMinScore(0); setSector(""); }}
+                      className="mt-3 text-xs text-accent hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-muted">
+                    <p>Scanner is warming up. The worker scores the universe every ~60 seconds.</p>
+                    <p className="mt-2 text-xs text-subtle">If this persists, check <a href="/status" className="text-accent hover:underline">system status</a>.</p>
+                  </div>
+                )}
               </td></tr>
             ) : rows.map((r) => (
               <tr key={r.symbol} className="border-b border-border/50 hover:bg-black/20">
