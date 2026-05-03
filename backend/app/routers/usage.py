@@ -1,7 +1,7 @@
 """/api/usage — show user where they stand against their tier caps."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import AlertEvent, User, WatchlistItem
 from app.services.auth import current_user_required
-from app.services.tier import Tier, TIER_LIMITS
+from app.services.tier import TIER_LIMITS, Tier
 
 router = APIRouter()
 

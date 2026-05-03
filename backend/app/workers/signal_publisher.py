@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
-
 from datetime import UTC, date, datetime
+
 from sqlalchemy import delete, desc, select
 
 from app.config import get_settings
-from app.db import is_sqlite, session_scope
+from app.db import session_scope
 from app.models import (
     CongressTrade,
     DailyScorecardEntry,
@@ -25,6 +24,7 @@ from app.models import (
     Ticker,
     User,
 )
+
 # --- DATA-FEED IMPORTS ---
 # Hybrid swap (2026-05-02): real prices + live macro from Massive (api.massive.com).
 # Squeeze detection stays mock for now — running per-ticker /v2/aggs across the full
@@ -36,8 +36,8 @@ from app.services.mock_feed import (
     fetch_squeezes,
     universe,
 )
-from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.news_feed import fetch_latest_news
+from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_yesterday
 
@@ -178,7 +178,7 @@ async def tick() -> None:
     await _ensure_daily_scorecard(started.date())
 
     # Refresh news feed: on first tick after boot + every ~5 minutes thereafter
-    global _last_news_refresh, _last_backcheck  # noqa: PLW0603
+    global _last_news_refresh, _last_backcheck
     if _last_news_refresh is None or (started - _last_news_refresh).total_seconds() > 300:
         await _refresh_news()
         _last_news_refresh = started
@@ -190,27 +190,27 @@ async def tick() -> None:
 
     # Calendar refresh (IPOs + earnings) — daily cadence. Finnhub-aware
     # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
-    global _last_calendar_seed  # noqa: PLW0603
+    global _last_calendar_seed
     if _last_calendar_seed is None or (started - _last_calendar_seed).total_seconds() >= 86400:
         await _seed_calendar()
         _last_calendar_seed = started
 
     # Hourly Telegram digest to premium users
-    global _last_telegram_digest  # noqa: PLW0603
+    global _last_telegram_digest
     if _last_telegram_digest is None or (started - _last_telegram_digest).total_seconds() >= 3600:
         await _run_telegram_digest()
         _last_telegram_digest = started
 
     # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
     # Without this the trial converts to free Premium forever (zero conversion).
-    global _last_trial_check  # noqa: PLW0603
+    global _last_trial_check
     if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
         await _downgrade_expired_trials()
         _last_trial_check = started
 
     # Daily 13F holdings refresh (Quiver, with mock fallback).
     # 24h cadence is conservative — SEC reporting window is 45 days anyway.
-    global _last_holdings_refresh  # noqa: PLW0603
+    global _last_holdings_refresh
     if _last_holdings_refresh is None or (started - _last_holdings_refresh).total_seconds() >= 86400:
         await _refresh_elite_13f()
         _last_holdings_refresh = started
@@ -218,7 +218,7 @@ async def tick() -> None:
     # Daily trial-drip emails (day 3 / 7 / 13). Worker-restart-safe — the
     # User.drip_state column tracks per-user per-stage delivery so the same
     # user never receives the same drip stage twice.
-    global _last_drip_check  # noqa: PLW0603
+    global _last_drip_check
     if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
         try:
             from app.services.email import run_daily_drip
@@ -233,7 +233,7 @@ async def tick() -> None:
     # Weekly universe refresh from Polygon's reference API.
     # Only fires when POLYGON_API_KEY is set — discovers new IPOs and ETF
     # listings without needing manual ticker-list maintenance.
-    global _last_universe_refresh  # noqa: PLW0603
+    global _last_universe_refresh
     if settings.polygon_api_key and (
         _last_universe_refresh is None
         or (started - _last_universe_refresh).total_seconds() >= 604800
@@ -244,7 +244,7 @@ async def tick() -> None:
     # Daily Finnhub fundamentals pre-fetch — populates the in-memory cache that
     # polygon_feed.fetch_snapshots reads per tick. Fundamentals don't change
     # tick-to-tick so once-per-day refresh is plenty.
-    global _last_fundamentals_refresh  # noqa: PLW0603
+    global _last_fundamentals_refresh
     if settings.finnhub_api_key and (
         _last_fundamentals_refresh is None
         or (started - _last_fundamentals_refresh).total_seconds() >= 86400
@@ -255,7 +255,7 @@ async def tick() -> None:
     # Daily Finnhub insider Form 4 pre-fetch — populates the smart-money cache
     # that polygon_feed.fetch_snapshots reads per tick. Insider trades hit Form 4
     # within days; daily refresh keeps the signal current.
-    global _last_insider_refresh  # noqa: PLW0603
+    global _last_insider_refresh
     if settings.finnhub_api_key and (
         _last_insider_refresh is None
         or (started - _last_insider_refresh).total_seconds() >= 86400
@@ -264,7 +264,7 @@ async def tick() -> None:
         _last_insider_refresh = started
 
     # Daily sector backfill — fills in sector="Unknown" rows from Finnhub.
-    global _last_sector_backfill  # noqa: PLW0603
+    global _last_sector_backfill
     if settings.finnhub_api_key and (
         _last_sector_backfill is None
         or (started - _last_sector_backfill).total_seconds() >= 86400
@@ -276,7 +276,7 @@ async def tick() -> None:
     # ticker, computes trend/RS/momentum, populates the in-memory caches that
     # polygon_feed.fetch_snapshots reads per tick. Once-per-day is fine because
     # daily-bar-derived factors don't change tick-to-tick.
-    global _last_aggregates_refresh  # noqa: PLW0603
+    global _last_aggregates_refresh
     if (settings.massive_api_key or settings.polygon_api_key) and (
         _last_aggregates_refresh is None
         or (started - _last_aggregates_refresh).total_seconds() >= 86400
@@ -288,7 +288,7 @@ async def tick() -> None:
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
     # process memory to avoid double-fires within the same day. Worker restart
     # mid-day will re-fire — acceptable since users would rather get two than zero.
-    global _last_eod_digest_date  # noqa: PLW0603
+    global _last_eod_digest_date
     today_str = started.strftime("%Y-%m-%d")
     if started.hour >= 21 and _last_eod_digest_date != today_str:
         try:
@@ -378,6 +378,7 @@ async def _downgrade_expired_trials() -> None:
     isn't matched by any of the conditions).
     """
     from sqlalchemy import update
+
     from app.models import User as UserModel
 
     now = datetime.now(UTC)
@@ -443,10 +444,10 @@ async def _refresh_fundamentals_cache() -> None:
     7-day disk cache from finnhub_feed.fetch_basic_financials).
     """
     from app.services.finnhub_feed import (
-        fetch_basic_financials,
         compute_fundamentals_score,
-        set_cached_score,
+        fetch_basic_financials,
         fund_cache_size,
+        set_cached_score,
     )
 
     async with session_scope() as session:
@@ -485,13 +486,19 @@ async def _refresh_aggregates_cache() -> None:
     ~5-10 minutes wall time at moderate parallelism. Sleep between calls
     to be polite.
     """
+    from datetime import date as _d
+    from datetime import timedelta as _td
+
     from app.services.polygon_feed import (
-        fetch_aggregates,
-        compute_trend_score, compute_rs_score, compute_momentum_score,
-        set_cached_trend, set_cached_rs, set_cached_momentum,
         aggregate_cache_sizes,
+        compute_momentum_score,
+        compute_rs_score,
+        compute_trend_score,
+        fetch_aggregates,
+        set_cached_momentum,
+        set_cached_rs,
+        set_cached_trend,
     )
-    from datetime import date as _d, timedelta as _td
 
     # Fetch SPY first as the RS benchmark
     today = _d.today()
@@ -544,8 +551,8 @@ async def _refresh_insider_cache() -> None:
     tickers, sub-second when warm thanks to per-symbol 24h disk cache).
     """
     from app.services.finnhub_feed import (
-        fetch_insider_transactions,
         compute_smart_money_score,
+        fetch_insider_transactions,
         set_cached_smart_money_score,
         smart_money_cache_size,
     )
@@ -577,6 +584,7 @@ async def _backfill_sectors() -> None:
     too slow to call inline during discovery).
     """
     from sqlalchemy import or_, update
+
     from app.services.finnhub_feed import fetch_company_profile
 
     async with session_scope() as session:
@@ -642,7 +650,6 @@ async def _refresh_elite_13f() -> None:
     falls back to deterministic mock data so the /api/holdings endpoint
     never returns empty in dev.
     """
-    from app.models import InstitutionalHolding
     from app.services.quiver_feed import fetch_elite_13f_holdings, mock_elite_13f_holdings
 
     rows = await fetch_elite_13f_holdings()
@@ -668,9 +675,10 @@ async def _seed_calendar() -> None:
     refresh so stale events drop off naturally — Finnhub returns the rolling
     window, no need to track which rows were inserted previously.
     """
+    from sqlalchemy import delete
+
     from app.models import EarningsEvent, IPOEvent
     from app.services.calendar_feed import upcoming_earnings, upcoming_ipos
-    from sqlalchemy import delete
 
     async with session_scope() as session:
         # IPOs — replace whole table with the fresh window

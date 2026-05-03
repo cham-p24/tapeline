@@ -14,11 +14,11 @@ export function ScannerLegend() {
     { label: "WEAK",            range: "0–24",   tone: "bg-down/10 text-down", desc: "Factors broadly negative. Avoid longs, consider shorts." },
   ];
   return (
-    <details className="card mt-4 cursor-pointer group" open>
-      <summary className="flex items-center justify-between p-4 list-none">
+    <details className="card mt-4 cursor-pointer group">
+      <summary className="flex items-center justify-between p-3 list-none">
         <div>
-          <h2 className="font-semibold">How to read this table</h2>
-          <p className="mt-0.5 text-xs text-muted">Signal + score range + what each factor means. Click to collapse.</p>
+          <h2 className="text-sm font-semibold">How to read this table</h2>
+          <p className="mt-0.5 text-xs text-muted">Click for signal labels, score ranges, and the 6 factors.</p>
         </div>
         <span className="text-accent transition group-open:rotate-45">+</span>
       </summary>

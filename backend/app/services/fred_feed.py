@@ -10,6 +10,7 @@ Cache: 1h per series (FRED data updates daily, so 1h is plenty courteous).
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import time
@@ -69,10 +70,8 @@ async def _fetch_series_latest(series_id: str) -> float | None:
                 raw = obs[0].get("value", "")
                 if raw and raw != ".":  # FRED uses "." for missing values
                     value = float(raw)
-                    try:
+                    with contextlib.suppress(OSError):
                         cache_file.write_text(json.dumps({"_ts": time.time(), "value": value}))
-                    except OSError:
-                        pass
                     return value
     except (httpx.HTTPError, ValueError, KeyError):
         logger.exception("fred.fetch_failed series=%s", series_id)

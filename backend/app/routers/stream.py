@@ -30,7 +30,7 @@ async def live_stream() -> EventSourceResponse:
                 try:
                     msg = await asyncio.wait_for(queue.get(), timeout=25.0)
                     yield {"event": "update", "data": msg}
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Heartbeat to keep proxy connections alive
                     yield {"event": "ping", "data": "{}"}
         finally:

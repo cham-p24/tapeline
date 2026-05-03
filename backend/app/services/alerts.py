@@ -271,6 +271,7 @@ async def _fire(
     elif rule.channel == "web_push":
         try:
             from sqlalchemy import select as _sel
+
             from app.models import WebPushSubscription
             from app.services.web_push import send_web_push
             subs_r = await session.execute(

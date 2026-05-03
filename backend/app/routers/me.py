@@ -140,8 +140,9 @@ async def subscribe_web_push(
     """Register a browser push subscription. Pro+ feature."""
     if not has_feature(Tier(user.tier), "alerts.web_push"):
         raise HTTPException(403, "Web push alerts require Pro tier")
-    from app.models import WebPushSubscription
     from sqlalchemy import select
+
+    from app.models import WebPushSubscription
     # Replace any existing sub at this endpoint for this user
     existing_r = await session.execute(
         select(WebPushSubscription).where(
@@ -174,8 +175,9 @@ async def unsubscribe_web_push(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Remove a single push subscription by its endpoint URL (query-param keyed)."""
-    from app.models import WebPushSubscription
     from sqlalchemy import delete
+
+    from app.models import WebPushSubscription
     await session.execute(
         delete(WebPushSubscription).where(
             WebPushSubscription.user_id == user.id,
@@ -195,9 +197,10 @@ async def test_web_push(
     """Send a test push notification to all of the user's subscribed browsers."""
     if not has_feature(Tier(user.tier), "alerts.web_push"):
         raise HTTPException(403, "Web push alerts require Pro tier")
+    from sqlalchemy import select
+
     from app.models import WebPushSubscription
     from app.services.web_push import send_web_push
-    from sqlalchemy import select
     subs_r = await session.execute(
         select(WebPushSubscription).where(WebPushSubscription.user_id == user.id)
     )

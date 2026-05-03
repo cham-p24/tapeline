@@ -13,10 +13,10 @@ overrides handle larger seat counts or API caps if needed.
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Tier(str, Enum):
+class Tier(StrEnum):
     FREE = "free"
     PRO = "pro"
     PREMIUM = "premium"

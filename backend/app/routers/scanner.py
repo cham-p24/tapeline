@@ -1,7 +1,7 @@
 """GET /api/scanner — paginated ticker list with filters + tier gating."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, select
@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import Ticker, User
 from app.services.auth import current_user_optional
-from app.services.tier import Tier, limit as tier_limit
+from app.services.tier import Tier
+from app.services.tier import limit as tier_limit
 
 router = APIRouter()
 
@@ -50,8 +51,9 @@ async def list_scanner(
     result = await session.execute(stmt)
     rows = result.scalars().all()
 
-    # Free tier: delay timestamps by 15 minutes to enforce the "delayed data" model
-    delay_minutes = 15 if tier == Tier.FREE else 0
+    # Read the delay from tier.py (Free is 1440 = 24 hours; Pro/Premium = 0)
+    # so the timestamp display matches what /how-it-works and /pricing advertise.
+    delay_minutes = tier_limit(tier, "data_delay_minutes")
     return {
         "count": len(rows),
         "tier": tier.value,

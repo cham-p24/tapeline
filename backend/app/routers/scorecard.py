@@ -1,10 +1,8 @@
 """Public daily scorecard — builds trust via historical transparency."""
 from __future__ import annotations
 
-from datetime import timedelta
-
 from fastapi import APIRouter, Depends
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session

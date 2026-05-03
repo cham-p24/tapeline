@@ -20,7 +20,6 @@ from app.db import session_scope
 from app.models import User
 from app.services.session import hash_password
 
-
 DEFAULT_EMAIL = "owner@tapeline.io"
 DEFAULT_PASSWORD = "TapelineOwner!2026"  # Replace after first login
 
@@ -55,12 +54,12 @@ async def main() -> None:
     print("=" * 60)
     print("OWNER LOGIN")
     print("=" * 60)
-    print(f"  URL:      http://localhost:3000/signin")
+    print("  URL:      http://localhost:3000/signin")
     print(f"  Email:    {email}")
     print(f"  Password: {password}")
     print("=" * 60)
     print("  Tier:     premium (full access to every feature)")
-    print(f"  Admin:    yes (can access /app/admin)")
+    print("  Admin:    yes (can access /app/admin)")
     print("=" * 60)
     print()
     print("CHANGE THE PASSWORD after first login:")

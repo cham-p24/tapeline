@@ -177,11 +177,11 @@ def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
     Items shape: each dict has {symbol, score, signal, change_pct_1d, baseline_score?, score_delta?, reason}.
     """
     if not items:
-        body = """
-        <h1 style="margin:0 0 12px;font-size:24px;">End of day · {date}</h1>
+        body = f"""
+        <h1 style="margin:0 0 12px;font-size:24px;">End of day · {_today_short()}</h1>
         <p style="color:#9ca3af;margin:0 0 20px;">Your watchlist is empty. Add tickers to see them here tomorrow.</p>
         <a href="https://tapeline.io/app/watchlist" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open watchlist &rarr;</a>
-        """.format(date=_today_short())
+        """
         return _shell(body)
 
     rows_html = []
@@ -251,6 +251,7 @@ async def run_eod_watchlist_digest(session) -> int:
     Returns count of emails sent. Pure no-op if RESEND_API_KEY isn't set.
     """
     from sqlalchemy import desc, select
+
     from app.models import Ticker, User, WatchlistItem
 
     users_r = await session.execute(
@@ -334,7 +335,9 @@ async def run_daily_drip(session) -> dict[str, int]:
       - Day 13 email: trial_ends_at is between (now+0d,  now+1d)
     """
     from datetime import UTC, datetime, timedelta
+
     from sqlalchemy import select
+
     from app.models import User
 
     now = datetime.now(UTC)

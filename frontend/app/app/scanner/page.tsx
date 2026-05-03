@@ -150,12 +150,12 @@ export default function ScannerPage() {
                   {r.confidence_pct == null ? "—" : `${r.confidence_pct.toFixed(0)}%`}
                 </td>
                 <td className="px-4 py-2"><SignalPill v={r.signal} /></td>
-                <td className="px-4 py-2 text-right">${r.price?.toFixed(2)}</td>
-                <td className={`px-4 py-2 text-right ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}%</td>
-                <td className={`px-4 py-2 text-right ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}%</td>
-                <td className={`px-4 py-2 text-right ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}%</td>
-                <td className="px-4 py-2 text-right text-muted">{compactNum(r.volume)}</td>
-                <td className="px-4 py-2 text-xs text-muted max-w-[360px] truncate" title={r.reason ?? ""}>
+                <td className="px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
+                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}%</td>
+                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}%</td>
+                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}%</td>
+                <td className="px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
+                <td className="px-4 py-2 text-xs text-muted leading-snug max-w-[520px]" title={r.reason ?? ""}>
                   {r.reason || "—"}
                 </td>
               </tr>

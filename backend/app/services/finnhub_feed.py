@@ -20,10 +20,11 @@ Cache:
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -294,10 +295,8 @@ async def fetch_ipo_calendar(days_ahead: int = 90) -> list[dict[str, Any]] | Non
             except ValueError:
                 pass
         elif price_str:
-            try:
+            with contextlib.suppress(ValueError):
                 price_low = price_high = float(price_str)
-            except ValueError:
-                pass
 
         status_raw = (r.get("status") or "").lower()
         status = {

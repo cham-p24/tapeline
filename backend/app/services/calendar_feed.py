@@ -10,6 +10,7 @@ they try Finnhub first and fall back to the mock generators when no key is set.
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 import random
 from datetime import date, timedelta
@@ -38,7 +39,7 @@ _IPO_SAMPLE = [
 def mock_upcoming_ipos(days_ahead: int = 90) -> list[dict[str, Any]]:
     rows = []
     today = date.today()
-    for i, (sym, name, sector, exch, lo, hi, uw) in enumerate(_IPO_SAMPLE):
+    for _i, (sym, name, sector, exch, lo, hi, uw) in enumerate(_IPO_SAMPLE):
         expected = today + timedelta(days=random.randint(3, days_ahead))
         status = "upcoming" if expected > today + timedelta(days=2) else "priced"
         rows.append({
@@ -95,10 +96,8 @@ async def upcoming_ipos(days_ahead: int = 90) -> list[dict[str, Any]]:
         # Convert ISO date strings (from cache) back to date objects for DB write
         for r in real:
             if isinstance(r.get("expected_date"), str):
-                try:
+                with contextlib.suppress(ValueError):
                     r["expected_date"] = date.fromisoformat(r["expected_date"])
-                except ValueError:
-                    pass
         logger.info("calendar.ipos source=finnhub count=%d", len(real))
         return real
     logger.info("calendar.ipos source=mock")
@@ -115,10 +114,8 @@ async def upcoming_earnings(days_ahead: int = 14) -> list[dict[str, Any]]:
     if real:
         for r in real:
             if isinstance(r.get("report_date"), str):
-                try:
+                with contextlib.suppress(ValueError):
                     r["report_date"] = date.fromisoformat(r["report_date"])
-                except ValueError:
-                    pass
         logger.info("calendar.earnings source=finnhub count=%d", len(real))
         return real
     logger.info("calendar.earnings source=mock")

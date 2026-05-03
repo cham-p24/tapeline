@@ -13,6 +13,13 @@
   .nums {
     font-variant-numeric: tabular-nums;
   }
+  /* Native <select> dropdowns render <option>s with browser default
+     styling (usually white bg + black text). Force the dark-theme palette
+     so the dropdown menu is readable on the dark UI. */
+  select option {
+    background-color: #0a0a0a;
+    color: #f4f4f5;
+  }
 }
 
 @layer components {

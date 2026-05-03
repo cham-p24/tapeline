@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -115,7 +115,9 @@ app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
 app.include_router(calendar_routes.ipo_router, prefix="/api/ipos", tags=["calendar"])
 app.include_router(calendar_routes.earnings_router, prefix="/api/earnings", tags=["calendar"])
 from app.routers import referrals  # noqa: E402
+
 app.include_router(referrals.router, prefix="/api/referrals", tags=["referrals"])
 from app.routers import usage  # noqa: E402
+
 app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
 app.include_router(roadmap.router, prefix="/api/roadmap", tags=["roadmap"])

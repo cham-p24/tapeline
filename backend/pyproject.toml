@@ -49,7 +49,15 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # Line too long — line-length 100 is enforced separately
+    "B008",   # Function call in argument default — required by FastAPI Depends() pattern
+    "E701",   # Multiple statements on one line (colon) — common in compact one-liners
+    "RUF001", # Ambiguous unicode (string body) — emoji + smart quotes are intentional
+    "RUF002", # Ambiguous unicode (docstring) — same
+    "RUF003", # Ambiguous unicode (comment) — same
+    "SIM105", # Use contextlib.suppress — minor style preference, try/except/pass is clearer
+]
 
 [tool.mypy]
 python_version = "3.12"

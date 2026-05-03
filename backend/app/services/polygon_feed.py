@@ -39,7 +39,7 @@ BASE_URL = "https://api.massive.com"
 def _api_key() -> str:
     """Returns whichever vendor key is configured. Prefer the new MASSIVE_API_KEY
     when both are set so accounts created post-rebrand work cleanly."""
-    return settings.massive_api_key or _api_key() or ""
+    return settings.massive_api_key or settings.polygon_api_key or ""
 _RATE_LIMIT_PER_MIN = {"starter": 5, "developer": 1000, "advanced": 10_000}
 
 # Seed universe — list of symbols we score. In production this gets
@@ -92,8 +92,9 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     The composite `score` gets recomputed after merging so real fundamentals
     actually move the needle (they're 15% of the total weight).
     """
-    from app.services.mock_feed import fetch_snapshots as _mock_snapshots, _signal_from_score
     from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
+    from app.services.mock_feed import _signal_from_score
+    from app.services.mock_feed import fetch_snapshots as _mock_snapshots
     # Trend / RS / Momentum caches live in this same module (populated by worker)
 
     # Start with mock — gives us the full schema (sub_* + reason + confidence_pct)

@@ -89,7 +89,7 @@ async def verify_jwt(token: str) -> dict[str, Any]:
         raise HTTPException(401, "Unknown signing key")
 
     try:
-        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import padding
         from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
 
