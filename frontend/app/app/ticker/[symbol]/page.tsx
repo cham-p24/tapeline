@@ -48,7 +48,7 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <Link href="/app/scanner" className="text-muted hover:text-fg text-sm">&larr; Scanner</Link>
@@ -62,6 +62,24 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
           <div className={`nums ${(data.change_pct_1d ?? 0) > 0 ? "text-up" : "text-down"}`}>
             {(data.change_pct_1d ?? 0) >= 0 ? "+" : ""}{data.change_pct_1d?.toFixed(2)}% today
           </div>
+          {/* Share opens X with the public /t/[symbol] URL pre-filled. The
+              social card crawler hits opengraph-image.tsx and renders the
+              tier-coloured score preview. */}
+          <a
+            href={`https://twitter.com/intent/tweet?${new URLSearchParams({
+              text: `$${data.symbol} score: ${(data.score ?? 0).toFixed(0)}/100 (${data.signal ?? "—"})\n\nTransparent 6-factor formula, public scorecard.`,
+              url: `https://tapeline.io/t/${data.symbol}`,
+            }).toString()}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted hover:text-fg transition-colors"
+            title="Tweet this score with the live OG card"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+            Share
+          </a>
         </div>
       </div>
 
