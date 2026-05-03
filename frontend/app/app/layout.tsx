@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/Toast";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
 import { TrialBanner } from "@/components/TrialBanner";
+import { StaleDataBanner } from "@/components/StaleDataBanner";
 
 const tabs = [
   { href: "/app/scanner", label: "Scanner" },
@@ -81,6 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <GlobalSearch />
 
         <div className="mx-auto max-w-7xl px-6 py-6">
+          <StaleDataBanner />
           <TrialBanner />
           {children}
         </div>
