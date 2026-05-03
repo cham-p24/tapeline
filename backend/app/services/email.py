@@ -142,17 +142,19 @@ def render_trial_day7_email(user_name: str) -> str:
     <p style="color:#d1d5db;margin:0 0 16px;">Seven days left of full Premium access.</p>
     <p style="color:#9ca3af;margin:0 0 20px;">When the trial ends, your account drops to Free — top 20 tickers, 24-hour delayed, no alerts. To keep what you have, add a card.</p>
     <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:20px;margin:16px 0;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
         <strong style="font-size:18px;">Pro</strong>
         <span style="font-size:22px;font-weight:700;">$29<span style="font-size:14px;color:#9ca3af;">/mo</span></span>
       </div>
+      <p style="color:#22c55e;margin:0 0 8px;font-size:13px;">or <strong>$24.99/mo billed annually</strong> — save $49/yr</p>
       <p style="color:#9ca3af;margin:0;font-size:13px;">Full live scanner, squeeze, regime, watchlist, email alerts, daily briefing.</p>
     </div>
     <div style="background:#121214;border:1px solid #3b82f6;border-radius:8px;padding:20px;margin:16px 0;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
         <strong style="font-size:18px;color:#3b82f6;">Premium</strong>
         <span style="font-size:22px;font-weight:700;">$49<span style="font-size:14px;color:#9ca3af;">/mo</span></span>
       </div>
+      <p style="color:#22c55e;margin:0 0 8px;font-size:13px;">or <strong>$39.99/mo billed annually</strong> — save $109/yr</p>
       <p style="color:#9ca3af;margin:0;font-size:13px;">Everything in Pro + Congress + Telegram unlimited + API + elite 13F holdings.</p>
     </div>
     <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Add a card &rarr;</a>
