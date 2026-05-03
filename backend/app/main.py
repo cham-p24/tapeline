@@ -87,6 +87,32 @@ async def unhandled_exception(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
+@app.get("/api/public/top-tickers")
+async def public_top_tickers(limit: int = 500) -> dict[str, list[str]]:
+    """Public, no-auth, no-tier-gating list of top tickers by score.
+
+    Used by the frontend sitemap.ts at sitemap-render time to seed the
+    /t/{symbol} URL list for Google. Intentionally separate from the
+    /api/scanner endpoint, which tier-gates row count for the in-app
+    scanner UI — sitemap surface needs to be wide regardless of auth.
+    """
+    from sqlalchemy import desc, select
+
+    from app.db import session_scope
+    from app.models import Ticker
+
+    capped = max(1, min(limit, 1000))
+    async with session_scope() as session:
+        result = await session.execute(
+            select(Ticker.symbol)
+            .where(Ticker.score.is_not(None))
+            .order_by(desc(Ticker.score))
+            .limit(capped)
+        )
+        symbols = [row[0] for row in result.all()]
+    return {"count": len(symbols), "symbols": symbols}
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     """Bare-bones liveness probe — must stay cheap (no DB, no external calls).

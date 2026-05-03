@@ -26,15 +26,16 @@ const API_BASE =
 
 async function fetchTopTickers(limit = 500): Promise<string[]> {
   try {
-    // Scanner endpoint takes no auth, sorts by score by default. Order by
-    // score desc captures the most-relevant tickers for SEO landing pages.
-    const res = await fetch(
-      `${API_BASE}/api/scanner?min_score=0&sort=score&order=desc&limit=${limit}`,
-      { next: { revalidate: 3600 } }
-    );
+    // /api/public/top-tickers is the no-auth, no-tier-gating endpoint built
+    // specifically for sitemap use. The /api/scanner endpoint caps anonymous
+    // callers to the FREE-tier 20-row limit, which would defeat the SEO
+    // expansion entirely.
+    const res = await fetch(`${API_BASE}/api/public/top-tickers?limit=${limit}`, {
+      next: { revalidate: 3600 },
+    });
     if (!res.ok) return FALLBACK_TICKERS;
-    const body = (await res.json()) as { items?: { symbol: string }[] };
-    const syms = (body.items ?? []).map((i) => i.symbol).filter(Boolean);
+    const body = (await res.json()) as { symbols?: string[] };
+    const syms = body.symbols ?? [];
     return syms.length > 0 ? syms : FALLBACK_TICKERS;
   } catch {
     return FALLBACK_TICKERS;
