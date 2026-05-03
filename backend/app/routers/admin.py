@@ -168,6 +168,31 @@ async def platform_stats(
             User.stripe_customer_id.is_(None),
         )
     )).scalar() or 0
+
+    # MRR — only count subscriptions in Stripe's "active" state. Excludes:
+    #   - trialing (no card on file, will likely churn to free at trial end)
+    #   - past_due / unpaid / canceled (also $0 in the bank)
+    # When Subscription.tier is missing (very early launch with no Stripe sync
+    # yet), falls back to 0 — better than overstating MRR before any actual
+    # revenue exists.
+    paying_pro = (await session.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.status == "active",
+            Subscription.tier == "pro",
+        )
+    )).scalar() or 0
+    paying_premium = (await session.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.status == "active",
+            Subscription.tier == "premium",
+        )
+    )).scalar() or 0
+    # NOTE: monthly-rate approximation. Annual subscribers contribute $24.92 /
+    # $39.92 per recognized month; we'd need billing_period on the Subscription
+    # row (or a Stripe per-row lookup) to disambiguate. Acceptable approximation
+    # until annual subscriber count is non-trivial.
+    mrr_usd = paying_pro * 29 + paying_premium * 49
+
     return {
         "users_total": users_total,
         "users_pro": pro_count,
@@ -176,5 +201,9 @@ async def platform_stats(
         "trials_expiring_7d": trials_expiring_7d,
         "active_subscriptions": active_subs,
         "alerts_delivered": alerts_delivered,
-        "mrr_usd": pro_count * 29 + premium_count * 49,
+        # Paying-only counts — what actually drives revenue, distinct from
+        # tier counts which include trialing users.
+        "paying_pro": paying_pro,
+        "paying_premium": paying_premium,
+        "mrr_usd": mrr_usd,
     }
