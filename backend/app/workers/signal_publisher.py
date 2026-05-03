@@ -56,6 +56,7 @@ _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run 
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
+_last_aggregates_refresh: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -267,6 +268,18 @@ async def tick() -> None:
         await _backfill_sectors()
         _last_sector_backfill = started
 
+    # Daily Massive aggregates refresh — pre-fetches 250 days of OHLC bars per
+    # ticker, computes trend/RS/momentum, populates the in-memory caches that
+    # polygon_feed.fetch_snapshots reads per tick. Once-per-day is fine because
+    # daily-bar-derived factors don't change tick-to-tick.
+    global _last_aggregates_refresh  # noqa: PLW0603
+    if (settings.massive_api_key or settings.polygon_api_key) and (
+        _last_aggregates_refresh is None
+        or (started - _last_aggregates_refresh).total_seconds() >= 86400
+    ):
+        await _refresh_aggregates_cache()
+        _last_aggregates_refresh = started
+
     # End-of-day watchlist email digest. Fires once per UTC day shortly after
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
     # process memory to avoid double-fires within the same day. Worker restart
@@ -450,6 +463,71 @@ async def _refresh_fundamentals_cache() -> None:
         await asyncio.sleep(1.1)
 
     logger.info("fundamentals.refreshed scored=%d cache_size=%d", refreshed, fund_cache_size())
+
+
+async def _refresh_aggregates_cache() -> None:
+    """
+    Daily pre-fetch of OHLC aggregates for every ticker. Computes trend, RS,
+    and momentum scores from the bars and populates the in-memory caches that
+    polygon_feed.fetch_snapshots reads per tick.
+
+    Strategy:
+    1. Fetch SPY first (needed for RS comparisons across all other tickers)
+    2. For each ticker, fetch 250 days of daily bars from Massive
+    3. Compute trend / rs / momentum scores
+    4. Store in module-level caches in polygon_feed
+
+    Massive Stocks Starter is unlimited API calls so the 870 calls take
+    ~5-10 minutes wall time at moderate parallelism. Sleep between calls
+    to be polite.
+    """
+    from app.services.polygon_feed import (
+        fetch_aggregates,
+        compute_trend_score, compute_rs_score, compute_momentum_score,
+        set_cached_trend, set_cached_rs, set_cached_momentum,
+        aggregate_cache_sizes,
+    )
+    from datetime import date as _d, timedelta as _td
+
+    # Fetch SPY first as the RS benchmark
+    today = _d.today()
+    start = today - _td(days=365)
+    try:
+        spy_bars = await fetch_aggregates("SPY", from_date=start, to_date=today)
+    except Exception:
+        logger.exception("aggregates.spy_fetch_failed — skipping aggregates refresh this cycle")
+        return
+
+    if not spy_bars or len(spy_bars) < 63:
+        logger.warning("aggregates.spy_insufficient_bars count=%d — skipping refresh", len(spy_bars) if spy_bars else 0)
+        return
+
+    async with session_scope() as session:
+        result = await session.execute(select(Ticker.symbol))
+        symbols = [row[0] for row in result.all() if row[0] != "SPY"]
+
+    refreshed = 0
+    for sym in symbols:
+        try:
+            bars = await fetch_aggregates(sym, from_date=start, to_date=today)
+            if bars:
+                t = compute_trend_score(bars)
+                r = compute_rs_score(bars, spy_bars)
+                m = compute_momentum_score(bars)
+                set_cached_trend(sym, t)
+                set_cached_rs(sym, r)
+                set_cached_momentum(sym, m)
+                if any(v is not None for v in (t, r, m)):
+                    refreshed += 1
+        except Exception:
+            logger.exception("aggregates.fetch_failed symbol=%s", sym)
+        await asyncio.sleep(0.3)  # gentle pacing — Starter is unlimited but still
+
+    sizes = aggregate_cache_sizes()
+    logger.info(
+        "aggregates.refreshed scored=%d trend_cache=%d rs_cache=%d mom_cache=%d",
+        refreshed, sizes["trend"], sizes["rs"], sizes["momentum"],
+    )
 
 
 async def _refresh_insider_cache() -> None:

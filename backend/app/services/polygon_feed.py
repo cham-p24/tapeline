@@ -94,6 +94,7 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     """
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots, _signal_from_score
     from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
+    # Trend / RS / Momentum caches live in this same module (populated by worker)
 
     # Start with mock — gives us the full schema (sub_* + reason + confidence_pct)
     base_rows = _mock_snapshots()
@@ -142,6 +143,18 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
         if sm is not None:
             r["sub_smart_money"] = sm
 
+        # Real trend / RS / momentum from Massive aggregates cache
+        # (populated daily by worker via _refresh_aggregates_cache)
+        trend = get_cached_trend(sym)
+        if trend is not None:
+            r["sub_trend"] = trend
+        rs = get_cached_rs(sym)
+        if rs is not None:
+            r["sub_rs"] = rs
+        mom = get_cached_momentum(sym)
+        if mom is not None:
+            r["sub_momentum"] = mom
+
         # Recompute composite from updated sub_* — keeps all 6 factors blended.
         # Weights mirror mock_feed/signal_publisher: trend .25 rs .20 fund .15 smart .15 macro .15 mom .10
         composite = (
@@ -188,6 +201,152 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
         "volume": int(day.get("v", 0) or 0),
         "last_timestamp": datetime.now(UTC).isoformat(),
     }
+
+
+# =====================================================================
+# Per-factor score caches — populated daily by worker, read per-tick by
+# fetch_snapshots. Same pattern as finnhub_feed._FUND_SCORE_CACHE.
+# =====================================================================
+_TREND_SCORE_CACHE: dict[str, float] = {}
+_RS_SCORE_CACHE: dict[str, float] = {}
+_MOMENTUM_SCORE_CACHE: dict[str, float] = {}
+
+
+def get_cached_trend(symbol: str) -> float | None:
+    return _TREND_SCORE_CACHE.get(symbol.upper())
+
+
+def get_cached_rs(symbol: str) -> float | None:
+    return _RS_SCORE_CACHE.get(symbol.upper())
+
+
+def get_cached_momentum(symbol: str) -> float | None:
+    return _MOMENTUM_SCORE_CACHE.get(symbol.upper())
+
+
+def set_cached_trend(symbol: str, score: float | None) -> None:
+    if score is not None:
+        _TREND_SCORE_CACHE[symbol.upper()] = score
+
+
+def set_cached_rs(symbol: str, score: float | None) -> None:
+    if score is not None:
+        _RS_SCORE_CACHE[symbol.upper()] = score
+
+
+def set_cached_momentum(symbol: str, score: float | None) -> None:
+    if score is not None:
+        _MOMENTUM_SCORE_CACHE[symbol.upper()] = score
+
+
+def aggregate_cache_sizes() -> dict[str, int]:
+    return {
+        "trend": len(_TREND_SCORE_CACHE),
+        "rs": len(_RS_SCORE_CACHE),
+        "momentum": len(_MOMENTUM_SCORE_CACHE),
+    }
+
+
+def compute_trend_score(bars: list[dict[str, Any]]) -> float | None:
+    """
+    0-100 trend score from a list of OHLC bars (Polygon /v2/aggs response shape).
+    Each bar dict has: o, h, l, c, v, t (open, high, low, close, volume, timestamp).
+
+    Algorithm — distance from 200DMA + slope of 50DMA + above/below structure:
+    - Above 200DMA + 50DMA above 200DMA + 50DMA rising → 80–95
+    - Above 200DMA but flattening → 65–80
+    - Below 200DMA but trying to recover → 35–55
+    - Below 200DMA with negative 50DMA slope → 10–30
+
+    Returns None if fewer than 200 bars available.
+    """
+    if not bars or len(bars) < 200:
+        return None
+    closes = [b.get("c") for b in bars if b.get("c") is not None]
+    if len(closes) < 200:
+        return None
+
+    last = closes[-1]
+    sma_50 = sum(closes[-50:]) / 50
+    sma_200 = sum(closes[-200:]) / 200
+    sma_50_prev = sum(closes[-60:-10]) / 50  # 50DMA from 10 bars ago, for slope
+
+    # Distance from 200DMA as % — positive = above
+    dist_200 = (last / sma_200 - 1) * 100 if sma_200 > 0 else 0
+    # 50DMA slope (% change over 10 bars)
+    slope_50 = (sma_50 / sma_50_prev - 1) * 100 if sma_50_prev > 0 else 0
+    # Above/below 200DMA bias
+    above_200 = sma_50 > sma_200
+
+    # Build score: start at 50 (neutral), shift by structure
+    score = 50.0
+    score += min(20, max(-20, dist_200 * 1.5))   # +/- 20 based on distance from 200DMA
+    score += min(15, max(-15, slope_50 * 8))     # +/- 15 based on 50DMA slope
+    score += 10 if above_200 else -10            # +10/-10 for golden/death-cross structure
+
+    return round(max(0, min(100, score)), 1)
+
+
+def compute_rs_score(bars: list[dict[str, Any]], spy_bars: list[dict[str, Any]]) -> float | None:
+    """
+    Relative-strength score vs SPY over the last ~3 months (63 trading days).
+
+    Score 50 = matched SPY return. >50 = outperformed. <50 = underperformed.
+    Magnitude scales with size of out/under-performance.
+    """
+    if not bars or not spy_bars or len(bars) < 63 or len(spy_bars) < 63:
+        return None
+
+    closes = [b.get("c") for b in bars if b.get("c") is not None]
+    spy_closes = [b.get("c") for b in spy_bars if b.get("c") is not None]
+    if len(closes) < 63 or len(spy_closes) < 63:
+        return None
+
+    ticker_3m = (closes[-1] / closes[-63] - 1) * 100 if closes[-63] > 0 else 0
+    spy_3m = (spy_closes[-1] / spy_closes[-63] - 1) * 100 if spy_closes[-63] > 0 else 0
+    diff = ticker_3m - spy_3m  # +5 means ticker beat SPY by 5 percentage points
+
+    # Map -20pp to +20pp difference → 10–90 score
+    score = 50 + (diff * 2)
+    return round(max(0, min(100, score)), 1)
+
+
+def compute_momentum_score(bars: list[dict[str, Any]]) -> float | None:
+    """
+    Momentum score from 14-period RSI + recent volume thrust.
+
+    RSI 30 = oversold (low momentum), RSI 70 = overbought (high momentum).
+    Layer on volume: +10 if recent 5-bar avg volume > 1.5× the prior 20-bar avg.
+    """
+    if not bars or len(bars) < 30:
+        return None
+    closes = [b.get("c") for b in bars if b.get("c") is not None]
+    volumes = [b.get("v", 0) or 0 for b in bars if b.get("c") is not None]
+    if len(closes) < 30:
+        return None
+
+    # Wilder RSI(14)
+    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+    gains = [d if d > 0 else 0 for d in deltas]
+    losses = [-d if d < 0 else 0 for d in deltas]
+    avg_gain = sum(gains[-14:]) / 14
+    avg_loss = sum(losses[-14:]) / 14
+    if avg_loss == 0:
+        rsi = 100.0
+    else:
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+
+    score = rsi  # RSI is already 0-100
+
+    # Volume thrust bonus: recent 5-bar avg vs prior 20-bar avg
+    if len(volumes) >= 25:
+        recent_vol = sum(volumes[-5:]) / 5
+        prior_vol = sum(volumes[-25:-5]) / 20
+        if prior_vol > 0 and recent_vol / prior_vol > 1.5:
+            score += 10
+
+    return round(max(0, min(100, score)), 1)
 
 
 def _naive_score_from_move(move_pct: float) -> float:
