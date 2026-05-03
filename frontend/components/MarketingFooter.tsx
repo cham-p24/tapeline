@@ -75,11 +75,20 @@ function FooterCol({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
-function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+function FooterLink({
+  href,
+  children,
+  desc,
+}: {
+  href: string;
+  children: React.ReactNode;
+  desc?: string;
+}) {
   return (
     <li>
-      <Link href={href} className="text-muted hover:text-fg transition-colors">
-        {children}
+      <Link href={href} className="block text-muted hover:text-fg transition-colors group">
+        <span className="block">{children}</span>
+        {desc && <span className="block text-[11px] text-subtle group-hover:text-muted leading-snug mt-0.5">{desc}</span>}
       </Link>
     </li>
   );
