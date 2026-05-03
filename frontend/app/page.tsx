@@ -31,6 +31,18 @@ export default function LandingPage() {
               <Link href="/scorecard" className="btn-ghost text-base">See the record</Link>
             </div>
             <p className="mt-3 text-xs text-muted">14-day Premium trial · no credit card · cancel in one click</p>
+            {/* Try-before-signup link — visitors land on a real, public per-ticker
+                page with the live score, the 6-factor breakdown, and the why
+                sentence. Removes the "what does this actually look like" friction
+                without forcing a signup. */}
+            <p className="mt-5 text-sm text-muted">
+              Or see a live example:{" "}
+              <Link href="/t/AAPL" className="text-accent hover:underline">$AAPL</Link>
+              {" · "}
+              <Link href="/t/NVDA" className="text-accent hover:underline">$NVDA</Link>
+              {" · "}
+              <Link href="/t/SPY" className="text-accent hover:underline">$SPY</Link>
+            </p>
           </div>
 
           {/* Right: product preview */}

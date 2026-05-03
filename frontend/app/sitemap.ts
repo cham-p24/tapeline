@@ -1,11 +1,13 @@
 import type { MetadataRoute } from "next";
 
-// Tickers that get explicit sitemap entries. Picks up search demand for
-// "[TICKER] stock score" type queries on the most-Googled symbols.
-// Google's sitemap limit is 50,000 URLs — could expand later by reading
-// the live ticker universe, but this seeds the discovery loop without
-// blowing up the sitemap file.
-const SITEMAP_TICKERS = [
+// Sitemap revalidates hourly so newly-discovered tickers reach Google within
+// the day, without paying a DB roundtrip on every crawler hit.
+export const revalidate = 3600;
+
+// Hardcoded fallback if the API is unreachable during a build/regeneration.
+// These are the top mega-caps + sector ETFs; the dynamic API call below
+// expands to the top-500 by $-volume in normal operation.
+const FALLBACK_TICKERS = [
   "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "AVGO", "ORCL", "AMD",
   "JPM", "BAC", "V", "MA", "BRK.B",
   "JNJ", "UNH", "LLY", "PFE",
@@ -17,7 +19,29 @@ const SITEMAP_TICKERS = [
   "GLD", "SLV", "USO", "TLT",
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "https://api.tapeline.io";
+
+async function fetchTopTickers(limit = 500): Promise<string[]> {
+  try {
+    // Scanner endpoint takes no auth, sorts by score by default. Order by
+    // score desc captures the most-relevant tickers for SEO landing pages.
+    const res = await fetch(
+      `${API_BASE}/api/scanner?min_score=0&sort=score&order=desc&limit=${limit}`,
+      { next: { revalidate: 3600 } }
+    );
+    if (!res.ok) return FALLBACK_TICKERS;
+    const body = (await res.json()) as { items?: { symbol: string }[] };
+    const syms = (body.items ?? []).map((i) => i.symbol).filter(Boolean);
+    return syms.length > 0 ? syms : FALLBACK_TICKERS;
+  } catch {
+    return FALLBACK_TICKERS;
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io";
   const now = new Date();
 
@@ -39,7 +63,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/legal/privacy`,             lastModified: now, priority: 0.3 },
   ];
 
-  const tickerEntries: MetadataRoute.Sitemap = SITEMAP_TICKERS.map((sym) => ({
+  const tickers = await fetchTopTickers(500);
+  const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
     url: `${base}/t/${sym}`,
     lastModified: now,
     changeFrequency: "daily" as const,
