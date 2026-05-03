@@ -2,7 +2,7 @@
 Alert evaluation engine.
 
 Runs after each worker tick. Evaluates four rule types and fires matching
-alerts via the user's configured channel (email or telegram). Per-rule
+alerts via the user's configured channel (email, telegram, or web_push). Per-rule
 debounce prevents spam.
 
 Rule types:
@@ -248,26 +248,10 @@ async def _fire(
             event.delivered = ok
         except Exception:
             logger.exception("alert.telegram_failed user=%s rule=%s", user.id, rule.id)
-    elif rule.channel == "sms" and user.phone_number:
-        try:
-            from app.services.sms import send_sms
-            # SMS char limit + cost — keep terse
-            text = f"Tapeline {rule.name}: {message}"
-            ok = await send_sms(user.phone_number, text)
-            event.delivered = ok
-        except Exception:
-            logger.exception("alert.sms_failed user=%s rule=%s", user.id, rule.id)
-    elif rule.channel == "discord" and user.discord_webhook_url:
-        try:
-            from app.services.discord import send_discord_alert
-            ok = await send_discord_alert(
-                user.discord_webhook_url,
-                title=f"[{rule.name}] {symbol}",
-                description=message + "\n\nOpen: https://tapeline.io/app/scanner",
-            )
-            event.delivered = ok
-        except Exception:
-            logger.exception("alert.discord_failed user=%s rule=%s", user.id, rule.id)
+    # SMS + Discord channels were retired 2026-05-04. The dispatch arms
+    # were removed but the underlying app.services.{sms,discord}.py service
+    # files + DB columns are kept so the channels can be re-enabled later
+    # by re-adding entries to FEATURES in tier.py + restoring these arms.
     elif rule.channel == "web_push":
         try:
             from sqlalchemy import select as _sel

@@ -39,14 +39,18 @@ FEATURES: dict[str, Tier] = {
     "briefing.daily": Tier.PRO,
     "export.csv": Tier.PRO,
     # Pro-tier alert channels (free to deliver, low friction)
-    "alerts.discord": Tier.PRO,       # Discord webhook (free, medium setup)
     "alerts.web_push": Tier.PRO,      # Browser push notifications (free, one click)
     # Premium-only features
     "congress.feed": Tier.PREMIUM,
     "alerts.telegram": Tier.PREMIUM,
-    "alerts.sms": Tier.PREMIUM,       # Twilio SMS delivery
     "api.access": Tier.PREMIUM,
     "holdings.elite": Tier.PREMIUM,   # Quiver elite-fund 13F holdings
+    # Removed 2026-05-04: alerts.discord (low usage, webhook setup friction
+    # turned out to be a real conversion blocker) and alerts.sms (Twilio
+    # billing overhead per send made the unit economics ugly at low volume).
+    # Service files left in app/services/{discord,sms}.py and DB columns
+    # left intact so the channels can be re-enabled by re-adding the
+    # entries above without a migration.
 }
 
 

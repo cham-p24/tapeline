@@ -100,8 +100,6 @@ export function PaywallModal({
     "ticker.full": "Full ticker deep-dive",
     "congress": "Congressional trades",
     "alerts.telegram": "Telegram alerts",
-    "alerts.sms": "SMS alerts",
-    "alerts.discord": "Discord alerts",
     "alerts.web_push": "Browser push alerts",
     "briefing": "Daily briefing email",
     "api": "API access",

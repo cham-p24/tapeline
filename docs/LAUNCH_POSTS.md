@@ -125,7 +125,7 @@ Premium, Zacks, WallStreetZen. They all fail the same way:
 
 - Pro: $29/mo or $24.99/mo billed annually ($299/yr)
 - Premium: $49/mo or $39.99/mo billed annually ($479/yr) — adds Congress
-  trades, elite-fund 13F holdings, Telegram + SMS alerts, public API
+  trades, elite-fund 13F holdings, Telegram alerts, public API
 
 The math vs. competitors:
 - Bloomberg Terminal: $31,980/yr (98% cheaper)

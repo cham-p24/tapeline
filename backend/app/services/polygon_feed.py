@@ -35,6 +35,7 @@ settings = get_settings()
 # as well as the new MASSIVE_API_KEY for an extended grace period. Hostname is
 # overridable via MASSIVE_BASE_URL for sandbox / failover targets.
 import os
+
 BASE_URL = os.environ.get("MASSIVE_BASE_URL", "https://api.massive.com")
 
 
@@ -366,6 +367,21 @@ def _naive_score_from_move(move_pct: float) -> float:
     # Map -5%..+5% move to 10..90 score
     s = 50 + (move_pct * 8)
     return max(0.0, min(100.0, s))
+
+
+def _signal_from_score(score: float) -> str:
+    """
+    Descriptive (not prescriptive) labels describing the STATE of the factor data.
+    Legal posture: never tells the user what to do. See LEGAL_CHECKLIST.md.
+    Mirrors the same buckets used in mock_feed._signal_from_score so labels
+    stay consistent regardless of which feed produced the score.
+    """
+    if score >= 85: return "HIGH CONVICTION"
+    if score >= 70: return "STRONG SETUP"
+    if score >= 55: return "CONSTRUCTIVE"
+    if score >= 40: return "NEUTRAL"
+    if score >= 25: return "CAUTION"
+    return "WEAK"
 
 
 async def fetch_aggregates(

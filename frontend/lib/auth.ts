@@ -75,8 +75,6 @@ export const FEATURE_TIERS = {
   "ticker.full":        "pro" as const,
   "congress":           "premium" as const,
   "alerts.telegram":    "premium" as const,
-  "alerts.sms":         "premium" as const,
-  "alerts.discord":     "pro" as const,
   "alerts.web_push":    "pro" as const,
   "briefing":           "premium" as const,
   "api":                "premium" as const,

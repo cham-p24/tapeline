@@ -18,15 +18,15 @@
 - Watchlist (50) with smart alerts
 - Email alerts: up to 10 per day
 - Daily briefing email · CSV export
-- Browser push + Discord alerts
-- No Congress data, no Telegram/SMS, no API
+- Browser push alerts
+- No Congress data, no Telegram, no API
 
 ### Premium — "Analyst"
 **$49/mo** or **$39.99/mo billed annually** ($479/yr · save $109)
 - Everything in Pro
 - **Congressional trade feed** (daily updates, ticker aggregation)
 - **Elite 13F holdings** (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
-- **Telegram alerts** (unlimited) + **SMS alerts** (Twilio)
+- **Telegram alerts** (unlimited)
 - **API access** (1,000 requests/day)
 - Email alerts: unlimited
 - Watchlist (200) · saved scans (100)

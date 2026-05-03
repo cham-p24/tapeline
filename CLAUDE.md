@@ -25,8 +25,10 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 ## Tier model — canonical source: `backend/app/services/tier.py`
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
-- **Pro** $29/mo OR **$24.99/mo billed annually** ($299/yr · save $49) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push + Discord
-- **Premium** $49/mo OR **$39.99/mo billed annually** ($479/yr · save $109) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, SMS, email unlimited, public API (1,000/day), priority support
+- **Pro** $29/mo OR **$24.99/mo billed annually** ($299/yr · save $49) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
+- **Premium** $49/mo OR **$39.99/mo billed annually** ($479/yr · save $109) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, email unlimited, public API (1,000/day), priority support
+
+**Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
@@ -92,12 +94,12 @@ Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data fo
   Add `firefox` and `webkit` projects in `playwright.config.ts` when ready for cross-browser coverage. Tests boot Next.js automatically via the `webServer` block; backend isn't required (UI-rendering tests, no API hits).
 
 ## Notification channels
-Five delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
+Three live delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
 - **Email** (Pro+) — Resend, no extra cost. Default channel for every rule. Always on.
 - **Browser push / Web Push** (Pro+) — VAPID + Service Worker (`frontend/public/sw.js`). Free. One-click enable on Chrome/Firefox/Edge desktop + Android. iOS requires PWA install.
-- **Discord** (Pro+) — webhook URL the user creates in their server. Free. Posts rich embeds.
 - **Telegram** (Premium) — free, hourly digest + per-rule alerts. Customer adds their chat_id at `/app/billing` (Telegram card).
-- **SMS** (Premium) — Twilio (~$0.008/msg US, more elsewhere). Reserve for high-conviction rules — every send is billed.
+
+**Retired:** Discord webhook + Twilio SMS (2026-05-04). Discord setup friction was a real conversion blocker; SMS unit economics didn't work at low volume. `services/{discord,sms}.py` + DB columns retained — re-add `alerts.discord` / `alerts.sms` to `tier.py:FEATURES` to bring them back without a migration.
 
 End-of-day watchlist email digest fires daily ~21:00 UTC for every Pro+ user with watchlist items (`services/email.py:run_eod_watchlist_digest`).
 
@@ -129,9 +131,9 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/finnhub_feed.py` — Finnhub fundamentals + earnings + IPO calendars + insider Form 4. Calendar replacement wired into `calendar_feed.upcoming_*`; fundamentals → score wiring still TODO.
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
-- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with five-channel delivery (email / web push / Discord / Telegram / SMS)
-- `backend/app/services/sms.py` — Twilio SMS (no-op when not configured)
-- `backend/app/services/discord.py` — Discord webhook delivery (no-op when no webhook saved)
+- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with three-channel delivery (email / web push / Telegram)
+- `backend/app/services/sms.py` — RETIRED 2026-05-04, file kept for re-enable
+- `backend/app/services/discord.py` — RETIRED 2026-05-04, file kept for re-enable
 - `backend/app/services/web_push.py` — Web Push via VAPID + pywebpush (no-op when either is missing)
 - `frontend/public/sw.js` — Service Worker for Web Push notification handling
 - `frontend/lib/webPush.ts` — client-side subscribe/unsubscribe/test helpers

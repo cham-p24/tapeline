@@ -19,7 +19,7 @@ class AlertRuleCreate(BaseModel):
     rule_type: str = Field(..., pattern="^(score|squeeze|regime|congress)$")
     symbol: str | None = Field(None, max_length=20)
     threshold: float | None = None
-    channel: str = Field("email", pattern="^(email|telegram|sms|discord|web_push)$")
+    channel: str = Field("email", pattern="^(email|telegram|web_push)$")
 
 
 @router.get("/rules")
@@ -40,12 +40,10 @@ async def create_rule(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    # Feature gate: alerts require Pro or Premium. SMS + Telegram are Premium-only;
-    # Discord + web push are Pro+; email is the default Pro channel.
+    # Feature gate: Telegram = Premium-only, web_push = Pro+, email = default Pro.
+    # Discord + SMS channels were retired 2026-05-04.
     feature = (
         "alerts.telegram" if body.channel == "telegram"
-        else "alerts.sms" if body.channel == "sms"
-        else "alerts.discord" if body.channel == "discord"
         else "alerts.web_push" if body.channel == "web_push"
         else "alerts.email"
     )

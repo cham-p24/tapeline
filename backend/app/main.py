@@ -41,7 +41,9 @@ settings = get_settings()
 
 # Captured once at module import — exposed by /api/version so the operator
 # can verify a deploy actually landed by checking that boot_time changed.
-from datetime import UTC as _UTC, datetime as _datetime
+from datetime import UTC as _UTC
+from datetime import datetime as _datetime
+
 _boot_time_iso = _datetime.now(_UTC).isoformat()
 
 # ---- Sentry (env-gated) -----------------------------------------------------
@@ -295,10 +297,10 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
 app.include_router(calendar_routes.ipo_router, prefix="/api/ipos", tags=["calendar"])
 app.include_router(calendar_routes.earnings_router, prefix="/api/earnings", tags=["calendar"])
-from app.routers import referrals  # noqa: E402
+from app.routers import referrals
 
 app.include_router(referrals.router, prefix="/api/referrals", tags=["referrals"])
-from app.routers import usage  # noqa: E402
+from app.routers import usage
 
 app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
 app.include_router(roadmap.router, prefix="/api/roadmap", tags=["roadmap"])

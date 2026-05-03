@@ -45,9 +45,8 @@ const SECTIONS: Section[] = [
       { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
-      { label: "Browser push + Discord", free: "—", pro: "✓", premium: "✓" },
+      { label: "Browser push", free: "—", pro: "✓", premium: "✓" },
       { label: "Telegram alerts", free: "—", pro: "—", premium: "Unlimited · hourly digest" },
-      { label: "SMS alerts", free: "—", pro: "—", premium: "✓" },
     ],
   },
   {

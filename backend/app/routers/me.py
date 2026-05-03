@@ -36,8 +36,6 @@ async def me(user: User | None = Depends(current_user_optional)) -> dict:
         "name": user.name,
         "tier": user.tier,
         "telegram_chat_id": user.telegram_chat_id,
-        "phone_number": user.phone_number,
-        "discord_webhook_url": user.discord_webhook_url,
         "features": {f: has_feature(tier, f) for f in FEATURES},
         "limits": {
             "scanner_rows": limit(tier, "scanner_rows"),
@@ -45,70 +43,6 @@ async def me(user: User | None = Depends(current_user_optional)) -> dict:
             "api_requests_per_day": limit(tier, "api_requests_per_day"),
         },
     }
-
-
-# ---- Discord webhook (Pro+) ----------------------------------------------
-
-class DiscordSetBody(BaseModel):
-    webhook_url: str = Field(
-        ...,
-        min_length=20,
-        max_length=300,
-        description="Full Discord webhook URL — get one from your server's integrations settings.",
-    )
-
-
-@router.patch("/discord")
-async def set_discord_webhook(
-    body: DiscordSetBody,
-    user: User = Depends(current_user_required),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Set the user's Discord webhook URL. Pro+ feature."""
-    if not has_feature(Tier(user.tier), "alerts.discord"):
-        raise HTTPException(403, "Discord alerts require Pro tier")
-    from app.services.discord import looks_like_discord_webhook
-    if not looks_like_discord_webhook(body.webhook_url):
-        raise HTTPException(400, "Doesn't look like a Discord webhook URL — should start with https://discord.com/api/webhooks/")
-    user.discord_webhook_url = body.webhook_url
-    await session.commit()
-    logger.info("me.discord_set user=%s", user.id)
-    return {"ok": True}
-
-
-@router.delete("/discord")
-async def clear_discord_webhook(
-    user: User = Depends(current_user_required),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Disconnect Discord. Stops alert delivery to that webhook."""
-    user.discord_webhook_url = None
-    await session.commit()
-    logger.info("me.discord_cleared user=%s", user.id)
-    return {"ok": True}
-
-
-@router.post("/discord/test")
-async def test_discord_message(
-    user: User = Depends(current_user_required),
-) -> dict:
-    """Post a test embed to the user's Discord webhook."""
-    if not has_feature(Tier(user.tier), "alerts.discord"):
-        raise HTTPException(403, "Discord alerts require Pro tier")
-    if not user.discord_webhook_url:
-        raise HTTPException(400, "No Discord webhook set. Save yours first, then test.")
-    from app.services.discord import send_discord_alert
-    ok = await send_discord_alert(
-        user.discord_webhook_url,
-        title="Tapeline test alert",
-        description="If you can see this in your Discord channel, your alerts are wired up.",
-    )
-    if not ok:
-        raise HTTPException(
-            502,
-            "Discord post failed — check that the webhook URL is still valid in your server's integrations.",
-        )
-    return {"ok": True}
 
 
 # ---- Web Push (Pro+) ----------------------------------------------------
@@ -290,67 +224,3 @@ async def test_telegram_message(
     return {"ok": True}
 
 
-# ---- SMS (Twilio) — Premium-only ----------------------------------------
-
-class PhoneSetBody(BaseModel):
-    phone_number: str = Field(
-        ...,
-        min_length=8,
-        max_length=20,
-        pattern=r"^\+?[\d\s\-()]+$",
-        description="Phone number in E.164 format (or close — server normalises).",
-    )
-
-
-@router.patch("/phone")
-async def set_phone_number(
-    body: PhoneSetBody,
-    user: User = Depends(current_user_required),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Set the user's phone for SMS alerts. Premium-only."""
-    if not has_feature(Tier(user.tier), "alerts.sms"):
-        raise HTTPException(403, "SMS alerts require Premium tier")
-    from app.services.sms import normalize_phone
-    cleaned = normalize_phone(body.phone_number)
-    if not cleaned or len(cleaned) < 8:
-        raise HTTPException(400, "Invalid phone number")
-    user.phone_number = cleaned
-    await session.commit()
-    logger.info("me.phone_set user=%s", user.id)
-    return {"ok": True, "phone_number": user.phone_number}
-
-
-@router.delete("/phone")
-async def clear_phone_number(
-    user: User = Depends(current_user_required),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Disconnect SMS alerts."""
-    user.phone_number = None
-    await session.commit()
-    logger.info("me.phone_cleared user=%s", user.id)
-    return {"ok": True}
-
-
-@router.post("/phone/test")
-async def test_phone_message(
-    user: User = Depends(current_user_required),
-) -> dict:
-    """Send a one-off test SMS to verify the wiring."""
-    if not has_feature(Tier(user.tier), "alerts.sms"):
-        raise HTTPException(403, "SMS alerts require Premium tier")
-    if not user.phone_number:
-        raise HTTPException(400, "No phone number set. Save yours first, then test.")
-    from app.services.sms import send_sms
-    ok = await send_sms(
-        user.phone_number,
-        "Tapeline test SMS — your alerts are wired up correctly.",
-    )
-    if not ok:
-        raise HTTPException(
-            502,
-            "SMS send failed. Check Twilio config (TWILIO_ACCOUNT_SID, "
-            "TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER) and that the number is in E.164 format.",
-        )
-    return {"ok": True}
