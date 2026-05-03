@@ -138,8 +138,8 @@ export default function BillingPage() {
         />
         <Plan
           name="Premium"
-          price={billingPeriod === "annual" ? "$40.99" : "$49"}
-          note={billingPeriod === "annual" ? "$491/yr · billed annually · save $97" : undefined}
+          price={billingPeriod === "annual" ? "$39.99" : "$49"}
+          note={billingPeriod === "annual" ? "$479/yr · billed annually · save $109" : undefined}
           items={[
             "Everything in Pro",
             "Congressional trades feed",

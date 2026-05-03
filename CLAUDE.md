@@ -26,7 +26,7 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
 - **Pro** $29/mo OR **$24.99/mo billed annually** ($299/yr · save $49) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push + Discord
-- **Premium** $49/mo OR **$40.99/mo billed annually** ($491/yr · save $97) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, SMS, email unlimited, public API (1,000/day), priority support
+- **Premium** $49/mo OR **$39.99/mo billed annually** ($479/yr · save $109) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, SMS, email unlimited, public API (1,000/day), priority support
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 

@@ -39,7 +39,7 @@ const PLANS = [
   {
     name: "Premium",
     tagline: "Everything, no limits.",
-    prices: { monthly: 49, annual: 491 },
+    prices: { monthly: 49, annual: 479 },
     highlights: [
       "Everything in Pro, plus:",
       "Congressional trades feed",

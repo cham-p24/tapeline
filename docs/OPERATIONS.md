@@ -66,7 +66,7 @@ of Turnstile. Turnstile adds the third layer.
    - `Pro Monthly` — $29 USD recurring monthly
    - `Pro Annual` — $299 USD recurring yearly (charm price; displays as $24.99/mo)
    - `Premium Monthly` — $49 USD recurring monthly
-   - `Premium Annual` — $491 USD recurring yearly (charm price; displays as $40.99/mo)
+   - `Premium Annual` — $479 USD recurring yearly (charm price; displays as $39.99/mo)
 3. Paste into `.env`:
    ```
    STRIPE_SECRET_KEY=sk_live_...

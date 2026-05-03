@@ -22,7 +22,7 @@
 - No Congress data, no Telegram/SMS, no API
 
 ### Premium — "Analyst"
-**$49/mo** or **$40.99/mo billed annually** ($491/yr · save $97)
+**$49/mo** or **$39.99/mo billed annually** ($479/yr · save $109)
 - Everything in Pro
 - **Congressional trade feed** (daily updates, ticker aggregation)
 - **Elite 13F holdings** (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
@@ -86,6 +86,6 @@ $105k ARR by month 12 is the stretch goal. Even 25% of that is a validated side 
 
 Monthly → Annual discount is **~14% on Pro / ~16.5% on Premium** (close to 2 months free), with charm pricing on the per-month equivalent:
 - Pro: $29 × 12 = $348 → **$299 annual** ($24.99/mo · save $49/yr)
-- Premium: $49 × 12 = $588 → **$491 annual** ($40.99/mo · save $97/yr)
+- Premium: $49 × 12 = $588 → **$479 annual** ($39.99/mo · save $109/yr)
 
 Annual plans should be **≥40% of paid revenue** by month 6 — they dramatically reduce churn.
