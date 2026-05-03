@@ -67,5 +67,10 @@ latest_live_monitor.log
 coverage/
 .vitest-cache/
 
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
 # Worker caches
 backend/.cache/

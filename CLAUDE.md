@@ -82,7 +82,15 @@ Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data fo
 - **No `/v3/reference/tickers/{sym}` sector backfill** — universe auto-discovery from Polygon adds new tickers with `sector="Unknown"`. Worker should backfill sectors lazily for tickers users actually look at.
 - **Web push send needs `pywebpush`** — `services/web_push.py` imports it conditionally; if not installed, the channel logs a skip and continues. Run `pip install pywebpush` in the backend venv to activate.
 - **Frontend tests cover ~6 surfaces** — Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels, BillingToggle, HoldingsPage. Grow with billing flow + alerts CRUD + scanner page next.
-- **No E2E tests** — Playwright would land later. Unit tests catch most regressions.
+- **Playwright E2E scaffold lives at `frontend/e2e/`** — 3 spec files covering landing, pricing, and auth-form rendering. To run locally:
+  ```powershell
+  cd frontend
+  npm install              # picks up @playwright/test from package.json
+  npm run e2e:install      # downloads chromium binary (~150MB, one-off)
+  npm run e2e              # runs all tests headless
+  npm run e2e:ui           # opens Playwright UI for debugging
+  ```
+  Add `firefox` and `webkit` projects in `playwright.config.ts` when ready for cross-browser coverage. Tests boot Next.js automatically via the `webServer` block; backend isn't required (UI-rendering tests, no API hits).
 
 ## Notification channels
 Five delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
