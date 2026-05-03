@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Regime } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { CardSkeleton } from "@/components/Skeleton";
 
 export default function RegimePage() {
   const [r, setR] = useState<Regime | null>(null);
@@ -40,7 +41,7 @@ export default function RegimePage() {
       </details>
 
       {!r ? (
-        <div className="card mt-6 p-8 text-center text-muted">Loading…</div>
+        <CardSkeleton rows={5} />
       ) : (
         <>
           <div className={`card mt-6 p-8 ${toneBg.split(" ")[0]}`}>

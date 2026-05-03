@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { useToast } from "@/components/Toast";
+import { CardSkeleton } from "@/components/Skeleton";
 
 type ReferralStats = {
   referral_code: string | null;
@@ -46,7 +47,7 @@ export default function ReferralsPage() {
       </p>
 
       {!stats ? (
-        <div className="card mt-6 p-6 text-muted">Loading…</div>
+        <CardSkeleton rows={4} />
       ) : (
         <>
           <div className="card mt-6 p-6">

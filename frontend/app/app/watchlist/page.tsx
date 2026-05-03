@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type WatchlistItem } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { TableSkeleton } from "@/components/Skeleton";
 
 // Starter watchlist for brand-new users — one click adds the mega-caps
 // most retail traders are already watching, plus SPY as the benchmark.
@@ -155,7 +156,9 @@ export default function WatchlistPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={9} className="px-4 py-6 text-center text-muted">Loading…</td></tr>}
+            {loading && (
+              <tr><td colSpan={9}><TableSkeleton cols={9} rows={5} /></td></tr>
+            )}
             {items.map((w) => (
               <tr key={w.id} className={`border-b border-border/50 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
                 <td className="px-4 py-2 font-medium">

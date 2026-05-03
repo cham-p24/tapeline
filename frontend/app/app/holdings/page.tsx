@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type HoldingItem, type TrackedFund } from "@/lib/api";
 import { Paywall } from "@/components/Paywall";
+import { TableSkeleton } from "@/components/Skeleton";
 
 export default function HoldingsPage() {
   const [rows, setRows] = useState<HoldingItem[]>([]);
@@ -92,7 +93,7 @@ export default function HoldingsPage() {
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted">Loading…</td></tr>
+                <tr><td colSpan={7}><TableSkeleton cols={7} rows={6} /></td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted">
                   No holdings match. Clear the filters or wait for the next 24h refresh.

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { CardSkeleton } from "@/components/Skeleton";
 
 type Stats = {
   users_total: number; users_pro: number; users_premium: number;
@@ -69,7 +70,7 @@ export default function AdminPage() {
     } catch (e: any) { alert(e.message); }
   }
 
-  if (loading) return <div className="text-muted">Loading…</div>;
+  if (loading) return <CardSkeleton rows={6} />;
   if (err) {
     return (
       <div className="card p-8">

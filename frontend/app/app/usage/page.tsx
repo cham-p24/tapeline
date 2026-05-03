@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { CardSkeleton } from "@/components/Skeleton";
 
 type UsageData = {
   tier: string;
@@ -28,7 +29,7 @@ export default function UsagePage() {
       .catch(() => {});
   }, []);
 
-  if (!data) return <div className="text-muted">Loading…</div>;
+  if (!data) return <CardSkeleton rows={5} />;
 
   return (
     <div>

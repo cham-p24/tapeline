@@ -15,3 +15,14 @@ export function TableSkeleton({ cols, rows = 6 }: { cols: number; rows?: number 
     </div>
   );
 }
+
+/** Card-shaped placeholder used by single-card pages (regime / referrals / usage). */
+export function CardSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="card mt-6 p-6 space-y-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className={`h-4 ${i === 0 ? "w-1/3" : i % 2 ? "w-2/3" : "w-1/2"}`} />
+      ))}
+    </div>
+  );
+}
