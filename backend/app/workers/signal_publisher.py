@@ -230,11 +230,11 @@ async def tick() -> None:
             logger.exception("drip.run_failed")
         _last_drip_check = started
 
-    # Weekly universe refresh from Polygon's reference API.
-    # Only fires when POLYGON_API_KEY is set — discovers new IPOs and ETF
+    # Weekly universe refresh from Massive's reference API.
+    # Only fires when a vendor key is set — discovers new IPOs and ETF
     # listings without needing manual ticker-list maintenance.
     global _last_universe_refresh
-    if settings.polygon_api_key and (
+    if (settings.massive_api_key or settings.polygon_api_key) and (
         _last_universe_refresh is None
         or (started - _last_universe_refresh).total_seconds() >= 604800
     ):
