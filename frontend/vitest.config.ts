@@ -9,6 +9,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./test-setup.ts"],
     css: false,
+    // Vitest auto-discovers any `*.spec.ts` file. The Playwright E2E specs
+    // under `e2e/` import `@playwright/test` which Vitest can't resolve, so
+    // exclude them — Playwright runs them via `npm run e2e` instead.
+    exclude: ["node_modules", "dist", ".next", "e2e/**"],
   },
   resolve: {
     alias: {

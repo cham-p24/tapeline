@@ -20,6 +20,7 @@ describe("ScannerPreview", () => {
 
   it("renders a Why column with non-empty text", () => {
     render(<ScannerPreview />);
-    expect(screen.getByText(/Strong uptrend/)).toBeInTheDocument();
+    // Multiple sample rows show "Strong uptrend" — assert at least one
+    expect(screen.getAllByText(/Strong uptrend/).length).toBeGreaterThan(0);
   });
 });

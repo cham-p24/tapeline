@@ -41,7 +41,9 @@ describe("Paywall (feature='congress', requires premium)", () => {
     // Children render under a blurred overlay — text exists in DOM but a
     // Premium-feature CTA appears too. Assert on the lock overlay.
     expect(screen.getByText(/Premium feature/i)).toBeInTheDocument();
-    expect(screen.getByText(/Upgrade/i)).toBeInTheDocument();
+    // Both the heading ("Upgrade to unlock") and the CTA link ("Upgrade →")
+    // contain the word, so target the link role specifically.
+    expect(screen.getByRole("link", { name: /^Upgrade/i })).toBeInTheDocument();
   });
 
   it("hides the children for a free user", () => {

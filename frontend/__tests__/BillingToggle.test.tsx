@@ -25,11 +25,12 @@ describe("BillingPage", () => {
     expect(screen.getByRole("heading", { name: "Premium" })).toBeInTheDocument();
   });
 
-  it("defaults to annual billing and shows discounted prices", () => {
+  it("defaults to annual billing and shows charm-priced effective monthly", () => {
     render(<BillingPage />);
-    // Annual is the default; Pro should show $24 (effective monthly), Premium $41
-    expect(screen.getByText("$24")).toBeInTheDocument();
-    expect(screen.getByText("$41")).toBeInTheDocument();
+    // Annual is the default; charm pricing displays Pro at $24.99/mo
+    // ($299/yr) and Premium at $40.99/mo ($491/yr).
+    expect(screen.getByText("$24.99")).toBeInTheDocument();
+    expect(screen.getByText("$40.99")).toBeInTheDocument();
   });
 
   it("switches to monthly pricing when toggle is clicked", () => {
