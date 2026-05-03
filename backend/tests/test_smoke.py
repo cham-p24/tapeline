@@ -68,6 +68,19 @@ async def test_watchlist_requires_auth(client):
 
 
 @pytest.mark.asyncio
+async def test_version_endpoint(client):
+    """Reports the running build's commit SHA + boot time so the operator
+    can verify a deploy actually landed."""
+    async with client:
+        r = await _get(client, "/api/version")
+        assert r.status_code == 200
+        body = r.json()
+        assert "commit" in body
+        assert "boot_time" in body
+        assert body["env"] in ("development", "staging", "production")
+
+
+@pytest.mark.asyncio
 async def test_status_endpoint(client):
     """The richer /api/status used by the public uptime page + the
     /app/* stale-data banner. Must always return a recognisable shape."""

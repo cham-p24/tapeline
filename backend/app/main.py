@@ -39,6 +39,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Captured once at module import — exposed by /api/version so the operator
+# can verify a deploy actually landed by checking that boot_time changed.
+from datetime import UTC as _UTC, datetime as _datetime
+_boot_time_iso = _datetime.now(_UTC).isoformat()
+
 # ---- Sentry (env-gated) -----------------------------------------------------
 # Initialised before app construction so the FastAPI integration can hook
 # the request lifecycle. No-op when SENTRY_DSN is blank — zero overhead in
@@ -181,6 +186,31 @@ async def health() -> dict[str, str]:
     """Bare-bones liveness probe — must stay cheap (no DB, no external calls).
     Used by Fly.io health checks + uptime monitors that just need a 200."""
     return {"status": "ok", "app": settings.app_name, "env": settings.app_env, "version": "0.1.0"}
+
+
+@app.get("/api/version")
+async def version() -> dict[str, str]:
+    """Reports the running build's git SHA + boot time. Use this when verifying
+    a deploy actually landed: hit /api/version, compare commit to your latest
+    git SHA, confirm boot_time updated since the deploy started.
+
+    SHA is read once at process start from the FLY_IMAGE_REF env var (Fly.io
+    sets it automatically), the GIT_SHA env var (manual override), or the
+    fly machine ID. boot_time is captured at module import.
+    """
+    import os
+    sha = (
+        os.environ.get("GIT_SHA")
+        or os.environ.get("FLY_IMAGE_REF", "").split(":")[-1]
+        or os.environ.get("FLY_MACHINE_ID", "")
+        or "unknown"
+    )
+    return {
+        "version": "0.1.0",
+        "commit": sha[:12] if sha else "unknown",
+        "boot_time": _boot_time_iso,
+        "env": settings.app_env,
+    }
 
 
 @app.get("/api/status")
