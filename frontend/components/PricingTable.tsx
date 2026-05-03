@@ -130,7 +130,19 @@ export function PricingTable() {
                   <p className="mt-1.5 text-xs text-muted">Billed ${price}/yr · save ${(p.prices.monthly * 12) - p.prices.annual}/yr</p>
                 )}
               </div>
-              <ul className="mt-6 space-y-2.5 text-sm">
+              {/* Premium card: "Everything in Pro" anchor strip above the
+                  bullets so the upgrade reason is the additions, not "look
+                  here's a duplicate of the Pro list". */}
+              {(p as { proPlus?: boolean }).proPlus && (
+                <div className="mt-6 flex items-center gap-2 rounded-md border border-border bg-panel2/40 px-3 py-2 text-xs text-muted">
+                  <svg className="h-3.5 w-3.5 text-up flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Everything in Pro</span>
+                  <span className="ml-auto text-accent font-medium">+ all of:</span>
+                </div>
+              )}
+              <ul className={`${(p as { proPlus?: boolean }).proPlus ? "mt-3" : "mt-6"} space-y-2.5 text-sm`}>
                 {p.highlights.map((f) => (
                   <li key={f} className="flex gap-3">
                     <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" viewBox="0 0 16 16" fill="none">

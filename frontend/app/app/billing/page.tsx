@@ -315,15 +315,15 @@ export default function BillingPage() {
               name="Premium"
               price={billingPeriod === "annual" ? "$39.99" : "$49"}
               note={billingPeriod === "annual" ? "$479/yr · billed annually · save $109" : "billed monthly"}
+              proPlus
               items={[
-                "Everything in Pro",
-                "Congressional trades feed",
-                "Elite 13F holdings",
-                "Telegram + SMS alerts (unlimited)",
-                "Email alerts (unlimited)",
-                "API access (1,000 req/day)",
-                "Watchlist (200) · saved scans (100)",
-                "Priority support",
+                "Congressional trades feed (House + Senate)",
+                "Elite 13F — Buffett, Burry, Tepper, Ackman + 4 more",
+                "Telegram alerts · unlimited (Pro: none)",
+                "Email alerts · unlimited (Pro: 10/day)",
+                "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
+                "Public API · 1,000 req/day",
+                "Priority support · same-day reply",
               ]}
               cta="Upgrade to Premium"
               highlight={tier === "premium"}
@@ -670,11 +670,11 @@ function WebPushCard() {
 
 
 function Plan({
-  name, price, items, note, cta, highlight, disabled, busy, onUpgrade,
+  name, price, items, note, cta, highlight, disabled, busy, onUpgrade, proPlus,
 }: {
   name: string; price: string; items: string[]; note?: string;
   cta?: string; highlight?: boolean; disabled?: boolean; busy?: boolean;
-  onUpgrade?: () => void;
+  onUpgrade?: () => void; proPlus?: boolean;
 }) {
   return (
     <div className={`card p-6 ${highlight ? "ring-2 ring-accent" : ""}`}>
@@ -684,7 +684,16 @@ function Plan({
       </div>
       <div className="mt-2 flex items-baseline gap-1"><span className="text-3xl font-bold">{price}</span><span className="text-muted">/mo</span></div>
       {note && <p className="mt-1 text-xs text-muted">{note}</p>}
-      <ul className="mt-4 space-y-1 text-sm">
+      {/* "Everything in Pro" anchor strip — makes the upgrade reason
+          obviously the additions, not a duplicated bullet list. */}
+      {proPlus && (
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-border bg-black/30 px-2.5 py-1.5 text-[11px] text-muted">
+          <span className="text-up">✓</span>
+          <span>Everything in Pro</span>
+          <span className="ml-auto text-accent font-medium">+ all of:</span>
+        </div>
+      )}
+      <ul className={`${proPlus ? "mt-3" : "mt-4"} space-y-1 text-sm`}>
         {items.map((i) => <li key={i} className="flex gap-2"><span className="text-accent">✓</span><span>{i}</span></li>)}
       </ul>
       {cta && (
