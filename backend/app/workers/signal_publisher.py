@@ -244,24 +244,27 @@ async def tick() -> None:
     # Daily Finnhub fundamentals pre-fetch — populates the in-memory cache that
     # polygon_feed.fetch_snapshots reads per tick. Fundamentals don't change
     # tick-to-tick so once-per-day refresh is plenty.
+    #
+    # CRITICAL: launched as a background task via create_task so the slow
+    # iteration (rate-limited Finnhub calls × ~500 tickers ≈ 9 min) does NOT
+    # block the next scoring tick. The latch is set BEFORE the task runs so
+    # subsequent ticks won't re-fire it while it's still in-flight.
     global _last_fundamentals_refresh
     if settings.finnhub_api_key and (
         _last_fundamentals_refresh is None
         or (started - _last_fundamentals_refresh).total_seconds() >= 86400
     ):
-        await _refresh_fundamentals_cache()
         _last_fundamentals_refresh = started
+        asyncio.create_task(_refresh_fundamentals_cache())
 
-    # Daily Finnhub insider Form 4 pre-fetch — populates the smart-money cache
-    # that polygon_feed.fetch_snapshots reads per tick. Insider trades hit Form 4
-    # within days; daily refresh keeps the signal current.
+    # Daily Finnhub insider Form 4 pre-fetch — same background pattern.
     global _last_insider_refresh
     if settings.finnhub_api_key and (
         _last_insider_refresh is None
         or (started - _last_insider_refresh).total_seconds() >= 86400
     ):
-        await _refresh_insider_cache()
         _last_insider_refresh = started
+        asyncio.create_task(_refresh_insider_cache())
 
     # Daily sector backfill — fills in sector="Unknown" rows from Finnhub.
     global _last_sector_backfill
@@ -269,20 +272,19 @@ async def tick() -> None:
         _last_sector_backfill is None
         or (started - _last_sector_backfill).total_seconds() >= 86400
     ):
-        await _backfill_sectors()
         _last_sector_backfill = started
+        asyncio.create_task(_backfill_sectors())
 
     # Daily Massive aggregates refresh — pre-fetches 250 days of OHLC bars per
     # ticker, computes trend/RS/momentum, populates the in-memory caches that
-    # polygon_feed.fetch_snapshots reads per tick. Once-per-day is fine because
-    # daily-bar-derived factors don't change tick-to-tick.
+    # polygon_feed.fetch_snapshots reads per tick.
     global _last_aggregates_refresh
     if (settings.massive_api_key or settings.polygon_api_key) and (
         _last_aggregates_refresh is None
         or (started - _last_aggregates_refresh).total_seconds() >= 86400
     ):
-        await _refresh_aggregates_cache()
         _last_aggregates_refresh = started
+        asyncio.create_task(_refresh_aggregates_cache())
 
     # End-of-day watchlist email digest. Fires once per UTC day shortly after
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
@@ -455,14 +457,22 @@ async def _downgrade_expired_trials() -> None:
 
 async def _refresh_fundamentals_cache() -> None:
     """
-    Daily pre-fetch of Finnhub fundamentals for every ticker in the DB.
-    Populates finnhub_feed._FUND_SCORE_CACHE so polygon_feed.fetch_snapshots
-    can read real sub_fundamentals values per tick (instead of random mock).
+    Daily pre-fetch of Finnhub fundamentals for the top-liquidity slice of
+    the universe. Populates finnhub_feed._FUND_SCORE_CACHE so
+    polygon_feed.fetch_snapshots can read real sub_fundamentals values
+    per tick (instead of random mock).
 
-    Free-tier safety: 60 calls/min limit; 870 tickers ≈ 14.5 min if all are
-    fresh, ~30 sec if everything is cached (most calls hit the per-symbol
-    7-day disk cache from finnhub_feed.fetch_basic_financials).
+    LIQUIDITY CAP: Massive auto-discovers ~5700 tickers including thousands
+    of sub-$1 micro-caps no real user looks at. Refreshing all of them at
+    Finnhub's free-tier 60-calls/min would take ~95 minutes — long enough
+    to overlap with the next 24h cycle. We cap at the top FUNDAMENTALS_CAP
+    by `volume × price` (rough $-volume liquidity proxy) so the refresh
+    completes in ~9 minutes and the next-day cycle has clean state.
     """
+    FUNDAMENTALS_CAP = 500
+
+    from sqlalchemy import desc
+
     from app.services.finnhub_feed import (
         compute_fundamentals_score,
         fetch_basic_financials,
@@ -471,9 +481,16 @@ async def _refresh_fundamentals_cache() -> None:
     )
 
     async with session_scope() as session:
-        result = await session.execute(select(Ticker.symbol))
+        # Order by an approximation of $-volume. NULLs land last via the desc
+        # sort (NULLs are treated as min in most dialects under DESC).
+        result = await session.execute(
+            select(Ticker.symbol, Ticker.volume, Ticker.price)
+            .order_by(desc(Ticker.volume * Ticker.price))
+            .limit(FUNDAMENTALS_CAP)
+        )
         symbols = [row[0] for row in result.all()]
 
+    logger.info("fundamentals.refresh_started count=%d", len(symbols))
     refreshed = 0
     for sym in symbols:
         try:
@@ -533,10 +550,24 @@ async def _refresh_aggregates_cache() -> None:
         logger.warning("aggregates.spy_insufficient_bars count=%d — skipping refresh", len(spy_bars) if spy_bars else 0)
         return
 
+    # Same liquidity cap as the Finnhub refreshes — Massive Stocks Starter
+    # IS unlimited on call volume, but iterating 5700 tickers at 0.3s each
+    # is still ~28 minutes of background work that we don't need to do for
+    # micro-caps no scanner user filters into. Top 1000 by $-volume catches
+    # everyone real users actually scan.
+    AGGREGATES_CAP = 1000
+
+    from sqlalchemy import desc as _desc
+
     async with session_scope() as session:
-        result = await session.execute(select(Ticker.symbol))
+        result = await session.execute(
+            select(Ticker.symbol)
+            .order_by(_desc(Ticker.volume * Ticker.price))
+            .limit(AGGREGATES_CAP)
+        )
         symbols = [row[0] for row in result.all() if row[0] != "SPY"]
 
+    logger.info("aggregates.refresh_started count=%d", len(symbols))
     refreshed = 0
     for sym in symbols:
         try:
@@ -563,13 +594,18 @@ async def _refresh_aggregates_cache() -> None:
 
 async def _refresh_insider_cache() -> None:
     """
-    Daily pre-fetch of Finnhub insider Form 4 transactions for every ticker.
-    Populates _SMART_MONEY_SCORE_CACHE so polygon_feed reads real values
-    per tick instead of random mock for sub_smart_money.
+    Daily pre-fetch of Finnhub insider Form 4 transactions for the
+    top-liquidity slice. Populates _SMART_MONEY_SCORE_CACHE so polygon_feed
+    reads real values per tick instead of random mock for sub_smart_money.
 
-    Same rate-limit budget as fundamentals (~16 min cold-start across 870
-    tickers, sub-second when warm thanks to per-symbol 24h disk cache).
+    Same liquidity cap as fundamentals — without it, Massive's auto-discovered
+    5700-ticker universe would take ~95 min through Finnhub's 60-calls/min
+    free tier, blocking the next-day cycle.
     """
+    INSIDER_CAP = 500
+
+    from sqlalchemy import desc
+
     from app.services.finnhub_feed import (
         compute_smart_money_score,
         fetch_insider_transactions,
@@ -578,9 +614,14 @@ async def _refresh_insider_cache() -> None:
     )
 
     async with session_scope() as session:
-        result = await session.execute(select(Ticker.symbol))
+        result = await session.execute(
+            select(Ticker.symbol)
+            .order_by(desc(Ticker.volume * Ticker.price))
+            .limit(INSIDER_CAP)
+        )
         symbols = [row[0] for row in result.all()]
 
+    logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
     for sym in symbols:
         try:
