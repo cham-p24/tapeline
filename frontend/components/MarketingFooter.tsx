@@ -29,6 +29,7 @@ export function MarketingFooter() {
             <FooterLink href="/how-it-works">How it works</FooterLink>
             <FooterLink href="/pricing">Pricing</FooterLink>
             <FooterLink href="/scorecard">Public scorecard</FooterLink>
+            <FooterLink href="/blog">Blog</FooterLink>
             <FooterLink href="/changelog">Changelog</FooterLink>
             <FooterLink href="/roadmap">Roadmap</FooterLink>
           </FooterCol>

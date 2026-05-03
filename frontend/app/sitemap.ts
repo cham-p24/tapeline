@@ -51,6 +51,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/pricing`,                   lastModified: now, priority: 0.9 },
     { url: `${base}/how-it-works`,              lastModified: now, priority: 0.9 },
     { url: `${base}/scorecard`,                 lastModified: now, priority: 0.9 },
+    { url: `${base}/blog`,                      lastModified: now, priority: 0.7 },
     { url: `${base}/changelog`,                 lastModified: now, priority: 0.6 },
     { url: `${base}/roadmap`,                   lastModified: now, priority: 0.6 },
     { url: `${base}/status`,                    lastModified: now, priority: 0.4 },
@@ -72,5 +73,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticEntries, ...tickerEntries];
+  // Blog posts — pulled from the same manifest the /blog routes use so
+  // adding a post automatically lands in the sitemap.
+  const { POSTS } = await import("./blog/posts");
+  const postEntries: MetadataRoute.Sitemap = POSTS.map((p) => ({
+    url: `${base}/blog/${p.slug}`,
+    lastModified: new Date(p.publishedAt),
+    priority: 0.6,
+  }));
+
+  return [...staticEntries, ...tickerEntries, ...postEntries];
 }

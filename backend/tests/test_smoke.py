@@ -68,6 +68,40 @@ async def test_watchlist_requires_auth(client):
 
 
 @pytest.mark.asyncio
+async def test_status_endpoint(client):
+    """The richer /api/status used by the public uptime page + the
+    /app/* stale-data banner. Must always return a recognisable shape."""
+    async with client:
+        r = await _get(client, "/api/status")
+        assert r.status_code in (200, 503)  # 503 if DB hard-fails
+        body = r.json()
+        assert "checks" in body
+        assert "integrations" in body["checks"]
+        assert "status" in body
+        assert body["status"] in ("ok", "degraded")
+
+
+@pytest.mark.asyncio
+async def test_public_top_tickers(client):
+    """The endpoint sitemap.ts hits to seed /t/{symbol} URLs.
+
+    Caught a real production 500 the first time we shipped this — the
+    return type was annotated as dict[str, list[str]] but `count` is an
+    int, so FastAPI's response validator rejected the payload. This test
+    asserts the actual shape (count: int, symbols: list[str]) so any
+    future drift is caught before deploy.
+    """
+    async with client:
+        r = await _get(client, "/api/public/top-tickers?limit=10")
+        assert r.status_code == 200
+        body = r.json()
+        assert isinstance(body.get("count"), int)
+        assert isinstance(body.get("symbols"), list)
+        assert body["count"] == len(body["symbols"])
+        assert body["count"] <= 10
+
+
+@pytest.mark.asyncio
 async def test_legal_404_graceful(client):
     async with client:
         r = await _get(client, "/api/nonexistent")
