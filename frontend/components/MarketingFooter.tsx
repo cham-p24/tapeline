@@ -12,8 +12,9 @@ export function MarketingFooter() {
   return (
     <footer className="border-t border-border">
       <div className="mx-auto max-w-6xl px-6 py-10">
-        {/* Top row: brand + nav columns */}
-        <div className="grid gap-8 md:grid-cols-4">
+        {/* Top row: brand + nav columns. Mobile = 1 col stack, tablet = 2x2,
+            desktop = 4 across. */}
+        <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
           <div>
             <Link href="/" className="flex items-center gap-2">
               <div className="h-2 w-6 rounded-full bg-accent" />

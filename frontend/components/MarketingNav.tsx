@@ -13,20 +13,23 @@ export function MarketingNav() {
           <div className="h-2 w-6 rounded-full bg-accent" />
           <span className="text-lg font-semibold tracking-tight">Tapeline</span>
         </Link>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
+          {/* Pricing visible even on mobile — it's the conversion page and the
+              one users genuinely look for first. The rest stay sm+ only to
+              keep the bar from crowding "Start free" on iPhone. */}
+          <Link href="/pricing" className="text-sm text-muted hover:text-fg">
+            Pricing
+          </Link>
           <Link href="/how-it-works" className="hidden text-sm text-muted hover:text-fg sm:inline">
             How it works
           </Link>
           <Link href="/scorecard" className="hidden text-sm text-muted hover:text-fg sm:inline">
             Scorecard
           </Link>
-          <Link href="/pricing" className="hidden text-sm text-muted hover:text-fg sm:inline">
-            Pricing
-          </Link>
           <Link href="/signin" className="hidden text-sm text-muted hover:text-fg sm:inline">
             Sign in
           </Link>
-          <Link href="/signup" className="btn-primary">
+          <Link href="/signup" className="btn-primary text-sm whitespace-nowrap">
             Start free
           </Link>
         </div>

@@ -122,22 +122,22 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
     <main className="min-h-screen">
       <MarketingNav />
 
-      <section className="mx-auto max-w-4xl px-6 py-12">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
         {/* Header row */}
         <div className="flex flex-wrap items-baseline justify-between gap-4">
-          <div>
-            <div className="flex items-baseline gap-3">
-              <h1 className="text-5xl font-bold tracking-tight nums">{data.symbol}</h1>
-              <span className="text-base text-muted">{data.name}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight nums">{data.symbol}</h1>
+              <span className="text-sm sm:text-base text-muted truncate max-w-full">{data.name}</span>
             </div>
-            <div className="mt-2 flex items-center gap-3 text-sm text-muted">
+            <div className="mt-2 flex items-center gap-3 text-xs sm:text-sm text-muted">
               {data.sector && <span>{data.sector}</span>}
               {data.asset_class && <span className="text-subtle">·</span>}
               {data.asset_class && <span className="capitalize">{data.asset_class}</span>}
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold nums">
+          <div className="text-right flex-shrink-0">
+            <div className="text-2xl sm:text-3xl font-bold nums">
               {data.price != null ? `$${data.price.toFixed(2)}` : "—"}
             </div>
             {data.change_pct_1d != null && (
@@ -150,18 +150,18 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
         </div>
 
         {/* Score + signal hero */}
-        <div className="mt-10 rounded-2xl border border-border bg-panel p-8">
-          <div className="flex flex-wrap items-end gap-8">
+        <div className="mt-8 sm:mt-10 rounded-2xl border border-border bg-panel p-5 sm:p-8">
+          <div className="flex flex-wrap items-end gap-6 sm:gap-8">
             <div>
               <div className="text-xs uppercase tracking-wider text-muted">Tapeline score</div>
-              <div className={`mt-1 text-7xl font-bold nums tracking-tight ${scoreColor}`}>
+              <div className={`mt-1 text-6xl sm:text-7xl font-bold nums tracking-tight ${scoreColor}`}>
                 {data.score != null ? data.score.toFixed(0) : "—"}
-                <span className="ml-1 text-2xl text-muted font-medium">/ 100</span>
+                <span className="ml-1 text-xl sm:text-2xl text-muted font-medium">/ 100</span>
               </div>
             </div>
             <div>
               <div className="text-xs uppercase tracking-wider text-muted">Signal</div>
-              <div className={`mt-1 text-2xl font-bold tracking-tight ${scoreColor}`}>{signal}</div>
+              <div className={`mt-1 text-xl sm:text-2xl font-bold tracking-tight ${scoreColor}`}>{signal}</div>
               {data.confidence_pct != null && (
                 <div className="mt-1 text-xs text-muted">
                   {data.confidence_pct.toFixed(0)}% data confidence
@@ -170,19 +170,19 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
             </div>
           </div>
           {data.reason && (
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-fg">{data.reason}</p>
+            <p className="mt-6 max-w-2xl text-sm sm:text-base leading-relaxed text-fg">{data.reason}</p>
           )}
         </div>
 
         {/* 6-factor breakdown */}
-        <h2 className="mt-12 text-sm font-semibold uppercase tracking-wider text-muted">
+        <h2 className="mt-10 sm:mt-12 text-sm font-semibold uppercase tracking-wider text-muted">
           Score breakdown · public formula
         </h2>
         <div className="mt-4 space-y-2">
           {factors.map((f) => (
-            <div key={f.label} className="flex items-center gap-4 rounded-lg border border-border bg-panel/40 px-4 py-3">
-              <div className="w-44 flex-shrink-0">
-                <div className="text-sm font-medium">{f.label}</div>
+            <div key={f.label} className="flex items-center gap-3 sm:gap-4 rounded-lg border border-border bg-panel/40 px-3 sm:px-4 py-3">
+              <div className="w-28 sm:w-44 flex-shrink-0">
+                <div className="text-xs sm:text-sm font-medium truncate">{f.label}</div>
                 <div className="text-[10px] uppercase tracking-wider text-subtle">{f.weight}% weight</div>
               </div>
               <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-background">
@@ -191,7 +191,7 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
                   style={{ width: `${f.value != null ? Math.max(0, Math.min(100, f.value)) : 0}%` }}
                 />
               </div>
-              <div className="w-12 text-right font-medium nums tabular-nums">
+              <div className="w-10 sm:w-12 text-right font-medium nums tabular-nums text-sm sm:text-base">
                 {f.value != null ? f.value.toFixed(0) : "—"}
               </div>
             </div>
@@ -204,8 +204,8 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
         </p>
 
         {/* CTA */}
-        <div className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-8">
-          <h2 className="text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
+        <div className="mt-10 sm:mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-5 sm:p-8">
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">
             Free signup gives you the score for the top 20 tickers, 24-hour delayed.
             14-day Premium trial unlocks the full ~870-ticker live universe, smart alerts, congressional trades, and elite-fund 13F holdings.
