@@ -63,6 +63,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/legal/risk`,                lastModified: now, priority: 0.3 },
     { url: `${base}/legal/terms`,               lastModified: now, priority: 0.3 },
     { url: `${base}/legal/privacy`,             lastModified: now, priority: 0.3 },
+    { url: `${base}/security`,                  lastModified: now, priority: 0.4 },
+    { url: `${base}/support`,                   lastModified: now, priority: 0.4 },
   ];
 
   const tickers = await fetchTopTickers(500);

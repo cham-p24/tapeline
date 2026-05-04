@@ -41,6 +41,7 @@ export function MarketingFooter() {
 
           <FooterCol title="Trust">
             <FooterLink href="/status" desc="Live API + worker uptime, refresh every 30s">System status</FooterLink>
+            <FooterLink href="/security" desc="Encryption, payment data, vulnerability disclosure">Security</FooterLink>
             <FooterLink href="/legal/terms" desc="Subscription terms, cancellation, refunds">Terms</FooterLink>
             <FooterLink href="/legal/privacy" desc="What we collect + how it's stored">Privacy</FooterLink>
             <FooterLink href="/legal/risk" desc="Not investment advice — scope of the data">Risk disclosure</FooterLink>
