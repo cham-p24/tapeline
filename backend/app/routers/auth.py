@@ -89,7 +89,10 @@ async def signup(
             "referral_code": None, "created_at": None,
         }}
 
-    email = body.email.lower().strip()
+    # Normalise the email so dot/+tag permutations of the same Gmail / Outlook
+    # inbox can't mint multiple trials. See services/trial_abuse.normalise_email.
+    from app.services.trial_abuse import normalise_email, record_signup, signup_allowed
+    email = normalise_email(body.email)
     if is_disposable_email(email):
         logger.warning("auth.disposable_email_blocked email=%s", email)
         raise HTTPException(400, "This email provider isn't supported. Please use a regular email address.")
@@ -97,6 +100,17 @@ async def signup(
     client_ip = request.client.host if request.client else None
     if not await verify_turnstile(body.turnstile_token, client_ip):
         raise HTTPException(400, "Bot challenge failed. Please refresh and try again.")
+
+    # IP-based 24h signup cap. Stops drive-by trial farming where one host
+    # creates dozens of accounts via Gmail tag permutations or scripts.
+    if not signup_allowed(client_ip):
+        logger.warning("auth.ip_rate_limited ip=%s email=%s", client_ip, email)
+        raise HTTPException(
+            429,
+            "Too many signups from this network in the last 24 hours. "
+            "Please try again tomorrow or contact support@tapeline.io if you "
+            "share an IP with several legitimate users.",
+        )
 
     # ---- Normal signup path -------------------------------------------------
     existing = await session.execute(select(User).where(User.email == email))
@@ -142,6 +156,11 @@ async def signup(
     session.add(user)
     await session.commit()
     await session.refresh(user)
+
+    # Record the IP for the 24h sliding-window cap. Done AFTER the DB commit so
+    # a failed signup (DB unavailable, transaction conflict) doesn't burn the
+    # legitimate user's budget.
+    record_signup(client_ip)
 
     token = issue_session_token(user.id)
     response.set_cookie(value=token, **session_cookie_kwargs())

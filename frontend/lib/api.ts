@@ -124,6 +124,17 @@ export type Regime = {
   breadth_pct: number;
   sector_leaders: string;
   updated_at: string | null;
+  fear_greed?: {
+    score: number;
+    label: string;
+    color: string;
+    components: {
+      vix:     { score: number; input: number | null };
+      breadth: { score: number; input: number | null };
+      regime:  { score: number; input: string | null };
+      spy_5d:  { score: number; input: number | null };
+    };
+  };
 };
 
 export type CongressTrade = {

@@ -206,6 +206,33 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert r4.status_code == 200
 
 
+def test_email_normalisation():
+    """Gmail / Outlook style providers strip dots + tags so a single inbox
+    can't mint multiple trials. Lowercases everything regardless. This is
+    a unit test (no async client) — pure-function check."""
+    from app.services.trial_abuse import normalise_email
+    assert normalise_email("Bob.Smith+launch@gmail.com") == "bobsmith@gmail.com"
+    assert normalise_email("alice+spam@fastmail.com") == "alice@fastmail.com"
+    assert normalise_email("Carol@Example.com") == "carol@example.com"
+    assert normalise_email("first.last+a@outlook.com") == "firstlast@outlook.com"
+    # Providers we don't normalise still get lowercased + trimmed
+    assert normalise_email("  WHITESPACE@gmail.com  ") == "whitespace@gmail.com"
+    # Non-Gmail/Outlook keeps dots in the local part
+    assert normalise_email("first.last@example.com") == "first.last@example.com"
+
+
+def test_ip_signup_rate_limit():
+    """3 signups per IP per 24h is the hard cap."""
+    from app.services.trial_abuse import signup_allowed, record_signup, signup_count_24h
+    ip = "10.20.30.40"  # never used elsewhere in tests
+    assert signup_count_24h(ip) == 0
+    for _ in range(3):
+        assert signup_allowed(ip)
+        record_signup(ip)
+    assert not signup_allowed(ip), "4th signup must be blocked"
+    assert signup_count_24h(ip) == 3
+
+
 @pytest.mark.asyncio
 async def test_signup_disposable_email_blocked(client, monkeypatch):
     """Disposable-email signups must 400. The block list is the second

@@ -5,6 +5,7 @@ import { api, type Regime } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { CardSkeleton } from "@/components/Skeleton";
+import { FearGreedDial } from "@/components/FearGreedDial";
 
 export default function RegimePage() {
   const [r, setR] = useState<Regime | null>(null);
@@ -44,11 +45,38 @@ export default function RegimePage() {
         <CardSkeleton rows={5} />
       ) : (
         <>
-          <div className={`card mt-6 p-8 ${toneBg.split(" ")[0]}`}>
-            <div className="text-xs uppercase text-muted">Current regime</div>
-            <div className={`mt-1 text-6xl font-bold tracking-tight ${toneBg.split(" ")[1]}`}>
-              {r.regime}
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {/* Current regime hero */}
+            <div className={`card p-8 ${toneBg.split(" ")[0]}`}>
+              <div className="text-xs uppercase text-muted">Current regime</div>
+              <div className={`mt-1 text-6xl font-bold tracking-tight ${toneBg.split(" ")[1]}`}>
+                {r.regime}
+              </div>
+              <p className="mt-4 text-xs text-muted leading-relaxed">
+                Synthesised from VIX, breadth, rate direction, and sector rotation.
+                Updated each worker tick (~60s).
+              </p>
             </div>
+
+            {/* Fear & Greed dial */}
+            {r.fear_greed && (
+              <div className="card p-6 flex flex-col items-center">
+                <div className="text-xs uppercase text-muted self-start">Fear &amp; Greed</div>
+                <div className="mt-2">
+                  <FearGreedDial
+                    score={r.fear_greed.score}
+                    label={r.fear_greed.label}
+                    color={r.fear_greed.color}
+                  />
+                </div>
+                <p className="mt-4 text-[11px] text-subtle text-center leading-relaxed">
+                  Composite of VIX ({r.fear_greed.components.vix.score.toFixed(0)}),
+                  breadth ({r.fear_greed.components.breadth.score.toFixed(0)}),
+                  regime ({r.fear_greed.components.regime.score.toFixed(0)}),
+                  and 5-day SPY momentum ({r.fear_greed.components.spy_5d.score.toFixed(0)}).
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
