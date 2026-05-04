@@ -104,10 +104,18 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
     from app.services.mock_feed import _signal_from_score
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots
+    from app.services.universe import active_universe
     # Trend / RS / Momentum caches live in this same module (populated by worker)
 
-    # Start with mock — gives us the full schema (sub_* + reason + confidence_pct)
-    base_rows = _mock_snapshots()
+    # Active universe = top-N by daily $-volume (cached by worker via
+    # universe.refresh_active_universe). Falls back to the hardcoded
+    # TICKER_UNIVERSE if the cache hasn't been populated yet.
+    universe_list = active_universe()
+    # Generate the full mock-shape base rows for THIS universe (including
+    # synthesised sub_* scores + reason + confidence). polygon_feed will
+    # then override price/volume/sub_fundamentals/sub_smart_money/etc.
+    # with real Massive + Finnhub data per row.
+    base_rows = _mock_snapshots(universe_override=universe_list)
 
     if not _api_key():
         # No Massive key — pure mock fallback

@@ -206,6 +206,35 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert r4.status_code == 200
 
 
+def test_active_universe_fallback():
+    """Before the worker has populated the cache, active_universe() must
+    fall back to mock_feed.TICKER_UNIVERSE so dev / fresh test envs never
+    hard-fail."""
+    from app.services.universe import active_universe
+    universe_list = active_universe()
+    assert len(universe_list) > 0
+    assert all(isinstance(t, tuple) and len(t) == 3 for t in universe_list)
+    assert all(t[0] for t in universe_list), "every entry must have a symbol"
+
+
+def test_mock_fetch_snapshots_accepts_universe_override():
+    """polygon_feed.fetch_snapshots passes a DB-sourced universe via
+    universe_override so we can score the top-N most-liquid tickers
+    rather than the hardcoded 112-name seed."""
+    from app.services.mock_feed import fetch_snapshots
+    custom = [
+        ("FAKE1", "Fake One Inc.", "Technology"),
+        ("FAKE2", "Fake Two Corp.", "Healthcare"),
+    ]
+    rows = fetch_snapshots(universe_override=custom)
+    assert len(rows) == 2
+    syms = {r["symbol"] for r in rows}
+    assert syms == {"FAKE1", "FAKE2"}
+    for r in rows:
+        assert r["price"] > 0
+        assert "score" in r and 0 <= r["score"] <= 100
+
+
 def test_email_normalisation():
     """Gmail / Outlook style providers strip dots + tags so a single inbox
     can't mint multiple trials. Lowercases everything regardless. This is

@@ -52,6 +52,7 @@ _last_trial_check: datetime | None = None
 _last_holdings_refresh: datetime | None = None
 _last_drip_check: datetime | None = None
 _last_universe_refresh: datetime | None = None
+_last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
@@ -240,6 +241,21 @@ async def tick() -> None:
     ):
         await _refresh_universe()
         _last_universe_refresh = started
+
+    # Hourly active-scoring-universe refresh (top-N by daily $-volume from
+    # the DB-tracked 5,757). Cheap query — keeps the cache that
+    # polygon_feed.fetch_snapshots reads each tick within an hour of fresh.
+    global _last_active_universe_refresh
+    if _last_active_universe_refresh is None or (
+        started - _last_active_universe_refresh
+    ).total_seconds() >= 3600:
+        from app.services.universe import refresh_active_universe
+        try:
+            n = await refresh_active_universe()
+            logger.info("active_universe.refreshed count=%d", n)
+        except Exception:
+            logger.exception("active_universe.refresh_failed")
+        _last_active_universe_refresh = started
 
     # Daily Finnhub fundamentals pre-fetch — populates the in-memory cache that
     # polygon_feed.fetch_snapshots reads per tick. Fundamentals don't change

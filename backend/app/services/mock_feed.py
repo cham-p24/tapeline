@@ -136,6 +136,19 @@ _BASELINE_PRICES: dict[str, float] = {sym: random.uniform(25, 500) for sym, _, _
 _DRIFT: dict[str, float] = {sym: random.uniform(-0.0002, 0.0002) for sym, _, _ in TICKER_UNIVERSE}
 
 
+def _ensure_baseline(sym: str) -> None:
+    """Lazy-initialise the random walk for a symbol that wasn't in the
+    original hardcoded TICKER_UNIVERSE. Called when the active universe
+    is sourced from the DB (services/universe.py) and includes names
+    we hadn't pre-seeded. Deterministic per-symbol so reruns are stable.
+    """
+    if sym in _BASELINE_PRICES:
+        return
+    rng = random.Random(sum(ord(c) for c in sym) * 7919)
+    _BASELINE_PRICES[sym] = rng.uniform(25, 500)
+    _DRIFT[sym] = rng.uniform(-0.0002, 0.0002)
+
+
 def universe() -> list[dict[str, str]]:
     """Return the master ticker list for initial DB seed."""
     return [
@@ -144,14 +157,23 @@ def universe() -> list[dict[str, str]]:
     ]
 
 
-def fetch_snapshots() -> list[dict[str, Any]]:
+def fetch_snapshots(
+    universe_override: list[tuple[str, str, str]] | None = None,
+) -> list[dict[str, Any]]:
     """
     Generate a batch of fresh mock snapshots with full score breakdown.
     Sub-scores are what make Tapeline's 'synthesis moat' visible to users.
+
+    `universe_override` lets the caller (typically polygon_feed) pass a
+    larger, DB-sourced active universe of (symbol, name, sector) tuples.
+    Falls back to the hardcoded TICKER_UNIVERSE when None — preserves
+    test + dev behaviour.
     """
+    universe_list = universe_override if universe_override is not None else TICKER_UNIVERSE
     now = datetime.now(UTC)
     rows = []
-    for sym, _name, sector in TICKER_UNIVERSE:
+    for sym, _name, sector in universe_list:
+        _ensure_baseline(sym)
         shock = random.gauss(0, 0.004)
         _BASELINE_PRICES[sym] *= max(0.5, 1 + _DRIFT[sym] + shock)
         price = round(_BASELINE_PRICES[sym], 2)
