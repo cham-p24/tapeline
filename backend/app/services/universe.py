@@ -58,8 +58,16 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
             # ORDER BY volume * price DESC NULLS LAST — gives us the most
             # liquid actively-tradeable names first. NULLs (newly-discovered
             # tickers without a snapshot yet) sort to the bottom.
+            # Without NULLS LAST, Postgres puts NULL first in DESC ordering,
+            # which would crowd out real high-$-volume mega-caps with
+            # unscored newly-discovered tickers.
+            #
+            # Filter `volume IS NOT NULL AND price IS NOT NULL` is the
+            # belt-and-suspenders version that works on every dialect (SQLite
+            # doesn't natively support NULLS LAST in older versions).
             r = await session.execute(
                 select(Ticker.symbol, Ticker.name, Ticker.sector)
+                .where(Ticker.volume.is_not(None), Ticker.price.is_not(None))
                 .order_by(desc(Ticker.volume * Ticker.price))
                 .limit(size)
             )
