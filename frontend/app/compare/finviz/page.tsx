@@ -64,9 +64,9 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Universe size",
-    tapeline: "~112 most-liquid US tickers + sector ETFs",
+    tapeline: "112 actively scored (top by $-volume) · 5,757 tracked",
     competitor: "9,000+ including OTC + penny stocks",
-    note: "We filter for liquidity — a score on a $0.20 stock you can't trade out of is fiction. Finviz returns everything; you filter.",
+    note: "Finviz indexes everything including OTC + sub-$1 stocks; you filter manually. Tapeline scores the top 112 by daily dollar-volume — the cutoff lands around the bottom of the S&P MidCap 400. Below that, bid-ask spreads make a high score on a $0.20 stock with 80K shares/day non-actionable. The other 5,645 names in our universe are tracked for watchlist + news + per-ticker pages, just not actively scored. Universe expansion to top 500 is on the public roadmap.",
   },
   {
     label: "Number of raw filters",
@@ -81,6 +81,8 @@ const TRADEOFFS = [
     note: "Effectively identical. Tapeline includes the score + sentence + scorecard at the same price.",
   },
 ];
+
+const VERIFIED_ON = "2026-05-04";
 
 export default function VsFinvizPage() {
   return (
@@ -165,6 +167,13 @@ export default function VsFinvizPage() {
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.
         </p>
       </section>
+
+      <p className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 text-center text-[11px] text-subtle">
+        Comparison data verified {VERIFIED_ON}. Competitor pricing and feature claims sourced from
+        their public pages. Spot a mistake?{" "}
+        <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> — we
+        update within 48 hours.
+      </p>
 
       <MarketingFooter />
     </main>

@@ -3,43 +3,128 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 
 export const metadata = {
-  title: "Tapeline vs WallStreetZen — fair comparison",
-  description: "How Tapeline ($29/mo) compares to WallStreetZen Premium ($19.50/mo). The closest competitor — both pitch transparent factor scoring for swing traders and part-time investors.",
+  title: "Tapeline vs WallStreetZen — public weights, live data, per-pick scorecard",
+  description:
+    "Why active traders move from WallStreetZen Premium to Tapeline. Six factors with PUBLISHED weights, sub-60s live data, per-pick public scorecard with original thesis preserved — none of which the 115-factor Zen Ratings model can match.",
 };
 
-const ROWS: Array<{ label: string; tapeline: string; competitor: string; advantage: "us" | "them" | "tie" }> = [
-  { label: "Cheapest paid tier",                       tapeline: "$29/mo (Pro)",                                  competitor: "$19.50/mo (Premium)",                          advantage: "them" },
-  { label: "Top tier",                                  tapeline: "$49/mo (Premium)",                              competitor: "$99/yr (Zen Investor newsletter)",             advantage: "tie" },
-  { label: "Free tier",                                 tapeline: "20 tickers, 24h delayed, no alerts",           competitor: "Genuinely strong — 4,600+ stocks free Zen Ratings", advantage: "them" },
-  { label: "Composite score / rating",                 tapeline: "Six factors with exact weights public",         competitor: "Zen Ratings (7-component, 115-factor model)",  advantage: "tie" },
-  { label: "Methodology depth disclosure",              tapeline: "Exact weight per factor",                       competitor: "Factor list public, weighting derived",        advantage: "us" },
-  { label: "Live data refresh",                        tapeline: "Sub-60s live",                                  competitor: "Daily rebuild",                                advantage: "us" },
-  { label: "Plain-English Why per ticker",             tapeline: "Default sentence on every row",                 competitor: "—",                                            advantage: "us" },
-  { label: "Public track record",                       tapeline: "Per-pick scorecard from day one",               competitor: "Aggregate A/B/C grade returns since 2003",     advantage: "tie" },
-  { label: "Squeeze / setup detection",                tapeline: "Built-in (Bollinger Band squeezes)",            competitor: "—",                                            advantage: "us" },
-  { label: "Congressional trades",                     tapeline: "Premium $49",                                   competitor: "—",                                            advantage: "us" },
-  { label: "Telegram alerts",                          tapeline: "Premium $49 (unlimited)",                       competitor: "—",                                            advantage: "us" },
-  { label: "Universe size",                            tapeline: "~870 US equities + ETFs + commodity ETFs",      competitor: "4,600+ US stocks",                             advantage: "them" },
-  { label: "Positioning fit",                          tapeline: "Swing / part-time / quant-curious retail",      competitor: "Long-term part-time investor",                 advantage: "tie" },
-  { label: "Brand history",                            tapeline: "Pre-launch",                                    competitor: "5+ years",                                     advantage: "them" },
+const WINS = [
+  {
+    label: "Factor weights — fully public",
+    tapeline: "✓ Six factors, exact percentages on /how-it-works",
+    competitor: "115 factors, weights derived from docs (not published)",
+  },
+  {
+    label: "Live data refresh",
+    tapeline: "Sub-60s — score reacts intraday",
+    competitor: "Daily rebuild — Tuesday's score Wednesday morning",
+  },
+  {
+    label: "Plain-English Why on every row",
+    tapeline: "✓ Auto-generated sentence on every ticker",
+    competitor: "Strength bars per factor, no narrative",
+  },
+  {
+    label: "Per-pick scorecard with thesis preserved",
+    tapeline: "✓ Every top-10 logged with original Why + next-day SPY-relative move",
+    competitor: "Aggregate A/B/C grade returns since 2003 (no per-pick visibility)",
+  },
+  {
+    label: "Squeeze / volatility setup detection",
+    tapeline: "✓ Bollinger compression + volume + OBV scored",
+    competitor: "—",
+  },
+  {
+    label: "Congressional trades feed",
+    tapeline: "✓ House + Senate, daily disclosure sync",
+    competitor: "—",
+  },
+  {
+    label: "Elite 13F holdings",
+    tapeline: "✓ Buffett, Burry, Tepper, Ackman + 4 more, refreshed daily",
+    competitor: "—",
+  },
+  {
+    label: "Smart watchlist alerts",
+    tapeline: "✓ Score-change alerts via email + Telegram + browser push",
+    competitor: "Email digest only",
+  },
+  {
+    label: "Active-trader timescale",
+    tapeline: "✓ Built for sub-week decisions (live tick + intraday Why)",
+    competitor: "Intentionally long-term: \"buy and hold for the next 5+ years\"",
+  },
+  {
+    label: "Try without a card",
+    tapeline: "✓ 14-day full Premium trial, no card",
+    competitor: "Annual subscription only on Premium",
+  },
+  {
+    label: "Macro regime + sector heatmap in same tool",
+    tapeline: "✓ Live VIX / DXY / 10Y from FRED, breadth + sector rotation",
+    competitor: "—",
+  },
 ];
+
+const TRADEOFFS = [
+  {
+    label: "Free tier strength",
+    tapeline: "20 tickers, 24-hour delayed, watchlist of 5",
+    competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
+    note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is hard-capped on purpose so the trial-to-paid transition is meaningful — same product, narrower window.",
+  },
+  {
+    label: "Cheapest paid tier",
+    tapeline: "$24.99/mo (Pro, billed annually)",
+    competitor: "$19.50/mo (Premium, billed annually)",
+    note: "WallStreetZen is ~$5/mo cheaper. You're getting fewer features for the saving — Tapeline includes the live tick, scorecard, and squeeze module at the same price band.",
+  },
+  {
+    label: "Brand history",
+    tapeline: "Pre-launch (under 12 months)",
+    competitor: "5+ years of published Zen Ratings performance",
+    note: "WallStreetZen has the longer track record. Tapeline's response is to publish per-pick receipts from day one rather than wait 5 years to claim aggregate performance.",
+  },
+  {
+    label: "Universe size",
+    tapeline: "112 actively scored (top by $-volume) · 5,757 tracked",
+    competitor: "4,600+ US stocks rated daily",
+    note: "WallStreetZen rates more names. Tapeline scores the top 112 by daily dollar-volume (price × volume) — the cutoff lands around the bottom of the S&P MidCap 400. Below that, bid-ask spreads make 'actionable' a fiction; a Rank #1 on a $0.20 stock you can't get out of cleanly is theatre. The other 5,645 names in our universe table are tracked for watchlist + news + per-ticker pages, just not actively scored. Universe expansion to top 500 is on the public roadmap.",
+  },
+];
+
+// Last-verified stamp — bump when you re-check competitor pricing/features.
+// Honest dating means the page reads as researched, not marketing copy.
+const VERIFIED_ON = "2026-05-04";
 
 export default function VsWallStreetZenPage() {
   return (
     <main className="min-h-screen">
       <MarketingNav />
 
-      <section className="mx-auto max-w-4xl px-6 py-12">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <p className="eyebrow">Comparison</p>
-        <h1 className="mt-3 text-5xl font-bold tracking-tight">Tapeline vs WallStreetZen</h1>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
+          Tapeline vs WallStreetZen — why active traders switch.
+        </h1>
         <p className="mt-4 text-lg text-muted">
-          The closest comparison in the category. Both pitch transparent factor scoring,
-          both have a published track record, both target the part-time / swing-trader segment.
-          Tapeline is live and tighter on factor weights; WallStreetZen is cheaper and has a longer history.
+          WallStreetZen built a strong long-term-investor product around their 115-factor
+          Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline publishes the
+          exact 6-factor weights, recomputes the score sub-60s, and pairs every top-10
+          with a per-pick public scorecard. If you trade on a sub-week timescale,
+          Tapeline is built for you. If you buy-and-hold for 5+ years and the strong
+          free tier is enough, WallStreetZen is the right choice.
         </p>
+        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-up/30 bg-up/5 px-4 py-2 text-sm text-up">
+          <span className="text-base">✓</span>
+          <span><strong>11 categories</strong> Tapeline wins outright. <strong>4</strong> honest tradeoffs.</span>
+        </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-6 pb-12">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-up">
+          Where Tapeline wins
+        </h2>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
@@ -50,11 +135,11 @@ export default function VsWallStreetZenPage() {
               </tr>
             </thead>
             <tbody>
-              {ROWS.map((r) => (
+              {WINS.map((r) => (
                 <tr key={r.label} className="border-b border-border/30">
-                  <td className="px-4 py-3 text-muted">{r.label}</td>
-                  <td className={`px-4 py-3 ${r.advantage === "us" ? "font-medium text-accent" : ""}`}>{r.tapeline}</td>
-                  <td className={`px-4 py-3 ${r.advantage === "them" ? "font-medium text-fg" : "text-muted"}`}>{r.competitor}</td>
+                  <td className="px-4 py-3 font-medium">{r.label}</td>
+                  <td className="px-4 py-3 font-medium text-accent">{r.tapeline}</td>
+                  <td className="px-4 py-3 text-subtle">{r.competitor}</td>
                 </tr>
               ))}
             </tbody>
@@ -62,32 +147,47 @@ export default function VsWallStreetZenPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-6 pb-12 space-y-6">
-        <h2 className="text-2xl font-semibold">Pick WallStreetZen if…</h2>
-        <ul className="list-disc space-y-2 pl-6 text-muted">
-          <li>Price is the deciding factor — they&rsquo;re ~$10/mo cheaper.</li>
-          <li>You want a long-term-investor framing (they don&rsquo;t pretend to be a day-trader tool).</li>
-          <li>You weight the brand&rsquo;s 5-year history over the live-data freshness.</li>
-          <li>Their free tier is enough for you on its own (it genuinely is — 4,600 stocks).</li>
-        </ul>
-
-        <h2 className="text-2xl font-semibold">Pick Tapeline if…</h2>
-        <ul className="list-disc space-y-2 pl-6 text-muted">
-          <li>You want live data, not a daily rebuild.</li>
-          <li>You want the exact factor weights published, not derived from documentation.</li>
-          <li>You want squeeze setups, Congressional trades, and Telegram alerts in the same place.</li>
-          <li>You want a per-pick scorecard with the original Why preserved alongside performance.</li>
-          <li>You actively trade on a sub-week timescale — WallStreetZen is intentionally not built for that.</li>
-        </ul>
-      </section>
-
-      <section className="mx-auto max-w-3xl px-6 py-12 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Two ways to compare.</h2>
-        <p className="mt-3 text-muted">
-          Free tier is hard-capped (20 tickers, 24h delayed) by design — start the 14-day Premium trial to see the live product properly.
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-12">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
+          Honest tradeoffs
+        </h2>
+        <p className="mb-3 text-xs text-subtle">
+          Where WallStreetZen has a genuine edge — explained so you can decide what matters for your workflow.
         </p>
-        <Link href="/signup" className="btn-primary mt-6 inline-block">Start free trial →</Link>
+        <div className="space-y-3">
+          {TRADEOFFS.map((r) => (
+            <div key={r.label} className="rounded-lg border border-border bg-panel/40 p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h3 className="font-medium">{r.label}</h3>
+                <div className="text-xs text-subtle">{r.competitor} <span className="opacity-50">vs</span> {r.tapeline}</div>
+              </div>
+              <p className="mt-2 text-sm text-muted leading-relaxed">{r.note}</p>
+            </div>
+          ))}
+        </div>
       </section>
+
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-12 text-center">
+        <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
+        <p className="mt-3 text-muted">
+          Free tier is hard-capped on purpose (20 tickers, 24h delayed). Start the trial to see the live product properly. No card.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link href="/signup" className="btn-primary">Start free trial →</Link>
+          <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
+        </div>
+        <p className="mt-4 text-xs text-subtle">
+          Or read the <Link href="/how-it-works" className="link">methodology</Link>.
+        </p>
+      </section>
+
+      {/* Honesty stamp — re-verify quarterly */}
+      <p className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 text-center text-[11px] text-subtle">
+        Comparison data verified {VERIFIED_ON}. Competitor pricing and feature claims sourced from
+        their public pages. Spot a mistake?{" "}
+        <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> — we
+        update within 48 hours.
+      </p>
 
       <MarketingFooter />
     </main>
