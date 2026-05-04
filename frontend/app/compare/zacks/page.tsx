@@ -83,9 +83,9 @@ const TRADEOFFS = [
   },
   {
     label: "Universe size",
-    tapeline: "112 actively scored (top by $-volume) · 5,757 tracked",
+    tapeline: "~1,000 actively scored (top by $-volume) · 5,757 tracked",
     competitor: "4,400+ US stocks ranked daily",
-    note: "Zacks ranks more names. Tapeline scores the top 112 by daily dollar-volume — the cutoff lands around the bottom of the S&P MidCap 400. Below that, bid-ask spreads make a Rank #1 on a $0.20 micro-cap with 50K shares of daily volume non-actionable. The other 5,645 names in our universe table are tracked for watchlist + news + per-ticker pages, just not actively scored. Universe expansion to top 500 is on the public roadmap.",
+    note: "Zacks ranks more names. Tapeline scores the top ~1,000 by daily dollar-volume — the cutoff lands around the bottom of the S&P MidCap 400. Below that, bid-ask spreads make a Rank #1 on a $0.20 micro-cap with 50K shares of daily volume non-actionable. The other ~4,700 names in our universe table are tracked for watchlist + news + per-ticker pages, just not actively scored.",
   },
 ];
 

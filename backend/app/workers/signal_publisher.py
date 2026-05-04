@@ -257,39 +257,44 @@ async def tick() -> None:
             logger.exception("active_universe.refresh_failed")
         _last_active_universe_refresh = started
 
-    # Daily Finnhub fundamentals pre-fetch — populates the in-memory cache that
-    # polygon_feed.fetch_snapshots reads per tick. Fundamentals don't change
-    # tick-to-tick so once-per-day refresh is plenty.
-    #
-    # CRITICAL: launched as a background task via create_task so the slow
-    # iteration (rate-limited Finnhub calls × ~500 tickers ≈ 9 min) does NOT
-    # block the next scoring tick. The latch is set BEFORE the task runs so
-    # subsequent ticks won't re-fire it while it's still in-flight.
-    global _last_fundamentals_refresh
-    if settings.finnhub_api_key and (
+    # Daily Finnhub refreshes (fundamentals, insider Form 4, sector backfill).
+    # All three hit the same Finnhub free-tier 60-calls/min budget — so we
+    # serialize them inside a single background task instead of spawning
+    # three concurrent tasks that combined would 3x the budget and trigger
+    # 429s. Latches are set BEFORE the task runs so subsequent ticks don't
+    # re-fire while the in-flight run is still working.
+    global _last_fundamentals_refresh, _last_insider_refresh, _last_sector_backfill
+    needs_finnhub = settings.finnhub_api_key and (
         _last_fundamentals_refresh is None
         or (started - _last_fundamentals_refresh).total_seconds() >= 86400
-    ):
-        _last_fundamentals_refresh = started
-        asyncio.create_task(_refresh_fundamentals_cache())
-
-    # Daily Finnhub insider Form 4 pre-fetch — same background pattern.
-    global _last_insider_refresh
-    if settings.finnhub_api_key and (
-        _last_insider_refresh is None
+        or _last_insider_refresh is None
         or (started - _last_insider_refresh).total_seconds() >= 86400
-    ):
-        _last_insider_refresh = started
-        asyncio.create_task(_refresh_insider_cache())
-
-    # Daily sector backfill — fills in sector="Unknown" rows from Finnhub.
-    global _last_sector_backfill
-    if settings.finnhub_api_key and (
-        _last_sector_backfill is None
+        or _last_sector_backfill is None
         or (started - _last_sector_backfill).total_seconds() >= 86400
-    ):
+    )
+    if needs_finnhub:
+        _last_fundamentals_refresh = started
+        _last_insider_refresh = started
         _last_sector_backfill = started
-        asyncio.create_task(_backfill_sectors())
+
+        async def _serial_finnhub_refreshes() -> None:
+            """Run the three Finnhub-using refreshes back-to-back.
+            Combined wall time at 1.1s/req × 500 + 500 + ~rare-sector backfill
+            is ~18-20 min — long, but always under the per-minute API limit."""
+            try:
+                await _refresh_fundamentals_cache()
+            except Exception:
+                logger.exception("fundamentals.refresh_failed")
+            try:
+                await _refresh_insider_cache()
+            except Exception:
+                logger.exception("insider.refresh_failed")
+            try:
+                await _backfill_sectors()
+            except Exception:
+                logger.exception("sectors.backfill_failed")
+
+        asyncio.create_task(_serial_finnhub_refreshes())
 
     # Daily Massive aggregates refresh — pre-fetches 250 days of OHLC bars per
     # ticker, computes trend/RS/momentum, populates the in-memory caches that
