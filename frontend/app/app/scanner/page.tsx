@@ -9,6 +9,7 @@ import { HoverCard } from "@/components/HoverCard";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ScannerLegend } from "@/components/ScannerLegend";
 import { TableSkeleton } from "@/components/Skeleton";
+import { RecentTickers } from "@/components/RecentTickers";
 
 type SortKey = "score" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
 
@@ -44,6 +45,10 @@ export default function ScannerPage() {
       </div>
 
       <ScannerLegend />
+
+      <div className="mt-4">
+        <RecentTickers />
+      </div>
 
       {/* Filters */}
       <div className="mt-6 flex flex-wrap items-center gap-3">

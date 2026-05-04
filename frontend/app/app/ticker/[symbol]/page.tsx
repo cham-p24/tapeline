@@ -6,6 +6,7 @@ import { api, type TickerDetail } from "@/lib/api";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
+import { recordTickerVisit } from "@/components/RecentTickers";
 
 export default function TickerPage({ params }: { params: { symbol: string } }) {
   const symbol = params.symbol.toUpperCase();
@@ -20,6 +21,8 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
   }, [symbol]);
 
   useEffect(() => { load(); }, [load]);
+  // Track this visit so it appears in the "Recent" pill row across the app.
+  useEffect(() => { recordTickerVisit(symbol); }, [symbol]);
   const { status, lastUpdate } = useLiveStream(load);
 
   async function addWatch() {

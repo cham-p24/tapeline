@@ -6,6 +6,7 @@ import { api, type WatchlistItem } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
+import { RecentTickers } from "@/components/RecentTickers";
 
 // Starter watchlist for brand-new users — one click adds the mega-caps
 // most retail traders are already watching, plus SPY as the benchmark.
@@ -73,6 +74,10 @@ export default function WatchlistPage() {
           <p className="text-sm text-muted">Track tickers you care about. Smart alerts fire when scores drift meaningfully.</p>
         </div>
         <LiveBadge status={status} lastUpdate={lastUpdate} />
+      </div>
+
+      <div className="mt-4">
+        <RecentTickers />
       </div>
 
       {/* Add ticker */}
