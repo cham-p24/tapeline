@@ -73,7 +73,7 @@ t=4.5  Alert rules evaluated; matched rules trigger email/telegram queue
 
 | Feature | Free | Pro ($29) | Premium ($49) |
 |---|---|---|---|
-| Scanner | 10 tickers, 15-min delayed | All ~870, live | All ~870, live |
+| Scanner | 20 tickers, 24h delayed | All ~1,000, live | All ~1,000, live |
 | Squeeze Watch | — | ✅ | ✅ |
 | Market Regime | ✅ basic | ✅ full | ✅ full |
 | Congress Trades | — | — | ✅ |

@@ -143,8 +143,8 @@ data source in `/docs/DATA_SOURCES.md`.
 **What's coming**
 
 Public roadmap at `/roadmap`, voted on by Premium subscribers. Universe
-expansion (currently scoring 112 mega-caps + sector ETFs, infrastructure
-in place to grow to 500-1000 by user demand). Mobile push notifications.
+— currently scoring 1,000 most-liquid by $-volume, infrastructure in
+place to expand further. Mobile push notifications.
 Backtesting against the public scorecard.
 
 I'd love feedback — kick the tires at tapeline.io and tell me what's

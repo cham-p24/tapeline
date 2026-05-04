@@ -12,7 +12,7 @@
 
 ### Pro — "Scanner"
 **$29/mo** or **$24.99/mo billed annually** ($299/yr · save $49)
-- Scanner: full ~870-ticker universe, **live (sub-60s refresh)**
+- Scanner: full ~1,000-ticker universe, **live (sub-60s refresh)**
 - Squeeze Watch: full setup list with windows
 - Market regime: full view with VIX/DXY/10Y/sector leaders
 - Watchlist (50) with smart alerts

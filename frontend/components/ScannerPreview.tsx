@@ -18,7 +18,7 @@ export function ScannerPreview() {
           <span className="h-2 w-2 animate-pulse rounded-full bg-up" />
           Live · updated just now
         </div>
-        <div className="text-muted">Showing 6 of 870 tickers</div>
+        <div className="text-muted">Showing 6 of 1,000 tickers</div>
       </div>
       <table className="w-full text-sm nums">
         <thead className="border-b border-border/50 text-xs uppercase text-muted">

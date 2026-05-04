@@ -208,7 +208,7 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">
             Free signup gives you the score for the top 20 tickers, 24-hour delayed.
-            14-day Premium trial unlocks the full ~870-ticker live universe, smart alerts, congressional trades, and elite-fund 13F holdings.
+            14-day Premium trial unlocks the full ~1,000-ticker live universe, smart alerts, congressional trades, and elite-fund 13F holdings.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href={`/signup?next=${encodeURIComponent(`/app/ticker/${sym}`)}`} className="btn-accent">
