@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { Skeleton } from "@/components/Skeleton";
 
 export default function ScorecardPage() {
   const [data, setData] = useState<{
@@ -19,7 +20,30 @@ export default function ScorecardPage() {
 
   useEffect(() => { api.scorecard(30).then(setData).catch(console.error); }, []);
 
-  if (!data) return <div className="p-8 text-muted">Loading…</div>;
+  // Loading state with proper skeleton — replaces the literal "Loading…" text
+  // that search-engine + social-card crawlers were getting in SSR.
+  if (!data) {
+    return (
+      <main className="min-h-screen">
+        <MarketingNav />
+        <div className="mx-auto max-w-5xl px-6 py-10">
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="mt-4 h-4 w-full max-w-xl" />
+          <div className="mt-8 grid gap-4 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-20" />
+            ))}
+          </div>
+          <div className="mt-8 space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </div>
+        <MarketingFooter />
+      </main>
+    );
+  }
 
   const dates = Object.keys(data.days).sort().reverse();
 
@@ -40,12 +64,22 @@ export default function ScorecardPage() {
         No cherry-picking, no survivor bias &mdash; this is the full public record.
       </p>
 
+      {/* Early-launch banner — when we have picks logged but next-day prices
+          haven't been back-checked yet. Avoids the dashes-everywhere look
+          and explains the timeline honestly. */}
+      {data.summary.days_tracked > 0 && data.summary.entries_scored === 0 && (
+        <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-sm text-accent">
+          <strong>Scorecard is live but the back-check is pending.</strong>{" "}
+          <span className="text-muted">We&rsquo;ve logged {data.summary.days_tracked} day&rsquo;s top-10 picks; the next-day-vs-SPY performance fills in 24 hours after each market close. Check back tomorrow for the first complete row.</span>
+        </div>
+      )}
+
       {/* Summary stats */}
       <div className="mt-8 grid gap-4 sm:grid-cols-4">
         <Stat label="Days tracked" value={String(data.summary.days_tracked)} />
-        <Stat label="Avg 1D return" value={data.summary.avg_1d_return != null ? `${data.summary.avg_1d_return.toFixed(2)}%` : "—"} tone={data.summary.avg_1d_return != null ? (data.summary.avg_1d_return > 0 ? "up" : "down") : undefined} />
-        <Stat label="Avg alpha vs SPY" value={data.summary.avg_alpha_vs_spy != null ? `${data.summary.avg_alpha_vs_spy.toFixed(2)}%` : "—"} tone={data.summary.avg_alpha_vs_spy != null ? (data.summary.avg_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
-        <Stat label="Beat SPY rate" value={data.summary.hit_rate_beat_spy != null ? `${data.summary.hit_rate_beat_spy.toFixed(0)}%` : "—"} />
+        <Stat label="Avg 1D return" value={data.summary.avg_1d_return != null ? `${data.summary.avg_1d_return.toFixed(2)}%` : "pending"} tone={data.summary.avg_1d_return != null ? (data.summary.avg_1d_return > 0 ? "up" : "down") : undefined} />
+        <Stat label="Avg alpha vs SPY" value={data.summary.avg_alpha_vs_spy != null ? `${data.summary.avg_alpha_vs_spy.toFixed(2)}%` : "pending"} tone={data.summary.avg_alpha_vs_spy != null ? (data.summary.avg_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
+        <Stat label="Beat SPY rate" value={data.summary.hit_rate_beat_spy != null ? `${data.summary.hit_rate_beat_spy.toFixed(0)}%` : "pending"} />
       </div>
 
       {dates.length === 0 ? (
