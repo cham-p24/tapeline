@@ -2,7 +2,7 @@
 
 **A live quantitative market scanner for retail traders.**
 
-Tapeline surfaces high-conviction technical and fundamental signals across US equities, ETFs, and crypto. It scores ~1,000 tickers every minute during market hours, detects Bollinger Band squeezes and volume expansions, tracks Congressional trades and institutional flows, and classifies the overall market regime.
+Tapeline surfaces high-conviction technical and fundamental signals across US equities, ETFs, and crypto. It scores ~2,500 tickers every minute during market hours, detects Bollinger Band squeezes and volume expansions, tracks Congressional trades and institutional flows, and classifies the overall market regime.
 
 Built on the same engine that powers a production personal trading bot.
 
@@ -48,7 +48,7 @@ Built on the same engine that powers a production personal trading bot.
 
 ## Product tabs (v1)
 
-1. **📡 Scanner** — ~1,000 tickers, composite score, filters, sort
+1. **📡 Scanner** — ~2,500 tickers, composite score, filters, sort
 2. **🔥 Squeeze Watch** — BB squeeze days, volume expansion, OBV trend, suggested window
 3. **🌊 Market Regime** — current regime, VIX, DXY, 10Y, rate direction, sector leaders
 4. **🏛️ Congress Trades** — recent politician buys/sells aggregated by ticker

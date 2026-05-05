@@ -11,6 +11,11 @@ Rule types:
 - regime:   fires when market regime matches rule.symbol (e.g. "BEAR")
 - congress: fires when a new congress trade is disclosed for rule.symbol
             (or any ticker if rule.symbol is None)
+- news:     fires when a fresh article mentions rule.symbol. If rule.threshold
+            is set and the article has scored sentiment, only fires when
+            sentiment >= threshold (so positive-news-only rules are possible).
+            When sentiment is null (real Polygon data on the cheap tier
+            doesn't carry sentiment) the rule fires on any new article.
 """
 from __future__ import annotations
 
@@ -24,6 +29,7 @@ from app.models import (
     AlertEvent,
     AlertRule,
     CongressTrade,
+    NewsItem,
     RegimeState,
     SqueezeSetup,
     Ticker,
@@ -40,6 +46,11 @@ MIN_FIRE_INTERVAL = timedelta(minutes=15)
 # in the last hour (prevents re-firing on the entire backlog every tick)
 CONGRESS_FRESHNESS = timedelta(hours=1)
 
+# Look-back for "fresh" news articles when a rule has never fired before.
+# After first fire, subsequent ticks compare to last_fired_at directly so
+# we never re-fire on the same article.
+NEWS_FRESHNESS = timedelta(hours=1)
+
 
 async def evaluate_all_rules(session: AsyncSession) -> int:
     """Run every rule-type evaluator. Returns total alerts fired this tick."""
@@ -48,6 +59,7 @@ async def evaluate_all_rules(session: AsyncSession) -> int:
     fired += await evaluate_squeeze_rules(session)
     fired += await evaluate_regime_rules(session)
     fired += await evaluate_congress_rules(session)
+    fired += await evaluate_news_rules(session)
     return fired
 
 
@@ -143,6 +155,81 @@ async def evaluate_regime_rules(session: AsyncSession) -> int:
             )
             await _fire(session, rule, user, "MARKET", msg, score=0)
             fired += 1
+
+    if fired:
+        await session.commit()
+    return fired
+
+
+async def evaluate_news_rules(session: AsyncSession) -> int:
+    """Fire when a fresh article mentions rule.symbol.
+
+    Threshold semantics: if rule.threshold is set AND the article has a
+    sentiment score, the rule fires only when sentiment >= threshold. If
+    sentiment is None (typical on Polygon's cheaper tiers — only Developer+
+    populates the sentiment field) the threshold check is skipped so users
+    still get notified on any new article. This keeps the feature useful
+    today, while letting paying users tighten the rule once we move to a
+    sentiment-bearing data tier.
+
+    Symbol filter: rule.symbol is required for news rules (no "any ticker"
+    mode — the volume of news firehose makes that useless). Comma-separated
+    `tickers` column is matched via LIKE on `,SYMBOL,` with a wrapped
+    sentinel so we don't false-match `BAC` against `,BABA,`.
+    """
+    now = datetime.now(UTC)
+    rules = await _enabled_rules(session, "news")
+    if not rules:
+        return 0
+
+    fired = 0
+    for rule, user in rules:
+        if _debounced(rule, now):
+            continue
+        if not rule.symbol:
+            continue  # news rules need a target symbol
+        sym = rule.symbol.upper()
+
+        # First-fire window: NEWS_FRESHNESS. Subsequent fires: since last
+        # fire (so we never re-fire the same article).
+        cutoff = rule.last_fired_at if rule.last_fired_at else now - NEWS_FRESHNESS
+        # NewsItem.tickers is a comma-separated string; wrap in sentinels for
+        # exact-match LIKE without false-matching e.g. "BABA" when looking for "BAC".
+        like_pattern = f"%,{sym},%"
+        # Stored values aren't sentinel-wrapped; we wrap at query time using
+        # `("," || tickers || ",")` so the LIKE works dialect-agnostically.
+        from sqlalchemy import literal_column
+
+        wrapped = literal_column("(',' || tickers || ',')")
+        q = (
+            select(NewsItem)
+            .where(NewsItem.published_at > cutoff)
+            .where(wrapped.like(like_pattern))
+            .order_by(desc(NewsItem.published_at))
+            .limit(5)
+        )
+        articles_r = await session.execute(q)
+        articles = articles_r.scalars().all()
+        if not articles:
+            continue
+
+        # Pick the first article passing the sentiment gate (or any if no gate).
+        chosen = None
+        for art in articles:
+            if rule.threshold is not None and art.sentiment is not None:
+                if art.sentiment < rule.threshold:
+                    continue
+            chosen = art
+            break
+        if chosen is None:
+            continue
+
+        sent_str = (
+            f" sentiment {chosen.sentiment:+.2f}" if chosen.sentiment is not None else ""
+        )
+        msg = f"{sym} news: {chosen.title} ({chosen.publisher}{sent_str})"
+        await _fire(session, rule, user, sym, msg, score=0)
+        fired += 1
 
     if fired:
         await session.commit()

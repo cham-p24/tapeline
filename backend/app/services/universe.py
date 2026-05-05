@@ -26,11 +26,15 @@ from typing import List, Tuple
 logger = logging.getLogger(__name__)
 
 # Default size of the active scoring universe. Tunable via the env var
-# ACTIVE_UNIVERSE_SIZE (read at module import). The daily-refresh caps
-# in signal_publisher (fundamentals=500, insider=500, aggregates=1000)
-# already accommodate up to 1000 active names without rate-limit pressure.
+# ACTIVE_UNIVERSE_SIZE (read at module import). 2,500 covers everything
+# liquid down to mid-/small-cap territory; below that the bid-ask spreads
+# make any score non-actionable.
+#
+# Finnhub fundamentals refresh on the free tier (60 calls/min) takes
+# ~42 minutes for 2,500 names — well under the daily refresh cycle.
+# Bump to 5,000 needs paid Finnhub or a cached-fundamentals approach.
 import os as _os
-ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "1000"))
+ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "2500"))
 
 # Module-level cache of (symbol, name, sector) tuples.
 _active_universe: List[Tuple[str, str, str]] = []

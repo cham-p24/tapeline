@@ -16,7 +16,7 @@ router = APIRouter()
 
 class AlertRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=80)
-    rule_type: str = Field(..., pattern="^(score|squeeze|regime|congress)$")
+    rule_type: str = Field(..., pattern="^(score|squeeze|regime|congress|news)$")
     symbol: str | None = Field(None, max_length=20)
     threshold: float | None = None
     channel: str = Field("email", pattern="^(email|telegram|web_push)$")

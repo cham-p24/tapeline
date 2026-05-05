@@ -64,9 +64,9 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Universe size",
-    tapeline: "~1,000 actively scored (top by $-volume) · 5,757 tracked",
+    tapeline: "~2,500 actively scored (top by $-volume) · 5,757 tracked",
     competitor: "9,000+ including OTC + penny stocks",
-    note: "Finviz indexes everything including OTC + sub-$1 stocks; you filter manually. Tapeline scores the top ~1,000 by daily dollar-volume — the cutoff lands around the bottom of the S&P MidCap 400. Below that, bid-ask spreads make a high score on a $0.20 stock with 80K shares/day non-actionable. The other ~4,700 names in our universe are tracked for watchlist + news + per-ticker pages, just not actively scored.",
+    note: "Finviz indexes everything including OTC + sub-$1 stocks; you filter manually. Tapeline scores the top ~2,500 by daily dollar-volume — covers everything liquid down to small-caps. Below that, bid-ask spreads make a high score on a $0.20 stock with 80K shares/day non-actionable. The other ~3,200 names in our universe are tracked for watchlist + news + per-ticker pages, just not actively scored.",
   },
   {
     label: "Number of raw filters",

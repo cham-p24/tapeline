@@ -238,4 +238,13 @@ export const api = {
     vote: (item_slug: string) => post<{ ok: boolean; duplicate?: boolean }>("/api/roadmap/vote", { item_slug }, DEV_TOKEN),
     unvote: (item_slug: string) => del<{ ok: boolean }>(`/api/roadmap/vote?item_slug=${encodeURIComponent(item_slug)}`, DEV_TOKEN),
   },
+  alertRuleCreate: (body: {
+    name: string;
+    rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
+    symbol?: string | null;
+    threshold?: number | null;
+    channel?: "email" | "telegram" | "web_push";
+  }) => post<{ id: number; rule_type: string; symbol: string | null }>(
+    "/api/alerts/rules", body, DEV_TOKEN,
+  ),
 };

@@ -14,6 +14,8 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addMsg, setAddMsg] = useState<string | null>(null);
+  const [newsAlerting, setNewsAlerting] = useState(false);
+  const [newsAlertMsg, setNewsAlertMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setData(await api.ticker(symbol)); setError(null); }
@@ -35,6 +37,30 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
       setAddMsg(e.message?.includes("409") ? "Already in watchlist" : `Failed: ${e.message}`);
     }
     setAdding(false);
+  }
+
+  async function subscribeNews() {
+    setNewsAlerting(true);
+    setNewsAlertMsg(null);
+    try {
+      await api.alertRuleCreate({
+        name: `News on ${symbol}`,
+        rule_type: "news",
+        symbol,
+        // No threshold — we want every fresh article. Users can later edit
+        // the rule on /app/alerts to require sentiment >= 0.3 etc.
+        threshold: null,
+        channel: "email",
+      });
+      setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
+    } catch (e: any) {
+      const m = String(e.message || e);
+      // Friendly messages for the obvious cases:
+      if (m.includes("403")) setNewsAlertMsg("Pro plan required for email alerts");
+      else if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
+      else setNewsAlertMsg(`Failed: ${m}`);
+    }
+    setNewsAlerting(false);
   }
 
   if (error) return <div className="card p-8 text-down">Error: {error}</div>;
@@ -117,6 +143,15 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
             {adding ? "Adding…" : "★ Add to watchlist"}
           </button>
           {addMsg && <p className="mt-2 text-xs text-muted">{addMsg}</p>}
+          <button
+            onClick={subscribeNews}
+            disabled={newsAlerting}
+            className="btn-ghost mt-2 w-full text-sm"
+            title="Email me whenever a fresh article mentions this ticker"
+          >
+            {newsAlerting ? "Subscribing…" : "📰 Notify me on news"}
+          </button>
+          {newsAlertMsg && <p className="mt-2 text-xs text-muted">{newsAlertMsg}</p>}
         </div>
       </div>
 

@@ -202,7 +202,7 @@ export default function BillingPage() {
             <>
               <div className="mt-2 text-2xl font-bold nums">$0 <span className="text-sm font-normal text-muted">today</span></div>
               <ul className="mt-3 space-y-1 text-xs text-muted">
-                <li>· Full 1,000-ticker live universe</li>
+                <li>· Full 2,500-ticker live universe</li>
                 <li>· Watchlist of 200 with smart alerts</li>
                 <li>· Congressional trades + 13F holdings</li>
                 <li>· Telegram + SMS alerts unlimited</li>
@@ -246,7 +246,7 @@ export default function BillingPage() {
           />
           <UsageTile
             label="Scanner rows"
-            limit={tier === "free" ? 20 : 1000}
+            limit={tier === "free" ? 20 : 2500}
             unit="rows"
           />
         </div>
@@ -297,7 +297,7 @@ export default function BillingPage() {
               price={billingPeriod === "annual" ? "$24.99" : "$29"}
               note={billingPeriod === "annual" ? "$299/yr · billed annually · save $49" : "billed monthly"}
               items={[
-                "Full ~1,000 ticker universe, live",
+                "Full ~2,500 ticker universe, live",
                 "Score breakdown + Why on every row",
                 "Squeeze Watch + Regime + Heatmap",
                 "Watchlist (50) with smart alerts",

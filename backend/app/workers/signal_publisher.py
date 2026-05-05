@@ -484,13 +484,13 @@ async def _refresh_fundamentals_cache() -> None:
     per tick (instead of random mock).
 
     LIQUIDITY CAP: Massive auto-discovers ~5700 tickers including thousands
-    of sub-$1 micro-caps no real user looks at. Refreshing all of them at
-    Finnhub's free-tier 60-calls/min would take ~95 minutes — long enough
-    to overlap with the next 24h cycle. We cap at the top FUNDAMENTALS_CAP
-    by `volume × price` (rough $-volume liquidity proxy) so the refresh
-    completes in ~9 minutes and the next-day cycle has clean state.
+    of sub-$1 micro-caps no real user looks at. Cap matches the active
+    scoring universe (2,500) so every ticker we score has fresh
+    fundamentals — refresh takes ~42 min on Finnhub free tier (60/min),
+    well inside the 24h cycle.
     """
-    FUNDAMENTALS_CAP = 500
+    from app.services.universe import ACTIVE_UNIVERSE_SIZE
+    FUNDAMENTALS_CAP = ACTIVE_UNIVERSE_SIZE
 
     from sqlalchemy import desc
 
@@ -574,9 +574,11 @@ async def _refresh_aggregates_cache() -> None:
     # Same liquidity cap as the Finnhub refreshes — Massive Stocks Starter
     # IS unlimited on call volume, but iterating 5700 tickers at 0.3s each
     # is still ~28 minutes of background work that we don't need to do for
-    # micro-caps no scanner user filters into. Top 1000 by $-volume catches
-    # everyone real users actually scan.
-    AGGREGATES_CAP = 1000
+    # micro-caps no scanner user filters into. Cap matches the active
+    # scoring universe (2,500) — ~12 min refresh, every scored ticker
+    # has real OHLC-derived trend/RS/momentum sub-scores.
+    from app.services.universe import ACTIVE_UNIVERSE_SIZE
+    AGGREGATES_CAP = ACTIVE_UNIVERSE_SIZE
 
     from sqlalchemy import desc as _desc
 
@@ -619,11 +621,11 @@ async def _refresh_insider_cache() -> None:
     top-liquidity slice. Populates _SMART_MONEY_SCORE_CACHE so polygon_feed
     reads real values per tick instead of random mock for sub_smart_money.
 
-    Same liquidity cap as fundamentals — without it, Massive's auto-discovered
-    5700-ticker universe would take ~95 min through Finnhub's 60-calls/min
-    free tier, blocking the next-day cycle.
+    Same liquidity cap as fundamentals — matches active scoring universe
+    (2,500) so every scored ticker has fresh insider transactions data.
     """
-    INSIDER_CAP = 500
+    from app.services.universe import ACTIVE_UNIVERSE_SIZE
+    INSIDER_CAP = ACTIVE_UNIVERSE_SIZE
 
     from sqlalchemy import desc
 

@@ -23,7 +23,7 @@ const ITEMS: RoadmapItem[] = [
 
   // IN PROGRESS
   { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Smooth one-click upgrade from trial to paid via Stripe Checkout.",                       status: "in_progress" },
-  { slug: "universe-expansion",     title: "1,000-ticker active scoring",  detail: "Score the top 1,000 names by daily $-volume — the cutoff lands around the bottom of the S&P MidCap 400.", status: "shipped" },
+  { slug: "universe-expansion",     title: "2,500-ticker active scoring",  detail: "Score the top 2,500 names by daily $-volume — covers everything liquid down to small-caps.", status: "shipped" },
 
   // NEXT
   { slug: "fundamentals-in-score",  title: "Fundamentals fully in the composite score", detail: "Earnings revisions, margin trends, valuation ratios moving the score per ticker, per tick.", status: "next" },

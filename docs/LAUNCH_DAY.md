@@ -186,7 +186,7 @@ Once you have ~50 signups and a few payments through Stripe:
 
 ```
 Health           status=ok · tick consistently <30s · all integrations green except Stripe
-Universe         5,757 tickers in DB · ~1,000 actively scored (top by $-volume) · /api/public/top-tickers seeds sitemap
+Universe         5,757 tickers in DB · ~2,500 actively scored (top by $-volume) · /api/public/top-tickers seeds sitemap
 Tests            14 backend + 17 frontend, all green
 Sitemap          132+ URLs · all per-page OG cards rendering · JSON-LD on every page
 Security         HSTS 2yr+preload · X-Frame DENY · Sentry env-gated · client-error endpoint live

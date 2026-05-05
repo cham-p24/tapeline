@@ -24,7 +24,7 @@ const PLANS = [
     tagline: "Live scanner. Daily edge.",
     prices: { monthly: 29, annual: 299 },
     highlights: [
-      "Full ~1,000 ticker universe, live",
+      "Full ~2,500 ticker universe, live",
       "Score + plain-English Why on every row",
       "Squeeze Watch · Regime · Heatmap",
       "IPOs · Earnings · News calendars",
