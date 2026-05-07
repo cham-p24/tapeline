@@ -216,9 +216,12 @@ async def evaluate_news_rules(session: AsyncSession) -> int:
         # Pick the first article passing the sentiment gate (or any if no gate).
         chosen = None
         for art in articles:
-            if rule.threshold is not None and art.sentiment is not None:
-                if art.sentiment < rule.threshold:
-                    continue
+            if (
+                rule.threshold is not None
+                and art.sentiment is not None
+                and art.sentiment < rule.threshold
+            ):
+                continue
             chosen = art
             break
         if chosen is None:

@@ -120,7 +120,7 @@ def compute_fear_greed(
         + 0.20 * regime_score
         + 0.15 * spy_score
     )
-    score = int(round(_clamp(composite)))
+    score = round(_clamp(composite))
     label, color = label_for(score)
 
     return {

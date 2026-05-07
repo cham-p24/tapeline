@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +33,11 @@ logger = logging.getLogger(__name__)
 # ~42 minutes for 2,500 names — well under the daily refresh cycle.
 # Bump to 5,000 needs paid Finnhub or a cached-fundamentals approach.
 import os as _os
+
 ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "2500"))
 
 # Module-level cache of (symbol, name, sector) tuples.
-_active_universe: List[Tuple[str, str, str]] = []
+_active_universe: list[tuple[str, str, str]] = []
 _refreshed_at: float = 0.0
 
 
@@ -75,7 +75,7 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
                 .order_by(desc(Ticker.volume * Ticker.price))
                 .limit(size)
             )
-            rows: list[Tuple[str, str, str]] = [
+            rows: list[tuple[str, str, str]] = [
                 (row[0], row[1] or row[0], row[2] or "Unknown")
                 for row in r.all()
                 if row[0]
@@ -93,7 +93,7 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
     return len(_active_universe)
 
 
-def active_universe() -> List[Tuple[str, str, str]]:
+def active_universe() -> list[tuple[str, str, str]]:
     """Sync getter. Returns the cached active universe, or the hardcoded
     fallback if the cache is empty (first call before any refresh).
     """

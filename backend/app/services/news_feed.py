@@ -57,12 +57,9 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
     """
     # Benzinga first — better wire speed + richer ticker tagging.
     try:
-        from app.services.benzinga_feed import (
-            fetch_news_for_ticker as bz_fetch,
-            is_configured as bz_ready,
-        )
-        if bz_ready():
-            rows = await bz_fetch(symbol, limit)
+        from app.services import benzinga_feed as bz
+        if bz.is_configured():
+            rows = await bz.fetch_news_for_ticker(symbol, limit)
             if rows:
                 return rows
     except Exception:
@@ -82,12 +79,9 @@ async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
     """Get recent news across the universe."""
     # Benzinga first.
     try:
-        from app.services.benzinga_feed import (
-            fetch_latest_news as bz_latest,
-            is_configured as bz_ready,
-        )
-        if bz_ready():
-            rows = await bz_latest(limit)
+        from app.services import benzinga_feed as bz
+        if bz.is_configured():
+            rows = await bz.fetch_latest_news(limit)
             if rows:
                 return rows
     except Exception:

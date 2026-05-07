@@ -47,7 +47,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
 
@@ -140,11 +140,11 @@ def _normalise(a: dict[str, Any]) -> dict[str, Any]:
     # default to UTC.
     created_raw = a.get("created") or a.get("published") or ""
     try:
-        published = parsedate_to_datetime(created_raw) if created_raw else datetime.now(timezone.utc)
+        published = parsedate_to_datetime(created_raw) if created_raw else datetime.now(UTC)
         if published.tzinfo is None:
-            published = published.replace(tzinfo=timezone.utc)
+            published = published.replace(tzinfo=UTC)
     except (TypeError, ValueError):
-        published = datetime.now(timezone.utc)
+        published = datetime.now(UTC)
 
     # `stocks` and `tickers` are both used across Benzinga product variants.
     raw_syms = a.get("stocks") or a.get("tickers") or []
@@ -272,7 +272,7 @@ async def fetch_analyst_ratings(symbol: str, days_back: int = 180) -> dict[str, 
         if cached and (time.monotonic() - cached[0]) < _RATINGS_TTL_SECONDS:
             return cached[1]
 
-        date_to = datetime.now(timezone.utc).date()
+        date_to = datetime.now(UTC).date()
         date_from = date_to - timedelta(days=days_back)
         params: dict[str, Any] = {
             "token": _api_key(),

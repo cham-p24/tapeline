@@ -22,6 +22,8 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
+type FactorEntry = { value: number | null; weight: number; label: string };
+
 type TickerData = {
   symbol: string;
   name: string;
@@ -36,12 +38,17 @@ type TickerData = {
   change_pct_1m: number | null;
   volume: number | null;
   reason: string | null;
-  sub_trend?: number | null;
-  sub_rs?: number | null;
-  sub_fundamentals?: number | null;
-  sub_smart_money?: number | null;
-  sub_macro?: number | null;
-  sub_momentum?: number | null;
+  // The /api/ticker/{symbol} endpoint returns sub-factor values nested
+  // inside `breakdown.<key>.value`, NOT as top-level sub_* fields. The
+  // page initially assumed the flat shape and rendered every bar at 0%.
+  breakdown?: {
+    trend?: FactorEntry;
+    rs?: FactorEntry;
+    fundamentals?: FactorEntry;
+    smart_money?: FactorEntry;
+    macro?: FactorEntry;
+    momentum?: FactorEntry;
+  };
 };
 
 async function fetchTicker(symbol: string): Promise<TickerData | null> {
@@ -109,13 +116,14 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
   const scoreColor =
     score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-yellow-400" : "text-down";
 
+  const b = data.breakdown ?? {};
   const factors: { label: string; value: number | null | undefined; weight: number }[] = [
-    { label: "Trend",              value: data.sub_trend,        weight: 25 },
-    { label: "Relative strength",  value: data.sub_rs,           weight: 20 },
-    { label: "Fundamentals",       value: data.sub_fundamentals, weight: 15 },
-    { label: "Smart money",        value: data.sub_smart_money,  weight: 15 },
-    { label: "Macro",              value: data.sub_macro,        weight: 15 },
-    { label: "Momentum",           value: data.sub_momentum,     weight: 10 },
+    { label: "Trend",              value: b.trend?.value,        weight: 25 },
+    { label: "Relative strength",  value: b.rs?.value,           weight: 20 },
+    { label: "Fundamentals",       value: b.fundamentals?.value, weight: 15 },
+    { label: "Smart money",        value: b.smart_money?.value,  weight: 15 },
+    { label: "Macro",              value: b.macro?.value,        weight: 15 },
+    { label: "Momentum",           value: b.momentum?.value,     weight: 10 },
   ];
 
   return (

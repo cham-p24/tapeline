@@ -23,7 +23,6 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict, deque
-from typing import Deque
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ def normalise_email(email: str) -> str:
 # Memory bound: an attacker can fill at most MAX_PER_IP_PER_24H * (number of
 # unique IPs) entries; in practice the deque self-prunes on each insert so
 # steady-state memory is tiny.
-_signup_log: dict[str, Deque[float]] = defaultdict(deque)
+_signup_log: dict[str, deque[float]] = defaultdict(deque)
 
 WINDOW_SECONDS = 24 * 60 * 60
 MAX_PER_IP_PER_24H = 3
