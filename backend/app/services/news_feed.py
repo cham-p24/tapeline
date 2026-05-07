@@ -1,11 +1,13 @@
 """
 News feed adapter.
 
-Production path: Polygon.io's /v2/reference/news endpoint (included with
-paid Polygon subscriptions, commercial redistribution permitted).
+Source preference (first non-empty wins):
 
-Dev path: synthesized headlines matched to the mock universe so the UI
-has something to render before a Polygon key exists.
+    1. Benzinga (BENZINGA_API_KEY)  — faster wire, better ticker tagging.
+    2. Massive / Polygon (MASSIVE_API_KEY or POLYGON_API_KEY) — included
+       with the data subscription we already pay for.
+    3. Mock — synthesised headlines so the UI has something to render
+       before either key exists. Cleared on first real fetch.
 """
 from __future__ import annotations
 
@@ -49,7 +51,23 @@ def _vendor_key() -> str:
 
 
 async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, Any]]:
-    """Get recent news items mentioning a specific symbol."""
+    """Get recent news items mentioning a specific symbol.
+
+    Prefers Benzinga; falls back to Polygon/Massive; mock-news as last resort.
+    """
+    # Benzinga first — better wire speed + richer ticker tagging.
+    try:
+        from app.services.benzinga_feed import (
+            fetch_news_for_ticker as bz_fetch,
+            is_configured as bz_ready,
+        )
+        if bz_ready():
+            rows = await bz_fetch(symbol, limit)
+            if rows:
+                return rows
+    except Exception:
+        logger.exception("news.benzinga_ticker_failed symbol=%s", symbol)
+
     if _vendor_key():
         try:
             rows = await _fetch_from_polygon([symbol], limit)
@@ -62,6 +80,19 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
 
 async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
     """Get recent news across the universe."""
+    # Benzinga first.
+    try:
+        from app.services.benzinga_feed import (
+            fetch_latest_news as bz_latest,
+            is_configured as bz_ready,
+        )
+        if bz_ready():
+            rows = await bz_latest(limit)
+            if rows:
+                return rows
+    except Exception:
+        logger.exception("news.benzinga_latest_failed")
+
     if _vendor_key():
         try:
             rows = await _fetch_from_polygon(None, limit)

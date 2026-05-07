@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     # Without a key, sub_fundamentals stays mock-random and calendars use mock_upcoming_*.
     finnhub_api_key: str = ""
 
+    # ---- Benzinga (premium news wire) ----
+    # Faster headlines + more complete ticker tagging than Polygon's free tier.
+    # When set, news_feed prefers Benzinga and falls back to Polygon on error.
+    # Without a key, news still works via Polygon/Massive — just slower / fewer
+    # ticker mentions per article.
+    benzinga_api_key: str = ""
+
     # ---- Bot protection (Cloudflare Turnstile, optional) ----
     # When secret key is unset, Turnstile verification passes through (dev mode).
     # Honeypot field + disposable-email block always run regardless.
