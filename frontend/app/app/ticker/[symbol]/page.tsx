@@ -7,6 +7,7 @@ import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { recordTickerVisit } from "@/components/RecentTickers";
+import { AnalystRatings } from "@/components/AnalystRatings";
 
 export default function TickerPage({ params }: { params: { symbol: string } }) {
   const symbol = params.symbol.toUpperCase();
@@ -196,6 +197,11 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
           </div>
         )}
       </div>
+
+      {/* Analyst ratings — Benzinga consensus + recent rating actions.
+          Lazy-loads after page paint so a slow Benzinga response doesn't
+          block the score and breakdown panels above. */}
+      <AnalystRatings symbol={data.symbol} currentPrice={data.price} />
 
       {/* TradingView chart embed */}
       <div className="mt-6 card p-4">

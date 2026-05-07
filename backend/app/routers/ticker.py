@@ -1,4 +1,9 @@
-"""GET /api/ticker/{symbol} — detailed single-ticker view with breakdown + news."""
+"""GET /api/ticker/{symbol} — detailed single-ticker view with breakdown + news.
+
+Also: GET /api/ticker/{symbol}/ratings — analyst ratings consensus + recent
+events from Benzinga. Lazy-loaded by the frontend so the main ticker page
+doesn't block on the upstream rating call.
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import NewsItem, SqueezeSetup, Ticker
+from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.news_feed import fetch_news_for_ticker
 
 router = APIRouter()
@@ -94,3 +100,15 @@ async def ticker_detail(
 class _DictNews:
     """Tiny adapter so live-fetched news items render through the same serializer."""
     def __init__(self, **kw): self.__dict__.update(kw)
+
+
+@router.get("/{symbol}/ratings")
+async def ticker_ratings(symbol: str) -> dict:
+    """Analyst ratings consensus + recent events for a ticker.
+
+    Lazy-loaded — the main ticker payload doesn't include this so the page
+    paints before the upstream Benzinga call completes. When Benzinga is
+    unconfigured or returns no coverage, the response shape stays the same
+    with an empty events list so the frontend renders a clean empty state.
+    """
+    return await fetch_analyst_ratings(symbol.upper())

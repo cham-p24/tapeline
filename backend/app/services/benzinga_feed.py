@@ -1,37 +1,53 @@
 """
-Benzinga news adapter.
+Benzinga adapter — news + analyst ratings.
 
-Benzinga's news API delivers wire copy faster than Polygon and tends to
-mention more tickers per article (Polygon often only tags primary tickers,
-Benzinga tags every cashtag mentioned in body). We prefer Benzinga as the
-primary news source when BENZINGA_API_KEY is set, falling back to Polygon
-(via news_feed.py) on error.
+Two products in one file:
+    - News (`/api/v2/news`) preferred over Polygon for the live news bar
+      and per-ticker headlines: faster wire, richer cashtag tagging.
+    - Analyst ratings (`/api/v2.1/calendar/ratings`) powers the per-ticker
+      consensus widget. Tapeline does not factor ratings into the
+      6-factor score — they're displayed alongside it as a complement.
 
-Auth: query-param `token=...`. Endpoint:
-    https://api.benzinga.com/api/v2/news
+Auth: query-param `token=...` for both endpoints.
 
-Response items expose:
+News response items:
     {
         "id": 12345,
         "title": "...",
         "author": "...",
         "created": "Tue, 06 May 2026 14:23:11 -0400",
-        "updated": "...",
         "url": "https://www.benzinga.com/...",
         "stocks": [{"name": "AAPL"}, {"name": "MSFT"}],
-        "channels": [{"name": "Earnings"}],
         "teaser": "...",
         "body": "<p>...</p>",
     }
 
-Important: Benzinga's free tier doesn't carry sentiment scores. Articles
+Ratings response items (calendar.ratings):
+    {
+        "id": "...",
+        "date": "2026-05-07",
+        "ticker": "AAPL",
+        "action_company": "Goldman Sachs",   # firm
+        "analyst": "...",                    # analyst name (sometimes blank)
+        "rating_current": "Buy",
+        "rating_prior": "Hold",
+        "pt_current": "220.00",              # price target (string in API!)
+        "pt_prior": "195.00",
+        "action_pt": "Raises",               # Maintains | Raises | Lowers | Announces
+        "action_company": "Goldman Sachs",
+        "url": "https://...",
+    }
+
+Important: Benzinga's free tier doesn't carry news sentiment. Articles
 return with sentiment=None and the news-alert evaluator falls through to
-"fire on any new article" semantics, same as Polygon's cheap tier.
+"fire on any new article" semantics.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 
@@ -43,8 +59,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 _BASE_URL = "https://api.benzinga.com/api/v2/news"
+_RATINGS_URL = "https://api.benzinga.com/api/v2.1/calendar/ratings"
 # Conservative timeout — Benzinga is generally <500ms but flaky during NYSE open.
 _TIMEOUT_SECONDS = 12.0
+
+# In-memory ratings cache. Ratings refresh in trickle (a few per ticker per
+# week max), so a 6-hour TTL is plenty and keeps us well under any rate cap.
+_RATINGS_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_RATINGS_TTL_SECONDS = 6 * 60 * 60
+_RATINGS_LOCK = asyncio.Lock()
 
 
 def _api_key() -> str:
@@ -145,4 +168,196 @@ def _normalise(a: dict[str, Any]) -> dict[str, Any]:
         "description": a.get("teaser"),
         "tickers": tickers_str,
         "sentiment": None,  # not in the base news endpoint
+    }
+
+
+# ---------------------------------------------------------------------------
+# Analyst ratings
+# ---------------------------------------------------------------------------
+
+# Map Benzinga's free-text ratings (which vary per firm — Buy / Outperform /
+# Overweight / Strong Buy / Long-term Buy / Top Pick / ...) onto a small set
+# of buckets used for the consensus tally on the widget.
+_BULL_TOKENS = {
+    "buy", "strong buy", "outperform", "overweight", "long-term buy",
+    "positive", "top pick", "accumulate", "add", "conviction buy", "market outperform",
+}
+_BEAR_TOKENS = {
+    "sell", "strong sell", "underperform", "underweight", "negative",
+    "reduce", "market underperform",
+}
+_NEUTRAL_TOKENS = {
+    "hold", "neutral", "market perform", "in-line", "equal-weight",
+    "sector perform", "peer perform", "perform",
+}
+
+
+def _bucket(label: str | None) -> str:
+    """Bucket a free-text rating string into bull / bear / neutral."""
+    if not label:
+        return "neutral"
+    s = label.strip().lower()
+    if s in _BULL_TOKENS:
+        return "bull"
+    if s in _BEAR_TOKENS:
+        return "bear"
+    if s in _NEUTRAL_TOKENS:
+        return "neutral"
+    # Fall back to a contains-check so brokerage-specific phrasing
+    # ("Buy with caution", "Long-Term Buy") still bucket sensibly.
+    if any(tok in s for tok in ("buy", "outperform", "overweight", "positive", "accumulate")):
+        return "bull"
+    if any(tok in s for tok in ("sell", "underperform", "underweight", "negative", "reduce")):
+        return "bear"
+    return "neutral"
+
+
+def _parse_pt(raw: Any) -> float | None:
+    """Benzinga returns price targets as strings ("220.00") or empty strings."""
+    if raw is None:
+        return None
+    try:
+        s = str(raw).strip()
+        if not s:
+            return None
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+async def fetch_analyst_ratings(symbol: str, days_back: int = 180) -> dict[str, Any]:
+    """Recent analyst ratings + consensus summary for a ticker.
+
+    Returns:
+        {
+          "symbol": "AAPL",
+          "consensus": {"bull": 8, "bear": 1, "neutral": 3, "total": 12},
+          "avg_pt": 220.50,           # average of recent price targets, or None
+          "avg_pt_upside_pct": 12.3,  # % above current price, computed by caller
+          "events": [                 # most recent N rating actions
+            {
+              "date": "2026-05-07",
+              "firm": "Goldman Sachs",
+              "analyst": "...",
+              "action_pt": "Raises",
+              "rating_current": "Buy",
+              "rating_prior": "Hold",
+              "pt_current": 220.0,
+              "pt_prior": 195.0,
+              "url": "...",
+            },
+            ...
+          ],
+          "source": "benzinga" | "empty",
+        }
+
+    Empty/no-coverage tickers return an empty consensus + empty events list,
+    not an error — many small-caps have zero analyst coverage and that's fine.
+    """
+    symbol = (symbol or "").upper()
+    if not symbol:
+        return _empty_ratings(symbol)
+    if not is_configured():
+        return _empty_ratings(symbol)
+
+    # Cache hit?
+    cached = _RATINGS_CACHE.get(symbol)
+    if cached and (time.monotonic() - cached[0]) < _RATINGS_TTL_SECONDS:
+        return cached[1]
+
+    # Single-flight lock so a stampede of concurrent requests for a hot
+    # ticker (NVDA, TSLA on a movement day) only fires one upstream call.
+    async with _RATINGS_LOCK:
+        cached = _RATINGS_CACHE.get(symbol)
+        if cached and (time.monotonic() - cached[0]) < _RATINGS_TTL_SECONDS:
+            return cached[1]
+
+        date_to = datetime.now(timezone.utc).date()
+        date_from = date_to - timedelta(days=days_back)
+        params: dict[str, Any] = {
+            "token": _api_key(),
+            "parameters[tickers]": symbol,
+            "parameters[date_from]": date_from.isoformat(),
+            "parameters[date_to]": date_to.isoformat(),
+            "pagesize": 100,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as c:
+                r = await c.get(_RATINGS_URL, params=params, headers={"Accept": "application/json"})
+                r.raise_for_status()
+                body = r.json()
+        except Exception:
+            logger.exception("benzinga.ratings_fetch_failed symbol=%s", symbol)
+            return _empty_ratings(symbol)
+
+        # Response is either {"ratings": [...]} or a top-level list.
+        raw_items = body.get("ratings") if isinstance(body, dict) else body
+        if not isinstance(raw_items, list):
+            raw_items = []
+
+        events: list[dict[str, Any]] = []
+        consensus = {"bull": 0, "bear": 0, "neutral": 0, "total": 0}
+        pt_values: list[float] = []
+
+        # Benzinga returns most-recent first; we keep that order.
+        # Track per-firm latest opinion so the consensus tally counts each
+        # firm once (the most recent action), not every rating change ever.
+        latest_per_firm: dict[str, str] = {}
+        latest_pt_per_firm: dict[str, float] = {}
+
+        for raw in raw_items:
+            try:
+                event = _normalise_rating(raw)
+            except Exception:
+                logger.exception("benzinga.rating_parse_failed id=%s", (raw or {}).get("id"))
+                continue
+
+            firm = event["firm"] or "(unknown)"
+            # First-seen-wins because the list is sorted desc → it's the latest.
+            if firm not in latest_per_firm:
+                latest_per_firm[firm] = _bucket(event["rating_current"])
+                pt = event["pt_current"]
+                if pt is not None:
+                    latest_pt_per_firm[firm] = pt
+            events.append(event)
+
+        for bucket in latest_per_firm.values():
+            consensus[bucket] += 1
+        consensus["total"] = sum(consensus[k] for k in ("bull", "bear", "neutral"))
+        pt_values = list(latest_pt_per_firm.values())
+        avg_pt = round(sum(pt_values) / len(pt_values), 2) if pt_values else None
+
+        result = {
+            "symbol": symbol,
+            "consensus": consensus,
+            "avg_pt": avg_pt,
+            "events": events[:20],  # cap at 20 most-recent for the widget
+            "source": "benzinga" if events else "empty",
+        }
+        _RATINGS_CACHE[symbol] = (time.monotonic(), result)
+        return result
+
+
+def _normalise_rating(raw: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "date": str(raw.get("date") or ""),
+        "firm": (raw.get("action_company") or raw.get("company") or "").strip() or None,
+        "analyst": (raw.get("analyst") or "").strip() or None,
+        "action_pt": (raw.get("action_pt") or "").strip() or None,
+        "rating_current": (raw.get("rating_current") or "").strip() or None,
+        "rating_prior": (raw.get("rating_prior") or "").strip() or None,
+        "pt_current": _parse_pt(raw.get("pt_current")),
+        "pt_prior": _parse_pt(raw.get("pt_prior")),
+        "url": raw.get("url") or raw.get("url_news") or None,
+    }
+
+
+def _empty_ratings(symbol: str) -> dict[str, Any]:
+    return {
+        "symbol": symbol,
+        "consensus": {"bull": 0, "bear": 0, "neutral": 0, "total": 0},
+        "avg_pt": None,
+        "events": [],
+        "source": "empty",
     }

@@ -74,6 +74,23 @@ Three application-level layers (Cloudflare Bot Fight Mode is the recommended fre
 
 Rate limit: `services/rate_limit.py` `limit_auth` caps `/api/auth/*` at 10 attempts per IP per minute (vs default 120 for /api/*).
 
+## Benzinga (news + analyst ratings)
+Wired 2026-05-08 with `BENZINGA_API_KEY` env var. Two products in one adapter
+(`services/benzinga_feed.py`):
+- **News** — when configured, `news_feed.py` prefers Benzinga over Massive
+  for the live news bar + per-ticker headlines. Faster wire, richer cashtag
+  tagging. Falls through to Massive on error so news never goes dark.
+- **Analyst ratings** — `fetch_analyst_ratings(symbol)` returns consensus
+  tally (Buy/Hold/Sell — bucketed via `_BULL_TOKENS`/`_BEAR_TOKENS` to
+  normalise across firm-specific phrasing), avg price target, and recent
+  rating events. Endpoint `/api/ticker/{symbol}/ratings`, lazy-loaded by the
+  `<AnalystRatings>` widget on the ticker page. 6h in-memory cache per symbol
+  with single-flight lock to avoid stampede on hot tickers. **Not factored
+  into the 6-factor score** — displayed alongside it as a complement.
+
+Without a key both features no-op cleanly: news falls back to Massive, the
+ratings widget renders a "No analyst coverage" empty state.
+
 ## Smart-money / 13F holdings
 Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer); 24h cache + multi-endpoint fallback. Worker task `_refresh_elite_13f` runs daily; falls back to `mock_elite_13f_holdings()` when no `QUIVER_API_KEY`. Endpoint `/api/holdings` (Premium-only via feature `holdings.elite`). Frontend page not yet built — use existing congress page pattern for `/app/holdings` when ready.
 

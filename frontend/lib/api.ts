@@ -137,6 +137,24 @@ export type Regime = {
   };
 };
 
+export type AnalystRatings = {
+  symbol: string;
+  consensus: { bull: number; bear: number; neutral: number; total: number };
+  avg_pt: number | null;
+  events: Array<{
+    date: string;
+    firm: string | null;
+    analyst: string | null;
+    action_pt: string | null;          // "Raises" | "Lowers" | "Maintains" | "Announces" | null
+    rating_current: string | null;
+    rating_prior: string | null;
+    pt_current: number | null;
+    pt_prior: number | null;
+    url: string | null;
+  }>;
+  source: "benzinga" | "empty";
+};
+
 export type CongressTrade = {
   id: number;
   politician: string;
@@ -215,6 +233,7 @@ export const api = {
   regime: () => get<Regime>("/api/regime"),
   congress: () => get<{ count: number; items: CongressTrade[] }>("/api/congress"),
   ticker: (symbol: string) => get<TickerDetail>(`/api/ticker/${symbol}`),
+  tickerRatings: (symbol: string) => get<AnalystRatings>(`/api/ticker/${symbol}/ratings`),
   news: (symbol?: string, limit = 20) => {
     const qs = new URLSearchParams({ limit: String(limit), ...(symbol ? { symbol } : {}) });
     return get<{ count: number; items: Array<{ id: string; title: string; publisher: string; published_at: string; url: string; description: string | null; tickers: string[]; sentiment: number | null }> }>(`/api/news?${qs}`);

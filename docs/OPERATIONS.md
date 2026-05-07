@@ -129,6 +129,26 @@ SMS on a high-frequency rule — every message is billed.
    to real data (or sooner if you nuke the cache: `rm backend/.cache/quiver_*.json`)
 5. Verify: `/app/holdings` should show real fund positions (Buffett, Burry, etc.)
 
+### Step 6a — Benzinga news + analyst ratings (~$30/mo, 10 minutes)
+
+Activates two features at once:
+- News feed swaps from Polygon/Massive (slow, sparse cashtags) to Benzinga
+  (sub-second wire, every cashtag tagged) for the live news bar + per-ticker headlines.
+- **NEW:** Analyst ratings widget on `/app/ticker/{symbol}` showing consensus
+  (Buy/Hold/Sell tally), average price target with upside vs. current price, and
+  recent rating actions (firm + prior → current + PT changes).
+
+1. Sign up at https://www.benzinga.com/apis (Newsfeed + Analyst Ratings tiers).
+2. Grab the API token (format `bz.XXX...`).
+3. Paste into `.env`: `BENZINGA_API_KEY=bz.XXX...`
+4. Push to production: `fly secrets set BENZINGA_API_KEY=bz.XXX... -a tapeline-api`
+5. Restart the worker locally (or Fly redeploys automatically). The next news
+   tick (~5 min) will pull from Benzinga; the ratings widget loads on first
+   ticker-page visit (cached 6h per symbol).
+
+Without a key, news still works via Massive and the ratings widget renders an
+empty state with a friendly note — no errors, nothing breaks.
+
 ### Step 7 — Google + Microsoft OAuth (Both free, 30 minutes total)
 
 **Google:**
