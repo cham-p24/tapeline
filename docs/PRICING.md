@@ -48,9 +48,9 @@ Tapeline Pro at $29 undercuts everyone in the live-scanner category. Premium at 
 
 ## Trial / conversion strategy
 
-- **14-day Pro trial, no credit card** — every new signup starts in Pro for 14 days
+- **14-day Premium trial, no credit card** — every new signup starts in Premium for 14 days
 - At day 14, prompts to add card OR drops to Free
-- Annual plans shown prominently on pricing page ("save $58")
+- Annual plans shown prominently on pricing page ("save $49 / $109")
 - Email drip: day 0 welcome, day 3 feature tour, day 7 trial reminder, day 13 trial ends tomorrow
 
 ## Unit economics (rough)

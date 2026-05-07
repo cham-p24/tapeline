@@ -205,7 +205,7 @@ export default function BillingPage() {
                 <li>· Full 2,500-ticker live universe</li>
                 <li>· Watchlist of 200 with smart alerts</li>
                 <li>· Congressional trades + 13F holdings</li>
-                <li>· Telegram + SMS alerts unlimited</li>
+                <li>· Telegram alerts unlimited</li>
               </ul>
             </>
           ) : (
