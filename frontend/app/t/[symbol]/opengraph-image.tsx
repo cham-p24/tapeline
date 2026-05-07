@@ -15,7 +15,7 @@ export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export const alt = "Tapeline score for this ticker";
+export const alt = "Tapeline Score for this ticker";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||

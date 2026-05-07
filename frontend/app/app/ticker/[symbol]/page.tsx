@@ -8,6 +8,7 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { recordTickerVisit } from "@/components/RecentTickers";
 import { AnalystRatings } from "@/components/AnalystRatings";
+import { ScoreRadial } from "@/components/ScoreRadial";
 
 export default function TickerPage({ params }: { params: { symbol: string } }) {
   const symbol = params.symbol.toUpperCase();
@@ -115,19 +116,35 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
 
       {/* Top row: score + signal + actions */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <div className="card p-5">
-          <div className="flex items-baseline justify-between">
-            <div className="text-xs uppercase text-muted">Composite score</div>
-            {data.confidence_pct != null && (
-              <span className={`text-xs nums ${confColor(data.confidence_pct)}`}
-                    title={confLabel(data.confidence_pct)}>
-                conf {data.confidence_pct.toFixed(0)}%
-              </span>
-            )}
-          </div>
-          <div className="mt-1 text-4xl font-bold">{data.score?.toFixed(1)}</div>
-          <div className={`mt-2 inline-block rounded px-2 py-0.5 text-xs ${toneSig}`}>
-            {data.signal}
+        <div className="card p-5 flex items-center gap-4">
+          {/* Inline radial — small visual signature next to the number,
+              showing the shape of the 6 sub-scores at a glance. */}
+          <ScoreRadial
+            trend={data.breakdown.trend?.value}
+            rs={data.breakdown.rs?.value}
+            fundamentals={data.breakdown.fundamentals?.value}
+            smart_money={data.breakdown.smart_money?.value}
+            macro={data.breakdown.macro?.value}
+            momentum={data.breakdown.momentum?.value}
+            score={data.score ?? null}
+            size={108}
+            showCenter={false}
+            showLabels={false}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xs uppercase text-muted">Tapeline Score</div>
+              {data.confidence_pct != null && (
+                <span className={`text-xs nums ${confColor(data.confidence_pct)}`}
+                      title={confLabel(data.confidence_pct)}>
+                  conf {data.confidence_pct.toFixed(0)}%
+                </span>
+              )}
+            </div>
+            <div className="mt-1 text-4xl font-bold">{data.score?.toFixed(1)}</div>
+            <div className={`mt-2 inline-block rounded px-2 py-0.5 text-xs ${toneSig}`}>
+              {data.signal}
+            </div>
           </div>
         </div>
         <div className="card p-5">

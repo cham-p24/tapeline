@@ -16,6 +16,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { ScoreRadial } from "@/components/ScoreRadial";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -82,7 +83,7 @@ export async function generateMetadata({ params }: { params: { symbol: string } 
   const signal = data.signal ?? "—";
   const why = data.reason ?? "Six-factor synthesis updated live.";
   const title = `${sym} score ${score} · ${signal}`;
-  const description = `Tapeline score ${score}/100 (${signal}) for ${data.name}. ${why} See the formula on /how-it-works.`;
+  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name}. ${why} See the formula on /how-it-works.`;
   return {
     title,
     description,
@@ -157,29 +158,58 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
           </div>
         </div>
 
-        {/* Score + signal hero */}
+        {/* Score + signal hero — radial visual signature on the right gives
+            the score a *shape*, not just a number. Same role Simply Wall St's
+            Snowflake plays for theirs. Each axis is one factor; lopsided
+            polygons read as "strong on X, weak on Y" at a glance. */}
         <div className="mt-8 sm:mt-10 rounded-2xl border border-border bg-panel p-5 sm:p-8">
-          <div className="flex flex-wrap items-end gap-6 sm:gap-8">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-muted">Tapeline score</div>
+          <div className="flex flex-wrap items-start justify-between gap-6 sm:gap-8">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs uppercase tracking-wider text-muted">Tapeline Score</div>
               <div className={`mt-1 text-6xl sm:text-7xl font-bold nums tracking-tight ${scoreColor}`}>
                 {data.score != null ? data.score.toFixed(0) : "—"}
                 <span className="ml-1 text-xl sm:text-2xl text-muted font-medium">/ 100</span>
               </div>
-            </div>
-            <div>
-              <div className="text-xs uppercase tracking-wider text-muted">Signal</div>
-              <div className={`mt-1 text-xl sm:text-2xl font-bold tracking-tight ${scoreColor}`}>{signal}</div>
-              {data.confidence_pct != null && (
-                <div className="mt-1 text-xs text-muted">
-                  {data.confidence_pct.toFixed(0)}% data confidence
-                </div>
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wider text-muted">Signal</div>
+                <div className={`mt-1 text-xl sm:text-2xl font-bold tracking-tight ${scoreColor}`}>{signal}</div>
+                {data.confidence_pct != null && (
+                  <div className="mt-1 text-xs text-muted">
+                    {data.confidence_pct.toFixed(0)}% data confidence
+                  </div>
+                )}
+              </div>
+              {data.reason && (
+                <p className="mt-6 max-w-xl text-sm sm:text-base leading-relaxed text-fg">{data.reason}</p>
               )}
             </div>
+            <div className="hidden sm:block flex-shrink-0">
+              <ScoreRadial
+                trend={b.trend?.value ?? null}
+                rs={b.rs?.value ?? null}
+                fundamentals={b.fundamentals?.value ?? null}
+                smart_money={b.smart_money?.value ?? null}
+                macro={b.macro?.value ?? null}
+                momentum={b.momentum?.value ?? null}
+                score={data.score ?? null}
+                size={220}
+              />
+            </div>
           </div>
-          {data.reason && (
-            <p className="mt-6 max-w-2xl text-sm sm:text-base leading-relaxed text-fg">{data.reason}</p>
-          )}
+          {/* Mobile-only radial — placed below the score so it doesn't
+              fight for header space on narrow viewports. */}
+          <div className="mt-6 flex justify-center sm:hidden">
+            <ScoreRadial
+              trend={b.trend?.value ?? null}
+              rs={b.rs?.value ?? null}
+              fundamentals={b.fundamentals?.value ?? null}
+              smart_money={b.smart_money?.value ?? null}
+              macro={b.macro?.value ?? null}
+              momentum={b.momentum?.value ?? null}
+              score={data.score ?? null}
+              size={200}
+            />
+          </div>
         </div>
 
         {/* 6-factor breakdown */}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ScannerPreview } from "@/components/ScannerPreview";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { TickerSearch } from "@/components/TickerSearch";
 
 export default function LandingPage() {
   return (
@@ -23,41 +24,75 @@ export default function LandingPage() {
               <span className="text-accent">shows its work.</span>
             </h1>
             <p className="mt-6 text-lg text-muted">
-              Six factors with the exact weights published. One plain-English sentence on every ticker, every row.
-              Every call we make goes on a permanent public record — same day.
+              The <span className="text-fg font-medium">Tapeline Score</span> blends six factors at published weights into one
+              read on every ticker. Every call goes on a permanent public record — same day.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn-primary text-base">Start 14-day trial &rarr;</Link>
               <Link href="/scorecard" className="btn-ghost text-base">See the record</Link>
             </div>
             <p className="mt-3 text-xs text-muted">14-day Premium trial · no credit card · cancel in one click</p>
-            {/* Try-before-signup link — visitors land on a real, public per-ticker
-                page with the live score, the 6-factor breakdown, and the why
-                sentence. Removes the "what does this actually look like" friction
-                without forcing a signup. */}
-            <p className="mt-5 text-sm text-muted">
-              Or see a live example:{" "}
-              <Link href="/t/AAPL" className="text-accent hover:underline">$AAPL</Link>
+            {/* Compare strip — visitors actively comparing scanners click here
+                rather than bouncing. Lands on the existing /compare/* pages. */}
+            <p className="mt-5 text-xs text-muted">
+              Compare with{" "}
+              <Link href="/compare/zacks" className="text-accent hover:underline">Zacks</Link>
               {" · "}
-              <Link href="/t/NVDA" className="text-accent hover:underline">$NVDA</Link>
+              <Link href="/compare/finviz" className="text-accent hover:underline">Finviz</Link>
               {" · "}
-              <Link href="/t/SPY" className="text-accent hover:underline">$SPY</Link>
+              <Link href="/compare/wallstreetzen" className="text-accent hover:underline">WallStreetZen</Link>
             </p>
           </div>
 
-          {/* Right: product preview */}
+          {/* Right: product preview + try-it search.
+              Search lives next to the scanner preview so the visitor sees the
+              live mock, then immediately gets to type their own ticker — the
+              "see what you'd get" loop happens before any signup ask. */}
           <div className="lg:col-span-3">
             <ScannerPreview />
             <p className="mt-3 text-center text-xs text-muted">
               Every ticker scored on 6 factors · hover any score in the app for the full breakdown
             </p>
+            <div className="mt-6 rounded-2xl border border-border bg-panel/40 p-5">
+              <TickerSearch />
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Trust bar — 3 points, tight */}
+      {/* Headline trust pillars — the moat in three lines.
+          Lands between the hero and the data/legal microcopy strip below.
+          Reads as a confident factual claim, not a marketing line, because
+          each pillar links to the artefact that proves it. */}
+      <section className="border-t border-border">
+        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 sm:grid-cols-3">
+          <Pillar
+            label="Six published weights"
+            body={<>
+              Trend 25% · RS 20% · Fund 15% · SM 15% · Macro 15% · Mom 10%.
+              No black box, no hidden multipliers.
+            </>}
+            href="/how-it-works"
+            cta="See the formula"
+          />
+          <Pillar
+            label="Every call back-checked vs SPY"
+            body="Top-10 picks logged at close. Next-day return + alpha vs SPY recorded automatically."
+            href="/scorecard"
+            cta="See the scorecard"
+          />
+          <Pillar
+            label="100% on the public record"
+            body="No cherry-picking. No hindsight edits. Original reasoning preserved with every entry."
+            href="/scorecard"
+            cta="Audit any day"
+          />
+        </div>
+      </section>
+
+      {/* Data + legal microcopy — quieter strip beneath the moat pillars. */}
       <section className="border-y border-border bg-panel/50">
-        <div className="mx-auto grid max-w-6xl gap-3 px-6 py-5 text-center text-xs text-muted sm:grid-cols-3">
+        <div className="mx-auto grid max-w-6xl gap-3 px-6 py-4 text-center text-xs text-muted sm:grid-cols-3">
           <div>🔬 Powered by Massive (formerly Polygon.io) licensed data</div>
           <div>📈 Every pick on the <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link></div>
           <div>⚠️ Informational only — <Link href="/legal/risk" className="text-accent hover:underline">not investment advice</Link></div>
@@ -118,6 +153,32 @@ function Step({ n, title, children }: { n: string; title: string; children: Reac
       </div>
       <h3 className="mt-4 text-lg font-semibold">{title}</h3>
       <p className="mt-2 text-sm text-muted leading-relaxed">{children}</p>
+    </div>
+  );
+}
+
+function Pillar({
+  label, body, href, cta,
+}: {
+  label: string;
+  body: React.ReactNode;
+  href: string;
+  cta: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2.5">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-up/15 text-up">
+          <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <h3 className="text-sm font-semibold tracking-tight">{label}</h3>
+      </div>
+      <p className="mt-2 text-sm text-muted leading-relaxed">{body}</p>
+      <Link href={href} className="mt-2 inline-block text-xs text-accent hover:underline">
+        {cta} →
+      </Link>
     </div>
   );
 }
