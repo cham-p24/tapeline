@@ -58,7 +58,7 @@ export default function LandingPage() {
       {/* Trust bar — 3 points, tight */}
       <section className="border-y border-border bg-panel/50">
         <div className="mx-auto grid max-w-6xl gap-3 px-6 py-5 text-center text-xs text-muted sm:grid-cols-3">
-          <div>🔬 Powered by Polygon.io licensed data</div>
+          <div>🔬 Powered by Massive (formerly Polygon.io) licensed data</div>
           <div>📈 Every pick on the <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link></div>
           <div>⚠️ Informational only — <Link href="/legal/risk" className="text-accent hover:underline">not investment advice</Link></div>
         </div>
