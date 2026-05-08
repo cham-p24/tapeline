@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { TransparencyStrip } from "@/components/TransparencyStrip";
 
 export const metadata = {
   title: "Security — Tapeline",
@@ -179,6 +180,7 @@ export default function SecurityPage() {
         </p>
       </section>
 
+      <TransparencyStrip current="/security" />
       <MarketingFooter />
     </main>
   );

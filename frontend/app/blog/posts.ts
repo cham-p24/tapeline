@@ -134,56 +134,57 @@ export const POSTS: BlogPost[] = [
     `,
   },
   {
-    slug: "why-we-score-112-not-5000",
-    title: "Why we score 112 tickers, not 5,000.",
+    slug: "why-we-score-2500-not-5000",
+    title: "Why we score 2,500 tickers, not 5,000.",
     excerpt:
-      "The Massive feed gives us 5,757 US tickers. We score about 112 of them. Here's why that's a feature, not a limitation — and what changes when we expand.",
+      "The Massive feed gives us 5,757 US tickers. We actively score 2,500. Here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
     publishedAt: "2026-05-03",
     author: "Tapeline",
     body: `
       <p>The data feed (Massive, formerly Polygon.io) gives us coverage of
-      every listed US security. About 5,700 tickers, after filtering out
-      OTC. We score roughly 112 of them. Most users notice this within the
-      first day and ask why their favourite micro-cap isn't in the scanner.</p>
-
-      <p>It's deliberate. Here's the reasoning:</p>
+      every listed US security. About 5,757 tickers, after filtering out
+      OTC. We actively score the top 2,500 by daily dollar-volume.
+      Roughly half the new-user feedback is "why isn't $XYZ scored?" — so
+      here's the reasoning, written once.</p>
 
       <h2>The filter is liquidity</h2>
-      <p>The 112 are picked by daily dollar-volume — price × volume — and
-      the cutoff lands roughly at the bottom of the S&P MidCap 400.
-      Everything below that has bid-ask spreads wide enough that the
-      "score" stops representing anything actionable. A 90 score on a
-      $0.15 stock that trades 80,000 shares a day is a fiction; you can't
-      get in or out at that price.</p>
+      <p>The 2,500 are picked by daily dollar-volume — price × volume —
+      and the cutoff lands well below the S&amp;P MidCap 400, deep into
+      small-cap territory. Everything below has bid-ask spreads wide
+      enough that the "score" stops representing anything actionable. A
+      90 score on a $0.15 stock that trades 80,000 shares a day is a
+      fiction; you can't get in or out at that price without moving the
+      tape against yourself.</p>
 
-      <h2>The factors aren't equally available</h2>
-      <p>Trend, momentum, and macro work fine on any ticker with a year of
-      bars. Fundamentals (Finnhub) and insider Form 4 (also Finnhub) are
-      sparse for sub-$200M caps. Smart-money via Quiver Quantitative tracks
-      8 elite funds — they don't hold $50M-cap micro-caps. Forcing a score
-      across all 5,700 would mean 4,000+ confidence values landing under
-      40%. That's noise, not signal.</p>
+      <h2>The factors aren't equally available below the cutoff</h2>
+      <p>Trend, momentum, and macro work fine on any ticker with a year
+      of bars. Fundamentals (Finnhub) and insider Form 4 are sparse for
+      sub-$200M caps. Smart-money via Quiver tracks 8 elite funds — they
+      don't hold $50M micro-caps. Forcing a score across the entire
+      5,757-row universe would mean ~3,200 confidence values landing
+      under 40%. That's noise, not signal — exactly the experience we're
+      trying to replace.</p>
 
-      <h2>What you can actually scan</h2>
-      <p>The 112 covers basically every name a retail trader is plausibly
-      considering: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, the rest of
-      the FANG layer, the major financial / energy / industrial / healthcare
-      mega-caps, and 32 commodity / sector ETFs (gold, silver, oil, gas,
-      ag, copper, uranium, miners, plus all the major SPDR sector ETFs and
-      QQQ / SPY / IWM / DIA / VTI / SMH / TLT / GLD).</p>
+      <h2>What we do with the other 3,200</h2>
+      <p>The full 5,757-row universe table is auto-populated weekly from
+      Massive's reference API. We use it for: watchlist tracking (you
+      can watch any ticker, scored or not), per-ticker pages with price
+      and 1-day change, news feeds with sentiment tagging, and ranking —
+      so when liquidity grows on a name, it gets promoted into the
+      active 2,500 automatically on the next refresh cycle.</p>
 
-      <h2>What's on the post-launch list</h2>
-      <p>Universe expansion to ~500 tickers, prioritising names the active
-      user base actually scans. The infrastructure is wired (the 5,700-row
-      universe table is auto-populated from Massive's reference API on a
-      weekly cron). What's missing is the daily scoring pass for the wider
-      slice — that's a Finnhub-rate-limit thing, not a code thing. When
-      enough Premium users put a name like AMD at $200B mcap on their
-      watchlists we'll bump it into the active scoring set.</p>
+      <h2>Why not just score all 5,757?</h2>
+      <p>Two reasons. First, the noise above. Second, Finnhub's free tier
+      is 60 calls/minute — enough for the fundamentals refresh on 2,500
+      names but not 5,000+. A bigger universe means a bigger Finnhub bill,
+      not a better product. We'll only expand if customer behaviour says
+      the marginal names are actually being scanned.</p>
 
-      <p>If a ticker you care about isn't in the scanner, watch it on the
-      watchlist page anyway — it'll show price + 1d change but no score.
-      We'll likely add it to the active set next universe-refresh cycle.</p>
+      <p>The 2,500 covers basically every US name a retail trader is
+      plausibly considering: every S&amp;P 500 + every NASDAQ-100 + every
+      Russell 1000 component, plus the most actively-traded sector and
+      commodity ETFs. If your watchlist already lives in that range —
+      which most do — Tapeline scores everything you care about.</p>
     `,
   },
   {

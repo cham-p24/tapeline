@@ -74,3 +74,4 @@ test-results/
 
 # Worker caches
 backend/.cache/
+frontend/tsconfig.tsbuildinfo

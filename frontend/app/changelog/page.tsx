@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { TransparencyStrip } from "@/components/TransparencyStrip";
 
 export const metadata = {
   title: "Changelog — Tapeline",
@@ -153,6 +154,7 @@ export default function ChangelogPage() {
         </div>
       </section>
 
+      <TransparencyStrip current="/changelog" />
       <MarketingFooter />
     </main>
   );

@@ -3,15 +3,26 @@ import { ScannerPreview } from "@/components/ScannerPreview";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TickerSearch } from "@/components/TickerSearch";
+import { LiveCounters } from "@/components/LiveCounters";
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen">
       <MarketingNav />
 
-      {/* Hero + product preview in one fold */}
-      <section className="mx-auto max-w-6xl px-6 pt-16 pb-12">
-        <div className="grid gap-10 lg:grid-cols-5 lg:gap-8">
+      {/* Hero + product preview in one fold.
+          Soft accent-coloured radial glow behind the section gives depth
+          without colour — Linear/Vercel-style. Pointer-events disabled so
+          it never traps clicks. */}
+      <section className="relative overflow-hidden px-6 pt-16 pb-12">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 mx-auto h-[640px] max-w-6xl"
+        >
+          <div className="absolute left-1/2 top-0 h-[480px] w-[920px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
+          <div className="absolute left-[12%] top-32 h-[280px] w-[420px] rounded-full bg-up/5 blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-6xl grid gap-10 lg:grid-cols-5 lg:gap-8">
           {/* Left: copy */}
           <div className="lg:col-span-2">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
@@ -60,11 +71,20 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Live counters strip — concrete numbers fetched from /api/status,
+          refreshed every 60s. Replaces vague "live" with specifics: how
+          many tickers, how many news items, current regime, last tick. */}
+      <section className="border-t border-border bg-panel/20">
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          <LiveCounters />
+        </div>
+      </section>
+
       {/* Headline trust pillars — the moat in three lines.
           Lands between the hero and the data/legal microcopy strip below.
           Reads as a confident factual claim, not a marketing line, because
           each pillar links to the artefact that proves it. */}
-      <section className="border-t border-border">
+      <section>
         <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 sm:grid-cols-3">
           <Pillar
             label="Six published weights"

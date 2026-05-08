@@ -8,6 +8,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TransparencyStrip } from "@/components/TransparencyStrip";
 
 type StatusResponse = {
   status: "ok" | "degraded";
@@ -157,6 +158,7 @@ export default function StatusPage() {
           Raw JSON: <code className="text-accent">GET https://api.tapeline.io/api/status</code>
         </footer>
       </div>
+      <TransparencyStrip current="/status" />
     </main>
   );
 }

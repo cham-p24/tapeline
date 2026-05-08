@@ -11,6 +11,7 @@ import { api, type ScorecardEntry } from "@/lib/api";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { Skeleton } from "@/components/Skeleton";
+import { TransparencyStrip } from "@/components/TransparencyStrip";
 
 export default function ScorecardPage() {
   const [data, setData] = useState<{
@@ -40,6 +41,7 @@ export default function ScorecardPage() {
             ))}
           </div>
         </div>
+        <TransparencyStrip current="/scorecard" />
         <MarketingFooter />
       </main>
     );

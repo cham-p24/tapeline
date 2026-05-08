@@ -7,6 +7,7 @@
  * Keep the disclaimer copy in sync with docs/LEGAL_CHECKLIST.md.
  */
 import Link from "next/link";
+import { LiveStatusPill } from "@/components/LiveStatusPill";
 
 export function MarketingFooter() {
   return (
@@ -58,9 +59,14 @@ export function MarketingFooter() {
             Read the full <Link href="/legal/risk" className="text-accent hover:underline">risk disclosure</Link>
             {" "}before relying on any signal. Talk to a licensed advisor before making investment decisions.
           </p>
-          <p className="mt-3 text-subtle">
-            © {new Date().getFullYear()} Tapeline. Built in Melbourne. tapeline.io
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-subtle">
+              © {new Date().getFullYear()} Tapeline. Built in Melbourne. tapeline.io
+            </p>
+            {/* Live operational pill — fetched from /api/status on a 30s
+                interval. Passive trust signal across every public page. */}
+            <LiveStatusPill />
+          </div>
         </div>
       </div>
     </footer>

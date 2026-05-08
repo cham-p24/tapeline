@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { TransparencyStrip } from "@/components/TransparencyStrip";
 
 export const metadata = { title: "How it works — Tapeline" };
 
@@ -147,6 +148,7 @@ export default function HowItWorksPage() {
         </Link>
       </section>
 
+      <TransparencyStrip current="/how-it-works" />
       <MarketingFooter />
     </main>
   );
