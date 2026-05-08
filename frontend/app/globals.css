@@ -36,3 +36,30 @@
     @apply btn text-muted hover:text-fg hover:bg-panel;
   }
 }
+
+/* Radial polygon mount animation — used by <ScoreRadial>. The polygon's
+   stroke draws in, then the fill + vertex dots fade in. Skipped when the
+   user has prefers-reduced-motion set (handled by the media query below). */
+@keyframes radial-draw {
+  0%   { stroke-dashoffset: 600; opacity: 0; }
+  40%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+@keyframes radial-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.radial-polygon {
+  stroke-dasharray: 600;
+  animation: radial-draw 0.85s ease-out forwards;
+}
+.radial-fade-in {
+  animation: radial-fade-in 0.5s ease-out 0.25s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .radial-polygon,
+  .radial-fade-in {
+    animation: none;
+    stroke-dasharray: 0;
+  }
+}

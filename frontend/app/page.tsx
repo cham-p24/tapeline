@@ -4,6 +4,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TickerSearch } from "@/components/TickerSearch";
 import { LiveCounters } from "@/components/LiveCounters";
+import { FadeIn } from "@/components/FadeIn";
 
 export default function LandingPage() {
   return (
@@ -86,27 +87,33 @@ export default function LandingPage() {
           each pillar links to the artefact that proves it. */}
       <section>
         <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 sm:grid-cols-3">
-          <Pillar
-            label="Six published weights"
-            body={<>
-              Trend 25% · RS 20% · Fund 15% · SM 15% · Macro 15% · Mom 10%.
-              No black box, no hidden multipliers.
-            </>}
-            href="/how-it-works"
-            cta="See the formula"
-          />
-          <Pillar
-            label="Every call back-checked vs SPY"
-            body="Top-10 picks logged at close. Next-day return + alpha vs SPY recorded automatically."
-            href="/scorecard"
-            cta="See the scorecard"
-          />
-          <Pillar
-            label="100% on the public record"
-            body="No cherry-picking. No hindsight edits. Original reasoning preserved with every entry."
-            href="/scorecard"
-            cta="Audit any day"
-          />
+          <FadeIn delayMs={0}>
+            <Pillar
+              label="Six published weights"
+              body={<>
+                Trend 25% · RS 20% · Fund 15% · SM 15% · Macro 15% · Mom 10%.
+                No black box, no hidden multipliers.
+              </>}
+              href="/how-it-works"
+              cta="See the formula"
+            />
+          </FadeIn>
+          <FadeIn delayMs={100}>
+            <Pillar
+              label="Every call back-checked vs SPY"
+              body="Top-10 picks logged at close. Next-day return + alpha vs SPY recorded automatically."
+              href="/scorecard"
+              cta="See the scorecard"
+            />
+          </FadeIn>
+          <FadeIn delayMs={200}>
+            <Pillar
+              label="100% on the public record"
+              body="No cherry-picking. No hindsight edits. Original reasoning preserved with every entry."
+              href="/scorecard"
+              cta="Audit any day"
+            />
+          </FadeIn>
         </div>
       </section>
 
@@ -125,18 +132,24 @@ export default function LandingPage() {
         <p className="mt-2 text-muted">From data to decision in one glance.</p>
 
         <div className="mt-10 grid gap-6 md:grid-cols-3">
-          <Step n="1" title="Six factors, exact weights">
-            Trend 25% · relative strength 20% · fundamentals 15% · smart money 15% · macro 15% · momentum 10%.
-            Weights are public. Every change is announced before it ships.
-          </Step>
-          <Step n="2" title="One sentence per ticker">
-            Default plain-English Why on every row — no chat session required, no premium gate.
-            Hover the score for the factor breakdown.
-          </Step>
-          <Step n="3" title="Every call on the public record">
-            Top-10 picks logged daily to the <Link href="/scorecard" className="text-accent">public scorecard</Link>{" "}
-            with the original reasoning preserved. Performance vs SPY recorded next session. No cherry-picking, no hindsight edits.
-          </Step>
+          <FadeIn delayMs={0}>
+            <Step n="1" title="Six factors, exact weights">
+              Trend 25% · relative strength 20% · fundamentals 15% · smart money 15% · macro 15% · momentum 10%.
+              Weights are public. Every change is announced before it ships.
+            </Step>
+          </FadeIn>
+          <FadeIn delayMs={100}>
+            <Step n="2" title="One sentence per ticker">
+              Default plain-English Why on every row — no chat session required, no premium gate.
+              Hover the score for the factor breakdown.
+            </Step>
+          </FadeIn>
+          <FadeIn delayMs={200}>
+            <Step n="3" title="Every call on the public record">
+              Top-10 picks logged daily to the <Link href="/scorecard" className="text-accent">public scorecard</Link>{" "}
+              with the original reasoning preserved. Performance vs SPY recorded next session. No cherry-picking, no hindsight edits.
+            </Step>
+          </FadeIn>
         </div>
 
         <div className="mt-8 text-center">

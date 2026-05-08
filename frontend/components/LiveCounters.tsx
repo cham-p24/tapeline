@@ -54,7 +54,9 @@ export function LiveCounters() {
   }, []);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-4">
+    // grid-cols-2 on mobile so the strip is compact (2x2) rather than four
+    // tall cards stacked. Expands to 1x4 from sm breakpoint up.
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
       <Counter label="Tickers tracked" value={data.tickers != null ? data.tickers.toLocaleString() : "—"} sub="from Massive reference" />
       <Counter label="News items indexed" value={data.news != null ? data.news.toLocaleString() : "—"} sub="rolling, ~5min refresh" />
       <Counter label="Scoring cadence" value="60s" sub={data.age != null ? `last tick ${data.age}s ago` : "every market tick"} live />

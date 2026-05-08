@@ -156,13 +156,24 @@ export function ScoreRadial({
         );
       })}
 
-      {/* Value polygon */}
-      <path d={valuePath} fill={tone} fillOpacity={0.18} stroke={tone} strokeWidth={1.75} strokeLinejoin="round" />
+      {/* Value polygon — draws in via stroke-dashoffset on mount, then the
+          fill + dots fade in just behind. Honours prefers-reduced-motion. */}
+      <path
+        d={valuePath}
+        fill={tone}
+        fillOpacity={0.18}
+        stroke={tone}
+        strokeWidth={1.75}
+        strokeLinejoin="round"
+        className="radial-polygon"
+      />
 
       {/* Vertex dots */}
-      {valuePoints.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={2.5} fill={tone} />
-      ))}
+      <g className="radial-fade-in">
+        {valuePoints.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill={tone} />
+        ))}
+      </g>
 
       {/* Labels */}
       {showLabels &&

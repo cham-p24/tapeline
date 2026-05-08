@@ -22,6 +22,8 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
+type FactorEntry = { value: number | null; weight: number; label: string };
+
 type TickerData = {
   symbol: string;
   name: string;
@@ -31,6 +33,16 @@ type TickerData = {
   signal: string | null;
   change_pct_1d: number | null;
   reason: string | null;
+  // The score breakdown drives the small radial signature in the corner
+  // of the OG image. Same shape as the /api/ticker response.
+  breakdown?: {
+    trend?: FactorEntry;
+    rs?: FactorEntry;
+    fundamentals?: FactorEntry;
+    smart_money?: FactorEntry;
+    macro?: FactorEntry;
+    momentum?: FactorEntry;
+  };
 };
 
 async function fetchTicker(symbol: string): Promise<TickerData | null> {
@@ -189,6 +201,25 @@ export default async function OG({ params }: { params: { symbol: string } }) {
           </div>
         )}
 
+        {/* Brand-mark radial — corner signature derived from the actual
+            sub-scores. Same role Simply Wall St's Snowflake plays in their
+            share previews — a recognisable shape that's instantly
+            "Tapeline" without requiring the full app surface. */}
+        {data && (
+          <div
+            style={{
+              position: "absolute",
+              top: "120px",
+              right: "80px",
+              width: "240px",
+              height: "240px",
+              display: "flex",
+            }}
+          >
+            <RadialMark data={data} accent={accent} />
+          </div>
+        )}
+
         {/* Footer row — price + change + tagline */}
         <div
           style={{
@@ -250,5 +281,74 @@ export default async function OG({ params }: { params: { symbol: string } }) {
       </div>
     ),
     { ...size }
+  );
+}
+
+/**
+ * Inline 6-axis radial used as the OG image corner brand mark. Pure SVG
+ * inside a flex container — next/og's edge runtime supports inline <svg>.
+ *
+ * Keeps the polygon math identical to <ScoreRadial> so the social preview
+ * shape matches what the visitor sees once they click through. Visual
+ * continuity from share → page.
+ */
+function RadialMark({
+  data,
+  accent,
+}: {
+  data: TickerData;
+  accent: string;
+}) {
+  const subs = [
+    data.breakdown?.trend?.value,
+    data.breakdown?.rs?.value,
+    data.breakdown?.fundamentals?.value,
+    data.breakdown?.smart_money?.value,
+    data.breakdown?.macro?.value,
+    data.breakdown?.momentum?.value,
+  ];
+  const size = 240;
+  const cx = size / 2;
+  const cy = size / 2;
+  const rMax = size / 2 - 12;
+
+  function pointAt(i: number, frac: number) {
+    const angleDeg = -90 + i * 60;
+    const a = (angleDeg * Math.PI) / 180;
+    const r = rMax * Math.max(0, Math.min(1, frac));
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)] as const;
+  }
+
+  function hexPath(frac: number): string {
+    return subs.map((_, i) => {
+      const [x, y] = pointAt(i, frac);
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ") + " Z";
+  }
+
+  const valuePath = subs.map((v, i) => {
+    const [x, y] = pointAt(i, v == null ? 0 : v / 100);
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ") + " Z";
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block" }}>
+      {/* reference rings */}
+      {[0.25, 0.5, 0.75, 1.0].map((r) => (
+        <path key={r} d={hexPath(r)} fill="none" stroke="#52525b" strokeOpacity={r === 1 ? 0.45 : 0.18} strokeWidth={r === 1 ? 1.5 : 1} />
+      ))}
+      {/* axes */}
+      {subs.map((_, i) => {
+        const [x, y] = pointAt(i, 1);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#52525b" strokeOpacity={0.18} strokeWidth={1} />;
+      })}
+      {/* value polygon */}
+      <path d={valuePath} fill={accent} fillOpacity={0.22} stroke={accent} strokeWidth={2.5} strokeLinejoin="round" />
+      {/* vertex dots */}
+      {subs.map((v, i) => {
+        const [x, y] = pointAt(i, v == null ? 0 : v / 100);
+        return <circle key={i} cx={x} cy={y} r={3.5} fill={accent} />;
+      })}
+    </svg>
   );
 }
