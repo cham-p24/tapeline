@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { ScoreRadial } from "@/components/ScoreRadial";
+import { ScoreSparkline } from "@/components/ScoreSparkline";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -82,22 +83,44 @@ export async function generateMetadata({ params }: { params: { symbol: string } 
   const score = data.score?.toFixed(0) ?? "—";
   const signal = data.signal ?? "—";
   const why = data.reason ?? "Six-factor synthesis updated live.";
-  const title = `${sym} score ${score} · ${signal}`;
-  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name}. ${why} See the formula on /how-it-works.`;
+  const title = `${sym} stock score ${score}/100 · ${signal} — Tapeline`;
+  // Long-tail-friendly description hits the queries traders actually run:
+  // "TICKER stock score", "TICKER analysis", "TICKER price target", etc.
+  // Keeps copy honest (no return claims, descriptive not prescriptive).
+  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. Updated live with public formula and back-checked scorecard.`;
+  // Keyword set for crawlers — narrow, ticker-specific, no spam stuffing.
+  const keywords = [
+    `${sym} stock score`,
+    `${sym} stock analysis`,
+    `${sym} ${data.name}`,
+    `${sym} technical rating`,
+    `${sym} fundamental analysis`,
+    "Tapeline Score",
+    "stock scanner",
+  ];
   return {
     title,
     description,
+    keywords,
     alternates: { canonical: `https://tapeline.io/t/${sym}` },
     openGraph: {
       title: `${sym} · ${score}/100 · ${signal}`,
       description: why,
       url: `https://tapeline.io/t/${sym}`,
       type: "website",
+      siteName: "Tapeline",
     },
     twitter: {
       card: "summary_large_image",
       title: `${sym} · ${score}/100 · ${signal}`,
       description: why,
+      site: "@tapeline_io",
+    },
+    other: {
+      // Schema.org structured data for rich SERPs. Helps Google understand
+      // this is a financial-product page, not just any page mentioning a stock.
+      "article:modified_time": new Date().toISOString(),
+      "article:section": "Stocks",
     },
   };
 }
@@ -240,6 +263,13 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
           Weights are public and never change without a changelog entry.
           Read the full methodology on <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
         </p>
+
+        {/* Score history sparkline — sparse trace from the daily scorecard.
+            Shows nothing for tickers that haven't hit top-10, and renders
+            a friendly empty state explaining why. */}
+        <div className="mt-8">
+          <ScoreSparkline symbol={data.symbol} days={60} />
+        </div>
 
         {/* CTA */}
         <div className="mt-10 sm:mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-5 sm:p-8">

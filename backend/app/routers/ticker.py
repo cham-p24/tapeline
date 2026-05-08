@@ -112,3 +112,53 @@ async def ticker_ratings(symbol: str) -> dict:
     with an empty events list so the frontend renders a clean empty state.
     """
     return await fetch_analyst_ratings(symbol.upper())
+
+
+@router.get("/{symbol}/history")
+async def ticker_score_history(
+    symbol: str,
+    days: int = 60,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Sparse score history for a ticker — points pulled from the daily
+    scorecard.
+
+    Only days where this ticker landed in the top-10 are present (that's
+    the only per-day score snapshot the DB stores). For mega-cap regulars
+    that's near-daily; for one-time fliers it's sparse. Frontend renders
+    an empty sparkline when no rows exist.
+
+    Long-term: a per-tick or per-day score-history table would give every
+    ticker a full trace. Tracked in TECH_DEBT.md as a post-launch lift.
+    """
+    from datetime import date, timedelta
+
+    from app.models import DailyScorecardEntry
+
+    sym = symbol.upper()
+    cutoff = date.today() - timedelta(days=days)
+    rows_r = await session.execute(
+        select(
+            DailyScorecardEntry.as_of,
+            DailyScorecardEntry.score_at_flag,
+            DailyScorecardEntry.rank,
+            DailyScorecardEntry.change_pct_1d_after,
+            DailyScorecardEntry.alpha_vs_spy,
+        )
+        .where(
+            DailyScorecardEntry.symbol == sym,
+            DailyScorecardEntry.as_of >= cutoff,
+        )
+        .order_by(DailyScorecardEntry.as_of)
+    )
+    points = [
+        {
+            "date": r[0].isoformat(),
+            "score": float(r[1]),
+            "rank": int(r[2]),
+            "change_pct_1d_after": float(r[3]) if r[3] is not None else None,
+            "alpha_vs_spy": float(r[4]) if r[4] is not None else None,
+        }
+        for r in rows_r.all()
+    ]
+    return {"symbol": sym, "days": days, "points": points}

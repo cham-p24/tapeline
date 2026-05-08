@@ -9,6 +9,7 @@ import { useLiveStream } from "@/lib/useLiveStream";
 import { recordTickerVisit } from "@/components/RecentTickers";
 import { AnalystRatings } from "@/components/AnalystRatings";
 import { ScoreRadial } from "@/components/ScoreRadial";
+import { ScoreSparkline } from "@/components/ScoreSparkline";
 
 export default function TickerPage({ params }: { params: { symbol: string } }) {
   const symbol = params.symbol.toUpperCase();
@@ -213,6 +214,12 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
             <p className="mt-2 text-sm text-muted">Volatility is within normal range for this ticker right now.</p>
           </div>
         )}
+      </div>
+
+      {/* Score history sparkline — trace from the daily scorecard, sparse
+          by design (only top-10 days populate). Empty-state-friendly. */}
+      <div className="mt-6">
+        <ScoreSparkline symbol={data.symbol} days={60} />
       </div>
 
       {/* Analyst ratings — Benzinga consensus + recent rating actions.
