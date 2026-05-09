@@ -8,6 +8,7 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { recordTickerVisit } from "@/components/RecentTickers";
 import { AnalystRatings } from "@/components/AnalystRatings";
+import { Paywall } from "@/components/Paywall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 
@@ -222,10 +223,16 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
         <ScoreSparkline symbol={data.symbol} days={60} />
       </div>
 
-      {/* Analyst ratings — Benzinga consensus + recent rating actions.
-          Lazy-loads after page paint so a slow Benzinga response doesn't
-          block the score and breakdown panels above. */}
-      <AnalystRatings symbol={data.symbol} currentPrice={data.price} />
+      {/* Analyst ratings — Premium tier only. Benzinga primary (US names),
+          Finnhub aggregate fallback (UK / international ADRs). Trial users
+          see this for free since trial = Premium for 14 days; post-trial
+          Free + Pro users see the Paywall instead. Mirrors how other
+          Premium intelligence (Congress, 13F, Telegram) is gated. */}
+      <div className="mt-6">
+        <Paywall feature="ratings.analyst" title="Analyst consensus is Premium">
+          <AnalystRatings symbol={data.symbol} currentPrice={data.price} />
+        </Paywall>
+      </div>
 
       {/* TradingView chart embed */}
       <div className="mt-6 card p-4">

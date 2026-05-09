@@ -55,9 +55,10 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
           <h2 className="font-semibold">📊 Analyst ratings</h2>
         </div>
         <p className="p-6 text-sm text-muted">
-          No analyst coverage indexed for {symbol} yet. Smaller-cap or recently-listed
-          tickers often lack street coverage — the 6-factor score gives you a read in
-          spite of that.
+          No analyst consensus tracked for {symbol} from our current data sources.
+          Coverage is uneven across providers — primary US-listed names land first,
+          UK / international ADRs and smaller names land later. The 6-factor Tapeline
+          Score doesn't depend on street coverage and updates live regardless.
         </p>
       </div>
     );
@@ -112,7 +113,19 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
         </div>
       </div>
 
-      {/* Recent events */}
+      {/* Recent events — Benzinga returns per-firm rating actions; Finnhub
+          returns only aggregate counts (no events). When events is empty
+          but consensus is non-zero, show a short note instead of a header
+          + empty list. */}
+      {events.length === 0 ? (
+        <div className="border-t border-border px-5 py-4 text-xs text-muted">
+          Aggregate consensus from a wire feed — individual firm-by-firm rating
+          changes aren't surfaced for {symbol}. Total above reflects the latest
+          published period.
+        </div>
+      ) : null}
+
+      {events.length > 0 ? (
       <div className="border-t border-border">
         <div className="px-5 py-3 text-[11px] uppercase tracking-wider text-muted">
           Recent rating actions
@@ -163,10 +176,11 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
           ))}
         </ul>
       </div>
+      ) : null}
 
       <p className="border-t border-border p-3 text-[11px] text-subtle text-center">
-        Ratings via Benzinga · informational only · Tapeline does not factor analyst
-        consensus into the 6-factor score
+        Ratings via Benzinga + Finnhub fallback · informational only · Tapeline does
+        not factor analyst consensus into the 6-factor score
       </p>
     </div>
   );

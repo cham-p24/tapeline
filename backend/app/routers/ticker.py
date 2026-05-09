@@ -1,8 +1,9 @@
 """GET /api/ticker/{symbol} — detailed single-ticker view with breakdown + news.
 
 Also: GET /api/ticker/{symbol}/ratings — analyst ratings consensus + recent
-events from Benzinga. Lazy-loaded by the frontend so the main ticker page
-doesn't block on the upstream rating call.
+events from Benzinga (with Finnhub aggregate fallback). Premium-only —
+mirrors holdings.elite gating. Lazy-loaded by the frontend so the main
+ticker page doesn't block on the upstream rating call.
 """
 from __future__ import annotations
 
@@ -11,9 +12,11 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import NewsItem, SqueezeSetup, Ticker
+from app.models import NewsItem, SqueezeSetup, Ticker, User
+from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.news_feed import fetch_news_for_ticker
+from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
@@ -103,14 +106,25 @@ class _DictNews:
 
 
 @router.get("/{symbol}/ratings")
-async def ticker_ratings(symbol: str) -> dict:
-    """Analyst ratings consensus + recent events for a ticker.
+async def ticker_ratings(
+    symbol: str,
+    user: User = Depends(current_user_required),
+) -> dict:
+    """Analyst ratings consensus + recent events for a ticker — Premium-only.
+
+    Trial users (auto-Premium for 14 days) and paid Premium subscribers see
+    the widget. Free + Pro users hit the Paywall on the frontend; this
+    endpoint also enforces the gate so the data can't be sniffed via direct
+    API call.
 
     Lazy-loaded — the main ticker payload doesn't include this so the page
-    paints before the upstream Benzinga call completes. When Benzinga is
-    unconfigured or returns no coverage, the response shape stays the same
-    with an empty events list so the frontend renders a clean empty state.
+    paints before the upstream Benzinga call completes. When both Benzinga
+    and the Finnhub fallback have no coverage, the response shape stays the
+    same with an empty events list so the frontend renders a clean empty
+    state.
     """
+    if not has_feature(Tier(user.tier), "ratings.analyst"):
+        raise HTTPException(403, "Analyst consensus requires Premium tier")
     return await fetch_analyst_ratings(symbol.upper())
 
 

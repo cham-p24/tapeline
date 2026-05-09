@@ -251,19 +251,23 @@ async def fetch_analyst_ratings(symbol: str, days_back: int = 180) -> dict[str, 
           "source": "benzinga" | "empty",
         }
 
-    Empty/no-coverage tickers return an empty consensus + empty events list,
-    not an error — many small-caps have zero analyst coverage and that's fine.
+    When Benzinga has no coverage (common for UK-listed and international
+    ADRs — e.g. BUR, RIO, AZN), falls through to Finnhub's aggregate
+    recommendations. Finnhub returns latest-period buy/hold/sell tally
+    with no per-firm event detail — same response shape, empty events list.
     """
     symbol = (symbol or "").upper()
     if not symbol:
-        return _empty_ratings(symbol)
-    if not is_configured():
         return _empty_ratings(symbol)
 
     # Cache hit?
     cached = _RATINGS_CACHE.get(symbol)
     if cached and (time.monotonic() - cached[0]) < _RATINGS_TTL_SECONDS:
         return cached[1]
+
+    # No Benzinga key → skip straight to Finnhub fallback.
+    if not is_configured():
+        return await _finnhub_fallback(symbol)
 
     # Single-flight lock so a stampede of concurrent requests for a hot
     # ticker (NVDA, TSLA on a movement day) only fires one upstream call.
@@ -328,15 +332,40 @@ async def fetch_analyst_ratings(symbol: str, days_back: int = 180) -> dict[str, 
         pt_values = list(latest_pt_per_firm.values())
         avg_pt = round(sum(pt_values) / len(pt_values), 2) if pt_values else None
 
-        result = {
+        result: dict[str, Any] = {
             "symbol": symbol,
             "consensus": consensus,
             "avg_pt": avg_pt,
             "events": events[:20],  # cap at 20 most-recent for the widget
             "source": "benzinga" if events else "empty",
         }
+        # If Benzinga returned nothing, try Finnhub before caching the empty
+        # result. Common for UK / international tickers where Benzinga's
+        # coverage is thin.
+        if not events:
+            fb = await _finnhub_fallback(symbol)
+            if fb["consensus"]["total"] > 0:
+                result = fb
         _RATINGS_CACHE[symbol] = (time.monotonic(), result)
         return result
+
+
+async def _finnhub_fallback(symbol: str) -> dict[str, Any]:
+    """Try Finnhub's aggregate recommendations as a backup data source.
+
+    Returns the same shape as fetch_analyst_ratings — empty consensus +
+    empty events when Finnhub also has nothing. Frontend renders the
+    empty state in either case.
+    """
+    try:
+        from app.services import finnhub_feed as fh
+        if fh.configured():
+            data = await fh.fetch_analyst_recommendations(symbol)
+            if data and data.get("consensus", {}).get("total", 0) > 0:
+                return data
+    except Exception:
+        logger.exception("benzinga.finnhub_fallback_failed symbol=%s", symbol)
+    return _empty_ratings(symbol)
 
 
 def _normalise_rating(raw: dict[str, Any]) -> dict[str, Any]:

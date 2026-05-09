@@ -24,7 +24,7 @@ import contextlib
 import json
 import logging
 import time
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -514,3 +514,138 @@ async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[d
         })
     _save_cache(cache_key, rows)
     return rows
+
+
+# ---------------------------------------------------------------------------
+# News + analyst coverage — Benzinga gap fillers
+# ---------------------------------------------------------------------------
+# Benzinga has wide coverage of US-domiciled tickers but goes thin on
+# international / UK-listed names (BUR, RIO ADR, etc.). Finnhub's coverage
+# is broader on the international side because they aggregate from a wider
+# wire net. We use these as the third tier in news_feed's fallback chain
+# (after Benzinga + Massive) and as the secondary source for analyst
+# ratings when Benzinga returns empty.
+
+CACHE_TTL_NEWS_HOURS = 0.25  # 15 min — news is the most time-sensitive
+CACHE_TTL_RECS_HOURS = 12    # Analyst recs aggregate is monthly; 12h is plenty
+
+
+async def fetch_news_for_ticker(
+    symbol: str, days_back: int = 14, limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Per-ticker news from Finnhub /company-news.
+
+    Used as the third fallback in news_feed when Benzinga returns nothing
+    (UK-listed names, smaller US ADRs, etc.). Returns the canonical
+    news-row shape so consumers don't care which source served it.
+    """
+    from datetime import datetime
+
+    if not configured():
+        return []
+
+    sym = symbol.upper()
+    cache_key = f"news_{sym}_{days_back}d_{limit}"
+    cached = _load_cache(cache_key, CACHE_TTL_NEWS_HOURS)
+    if cached is not None:
+        return cached
+
+    today = date.today()
+    start = today - timedelta(days=days_back)
+    params = {
+        "symbol": sym,
+        "from": start.isoformat(),
+        "to": today.isoformat(),
+        "token": _api_key(),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{BASE_URL}/company-news", params=params)
+            if r.status_code != 200:
+                return []
+            data = r.json() if isinstance(r.json(), list) else []
+    except Exception:
+        logger.exception("finnhub.news_fetch_failed symbol=%s", sym)
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for a in data[:limit]:
+        # Finnhub's `datetime` is a unix timestamp (seconds).
+        try:
+            ts = int(a.get("datetime") or 0)
+            published = datetime.fromtimestamp(ts, tz=UTC)
+        except Exception:
+            published = datetime.now(UTC)
+        article_id = f"fh-{a.get('id') or ts}"
+        rows.append({
+            "id": article_id,
+            "title": str(a.get("headline") or "").strip()[:300],
+            "publisher": (a.get("source") or "Finnhub").strip(),
+            "author": None,
+            "published_at": published,
+            "url": a.get("url") or "",
+            "description": (a.get("summary") or "").strip()[:300] or None,
+            "tickers": sym,
+            "sentiment": None,
+        })
+    _save_cache(cache_key, rows)
+    return rows
+
+
+async def fetch_analyst_recommendations(symbol: str) -> dict[str, Any] | None:
+    """Aggregate analyst tally from Finnhub /stock/recommendation.
+
+    Returns the latest-period buy/hold/sell consensus in the same shape
+    benzinga_feed.fetch_analyst_ratings produces, so the frontend renders
+    identically. Used as fallback when Benzinga has no coverage for the
+    ticker (which is common for UK-listed and international names).
+
+    Note: Finnhub's free tier only exposes the AGGREGATE — individual
+    rating events (firm-by-firm with prior/current + price targets) are
+    a paid endpoint. So `events: []` and `avg_pt: null` here. The
+    frontend handles the empty events list gracefully.
+    """
+    if not configured():
+        return None
+
+    sym = symbol.upper()
+    cache_key = f"recs_{sym}"
+    cached = _load_cache(cache_key, CACHE_TTL_RECS_HOURS)
+    if cached is not None:
+        return cached
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(
+                f"{BASE_URL}/stock/recommendation",
+                params={"symbol": sym, "token": _api_key()},
+            )
+            if r.status_code != 200:
+                return None
+            data = r.json() if isinstance(r.json(), list) else []
+    except Exception:
+        logger.exception("finnhub.recs_fetch_failed symbol=%s", sym)
+        return None
+
+    if not data:
+        return None
+
+    # Pick the latest period. Finnhub returns desc by period.
+    latest = data[0]
+    bull = int(latest.get("strongBuy") or 0) + int(latest.get("buy") or 0)
+    bear = int(latest.get("strongSell") or 0) + int(latest.get("sell") or 0)
+    neutral = int(latest.get("hold") or 0)
+    total = bull + bear + neutral
+    if total == 0:
+        return None
+
+    result = {
+        "symbol": sym,
+        "consensus": {"bull": bull, "bear": bear, "neutral": neutral, "total": total},
+        "avg_pt": None,
+        "events": [],  # Finnhub free tier doesn't expose per-firm events.
+        "source": "finnhub",
+        "as_of_period": str(latest.get("period") or ""),
+    }
+    _save_cache(cache_key, result)
+    return result

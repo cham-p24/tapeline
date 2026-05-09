@@ -55,7 +55,9 @@ export default function EarningsPage() {
         {Object.keys(byDate).sort().map((d) => (
           <div key={d} className="card">
             <div className="border-b border-border px-4 py-3">
-              <h2 className="font-semibold">{new Date(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</h2>
+              {/* Locale-aware: visitor in Australia sees "Monday, 8 May",
+                  US sees "Monday, May 8", UK sees "Monday, 8 May", etc. */}
+              <h2 className="font-semibold">{new Date(d).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</h2>
               <p className="text-xs text-muted">{byDate[d].length} companies reporting</p>
             </div>
             <table className="w-full text-sm nums">

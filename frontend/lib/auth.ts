@@ -80,6 +80,7 @@ export const FEATURE_TIERS = {
   "api":                "premium" as const,
   "holdings.elite":     "premium" as const,
   "csv_export":         "pro" as const,
+  "ratings.analyst":    "premium" as const,
 };
 
 export function canUse(user: SessionUser | null, feature: keyof typeof FEATURE_TIERS): boolean {

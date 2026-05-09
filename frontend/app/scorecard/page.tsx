@@ -93,7 +93,17 @@ export default function ScorecardPage() {
           {dates.map((d) => (
             <div key={d} className="card">
               <div className="border-b border-border p-4">
-                <h2 className="font-semibold">{new Date(d).toDateString()}</h2>
+                {/* Locale-aware day header — toDateString() forced English
+                    "Thu May 07 2026"; this matches the visitor's browser
+                    locale + timezone via Intl. */}
+                <h2 className="font-semibold">
+                  {new Date(d).toLocaleDateString(undefined, {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </h2>
               </div>
               <table className="w-full text-sm nums">
                 <thead className="bg-black/40 text-xs uppercase text-muted">

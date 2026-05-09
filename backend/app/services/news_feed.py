@@ -53,7 +53,15 @@ def _vendor_key() -> str:
 async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, Any]]:
     """Get recent news items mentioning a specific symbol.
 
-    Prefers Benzinga; falls back to Polygon/Massive; mock-news as last resort.
+    Source preference (first non-empty wins):
+        1. Benzinga — fastest wire, richest cashtag tagging on US names
+        2. Massive (Polygon) — included with the data subscription
+        3. Finnhub — broader international + UK-listed coverage
+        4. Mock — last resort so the UI always renders something
+
+    Tier 3 (Finnhub) was added 2026-05-08 after BUR-style tickers (UK-listed
+    Burford, ADRs of European names, etc.) returned 0 from Benzinga AND
+    stale-only from Massive. Finnhub's wire net catches those reliably.
     """
     # Benzinga first — better wire speed + richer ticker tagging.
     try:
@@ -71,7 +79,19 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
             if rows:
                 return rows
         except Exception:
-            logger.exception("news.ticker_fetch_failed symbol=%s", symbol)
+            logger.exception("news.massive_ticker_failed symbol=%s", symbol)
+
+    # Finnhub fallback — covers the gaps Benzinga + Massive leave on
+    # international and small-cap-ADR names. Free tier 60/min is plenty.
+    try:
+        from app.services import finnhub_feed as fh
+        if fh.configured():
+            rows = await fh.fetch_news_for_ticker(symbol, limit=limit)
+            if rows:
+                return rows
+    except Exception:
+        logger.exception("news.finnhub_ticker_failed symbol=%s", symbol)
+
     return _mock_news(symbol, limit)
 
 
