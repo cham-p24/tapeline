@@ -280,13 +280,25 @@ async def status() -> dict[str, object]:
 
             if latest_news is not None:
                 news_age = (datetime.now(UTC) - latest_news).total_seconds()
-                # Coarse threshold v1 — "ok" up to 1h (covers market-hours
-                # cadence and the slowest weekend wire), "stale" up to 8h
-                # (catches multi-cycle insert failures), "down" beyond.
-                # Will refine to market-hours-aware later.
-                if news_age < 3600:
+                # Market-hours-aware thresholds (matches the freshness
+                # regression cron). Benzinga's wire goes very quiet on
+                # weekends and off-hours, so a flat 1h threshold would
+                # paint the pill yellow every weekend. Tuned to catch
+                # genuine pipeline failures without false-alarming on
+                # natural wire-quiet windows.
+                now_utc = datetime.now(UTC)
+                is_weekend = now_utc.weekday() >= 5
+                # NYSE-ish window in UTC: 13:00-24:00 Mon-Fri.
+                is_market_hours = (not is_weekend) and 13 <= now_utc.hour < 24
+                if is_market_hours:
+                    ok_threshold, stale_threshold = 1800, 14400  # 30m, 4h
+                elif is_weekend:
+                    ok_threshold, stale_threshold = 28800, 57600  # 8h, 16h
+                else:
+                    ok_threshold, stale_threshold = 7200, 28800   # 2h, 8h
+                if news_age < ok_threshold:
                     n_status = "ok"
-                elif news_age < 28800:  # 8h
+                elif news_age < stale_threshold:
                     n_status = "stale"
                 else:
                     n_status = "down"
