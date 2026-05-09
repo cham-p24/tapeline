@@ -146,6 +146,13 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
 
     rows = []
     for a in body.get("results", []):
+        # Match benzinga_feed: column widened to String(2000) in
+        # migration 0014; we cap at 1900 with a comma-boundary truncate
+        # to avoid partial symbols and leave headroom.
+        tickers_str = ",".join(a.get("tickers", []) or [])
+        if len(tickers_str) > 1900:
+            cutoff = tickers_str.rfind(",", 0, 1900)
+            tickers_str = tickers_str[:cutoff] if cutoff > 0 else tickers_str[:1900]
         rows.append({
             "id": a["id"],
             "title": a["title"],
@@ -154,7 +161,7 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
             "published_at": datetime.fromisoformat(a["published_utc"].replace("Z", "+00:00")),
             "url": a["article_url"],
             "description": a.get("description"),
-            "tickers": ",".join(a.get("tickers", []) or []),
+            "tickers": tickers_str,
             "sentiment": (a.get("insights", [{}])[0] or {}).get("sentiment_score") if a.get("insights") else None,
         })
     return rows

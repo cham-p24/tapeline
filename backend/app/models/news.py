@@ -20,8 +20,11 @@ class NewsItem(Base):
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Comma-separated tickers; indexed via LIKE searches (fine at MVP scale)
-    tickers: Mapped[str] = mapped_column(String(200), nullable=False, default="", index=True)
+    # Comma-separated tickers; indexed via LIKE searches (fine at MVP scale).
+    # Widened from String(200) → String(2000) in migration 0014 after a
+    # production incident where Benzinga round-up articles tagged 50+ symbols
+    # broke the entire batch INSERT.
+    tickers: Mapped[str] = mapped_column(String(2000), nullable=False, default="", index=True)
 
     # Simple sentiment score [-1, 1]; Polygon News provides this at Developer+ tier
     sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)

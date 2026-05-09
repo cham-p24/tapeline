@@ -156,7 +156,16 @@ def _normalise(a: dict[str, Any]) -> dict[str, Any]:
                 sym_list.append(str(n).upper())
         elif isinstance(s, str):
             sym_list.append(s.upper())
+    # Hard-cap at the column width. Benzinga occasionally tags one article
+    # with 50+ tickers (e.g. "Nasdaq Tops 29,000 Records..." round-up
+    # pieces). The DB column is String(2000) post-migration 0014; we
+    # truncate at 1900 to keep a 100-char safety margin and prevent
+    # batch INSERT failures if a future Benzinga update produces longer
+    # strings. Truncate at the last comma to avoid partial symbols.
     tickers_str = ",".join(sym_list)
+    if len(tickers_str) > 1900:
+        cutoff = tickers_str.rfind(",", 0, 1900)
+        tickers_str = tickers_str[:cutoff] if cutoff > 0 else tickers_str[:1900]
 
     return {
         "id": article_id,

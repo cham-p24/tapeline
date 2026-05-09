@@ -380,13 +380,34 @@ async def _refresh_news() -> None:
     except Exception:
         logger.exception("news.refresh_failed")
         return
-    async with session_scope() as session:
-        for it in items:
-            exists = await session.execute(select(NewsItem).where(NewsItem.id == it["id"]))
-            if exists.scalar_one_or_none() is not None:
-                continue
-            session.add(NewsItem(**it))
-    logger.info("news.refreshed count=%d", len(items))
+
+    # Insert each article in its own session/transaction. Previous version
+    # used a single session for the whole batch — when ONE article failed
+    # the column-width check (tickers VARCHAR(200) and one Benzinga article
+    # tagged with 50+ symbols), the entire batch rolled back, leaving DB
+    # 14h+ stale. Per-article isolation means a bad row can't poison the
+    # rest. Tracked: 2026-05-09 production incident.
+    inserted = 0
+    skipped_dup = 0
+    failed = 0
+    for it in items:
+        try:
+            async with session_scope() as session:
+                exists = await session.execute(
+                    select(NewsItem).where(NewsItem.id == it["id"])
+                )
+                if exists.scalar_one_or_none() is not None:
+                    skipped_dup += 1
+                    continue
+                session.add(NewsItem(**it))
+            inserted += 1
+        except Exception:
+            failed += 1
+            logger.exception("news.insert_failed id=%s title=%s", it.get("id"), str(it.get("title", ""))[:50])
+    logger.info(
+        "news.refreshed fetched=%d inserted=%d duplicate=%d failed=%d",
+        len(items), inserted, skipped_dup, failed,
+    )
 
 
 async def _run_backcheck() -> None:
