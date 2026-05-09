@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.tapeline.io";
 
@@ -10,6 +10,49 @@ type StatusBody = {
     worker_last_tick?: { regime?: string; age_seconds?: number };
   };
 };
+
+/**
+ * Counts up to `target` over ~1.2s the first time a non-null value
+ * arrives, eased. Subsequent updates snap (no re-animation per refresh).
+ * Honours prefers-reduced-motion — those users see the final value
+ * immediately, no animation. Returns the integer to display.
+ */
+function useCountUp(target: number | null, durationMs = 1200): number | null {
+  const [value, setValue] = useState<number | null>(null);
+  const seenRef = useRef(false);
+
+  useEffect(() => {
+    if (target == null) return;
+    // After the initial draw, just snap to the latest value rather than
+    // re-animating on every 60s status refresh.
+    if (seenRef.current) {
+      setValue(target);
+      return;
+    }
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setValue(target);
+      seenRef.current = true;
+      return;
+    }
+    const start = 0;
+    const startTime = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - startTime) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setValue(Math.round(start + (target - start) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else seenRef.current = true;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+
+  return value;
+}
 
 /**
  * Live counter strip — plucked from /api/status, refreshed every 60s.
@@ -53,14 +96,35 @@ export function LiveCounters() {
     };
   }, []);
 
+  // Animated counts for the two integer cells; the other two are text.
+  const tickersAnim = useCountUp(data.tickers);
+  const newsAnim = useCountUp(data.news);
+
   return (
     // grid-cols-2 on mobile so the strip is compact (2x2) rather than four
     // tall cards stacked. Expands to 1x4 from sm breakpoint up.
     <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
-      <Counter label="Tickers tracked" value={data.tickers != null ? data.tickers.toLocaleString() : "—"} sub="from Massive reference" />
-      <Counter label="News items indexed" value={data.news != null ? data.news.toLocaleString() : "—"} sub="rolling, ~5min refresh" />
-      <Counter label="Scoring cadence" value="60s" sub={data.age != null ? `last tick ${data.age}s ago` : "every market tick"} live />
-      <Counter label="Current regime" value={data.regime ?? "—"} sub="VIX + breadth + 10Y + DXY" />
+      <Counter
+        label="Tickers tracked"
+        value={tickersAnim != null ? tickersAnim.toLocaleString() : "—"}
+        sub="from Massive reference"
+      />
+      <Counter
+        label="News items indexed"
+        value={newsAnim != null ? newsAnim.toLocaleString() : "—"}
+        sub="rolling, ~5min refresh"
+      />
+      <Counter
+        label="Scoring cadence"
+        value="60s"
+        sub={data.age != null ? `last tick ${data.age}s ago` : "every market tick"}
+        live
+      />
+      <Counter
+        label="Current regime"
+        value={data.regime ?? "—"}
+        sub="VIX + breadth + 10Y + DXY"
+      />
     </div>
   );
 }

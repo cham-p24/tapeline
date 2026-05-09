@@ -59,9 +59,16 @@ export function MarketingFooter() {
             Read the full <Link href="/legal/risk" className="text-accent hover:underline">risk disclosure</Link>
             {" "}before relying on any signal. Talk to a licensed advisor before making investment decisions.
           </p>
+          {/* One line of voice — most SaaS footers read like form letters.
+              This admits a human is behind the wheel, which is itself the
+              brand promise: published formula, public scorecard, no
+              corporate ambiguity. */}
+          <p className="mt-4 text-subtle italic">
+            Built in Melbourne by a single human who got tired of newsletter shops hiding their losers.
+          </p>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-subtle">
-              © {new Date().getFullYear()} Tapeline. Built in Melbourne. tapeline.io
+              © {new Date().getFullYear()} Tapeline. tapeline.io
             </p>
             {/* Live operational pill — fetched from /api/status on a 30s
                 interval. Passive trust signal across every public page. */}

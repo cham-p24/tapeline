@@ -130,6 +130,18 @@ export function PricingTable() {
                   <p className="mt-1.5 text-xs text-muted">Billed ${price}/yr · save ${(p.prices.monthly * 12) - p.prices.annual}/yr</p>
                 )}
               </div>
+              {/* Premium card: price-anchor chip — Bloomberg Terminal as the
+                  universally-known "expensive professional terminal" cost.
+                  Makes $479/yr read as 98% off the same data spine. */}
+              {(p as { proPlus?: boolean }).proPlus && billing === "annual" && price > 0 && (
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-up/20 bg-up/5 px-2.5 py-1 text-[11px] text-up">
+                  <span aria-hidden="true">↘</span>
+                  <span className="text-fg">98% cheaper</span>
+                  <span className="text-muted">than Bloomberg Terminal</span>
+                  <span className="text-subtle line-through nums">$31,980/yr</span>
+                </div>
+              )}
+
               {/* Premium card: "Everything in Pro" anchor strip above the
                   bullets so the upgrade reason is the additions, not "look
                   here's a duplicate of the Pro list". */}
@@ -171,7 +183,7 @@ export function PricingTable() {
       <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
         <span>14-day Premium trial · no card</span>
         <span className="text-subtle">·</span>
-        <span>7-day money back</span>
+        <span>30-day money back</span>
         <span className="text-subtle">·</span>
         <span>Annual price locked forever</span>
         <span className="text-subtle">·</span>
