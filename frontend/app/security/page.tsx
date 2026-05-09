@@ -2,12 +2,14 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = {
-  title: "Security — Tapeline",
+export const metadata = pageMeta({
+  title: "Tapeline Security: Encryption, Password Storage, Payments, Disclosure",
   description:
-    "How Tapeline handles your data: encryption, password storage, payment data, vulnerability disclosure. We'd rather over-explain than make you guess.",
-};
+    "How Tapeline handles your data: TLS in transit, encryption at rest, Argon2 password hashing, Stripe-vaulted payment data, and our public vulnerability disclosure process. We'd rather over-explain than make you guess.",
+  path: "/security",
+});
 
 const VERIFIED_ON = "2026-05-04";
 

@@ -2,8 +2,40 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { pageMeta } from "@/lib/seo";
+import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-export const metadata = { title: "How it works — Tapeline" };
+export const metadata = pageMeta({
+  title: "How Tapeline Works: 6-Factor Stock Scoring Formula (Public Weights)",
+  description:
+    "How the Tapeline Score is calculated: a transparent weighted blend of Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Public weights, exact methodology, no black box.",
+  path: "/how-it-works",
+});
+
+// Q/A drawn from the page so Google can render the methodology FAQ under
+// "tapeline how it works" / "how is the tapeline score calculated" SERPs.
+const HOW_FAQ = [
+  {
+    q: "How is the Tapeline Score calculated?",
+    a: "Each ticker gets six sub-scores (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), each normalised to 0-100. The composite is a weighted sum: 25% Trend + 20% Relative Strength + 15% Fundamentals + 15% Smart Money + 15% Macro + 10% Momentum. Weights are fixed and public; any change ships through the public changelog.",
+  },
+  {
+    q: "What do the signal labels mean?",
+    a: "Six descriptive tiers map to score ranges: HIGH CONVICTION (85-100), STRONG SETUP (70-84), CONSTRUCTIVE (55-69), NEUTRAL (40-54), CAUTION (25-39), WEAK (0-24). Labels are descriptive, not prescriptive — Tapeline is not a registered investment adviser and does not issue buy/sell calls.",
+  },
+  {
+    q: "How often does the score update?",
+    a: "Scores re-tick every minute during market hours and persist between sessions. Most data feeds (price, volume, RSI, MACD, regime) update sub-60s; fundamentals refresh on company filing cadence; insider Form 4 within hours of SEC filing.",
+  },
+  {
+    q: "What is the per-ticker confidence percentage?",
+    a: "Confidence reflects how many of the underlying data feeds returned data for a given ticker — not every name has Quiver 13F coverage, P/E, or recent insider filings. 95%+ means full data on every signal feature; under 40% means sparse data and the score should be deprioritised.",
+  },
+  {
+    q: "Is the formula really public?",
+    a: "Yes. The exact 6-factor weighted equation is published on this page and reproduced in our blog, with every weight change versioned in the public changelog. The moat is the data spine plus the public scorecard — anyone is welcome to copy the formula.",
+  },
+];
 
 const FACTORS = [
   { name: "Trend",               weight: 25, desc: "Slope of 20/50/200-day moving averages, MACD direction, distance from 200DMA." },
@@ -26,6 +58,8 @@ const SIGNALS = [
 export default function HowItWorksPage() {
   return (
     <main className="min-h-screen">
+      {/* FAQPage schema for the methodology questions below. */}
+      <script {...jsonLdScript(faqJsonLd(HOW_FAQ))} />
       <MarketingNav />
 
       {/* Hero */}
@@ -133,6 +167,27 @@ export default function HowItWorksPage() {
                     <span className="font-mono text-muted nums w-16 text-right">{s.range}</span>
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ — visible content that mirrors HOW_FAQ JSON-LD above. */}
+      <section className="border-t border-border/60 bg-panel/20">
+        <div className="section py-16">
+          <div className="mx-auto max-w-3xl">
+            <p className="eyebrow">Common questions</p>
+            <h2 className="mt-3 text-3xl font-semibold">Methodology FAQ</h2>
+            <div className="mt-8 divide-y divide-border border-y border-border">
+              {HOW_FAQ.map((item) => (
+                <details key={item.q} className="group py-4">
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                    <h3 className="text-sm sm:text-base font-medium">{item.q}</h3>
+                    <span className="text-muted transition-transform group-open:rotate-45">+</span>
+                  </summary>
+                  <p className="mt-3 text-sm text-muted leading-relaxed">{item.a}</p>
+                </details>
               ))}
             </div>
           </div>

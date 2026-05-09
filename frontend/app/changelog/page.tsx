@@ -2,11 +2,14 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = {
-  title: "Changelog — Tapeline",
-  description: "Every change to Tapeline, with the date it shipped. Public, immutable, no marketing spin.",
-};
+export const metadata = pageMeta({
+  title: "Tapeline Changelog — Every Shipped Release, Dated",
+  description:
+    "Public, immutable Tapeline changelog. New features, bug fixes, methodology updates and weight changes — every shipped release with the date it landed. No marketing spin.",
+  path: "/changelog",
+});
 
 type Entry = {
   date: string;

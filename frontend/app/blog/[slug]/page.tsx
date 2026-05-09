@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { findPost, POSTS } from "../posts";
+import { pageMeta } from "@/lib/seo";
+import { articleJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export async function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -10,25 +12,20 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const post = findPost(params.slug);
-  if (!post) return { title: "Post not found — Tapeline" };
-  return {
+  if (!post) {
+    return pageMeta({
+      title: "Post not found — Tapeline",
+      description: "This post no longer exists or has moved. Browse the latest at /blog.",
+      path: `/blog/${params.slug}`,
+    });
+  }
+  return pageMeta({
     title: post.title,
     description: post.excerpt,
-    alternates: { canonical: `https://tapeline.io/blog/${post.slug}` },
-    openGraph: {
-      title: post.title,
-      description: post.excerpt,
-      type: "article",
-      publishedTime: post.publishedAt,
-      authors: [post.author],
-      url: `https://tapeline.io/blog/${post.slug}`,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: post.title,
-      description: post.excerpt,
-    },
-  };
+    path: `/blog/${post.slug}`,
+    ogType: "article",
+    publishedTime: post.publishedAt,
+  });
 }
 
 export default function BlogPost({ params }: { params: { slug: string } }) {
@@ -37,6 +34,19 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
 
   return (
     <main className="min-h-screen">
+      {/* Article schema — gives Google an explicit headline, datePublished
+          and author for rich-result eligibility. */}
+      <script
+        {...jsonLdScript(
+          articleJsonLd({
+            title: post.title,
+            description: post.excerpt,
+            url: `https://tapeline.io/blog/${post.slug}`,
+            publishedAt: post.publishedAt,
+            author: post.author,
+          }),
+        )}
+      />
       <MarketingNav />
 
       <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">

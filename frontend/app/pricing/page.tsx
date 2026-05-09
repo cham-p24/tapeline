@@ -3,12 +3,42 @@ import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
+import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-export const metadata = { title: "Pricing — Tapeline" };
+export const metadata = pageMeta({
+  title: "Tapeline Pricing: Pro $24.99/mo · Premium $39.99/mo · 14-Day Free Trial",
+  description:
+    "Tapeline plans: Free (top 20 tickers, 24-hour delayed), Pro from $24.99/mo (annual) for the live ~2,500-ticker universe, Premium from $39.99/mo (annual) adds Congressional trades, elite 13F holdings, Telegram alerts. 14-day Premium trial, no credit card.",
+  path: "/pricing",
+});
+
+// FAQs already on the page — mirror them in JSON-LD so Google can show
+// the rich-result accordion under our SERP listing for "tapeline pricing".
+const FAQ_ITEMS = [
+  {
+    q: "What happens when my trial ends?",
+    a: "Your account drops to Free — top 20 tickers, 24-hour delayed. Watchlists and settings stay intact. Add a card any time to keep Premium.",
+  },
+  {
+    q: "Can I switch plans later?",
+    a: "Yes — any time, prorated automatically. Upgrade takes effect immediately. Downgrade at the end of your billing period.",
+  },
+  {
+    q: "Refund policy?",
+    a: "7-day money back on any paid plan. Email support@tapeline.io in your first week, we refund in full — no forms.",
+  },
+  {
+    q: "Will prices go up?",
+    a: "Possibly. When they do, annual subscribers are grandfathered at their current rate for as long as their subscription is active.",
+  },
+];
 
 export default function PricingPage() {
   return (
     <main className="min-h-screen">
+      {/* FAQPage schema — mirrors the on-page FAQ. */}
+      <script {...jsonLdScript(faqJsonLd(FAQ_ITEMS))} />
       <MarketingNav />
 
       {/* Hero — single tight intro, no orphaned scroll links */}
