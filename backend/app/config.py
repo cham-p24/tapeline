@@ -96,6 +96,14 @@ class Settings(BaseSettings):
     # ticker mentions per article.
     benzinga_api_key: str = ""
 
+    # ---- Internal alert webhook (cron health checks) ----
+    # Random shared secret used by GitHub Actions cron to authenticate
+    # to /api/internal/alert. Generate with:
+    #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+    # Set on Fly + as a NEWS_FRESHNESS_WEBHOOK GitHub repo variable
+    # containing the full URL: https://api.tapeline.io/api/internal/alert?token=<secret>
+    internal_alert_secret: str = ""
+
     # ---- Bot protection (Cloudflare Turnstile, optional) ----
     # When secret key is unset, Turnstile verification passes through (dev mode).
     # Honeypot field + disposable-email block always run regardless.

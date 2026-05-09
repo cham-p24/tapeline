@@ -21,6 +21,7 @@ from app.routers import (
     congress,
     heatmap,
     holdings,
+    internal,
     me,
     news,
     oauth,
@@ -352,6 +353,7 @@ app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
+app.include_router(internal.router, prefix="/api/internal", tags=["internal"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
