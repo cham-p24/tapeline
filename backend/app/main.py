@@ -255,6 +255,54 @@ async def status() -> dict[str, object]:
                 }
             else:
                 checks["worker_last_tick"] = {"status": "unknown", "detail": "no regime row yet"}
+
+            # News-health probe — added 2026-05-09 after the 14h-stale incident
+            # where _refresh_news was failing silently on a column-width
+            # overflow. Age is the wire-freshness floor; 24h count is the
+            # "is the worker still inserting at all" signal.
+            from datetime import timedelta as _td
+
+            latest_news = (
+                await session.execute(
+                    select(NewsItem.published_at)
+                    .order_by(NewsItem.published_at.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            since_24h = datetime.now(UTC) - _td(hours=24)
+            n_24h = (
+                await session.execute(
+                    select(func.count(NewsItem.id)).where(
+                        NewsItem.created_at >= since_24h
+                    )
+                )
+            ).scalar_one()
+
+            if latest_news is not None:
+                news_age = (datetime.now(UTC) - latest_news).total_seconds()
+                # Coarse threshold v1 — "ok" up to 1h (covers market-hours
+                # cadence and the slowest weekend wire), "stale" up to 8h
+                # (catches multi-cycle insert failures), "down" beyond.
+                # Will refine to market-hours-aware later.
+                if news_age < 3600:
+                    n_status = "ok"
+                elif news_age < 28800:  # 8h
+                    n_status = "stale"
+                else:
+                    n_status = "down"
+                checks["news"] = {
+                    "status": n_status,
+                    "latest_article_age_seconds": int(news_age),
+                    "latest_published_at": latest_news.isoformat(),
+                    "articles_last_24h": int(n_24h or 0),
+                }
+                # Bubble up to top-level status so the public /status pill
+                # turns yellow when news is stale even if everything else
+                # is fine.
+                if n_status in ("stale", "down"):
+                    out["status"] = "degraded"
+            else:
+                checks["news"] = {"status": "unknown", "detail": "no news rows yet"}
     except Exception as exc:
         checks["database"] = {"status": "error", "detail": str(exc)[:200]}
         out["status"] = "degraded"

@@ -57,6 +57,7 @@ _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run 
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
+_last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
 
 
@@ -208,6 +209,17 @@ async def tick() -> None:
     if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
         await _downgrade_expired_trials()
         _last_trial_check = started
+
+    # Hourly per-watchlisted-ticker news refresh (Premium tier feature).
+    # Broad sweep + Massive cover the loud names; this fan-out covers the
+    # tickers users specifically care about — small-caps, UK ADRs (BUR
+    # etc.), niche names where the broad sweep doesn't surface anything.
+    # Quota math: 1000 unique tickers × 1/hour = 24k Benzinga calls/day,
+    # well under the 4000/min limit. Finnhub (60/min) handled via fallback.
+    global _last_watchlisted_news_refresh
+    if _last_watchlisted_news_refresh is None or (started - _last_watchlisted_news_refresh).total_seconds() >= 3600:
+        await _refresh_watchlisted_news()
+        _last_watchlisted_news_refresh = started
 
     # Daily 13F holdings refresh (Quiver, with mock fallback).
     # 24h cadence is conservative — SEC reporting window is 45 days anyway.
@@ -407,6 +419,78 @@ async def _refresh_news() -> None:
     logger.info(
         "news.refreshed fetched=%d inserted=%d duplicate=%d failed=%d",
         len(items), inserted, skipped_dup, failed,
+    )
+
+
+async def _refresh_watchlisted_news() -> None:
+    """Hourly per-watchlisted-ticker news refresh — Premium-tier feature.
+
+    The 5-min broad sweep covers high-volume names. Long-tail tickers
+    (small-caps, UK ADRs like BUR, niche ETFs) often never appear in the
+    broad sweep because Benzinga prioritises trending US large-caps. This
+    fan-out fetches per-ticker news for every symbol on every Premium-
+    tier user's watchlist, using the Benzinga → Massive → Finnhub chain.
+
+    Cap at 1000 unique tickers per cycle to bound work. Inserts use the
+    same per-article isolation pattern as `_refresh_news` so one bad row
+    can't poison the rest. Logs `inserted` / `duplicate` / `failed`
+    counts for the same observability reasons.
+    """
+    from app.models import User
+    from app.models.watchlist import WatchlistItem
+    from app.services.news_feed import fetch_news_for_ticker
+
+    try:
+        async with session_scope() as session:
+            # Union of all symbols on Premium-tier users' watchlists.
+            # Trial users count as Premium for the trial window — they're
+            # already in tier="premium" until _downgrade_expired_trials drops
+            # them. So this query naturally covers them.
+            rows = await session.execute(
+                select(WatchlistItem.symbol)
+                .join(User, User.id == WatchlistItem.user_id)
+                .where(User.tier == "premium")
+                .distinct()
+                .limit(1000)
+            )
+            symbols = [s[0] for s in rows.all() if s[0]]
+    except Exception:
+        logger.exception("watchlisted_news.symbols_query_failed")
+        return
+
+    if not symbols:
+        logger.info("watchlisted_news.skipped reason=no_premium_watchlists")
+        return
+
+    inserted = 0
+    skipped_dup = 0
+    failed = 0
+    for sym in symbols:
+        try:
+            articles = await fetch_news_for_ticker(sym, limit=5)
+        except Exception:
+            logger.exception("watchlisted_news.fetch_failed symbol=%s", sym)
+            continue
+        for it in articles:
+            try:
+                async with session_scope() as session:
+                    exists = await session.execute(
+                        select(NewsItem).where(NewsItem.id == it["id"])
+                    )
+                    if exists.scalar_one_or_none() is not None:
+                        skipped_dup += 1
+                        continue
+                    session.add(NewsItem(**it))
+                inserted += 1
+            except Exception:
+                failed += 1
+                logger.exception(
+                    "watchlisted_news.insert_failed symbol=%s id=%s",
+                    sym, it.get("id"),
+                )
+    logger.info(
+        "watchlisted_news.refreshed unique_tickers=%d inserted=%d duplicate=%d failed=%d",
+        len(symbols), inserted, skipped_dup, failed,
     )
 
 

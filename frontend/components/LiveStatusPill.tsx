@@ -9,6 +9,10 @@ type StatusBody = {
   checks?: {
     database?: { status?: string };
     worker_last_tick?: { status?: string; age_seconds?: number };
+    news?: {
+      status?: string;
+      latest_article_age_seconds?: number;
+    };
   };
 };
 
@@ -40,13 +44,20 @@ export function LiveStatusPill({ compact = false }: { compact?: boolean }) {
         const age = body.checks?.worker_last_tick?.age_seconds ?? 0;
         // Worker tick should land every 60s; flag stale beyond 5min.
         const fresh = age < 300;
+        // News health — backend bubbles up status:"degraded" when news is
+        // stale (>1h) or down (>8h). Surface a more specific label so the
+        // pill answers "what's degraded?" not just "something."
+        const newsStatus = body.checks?.news?.status;
+        const newsStale = newsStatus === "stale" || newsStatus === "down";
         if (!mounted) return;
-        if (overall && dbOk && workerOk && fresh) {
+        if (overall && dbOk && workerOk && fresh && !newsStale) {
           setTone("ok");
           setLabel("All systems operational");
         } else if (dbOk) {
           setTone("degraded");
-          setLabel(fresh ? "Degraded" : "Worker tick stale");
+          if (!fresh) setLabel("Worker tick stale");
+          else if (newsStale) setLabel("News feed stale");
+          else setLabel("Degraded");
         } else {
           setTone("down");
           setLabel("Issue detected");

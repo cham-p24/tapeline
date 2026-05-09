@@ -1,0 +1,22 @@
+name: News freshness check
+
+on:
+  schedule:
+    # Every 15 min. GitHub Actions cron is best-effort (often runs 5-15
+    # min late under load); the freshness threshold is wider than the
+    # cron lag so this isn't an issue.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:        # Manual trigger from the Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run news freshness check
+        run: |
+          # Standalone — no deps, no venv, just stdlib + urllib.
+          python backend/app/scripts/check_news_freshness.py \
+            --base "${{ vars.TAPELINE_API_BASE || 'https://api.tapeline.io' }}" \
+            ${{ vars.NEWS_FRESHNESS_WEBHOOK && format('--webhook "{0}"', vars.NEWS_FRESHNESS_WEBHOOK) || '' }}
