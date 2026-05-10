@@ -37,10 +37,14 @@ export function MarketingFooter() {
           <FooterCol title="Compare">
             <FooterLink href="/compare/finviz" desc="Why traders switch from Finviz">vs Finviz</FooterLink>
             <FooterLink href="/compare/zacks" desc="Live scanner vs static rankings">vs Zacks</FooterLink>
-            <FooterLink href="/compare/wallstreetzen" desc="Public formula vs 115-factor letter grade">vs WallStreetZen</FooterLink>
+            <FooterLink href="/compare/tradingview" desc="Score-first vs chart-first">vs TradingView</FooterLink>
+            <FooterLink href="/compare/trade-ideas" desc="Public formula at 1/5 the price">vs Trade Ideas</FooterLink>
+            <FooterLink href="/best-stock-scanners" desc="Hand-tested ranking, 10 tools">Best stock scanners</FooterLink>
           </FooterCol>
 
-          <FooterCol title="Trust">
+          <FooterCol title="Company">
+            <FooterLink href="/about" desc="Who built Tapeline + transparency timeline">About</FooterLink>
+            <FooterLink href="/press" desc="Logos, fact sheet, founder bio">Press kit</FooterLink>
             <FooterLink href="/status" desc="Live API + worker uptime, refresh every 30s">System status</FooterLink>
             <FooterLink href="/security" desc="Encryption, payment data, vulnerability disclosure">Security</FooterLink>
             <FooterLink href="/legal/terms" desc="Subscription terms, cancellation, refunds">Terms</FooterLink>
