@@ -15,10 +15,26 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import TypedDict
 
 import httpx
 
 from app.config import get_settings
+
+
+class MacroIndicators(TypedDict):
+    """Typed return shape for `fetch_macro_indicators`.
+
+    Numeric series return None when FRED isn't configured or the call failed
+    (caller substitutes a sensible default). `rate_direction` is always one
+    of RISING / FALLING / SIDEWAYS — never None — because we treat absence of
+    history as SIDEWAYS rather than nullable.
+    """
+
+    dxy: float | None
+    yield_10y: float | None
+    vix: float | None
+    rate_direction: str
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -147,7 +163,7 @@ def _direction(history: list[float], threshold_pct: float = 0.5) -> str:
     return "SIDEWAYS"
 
 
-async def fetch_macro_indicators() -> dict[str, float | str | None]:
+async def fetch_macro_indicators() -> MacroIndicators:
     """Returns {dxy, yield_10y, vix, rate_direction}.
 
     `rate_direction` is RISING / FALLING / SIDEWAYS based on the 10Y
@@ -155,9 +171,10 @@ async def fetch_macro_indicators() -> dict[str, float | str | None]:
     is configured.
     """
     history_10y = await _fetch_series_history(TREASURY_10Y, limit=35)
-    return {
-        "dxy": await _fetch_series_latest(DXY_SERIES),
-        "yield_10y": history_10y[0] if history_10y else await _fetch_series_latest(TREASURY_10Y),
-        "vix": await _fetch_series_latest(VIX_SERIES),
-        "rate_direction": _direction(history_10y),
-    }
+    yield_10y_latest: float | None = history_10y[0] if history_10y else await _fetch_series_latest(TREASURY_10Y)
+    return MacroIndicators(
+        dxy=await _fetch_series_latest(DXY_SERIES),
+        yield_10y=yield_10y_latest,
+        vix=await _fetch_series_latest(VIX_SERIES),
+        rate_direction=_direction(history_10y),
+    )
