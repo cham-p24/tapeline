@@ -3,15 +3,14 @@
 import { useEffect, useState } from "react";
 
 /**
- * High-fidelity scanner preview for the landing hero — matches the layout
- * of /app/scanner (live page, signed-in users) one-for-one: same column
- * order, same signal pill colours, same "Why"-sentence cadence, same
- * "Showing X of N · refresh every Ys" footer. Visitors see the actual
- * product surface, just frozen in time and without the app chrome.
+ * Live top-6 scanner preview for the landing hero. Pulls real scores
+ * from /api/scanner every 30s — visitors see the actual scoreboard,
+ * not a fixed mock. Falls back to a neutral seed if the fetch fails.
  *
- * Not wired to real data — but scores + 1d% nudge every 4s so the page
- * looks alive. Subtle accent flash on the mutating row sells the
- * "watching the tape" feel without overwhelming.
+ * The transparency moat ("we publish every score") only works if the
+ * homepage is honest. Prior version drifted six fixed mega-caps via
+ * Math.random; that was indistinguishable from a fake widget and
+ * undermined credibility on launch day.
  */
 type Row = {
   sym: string;
@@ -23,14 +22,14 @@ type Row = {
   why: string;
 };
 
-const INITIAL_ROWS: Row[] = [
-  { sym: "NVDA", sector: "Tech",        score: 92.4, conf: 94, sig: "HIGH CONVICTION", d1:  2.14, why: "Trend strength at a fresh cycle high; insider net buying over the last 90 days; momentum accelerating into the move." },
-  { sym: "MSFT", sector: "Tech",        score: 88.7, conf: 91, sig: "HIGH CONVICTION", d1:  1.02, why: "Leadership uptrend with steepening slope; outperforming the sector by a wide margin; smart-money flow positive." },
-  { sym: "LLY",  sector: "Healthcare",  score: 81.3, conf: 88, sig: "STRONG SETUP",    d1:  0.74, why: "Outperforming the sector on every timeframe — fundamentals top decile (revenue + margin trend + ROE)." },
-  { sym: "CAT",  sector: "Industrials", score: 76.1, conf: 82, sig: "STRONG SETUP",    d1:  0.45, why: "Primary trend decisively up across all timeframes; institutions adding (recent 13F filings); favourable macro backdrop." },
-  { sym: "XOM",  sector: "Energy",      score: 68.9, conf: 78, sig: "CONSTRUCTIVE",    d1: -0.32, why: "Insider buying picking up; macro tailwind on rates + crude; trend lagging on the 1M but improving." },
-  { sym: "AAPL", sector: "Tech",        score: 58.4, conf: 91, sig: "NEUTRAL",         d1: -0.15, why: "Mixed signals across factors — fundamentals fine, trend rolling under the 50DMA, smart-money flat." },
+// Frozen fallback if the live fetch fails — kept conservative so it
+// can't be confused with real top picks. No HIGH CONVICTION rows.
+const FALLBACK_ROWS: Row[] = [
+  { sym: "SPY", sector: "Index", score: 60.0, conf: 95, sig: "CONSTRUCTIVE", d1: 0.10, why: "Loading live picks…" },
+  { sym: "QQQ", sector: "Index", score: 60.0, conf: 95, sig: "CONSTRUCTIVE", d1: 0.10, why: "Loading live picks…" },
 ];
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 function signalForScore(s: number): string {
   if (s >= 85) return "HIGH CONVICTION";
@@ -41,36 +40,54 @@ function signalForScore(s: number): string {
   return "WEAK";
 }
 
+type ScannerItem = {
+  symbol: string;
+  sector: string | null;
+  score: number | null;
+  signal: string | null;
+  change_pct_1d: number | null;
+  confidence_pct: number | null;
+  reason: string | null;
+};
+
 export function ScannerPreview() {
-  const [rows, setRows] = useState<Row[]>(INITIAL_ROWS);
+  const [rows, setRows] = useState<Row[]>(FALLBACK_ROWS);
   const [flashIdx, setFlashIdx] = useState<number | null>(null);
   const [secsSinceTick, setSecsSinceTick] = useState(0);
 
   useEffect(() => {
-    // Each scoring tick: pick one row, nudge its score by ±0.1–0.6, drift
-    // 1d% slightly, recompute signal. Visually: a gentle background flash
-    // on the row that changed so the eye registers movement.
-    const tick = () => {
-      setRows((prev) => {
-        const i = Math.floor(Math.random() * prev.length);
-        const nudge = (Math.random() * 0.6 - 0.25);
-        const dNudge = (Math.random() * 0.4 - 0.18);
-        const next = [...prev];
-        const newScore = Math.max(20, Math.min(99, next[i].score + nudge));
-        const newD1 = Math.max(-3.5, Math.min(3.5, next[i].d1 + dNudge));
-        next[i] = {
-          ...next[i],
-          score: round1(newScore),
-          d1: round2(newD1),
-          sig: signalForScore(newScore),
-        };
-        setFlashIdx(i);
-        return next;
-      });
-      setSecsSinceTick(0);
+    let prevTopSym: string | null = null;
+    const fetchLive = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/scanner?sort=score&order=desc&limit=6`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as { items?: ScannerItem[] };
+        const items = (body.items ?? []).filter((i) => i.score != null && i.score > 0);
+        if (items.length === 0) return;
+        const next: Row[] = items.map((i) => ({
+          sym: i.symbol,
+          sector: i.sector || "—",
+          score: i.score ?? 0,
+          conf: Math.round(i.confidence_pct ?? 0),
+          sig: i.signal || signalForScore(i.score ?? 0),
+          d1: i.change_pct_1d ?? 0,
+          why: i.reason || "Score updates per tick — open the scanner for the full why.",
+        }));
+        setRows(next);
+        if (prevTopSym && prevTopSym !== next[0].sym) {
+          setFlashIdx(0);
+        }
+        prevTopSym = next[0].sym;
+        setSecsSinceTick(0);
+      } catch {
+        // Silent — fallback rows already showing
+      }
     };
 
-    const tickId = setInterval(tick, 4000);
+    fetchLive();
+    const tickId = setInterval(fetchLive, 30000);
     const counterId = setInterval(() => setSecsSinceTick((s) => s + 1), 1000);
     const flashClearId = setInterval(() => setFlashIdx(null), 850);
 
@@ -158,5 +175,3 @@ export function ScannerPreview() {
   );
 }
 
-function round1(n: number) { return Math.round(n * 10) / 10; }
-function round2(n: number) { return Math.round(n * 100) / 100; }

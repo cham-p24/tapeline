@@ -235,14 +235,21 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
             </div>
           </div>
           <div className="text-right flex-shrink-0">
+            {/* Treat price <= 0 (and the bogus -100% companion) as "not yet
+                ingested" rather than a real $0 stock. Happens transiently
+                between deploy and first worker tick when Ticker.price is
+                NULL — better to show "—" than "$0.00 / -100% today". */}
             <div className="text-2xl sm:text-3xl font-bold nums">
-              {data.price != null ? `$${data.price.toFixed(2)}` : "—"}
+              {data.price != null && data.price > 0 ? `$${data.price.toFixed(2)}` : "—"}
             </div>
-            {data.change_pct_1d != null && (
+            {data.change_pct_1d != null && data.price != null && data.price > 0 && data.change_pct_1d > -100 && (
               <div className={`text-sm font-medium nums ${changeColor}`}>
                 {change >= 0 ? "+" : ""}
                 {change.toFixed(2)}% today
               </div>
+            )}
+            {(data.price == null || data.price <= 0) && (
+              <div className="text-xs text-muted">price refreshing…</div>
             )}
           </div>
         </div>

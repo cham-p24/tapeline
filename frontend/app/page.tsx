@@ -18,12 +18,12 @@ export default function LandingPage() {
       <section className="relative overflow-hidden px-6 pt-16 pb-12">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 mx-auto h-[640px] max-w-6xl"
+          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 mx-auto h-[640px] max-w-7xl"
         >
           <div className="absolute left-1/2 top-0 h-[480px] w-[920px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
           <div className="absolute left-[12%] top-32 h-[280px] w-[420px] rounded-full bg-up/5 blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl grid gap-10 lg:grid-cols-5 lg:gap-8">
+        <div className="mx-auto max-w-7xl grid gap-10 lg:grid-cols-5 lg:gap-8">
           {/* Left: copy */}
           <div className="lg:col-span-2">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
@@ -76,7 +76,7 @@ export default function LandingPage() {
           refreshed every 60s. Replaces vague "live" with specifics: how
           many tickers, how many news items, current regime, last tick. */}
       <section className="border-t border-border bg-panel/20">
-        <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-8">
           <LiveCounters />
         </div>
       </section>
@@ -86,7 +86,7 @@ export default function LandingPage() {
           Reads as a confident factual claim, not a marketing line, because
           each pillar links to the artefact that proves it. */}
       <section>
-        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 sm:grid-cols-3">
+        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-10 sm:grid-cols-3">
           <FadeIn delayMs={0}>
             <Pillar
               label="Six published weights"
@@ -119,7 +119,7 @@ export default function LandingPage() {
 
       {/* Data + legal microcopy — quieter strip beneath the moat pillars. */}
       <section className="border-y border-border bg-panel/50">
-        <div className="mx-auto grid max-w-6xl gap-3 px-6 py-4 text-center text-xs text-muted sm:grid-cols-3">
+        <div className="mx-auto grid max-w-7xl gap-3 px-6 py-4 text-center text-xs text-muted sm:grid-cols-3">
           <div>🔬 Powered by Massive (formerly Polygon.io) licensed data</div>
           <div>📈 Every pick on the <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link></div>
           <div>⚠️ Informational only — <Link href="/legal/risk" className="text-accent hover:underline">not investment advice</Link></div>
@@ -127,7 +127,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it works — 3 steps */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
+      <section className="mx-auto max-w-7xl px-6 py-20">
         <h2 className="text-3xl font-bold tracking-tight">How it works</h2>
         <p className="mt-2 text-muted">From data to decision in one glance.</p>
 
