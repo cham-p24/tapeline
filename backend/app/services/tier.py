@@ -175,7 +175,7 @@ def is_on_trial(
     return trial_ends_at > now
 
 
-def effective_limit(user: "User", key: str) -> int:
+def effective_limit(user: User, key: str) -> int:
     """Return the cap for `key` accounting for trial-state throttling.
 
     Paid users get `limit(tier, key)` unchanged. Trial-state Premium users

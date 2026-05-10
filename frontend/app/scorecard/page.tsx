@@ -89,55 +89,55 @@ export default function ScorecardPage() {
           Scorecard starts logging today. Come back tomorrow to see the first day&apos;s results.
         </div>
       ) : (
-        <div className="mt-8 space-y-4">
+        <div className="mt-8 space-y-10">
           {dates.map((d) => (
-            <div key={d} className="card">
-              <div className="border-b border-border p-4">
-                {/* Locale-aware day header — toDateString() forced English
-                    "Thu May 07 2026"; this matches the visitor's browser
-                    locale + timezone via Intl. */}
-                <h2 className="font-semibold">
-                  {new Date(d).toLocaleDateString(undefined, {
-                    weekday: "short",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </h2>
-              </div>
+            // Borderless day group — no card chrome, the date header is the
+            // separator. Lets the table breathe into the page background and
+            // fits more vertical density on /scorecard. Per launch feedback:
+            // the card outline made it read as a heavy spreadsheet, not a
+            // continuous record.
+            <section key={d}>
+              <h2 className="px-1 pb-3 text-sm font-medium uppercase tracking-wide text-muted">
+                {new Date(d).toLocaleDateString(undefined, {
+                  weekday: "short",
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </h2>
               <table className="w-full text-sm nums">
-                <thead className="bg-black/40 text-xs uppercase text-muted">
+                <thead className="text-xs uppercase text-muted">
                   <tr>
-                    <th className="px-4 py-2 text-left">#</th>
-                    <th className="px-4 py-2 text-left">Ticker</th>
-                    <th className="px-4 py-2 text-right">Score</th>
-                    <th className="px-4 py-2 text-right">Price at flag</th>
-                    <th className="px-4 py-2 text-right">Next day</th>
-                    <th className="px-4 py-2 text-right">SPY</th>
-                    <th className="px-4 py-2 text-right">Alpha</th>
+                    <th className="px-2 py-2 text-left font-normal">#</th>
+                    <th className="px-2 py-2 text-left font-normal">Ticker</th>
+                    <th className="px-2 py-2 text-right font-normal">Score</th>
+                    <th className="px-2 py-2 text-right font-normal">Price at flag</th>
+                    <th className="px-2 py-2 text-right font-normal">Next day</th>
+                    <th className="px-2 py-2 text-right font-normal">SPY</th>
+                    <th className="px-2 py-2 text-right font-normal">Alpha</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.days[d].map((e) => (
-                    <tr key={e.symbol} className="border-b border-border/50">
-                      <td className="px-4 py-2 text-muted">{e.rank}</td>
-                      <td className="px-4 py-2 font-medium">{e.symbol}</td>
-                      <td className="px-4 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-right">${e.price_at_flag.toFixed(2)}</td>
-                      <td className={`px-4 py-2 text-right ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                    <tr key={e.symbol} className="border-b border-border/20 last:border-0">
+                      <td className="px-2 py-2 text-muted">{e.rank}</td>
+                      <td className="px-2 py-2 font-medium">{e.symbol}</td>
+                      <td className="px-2 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
+                      <td className="px-2 py-2 text-right">${e.price_at_flag.toFixed(2)}</td>
+                      <td className={`px-2 py-2 text-right ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.change_pct_1d_after != null ? `${e.change_pct_1d_after >= 0 ? "+" : ""}${e.change_pct_1d_after.toFixed(2)}%` : "pending"}
                       </td>
-                      <td className="px-4 py-2 text-right text-muted">
+                      <td className="px-2 py-2 text-right text-muted">
                         {e.spy_change_pct_1d != null ? `${e.spy_change_pct_1d >= 0 ? "+" : ""}${e.spy_change_pct_1d.toFixed(2)}%` : "—"}
                       </td>
-                      <td className={`px-4 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                      <td className={`px-2 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.alpha_vs_spy != null ? `${e.alpha_vs_spy >= 0 ? "+" : ""}${e.alpha_vs_spy.toFixed(2)}%` : "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </section>
           ))}
         </div>
       )}

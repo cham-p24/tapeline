@@ -56,7 +56,7 @@ export default function CongressPage() {
 
         <div className="card mt-4 overflow-hidden">
           <table className="w-full text-sm nums">
-            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+            <thead className="text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-2 text-left" title="When the trade was publicly disclosed via STOCK Act filing">Disclosed</th>
                 <th className="px-4 py-2 text-left">Politician</th>
@@ -69,7 +69,7 @@ export default function CongressPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border/50 hover:bg-black/20">
+                <tr key={r.id} className="border-b border-border/20 hover:bg-black/20">
                   <td className="px-4 py-2 text-muted">{new Date(r.disclosed_at).toLocaleString()}</td>
                   <td className="px-4 py-2 font-medium">{r.politician}
                     <span className="ml-2 text-xs text-muted">({r.party})</span>

@@ -105,7 +105,7 @@ export default function ScannerPage() {
       {/* Table */}
       <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-sm nums">
-          <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+          <thead className="text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Ticker</th>
               <th className="px-4 py-2 text-left">Sector</th>
@@ -143,7 +143,7 @@ export default function ScannerPage() {
                 )}
               </td></tr>
             ) : rows.map((r) => (
-              <tr key={r.symbol} className="border-b border-border/50 hover:bg-black/20">
+              <tr key={r.symbol} className="border-b border-border/20 hover:bg-black/20">
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
                 </td>
