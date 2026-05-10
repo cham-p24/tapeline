@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import AlertEvent, User, WatchlistItem
 from app.services.auth import current_user_required
-from app.services.tier import TIER_LIMITS, Tier
+from app.services.tier import TIER_LIMITS, Tier, effective_limit, is_on_trial
 
 router = APIRouter()
 
@@ -25,7 +25,15 @@ async def my_usage(
     + upgrade-nudge banners.
     """
     tier = Tier(user.tier)
-    caps = TIER_LIMITS[tier]
+    # Resolve caps via effective_limit so trial-state Premium users see the
+    # throttled api/telegram caps, not the paid-Premium caps.
+    on_trial = is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
+    caps = {
+        "watchlist_tickers":     effective_limit(user, "watchlist_tickers"),
+        "email_alerts_per_day":  effective_limit(user, "email_alerts_per_day"),
+        "api_requests_per_day":  effective_limit(user, "api_requests_per_day"),
+        "data_delay_minutes":    effective_limit(user, "data_delay_minutes"),
+    }
 
     # Watchlist size
     wl_count = (await session.execute(
@@ -45,6 +53,7 @@ async def my_usage(
 
     return {
         "tier": tier.value,
+        "on_trial": on_trial,
         "metrics": {
             "watchlist": {
                 "used": wl_count,
