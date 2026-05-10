@@ -62,9 +62,7 @@ def is_trading_day(d: date) -> bool:
     """True if US equity markets are open on `d`."""
     if d.weekday() >= 5:  # Saturday=5, Sunday=6
         return False
-    if d in _US_MARKET_HOLIDAYS_2026:
-        return False
-    return True
+    return d not in _US_MARKET_HOLIDAYS_2026
 
 
 def _next_trading_day(d: date) -> date:
