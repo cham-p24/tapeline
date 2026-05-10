@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { CardSkeleton } from "@/components/Skeleton";
+import { userLocale } from "@/lib/datetime";
 
 type Stats = {
   users_total: number; users_pro: number; users_premium: number;
@@ -167,7 +168,7 @@ export default function AdminPage() {
                 </td>
                 <td className="px-4 py-2 text-center text-xs">{u.has_stripe ? "✓" : "—"}</td>
                 <td className="px-4 py-2 text-center text-xs">{u.has_telegram ? "✓" : "—"}</td>
-                <td className="px-4 py-2 text-xs text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-2 text-xs text-muted">{new Date(u.created_at).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
                 <td className="px-4 py-2 text-right">
                   <select
                     value={u.tier}

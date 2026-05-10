@@ -8,19 +8,37 @@
  * produces "1/8/2026" — ambiguous to anyone outside the US (is it Jan 8
  * or Aug 1?).
  *
- * Both helpers below produce *unambiguous* output regardless of browser
- * locale, while still respecting the user's local timezone (via
- * Intl.DateTimeFormat's default `timeZone: undefined` behaviour).
+ * Locale resolution priority:
+ *   1. Explicit `locale` argument (used by server components that resolve
+ *      the cookie via next/headers).
+ *   2. `tapeline_locale` cookie set by middleware.ts from Vercel's edge
+ *      geo data — gives us the visitor's country-appropriate BCP 47 tag
+ *      regardless of what their browser reports.
+ *   3. en-GB final fallback (DD MMM YYYY — unambiguous for everyone).
+ *
+ * The user's actual timezone is always picked up automatically since we
+ * never pass `timeZone` — Intl resolves it to the runtime timezone.
  */
 
-/** "8 May 2026, 14:30" — always day-month-year, 24h time, in user's tz. */
-export function formatAbsolute(input: string | Date): string {
+const FALLBACK_LOCALE = "en-GB";
+
+/** Pull `tapeline_locale` from the document cookie jar on the client. */
+function readCookieLocale(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|;\s*)tapeline_locale=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function resolveLocale(explicit?: string): string {
+  if (explicit) return explicit;
+  return readCookieLocale() || FALLBACK_LOCALE;
+}
+
+/** "8 May 2026, 14:30" — locale-aware day-month-year + 24h time, in user's tz. */
+export function formatAbsolute(input: string | Date, locale?: string): string {
   const d = typeof input === "string" ? new Date(input) : input;
   if (isNaN(d.getTime())) return "—";
-  // en-GB gives DD MMM YYYY which everyone reads correctly.
-  // The user's actual timezone is picked up automatically since we don't
-  // pass timeZone — Intl resolves it to the runtime timezone.
-  return d.toLocaleString("en-GB", {
+  return d.toLocaleString(resolveLocale(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -35,7 +53,7 @@ export function formatAbsolute(input: string | Date): string {
  * Threshold: 7 days. Beyond that, the absolute date is more useful than
  * "127d ago".
  */
-export function formatRelativeOrAbsolute(input: string | Date): string {
+export function formatRelativeOrAbsolute(input: string | Date, locale?: string): string {
   const d = typeof input === "string" ? new Date(input) : input;
   if (isNaN(d.getTime())) return "—";
   const diffMs = Date.now() - d.getTime();
@@ -46,8 +64,8 @@ export function formatRelativeOrAbsolute(input: string | Date): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.round(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
-  // Older than a week — show absolute date. en-GB for unambiguous DMY.
-  return d.toLocaleDateString("en-GB", {
+  // Older than a week — show absolute date in the visitor's locale.
+  return d.toLocaleDateString(resolveLocale(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -61,4 +79,10 @@ export function userTimezone(): string {
   } catch {
     return "UTC";
   }
+}
+
+/** Read the resolved locale (cookie or fallback) — handy for client components
+ *  that want to render a single locale-aware date themselves. */
+export function userLocale(): string {
+  return resolveLocale();
 }

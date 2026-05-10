@@ -12,6 +12,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { userLocale } from "@/lib/datetime";
 
 export default function ScorecardPage() {
   const [data, setData] = useState<{
@@ -93,11 +94,11 @@ export default function ScorecardPage() {
           {dates.map((d) => (
             <div key={d} className="card">
               <div className="border-b border-border p-4">
-                {/* Locale-aware day header — toDateString() forced English
-                    "Thu May 07 2026"; this matches the visitor's browser
-                    locale + timezone via Intl. */}
+                {/* Locale-aware day header — uses the visitor's
+                    country-resolved locale from the tapeline_locale cookie
+                    (set by middleware from Vercel edge geo). */}
                 <h2 className="font-semibold">
-                  {new Date(d).toLocaleDateString(undefined, {
+                  {new Date(d).toLocaleDateString(userLocale(), {
                     weekday: "short",
                     year: "numeric",
                     month: "short",
