@@ -88,7 +88,7 @@ export function PricingTable() {
       </div>
       <p className="mt-3 text-center text-xs text-muted">All prices in USD</p>
       {billing === "annual" && (
-        <p className="mt-1 text-center text-xs text-up/90">Save 2 months · price locked forever</p>
+        <p className="mt-1 text-center text-xs text-up/90">Save 2 months · today's price, locked</p>
       )}
 
       {/* 3 main plans */}
