@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: "%s — Tapeline",
   },
   description:
-    "Live quantitative scanner: every US ticker gets one 0-100 score and one plain-English sentence. Six-factor formula is public. Track record updates daily. Pro $29/mo, Premium $49/mo.",
+    "Live quantitative scanner: every US ticker gets one 0-100 score and one plain-English sentence. Six-factor formula is public. Track record updates daily. Pro $29/mo, Premium $49/mo (USD).",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],

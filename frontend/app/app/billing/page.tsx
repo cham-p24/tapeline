@@ -259,7 +259,7 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                30-day money-back, no questions. Cancel in one click. Annual locks the price forever.
+                30-day money-back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">

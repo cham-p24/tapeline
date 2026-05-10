@@ -109,9 +109,12 @@ export default function VsFinvizPage() {
 
       {/* Where Tapeline wins */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-up">
-          Where Tapeline wins
-        </h2>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-up">
+            Where Tapeline wins
+          </h2>
+          <span className="text-[10px] uppercase tracking-wider text-subtle">All prices in USD</span>
+        </div>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">

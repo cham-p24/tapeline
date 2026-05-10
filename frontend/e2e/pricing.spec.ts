@@ -34,10 +34,12 @@ test.describe("Pricing page", () => {
   test("compare-plans table lists three columns including Premium", async ({ page }) => {
     await page.goto("/pricing");
 
-    // ComparisonTable section — header shows tier name + per-month sub-line
+    // ComparisonTable section — vertically stacked tier name + monthly + annual
     await expect(page.getByRole("heading", { name: /compare plans/i })).toBeVisible();
-    await expect(page.getByText(/\$29\/mo · \$24\.99\/mo annual/i)).toBeVisible();
-    await expect(page.getByText(/\$49\/mo · \$39\.99\/mo annual/i)).toBeVisible();
+    await expect(page.getByText(/or \$24\.99\/mo annual/i)).toBeVisible();
+    await expect(page.getByText(/or \$39\.99\/mo annual/i)).toBeVisible();
+    // Currency is unambiguous on every pricing surface
+    await expect(page.getByText(/All prices in USD/i).first()).toBeVisible();
 
     // Premium-only feature should show "—" for Pro and "✓" for Premium
     const congressRow = page.getByRole("row", { name: /congressional trades/i });
