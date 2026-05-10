@@ -5,6 +5,7 @@ import { api, type CongressTrade } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { Paywall } from "@/components/Paywall";
+import { formatAbsolute } from "@/lib/datetime";
 
 export default function CongressPage() {
   const [rows, setRows] = useState<CongressTrade[]>([]);
@@ -70,7 +71,7 @@ export default function CongressPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-border/20 hover:bg-black/20">
-                  <td className="px-4 py-2 text-muted">{new Date(r.disclosed_at).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-muted">{formatAbsolute(r.disclosed_at)}</td>
                   <td className="px-4 py-2 font-medium">{r.politician}
                     <span className="ml-2 text-xs text-muted">({r.party})</span>
                   </td>

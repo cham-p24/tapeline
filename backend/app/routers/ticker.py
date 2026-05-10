@@ -39,7 +39,36 @@ async def ticker_detail(
     sq_result = await session.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == symbol))
     sq = sq_result.scalar_one_or_none()
 
-    # News — prefer cached, fall back to live fetch
+    # News — ALWAYS live-fetch on every visit (Benzinga → Massive → Finnhub
+    # chain), persist any new articles, then return the latest 8 from DB.
+    #
+    # Previous version short-circuited on cache hit ("if not news_rows"),
+    # which meant tickers like BUR (UK ADR with 5 stale 2024 Massive
+    # articles cached) never re-fetched. Visitors saw 2-year-old news
+    # forever. The new flow:
+    #   1. Live fetch through the fallback chain (Benzinga first; falls
+    #      through to Finnhub which has fresh BUR/UK/international coverage).
+    #   2. Insert any unseen articles into NewsItem (id-deduped, per-row
+    #      try/except so one bad insert can't poison the rest).
+    #   3. SELECT the 8 most-recent — fresh articles rank above stale ones
+    #      naturally via ORDER BY published_at DESC.
+    try:
+        live = await fetch_news_for_ticker(symbol, limit=8)
+        for it in live:
+            try:
+                existing = await session.execute(
+                    select(NewsItem).where(NewsItem.id == it["id"])
+                )
+                if existing.scalar_one_or_none() is None:
+                    session.add(NewsItem(**it))
+            except Exception:
+                # Don't let one bad row kill the request — log + continue.
+                pass
+        await session.flush()
+    except Exception:
+        # Live fetch failure isn't fatal — fall through to cached news.
+        pass
+
     news_result = await session.execute(
         select(NewsItem)
         .where(NewsItem.tickers.like(f"%{symbol}%"))
@@ -47,12 +76,6 @@ async def ticker_detail(
         .limit(8)
     )
     news_rows = news_result.scalars().all()
-    if not news_rows:
-        try:
-            live = await fetch_news_for_ticker(symbol, limit=8)
-            news_rows = [_DictNews(**n) for n in live]  # type: ignore[arg-type]
-        except Exception:
-            news_rows = []
 
     return {
         "symbol": t.symbol,

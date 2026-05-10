@@ -53,46 +53,76 @@ def _vendor_key() -> str:
 async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, Any]]:
     """Get recent news items mentioning a specific symbol.
 
-    Source preference (first non-empty wins):
-        1. Benzinga — fastest wire, richest cashtag tagging on US names
-        2. Massive (Polygon) — included with the data subscription
-        3. Finnhub — broader international + UK-listed coverage
-        4. Mock — last resort so the UI always renders something
+    Queries all three sources (Benzinga, Massive, Finnhub) in parallel,
+    merges by `published_at desc`, dedupes by id, returns top N.
 
-    Tier 3 (Finnhub) was added 2026-05-08 after BUR-style tickers (UK-listed
-    Burford, ADRs of European names, etc.) returned 0 from Benzinga AND
-    stale-only from Massive. Finnhub's wire net catches those reliably.
+    Why parallel-merge instead of fallback chain:
+    The previous "first non-empty wins" pattern broke for tickers like
+    BUR (Burford Capital, UK ADR). Massive returns 5 stale 2024 articles
+    for BUR — non-empty, so the chain stopped there and never queried
+    Finnhub's fresh 2026 coverage. Visitors saw 2-year-old news forever.
+    Parallel-merge sorts everything by date and naturally surfaces the
+    freshest article regardless of which source produced it.
+
+    Quota cost is only marginally higher (3 requests instead of 1-2)
+    and worth it for accuracy. Falls back to mock when all three return
+    nothing.
     """
-    # Benzinga first — better wire speed + richer ticker tagging.
+    import asyncio
+
+    # Resolve each source to a coroutine (or None if not configured).
+    bz_task = None
+    massive_task = None
+    fh_task = None
+
     try:
         from app.services import benzinga_feed as bz
         if bz.is_configured():
-            rows = await bz.fetch_news_for_ticker(symbol, limit)
-            if rows:
-                return rows
+            bz_task = bz.fetch_news_for_ticker(symbol, limit)
     except Exception:
-        logger.exception("news.benzinga_ticker_failed symbol=%s", symbol)
+        logger.exception("news.benzinga_setup_failed symbol=%s", symbol)
 
     if _vendor_key():
-        try:
-            rows = await _fetch_from_polygon([symbol], limit)
-            if rows:
-                return rows
-        except Exception:
-            logger.exception("news.massive_ticker_failed symbol=%s", symbol)
+        massive_task = _fetch_from_polygon([symbol], limit)
 
-    # Finnhub fallback — covers the gaps Benzinga + Massive leave on
-    # international and small-cap-ADR names. Free tier 60/min is plenty.
     try:
         from app.services import finnhub_feed as fh
         if fh.configured():
-            rows = await fh.fetch_news_for_ticker(symbol, limit=limit)
-            if rows:
-                return rows
+            fh_task = fh.fetch_news_for_ticker(symbol, limit=limit)
     except Exception:
-        logger.exception("news.finnhub_ticker_failed symbol=%s", symbol)
+        logger.exception("news.finnhub_setup_failed symbol=%s", symbol)
 
-    return _mock_news(symbol, limit)
+    coros = [t for t in (bz_task, massive_task, fh_task) if t is not None]
+    if not coros:
+        return _mock_news(symbol, limit)
+
+    results = await asyncio.gather(*coros, return_exceptions=True)
+
+    merged: list[dict[str, Any]] = []
+    for r in results:
+        if isinstance(r, Exception):
+            logger.warning("news.source_failed symbol=%s err=%s", symbol, str(r)[:120])
+            continue
+        if isinstance(r, list):
+            merged.extend(r)
+
+    if not merged:
+        return _mock_news(symbol, limit)
+
+    # Dedupe by id (different sources can occasionally surface the same
+    # article via licensing partnerships).
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for a in merged:
+        aid = a.get("id")
+        if not aid or aid in seen:
+            continue
+        seen.add(aid)
+        unique.append(a)
+
+    # Sort by published_at desc — freshest first regardless of source.
+    unique.sort(key=lambda a: a.get("published_at") or "", reverse=True)
+    return unique[:limit]
 
 
 async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:

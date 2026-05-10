@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { userLocale } from "@/lib/datetime";
 
 type IPO = {
   id: number; symbol: string; company_name: string; sector: string | null;
@@ -73,7 +74,7 @@ export default function IPOPage() {
               <tr><td colSpan={9} className="px-4 py-8 text-center text-muted">No upcoming IPOs in window.</td></tr>
             ) : filtered.map((i) => (
               <tr key={i.id} className="border-b border-border/20 hover:bg-black/20">
-                <td className="px-4 py-2">{new Date(i.expected_date).toLocaleDateString()}</td>
+                <td className="px-4 py-2">{new Date(i.expected_date).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
                 <td className="px-4 py-2 font-mono font-medium">{i.symbol}</td>
                 <td className="px-4 py-2">{i.company_name}</td>
                 <td className="px-4 py-2 text-muted">{i.sector}</td>

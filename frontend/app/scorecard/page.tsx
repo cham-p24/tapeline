@@ -12,6 +12,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { userLocale } from "@/lib/datetime";
 
 export default function ScorecardPage() {
   const [data, setData] = useState<{
@@ -89,22 +90,55 @@ export default function ScorecardPage() {
           Scorecard starts logging today. Come back tomorrow to see the first day&apos;s results.
         </div>
       ) : (
-        <div className="mt-8 space-y-10">
-          {dates.map((d) => (
-            // Borderless day group — no card chrome, the date header is the
-            // separator. Lets the table breathe into the page background and
-            // fits more vertical density on /scorecard. Per launch feedback:
-            // the card outline made it read as a heavy spreadsheet, not a
-            // continuous record.
-            <section key={d}>
-              <h2 className="px-1 pb-3 text-sm font-medium uppercase tracking-wide text-muted">
-                {new Date(d).toLocaleDateString(undefined, {
-                  weekday: "short",
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </h2>
+        <>
+          {/* Legend — small explainer block so non-quant visitors can read
+              the columns. Sits above the per-day sections so it's the first
+              thing scanned after the summary stats. Lighter chrome than
+              before so it pairs with the borderless day sections below. */}
+          <div className="mt-8 rounded-xl bg-panel/30 p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">How to read this</h3>
+            <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Score</dt>
+                <dd className="text-muted">0&ndash;100 composite at flag time. Six factors at <Link href="/how-it-works" className="text-accent hover:underline">published weights</Link>.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Price at flag</dt>
+                <dd className="text-muted">Closing price the day we picked the ticker.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Next day</dt>
+                <dd className="text-muted">Closing price the next US trading day. Populated 24h after market close.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">SPY</dt>
+                <dd className="text-muted">SPY&rsquo;s return on the same day &mdash; the market benchmark.</dd>
+              </div>
+              <div className="flex gap-2 sm:col-span-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Alpha</dt>
+                <dd className="text-muted">Pick&rsquo;s return minus SPY&rsquo;s return. Positive = beat the market; negative = lagged it. <span className="text-up">Green</span> = win, <span className="text-down">red</span> = loss. Losses stay on the page.</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-subtle">
+              <span className="font-medium">&ldquo;pending&rdquo;</span> means the next-day price hasn&rsquo;t been recorded yet (entries from today, or back-check still running). <span className="font-medium">&mdash;</span> means data is unavailable for that field.
+            </p>
+          </div>
+
+          {/* Borderless day groups — date header acts as separator, table
+              breathes into page background. Per launch feedback: the card
+              outline made the page read as detached spreadsheets rather than
+              one continuous record. */}
+          <div className="mt-8 space-y-10">
+            {dates.map((d) => (
+              <section key={d}>
+                <h2 className="px-1 pb-3 text-sm font-medium uppercase tracking-wide text-muted">
+                  {new Date(d).toLocaleDateString(userLocale(), {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </h2>
               <table className="w-full text-sm nums">
                 <thead className="text-xs uppercase text-muted">
                   <tr>
@@ -140,6 +174,7 @@ export default function ScorecardPage() {
             </section>
           ))}
         </div>
+        </>
       )}
 
       </div>

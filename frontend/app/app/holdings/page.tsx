@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type HoldingItem, type TrackedFund } from "@/lib/api";
 import { Paywall } from "@/components/Paywall";
 import { TableSkeleton } from "@/components/Skeleton";
+import { userLocale } from "@/lib/datetime";
 
 export default function HoldingsPage() {
   const [rows, setRows] = useState<HoldingItem[]>([]);
@@ -106,7 +107,7 @@ export default function HoldingsPage() {
                   <td className="px-4 py-2 text-right text-up">{compactUSD(h.value_usd)}</td>
                   <td className="px-4 py-2 text-right text-muted">{compact(h.shares)}</td>
                   <td className="px-4 py-2 text-right">{h.percent_portfolio.toFixed(1)}%</td>
-                  <td className="px-4 py-2 text-xs text-muted">{new Date(h.fetched_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-xs text-muted">{new Date(h.fetched_at).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
                 </tr>
               ))}
             </tbody>

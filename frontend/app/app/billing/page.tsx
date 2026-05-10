@@ -11,6 +11,7 @@ import {
   testWebPush,
   unsubscribeFromWebPush,
 } from "@/lib/webPush";
+import { userLocale } from "@/lib/datetime";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -188,7 +189,7 @@ export default function BillingPage() {
           {isOnTrial ? (
             <>
               <div className="mt-2 text-2xl font-bold nums">
-                {trialEndsAt!.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
                 Add a card before then to lock in {meta.name} access. Otherwise your account drops to Free

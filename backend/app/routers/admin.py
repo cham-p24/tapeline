@@ -6,12 +6,12 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import AlertEvent, Subscription, User
+from app.models import AlertEvent, DailyScorecardEntry, Subscription, User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -132,6 +132,58 @@ async def set_user_tier(
     await session.commit()
     logger.info("admin.tier_set user=%s tier=%s", user_id, body.tier)
     return {"ok": True, "user_id": user_id, "tier": body.tier}
+
+
+class ScorecardResetBody(BaseModel):
+    # When true, wipe everything. When false (default), only delete entries
+    # known to be bad: zero flag price, or back-check that recorded the buggy
+    # "next-day price equals flag price" snapshot pattern.
+    wipe_all: bool = False
+
+
+@router.post("/scorecard/reset")
+async def reset_scorecard(
+    body: ScorecardResetBody,
+    _: None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Clean up the public scorecard before launch.
+
+    Two modes:
+      - `wipe_all=true`: drop every row. Use this once before launch to start
+        the public record from a clean state.
+      - `wipe_all=false` (default): drop only known-bad rows. Specifically:
+          * `price_at_flag <= 0` (broken upstream data)
+          * `price_next_day == price_at_flag` AND `change_pct_1d_after == 0`
+            (the stale-snapshot back-check bug — every pick recorded as 0%)
+    """
+    before_q = await session.execute(select(func.count()).select_from(DailyScorecardEntry))
+    before = before_q.scalar() or 0
+
+    if body.wipe_all:
+        await session.execute(delete(DailyScorecardEntry))
+        mode = "all"
+    else:
+        # Same-value snapshot bug: price_next_day equals price_at_flag AND
+        # the recorded return is 0. Catches the entire 5/9-style cohort.
+        await session.execute(
+            delete(DailyScorecardEntry).where(
+                or_(
+                    DailyScorecardEntry.price_at_flag <= 0,
+                    (DailyScorecardEntry.price_next_day == DailyScorecardEntry.price_at_flag)
+                    & (DailyScorecardEntry.change_pct_1d_after == 0.0),
+                )
+            )
+        )
+        mode = "bad_only"
+
+    await session.commit()
+
+    after_q = await session.execute(select(func.count()).select_from(DailyScorecardEntry))
+    after = after_q.scalar() or 0
+
+    logger.warning("admin.scorecard_reset mode=%s before=%d after=%d removed=%d", mode, before, after, before - after)
+    return {"ok": True, "mode": mode, "before": before, "after": after, "removed": before - after}
 
 
 @router.get("/stats")

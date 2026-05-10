@@ -11,6 +11,7 @@ import { AnalystRatings } from "@/components/AnalystRatings";
 import { Paywall } from "@/components/Paywall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 
 export default function TickerPage({ params }: { params: { symbol: string } }) {
   const symbol = params.symbol.toUpperCase();
@@ -263,7 +264,9 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
               <div className="mt-1 flex items-center gap-3 text-xs text-muted">
                 <span>{n.publisher}</span>
                 <span>·</span>
-                <span>{new Date(n.published_at).toLocaleString()}</span>
+                <span title={formatAbsolute(n.published_at)}>
+                  {formatRelativeOrAbsolute(n.published_at)}
+                </span>
                 {n.sentiment != null && (
                   <span className={n.sentiment > 0 ? "text-up" : n.sentiment < 0 ? "text-down" : ""}>
                     sentiment {n.sentiment > 0 ? "+" : ""}{n.sentiment.toFixed(2)}
