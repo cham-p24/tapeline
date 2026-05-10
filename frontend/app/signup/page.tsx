@@ -57,9 +57,12 @@ function SignUpForm() {
     }
     setBusy(true);
     try {
+      const { deviceFingerprint } = await import("@/lib/fingerprint");
+      const device_fp = await deviceFingerprint();
       await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: turnstileToken || undefined,
+        device_fingerprint: device_fp || undefined,
       });
       router.push(next);
       router.refresh();

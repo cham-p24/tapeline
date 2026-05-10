@@ -65,6 +65,12 @@ class Settings(BaseSettings):
 
     # ---- Telegram ----
     telegram_bot_token: str = ""
+    # Bot username (no @, no t.me/). Used to build the t.me/<username>?start=<token>
+    # deep-link for one-click signup. Resolve via getMe API when first wiring.
+    telegram_bot_username: str = "Tapeline_Bot"
+    # Shared secret in the webhook URL path so only Telegram (and anyone we
+    # show the URL to) can post updates. Mint random and set via setWebhook.
+    telegram_webhook_secret: str = ""
 
     # ---- SMS (Twilio, optional) ----
     # Without Twilio configured, the SMS alert channel is a no-op (alerts

@@ -463,6 +463,9 @@ async def fetch_regime() -> dict[str, Any]:
 
     dxy = fred_data.get("dxy") or 103.5
     y10 = fred_data.get("yield_10y") or 4.25
+    # FRED returns RISING / FALLING / SIDEWAYS based on the 10Y's last 30 obs.
+    # Defaults to SIDEWAYS when no FRED key is configured (graceful no-op).
+    rate_direction = fred_data.get("rate_direction") or "SIDEWAYS"
 
     # Placeholder — breadth requires sector-constituent walk; on Starter tier
     # this is expensive. Schedule it as a hourly job rather than per-tick.
@@ -479,7 +482,7 @@ async def fetch_regime() -> dict[str, Any]:
         "vix": round(vix, 2),
         "dxy": round(dxy, 2),
         "yield_10y": round(y10, 3),
-        "rate_direction": "SIDEWAYS",  # TODO: 10Y slope vs 30d back
+        "rate_direction": rate_direction,
         "breadth_pct": round(breadth_pct, 1),
         "sector_leaders": "Technology, Industrials, Financials",
     }
