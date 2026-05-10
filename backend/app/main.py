@@ -35,6 +35,9 @@ from app.routers import (
     watchlist,
     webhooks,
 )
+from app.routers import (
+    telegram as telegram_router,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -346,6 +349,7 @@ app.include_router(me.router, prefix="/api/me", tags=["me"])
 app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
+app.include_router(telegram_router.router, prefix="/api/telegram", tags=["telegram"])
 app.include_router(ticker.router, prefix="/api/ticker", tags=["ticker"])
 app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
 app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"])

@@ -44,6 +44,10 @@ class SignupBody(BaseModel):
     # Cloudflare Turnstile token. Verified server-side if Turnstile is configured;
     # ignored otherwise (dev mode pass-through).
     turnstile_token: str | None = Field(None, max_length=2048)
+    # Lightweight device fingerprint from frontend (lib/fingerprint.ts). Used
+    # for the same-device retrial check; empty/missing falls back to the
+    # other defences (honeypot, Turnstile, IP cap, email normalisation).
+    device_fingerprint: str | None = Field(None, max_length=64)
 
 
 class SigninBody(BaseModel):
@@ -91,7 +95,13 @@ async def signup(
 
     # Normalise the email so dot/+tag permutations of the same Gmail / Outlook
     # inbox can't mint multiple trials. See services/trial_abuse.normalise_email.
-    from app.services.trial_abuse import normalise_email, record_signup, signup_allowed
+    from app.services.trial_abuse import (
+        fingerprint_allowed,
+        normalise_email,
+        record_fingerprint_signup,
+        record_signup,
+        signup_allowed,
+    )
     email = normalise_email(body.email)
     if is_disposable_email(email):
         logger.warning("auth.disposable_email_blocked email=%s", email)
@@ -110,6 +120,18 @@ async def signup(
             "Too many signups from this network in the last 24 hours. "
             "Please try again tomorrow or contact support@tapeline.io if you "
             "share an IP with several legitimate users.",
+        )
+
+    # Device-fingerprint check — same browser can't mint multiple trials in
+    # a 30-day window, even with VPN + new email. Generic 409 message so
+    # we don't tell the attacker which signal tripped the check.
+    if not fingerprint_allowed(body.device_fingerprint):
+        logger.warning("auth.fingerprint_rate_limited fp=%s email=%s",
+                       (body.device_fingerprint or "")[:8], email)
+        raise HTTPException(
+            409,
+            "An account with these details already exists. "
+            "If you're trying to recover access, use Sign in or Reset password.",
         )
 
     # ---- Normal signup path -------------------------------------------------
@@ -161,6 +183,7 @@ async def signup(
     # a failed signup (DB unavailable, transaction conflict) doesn't burn the
     # legitimate user's budget.
     record_signup(client_ip)
+    record_fingerprint_signup(body.device_fingerprint)
 
     token = issue_session_token(user.id)
     response.set_cookie(value=token, **session_cookie_kwargs())

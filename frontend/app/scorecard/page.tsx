@@ -6,6 +6,7 @@
  * Lives outside /app so unlogged-in visitors and search engines can see it.
  */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
 import { MarketingNav } from "@/components/MarketingNav";
@@ -15,12 +16,21 @@ import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { userLocale } from "@/lib/datetime";
 
 export default function ScorecardPage() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
   const [data, setData] = useState<{
     summary: { days_tracked: number; entries_scored: number; avg_1d_return: number | null; avg_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null };
     days: Record<string, ScorecardEntry[]>;
   } | null>(null);
 
   useEffect(() => { api.scorecard(30).then(setData).catch(console.error); }, []);
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const sym = query.trim().toUpperCase();
+    if (!sym) return;
+    router.push(`/scorecard/${encodeURIComponent(sym)}`);
+  }
 
   // Loading state with proper skeleton — replaces the literal "Loading…" text
   // that search-engine + social-card crawlers were getting in SSR.
@@ -66,6 +76,29 @@ export default function ScorecardPage() {
         Every day we log our top-10 composite scores at market close. The next day we record how each name performed vs SPY.
         No cherry-picking, no survivor bias &mdash; this is the full public record.
       </p>
+
+      {/* Symbol search — jumps to /scorecard/[symbol] for the per-ticker history.
+          Doubles as an SEO surface (one indexable page per ticker history). */}
+      <form onSubmit={submitSearch} className="mt-5 flex max-w-md gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value.toUpperCase().slice(0, 10))}
+          placeholder="Look up any ticker (e.g. AAPL, TSLA)"
+          aria-label="Search ticker history"
+          className="block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums uppercase"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button
+          type="submit"
+          disabled={!query.trim()}
+          className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          See history
+        </button>
+      </form>
 
       {/* Early-launch banner — when we have picks logged but next-day prices
           haven't been back-checked yet. Avoids the dashes-everywhere look
@@ -139,15 +172,18 @@ export default function ScorecardPage() {
                     day: "numeric",
                   })}
                 </h2>
+              {/* Mobile: drop secondary columns (Price-at-flag, Next-day, SPY)
+                  so the row fits without horizontal scroll. The desktop view
+                  still gets the full breakdown. */}
               <table className="w-full text-sm nums">
                 <thead className="text-xs uppercase text-muted">
                   <tr>
                     <th className="px-2 py-2 text-left font-normal">#</th>
                     <th className="px-2 py-2 text-left font-normal">Ticker</th>
                     <th className="px-2 py-2 text-right font-normal">Score</th>
-                    <th className="px-2 py-2 text-right font-normal">Price at flag</th>
-                    <th className="px-2 py-2 text-right font-normal">Next day</th>
-                    <th className="px-2 py-2 text-right font-normal">SPY</th>
+                    <th className="hidden px-2 py-2 text-right font-normal sm:table-cell">Price at flag</th>
+                    <th className="hidden px-2 py-2 text-right font-normal sm:table-cell">Next day</th>
+                    <th className="hidden px-2 py-2 text-right font-normal sm:table-cell">SPY</th>
                     <th className="px-2 py-2 text-right font-normal">Alpha</th>
                   </tr>
                 </thead>
@@ -155,13 +191,17 @@ export default function ScorecardPage() {
                   {data.days[d].map((e) => (
                     <tr key={e.symbol} className="border-b border-border/20 last:border-0">
                       <td className="px-2 py-2 text-muted">{e.rank}</td>
-                      <td className="px-2 py-2 font-medium">{e.symbol}</td>
+                      <td className="px-2 py-2 font-medium">
+                        <Link href={`/scorecard/${encodeURIComponent(e.symbol)}`} className="hover:text-accent hover:underline">
+                          {e.symbol}
+                        </Link>
+                      </td>
                       <td className="px-2 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
-                      <td className="px-2 py-2 text-right">${e.price_at_flag.toFixed(2)}</td>
-                      <td className={`px-2 py-2 text-right ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                      <td className="hidden px-2 py-2 text-right sm:table-cell">${e.price_at_flag.toFixed(2)}</td>
+                      <td className={`hidden px-2 py-2 text-right sm:table-cell ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.change_pct_1d_after != null ? `${e.change_pct_1d_after >= 0 ? "+" : ""}${e.change_pct_1d_after.toFixed(2)}%` : "pending"}
                       </td>
-                      <td className="px-2 py-2 text-right text-muted">
+                      <td className="hidden px-2 py-2 text-right text-muted sm:table-cell">
                         {e.spy_change_pct_1d != null ? `${e.spy_change_pct_1d >= 0 ? "+" : ""}${e.spy_change_pct_1d.toFixed(2)}%` : "—"}
                       </td>
                       <td className={`px-2 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>

@@ -240,6 +240,34 @@ export const api = {
   },
   heatmap: () => get<{ sectors: HeatmapSector[] }>("/api/heatmap"),
   scorecard: (days = 30) => get<{ summary: { days_tracked: number; entries_scored: number; avg_1d_return: number | null; avg_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null }; days: Record<string, ScorecardEntry[]> }>(`/api/scorecard?days=${days}`),
+  popularTickers: (n = 8) => get<{ items: Array<{ symbol: string; name: string | null; sector: string | null; score: number | null }>; cached: boolean }>(`/api/scanner/popular?n=${n}`),
+  scorecardSymbol: (symbol: string) => get<{
+    summary: {
+      symbol: string;
+      in_universe: boolean;
+      name: string | null;
+      sector: string | null;
+      current_score: number | null;
+      current_signal: string | null;
+      appearances: number;
+      appearances_scored: number;
+      avg_1d_return: number | null;
+      avg_alpha_vs_spy: number | null;
+      hit_rate_beat_spy: number | null;
+      best_alpha: number | null;
+      worst_alpha: number | null;
+    };
+    rows: Array<{
+      as_of: string;
+      rank: number;
+      score_at_flag: number;
+      price_at_flag: number;
+      price_next_day: number | null;
+      change_pct_1d_after: number | null;
+      spy_change_pct_1d: number | null;
+      alpha_vs_spy: number | null;
+    }>;
+  }>(`/api/scorecard/symbol/${encodeURIComponent(symbol.toUpperCase())}`),
   watchlist: () => getAuth<{ count: number; items: WatchlistItem[] }>("/api/watchlist", DEV_TOKEN),
   watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
     post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),

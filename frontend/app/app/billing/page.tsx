@@ -445,8 +445,53 @@ function Selling({ title, body }: { title: string; body: string }) {
 function NotificationsCard() {
   const { user, refresh } = useUser();
   const [chatId, setChatId] = useState(user?.telegram_chat_id ?? "");
-  const [busy, setBusy] = useState<"save" | "test" | "clear" | null>(null);
+  const [busy, setBusy] = useState<"connect" | "save" | "test" | "clear" | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [polling, setPolling] = useState(false);
+
+  // Poll /api/me every 3s while a deep-link connect is in progress so the card
+  // flips to "Connected" the moment the webhook lands the chat_id. Stops after
+  // 10 minutes (token TTL) or as soon as we see a chat_id appear.
+  useEffect(() => {
+    if (!polling) return;
+    const startedAt = Date.now();
+    const handle = window.setInterval(async () => {
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        setPolling(false); return;
+      }
+      try {
+        const r = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+        if (!r.ok) return;
+        const me = await r.json();
+        if (me?.telegram_chat_id) {
+          await refresh();
+          setMsg({ kind: "ok", text: "Connected. Hourly digests will start at the top of the hour." });
+          setPolling(false);
+        }
+      } catch {
+        // Network blips during a deploy / Wi-Fi flap shouldn't kill the poll
+      }
+    }, 3000);
+    return () => window.clearInterval(handle);
+  }, [polling, refresh]);
+
+  async function connect() {
+    setBusy("connect"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/telegram/start-token`, {
+        method: "POST", credentials: "include",
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.detail || `Connect failed (${r.status})`);
+      // Open Telegram deep-link in a new tab — desktop app, mobile app, or web
+      window.open(body.deep_link, "_blank", "noopener,noreferrer");
+      setMsg({ kind: "ok", text: "Tap Start in Telegram. We'll auto-detect the connection." });
+      setPolling(true);
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
 
   async function save() {
     setBusy("save"); setMsg(null);
@@ -506,38 +551,58 @@ function NotificationsCard() {
         </span>
       </div>
 
-      <div className="mt-4">
-        <label className="block text-xs font-medium text-muted">Telegram chat ID</label>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={chatId}
-          onChange={(e) => setChatId(e.target.value)}
-          placeholder="e.g. 123456789"
-          className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums"
-        />
-        <p className="mt-2 text-xs text-subtle">
-          Don&rsquo;t have one? DM <code className="text-accent">@TapelineBot</code> the message <code className="text-accent">/start</code>{" "}
-          and it will reply with your numeric ID. Paste that here.
-        </p>
-      </div>
+      {!connected && (
+        <>
+          <p className="mt-3 text-sm text-muted">
+            One click. We&rsquo;ll open Telegram, you tap <span className="text-fg">Start</span>, and you&rsquo;re wired up.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={connect}
+              disabled={busy !== null || polling}
+              className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy === "connect" ? "Opening Telegram…" : polling ? "Waiting for Telegram…" : "Connect Telegram"}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="mt-4 text-xs text-subtle underline-offset-2 hover:text-muted hover:underline"
+          >
+            {showAdvanced ? "Hide manual setup" : "I already have my chat ID"}
+          </button>
+          {showAdvanced && (
+            <div className="mt-3 rounded-md border border-border/40 p-4">
+              <label className="block text-xs font-medium text-muted">Telegram chat ID</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={chatId}
+                onChange={(e) => setChatId(e.target.value)}
+                placeholder="e.g. 123456789"
+                className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums"
+              />
+              <button
+                onClick={save}
+                disabled={busy !== null || !chatId.trim()}
+                className="btn-ghost mt-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy === "save" ? "Saving…" : "Save chat ID"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <button
-          onClick={save}
-          disabled={busy !== null || !chatId.trim() || chatId.trim() === user?.telegram_chat_id}
-          className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy === "save" ? "Saving…" : "Save"}
-        </button>
-        <button
-          onClick={test}
-          disabled={busy !== null || !connected}
-          className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy === "test" ? "Sending…" : "Send test message"}
-        </button>
-        {connected && (
+      {connected && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            onClick={test}
+            disabled={busy !== null}
+            className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy === "test" ? "Sending…" : "Send test message"}
+          </button>
           <button
             onClick={clear}
             disabled={busy !== null}
@@ -545,8 +610,8 @@ function NotificationsCard() {
           >
             {busy === "clear" ? "Disconnecting…" : "Disconnect"}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {msg && (
         <div className={`mt-4 rounded-md border p-3 text-sm ${

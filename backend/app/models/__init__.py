@@ -7,6 +7,7 @@ from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
 from app.models.scorecard import DailyScorecardEntry
 from app.models.squeeze import SqueezeSetup
+from app.models.telegram_token import TelegramLinkToken
 from app.models.ticker import Ticker
 from app.models.user import AlertEvent, AlertRule, Subscription, User
 from app.models.watchlist import WatchlistItem
@@ -27,6 +28,7 @@ __all__ = [
     "SqueezeSetup",
     "StripeWebhookEvent",
     "Subscription",
+    "TelegramLinkToken",
     "Ticker",
     "User",
     "WatchlistItem",

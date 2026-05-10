@@ -118,6 +118,45 @@ def signup_count_24h(ip: str | None) -> int:
     return len(bucket)
 
 
+# ---- Device-fingerprint sliding window --------------------------------------
+#
+# Frontend computes a homemade 16-char fingerprint (lib/fingerprint.ts) and
+# sends it with the signup payload. We keep a 30-day sliding window of
+# fingerprints that have signed up, so the same browser can't trial-farm
+# even with VPN + new email + email-normalisation bypass.
+#
+# In-memory + per-process — fine while we're on a single Fly machine. Move
+# to Redis-backed when concurrent machines exceed one (same constraint as
+# `_signup_log`).
+
+_FP_WINDOW_SECONDS = 30 * 24 * 60 * 60
+_fingerprint_log: dict[str, deque[float]] = defaultdict(deque)
+
+
+def fingerprint_allowed(fp: str | None, *, max_in_window: int = 1) -> bool:
+    """True if this device fingerprint can create another trial right now.
+
+    Returns True (allowed) when fp is empty/None — the fingerprint is best-
+    effort (canvas may be blocked, fp generation may have failed). Honeypot
+    + Turnstile + IP cap + email normalisation all run alongside this.
+    """
+    if not fp:
+        return True
+    now = time.time()
+    cutoff = now - _FP_WINDOW_SECONDS
+    bucket = _fingerprint_log[fp]
+    while bucket and bucket[0] < cutoff:
+        bucket.popleft()
+    return len(bucket) < max_in_window
+
+
+def record_fingerprint_signup(fp: str | None) -> None:
+    """Record a successful signup keyed by device fingerprint."""
+    if not fp:
+        return
+    _fingerprint_log[fp].append(time.time())
+
+
 # ---- Abuse-rate health check ------------------------------------------------
 #
 # Run weekly to detect how much trial-farming is actually happening. This is

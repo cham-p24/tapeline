@@ -1,6 +1,7 @@
 """GET /api/scanner — paginated ticker list with filters + tier gating."""
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query
@@ -14,6 +15,60 @@ from app.services.tier import Tier
 from app.services.tier import limit as tier_limit
 
 router = APIRouter()
+
+# Module-level cache for /popular — recomputed every hour. The query is cheap
+# but we'd rather not run it on every empty-state render in /app/watchlist.
+_POPULAR_CACHE: dict[str, object] = {"ts": 0.0, "items": []}
+_POPULAR_TTL_SECONDS = 3600
+
+
+@router.get("/popular")
+async def popular_tickers(
+    session: AsyncSession = Depends(get_session),
+    n: int = Query(8, ge=1, le=20),
+) -> dict:
+    """Top N actively-scored tickers by daily dollar-volume.
+
+    Powers the watchlist starter pack + any "what's hot right now" surface.
+    Cached in process memory for an hour — replaces the prior hardcoded
+    AAPL/MSFT/NVDA/... list. Returns just symbols + names; the watchlist
+    seeder fills in scores when the user actually adds them.
+    """
+    now = time.time()
+    cached_ts = _POPULAR_CACHE.get("ts", 0.0)
+    cached_items = _POPULAR_CACHE.get("items") or []
+    if isinstance(cached_ts, (int, float)) and isinstance(cached_items, list) \
+       and (now - float(cached_ts)) < _POPULAR_TTL_SECONDS and len(cached_items) >= n:
+        return {"items": cached_items[:n], "cached": True}
+
+    # Compute "popularity" as price * volume so a thinly-traded $400 stock
+    # doesn't outrank a $40 stock with 10x the share volume. Skip rows
+    # missing either field. Cap to actively-scored tickers (score IS NOT NULL)
+    # so we don't seed the watchlist with stale rows from auto-discovery.
+    rows = (await session.execute(
+        select(Ticker)
+        .where(
+            Ticker.score.isnot(None),
+            Ticker.price.isnot(None),
+            Ticker.volume.isnot(None),
+            Ticker.volume > 0,
+        )
+        .order_by(desc(Ticker.price * Ticker.volume))
+        .limit(max(n * 2, 16))  # over-fetch so we have a fallback if some have NULL fields
+    )).scalars().all()
+
+    items = [
+        {"symbol": r.symbol, "name": r.name, "sector": r.sector, "score": r.score}
+        for r in rows
+    ][:n]
+
+    # Repopulate cache only if the DB returned something — otherwise the
+    # client falls back to a hardcoded seed and we keep the prior cache.
+    if items:
+        _POPULAR_CACHE["ts"] = now
+        _POPULAR_CACHE["items"] = items
+
+    return {"items": items, "cached": False}
 
 
 @router.get("")

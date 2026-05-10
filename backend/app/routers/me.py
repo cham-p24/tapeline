@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import logging
+import secrets
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import get_session
-from app.models import User
+from app.models import TelegramLinkToken, User
 from app.services.auth import current_user_optional, current_user_required
 from app.services.tier import FEATURES, Tier, effective_limit, has_feature, is_on_trial, limit
 
@@ -201,6 +205,39 @@ async def clear_telegram_chat_id(
     await session.commit()
     logger.info("me.telegram_cleared user=%s", user.id)
     return {"ok": True}
+
+
+@router.post("/telegram/start-token")
+async def telegram_start_token(
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Mint a one-time link token + return the t.me deep-link URL.
+
+    Frontend opens the URL in a new tab. Telegram delivers /start <token>
+    to our webhook (routers/telegram.py), which links the chat_id to the
+    user. Token is valid for 10 minutes; only one active token per user
+    (any prior tokens are wiped on each call).
+    """
+    if not has_feature(Tier(user.tier), "alerts.telegram"):
+        raise HTTPException(403, "Telegram alerts require Premium tier")
+    settings = get_settings()
+    if not settings.telegram_bot_username:
+        raise HTTPException(503, "Telegram bot not configured")
+
+    # Wipe any prior tokens for this user — only the latest is valid
+    await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.user_id == user.id))
+
+    token = secrets.token_urlsafe(24)
+    expires_at = datetime.now(UTC) + timedelta(minutes=10)
+    session.add(TelegramLinkToken(token=token, user_id=user.id, expires_at=expires_at))
+    await session.commit()
+
+    return {
+        "token": token,
+        "deep_link": f"https://t.me/{settings.telegram_bot_username}?start={token}",
+        "expires_at": expires_at.isoformat(),
+    }
 
 
 @router.post("/telegram/test")
