@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     oauth_google_client_secret: str = ""
     oauth_microsoft_client_id: str = ""
     oauth_microsoft_client_secret: str = ""
+    # Apple Sign-In requires the Services ID + Team ID + Key ID + .p8 private key.
+    # The .p8 contents go directly into the env var (multiline, including the
+    # `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines).
+    # Apple Developer Program membership ($99/yr) required to issue these.
+    oauth_apple_client_id: str = ""        # Services ID, e.g. "io.tapeline.signin"
+    oauth_apple_team_id: str = ""          # 10-char Apple Developer team ID
+    oauth_apple_key_id: str = ""           # 10-char Key ID matching the .p8
+    oauth_apple_private_key: str = ""      # full .p8 contents incl. BEGIN/END lines
 
     # ---- Billing (Stripe) ----
     stripe_secret_key: str = ""

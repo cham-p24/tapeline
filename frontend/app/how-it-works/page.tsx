@@ -158,14 +158,13 @@ export default function HowItWorksPage() {
 
             <div className="mt-10 space-y-2">
               {SIGNALS.map((s) => (
-                <div key={s.label} className="flex items-center justify-between gap-6 border-b border-border py-4 last:border-b-0">
-                  <div className="flex items-center gap-4">
-                    <span className={`font-mono text-sm font-medium ${s.tone}`}>{s.label}</span>
-                  </div>
-                  <div className="flex items-center gap-6 text-sm">
-                    <span className="text-muted">{s.desc}</span>
-                    <span className="font-mono text-muted nums w-16 text-right">{s.range}</span>
-                  </div>
+                <div
+                  key={s.label}
+                  className="grid grid-cols-[minmax(8.5rem,auto)_1fr_auto] items-center gap-x-4 gap-y-1 border-b border-border py-4 last:border-b-0"
+                >
+                  <span className={`font-mono text-sm font-medium ${s.tone}`}>{s.label}</span>
+                  <span className="text-sm text-muted">{s.desc}</span>
+                  <span className="font-mono text-xs text-muted nums w-16 text-right">{s.range}</span>
                 </div>
               ))}
             </div>
@@ -197,7 +196,7 @@ export default function HowItWorksPage() {
       {/* CTA */}
       <section className="section py-24 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
-        <p className="mt-3 text-muted">14-day Pro trial. No credit card.</p>
+        <p className="mt-3 text-muted">14-day Premium trial. No credit card.</p>
         <Link href="/signup" className="btn-accent mt-8 inline-flex h-11 px-6 text-base">
           Start free trial &rarr;
         </Link>
