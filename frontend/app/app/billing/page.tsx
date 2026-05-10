@@ -323,7 +323,6 @@ export default function BillingPage() {
                 "Telegram alerts · unlimited (Pro: none)",
                 "Email alerts · unlimited (Pro: 10/day)",
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
-                "Public API · 1,000 req/day",
                 "Priority support · same-day reply",
               ]}
               cta="Upgrade to Premium"

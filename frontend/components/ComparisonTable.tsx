@@ -54,7 +54,9 @@ const SECTIONS: Section[] = [
     rows: [
       { label: "Congressional trades feed", free: "—", pro: "—", premium: "✓" },
       { label: "Elite 13F holdings", free: "—", pro: "—", premium: "✓" },
-      { label: "Public API access", free: "—", pro: "—", premium: "1,000 req/day" },
+      // Public API row removed — programmatic /api/v1/* with API-key auth
+      // isn't built yet. Re-add when the endpoint ships rather than leaving
+      // a 1,000 req/day claim that has no backing implementation.
       { label: "CSV export", free: "—", pro: "✓", premium: "✓" },
     ],
   },

@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import Ticker, User, WatchlistItem
 from app.services.auth import current_user_required
+from app.services.tier import Tier, effective_limit
 
 router = APIRouter()
 
@@ -66,6 +67,23 @@ async def add_to_watchlist(
     )
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(409, f"{symbol} already in watchlist")
+
+    # Tier cap. Free=5, Pro=50, Premium=200. Enforced server-side because the
+    # client could be old/forked. effective_limit also handles the trial-aware
+    # throttle for no-card Premium trials, though this cap isn't trial-throttled
+    # (watchlist isn't an abuse vector the same way api/telegram caps are).
+    cap = effective_limit(user, "watchlist_tickers")
+    count_q = await session.execute(
+        select(func.count()).select_from(WatchlistItem).where(WatchlistItem.user_id == user.id)
+    )
+    current = count_q.scalar() or 0
+    if current >= cap:
+        tier = Tier(user.tier).value
+        raise HTTPException(
+            403,
+            f"Watchlist limit reached ({cap} tickers on {tier}). "
+            f"Remove a ticker first, or upgrade for a larger watchlist.",
+        )
 
     # Record baseline score at add-time
     t_result = await session.execute(select(Ticker).where(Ticker.symbol == symbol))
