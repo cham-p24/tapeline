@@ -107,12 +107,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               name: "Tapeline",
               url: "https://tapeline.io",
               logo: "https://tapeline.io/favicon.svg",
-              sameAs: ["https://x.com/tapeline_io"],
+              // sameAs is the canonical "this is the same entity" graph that
+              // feeds Google's Knowledge Panel and Knowledge Graph. Each URL
+              // here should be the actual public profile page on an
+              // authoritative platform (no redirects, no short links).
+              // Coverage checklist + submission instructions live in
+              // docs/OFFSITE.md. Update entries when a profile is created;
+              // remove if a profile is genuinely abandoned.
+              sameAs: [
+                "https://x.com/tapeline_io",
+                "https://www.linkedin.com/company/tapeline",
+                "https://github.com/cham-p24/tapeline",
+                "https://www.crunchbase.com/organization/tapeline",
+                "https://www.producthunt.com/products/tapeline",
+                "https://alternativeto.net/software/tapeline/",
+                "https://www.g2.com/products/tapeline",
+                "https://www.capterra.com/p/tapeline/",
+                "https://stocktwits.com/tapeline",
+                "https://tapeline.substack.com",
+                "https://www.youtube.com/@tapeline",
+                "https://www.reddit.com/user/tapeline_io",
+              ],
               contactPoint: [
                 {
                   "@type": "ContactPoint",
                   email: "support@tapeline.io",
                   contactType: "customer support",
+                  availableLanguage: ["en"],
+                },
+                {
+                  "@type": "ContactPoint",
+                  email: "press@tapeline.io",
+                  contactType: "press inquiries",
                   availableLanguage: ["en"],
                 },
               ],
