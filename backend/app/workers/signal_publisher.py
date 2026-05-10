@@ -344,7 +344,23 @@ async def tick() -> None:
 
 
 async def _ensure_daily_scorecard(today: date) -> None:
-    """Record today's top-10 picks once per day, for the public scorecard page."""
+    """Record today's top-10 picks once per day, for the public scorecard page.
+
+    Only logs on US trading days. The back-check job assumes every row maps
+    to a real "next trading day" close — writing rows on Sat/Sun/holidays
+    breaks that assumption and causes the back-check to skip entries forever
+    or write 0% return values comparing same-day snapshots.
+
+    Also skips tickers with a missing/zero price (bad upstream data) — a $0
+    flag price would cause divide-by-zero when computing return.
+    """
+    from app.services.scorecard_backcheck import is_trading_day
+
+    if not is_trading_day(today):
+        # Worker still ticks on weekends/holidays for other tasks; just skip
+        # the scorecard snapshot. Tomorrow's trading day will get its row.
+        return
+
     async with session_scope() as session:
         existing = await session.execute(
             select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today).limit(1)
@@ -354,15 +370,23 @@ async def _ensure_daily_scorecard(today: date) -> None:
         top = await session.execute(
             select(Ticker).where(Ticker.score.isnot(None)).order_by(desc(Ticker.score)).limit(10)
         )
-        for rank, t in enumerate(top.scalars().all(), start=1):
+        rank = 0
+        for t in top.scalars().all():
+            if not t.price or t.price <= 0:
+                # Don't poison the public record with $0-price entries — these
+                # come from tier-restricted snapshot fields or partial fetches.
+                # Skipping reduces the day's count below 10; that's fine, the
+                # scorecard page renders whatever's there.
+                continue
+            rank += 1
             session.add(DailyScorecardEntry(
                 as_of=today,
                 symbol=t.symbol,
                 rank=rank,
                 score_at_flag=t.score or 0,
-                price_at_flag=t.price or 0,
+                price_at_flag=float(t.price),
             ))
-        logger.info("scorecard.snapshot saved for %s", today)
+        logger.info("scorecard.snapshot saved for %s rows=%d", today, rank)
 
 
 _news_cache_wiped: bool = False

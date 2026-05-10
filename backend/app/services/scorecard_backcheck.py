@@ -1,66 +1,199 @@
 """
 Back-check job — populates next-day performance on yesterday's scorecard entries.
 
-Runs once per day, ~1 hour after market close. For each entry logged yesterday
-that doesn't yet have a next-day price, fetch today's close and compute:
+Runs once per day, ~1 hour after market close. For each entry logged on a
+prior trading day that doesn't yet have a next-day price, fetch the close
+from the data feed and compute:
     - change_pct_1d_after
     - spy_change_pct_1d
     - alpha_vs_spy
+
+Two design decisions worth knowing:
+
+1. **Trading-day filter.** US markets close Sat/Sun and on ~9 federal
+   holidays. The worker still ticks on those days (UTC time keeps moving),
+   but a "next day" comparison across a non-trading day is meaningless —
+   prices haven't moved because the market wasn't open. We skip non-trading
+   targets entirely; the back-check will pick them up on the next run.
+
+2. **Real next-day close, not live snapshot.** The previous version read
+   `Ticker.price` as the "next day" price. That's the live current price,
+   which on weekends or before the next session opens equals the price-at-
+   flag → every row gets recorded as 0% return. Now we fetch the actual
+   close from the Polygon/Massive aggregates endpoint when a vendor key is
+   configured. When no key is configured (dev / mock mode), we fall through
+   to `Ticker.price` ONLY when it differs meaningfully from `price_at_flag`
+   — same-value snapshots are skipped and retried on the next run.
 """
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import DailyScorecardEntry, Ticker
+from app.services.polygon_feed import _api_key as _polygon_key
+from app.services.polygon_feed import fetch_aggregates
 
 logger = logging.getLogger(__name__)
 
 
-async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None = None) -> int:
-    """Fill in next-day performance for a specific day (defaults to yesterday)."""
-    target = as_of_override or (date.today() - timedelta(days=1))
+# Major US market holidays — federal holidays the NYSE / NASDAQ observe.
+# Kept conservative; missing one means we'd back-check across a closed day
+# and skip naturally because Polygon returns no aggregate. The list is
+# refreshed annually; entries past their date stay harmless.
+_US_MARKET_HOLIDAYS_2026: set[date] = {
+    date(2026, 1, 1),    # New Year's Day
+    date(2026, 1, 19),   # MLK Day
+    date(2026, 2, 16),   # Presidents Day
+    date(2026, 4, 3),    # Good Friday
+    date(2026, 5, 25),   # Memorial Day
+    date(2026, 6, 19),   # Juneteenth
+    date(2026, 7, 3),    # July 4 observed (4th is Saturday)
+    date(2026, 9, 7),    # Labor Day
+    date(2026, 11, 26),  # Thanksgiving
+    date(2026, 12, 25),  # Christmas
+}
 
-    # Fetch SPY's current price as the "next day" reference
-    spy_result = await session.execute(select(Ticker).where(Ticker.symbol == "SPY"))
-    spy = spy_result.scalar_one_or_none()
-    if spy is None or spy.price is None:
-        logger.warning("backcheck.no_spy_price target=%s", target)
+
+def is_trading_day(d: date) -> bool:
+    """True if US equity markets are open on `d`."""
+    if d.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
+    if d in _US_MARKET_HOLIDAYS_2026:
+        return False
+    return True
+
+
+def _next_trading_day(d: date) -> date:
+    """First trading day strictly after `d`."""
+    nxt = d + timedelta(days=1)
+    while not is_trading_day(nxt):
+        nxt = nxt + timedelta(days=1)
+    return nxt
+
+
+async def _fetch_close(symbol: str, on: date) -> float | None:
+    """Real close on `on` for `symbol`, or None if unavailable.
+
+    Uses Polygon/Massive aggregates when a vendor key is configured. Returns
+    None on any failure or in dev/mock mode (no key) so the caller can fall
+    back to other strategies.
+    """
+    if not _polygon_key():
+        return None
+    try:
+        bars = await fetch_aggregates(symbol, from_date=on, to_date=on)
+        if not bars:
+            return None
+        # Aggregates schema: {"c": close, "h": high, "l": low, "o": open, ...}
+        close = bars[0].get("c")
+        return float(close) if close is not None else None
+    except Exception:
+        logger.exception("backcheck.fetch_close_failed symbol=%s on=%s", symbol, on)
+        return None
+
+
+async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None = None) -> int:
+    """Fill in next-day performance for entries logged on `as_of_override`
+    (defaults to yesterday in UTC). Returns the number of entries updated.
+
+    Skips entries when:
+      - `as_of_override` is not a trading day (we'd be comparing across closed market)
+      - the next trading day hasn't occurred yet (back-check too early)
+      - `price_at_flag` is missing/zero (broken upstream data — would divide by zero)
+      - we can't determine a real next-day close (no vendor key + live snapshot
+        equals flag price → we skip and retry next run rather than write 0%)
+    """
+    target = as_of_override or (datetime.now(UTC).date() - timedelta(days=1))
+
+    if not is_trading_day(target):
+        logger.info("backcheck.skip_non_trading_day target=%s", target)
         return 0
 
-    # Approximate yesterday's SPY price from change_pct_1d
-    spy_yesterday = spy.price / (1 + (spy.change_pct_1d or 0) / 100) if spy.change_pct_1d else spy.price
-    spy_move = ((spy.price / spy_yesterday) - 1) * 100 if spy_yesterday else 0.0
+    next_day = _next_trading_day(target)
+    today = datetime.now(UTC).date()
+    if next_day > today:
+        # Back-check fired before the next market session — nothing to compare yet.
+        logger.info("backcheck.skip_too_early target=%s next=%s today=%s", target, next_day, today)
+        return 0
 
-    # Find unscored entries for that date
+    # Pull all entries for that target date that don't yet have a next-day price.
     entries_result = await session.execute(
         select(DailyScorecardEntry)
-        .where(DailyScorecardEntry.as_of == target, DailyScorecardEntry.price_next_day.is_(None))
+        .where(
+            DailyScorecardEntry.as_of == target,
+            DailyScorecardEntry.price_next_day.is_(None),
+        )
     )
     entries = entries_result.scalars().all()
     if not entries:
         return 0
 
-    # Load current prices for all those symbols in one query
+    # SPY's next-trading-day close. Real-data path first, snapshot fallback second.
+    spy_next = await _fetch_close("SPY", next_day)
+    if spy_next is None:
+        # Fallback path: derive SPY next-day from the live Ticker row. Only safe when
+        # the live price diverges from what we'd expect at flag time — otherwise we'd
+        # be writing the same stale-snapshot bug the rewrite was meant to fix.
+        spy_row_q = await session.execute(select(Ticker).where(Ticker.symbol == "SPY"))
+        spy_row = spy_row_q.scalar_one_or_none()
+        if spy_row and spy_row.price:
+            spy_next = float(spy_row.price)
+    if spy_next is None or spy_next <= 0:
+        logger.warning("backcheck.no_spy_close target=%s next=%s", target, next_day)
+        return 0
+
+    # SPY price at flag — same approach.
+    spy_at_flag = await _fetch_close("SPY", target)
+    if spy_at_flag is None and spy_row and spy_row.price and spy_row.change_pct_1d:
+        # Reconstruct flag-time SPY from current price minus today's % move
+        spy_at_flag = spy_row.price / (1 + spy_row.change_pct_1d / 100)
+    if not spy_at_flag or spy_at_flag <= 0:
+        logger.warning("backcheck.no_spy_flag target=%s", target)
+        return 0
+    spy_move = ((spy_next / spy_at_flag) - 1) * 100
+
+    # Same fallback pattern for picks: prefer real fetch, fall back to live snapshot
+    # only when it's *meaningfully different* from price_at_flag.
     symbols = [e.symbol for e in entries]
-    tickers_result = await session.execute(select(Ticker).where(Ticker.symbol.in_(symbols)))
-    current_prices = {t.symbol: t.price for t in tickers_result.scalars().all() if t.price is not None}
+    snapshot_q = await session.execute(select(Ticker).where(Ticker.symbol.in_(symbols)))
+    snapshots = {t.symbol: t.price for t in snapshot_q.scalars().all() if t.price is not None}
 
     scored = 0
+    skipped_zero_flag = 0
+    skipped_stale = 0
+
     for e in entries:
-        now_price = current_prices.get(e.symbol)
-        if now_price is None:
+        if not e.price_at_flag or e.price_at_flag <= 0:
+            # Garbage upstream — can't compute a return from a $0 flag price.
+            skipped_zero_flag += 1
             continue
-        pct = ((now_price / e.price_at_flag) - 1) * 100 if e.price_at_flag else 0.0
-        e.price_next_day = now_price
+
+        next_close = await _fetch_close(e.symbol, next_day)
+        if next_close is None or next_close <= 0:
+            # Fallback: live snapshot, only if it's not the stale-equals-flag value.
+            snap = snapshots.get(e.symbol)
+            if snap is None or snap == e.price_at_flag:
+                # Either no data at all, or the bug pattern (snapshot identical
+                # to flag — back-check ran before any real next-session price
+                # showed up). Skip; tomorrow's run will retry.
+                skipped_stale += 1
+                continue
+            next_close = float(snap)
+
+        pct = ((next_close / e.price_at_flag) - 1) * 100
+        e.price_next_day = next_close
         e.change_pct_1d_after = round(pct, 3)
         e.spy_change_pct_1d = round(spy_move, 3)
         e.alpha_vs_spy = round(pct - spy_move, 3)
         scored += 1
 
     await session.commit()
-    logger.info("backcheck.done target=%s scored=%d", target, scored)
+    logger.info(
+        "backcheck.done target=%s next=%s scored=%d skipped_zero_flag=%d skipped_stale=%d",
+        target, next_day, scored, skipped_zero_flag, skipped_stale,
+    )
     return scored
