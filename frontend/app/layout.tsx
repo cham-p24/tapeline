@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 
@@ -21,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Live quantitative stock scanner. Every US ticker gets one 0-100 score and a plain-English sentence from a public 6-factor formula. Pro from $24.99/mo, Premium from $39.99/mo (annual). 14-day free trial, no credit card.",
+    "Live quantitative stock scanner. Every US ticker gets one 0-100 score and a plain-English sentence from a public 6-factor formula. Pro from $24.99/mo, Premium from $39.99/mo (USD, annual). 14-day free trial, no credit card.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -189,11 +191,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   "@type": "Offer",
                   name: "Pro · monthly",
-                  price: "29",
+                  price: "29.99",
                   priceCurrency: "USD",
                   priceSpecification: {
                     "@type": "UnitPriceSpecification",
-                    price: "29",
+                    price: "29.99",
                     priceCurrency: "USD",
                     unitText: "MONTH",
                   },
@@ -202,11 +204,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   "@type": "Offer",
                   name: "Pro · annual",
-                  price: "299",
+                  price: "299.99",
                   priceCurrency: "USD",
                   priceSpecification: {
                     "@type": "UnitPriceSpecification",
-                    price: "299",
+                    price: "299.99",
                     priceCurrency: "USD",
                     unitText: "ANN",
                   },
@@ -215,11 +217,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   "@type": "Offer",
                   name: "Premium · monthly",
-                  price: "49",
+                  price: "49.99",
                   priceCurrency: "USD",
                   priceSpecification: {
                     "@type": "UnitPriceSpecification",
-                    price: "49",
+                    price: "49.99",
                     priceCurrency: "USD",
                     unitText: "MONTH",
                   },
@@ -244,6 +246,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <UserProvider>{children}</UserProvider>
+        {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
+            config needed — auto-detects when deployed on Vercel and is a
+            no-op in local dev. Page-view + custom-event tracking +
+            Web Vitals (Core Web Vitals + custom metrics). Complementary
+            to Plausible above (Plausible is the privacy-first aggregate
+            view; Vercel adds per-route + Web Vitals). */}
+        <Analytics />
+        <SpeedInsights />
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)
             via <div className="cf-turnstile">. The script self-discovers them. */}

@@ -37,8 +37,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 type SignupExtras = {
   ref?: string;
-  company?: string;          // honeypot — must be empty for humans
-  turnstile_token?: string;  // Cloudflare Turnstile token (if configured)
+  company?: string;             // honeypot — must be empty for humans
+  turnstile_token?: string;     // Cloudflare Turnstile token (if configured)
+  device_fingerprint?: string;  // 16-char hex hash from lib/fingerprint.ts
 };
 
 export const authApi = {

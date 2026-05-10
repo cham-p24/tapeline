@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type HoldingItem, type TrackedFund } from "@/lib/api";
 import { Paywall } from "@/components/Paywall";
 import { TableSkeleton } from "@/components/Skeleton";
+import { userLocale } from "@/lib/datetime";
 
 export default function HoldingsPage() {
   const [rows, setRows] = useState<HoldingItem[]>([]);
@@ -80,7 +81,7 @@ export default function HoldingsPage() {
         {/* Table */}
         <div className="card mt-4 overflow-x-auto">
           <table className="w-full text-sm nums">
-            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+            <thead className="text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-2 text-left">Fund</th>
                 <th className="px-4 py-2 text-left">Manager</th>
@@ -99,14 +100,14 @@ export default function HoldingsPage() {
                   No holdings match. Clear the filters or wait for the next 24h refresh.
                 </td></tr>
               ) : rows.map((h) => (
-                <tr key={h.id} className="border-b border-border/50 hover:bg-black/20">
+                <tr key={h.id} className="border-b border-border/20 hover:bg-black/20">
                   <td className="px-4 py-2 font-medium">{h.fund_name}</td>
                   <td className="px-4 py-2 text-muted">{h.manager}</td>
                   <td className="px-4 py-2 font-medium">{h.symbol}</td>
                   <td className="px-4 py-2 text-right text-up">{compactUSD(h.value_usd)}</td>
                   <td className="px-4 py-2 text-right text-muted">{compact(h.shares)}</td>
                   <td className="px-4 py-2 text-right">{h.percent_portfolio.toFixed(1)}%</td>
-                  <td className="px-4 py-2 text-xs text-muted">{new Date(h.fetched_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-xs text-muted">{new Date(h.fetched_at).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
                 </tr>
               ))}
             </tbody>

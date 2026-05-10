@@ -11,6 +11,7 @@ import {
   testWebPush,
   unsubscribeFromWebPush,
 } from "@/lib/webPush";
+import { userLocale } from "@/lib/datetime";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -27,15 +28,15 @@ const TIER_META = {
   },
   pro: {
     name: "Pro",
-    monthly: 29,
-    annual: 299,
+    monthly: 29.99,
+    annual: 299.99,
     annualMonthly: 24.99,
     blurb: "Live scanner. Daily edge.",
   },
   premium: {
     name: "Premium",
-    monthly: 49,
-    annual: 479,
+    monthly: 49.99,
+    annual: 479.99,
     annualMonthly: 39.99,
     blurb: "Everything, no limits.",
   },
@@ -188,7 +189,7 @@ export default function BillingPage() {
           {isOnTrial ? (
             <>
               <div className="mt-2 text-2xl font-bold nums">
-                {trialEndsAt!.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
                 Add a card before then to lock in {meta.name} access. Otherwise your account drops to Free
@@ -259,7 +260,7 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                30-day money-back, no questions. Cancel in one click. Annual locks the price forever.
+                30-day money-back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
@@ -294,8 +295,8 @@ export default function BillingPage() {
             />
             <Plan
               name="Pro"
-              price={billingPeriod === "annual" ? "$24.99" : "$29"}
-              note={billingPeriod === "annual" ? "$299/yr · billed annually · save $49" : "billed monthly"}
+              price={billingPeriod === "annual" ? "$24.99" : "$29.99"}
+              note={billingPeriod === "annual" ? "$299.99/yr · billed annually · save $60" : "billed monthly"}
               items={[
                 "Full ~2,500 ticker universe, live",
                 "Score breakdown + Why on every row",
@@ -313,8 +314,8 @@ export default function BillingPage() {
             />
             <Plan
               name="Premium"
-              price={billingPeriod === "annual" ? "$39.99" : "$49"}
-              note={billingPeriod === "annual" ? "$479/yr · billed annually · save $109" : "billed monthly"}
+              price={billingPeriod === "annual" ? "$39.99" : "$49.99"}
+              note={billingPeriod === "annual" ? "$479.99/yr · billed annually · save $120" : "billed monthly"}
               proPlus
               items={[
                 "Congressional trades feed (House + Senate)",
@@ -357,7 +358,7 @@ export default function BillingPage() {
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
               title="Bloomberg-grade data"
-              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479/yr."
+              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
             />
             <Selling
               title="Public scorecard, day 1"
@@ -444,8 +445,53 @@ function Selling({ title, body }: { title: string; body: string }) {
 function NotificationsCard() {
   const { user, refresh } = useUser();
   const [chatId, setChatId] = useState(user?.telegram_chat_id ?? "");
-  const [busy, setBusy] = useState<"save" | "test" | "clear" | null>(null);
+  const [busy, setBusy] = useState<"connect" | "save" | "test" | "clear" | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [polling, setPolling] = useState(false);
+
+  // Poll /api/me every 3s while a deep-link connect is in progress so the card
+  // flips to "Connected" the moment the webhook lands the chat_id. Stops after
+  // 10 minutes (token TTL) or as soon as we see a chat_id appear.
+  useEffect(() => {
+    if (!polling) return;
+    const startedAt = Date.now();
+    const handle = window.setInterval(async () => {
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        setPolling(false); return;
+      }
+      try {
+        const r = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+        if (!r.ok) return;
+        const me = await r.json();
+        if (me?.telegram_chat_id) {
+          await refresh();
+          setMsg({ kind: "ok", text: "Connected. Hourly digests will start at the top of the hour." });
+          setPolling(false);
+        }
+      } catch {
+        // Network blips during a deploy / Wi-Fi flap shouldn't kill the poll
+      }
+    }, 3000);
+    return () => window.clearInterval(handle);
+  }, [polling, refresh]);
+
+  async function connect() {
+    setBusy("connect"); setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/me/telegram/start-token`, {
+        method: "POST", credentials: "include",
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.detail || `Connect failed (${r.status})`);
+      // Open Telegram deep-link in a new tab — desktop app, mobile app, or web
+      window.open(body.deep_link, "_blank", "noopener,noreferrer");
+      setMsg({ kind: "ok", text: "Tap Start in Telegram. We'll auto-detect the connection." });
+      setPolling(true);
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e.message });
+    } finally { setBusy(null); }
+  }
 
   async function save() {
     setBusy("save"); setMsg(null);
@@ -505,38 +551,58 @@ function NotificationsCard() {
         </span>
       </div>
 
-      <div className="mt-4">
-        <label className="block text-xs font-medium text-muted">Telegram chat ID</label>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={chatId}
-          onChange={(e) => setChatId(e.target.value)}
-          placeholder="e.g. 123456789"
-          className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums"
-        />
-        <p className="mt-2 text-xs text-subtle">
-          Don&rsquo;t have one? DM <code className="text-accent">@TapelineBot</code> the message <code className="text-accent">/start</code>{" "}
-          and it will reply with your numeric ID. Paste that here.
-        </p>
-      </div>
+      {!connected && (
+        <>
+          <p className="mt-3 text-sm text-muted">
+            One click. We&rsquo;ll open Telegram, you tap <span className="text-fg">Start</span>, and you&rsquo;re wired up.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={connect}
+              disabled={busy !== null || polling}
+              className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy === "connect" ? "Opening Telegram…" : polling ? "Waiting for Telegram…" : "Connect Telegram"}
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="mt-4 text-xs text-subtle underline-offset-2 hover:text-muted hover:underline"
+          >
+            {showAdvanced ? "Hide manual setup" : "I already have my chat ID"}
+          </button>
+          {showAdvanced && (
+            <div className="mt-3 rounded-md border border-border/40 p-4">
+              <label className="block text-xs font-medium text-muted">Telegram chat ID</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={chatId}
+                onChange={(e) => setChatId(e.target.value)}
+                placeholder="e.g. 123456789"
+                className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums"
+              />
+              <button
+                onClick={save}
+                disabled={busy !== null || !chatId.trim()}
+                className="btn-ghost mt-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy === "save" ? "Saving…" : "Save chat ID"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <button
-          onClick={save}
-          disabled={busy !== null || !chatId.trim() || chatId.trim() === user?.telegram_chat_id}
-          className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy === "save" ? "Saving…" : "Save"}
-        </button>
-        <button
-          onClick={test}
-          disabled={busy !== null || !connected}
-          className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy === "test" ? "Sending…" : "Send test message"}
-        </button>
-        {connected && (
+      {connected && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            onClick={test}
+            disabled={busy !== null}
+            className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy === "test" ? "Sending…" : "Send test message"}
+          </button>
           <button
             onClick={clear}
             disabled={busy !== null}
@@ -544,8 +610,8 @@ function NotificationsCard() {
           >
             {busy === "clear" ? "Disconnecting…" : "Disconnect"}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {msg && (
         <div className={`mt-4 rounded-md border p-3 text-sm ${

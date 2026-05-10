@@ -8,11 +8,10 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 
-// Starter watchlist for brand-new users — one click adds the mega-caps
-// most retail traders are already watching, plus SPY as the benchmark.
-// Without this seeding step the empty state asks new users to type a
-// ticker they may not know, which is the #1 first-touch friction.
-const STARTER_WATCHLIST = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY"];
+// Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
+// start before the worker has populated any scored tickers). Same shape
+// as the API response so the seed-button code path is identical.
+const STARTER_FALLBACK = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY"];
 
 export default function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
@@ -20,6 +19,18 @@ export default function WatchlistPage() {
   const [symbol, setSymbol] = useState("");
   const [threshold, setThreshold] = useState(10);
   const [seeding, setSeeding] = useState(false);
+  const [starter, setStarter] = useState<string[]>(STARTER_FALLBACK);
+
+  // Refresh the starter pack from the API on mount. Falls back to the
+  // hardcoded mega-cap list if the call fails for any reason.
+  useEffect(() => {
+    api.popularTickers(8)
+      .then((r) => {
+        const syms = r.items.map((i) => i.symbol).filter(Boolean);
+        if (syms.length >= 4) setStarter(syms);
+      })
+      .catch(() => { /* keep STARTER_FALLBACK */ });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -53,7 +64,7 @@ export default function WatchlistPage() {
       // Sequential because the watchlist endpoint creates one row per call;
       // 8 fast requests is fine and we want any 409s ("already exists") to
       // be silently swallowed without aborting the rest.
-      for (const sym of STARTER_WATCHLIST) {
+      for (const sym of starter) {
         try {
           await api.watchlistAdd(sym, threshold);
         } catch {
@@ -129,14 +140,14 @@ export default function WatchlistPage() {
                   disabled={seeding}
                   className="btn-accent text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {seeding ? "Adding…" : `Add starter pack (${STARTER_WATCHLIST.length} mega-caps + SPY) →`}
+                  {seeding ? "Adding…" : `Add starter pack (top ${starter.length} by daily volume) →`}
                 </button>
                 <Link href="/app/scanner" className="btn-ghost text-sm">
                   Browse the scanner instead
                 </Link>
               </div>
               <p className="mt-3 text-xs text-subtle">
-                Starter: {STARTER_WATCHLIST.join(" · ")}
+                Starter: {starter.join(" · ")}
               </p>
             </div>
           </div>
@@ -147,7 +158,7 @@ export default function WatchlistPage() {
       {(loading || items.length > 0) && (
       <div className="card mt-6 overflow-hidden">
         <table className="w-full text-sm nums">
-          <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+          <thead className="text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Ticker</th>
               <th className="px-4 py-2 text-right">Price</th>
@@ -165,7 +176,7 @@ export default function WatchlistPage() {
               <tr><td colSpan={9}><TableSkeleton cols={9} rows={5} /></td></tr>
             )}
             {items.map((w) => (
-              <tr key={w.id} className={`border-b border-border/50 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
+              <tr key={w.id} className={`border-b border-border/20 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${w.symbol}`} className="hover:text-accent">{w.symbol}</Link>
                   {w.alert_triggered && <span className="ml-2 text-xs text-yellow-400">⚠ alert</span>}

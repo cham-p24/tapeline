@@ -25,8 +25,8 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 ## Tier model — canonical source: `backend/app/services/tier.py`
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
-- **Pro** $29/mo OR **$24.99/mo billed annually** ($299/yr · save $49) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
-- **Premium** $49/mo OR **$39.99/mo billed annually** ($479/yr · save $109) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, email unlimited, public API (1,000/day), priority support
+- **Pro** $29.99/mo OR **$24.99/mo billed annually** ($299.99/yr · save $60) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
+- **Premium** $49.99/mo OR **$39.99/mo billed annually** ($479.99/yr · save $120) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, email unlimited, public API (1,000/day), priority support
 
 **Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
 
@@ -95,10 +95,10 @@ ratings widget renders a "No analyst coverage" empty state.
 Wired end-to-end as of 2026-04-27. `services/quiver_feed.py` fetches 13F data for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer); 24h cache + multi-endpoint fallback. Worker task `_refresh_elite_13f` runs daily; falls back to `mock_elite_13f_holdings()` when no `QUIVER_API_KEY`. Endpoint `/api/holdings` (Premium-only via feature `holdings.elite`). Frontend page not yet built — use existing congress page pattern for `/app/holdings` when ready.
 
 ## Known issues / partially-built
-- **`rate_direction` in regime is a placeholder** — `polygon_feed.py:fetch_regime` still returns hardcoded value. Breadth_pct + sector_leaders now computed live from the snapshot universe each tick. DXY/10Y/VIX use FRED when configured.
+- **`rate_direction` is now live from FRED** — `polygon_feed.fetch_regime` reads the 10Y yield's last 30 obs from FRED and classifies RISING / FALLING / SIDEWAYS via `fred_feed._direction()` (0.5 % threshold). Falls back to SIDEWAYS without a FRED key. Breadth_pct still placeholder; sector_leaders computed live each tick.
 - **Finnhub fundamentals not yet wired into per-tick `sub_fundamentals`** — `services/finnhub_feed.py` has `fetch_basic_financials()` + `compute_fundamentals_score()` working live (verified AAPL scored 79.1/100). Calendars (IPO + earnings) already use Finnhub when configured. To wire fundamentals into the score: pre-fetch all 870 tickers weekly, cache results, have `polygon_feed.fetch_snapshots` read from cache instead of generating random.
-- **No `/v3/reference/tickers/{sym}` sector backfill** — universe auto-discovery from Polygon adds new tickers with `sector="Unknown"`. Worker should backfill sectors lazily for tickers users actually look at.
-- **Web push send needs `pywebpush`** — `services/web_push.py` imports it conditionally; if not installed, the channel logs a skip and continues. Run `pip install pywebpush` in the backend venv to activate.
+- **Sector backfill is wired** — `signal_publisher._backfill_sectors` runs daily via `_serial_finnhub_refreshes`, queries `Ticker.sector IN (NULL, "Unknown")`, hits Finnhub `/stock/profile2` per symbol at 1.1s/call, caps at 200/day to stay under the free-tier budget. Auto-discovered tickers get their real sector within 24h.
+- **`pywebpush` is now in `pyproject.toml`** (>=2.0.1). Web push send works as soon as VAPID env vars are set.
 - **Frontend tests cover ~6 surfaces** — Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels, BillingToggle, HoldingsPage. Grow with billing flow + alerts CRUD + scanner page next.
 - **Playwright E2E scaffold lives at `frontend/e2e/`** — 3 spec files covering landing, pricing, and auth-form rendering. To run locally:
   ```powershell
@@ -133,7 +133,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - 6-factor scoring formula and weights
 - Descriptive (not prescriptive) signal labels
 - Public scorecard from day 1 (the trust mechanism)
-- Three-tier price points ($29 Pro / $49 Premium) — only revisit with conversion data
+- Three-tier price points ($29.99 Pro / $49.99 Premium) — only revisit with conversion data
 - Free tier shows real product (delayed) — not a feature-stripped version
 - Owner login mechanism (only seeded via `seed_owner.py`, never via signup form)
 

@@ -6,20 +6,31 @@
  * Lives outside /app so unlogged-in visitors and search engines can see it.
  */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { userLocale } from "@/lib/datetime";
 
 export default function ScorecardPage() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
   const [data, setData] = useState<{
     summary: { days_tracked: number; entries_scored: number; avg_1d_return: number | null; avg_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null };
     days: Record<string, ScorecardEntry[]>;
   } | null>(null);
 
   useEffect(() => { api.scorecard(30).then(setData).catch(console.error); }, []);
+
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const sym = query.trim().toUpperCase();
+    if (!sym) return;
+    router.push(`/scorecard/${encodeURIComponent(sym)}`);
+  }
 
   // Loading state with proper skeleton — replaces the literal "Loading…" text
   // that search-engine + social-card crawlers were getting in SSR.
@@ -66,6 +77,29 @@ export default function ScorecardPage() {
         No cherry-picking, no survivor bias &mdash; this is the full public record.
       </p>
 
+      {/* Symbol search — jumps to /scorecard/[symbol] for the per-ticker history.
+          Doubles as an SEO surface (one indexable page per ticker history). */}
+      <form onSubmit={submitSearch} className="mt-5 flex max-w-md gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value.toUpperCase().slice(0, 10))}
+          placeholder="Look up any ticker (e.g. AAPL, TSLA)"
+          aria-label="Search ticker history"
+          className="block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums uppercase"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button
+          type="submit"
+          disabled={!query.trim()}
+          className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          See history
+        </button>
+      </form>
+
       {/* Early-launch banner — when we have picks logged but next-day prices
           haven't been back-checked yet. Avoids the dashes-everywhere look
           and explains the timeline honestly. */}
@@ -89,57 +123,98 @@ export default function ScorecardPage() {
           Scorecard starts logging today. Come back tomorrow to see the first day&apos;s results.
         </div>
       ) : (
-        <div className="mt-8 space-y-4">
-          {dates.map((d) => (
-            <div key={d} className="card">
-              <div className="border-b border-border p-4">
-                {/* Locale-aware day header — toDateString() forced English
-                    "Thu May 07 2026"; this matches the visitor's browser
-                    locale + timezone via Intl. */}
-                <h2 className="font-semibold">
-                  {new Date(d).toLocaleDateString(undefined, {
+        <>
+          {/* Legend — small explainer block so non-quant visitors can read
+              the columns. Sits above the per-day sections so it's the first
+              thing scanned after the summary stats. Lighter chrome than
+              before so it pairs with the borderless day sections below. */}
+          <div className="mt-8 rounded-xl bg-panel/30 p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">How to read this</h3>
+            <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Score</dt>
+                <dd className="text-muted">0&ndash;100 composite at flag time. Six factors at <Link href="/how-it-works" className="text-accent hover:underline">published weights</Link>.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Price at flag</dt>
+                <dd className="text-muted">Closing price the day we picked the ticker.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Next day</dt>
+                <dd className="text-muted">Closing price the next US trading day. Populated 24h after market close.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="whitespace-nowrap font-medium text-fg">SPY</dt>
+                <dd className="text-muted">SPY&rsquo;s return on the same day &mdash; the market benchmark.</dd>
+              </div>
+              <div className="flex gap-2 sm:col-span-2">
+                <dt className="whitespace-nowrap font-medium text-fg">Alpha</dt>
+                <dd className="text-muted">Pick&rsquo;s return minus SPY&rsquo;s return. Positive = beat the market; negative = lagged it. <span className="text-up">Green</span> = win, <span className="text-down">red</span> = loss. Losses stay on the page.</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-subtle">
+              <span className="font-medium">&ldquo;pending&rdquo;</span> means the next-day price hasn&rsquo;t been recorded yet (entries from today, or back-check still running). <span className="font-medium">&mdash;</span> means data is unavailable for that field.
+            </p>
+          </div>
+
+          {/* Borderless day groups — date header acts as separator, table
+              breathes into page background. Per launch feedback: the card
+              outline made the page read as detached spreadsheets rather than
+              one continuous record. */}
+          <div className="mt-8 space-y-10">
+            {dates.map((d) => (
+              <section key={d}>
+                <h2 className="px-1 pb-3 text-sm font-medium uppercase tracking-wide text-muted">
+                  {new Date(d).toLocaleDateString(userLocale(), {
                     weekday: "short",
                     year: "numeric",
                     month: "short",
                     day: "numeric",
                   })}
                 </h2>
-              </div>
+              {/* Mobile: drop secondary columns (Price-at-flag, Next-day, SPY)
+                  so the row fits without horizontal scroll. The desktop view
+                  still gets the full breakdown. */}
               <table className="w-full text-sm nums">
-                <thead className="bg-black/40 text-xs uppercase text-muted">
+                <thead className="text-xs uppercase text-muted">
                   <tr>
-                    <th className="px-4 py-2 text-left">#</th>
-                    <th className="px-4 py-2 text-left">Ticker</th>
-                    <th className="px-4 py-2 text-right">Score</th>
-                    <th className="px-4 py-2 text-right">Price at flag</th>
-                    <th className="px-4 py-2 text-right">Next day</th>
-                    <th className="px-4 py-2 text-right">SPY</th>
-                    <th className="px-4 py-2 text-right">Alpha</th>
+                    <th className="px-2 py-2 text-left font-normal">#</th>
+                    <th className="px-2 py-2 text-left font-normal">Ticker</th>
+                    <th className="px-2 py-2 text-right font-normal">Score</th>
+                    <th className="hidden px-2 py-2 text-right font-normal sm:table-cell">Price at flag</th>
+                    <th className="hidden px-2 py-2 text-right font-normal sm:table-cell">Next day</th>
+                    <th className="hidden px-2 py-2 text-right font-normal sm:table-cell">SPY</th>
+                    <th className="px-2 py-2 text-right font-normal">Alpha</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.days[d].map((e) => (
-                    <tr key={e.symbol} className="border-b border-border/50">
-                      <td className="px-4 py-2 text-muted">{e.rank}</td>
-                      <td className="px-4 py-2 font-medium">{e.symbol}</td>
-                      <td className="px-4 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-right">${e.price_at_flag.toFixed(2)}</td>
-                      <td className={`px-4 py-2 text-right ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                    <tr key={e.symbol} className="border-b border-border/20 last:border-0">
+                      <td className="px-2 py-2 text-muted">{e.rank}</td>
+                      <td className="px-2 py-2 font-medium">
+                        <Link href={`/scorecard/${encodeURIComponent(e.symbol)}`} className="hover:text-accent hover:underline">
+                          {e.symbol}
+                        </Link>
+                      </td>
+                      <td className="px-2 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
+                      <td className="hidden px-2 py-2 text-right sm:table-cell">${e.price_at_flag.toFixed(2)}</td>
+                      <td className={`hidden px-2 py-2 text-right sm:table-cell ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.change_pct_1d_after != null ? `${e.change_pct_1d_after >= 0 ? "+" : ""}${e.change_pct_1d_after.toFixed(2)}%` : "pending"}
                       </td>
-                      <td className="px-4 py-2 text-right text-muted">
+                      <td className="hidden px-2 py-2 text-right text-muted sm:table-cell">
                         {e.spy_change_pct_1d != null ? `${e.spy_change_pct_1d >= 0 ? "+" : ""}${e.spy_change_pct_1d.toFixed(2)}%` : "—"}
                       </td>
-                      <td className={`px-4 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                      <td className={`px-2 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.alpha_vs_spy != null ? `${e.alpha_vs_spy >= 0 ? "+" : ""}${e.alpha_vs_spy.toFixed(2)}%` : "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </section>
           ))}
         </div>
+        </>
       )}
 
       </div>

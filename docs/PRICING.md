@@ -11,7 +11,7 @@
 - Purpose: lead magnet + landing-page demo + loss-aversion lever at trial expiry
 
 ### Pro — "Scanner"
-**$29/mo** or **$24.99/mo billed annually** ($299/yr · save $49)
+**$29.99/mo** or **$24.99/mo billed annually** ($299.99/yr · save $60)
 - Scanner: full ~2,500-ticker universe, **live (sub-60s refresh)**
 - Squeeze Watch: full setup list with windows
 - Market regime: full view with VIX/DXY/10Y/sector leaders
@@ -22,7 +22,7 @@
 - No Congress data, no Telegram, no API
 
 ### Premium — "Analyst"
-**$49/mo** or **$39.99/mo billed annually** ($479/yr · save $109)
+**$49.99/mo** or **$39.99/mo billed annually** ($479.99/yr · save $120)
 - Everything in Pro
 - **Congressional trade feed** (daily updates, ticker aggregation)
 - **Elite 13F holdings** (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
@@ -44,7 +44,7 @@ Competitive set:
 - BlackBoxStocks: $100/mo — squeeze + dark pool alerts
 - Zacks Premium: $250/yr — rankings, no scanner
 
-Tapeline Pro at $29 undercuts everyone in the live-scanner category. Premium at $49 matches Unusual Whales and beats Trade Ideas by 3x while covering different primary use cases (quant scanner vs. options flow).
+Tapeline Pro at $29.99 undercuts everyone in the live-scanner category. Premium at $49.99 matches Unusual Whales and beats Trade Ideas by 3x while covering different primary use cases (quant scanner vs. options flow).
 
 ## Trial / conversion strategy
 
@@ -84,8 +84,8 @@ $105k ARR by month 12 is the stretch goal. Even 25% of that is a validated side 
 
 ## Annual plan pricing math
 
-Monthly → Annual discount is **~14% on Pro / ~16.5% on Premium** (close to 2 months free), with charm pricing on the per-month equivalent:
-- Pro: $29 × 12 = $348 → **$299 annual** ($24.99/mo · save $49/yr)
-- Premium: $49 × 12 = $588 → **$479 annual** ($39.99/mo · save $109/yr)
+Monthly → Annual discount is **~17% on Pro / ~20% on Premium** (close to 2 months free), with charm pricing on the per-month equivalent:
+- Pro: $29.99 × 12 = $359.88 → **$299.99 annual** ($24.99/mo · save $60/yr)
+- Premium: $49.99 × 12 = $599.88 → **$479.99 annual** ($39.99/mo · save $120/yr)
 
 Annual plans should be **≥40% of paid revenue** by month 6 — they dramatically reduce churn.

@@ -1,10 +1,10 @@
 """
 Tier gating — three-tier model (Free / Pro / Premium).
 
-- Free: preview only (top 10 tickers, 15-min delayed)
-- Pro $29/mo: live scanner, full universe, squeeze + regime + heatmap,
+- Free: preview only (top 20 tickers, 24-hour delayed)
+- Pro $29.99/mo: live scanner, full universe, squeeze + regime + heatmap,
   watchlist with smart alerts, email alerts, CSV export
-- Premium $49/mo: everything in Pro + Congressional trades, unlimited
+- Premium $49.99/mo: everything in Pro + Congressional trades, unlimited
   Telegram alerts, unlimited email alerts, public API (1,000/day),
   priority support
 
@@ -13,7 +13,12 @@ overrides handle larger seat counts or API caps if needed.
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models import User
 
 
 class Tier(StrEnum):
@@ -106,3 +111,80 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
 def limit(user_tier: Tier | str, key: str) -> int:
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
     return TIER_LIMITS[actual].get(key, 0)
+
+
+# ---- Trial-aware throttling -------------------------------------------------
+#
+# A user is "on trial" when their tier was auto-elevated to PREMIUM at signup
+# and they haven't added a card yet. During this window we want them to taste
+# Premium for conversion-test purposes — but we don't want a determined trial-
+# farmer to extract material amounts of high-value Premium-only data over
+# repeated trial cycles.
+#
+# So during trial we keep the conversion-test features at full Premium caps
+# (scanner, watchlist, congress, holdings — these are the "see the product"
+# features), but we throttle the data-extraction-attractive caps:
+#
+#   - api_requests_per_day: 1,000 → 100
+#   - telegram_alerts_per_day: 10,000 → 100
+#
+# Paid Premium users (stripe_customer_id set) get the full cap. The reduction
+# applies only while the trial is active. When the trial expires the user
+# either drops to Free (and these caps drop to 0 anyway) or upgrades to paid
+# (and the throttle lifts).
+#
+# The actual enforcement of these caps is wired in API middleware + alert
+# delivery — those call sites consult `effective_limit(user, key)` rather
+# than `limit(tier, key)` so the throttle takes effect automatically.
+
+# Caps that get reduced during a Premium trial. Anything not in this dict
+# stays at the regular Premium cap during trial — full conversion-test value.
+_TRIAL_PREMIUM_REDUCTIONS: dict[str, int] = {
+    "api_requests_per_day": 100,        # vs 1,000 paid — abuse-resistant
+    "telegram_alerts_per_day": 100,     # vs 10,000 paid — still functional, less spammable
+}
+
+
+def is_on_trial(
+    tier: Tier | str | None,
+    trial_ends_at: datetime | None,
+    stripe_customer_id: str | None,
+) -> bool:
+    """True if the user is currently inside a no-card Premium trial.
+
+    Conditions, all required:
+      - effective tier is Premium
+      - trial_ends_at is set and still in the future
+      - stripe_customer_id is None (no Stripe customer record = no card on file)
+
+    Lifetime users (`is_lifetime=True`) get a Stripe customer record from the
+    one-off purchase flow, so they fall through this check naturally.
+    """
+    if tier is None or trial_ends_at is None:
+        return False
+    actual = Tier(tier) if isinstance(tier, str) else tier
+    if actual is not Tier.PREMIUM:
+        return False
+    if stripe_customer_id:
+        return False
+    # Compare in UTC; trial_ends_at is stored timezone-aware.
+    now = datetime.now(UTC)
+    # If trial_ends_at is naive (older rows might be), treat it as UTC.
+    if trial_ends_at.tzinfo is None:
+        trial_ends_at = trial_ends_at.replace(tzinfo=UTC)
+    return trial_ends_at > now
+
+
+def effective_limit(user: User, key: str) -> int:
+    """Return the cap for `key` accounting for trial-state throttling.
+
+    Paid users get `limit(tier, key)` unchanged. Trial-state Premium users
+    get the throttled value for keys in `_TRIAL_PREMIUM_REDUCTIONS`, and the
+    regular Premium cap for everything else.
+    """
+    base = limit(user.tier, key)
+    if key not in _TRIAL_PREMIUM_REDUCTIONS:
+        return base
+    if not is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id):
+        return base
+    return _TRIAL_PREMIUM_REDUCTIONS[key]

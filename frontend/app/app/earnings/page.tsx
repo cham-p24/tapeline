@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { userLocale } from "@/lib/datetime";
 
 type Earnings = {
   id: number; symbol: string; report_date: string; report_time: string;
@@ -55,13 +56,14 @@ export default function EarningsPage() {
         {Object.keys(byDate).sort().map((d) => (
           <div key={d} className="card">
             <div className="border-b border-border px-4 py-3">
-              {/* Locale-aware: visitor in Australia sees "Monday, 8 May",
-                  US sees "Monday, May 8", UK sees "Monday, 8 May", etc. */}
-              <h2 className="font-semibold">{new Date(d).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</h2>
+              {/* Locale-aware via the tapeline_locale cookie set by middleware
+                  from Vercel edge geo: AU sees "Monday, 8 May", US sees
+                  "Monday, May 8", DE sees "Montag, 8. Mai", etc. */}
+              <h2 className="font-semibold">{new Date(d).toLocaleDateString(userLocale(), { weekday: "long", month: "short", day: "numeric" })}</h2>
               <p className="text-xs text-muted">{byDate[d].length} companies reporting</p>
             </div>
             <table className="w-full text-sm nums">
-              <thead className="bg-black/40 text-xs uppercase text-muted">
+              <thead className="text-xs uppercase text-muted">
                 <tr>
                   <th className="px-4 py-2 text-left">Ticker</th>
                   <th className="px-4 py-2 text-left">Quarter</th>
@@ -72,7 +74,7 @@ export default function EarningsPage() {
               </thead>
               <tbody>
                 {byDate[d].map((r) => (
-                  <tr key={r.id} className="border-b border-border/50 hover:bg-black/20">
+                  <tr key={r.id} className="border-b border-border/20 hover:bg-black/20">
                     <td className="px-4 py-2 font-medium">
                       <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
                     </td>

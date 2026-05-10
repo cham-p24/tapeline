@@ -47,8 +47,9 @@ export function MarketingFooter() {
             <FooterLink href="/press" desc="Logos, fact sheet, founder bio">Press kit</FooterLink>
             <FooterLink href="/status" desc="Live API + worker uptime, refresh every 30s">System status</FooterLink>
             <FooterLink href="/security" desc="Encryption, payment data, vulnerability disclosure">Security</FooterLink>
-            <FooterLink href="/legal/terms" desc="Subscription terms, cancellation, refunds">Terms</FooterLink>
+            <FooterLink href="/legal/terms" desc="Subscription terms, acceptable use">Terms</FooterLink>
             <FooterLink href="/legal/privacy" desc="What we collect + how it's stored">Privacy</FooterLink>
+            <FooterLink href="/legal/refund" desc="Cancel anytime, 7-day full refund on monthly">Refund policy</FooterLink>
             <FooterLink href="/legal/risk" desc="Not investment advice — scope of the data">Risk disclosure</FooterLink>
           </FooterCol>
         </div>

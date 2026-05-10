@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { CardSkeleton } from "@/components/Skeleton";
+import { userLocale } from "@/lib/datetime";
 
 type Stats = {
   users_total: number; users_pro: number; users_premium: number;
@@ -138,7 +139,7 @@ export default function AdminPage() {
       <h2 className="mt-10 text-xl font-semibold">All users</h2>
       <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-sm nums">
-          <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+          <thead className="text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Email</th>
               <th className="px-4 py-2 text-left">Name</th>
@@ -152,7 +153,7 @@ export default function AdminPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="border-b border-border/50 hover:bg-black/20">
+              <tr key={u.id} className="border-b border-border/20 hover:bg-black/20">
                 <td className="px-4 py-2 font-medium">
                   {u.email}
                   {u.is_admin && <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] uppercase text-accent">admin</span>}
@@ -167,7 +168,7 @@ export default function AdminPage() {
                 </td>
                 <td className="px-4 py-2 text-center text-xs">{u.has_stripe ? "✓" : "—"}</td>
                 <td className="px-4 py-2 text-center text-xs">{u.has_telegram ? "✓" : "—"}</td>
-                <td className="px-4 py-2 text-xs text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-2 text-xs text-muted">{new Date(u.created_at).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
                 <td className="px-4 py-2 text-right">
                   <select
                     value={u.tier}
