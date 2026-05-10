@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Three-column comparison: Free / Pro ($29/mo or $24.99/mo annual) /
- * Premium ($49/mo or $39.99/mo annual). Mirrors the gating in
+ * Three-column comparison: Free / Pro ($29.99/mo or $24.99/mo annual) /
+ * Premium ($49.99/mo or $39.99/mo annual). Mirrors the gating in
  * backend/app/services/tier.py.
  *
  * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
@@ -70,18 +70,21 @@ const SECTIONS: Section[] = [
 export function ComparisonTable() {
   return (
     <div className="card mt-8 overflow-x-auto">
+      <div className="px-4 pt-3 text-right text-[10px] uppercase tracking-wider text-subtle">All prices in USD</div>
       <table className="w-full text-sm">
         <thead className="border-b border-border bg-black/40">
           <tr>
-            <th className="px-4 py-3 text-left text-xs uppercase text-muted">Feature</th>
-            <th className="px-4 py-3 text-center text-xs uppercase text-muted w-40">Free</th>
-            <th className="px-4 py-3 text-center text-xs uppercase w-48">
-              <span className="text-fg block">Pro</span>
-              <span className="text-[10px] normal-case text-muted block mt-0.5">$29/mo · $24.99/mo annual</span>
+            <th className="px-4 py-3 text-left text-xs uppercase text-muted align-bottom">Feature</th>
+            <th className="px-4 py-3 text-center text-xs uppercase text-muted w-40 align-bottom">Free</th>
+            <th className="px-4 py-3 text-center w-48 align-bottom">
+              <span className="text-fg block text-xs uppercase">Pro</span>
+              <span className="text-[11px] text-muted block mt-1.5 nums">$29.99/mo</span>
+              <span className="text-[10px] text-subtle block nums">or $24.99/mo annual</span>
             </th>
-            <th className="px-4 py-3 text-center text-xs uppercase w-48">
-              <span className="text-accent block">Premium</span>
-              <span className="text-[10px] normal-case text-muted block mt-0.5">$49/mo · $39.99/mo annual</span>
+            <th className="px-4 py-3 text-center w-48 align-bottom">
+              <span className="text-accent block text-xs uppercase">Premium</span>
+              <span className="text-[11px] text-muted block mt-1.5 nums">$49.99/mo</span>
+              <span className="text-[10px] text-subtle block nums">or $39.99/mo annual</span>
             </th>
           </tr>
         </thead>

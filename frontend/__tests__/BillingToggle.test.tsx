@@ -28,7 +28,7 @@ describe("BillingPage", () => {
   it("defaults to annual billing and shows charm-priced effective monthly", () => {
     render(<BillingPage />);
     // Annual is the default; charm pricing displays Pro at $24.99/mo
-    // ($299/yr) and Premium at $40.99/mo ($491/yr).
+    // ($299.99/yr) and Premium at $39.99/mo ($479.99/yr).
     expect(screen.getByText("$24.99")).toBeInTheDocument();
     expect(screen.getByText("$39.99")).toBeInTheDocument();
   });
@@ -38,7 +38,7 @@ describe("BillingPage", () => {
     const monthlyBtn = screen.getByRole("button", { name: /monthly/i });
     fireEvent.click(monthlyBtn);
     // After toggling, prices should be the headline monthly prices
-    expect(screen.getByText("$29")).toBeInTheDocument();
-    expect(screen.getByText("$49")).toBeInTheDocument();
+    expect(screen.getByText("$29.99")).toBeInTheDocument();
+    expect(screen.getByText("$49.99")).toBeInTheDocument();
   });
 });

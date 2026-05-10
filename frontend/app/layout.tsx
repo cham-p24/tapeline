@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: "%s — Tapeline",
   },
   description:
-    "Live quantitative scanner: every US ticker gets one 0-100 score and one plain-English sentence. Six-factor formula is public. Track record updates daily. Pro $29/mo, Premium $49/mo.",
+    "Live quantitative scanner: every US ticker gets one 0-100 score and one plain-English sentence. Six-factor formula is public. Track record updates daily. Pro $29.99/mo, Premium $49.99/mo (USD).",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -126,11 +126,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   "@type": "Offer",
                   name: "Pro",
-                  price: "29",
+                  price: "29.99",
                   priceCurrency: "USD",
                   priceSpecification: {
                     "@type": "UnitPriceSpecification",
-                    price: "29",
+                    price: "29.99",
                     priceCurrency: "USD",
                     unitText: "MONTH",
                   },
@@ -139,11 +139,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   "@type": "Offer",
                   name: "Premium",
-                  price: "49",
+                  price: "49.99",
                   priceCurrency: "USD",
                   priceSpecification: {
                     "@type": "UnitPriceSpecification",
-                    price: "49",
+                    price: "49.99",
                     priceCurrency: "USD",
                     unitText: "MONTH",
                   },

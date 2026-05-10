@@ -1,10 +1,10 @@
 """
 Tier gating — three-tier model (Free / Pro / Premium).
 
-- Free: preview only (top 10 tickers, 15-min delayed)
-- Pro $29/mo: live scanner, full universe, squeeze + regime + heatmap,
+- Free: preview only (top 20 tickers, 24-hour delayed)
+- Pro $29.99/mo: live scanner, full universe, squeeze + regime + heatmap,
   watchlist with smart alerts, email alerts, CSV export
-- Premium $49/mo: everything in Pro + Congressional trades, unlimited
+- Premium $49.99/mo: everything in Pro + Congressional trades, unlimited
   Telegram alerts, unlimited email alerts, public API (1,000/day),
   priority support
 

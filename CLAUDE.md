@@ -25,8 +25,8 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 ## Tier model — canonical source: `backend/app/services/tier.py`
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
-- **Pro** $29/mo OR **$24.99/mo billed annually** ($299/yr · save $49) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
-- **Premium** $49/mo OR **$39.99/mo billed annually** ($479/yr · save $109) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, email unlimited, public API (1,000/day), priority support
+- **Pro** $29.99/mo OR **$24.99/mo billed annually** ($299.99/yr · save $60) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
+- **Premium** $49.99/mo OR **$39.99/mo billed annually** ($479.99/yr · save $120) — everything in Pro + Congressional trades, elite 13F holdings, Telegram unlimited, email unlimited, public API (1,000/day), priority support
 
 **Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
 
@@ -133,7 +133,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - 6-factor scoring formula and weights
 - Descriptive (not prescriptive) signal labels
 - Public scorecard from day 1 (the trust mechanism)
-- Three-tier price points ($29 Pro / $49 Premium) — only revisit with conversion data
+- Three-tier price points ($29.99 Pro / $49.99 Premium) — only revisit with conversion data
 - Free tier shows real product (delayed) — not a feature-stripped version
 - Owner login mechanism (only seeded via `seed_owner.py`, never via signup form)
 

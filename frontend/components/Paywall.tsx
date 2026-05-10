@@ -23,7 +23,7 @@ export function Paywall({
   if (canUse(user, feature)) return <>{children}</>;
 
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49/mo (Premium)" : "$29/mo (Pro)";
+  const priceLine = requiredTier === "premium" ? "$49.99/mo (Premium)" : "$29.99/mo (Pro)";
   const signedIn = !!user;
 
   return (
@@ -38,7 +38,7 @@ export function Paywall({
           </div>
           <h2 className="mt-4 text-2xl font-bold tracking-tight">{title || "Upgrade to unlock"}</h2>
           <p className="mt-2 text-sm text-muted">
-            This feature is part of the {priceLine} plan. 14-day trial, no card required.
+            This feature is part of the {priceLine} plan (USD). 14-day trial, no card required.
           </p>
           <div className="mt-6 flex justify-center gap-3">
             {signedIn ? (
@@ -88,7 +88,7 @@ export function PaywallModal({
 }) {
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49/mo · Premium" : "$29/mo · Pro";
+  const priceLine = requiredTier === "premium" ? "$49.99/mo · Premium" : "$29.99/mo · Pro";
   const featureName = ({
     "scanner.full": "Full live scanner",
     "scanner.live": "Live scanner updates",
@@ -123,7 +123,7 @@ export function PaywallModal({
           <button onClick={onClose} className="btn-ghost text-sm">Not yet</button>
         </div>
         <p className="mt-4 text-xs text-muted text-center">
-          7-day money back · Price locked forever on annual plans
+          USD · 7-day money back · Price locked forever on annual plans
         </p>
       </div>
     </div>
