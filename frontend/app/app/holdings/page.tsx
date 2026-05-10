@@ -81,7 +81,7 @@ export default function HoldingsPage() {
         {/* Table */}
         <div className="card mt-4 overflow-x-auto">
           <table className="w-full text-sm nums">
-            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+            <thead className="text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-2 text-left">Fund</th>
                 <th className="px-4 py-2 text-left">Manager</th>
@@ -100,7 +100,7 @@ export default function HoldingsPage() {
                   No holdings match. Clear the filters or wait for the next 24h refresh.
                 </td></tr>
               ) : rows.map((h) => (
-                <tr key={h.id} className="border-b border-border/50 hover:bg-black/20">
+                <tr key={h.id} className="border-b border-border/20 hover:bg-black/20">
                   <td className="px-4 py-2 font-medium">{h.fund_name}</td>
                   <td className="px-4 py-2 text-muted">{h.manager}</td>
                   <td className="px-4 py-2 font-medium">{h.symbol}</td>

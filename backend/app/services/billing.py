@@ -53,9 +53,15 @@ async def create_checkout_session(
         )
 
     try:
+        # Wallets — Apple Pay, Google Pay, and Link — show up automatically on
+        # supported devices when "card" is in payment_method_types and they're
+        # enabled in the Stripe dashboard. Hosted Checkout runs on
+        # checkout.stripe.com which Stripe pre-registers for Apple Pay, so no
+        # extra domain verification step is needed. We list "link" explicitly
+        # so Stripe Link's 1-click flow gets surfaced as its own option.
         session = stripe.checkout.Session.create(
             mode="subscription",
-            payment_method_types=["card"],
+            payment_method_types=["card", "link"],
             line_items=[{"price": price_id, "quantity": 1}],
             customer_email=user_email,
             client_reference_id=user_id,

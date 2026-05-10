@@ -147,7 +147,7 @@ export default function WatchlistPage() {
       {(loading || items.length > 0) && (
       <div className="card mt-6 overflow-hidden">
         <table className="w-full text-sm nums">
-          <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+          <thead className="text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Ticker</th>
               <th className="px-4 py-2 text-right">Price</th>
@@ -165,7 +165,7 @@ export default function WatchlistPage() {
               <tr><td colSpan={9}><TableSkeleton cols={9} rows={5} /></td></tr>
             )}
             {items.map((w) => (
-              <tr key={w.id} className={`border-b border-border/50 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
+              <tr key={w.id} className={`border-b border-border/20 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${w.symbol}`} className="hover:text-accent">{w.symbol}</Link>
                   {w.alert_triggered && <span className="ml-2 text-xs text-yellow-400">⚠ alert</span>}

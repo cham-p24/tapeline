@@ -53,7 +53,7 @@ export default function SqueezePage() {
 
       <div className="card mt-6 overflow-hidden">
         <table className="w-full text-sm nums">
-          <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+          <thead className="text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Ticker</th>
               <th className="px-4 py-2 text-right" title="Composite squeeze score, 0-100. 75+ is meaningful.">Score</th>
@@ -67,7 +67,7 @@ export default function SqueezePage() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.symbol} className="border-b border-border/50 hover:bg-black/20">
+              <tr key={r.symbol} className="border-b border-border/20 hover:bg-black/20">
                 <td className="px-4 py-2 font-medium">{r.symbol}</td>
                 <td className={`px-4 py-2 text-right ${r.spike_score >= 75 ? "text-up font-semibold" : ""}`}>
                   {r.spike_score.toFixed(1)}

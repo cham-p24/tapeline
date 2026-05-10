@@ -92,29 +92,30 @@ export default function ScorecardPage() {
       ) : (
         <>
           {/* Legend — small explainer block so non-quant visitors can read
-              the columns. Sits above the per-day cards so it's the first
-              thing scanned after the summary stats. */}
-          <div className="mt-8 rounded-xl border border-border bg-panel/40 p-5">
-            <h3 className="text-sm font-semibold tracking-wider text-muted uppercase">How to read this</h3>
+              the columns. Sits above the per-day sections so it's the first
+              thing scanned after the summary stats. Lighter chrome than
+              before so it pairs with the borderless day sections below. */}
+          <div className="mt-8 rounded-xl bg-panel/30 p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">How to read this</h3>
             <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
               <div className="flex gap-2">
-                <dt className="font-medium text-fg whitespace-nowrap">Score</dt>
+                <dt className="whitespace-nowrap font-medium text-fg">Score</dt>
                 <dd className="text-muted">0&ndash;100 composite at flag time. Six factors at <Link href="/how-it-works" className="text-accent hover:underline">published weights</Link>.</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="font-medium text-fg whitespace-nowrap">Price at flag</dt>
+                <dt className="whitespace-nowrap font-medium text-fg">Price at flag</dt>
                 <dd className="text-muted">Closing price the day we picked the ticker.</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="font-medium text-fg whitespace-nowrap">Next day</dt>
+                <dt className="whitespace-nowrap font-medium text-fg">Next day</dt>
                 <dd className="text-muted">Closing price the next US trading day. Populated 24h after market close.</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="font-medium text-fg whitespace-nowrap">SPY</dt>
+                <dt className="whitespace-nowrap font-medium text-fg">SPY</dt>
                 <dd className="text-muted">SPY&rsquo;s return on the same day &mdash; the market benchmark.</dd>
               </div>
               <div className="flex gap-2 sm:col-span-2">
-                <dt className="font-medium text-fg whitespace-nowrap">Alpha</dt>
+                <dt className="whitespace-nowrap font-medium text-fg">Alpha</dt>
                 <dd className="text-muted">Pick&rsquo;s return minus SPY&rsquo;s return. Positive = beat the market; negative = lagged it. <span className="text-up">Green</span> = win, <span className="text-down">red</span> = loss. Losses stay on the page.</dd>
               </div>
             </dl>
@@ -123,14 +124,14 @@ export default function ScorecardPage() {
             </p>
           </div>
 
-        <div className="mt-6 space-y-4">
-          {dates.map((d) => (
-            <div key={d} className="card">
-              <div className="border-b border-border p-4">
-                {/* Locale-aware day header — uses the visitor's
-                    country-resolved locale from the tapeline_locale cookie
-                    (set by middleware from Vercel edge geo). */}
-                <h2 className="font-semibold">
+          {/* Borderless day groups — date header acts as separator, table
+              breathes into page background. Per launch feedback: the card
+              outline made the page read as detached spreadsheets rather than
+              one continuous record. */}
+          <div className="mt-8 space-y-10">
+            {dates.map((d) => (
+              <section key={d}>
+                <h2 className="px-1 pb-3 text-sm font-medium uppercase tracking-wide text-muted">
                   {new Date(d).toLocaleDateString(userLocale(), {
                     weekday: "short",
                     year: "numeric",
@@ -138,40 +139,39 @@ export default function ScorecardPage() {
                     day: "numeric",
                   })}
                 </h2>
-              </div>
               <table className="w-full text-sm nums">
-                <thead className="bg-black/40 text-xs uppercase text-muted">
+                <thead className="text-xs uppercase text-muted">
                   <tr>
-                    <th className="px-4 py-2 text-left">#</th>
-                    <th className="px-4 py-2 text-left">Ticker</th>
-                    <th className="px-4 py-2 text-right">Score</th>
-                    <th className="px-4 py-2 text-right">Price at flag</th>
-                    <th className="px-4 py-2 text-right">Next day</th>
-                    <th className="px-4 py-2 text-right">SPY</th>
-                    <th className="px-4 py-2 text-right">Alpha</th>
+                    <th className="px-2 py-2 text-left font-normal">#</th>
+                    <th className="px-2 py-2 text-left font-normal">Ticker</th>
+                    <th className="px-2 py-2 text-right font-normal">Score</th>
+                    <th className="px-2 py-2 text-right font-normal">Price at flag</th>
+                    <th className="px-2 py-2 text-right font-normal">Next day</th>
+                    <th className="px-2 py-2 text-right font-normal">SPY</th>
+                    <th className="px-2 py-2 text-right font-normal">Alpha</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.days[d].map((e) => (
-                    <tr key={e.symbol} className="border-b border-border/50">
-                      <td className="px-4 py-2 text-muted">{e.rank}</td>
-                      <td className="px-4 py-2 font-medium">{e.symbol}</td>
-                      <td className="px-4 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-right">${e.price_at_flag.toFixed(2)}</td>
-                      <td className={`px-4 py-2 text-right ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                    <tr key={e.symbol} className="border-b border-border/20 last:border-0">
+                      <td className="px-2 py-2 text-muted">{e.rank}</td>
+                      <td className="px-2 py-2 font-medium">{e.symbol}</td>
+                      <td className="px-2 py-2 text-right">{e.score_at_flag.toFixed(1)}</td>
+                      <td className="px-2 py-2 text-right">${e.price_at_flag.toFixed(2)}</td>
+                      <td className={`px-2 py-2 text-right ${(e.change_pct_1d_after ?? 0) > 0 ? "text-up" : (e.change_pct_1d_after ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.change_pct_1d_after != null ? `${e.change_pct_1d_after >= 0 ? "+" : ""}${e.change_pct_1d_after.toFixed(2)}%` : "pending"}
                       </td>
-                      <td className="px-4 py-2 text-right text-muted">
+                      <td className="px-2 py-2 text-right text-muted">
                         {e.spy_change_pct_1d != null ? `${e.spy_change_pct_1d >= 0 ? "+" : ""}${e.spy_change_pct_1d.toFixed(2)}%` : "—"}
                       </td>
-                      <td className={`px-4 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>
+                      <td className={`px-2 py-2 text-right font-medium ${(e.alpha_vs_spy ?? 0) > 0 ? "text-up" : (e.alpha_vs_spy ?? 0) < 0 ? "text-down" : "text-muted"}`}>
                         {e.alpha_vs_spy != null ? `${e.alpha_vs_spy >= 0 ? "+" : ""}${e.alpha_vs_spy.toFixed(2)}%` : "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </section>
           ))}
         </div>
         </>
