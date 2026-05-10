@@ -1,4 +1,6 @@
 import type { MetadataRoute } from "next";
+import { SECTORS } from "./sector/sectors";
+import { SIGNALS } from "./signal/signals";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
 // the day, without paying a DB roundtrip on every crawler hit.
@@ -51,13 +53,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/pricing`,                   lastModified: now, priority: 0.9 },
     { url: `${base}/how-it-works`,              lastModified: now, priority: 0.9 },
     { url: `${base}/scorecard`,                 lastModified: now, priority: 0.9 },
+    { url: `${base}/about`,                     lastModified: now, priority: 0.8 },
+    { url: `${base}/press`,                     lastModified: now, priority: 0.7 },
     { url: `${base}/blog`,                      lastModified: now, priority: 0.7 },
     { url: `${base}/changelog`,                 lastModified: now, priority: 0.6 },
     { url: `${base}/roadmap`,                   lastModified: now, priority: 0.6 },
     { url: `${base}/status`,                    lastModified: now, priority: 0.4 },
-    { url: `${base}/compare/finviz`,            lastModified: now, priority: 0.7 },
-    { url: `${base}/compare/zacks`,             lastModified: now, priority: 0.7 },
-    { url: `${base}/compare/wallstreetzen`,     lastModified: now, priority: 0.7 },
+    // Comparison pages — high commercial-investigation intent.
+    { url: `${base}/compare/finviz`,            lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/zacks`,             lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/wallstreetzen`,     lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/tradingview`,       lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/trade-ideas`,       lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/koyfin`,            lastModified: now, priority: 0.8 },
+    // Listicle / best-of pages — top of the commercial-investigation funnel.
+    { url: `${base}/best-finviz-alternatives`,  lastModified: now, priority: 0.8 },
+    { url: `${base}/best-stock-scanners`,       lastModified: now, priority: 0.8 },
     { url: `${base}/signin`,                    lastModified: now, priority: 0.4 },
     { url: `${base}/signup`,                    lastModified: now, priority: 0.6 },
     { url: `${base}/legal/risk`,                lastModified: now, priority: 0.3 },
@@ -66,6 +77,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/security`,                  lastModified: now, priority: 0.4 },
     { url: `${base}/support`,                   lastModified: now, priority: 0.4 },
   ];
+
+  // Programmatic surface: one URL per sector and per signal level. Each
+  // page renders a live snapshot ranking + methodology + FAQ. Cached 5 min.
+  const sectorEntries: MetadataRoute.Sitemap = SECTORS.map((s) => ({
+    url: `${base}/sector/${s.slug}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.7,
+  }));
+  const signalEntries: MetadataRoute.Sitemap = SIGNALS.map((s) => ({
+    url: `${base}/signal/${s.slug}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.7,
+  }));
 
   const tickers = await fetchTopTickers(500);
   const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
@@ -84,5 +110,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticEntries, ...tickerEntries, ...postEntries];
+  return [
+    ...staticEntries,
+    ...sectorEntries,
+    ...signalEntries,
+    ...tickerEntries,
+    ...postEntries,
+  ];
 }

@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = { title: "Risk Disclosure — Tapeline" };
+export const metadata = pageMeta({
+  title: "Tapeline Risk Disclosure — Not Investment Advice",
+  description:
+    "Tapeline scores are descriptive analytics, not investment advice. Read the full risk disclosure: trading risks, no fiduciary relationship, no guarantee of future performance, descriptive vs prescriptive labels.",
+  path: "/legal/risk",
+});
 
 export default function RiskPage() {
   return (

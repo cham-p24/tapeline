@@ -1,12 +1,40 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
+import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-export const metadata = {
-  title: "Tapeline vs Finviz — synthesis, transparency, public scorecard",
+export const metadata = pageMeta({
+  title: "Tapeline vs Finviz Elite (2026): Synthesis, Public Formula, Daily Scorecard",
   description:
-    "Why traders pick Tapeline over Finviz Elite for serious stock picking. One score per ticker, public formula, public scorecard — none of which Finviz publishes.",
-};
+    "Tapeline vs Finviz Elite — one composite score per ticker, plain-English Why on every row, and a public next-day scorecard, none of which Finviz publishes. 9 categories Tapeline wins, 3 honest tradeoffs.",
+  path: "/compare/finviz",
+});
+
+// Targets the long-tail SERPs around "is tapeline better than finviz",
+// "finviz alternative reddit", "tapeline vs finviz pricing".
+const COMPARE_FAQ = [
+  {
+    q: "Is Tapeline a Finviz alternative?",
+    a: "Yes. Tapeline is a 2026-built quantitative scanner that gives you one composite score per US ticker, a plain-English sentence explaining it, and a public scorecard back-checking every call vs SPY — at the same effective price as Finviz Elite ($24.99/mo annual vs $24.96/mo). Finviz remains the better pick if you want raw filters across 60+ technical and fundamental fields and don't want a synthesised answer.",
+  },
+  {
+    q: "How does Tapeline pricing compare to Finviz Elite?",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr) or $29/mo monthly. Premium is $39.99/mo billed annually ($479/yr) or $49/mo monthly. Finviz Elite is $24.96/mo billed annually or $39.50/mo monthly. Effectively identical at the entry tier, with Tapeline including the score, sentence, and scorecard at the same price.",
+  },
+  {
+    q: "Does Finviz publish its scoring formula?",
+    a: "Finviz does not publish a single composite score per ticker. It provides ~60 raw screener fields (P/E, RSI, EMA distance, insider ownership, etc.) and lets you filter against them. Tapeline publishes its 6-factor weighted formula and the exact percentages on /how-it-works.",
+  },
+  {
+    q: "Does Tapeline cover penny stocks like Finviz?",
+    a: "Tapeline tracks 5,757 US tickers but actively scores the top ~2,500 by daily dollar-volume — covering everything liquid down to small-caps. Finviz indexes everything including OTC and sub-$1 stocks and you filter manually. If your strategy depends on penny stocks below the liquidity cutoff, Finviz is the better fit.",
+  },
+  {
+    q: "Can I try Tapeline before paying?",
+    a: "Yes — 14-day Premium trial, no credit card required, cancel in one click. Free tier (top 20 tickers, 24-hour delayed) stays available indefinitely.",
+  },
+];
 
 // "Tapeline wins" rows first — the categories that decide which tool earns
 // a slot in someone's daily workflow. Tradeoff rows below are reframed: every
@@ -87,6 +115,7 @@ const VERIFIED_ON = "2026-05-04";
 export default function VsFinvizPage() {
   return (
     <main className="min-h-screen">
+      <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
@@ -169,6 +198,23 @@ export default function VsFinvizPage() {
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.
         </p>
+      </section>
+
+      {/* Visible FAQ — mirrors COMPARE_FAQ above so the FAQPage schema
+          reflects on-page content (Google's rich-result requirement). */}
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+        <h2 className="text-2xl font-semibold tracking-tight">Tapeline vs Finviz — questions</h2>
+        <div className="mt-6 divide-y divide-border border-y border-border">
+          {COMPARE_FAQ.map((item) => (
+            <details key={item.q} className="group py-4">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">{item.q}</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted leading-relaxed">{item.a}</p>
+            </details>
+          ))}
+        </div>
       </section>
 
       <p className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 text-center text-[11px] text-subtle">

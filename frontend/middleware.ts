@@ -1,24 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Tapeline middleware — does two things:
+ * Tapeline edge middleware — three responsibilities:
  *
- * 1. Auth gate on /app/*. Redirects unauthenticated users to /signin.
+ * 1. Locale detection on every page request. Reads Vercel's edge geo
+ *    data (request.geo.country — automatically populated, no API call)
+ *    and sets a `tapeline_locale` cookie with the visitor's country-
+ *    appropriate BCP 47 locale tag (e.g. "en-AU", "en-US", "de-DE").
+ *    Override of the browser locale because Chrome's default install
+ *    on AU/UK/EU often reports "en-US" via navigator.language even
+ *    when the user is in Sydney — produces M/D/YYYY for an Australian,
+ *    which is confusing. Reading request country fixes that.
+ *
+ * 2. Auth gate on /app/*. Redirects unauthenticated users to /signin.
  *    Cookie-level only (fast, no DB hit); backend enforces tier gates
  *    independently so this is defence-in-depth.
  *
- * 2. Locale detection on EVERY request. Reads Vercel's edge geo data
- *    (request.geo.country — automatically populated, no API call) and
- *    sets a `tapeline_locale` cookie containing the visitor's country-
- *    appropriate BCP 47 locale tag (e.g. "en-AU" for Australia, "en-US"
- *    for the United States, "de-DE" for Germany).
- *
- *    Why we override the browser locale: Chrome's default install on
- *    AU/UK/EU often reports "en-US" via navigator.language because
- *    that's the OS default for English. Trusting the browser produces
- *    M/D/YYYY for an Australian user — confusing. Reading the actual
- *    request country gives every visitor a date format that matches
- *    where they're physically located.
+ * 3. IndexNow key serving at /<INDEXNOW_KEY>.txt. The Bing/Yandex
+ *    IndexNow protocol requires the key as plaintext at that exact
+ *    URL. Serving it dynamically from env keeps the key out of git
+ *    history.
  */
 
 // Country → BCP 47 locale. English-speaking countries get their own
@@ -77,6 +78,30 @@ export function middleware(request: NextRequest) {
 
 function handleAuth(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // IndexNow key verification. Spec requires the file at
+  //   https://<host>/<KEY>.txt
+  // with the key as plaintext content. The regex narrows to hex
+  // strings 8-128 chars long so legitimate .txt files (robots.txt,
+  // ads.txt, etc.) never collide here.
+  const indexnowMatch = pathname.match(/^\/([a-f0-9]{8,128})\.txt$/i);
+  if (indexnowMatch) {
+    const key = process.env.INDEXNOW_KEY;
+    if (key && indexnowMatch[1] === key) {
+      return new NextResponse(key, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+    // Anything matching the .txt key shape but NOT our key gets a
+    // clean 404 rather than a generic Next.js page.
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
+  // Auth redirect for /app/*.
   const isAppRoute = pathname.startsWith("/app");
   if (!isAppRoute) return NextResponse.next();
 
@@ -90,9 +115,13 @@ function handleAuth(request: NextRequest) {
 }
 
 export const config = {
-  // Run on every page request (locale needs to refresh anywhere) but
-  // exclude static assets to keep it cheap on the edge runtime.
+  // Run on every non-static page (locale needs to refresh anywhere)
+  // PLUS any single-segment hex .txt path (IndexNow). The first
+  // matcher excludes _next assets + favicon; the second matcher is
+  // more specific and overlaps cleanly because middleware is
+  // de-duplicated per-request.
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)",
+    "/:key([a-fA-F0-9]{8,128}).txt",
   ],
 };

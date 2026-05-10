@@ -1,12 +1,38 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
+import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-export const metadata = {
-  title: "Tapeline vs Zacks — live scoring, public formula, daily scorecard",
+export const metadata = pageMeta({
+  title: "Tapeline vs Zacks (2026): Live Scoring vs Daily-Updated Proprietary Ranks",
   description:
-    "Why traders move from Zacks Premium to Tapeline. Public weights, sub-60s live data, plain-English Why on every ticker — none of which Zacks publishes.",
-};
+    "Tapeline vs Zacks Premium — sub-60s live scoring, public 6-factor formula, plain-English Why, and per-pick public scorecard, vs Zacks' once-daily proprietary ranks. Honest comparison.",
+  path: "/compare/zacks",
+});
+
+const COMPARE_FAQ = [
+  {
+    q: "Is Tapeline a Zacks alternative?",
+    a: "Yes. Both score US equities, but Tapeline publishes the exact 6-factor formula and weights, updates scores sub-60s during market hours, and back-checks every top-10 call publicly vs SPY. Zacks Rank is updated daily, the underlying earnings-revision model is proprietary, and there's no public per-pick scorecard.",
+  },
+  {
+    q: "How is the Tapeline score different from Zacks Rank?",
+    a: "Zacks Rank #1-#5 is driven primarily by analyst earnings estimate revisions over multiple time windows. The Tapeline Score blends six factors at published weights: Trend (25%), Relative Strength (20%), Fundamentals (15%, includes earnings), Smart Money (15%), Macro (15%), Momentum (10%). You see each contribution per ticker.",
+  },
+  {
+    q: "How does Tapeline pricing compare to Zacks Premium?",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr); Premium is $39.99/mo billed annually ($479/yr). Zacks Premium is approximately $21/mo (annual-only, $249/yr). Tapeline offers month-to-month pricing as well; Zacks Premium is annual-only. Tapeline Premium adds Congressional trades and elite 13F holdings that Zacks does not include.",
+  },
+  {
+    q: "Does Zacks publish a track record?",
+    a: "Zacks publishes aggregate Rank #1 historical performance, but does not publish a per-pick scorecard with every individual recommendation back-checked next-day. Tapeline auto-publishes every top-10 daily pick at /scorecard with the realized 1-day return vs SPY.",
+  },
+  {
+    q: "Should I use both?",
+    a: "Plenty do. Zacks Premium for the curated research and Equity Research Reports; Tapeline for the live multi-factor synthesis and the public scorecard. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side before deciding.",
+  },
+];
 
 // Tapeline-wins first. Each row carries concrete diff copy that lands the
 // punch — not just "✓ vs —", but a one-line reason it matters.
@@ -94,6 +120,7 @@ const VERIFIED_ON = "2026-05-04";
 export default function VsZacksPage() {
   return (
     <main className="min-h-screen">
+      <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
@@ -174,6 +201,22 @@ export default function VsZacksPage() {
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.
         </p>
+      </section>
+
+      {/* Visible FAQ — mirrors COMPARE_FAQ JSON-LD. */}
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+        <h2 className="text-2xl font-semibold tracking-tight">Tapeline vs Zacks — questions</h2>
+        <div className="mt-6 divide-y divide-border border-y border-border">
+          {COMPARE_FAQ.map((item) => (
+            <details key={item.q} className="group py-4">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">{item.q}</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted leading-relaxed">{item.a}</p>
+            </details>
+          ))}
+        </div>
       </section>
 
       <p className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 text-center text-[11px] text-subtle">

@@ -1,12 +1,38 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
+import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-export const metadata = {
-  title: "Tapeline vs WallStreetZen — public weights, live data, per-pick scorecard",
+export const metadata = pageMeta({
+  title: "Tapeline vs WallStreetZen (2026): Public Weights, Live Data, Per-Pick Scorecard",
   description:
-    "Why active traders move from WallStreetZen Premium to Tapeline. Six factors with PUBLISHED weights, sub-60s live data, per-pick public scorecard with original thesis preserved — none of which the 115-factor Zen Ratings model can match.",
-};
+    "Tapeline vs WallStreetZen Premium — 6-factor model with PUBLISHED weights, sub-60s live data, per-pick public scorecard, vs WallStreetZen's 115-factor proprietary Zen Ratings. Honest comparison.",
+  path: "/compare/wallstreetzen",
+});
+
+const COMPARE_FAQ = [
+  {
+    q: "Is Tapeline a WallStreetZen alternative?",
+    a: "Yes. Both score US stocks, but Tapeline publishes the exact 6-factor formula and weights, recomputes the score sub-60s, and back-checks every top-10 pick publicly vs SPY the next day. WallStreetZen's Zen Ratings combine 115 factors at undisclosed weights and update less frequently.",
+  },
+  {
+    q: "How is the Tapeline Score different from WallStreetZen Zen Ratings?",
+    a: "Zen Ratings is a multi-factor proprietary score across 115 inputs, with the underlying weighting derived from documentation rather than published. Tapeline publishes the exact 6 factors and percentages: Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Fewer factors, fully transparent weights.",
+  },
+  {
+    q: "How do prices compare?",
+    a: "Tapeline Pro is $24.99/mo billed annually; Premium is $39.99/mo billed annually. WallStreetZen Premium is approximately $24.50/mo billed annually. Effectively identical entry pricing, with Tapeline including the public scorecard, plain-English Why on every row, and Congressional + 13F feeds (Premium tier).",
+  },
+  {
+    q: "Does WallStreetZen publish a per-pick track record?",
+    a: "WallStreetZen publishes aggregate Zen Ratings performance metrics, but does not auto-publish every individual rating with the original thesis preserved and back-checked next-day. Tapeline auto-publishes every top-10 daily pick at /scorecard with realized 1-day return vs SPY.",
+  },
+  {
+    q: "Should I use both?",
+    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. The 14-day no-credit-card Tapeline trial lets you compare directly against your existing WallStreetZen workflow.",
+  },
+];
 
 const WINS = [
   {
@@ -100,6 +126,7 @@ const VERIFIED_ON = "2026-05-04";
 export default function VsWallStreetZenPage() {
   return (
     <main className="min-h-screen">
+      <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
@@ -182,6 +209,22 @@ export default function VsWallStreetZenPage() {
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.
         </p>
+      </section>
+
+      {/* Visible FAQ — mirrors COMPARE_FAQ JSON-LD. */}
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+        <h2 className="text-2xl font-semibold tracking-tight">Tapeline vs WallStreetZen — questions</h2>
+        <div className="mt-6 divide-y divide-border border-y border-border">
+          {COMPARE_FAQ.map((item) => (
+            <details key={item.q} className="group py-4">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">{item.q}</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted leading-relaxed">{item.a}</p>
+            </details>
+          ))}
+        </div>
       </section>
 
       {/* Honesty stamp — re-verify quarterly */}

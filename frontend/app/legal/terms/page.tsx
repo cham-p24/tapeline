@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = { title: "Terms of Service — Tapeline" };
+export const metadata = pageMeta({
+  title: "Tapeline Terms of Service",
+  description:
+    "Tapeline Terms of Service: account terms, billing, refund policy, acceptable use, intellectual property, liability limits, and dispute resolution.",
+  path: "/legal/terms",
+});
 
 export default function TermsPage() {
   return (

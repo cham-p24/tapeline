@@ -2,11 +2,14 @@ import Link from "next/link";
 import { RoadmapItems, type RoadmapItem } from "@/components/RoadmapItems";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = {
-  title: "Roadmap — Tapeline",
-  description: "What's shipped, what's in progress, what's next. Premium subscribers get to vote on the order.",
-};
+export const metadata = pageMeta({
+  title: "Tapeline Roadmap — Shipped, In Progress, and Up Next",
+  description:
+    "Tapeline product roadmap: what's shipped, what's in progress, what's planned next. Premium subscribers vote on the priority order.",
+  path: "/roadmap",
+});
 
 const ITEMS: RoadmapItem[] = [
   // SHIPPED

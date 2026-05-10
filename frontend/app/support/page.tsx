@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = {
-  title: "Support — Tapeline",
+export const metadata = pageMeta({
+  title: "Tapeline Support — Help, Contact, Common Issues, Billing",
   description:
-    "Help with Tapeline. Contact, response times, common issues, system status, billing, security disclosure.",
-};
+    "Get help with Tapeline. Contact channels, response time SLAs, common signin and billing questions, system status, and our security disclosure process.",
+  path: "/support",
+});
 
 export default function SupportPage() {
   return (

@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = { title: "Privacy Policy — Tapeline" };
+export const metadata = pageMeta({
+  title: "Tapeline Privacy Policy",
+  description:
+    "How Tapeline collects, uses, and protects your data. GDPR + CCPA aligned. Cookie policy, third-party processors, data retention, and your rights to access, correct, and delete.",
+  path: "/legal/privacy",
+});
 
 export default function PrivacyPage() {
   return (

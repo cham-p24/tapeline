@@ -13,13 +13,17 @@ const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "";
 const PLAUSIBLE_SCRIPT =
   process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT || "https://plausible.io/js/script.js";
 
+// Title template is "%s" so each page owns its full <title>. Putting the
+// brand suffix in the template double-applies it on pages that already
+// include " — Tapeline" in their own title (most of them do, for SEO).
+// Default title is used only when a page omits its own.
 export const metadata: Metadata = {
   title: {
-    default: "Tapeline — One score per stock. Live, transparent, public scorecard.",
-    template: "%s — Tapeline",
+    default: "Tapeline — One score per stock · Live transparent stock scanner",
+    template: "%s",
   },
   description:
-    "Live quantitative scanner: every US ticker gets one 0-100 score and one plain-English sentence. Six-factor formula is public. Track record updates daily. Pro $29.99/mo, Premium $49.99/mo (USD).",
+    "Live quantitative stock scanner. Every US ticker gets one 0-100 score and a plain-English sentence from a public 6-factor formula. Pro from $24.99/mo, Premium from $39.99/mo (USD, annual). 14-day free trial, no credit card.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -33,20 +37,24 @@ export const metadata: Metadata = {
     "market regime",
     "retail trading",
   ],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "Tapeline — Read the tape. Live.",
+    title: "Tapeline — A scanner that shows its work",
     description:
-      "One score and one sentence per US ticker. Squeeze detection, market regime, congressional trades, 13F holdings — synthesized live. Public scorecard from day 1.",
-    url: "https://tapeline.io",
+      "One score and one sentence per US ticker. Six-factor formula public. Track record back-checked vs SPY, daily. Pro from $24.99/mo, Premium from $39.99/mo.",
+    url: "/",
     siteName: "Tapeline",
     type: "website",
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Tapeline — Read the tape. Live.",
+    site: "@tapeline_io",
+    title: "Tapeline — A scanner that shows its work",
     description:
-      "Live quantitative scanner. One score per ticker. Public formula. Public scorecard.",
+      "Live quantitative scanner. One score per US ticker. Public formula. Public scorecard.",
   },
   robots: {
     index: true,
@@ -61,8 +69,6 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
     apple: "/favicon.svg",
   },
-  // Future: replace with verified handles when accounts are created.
-  // twitter: { ..., creator: "@tapelineio", site: "@tapelineio" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -86,8 +92,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {/* SEO structured data — Google + LinkedIn parse this for rich
-            results. Two graphs: Organization for the brand, SoftwareApplication
-            for the product so price + description + ratings can surface. */}
+            results. Three graphs:
+              - Organization for the brand
+              - WebSite (with SearchAction) so Google can render a sitelinks
+                search box under our brand result
+              - SoftwareApplication for the product so price + description
+                surface in SERPs */}
         <Script
           id="ld-org"
           type="application/ld+json"
@@ -99,7 +109,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               name: "Tapeline",
               url: "https://tapeline.io",
               logo: "https://tapeline.io/favicon.svg",
-              sameAs: [],
+              // sameAs is the canonical "this is the same entity" graph that
+              // feeds Google's Knowledge Panel and Knowledge Graph. Each URL
+              // here should be the actual public profile page on an
+              // authoritative platform (no redirects, no short links).
+              // Coverage checklist + submission instructions live in
+              // docs/OFFSITE.md. Update entries when a profile is created;
+              // remove if a profile is genuinely abandoned.
+              sameAs: [
+                "https://x.com/tapeline_io",
+                "https://www.linkedin.com/company/tapeline",
+                "https://github.com/cham-p24/tapeline",
+                "https://www.crunchbase.com/organization/tapeline",
+                "https://www.producthunt.com/products/tapeline",
+                "https://alternativeto.net/software/tapeline/",
+                "https://www.g2.com/products/tapeline",
+                "https://www.capterra.com/p/tapeline/",
+                "https://stocktwits.com/tapeline",
+                "https://tapeline.substack.com",
+                "https://www.youtube.com/@tapeline",
+                "https://www.reddit.com/user/tapeline_io",
+              ],
               contactPoint: [
                 {
                   "@type": "ContactPoint",
@@ -107,7 +137,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   contactType: "customer support",
                   availableLanguage: ["en"],
                 },
+                {
+                  "@type": "ContactPoint",
+                  email: "press@tapeline.io",
+                  contactType: "press inquiries",
+                  availableLanguage: ["en"],
+                },
               ],
+            }),
+          }}
+        />
+        <Script
+          id="ld-website"
+          type="application/ld+json"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "Tapeline",
+              url: "https://tapeline.io",
+              potentialAction: {
+                "@type": "SearchAction",
+                // Search box currently routes to ticker page; once a real
+                // /search exists, swap target to /search?q={search_term_string}
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate: "https://tapeline.io/t/{search_term_string}",
+                },
+                "query-input": "required name=search_term_string",
+              },
             }),
           }}
         />
@@ -121,13 +180,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               "@type": "SoftwareApplication",
               name: "Tapeline",
               applicationCategory: "FinanceApplication",
+              applicationSubCategory: "Stock Scanner",
               operatingSystem: "Web",
               description:
                 "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus squeeze detection, market regime, congressional trades, and a public scorecard.",
+              // Four explicit offers — monthly + annual for each tier — so
+              // SERPs can show the cheapest entry point ($24.99 Pro annual)
+              // and the highest commit ($479 Premium annual).
               offers: [
                 {
                   "@type": "Offer",
-                  name: "Pro",
+                  name: "Pro · monthly",
                   price: "29.99",
                   priceCurrency: "USD",
                   priceSpecification: {
@@ -140,7 +203,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 },
                 {
                   "@type": "Offer",
-                  name: "Premium",
+                  name: "Pro · annual",
+                  price: "299.99",
+                  priceCurrency: "USD",
+                  priceSpecification: {
+                    "@type": "UnitPriceSpecification",
+                    price: "299.99",
+                    priceCurrency: "USD",
+                    unitText: "ANN",
+                  },
+                  url: "https://tapeline.io/pricing",
+                },
+                {
+                  "@type": "Offer",
+                  name: "Premium · monthly",
                   price: "49.99",
                   priceCurrency: "USD",
                   priceSpecification: {
@@ -148,6 +224,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     price: "49.99",
                     priceCurrency: "USD",
                     unitText: "MONTH",
+                  },
+                  url: "https://tapeline.io/pricing",
+                },
+                {
+                  "@type": "Offer",
+                  name: "Premium · annual",
+                  price: "479",
+                  priceCurrency: "USD",
+                  priceSpecification: {
+                    "@type": "UnitPriceSpecification",
+                    price: "479",
+                    priceCurrency: "USD",
+                    unitText: "ANN",
                   },
                   url: "https://tapeline.io/pricing",
                 },

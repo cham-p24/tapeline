@@ -18,6 +18,12 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import {
+  breadcrumbJsonLd,
+  faqJsonLd,
+  jsonLdScript,
+  tickerReviewJsonLd,
+} from "@/lib/jsonld";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -67,25 +73,27 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   }
 }
 
-// Per-page metadata so each ticker page has its own title + description AND
+// Per-page metadata so each ticker page has its own title + description and
 // its own social-share text. The sibling opengraph-image.tsx auto-wires
-// og:image — but og:title / og:description / twitter:title are inherited from
-// the root layout unless we override them here.
+// og:image. The root layout's title.template is "%s" so the brand suffix
+// in the title here is NOT double-applied.
 export async function generateMetadata({ params }: { params: { symbol: string } }) {
   const sym = params.symbol.toUpperCase();
   const data = await fetchTicker(sym);
   if (!data) {
     return {
-      title: `${sym} — not in scanner`,
-      description: `${sym} is not currently in the Tapeline scanner universe.`,
+      title: `${sym} — Not in Scanner Universe · Tapeline`,
+      description: `${sym} is not currently in the Tapeline scanner universe. Browse covered tickers or explore the scoring methodology.`,
+      alternates: { canonical: `https://tapeline.io/t/${sym}` },
+      robots: { index: false, follow: true },
     };
   }
   const score = data.score?.toFixed(0) ?? "—";
   const signal = data.signal ?? "—";
   const why = data.reason ?? "Six-factor synthesis updated live.";
-  const title = `${sym} stock score ${score}/100 · ${signal} — Tapeline`;
-  // Long-tail-friendly description hits the queries traders actually run:
-  // "TICKER stock score", "TICKER analysis", "TICKER price target", etc.
+  const title = `${sym} Stock Score ${score}/100 · ${signal} · Tapeline`;
+  // Long-tail-friendly description hits queries traders actually run:
+  // "TICKER stock score", "TICKER analysis", "TICKER technical rating", etc.
   // Keeps copy honest (no return claims, descriptive not prescriptive).
   const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. Updated live with public formula and back-checked scorecard.`;
   // Keyword set for crawlers — narrow, ticker-specific, no spam stuffing.
@@ -95,20 +103,23 @@ export async function generateMetadata({ params }: { params: { symbol: string } 
     `${sym} ${data.name}`,
     `${sym} technical rating`,
     `${sym} fundamental analysis`,
+    `is ${sym} a buy`,
     "Tapeline Score",
     "stock scanner",
   ];
+  const url = `https://tapeline.io/t/${sym}`;
   return {
     title,
     description,
     keywords,
-    alternates: { canonical: `https://tapeline.io/t/${sym}` },
+    alternates: { canonical: url },
     openGraph: {
       title: `${sym} · ${score}/100 · ${signal}`,
       description: why,
-      url: `https://tapeline.io/t/${sym}`,
+      url,
       type: "website",
       siteName: "Tapeline",
+      locale: "en_US",
     },
     twitter: {
       card: "summary_large_image",
@@ -117,12 +128,40 @@ export async function generateMetadata({ params }: { params: { symbol: string } 
       site: "@tapeline_io",
     },
     other: {
-      // Schema.org structured data for rich SERPs. Helps Google understand
-      // this is a financial-product page, not just any page mentioning a stock.
       "article:modified_time": new Date().toISOString(),
       "article:section": "Stocks",
     },
   };
+}
+
+// On-page FAQ — kept short, real questions a trader asks when landing on a
+// ticker page from search. The same items feed the FAQPage JSON-LD below
+// (Google's rich-result eligibility requires the schema to mirror visible
+// page content). Answers are templated on the ticker but score/signal are
+// pulled live so they always reflect what's rendered above.
+function buildFaq(sym: string, name: string, score: string, signal: string): { q: string; a: string }[] {
+  return [
+    {
+      q: `What is the Tapeline Score for ${sym}?`,
+      a: `${sym} (${name}) currently scores ${score}/100 with the signal label ${signal}. The score is a weighted blend of six quantitative factors and updates sub-60 seconds during US market hours.`,
+    },
+    {
+      q: `How is ${sym}'s score calculated?`,
+      a: `The Tapeline Score is a transparent weighted sum: 25% Trend, 20% Relative Strength, 15% Fundamentals, 15% Smart Money, 15% Macro, 10% Momentum. Each sub-score is normalised to 0-100 and the exact formula is published on /how-it-works.`,
+    },
+    {
+      q: `Is ${sym} a buy?`,
+      a: `Tapeline doesn't issue buy or sell calls — we publish descriptive analytics, not investment advice. The signal label ${signal} describes the current state of the data; whether ${sym} fits your portfolio depends on your risk tolerance, time horizon, and tax situation. See the risk disclosure for details.`,
+    },
+    {
+      q: `How often does the ${sym} score update?`,
+      a: `${sym}'s score re-ticks every minute during US market hours and persists between sessions. Price and momentum data refresh sub-60s; fundamentals refresh on company filing cadence; insider Form 4 within hours of SEC filing.`,
+    },
+    {
+      q: `Where can I see the historical track record for Tapeline scores?`,
+      a: `Every Tapeline top-10 daily pick is auto-published with the next-day return vs SPY at /scorecard. The scorecard is immutable — every call is preserved with its original context for accountability.`,
+    },
+  ];
 }
 
 export default async function PublicTickerPage({ params }: { params: { symbol: string } }) {
@@ -150,8 +189,35 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
     { label: "Momentum",           value: b.momentum?.value,     weight: 10 },
   ];
 
+  // Structured data — three graphs inlined in the body. Google parses
+  // JSON-LD anywhere in the HTML; placing them in body avoids the React
+  // "scripts in head" hydration warnings.
+  const faqItems = buildFaq(
+    data.symbol,
+    data.name,
+    data.score?.toFixed(0) ?? "—",
+    data.signal ?? "—",
+  );
+  const url = `https://tapeline.io/t/${data.symbol}`;
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Tapeline", url: "https://tapeline.io/" },
+    { name: "Tickers", url: "https://tapeline.io/scorecard" },
+    { name: `${data.symbol} (${data.name})`, url },
+  ]);
+  const review = tickerReviewJsonLd({
+    symbol: data.symbol,
+    name: data.name,
+    url,
+    score: data.score,
+    signal: data.signal,
+    why: data.reason,
+  });
+
   return (
     <main className="min-h-screen">
+      <script {...jsonLdScript(breadcrumbs)} />
+      <script {...jsonLdScript(review)} />
+      <script {...jsonLdScript(faqJsonLd(faqItems))} />
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
@@ -304,6 +370,47 @@ export default async function PublicTickerPage({ params }: { params: { symbol: s
             </a>
           </div>
         </div>
+
+        {/* FAQ — visible content that mirrors the FAQPage JSON-LD above.
+            Hits the long-tail "{TICKER} stock score", "is {TICKER} a buy",
+            "how is {TICKER} scored" queries that traders actually search. */}
+        <section className="mt-12 sm:mt-16">
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
+            Frequently asked about {data.symbol}
+          </h2>
+          <div className="mt-6 divide-y divide-border border-y border-border">
+            {faqItems.map((item) => (
+              <details key={item.q} className="group py-4">
+                <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                  <h3 className="text-sm sm:text-base font-medium">{item.q}</h3>
+                  <span className="text-muted transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-3 text-sm text-muted leading-relaxed">{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        {/* Internal links to companion product surfaces — gives the page
+            real outbound link equity instead of a single CTA, and lets
+            crawlers reach the methodology + scorecard from every ticker. */}
+        <nav className="mt-12 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted" aria-label="Related Tapeline pages">
+          <Link href="/how-it-works" className="hover:text-fg underline-offset-4 hover:underline">
+            How {data.symbol} is scored
+          </Link>
+          <Link href="/scorecard" className="hover:text-fg underline-offset-4 hover:underline">
+            Public scorecard
+          </Link>
+          <Link href="/compare/finviz" className="hover:text-fg underline-offset-4 hover:underline">
+            Tapeline vs Finviz
+          </Link>
+          <Link href="/compare/zacks" className="hover:text-fg underline-offset-4 hover:underline">
+            Tapeline vs Zacks
+          </Link>
+          <Link href="/blog" className="hover:text-fg underline-offset-4 hover:underline">
+            Methodology blog
+          </Link>
+        </nav>
 
         {/* Trust line */}
         <p className="mt-10 text-xs text-subtle text-center">
