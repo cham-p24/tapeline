@@ -116,3 +116,72 @@ def signup_count_24h(ip: str | None) -> int:
     while bucket and bucket[0] < cutoff:
         bucket.popleft()
     return len(bucket)
+
+
+# ---- Abuse-rate health check ------------------------------------------------
+#
+# Run weekly to detect how much trial-farming is actually happening. This is
+# the "measure before you fix" step — only escalate to FingerprintJS / SMS
+# verification / card-required if the ratios below show real abuse.
+#
+# Pure SQL fallback if you'd rather run it in psql / DBeaver:
+#
+#   SELECT
+#       COUNT(*)                                              AS total_signups,
+#       COUNT(DISTINCT email)                                 AS distinct_emails,
+#       COUNT(DISTINCT split_part(email, '@', 2))             AS distinct_domains,
+#       COUNT(*) FILTER (WHERE stripe_customer_id IS NOT NULL) AS converted
+#   FROM users
+#   WHERE created_at > NOW() - INTERVAL '30 days';
+#
+# Healthy ratio: total_signups / distinct_emails ≈ 1.0 (every email unique
+# after normalisation). Drift toward 1.1+ = abusers slipping through. Conversion
+# rate < 5% sustained = a different problem (product/positioning, not abuse).
+
+
+async def signup_health(session, days: int = 30) -> dict[str, int | float]:
+    """Aggregate signup health over the last N days.
+
+    Returns a dict suitable for dropping into a weekly review dashboard or
+    JSON response. All counts use the *normalised* email so dot/+tag-only
+    duplicates are visible as "duplicate of an existing canonical address".
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import func, select
+
+    from app.models import User
+
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+
+    total_q = await session.execute(
+        select(func.count()).select_from(User).where(User.created_at >= cutoff)
+    )
+    total = total_q.scalar() or 0
+
+    distinct_emails_q = await session.execute(
+        select(func.count(func.distinct(User.email))).where(User.created_at >= cutoff)
+    )
+    distinct_emails = distinct_emails_q.scalar() or 0
+
+    converted_q = await session.execute(
+        select(func.count()).select_from(User).where(
+            User.created_at >= cutoff,
+            User.stripe_customer_id.is_not(None),
+        )
+    )
+    converted = converted_q.scalar() or 0
+
+    # Email-uniqueness ratio. >1.0 indicates duplicates that escaped the
+    # normaliser (different providers, e.g. Gmail vs Hotmail vs ProtonMail).
+    uniq_ratio = round(total / distinct_emails, 3) if distinct_emails > 0 else 0.0
+    conv_rate = round(100 * converted / total, 1) if total > 0 else 0.0
+
+    return {
+        "window_days": days,
+        "total_signups": total,
+        "distinct_emails": distinct_emails,
+        "uniqueness_ratio": uniq_ratio,
+        "converted": converted,
+        "conversion_pct": conv_rate,
+    }

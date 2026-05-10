@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import User
 from app.services.auth import current_user_optional, current_user_required
-from app.services.tier import FEATURES, Tier, has_feature, limit
+from app.services.tier import FEATURES, Tier, effective_limit, has_feature, is_on_trial, limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,18 +29,22 @@ async def me(user: User | None = Depends(current_user_optional)) -> dict:
             },
         }
     tier = Tier(user.tier)
+    on_trial = is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
     return {
         "authenticated": True,
         "id": user.id,
         "email": user.email,
         "name": user.name,
         "tier": user.tier,
+        "on_trial": on_trial,
         "telegram_chat_id": user.telegram_chat_id,
         "features": {f: has_feature(tier, f) for f in FEATURES},
+        # effective_limit applies trial-state throttling for the abuse-attractive
+        # caps (api/telegram); other caps come back at the full tier value.
         "limits": {
-            "scanner_rows": limit(tier, "scanner_rows"),
-            "email_alerts_per_day": limit(tier, "email_alerts_per_day"),
-            "api_requests_per_day": limit(tier, "api_requests_per_day"),
+            "scanner_rows": effective_limit(user, "scanner_rows"),
+            "email_alerts_per_day": effective_limit(user, "email_alerts_per_day"),
+            "api_requests_per_day": effective_limit(user, "api_requests_per_day"),
         },
     }
 
