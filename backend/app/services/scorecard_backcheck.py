@@ -81,10 +81,12 @@ async def _fetch_close(symbol: str, on: date) -> float | None:
     back to other strategies.
     """
     if not _polygon_key():
+        logger.warning("backcheck.fetch_close_no_key symbol=%s on=%s", symbol, on)
         return None
     try:
         bars = await fetch_aggregates(symbol, from_date=on, to_date=on)
         if not bars:
+            logger.warning("backcheck.fetch_close_empty symbol=%s on=%s", symbol, on)
             return None
         # Aggregates schema: {"c": close, "h": high, "l": low, "o": open, ...}
         close = bars[0].get("c")
@@ -92,6 +94,33 @@ async def _fetch_close(symbol: str, on: date) -> float | None:
     except Exception:
         logger.exception("backcheck.fetch_close_failed symbol=%s on=%s", symbol, on)
         return None
+
+
+async def _fetch_close_window(symbol: str, start: date, end: date) -> dict[date, float]:
+    """Bulk fetch closes for a date range. {date: close} indexed by trading date.
+
+    Single API call instead of one-per-date — Massive returns the whole
+    range in one body. Used for SPY back-check so we don't hammer the
+    aggregates endpoint per scorecard entry.
+    """
+    if not _polygon_key():
+        return {}
+    try:
+        bars = await fetch_aggregates(symbol, from_date=start, to_date=end)
+    except Exception:
+        logger.exception("backcheck.window_fetch_failed symbol=%s start=%s end=%s", symbol, start, end)
+        return {}
+    out: dict[date, float] = {}
+    for b in bars:
+        ts_ms = b.get("t")
+        close = b.get("c")
+        if ts_ms is None or close is None:
+            continue
+        # `t` is the bar's start timestamp in ms — for daily bars this is
+        # midnight of the trading day in US/Eastern (Massive normalises).
+        bar_date = datetime.fromtimestamp(ts_ms / 1000, tz=UTC).date()
+        out[bar_date] = float(close)
+    return out
 
 
 async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None = None) -> int:
@@ -130,27 +159,20 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
     if not entries:
         return 0
 
-    # SPY's next-trading-day close. Real-data path first, snapshot fallback second.
-    spy_next = await _fetch_close("SPY", next_day)
-    if spy_next is None:
-        # Fallback path: derive SPY next-day from the live Ticker row. Only safe when
-        # the live price diverges from what we'd expect at flag time — otherwise we'd
-        # be writing the same stale-snapshot bug the rewrite was meant to fix.
-        spy_row_q = await session.execute(select(Ticker).where(Ticker.symbol == "SPY"))
-        spy_row = spy_row_q.scalar_one_or_none()
-        if spy_row and spy_row.price:
-            spy_next = float(spy_row.price)
-    if spy_next is None or spy_next <= 0:
-        logger.warning("backcheck.no_spy_close target=%s next=%s", target, next_day)
-        return 0
-
-    # SPY price at flag — same approach.
-    spy_at_flag = await _fetch_close("SPY", target)
-    if spy_at_flag is None and spy_row and spy_row.price and spy_row.change_pct_1d:
-        # Reconstruct flag-time SPY from current price minus today's % move
-        spy_at_flag = spy_row.price / (1 + spy_row.change_pct_1d / 100)
-    if not spy_at_flag or spy_at_flag <= 0:
-        logger.warning("backcheck.no_spy_flag target=%s", target)
+    # SPY closes for both flag and next-day. Single bulk fetch — gives us
+    # actual historical bars from Massive instead of the previous fallback
+    # that "reconstructed" SPY from the live snapshot, which produced the
+    # same wrong percent for every historical day. If neither real close is
+    # available we skip and try again next run rather than write wrong data.
+    spy_window = await _fetch_close_window("SPY", target, next_day)
+    spy_at_flag = spy_window.get(target)
+    spy_next = spy_window.get(next_day)
+    if not spy_at_flag or not spy_next or spy_at_flag <= 0 or spy_next <= 0:
+        logger.warning(
+            "backcheck.spy_window_incomplete target=%s next=%s flag=%s next_close=%s "
+            "(skipping back-check this run rather than write wrong values)",
+            target, next_day, spy_at_flag, spy_next,
+        )
         return 0
     spy_move = ((spy_next / spy_at_flag) - 1) * 100
 
