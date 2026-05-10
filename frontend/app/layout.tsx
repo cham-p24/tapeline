@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 
@@ -155,6 +157,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <UserProvider>{children}</UserProvider>
+        {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
+            config needed — auto-detects when deployed on Vercel and is a
+            no-op in local dev. Page-view + custom-event tracking +
+            Web Vitals (Core Web Vitals + custom metrics). Complementary
+            to Plausible above (Plausible is the privacy-first aggregate
+            view; Vercel adds per-route + Web Vitals). */}
+        <Analytics />
+        <SpeedInsights />
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)
             via <div className="cf-turnstile">. The script self-discovers them. */}

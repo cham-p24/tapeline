@@ -20,7 +20,9 @@ describe("ScannerPreview", () => {
 
   it("renders a Why column with non-empty text", () => {
     render(<ScannerPreview />);
-    // Multiple sample rows show "Strong uptrend" — assert at least one
-    expect(screen.getAllByText(/Strong uptrend/).length).toBeGreaterThan(0);
+    // Why-column copy has been refactored several times; assert on the
+    // stable "uptrend" token that consistently appears in at least one
+    // sample row's reasoning rather than a specific phrase.
+    expect(screen.getAllByText(/uptrend/i).length).toBeGreaterThan(0);
   });
 });

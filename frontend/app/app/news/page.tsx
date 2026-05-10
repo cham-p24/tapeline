@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 
 type NewsRow = {
   id: string; title: string; publisher: string; published_at: string;
@@ -66,7 +67,7 @@ export default function NewsPage() {
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted">
                     <span>{n.publisher}</span>
                     <span>·</span>
-                    <span>{new Date(n.published_at).toLocaleString()}</span>
+                    <span title={formatAbsolute(n.published_at)}>{formatRelativeOrAbsolute(n.published_at)}</span>
                     {n.tickers.length > 0 && (
                       <span className="flex gap-1">
                         {n.tickers.slice(0, 4).map((t) => (

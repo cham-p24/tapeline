@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
+import { userLocale } from "@/lib/datetime";
 
 type ReferralStats = {
   referral_code: string | null;
@@ -90,7 +91,7 @@ export default function ReferralsPage() {
                         <td className="px-4 py-2 font-mono text-xs">{u.email}</td>
                         <td className="px-4 py-2 text-muted">{u.tier}</td>
                         <td className="px-4 py-2">{u.converted ? "✓" : "pending"}</td>
-                        <td className="px-4 py-2 text-muted text-xs">{u.joined ? new Date(u.joined).toLocaleDateString() : "—"}</td>
+                        <td className="px-4 py-2 text-muted text-xs">{u.joined ? new Date(u.joined).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
