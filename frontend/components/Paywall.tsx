@@ -23,7 +23,7 @@ export function Paywall({
   if (canUse(user, feature)) return <>{children}</>;
 
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49/mo (Premium)" : "$29/mo (Pro)";
+  const priceLine = requiredTier === "premium" ? "$49.99/mo (Premium)" : "$29.99/mo (Pro)";
   const signedIn = !!user;
 
   return (
@@ -88,7 +88,7 @@ export function PaywallModal({
 }) {
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49/mo · Premium" : "$29/mo · Pro";
+  const priceLine = requiredTier === "premium" ? "$49.99/mo · Premium" : "$29.99/mo · Pro";
   const featureName = ({
     "scanner.full": "Full live scanner",
     "scanner.live": "Live scanner updates",

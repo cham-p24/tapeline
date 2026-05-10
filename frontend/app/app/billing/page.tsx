@@ -27,15 +27,15 @@ const TIER_META = {
   },
   pro: {
     name: "Pro",
-    monthly: 29,
-    annual: 299,
+    monthly: 29.99,
+    annual: 299.99,
     annualMonthly: 24.99,
     blurb: "Live scanner. Daily edge.",
   },
   premium: {
     name: "Premium",
-    monthly: 49,
-    annual: 479,
+    monthly: 49.99,
+    annual: 479.99,
     annualMonthly: 39.99,
     blurb: "Everything, no limits.",
   },
@@ -294,8 +294,8 @@ export default function BillingPage() {
             />
             <Plan
               name="Pro"
-              price={billingPeriod === "annual" ? "$24.99" : "$29"}
-              note={billingPeriod === "annual" ? "$299/yr · billed annually · save $49" : "billed monthly"}
+              price={billingPeriod === "annual" ? "$24.99" : "$29.99"}
+              note={billingPeriod === "annual" ? "$299.99/yr · billed annually · save $60" : "billed monthly"}
               items={[
                 "Full ~2,500 ticker universe, live",
                 "Score breakdown + Why on every row",
@@ -313,8 +313,8 @@ export default function BillingPage() {
             />
             <Plan
               name="Premium"
-              price={billingPeriod === "annual" ? "$39.99" : "$49"}
-              note={billingPeriod === "annual" ? "$479/yr · billed annually · save $109" : "billed monthly"}
+              price={billingPeriod === "annual" ? "$39.99" : "$49.99"}
+              note={billingPeriod === "annual" ? "$479.99/yr · billed annually · save $120" : "billed monthly"}
               proPlus
               items={[
                 "Congressional trades feed (House + Senate)",
@@ -357,7 +357,7 @@ export default function BillingPage() {
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
               title="Bloomberg-grade data"
-              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479/yr."
+              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
             />
             <Selling
               title="Public scorecard, day 1"

@@ -48,7 +48,7 @@ const WINS = [
   },
   {
     label: "Top tier price",
-    tapeline: "$49/mo (Premium)",
+    tapeline: "$49.99/mo (Premium)",
     competitor: "$2,995/yr ≈ $250/mo (Ultimate) — 5× more",
   },
   {

@@ -22,7 +22,7 @@ const PLANS = [
   {
     name: "Pro",
     tagline: "Live scanner. Daily edge.",
-    prices: { monthly: 29, annual: 299 },
+    prices: { monthly: 29.99, annual: 299.99 },
     highlights: [
       "Full ~2,500 ticker universe, live",
       "Score + plain-English Why on every row",
@@ -39,7 +39,7 @@ const PLANS = [
   {
     name: "Premium",
     tagline: "For the serious operator.",
-    prices: { monthly: 49, annual: 479 },
+    prices: { monthly: 49.99, annual: 479.99 },
     // Premium-only additions on top of everything in Pro. Rendered in a
     // visually distinct block under the price so the upgrade reason is
     // obvious — not buried in a 7-bullet list that looks like Pro's.
@@ -96,7 +96,7 @@ export function PricingTable() {
         {PLANS.map((p) => {
           const price = p.prices[billing];
           // Charm-price the annual per-month display: round up to nearest .99
-          // ($299/yr → $24.99/mo; $479/yr → $39.99/mo). Monthly stays as-is.
+          // ($299.99/yr → $24.99/mo; $479.99/yr → $39.99/mo). Monthly stays as-is.
           const rawPerMonth = billing === "annual" ? price / 12 : price;
           const perMonth = billing === "annual" && price > 0
             ? Math.floor(rawPerMonth) + 0.99
@@ -128,12 +128,12 @@ export function PricingTable() {
                   <span className="text-muted">/ month</span>
                 </div>
                 {billing === "annual" && price > 0 && (
-                  <p className="mt-1.5 text-xs text-muted">Billed ${price}/yr · save ${(p.prices.monthly * 12) - p.prices.annual}/yr</p>
+                  <p className="mt-1.5 text-xs text-muted">Billed ${price.toFixed(2)}/yr · save ${Math.round((p.prices.monthly * 12) - p.prices.annual)}/yr</p>
                 )}
               </div>
               {/* Premium card: price-anchor chip — Bloomberg Terminal as the
                   universally-known "expensive professional terminal" cost.
-                  Makes $479/yr read as 98% off the same data spine. */}
+                  Makes $479.99/yr read as 98% off the same data spine. */}
               {(p as { proPlus?: boolean }).proPlus && billing === "annual" && price > 0 && (
                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-up/20 bg-up/5 px-2.5 py-1 text-[11px] text-up">
                   <span aria-hidden="true">↘</span>

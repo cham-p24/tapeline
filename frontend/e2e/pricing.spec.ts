@@ -27,8 +27,8 @@ test.describe("Pricing page", () => {
 
     await page.getByRole("button", { name: /^monthly$/i }).click();
 
-    await expect(page.getByText("$29").first()).toBeVisible();
-    await expect(page.getByText("$49").first()).toBeVisible();
+    await expect(page.getByText("$29.99").first()).toBeVisible();
+    await expect(page.getByText("$49.99").first()).toBeVisible();
   });
 
   test("compare-plans table lists three columns including Premium", async ({ page }) => {

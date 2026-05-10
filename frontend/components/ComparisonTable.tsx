@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Three-column comparison: Free / Pro ($29/mo or $24.99/mo annual) /
- * Premium ($49/mo or $39.99/mo annual). Mirrors the gating in
+ * Three-column comparison: Free / Pro ($29.99/mo or $24.99/mo annual) /
+ * Premium ($49.99/mo or $39.99/mo annual). Mirrors the gating in
  * backend/app/services/tier.py.
  *
  * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
@@ -78,12 +78,12 @@ export function ComparisonTable() {
             <th className="px-4 py-3 text-center text-xs uppercase text-muted w-40 align-bottom">Free</th>
             <th className="px-4 py-3 text-center w-48 align-bottom">
               <span className="text-fg block text-xs uppercase">Pro</span>
-              <span className="text-[11px] text-muted block mt-1.5 nums">$29/mo</span>
+              <span className="text-[11px] text-muted block mt-1.5 nums">$29.99/mo</span>
               <span className="text-[10px] text-subtle block nums">or $24.99/mo annual</span>
             </th>
             <th className="px-4 py-3 text-center w-48 align-bottom">
               <span className="text-accent block text-xs uppercase">Premium</span>
-              <span className="text-[11px] text-muted block mt-1.5 nums">$49/mo</span>
+              <span className="text-[11px] text-muted block mt-1.5 nums">$49.99/mo</span>
               <span className="text-[10px] text-subtle block nums">or $39.99/mo annual</span>
             </th>
           </tr>
