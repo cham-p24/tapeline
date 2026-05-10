@@ -90,7 +90,40 @@ export default function ScorecardPage() {
           Scorecard starts logging today. Come back tomorrow to see the first day&apos;s results.
         </div>
       ) : (
-        <div className="mt-8 space-y-4">
+        <>
+          {/* Legend — small explainer block so non-quant visitors can read
+              the columns. Sits above the per-day cards so it's the first
+              thing scanned after the summary stats. */}
+          <div className="mt-8 rounded-xl border border-border bg-panel/40 p-5">
+            <h3 className="text-sm font-semibold tracking-wider text-muted uppercase">How to read this</h3>
+            <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex gap-2">
+                <dt className="font-medium text-fg whitespace-nowrap">Score</dt>
+                <dd className="text-muted">0&ndash;100 composite at flag time. Six factors at <Link href="/how-it-works" className="text-accent hover:underline">published weights</Link>.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="font-medium text-fg whitespace-nowrap">Price at flag</dt>
+                <dd className="text-muted">Closing price the day we picked the ticker.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="font-medium text-fg whitespace-nowrap">Next day</dt>
+                <dd className="text-muted">Closing price the next US trading day. Populated 24h after market close.</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="font-medium text-fg whitespace-nowrap">SPY</dt>
+                <dd className="text-muted">SPY&rsquo;s return on the same day &mdash; the market benchmark.</dd>
+              </div>
+              <div className="flex gap-2 sm:col-span-2">
+                <dt className="font-medium text-fg whitespace-nowrap">Alpha</dt>
+                <dd className="text-muted">Pick&rsquo;s return minus SPY&rsquo;s return. Positive = beat the market; negative = lagged it. <span className="text-up">Green</span> = win, <span className="text-down">red</span> = loss. Losses stay on the page.</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-subtle">
+              <span className="font-medium">&ldquo;pending&rdquo;</span> means the next-day price hasn&rsquo;t been recorded yet (entries from today, or back-check still running). <span className="font-medium">&mdash;</span> means data is unavailable for that field.
+            </p>
+          </div>
+
+        <div className="mt-6 space-y-4">
           {dates.map((d) => (
             <div key={d} className="card">
               <div className="border-b border-border p-4">
@@ -141,6 +174,7 @@ export default function ScorecardPage() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       </div>

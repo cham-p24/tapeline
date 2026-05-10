@@ -69,19 +69,32 @@ const SECTIONS: Section[] = [
 
 export function ComparisonTable() {
   return (
-    <div className="card mt-8 overflow-x-auto">
+    // Constrain to max-w-5xl + center so the table doesn't stretch the
+    // full viewport on wide monitors (was creating an ugly empty band
+    // between the FEATURE column and the plan columns). Keep
+    // overflow-x-auto so the table scrolls horizontally on phones.
+    <div className="card mt-8 mx-auto max-w-5xl overflow-x-auto">
       <div className="px-4 pt-3 text-right text-[10px] uppercase tracking-wider text-subtle">All prices in USD</div>
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+        {/* Explicit column widths so the FEATURE column doesn't greedily
+            absorb all the leftover space on wide screens. ~40% feature,
+            ~20% per plan column. */}
+        <colgroup>
+          <col style={{ width: "40%" }} />
+          <col style={{ width: "20%" }} />
+          <col style={{ width: "20%" }} />
+          <col style={{ width: "20%" }} />
+        </colgroup>
         <thead className="border-b border-border bg-black/40">
           <tr>
             <th className="px-4 py-3 text-left text-xs uppercase text-muted align-bottom">Feature</th>
-            <th className="px-4 py-3 text-center text-xs uppercase text-muted w-40 align-bottom">Free</th>
-            <th className="px-4 py-3 text-center w-48 align-bottom">
+            <th className="px-4 py-3 text-center text-xs uppercase text-muted align-bottom">Free</th>
+            <th className="px-4 py-3 text-center align-bottom">
               <span className="text-fg block text-xs uppercase">Pro</span>
               <span className="text-[11px] text-muted block mt-1.5 nums">$29.99/mo</span>
               <span className="text-[10px] text-subtle block nums">or $24.99/mo annual</span>
             </th>
-            <th className="px-4 py-3 text-center w-48 align-bottom">
+            <th className="px-4 py-3 text-center align-bottom">
               <span className="text-accent block text-xs uppercase">Premium</span>
               <span className="text-[11px] text-muted block mt-1.5 nums">$49.99/mo</span>
               <span className="text-[10px] text-subtle block nums">or $39.99/mo annual</span>
