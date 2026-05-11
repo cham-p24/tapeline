@@ -34,8 +34,11 @@ async def create_checkout(
         user_email=user.email,
         tier=body.tier,
         billing_period=body.billing_period,
-        success_url=f"{settings.app_url}/app/billing?success=1",
-        cancel_url=f"{settings.app_url}/app/billing?cancelled=1",
+        # Params are read by the frontend trial_converted Vercel Analytics event
+        # in /app/billing — keep `checkout=success` + tier + billing_period in
+        # sync with app/app/billing/page.tsx.
+        success_url=f"{settings.app_url}/app/billing?checkout=success&tier={body.tier}&billing_period={body.billing_period}",
+        cancel_url=f"{settings.app_url}/app/billing?checkout=cancelled",
     )
     return {"url": url}
 

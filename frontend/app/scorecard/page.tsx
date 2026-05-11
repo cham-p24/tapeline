@@ -14,6 +14,11 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { userLocale } from "@/lib/datetime";
+import {
+  breadcrumbJsonLd,
+  jsonLdScript,
+  scorecardDatasetJsonLd,
+} from "@/lib/jsonld";
 
 export default function ScorecardPage() {
   const router = useRouter();
@@ -32,11 +37,32 @@ export default function ScorecardPage() {
     router.push(`/scorecard/${encodeURIComponent(sym)}`);
   }
 
+  // Structured data — Dataset (the proprietary asset) + BreadcrumbList.
+  // Emitted unconditionally so Googlebot + AI crawlers see them on both the
+  // loading skeleton and the data-loaded states. Live-stat enrichment (days
+  // tracked, hit rate) is intentionally excluded because the data fetch is
+  // client-side; embedding stale numbers in the SSR HTML is worse than
+  // omitting them.
+  const scorecardSchema = (
+    <>
+      <script {...jsonLdScript(scorecardDatasetJsonLd())} />
+      <script
+        {...jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Tapeline", url: "https://tapeline.io/" },
+            { name: "Public scorecard", url: "https://tapeline.io/scorecard" },
+          ]),
+        )}
+      />
+    </>
+  );
+
   // Loading state with proper skeleton — replaces the literal "Loading…" text
   // that search-engine + social-card crawlers were getting in SSR.
   if (!data) {
     return (
       <main className="min-h-screen">
+        {scorecardSchema}
         <MarketingNav />
         <div className="mx-auto max-w-5xl px-6 py-10">
           <Skeleton className="h-10 w-2/3" />
@@ -62,6 +88,7 @@ export default function ScorecardPage() {
 
   return (
     <main className="min-h-screen">
+      {scorecardSchema}
       <MarketingNav />
       <div className="mx-auto max-w-5xl px-6 py-10">
       <div className="mb-8 flex items-center justify-between">

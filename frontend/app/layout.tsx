@@ -116,6 +116,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // Coverage checklist + submission instructions live in
               // docs/OFFSITE.md. Update entries when a profile is created;
               // remove if a profile is genuinely abandoned.
+              // sameAs lists only profiles that actually resolve. A 404 here
+              // is a negative trust signal for the entity graph. Substack +
+              // YouTube were removed on 2026-05-11 after they HEAD-returned
+              // 404 — restore each when the profile is genuinely populated
+              // (see seo-tools/disclosure/README.md for the disclosure-day
+              // sequencing). The 403-returning entries are platform anti-
+              // scrape, not 404s — those still resolve in a browser and stay.
               sameAs: [
                 "https://x.com/tapeline_io",
                 "https://www.linkedin.com/company/tapeline",
@@ -126,8 +133,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 "https://www.g2.com/products/tapeline",
                 "https://www.capterra.com/p/tapeline/",
                 "https://stocktwits.com/tapeline",
-                "https://tapeline.substack.com",
-                "https://www.youtube.com/@tapeline",
                 "https://www.reddit.com/user/tapeline_io",
               ],
               contactPoint: [

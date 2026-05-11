@@ -4,7 +4,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { findPost, POSTS } from "../posts";
 import { pageMeta } from "@/lib/seo";
-import { articleJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { articleJsonLd, breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export async function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -35,7 +35,8 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
   return (
     <main className="min-h-screen">
       {/* Article schema — gives Google an explicit headline, datePublished
-          and author for rich-result eligibility. */}
+          and author for rich-result eligibility. BreadcrumbList helps Google
+          render the site-hierarchy path under the SERP result. */}
       <script
         {...jsonLdScript(
           articleJsonLd({
@@ -45,6 +46,15 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
             publishedAt: post.publishedAt,
             author: post.author,
           }),
+        )}
+      />
+      <script
+        {...jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Tapeline", url: "https://tapeline.io/" },
+            { name: "Blog", url: "https://tapeline.io/blog" },
+            { name: post.title, url: `https://tapeline.io/blog/${post.slug}` },
+          ]),
         )}
       />
       <MarketingNav />

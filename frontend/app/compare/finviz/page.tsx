@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
   title: "Tapeline vs Finviz Elite (2026): Synthesis, Public Formula, Daily Scorecard",
@@ -116,6 +116,24 @@ export default function VsFinvizPage() {
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
+      <script
+        {...jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Tapeline", url: "https://tapeline.io/" },
+            { name: "Compare", url: "https://tapeline.io/compare" },
+            { name: "vs Finviz", url: "https://tapeline.io/compare/finviz" },
+          ]),
+        )}
+      />
+      {compareJsonLd({
+        competitorName: "Finviz",
+        competitorUrl: "https://finviz.com",
+        competitorPriceMonthly: 39.5,
+        competitorAnnualNote: "Elite ~$24.96/mo billed annually; $39.50/mo monthly",
+        pageUrl: "https://tapeline.io/compare/finviz",
+      }).map((g, i) => (
+        <script key={`finvizld-${i}`} {...jsonLdScript(g)} />
+      ))}
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">

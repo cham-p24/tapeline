@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 import { authApi } from "@/lib/auth";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
@@ -47,6 +48,12 @@ function SignUpForm() {
     return () => { delete window.onTapelineTurnstile; };
   }, []);
 
+  // Funnel event: fired once on mount when a real human sees the signup form.
+  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics.
+  useEffect(() => {
+    track("signup_started", { next });
+  }, [next]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -64,6 +71,12 @@ function SignUpForm() {
         turnstile_token: turnstileToken || undefined,
         device_fingerprint: device_fp || undefined,
       });
+      // Funnel events: signup landed cleanly. Trial auto-starts on signup
+      // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
+      // trial event on the same beat. Property `oauth: false` lets us segment
+      // form-vs-OAuth conversion later when OAuth tracking lands.
+      track("signup_completed", { method: "email", next });
+      track("trial_started", { tier: "premium", days: 14, method: "email" });
       router.push(next);
       router.refresh();
     } catch (e: any) {

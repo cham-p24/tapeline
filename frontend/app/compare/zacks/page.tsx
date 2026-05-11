@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
   title: "Tapeline vs Zacks (2026): Live Scoring vs Daily-Updated Proprietary Ranks",
@@ -121,6 +121,23 @@ export default function VsZacksPage() {
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
+      <script
+        {...jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Tapeline", url: "https://tapeline.io/" },
+            { name: "Compare", url: "https://tapeline.io/compare" },
+            { name: "vs Zacks", url: "https://tapeline.io/compare/zacks" },
+          ]),
+        )}
+      />
+      {compareJsonLd({
+        competitorName: "Zacks",
+        competitorUrl: "https://www.zacks.com",
+        competitorAnnualNote: "Premium ~$249/yr (annual only); Ultimate ~$2,995/yr",
+        pageUrl: "https://tapeline.io/compare/zacks",
+      }).map((g, i) => (
+        <script key={`zacksld-${i}`} {...jsonLdScript(g)} />
+      ))}
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">

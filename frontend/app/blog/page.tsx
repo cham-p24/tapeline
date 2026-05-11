@@ -3,6 +3,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { POSTS } from "./posts";
 import { pageMeta } from "@/lib/seo";
+import { blogIndexJsonLd, breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 const baseMeta = pageMeta({
   title: "Tapeline Blog — Notes from Building a Quantitative Stock Scanner",
@@ -26,8 +27,20 @@ export default function BlogIndex() {
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
+  // Blog + ItemList schema replaces the un-typed JSON-LD this route used to
+  // emit. Posts feed into both BlogPosting children and ItemList ranking.
+  const blogGraph = blogIndexJsonLd({ posts: sorted });
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Tapeline", url: "https://tapeline.io/" },
+    { name: "Blog", url: "https://tapeline.io/blog" },
+  ]);
+
   return (
     <main className="min-h-screen">
+      {blogGraph.map((g, i) => (
+        <script key={`blogld-${i}`} {...jsonLdScript(g)} />
+      ))}
+      <script {...jsonLdScript(breadcrumbs)} />
       <MarketingNav />
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-16">

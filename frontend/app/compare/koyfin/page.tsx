@@ -105,6 +105,10 @@ export default function VsKoyfinPage() {
   return (
     <CompareLayout
       competitor="Koyfin"
+      competitorUrl="https://www.koyfin.com"
+      competitorPriceMonthly={39}
+      competitorAnnualNote="Free tier exists; Plus ~$39/mo, Pro tiers higher"
+      slug="koyfin"
       heading="Tapeline vs Koyfin — scanner vs terminal."
       lede="Koyfin is the Bloomberg-style data terminal at retail pricing — deep fundamentals, macro modules, multi-line charting. Tapeline is a stock-picking scanner with a composite score per ticker and a public scorecard. Different shapes of tool — pick Tapeline if you want one number per ticker; pick Koyfin if you want the data plumbing to make your own call. Many use both."
       wins={WINS}

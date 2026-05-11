@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { track } from "@vercel/analytics";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
 import { ComparisonTable } from "@/components/ComparisonTable";
@@ -46,6 +48,7 @@ type TierKey = keyof typeof TIER_META;
 
 export default function BillingPage() {
   const { user } = useUser();
+  const qp = useSearchParams();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "info" | "err"; text: string } | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
@@ -65,9 +68,56 @@ export default function BillingPage() {
     if (tier === "free") setShowPlans(true);
   }, [tier]);
 
+  // Funnel event: trial → paid conversion. Stripe's success_url should redirect
+  // back to /app/billing?checkout=success&tier={tier}. We fire once per
+  // navigation when that param is present so the conversion is captured even
+  // if the user reloads the billing page later. The user object's tier reflects
+  // the new state by the time this effect runs.
+  useEffect(() => {
+    if (qp.get("checkout") === "success") {
+      track("trial_converted", {
+        tier: qp.get("tier") || tier,
+        billing_period: qp.get("billing_period") || "annual",
+      });
+    }
+  }, [qp, tier]);
+
+  // Funnel event: trial -> free downgrade (the other side of trial_converted).
+  // The downgrade itself runs server-side via the hourly _downgrade_expired_trials
+  // job, which Vercel Analytics can't see directly. Instead we detect the
+  // post-downgrade state when the user next lands on /app/billing: tier is
+  // "free", trial_ends_at is set (so we know they HAD a trial), and the trial
+  // is in the past. localStorage dedupes per user so we don't double-count on
+  // every billing-page visit.
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return;
+    if (user.tier !== "free") return;
+    if (!user.trial_ends_at) return;
+    const trialEnd = new Date(user.trial_ends_at).getTime();
+    if (!Number.isFinite(trialEnd) || trialEnd > Date.now()) return;
+    try {
+      const key = `tapeline_trial_downgraded_${user.id || user.email}`;
+      if (window.localStorage.getItem(key) === "1") return;
+      window.localStorage.setItem(key, "1");
+      track("trial_downgraded", {
+        days_since_downgrade: Math.floor((Date.now() - trialEnd) / 86_400_000),
+      });
+    } catch {
+      // localStorage failures are non-fatal — analytics must never break the page.
+    }
+  }, [user]);
+
   async function startCheckout(target: "pro" | "premium") {
     setBusy(target);
     setMsg(null);
+    // Funnel event: user clicked Upgrade. Fired before the fetch so we capture
+    // intent even if the network round-trip or Stripe redirect fails.
+    track("checkout_started", {
+      target_tier: target,
+      billing_period: billingPeriod,
+      current_tier: tier,
+      on_trial: isOnTrial,
+    });
     try {
       const res = await fetch(`${API_BASE}/api/billing/checkout`, {
         method: "POST",

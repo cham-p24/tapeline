@@ -16,7 +16,13 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import {
+  aboutProfilePageJsonLd,
+  breadcrumbJsonLd,
+  faqJsonLd,
+  founderPersonJsonLd,
+  jsonLdScript,
+} from "@/lib/jsonld";
 
 export const metadata = pageMeta({
   title: "About Tapeline — The Public-Formula Stock Scanner",
@@ -80,6 +86,13 @@ export default function AboutPage() {
     <main className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(ABOUT_FAQ))} />
+      <script {...jsonLdScript(aboutProfilePageJsonLd())} />
+      {/* Founder Person schema — emitted only when disclosure env vars are
+          set (see lib/jsonld.ts:founderPersonJsonLd). Until n=100 picks +
+          launch of /blog/100-picks-in-public this is a no-op. */}
+      {founderPersonJsonLd() ? (
+        <script {...jsonLdScript(founderPersonJsonLd())} />
+      ) : null}
       <MarketingNav />
 
       <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">

@@ -105,6 +105,10 @@ export default function VsTradingViewPage() {
   return (
     <CompareLayout
       competitor="TradingView"
+      competitorUrl="https://www.tradingview.com"
+      competitorPriceMonthly={15}
+      competitorAnnualNote="Essential ~$15/mo annual; Premium ~$60/mo annual"
+      slug="tradingview"
       heading="Tapeline vs TradingView — score-first vs chart-first."
       lede="TradingView is the world's chart-first trading platform with a 60M+ user community. Tapeline is a 2026-built quantitative scanner with one composite score per ticker, a plain-English Why, and a public daily scorecard. Pick Tapeline if you want the synthesised answer; pick TradingView if you live in charts and crowdsourced ideas. Many run both."
       wins={WINS}

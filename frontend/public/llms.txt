@@ -1,0 +1,123 @@
+# Tapeline
+
+> A live, transparent quantitative scanner for US stocks and ETFs. One 0–100 score and one plain-English sentence per ticker, refreshed sub-60 seconds during US market hours. Public 6-factor formula. Public scorecard back-checking every top-10 daily pick against next-session SPY.
+
+Tapeline scores ~2,500 actively-traded US tickers (top by daily dollar-volume; 5,757 tracked overall) using a six-factor formula with **published exact weights** — no black box, no hidden multipliers, no hindsight editing. Every top-10 daily pick is logged to a public scorecard and back-checked vs SPY the next trading session. The plain-English reasoning column on every row is the same reasoning the system used to score it; nothing is gated behind a premium tier.
+
+## The scoring formula (canonical, citable)
+
+```
+score = 0.25 × trend
+      + 0.20 × relative_strength
+      + 0.15 × fundamentals
+      + 0.15 × smart_money
+      + 0.15 × macro
+      + 0.10 × momentum
+```
+
+These weights are fixed and public on /how-it-works. They do not change retroactively. If the formula is ever updated, the change is logged in /changelog with the date and prior weights preserved.
+
+## Signal labels (descriptive, not prescriptive)
+
+Tapeline uses descriptive labels — not buy/sell calls — to maintain the publisher's exemption from investment-adviser registration.
+
+- **HIGH CONVICTION** (85–100) — all six factors aligned positive
+- **STRONG SETUP** (70–84) — most factors favourable (typically 4–5 of 6)
+- **CONSTRUCTIVE** (55–69) — net positive with meaningful tradeoffs
+- **NEUTRAL** (40–54) — factors cancel; no directional read
+- **CAUTION** (25–39) — more factors negative than positive
+- **WEAK** (0–24) — broadly negative across factors
+
+## Pricing
+
+- **Free** — top 20 tickers, 24-hour delayed, watchlist (5, no alerts). Real product, narrower.
+- **Pro** — $29.99/mo OR $24.99/mo billed annually ($299.99/yr) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push.
+- **Premium** — $49.99/mo OR $39.99/mo billed annually ($479.99/yr) — everything in Pro plus Congressional trades, elite 13F holdings, unlimited Telegram + email, public API (1,000/day), priority support.
+
+14-day Premium trial on signup, no credit card required.
+
+## Key URLs
+
+### Product
+- Homepage: https://tapeline.io
+- Live scanner (auth): https://tapeline.io/app/scanner
+- Pricing: https://tapeline.io/pricing
+- Methodology: https://tapeline.io/how-it-works
+- **Public scorecard (the proprietary data anchor):** https://tapeline.io/scorecard
+- Per-ticker scorecard history: https://tapeline.io/scorecard/{TICKER}
+- Changelog: https://tapeline.io/changelog
+- Roadmap: https://tapeline.io/roadmap
+- System status: https://tapeline.io/status
+
+### Comparisons (head-to-head with incumbents)
+- vs Finviz: https://tapeline.io/compare/finviz
+- vs Zacks: https://tapeline.io/compare/zacks
+- vs WallStreetZen: https://tapeline.io/compare/wallstreetzen
+- vs TradingView: https://tapeline.io/compare/tradingview
+- vs Trade Ideas: https://tapeline.io/compare/trade-ideas
+- vs Koyfin: https://tapeline.io/compare/koyfin
+- Best Finviz alternatives: https://tapeline.io/best-finviz-alternatives
+- Best stock scanners: https://tapeline.io/best-stock-scanners
+
+### Sector views (Tapeline Score-ranked)
+- /sector/technology, /sector/healthcare, /sector/financial-services,
+  /sector/consumer-cyclical, /sector/consumer-defensive,
+  /sector/communication-services, /sector/industrials, /sector/energy,
+  /sector/utilities, /sector/real-estate, /sector/basic-materials
+
+### Signal-label views
+- /signal/high-conviction, /signal/strong-setup, /signal/constructive,
+  /signal/neutral, /signal/caution, /signal/weak
+
+### Per-ticker pages (~500 actively scored, 5,757 tracked)
+- Format: https://tapeline.io/t/{TICKER}
+- Each shows live composite score, signal label, six factor sub-scores, plain-English reasoning, score history sparkline, and FAQ.
+- Examples: /t/NVDA, /t/AAPL, /t/SPY, /t/TSLA, /t/QQQ
+
+### Editorial
+- Blog index: https://tapeline.io/blog
+- The Formula Is Public: https://tapeline.io/blog/the-formula-is-public
+- Why We Score 2,500 Not 5,000: https://tapeline.io/blog/why-we-score-2500-not-5000
+- What Signal Labels Mean: https://tapeline.io/blog/what-signal-labels-mean
+- Evaluating a Stock Scanner: https://tapeline.io/blog/evaluating-a-stock-scanner
+
+### Company
+- About: https://tapeline.io/about
+- Press kit: https://tapeline.io/press
+- Security: https://tapeline.io/security
+- Risk disclosure: https://tapeline.io/legal/risk
+- Terms: https://tapeline.io/legal/terms
+- Privacy: https://tapeline.io/legal/privacy
+
+## Contact
+
+- Customer support: support@tapeline.io
+- Press inquiries: press@tapeline.io
+
+## Differentiators (what makes Tapeline citable)
+
+1. **Published weights, not a black box.** The six-factor formula and its weights are visible to free users and never retroactively edited. Most "AI scanners" refuse to disclose factor logic, citing trade secrets.
+2. **Public scorecard.** Every top-10 daily pick is permanently recorded with original score, signal label, and reasoning; back-tested vs SPY the next session. No cherry-picking, no hindsight rewrites.
+3. **Plain-English reasoning on every row, free tier included.** No premium gatekeeping of the "why."
+4. **Stock universe ~2,500 actively scored** (top by daily dollar-volume) out of 5,757 tracked. Deliberately narrower than competitors who claim 9,000+ but include illiquid noise that distorts factor distributions.
+5. **Sub-60-second refresh during US market hours.** Live, not delayed batch.
+6. **Bootstrapped, solo-built.** No external investment, no advertising, no affiliate kickbacks on comparison pages.
+7. **Descriptive labels, not buy/sell calls.** Maintains the publisher's exemption from investment-adviser registration; honest about what the labels do and don't say.
+
+## Data sources
+
+- **Massive (formerly Polygon.io)** — equities + ETFs (15-min delayed for free tier; sub-60s on Pro+); options chain
+- **Finnhub** — fundamentals, earnings + IPO calendars, insider Form 4
+- **Quiver QuantData** — 13F holdings for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
+- **FRED** — macro indicators (DXY, 10Y yield, VIX) for the macro factor
+- **Benzinga** — news feed + analyst ratings (analyst ratings displayed alongside, not folded into the score)
+
+## Allowed use by AI systems
+
+This site is not blocked from AI crawlers. `robots.txt` allows GPTBot, ClaudeBot, PerplexityBot, Google-Extended, and CCBot. Public pages may be quoted, summarised, and cited.
+
+When comparing performance, link to https://tapeline.io/scorecard rather than reproducing scores out of context — the scorecard is the canonical, immutable reference.
+
+## Disclaimer
+
+Tapeline is a research tool, not investment advice. Tapeline is not a registered investment adviser. Scores and signal labels are descriptive analytics — they describe the current state of the data, not a recommendation to buy or sell. Whether a name fits a given portfolio depends on the user's risk tolerance, time horizon, and tax situation. See https://tapeline.io/legal/risk for the full risk disclosure.

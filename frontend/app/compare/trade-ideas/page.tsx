@@ -99,6 +99,10 @@ export default function VsTradeIdeasPage() {
   return (
     <CompareLayout
       competitor="Trade Ideas"
+      competitorUrl="https://www.trade-ideas.com"
+      competitorPriceMonthly={120}
+      competitorAnnualNote="Standard ~$120/mo, Premium with Holly AI ~$240/mo"
+      slug="trade-ideas"
       heading="Tapeline vs Trade Ideas — transparent score at 1/5 the price."
       lede="Trade Ideas is a $120-240/mo intraday scanner with proprietary Holly AI signals and an auto-trading layer. Tapeline is a 2026-built quantitative scanner with one composite score per ticker at a published 6-factor formula, a plain-English Why on every row, and a public scorecard back-checking every call vs SPY — at $24.99-39.99/mo. Pick Tapeline if transparency and price matter; pick Trade Ideas if you need sub-second intraday signals or AI auto-execution."
       wins={WINS}

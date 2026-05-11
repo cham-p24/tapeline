@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { track } from "@vercel/analytics";
 import { api, type ScannerRow } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -33,6 +34,22 @@ export default function ScannerPage() {
 
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  // Funnel event: activation = "did the user actually open the scanner".
+  // localStorage flag dedupes across sessions per browser so we count the
+  // first meaningful action exactly once. If they bounce before the scanner,
+  // no event fires — which is the signal we want for activation rate.
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      if (window.localStorage.getItem("tapeline_scanner_first_use") === "1") return;
+      window.localStorage.setItem("tapeline_scanner_first_use", "1");
+      track("scanner_first_use", {});
+    } catch {
+      // localStorage can throw under private-mode or storage quota — never
+      // let analytics break the page.
+    }
+  }, []);
 
   return (
     <div>

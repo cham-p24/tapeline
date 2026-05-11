@@ -14,7 +14,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { breadcrumbJsonLd, jsonLdScript, pressContactPageJsonLd } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
   title: "Tapeline Press Kit — Logos, Fact Sheet, Founder Bio, Media Contact",
@@ -90,6 +90,9 @@ export default function PressPage() {
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
+      {pressContactPageJsonLd().map((g, i) => (
+        <script key={`pressld-${i}`} {...jsonLdScript(g)} />
+      ))}
       <MarketingNav />
 
       <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">

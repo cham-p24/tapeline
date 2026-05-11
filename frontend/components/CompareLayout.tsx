@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
-import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import {
+  breadcrumbJsonLd,
+  compareJsonLd,
+  faqJsonLd,
+  jsonLdScript,
+} from "@/lib/jsonld";
 
 export type CompareRow = {
   label: string;
@@ -21,6 +26,14 @@ export type CompareFaq = { q: string; a: string };
 export type CompareLayoutProps = {
   /** Display name of the competitor (e.g., "TradingView", "Finviz Elite"). */
   competitor: string;
+  /** Competitor canonical homepage URL (used in head-to-head SoftwareApplication schema). */
+  competitorUrl: string;
+  /** Competitor entry monthly price in USD; omit if annual-only or no published price. */
+  competitorPriceMonthly?: number;
+  /** Free-form annual-pricing note carried into schema description. */
+  competitorAnnualNote?: string;
+  /** Slug of this comparison route (e.g., "finviz"). Used to build pageUrl. */
+  slug: string;
   /** H1 (e.g., "Tapeline vs TradingView — why traders switch."). */
   heading: string;
   /** Lede paragraph beneath H1. */
@@ -55,6 +68,10 @@ export type CompareLayoutProps = {
  */
 export function CompareLayout({
   competitor,
+  competitorUrl,
+  competitorPriceMonthly,
+  competitorAnnualNote,
+  slug,
   heading,
   lede,
   wins,
@@ -64,9 +81,26 @@ export function CompareLayout({
   eyebrow = "Comparison",
   ctaSecondaryHref = "/scorecard",
 }: CompareLayoutProps) {
+  const pageUrl = `https://tapeline.io/compare/${slug}`;
+  const headToHead = compareJsonLd({
+    competitorName: competitor,
+    competitorUrl,
+    competitorPriceMonthly,
+    competitorAnnualNote,
+    pageUrl,
+  });
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Tapeline", url: "https://tapeline.io/" },
+    { name: "Compare", url: "https://tapeline.io/compare" },
+    { name: `vs ${competitor}`, url: pageUrl },
+  ]);
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(faq))} />
+      <script {...jsonLdScript(breadcrumbs)} />
+      {headToHead.map((g, i) => (
+        <script key={`compld-${i}`} {...jsonLdScript(g)} />
+      ))}
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">

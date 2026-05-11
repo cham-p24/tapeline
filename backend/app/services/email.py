@@ -194,11 +194,96 @@ def render_trial_day3_email(user_name: str) -> str:
     """)
 
 
-def render_trial_day7_email(user_name: str) -> str:
-    """Day 7 — halfway. Reminder + nudge to add a card."""
+def _render_trial_summary_block(summary: dict | None) -> str:
+    """Render a per-user trial-period highlights block for the day-7/13 emails.
+
+    Pulls together:
+      - the user's watchlist density (how many high-signal names they're
+        currently watching, and the best score-delta mover)
+      - the public-scorecard cadence during their trial window (how many
+        top-10 picks logged, hit rate vs SPY, best alpha pick)
+
+    Falls back to an empty string when there's no usable signal — so the
+    email is never worse than the prior generic-urgency version.
+    """
+    if not summary:
+        return ""
+    lines: list[str] = []
+    wl_count = summary.get("watchlist_count") or 0
+    wl_strong = summary.get("watchlist_top_signals") or 0
+    if wl_count > 0:
+        lines.append(
+            f"<li><strong>Watchlist:</strong> {wl_count} ticker"
+            f"{'' if wl_count == 1 else 's'} on watch, "
+            f"<span style=\"color:#10b981;\">{wl_strong}</span> currently "
+            f"HIGH CONVICTION or STRONG SETUP.</li>"
+        )
+        best = summary.get("watchlist_best")
+        if best and best.get("delta") is not None and abs(best["delta"]) >= 1:
+            delta = best["delta"]
+            sign = "+" if delta > 0 else ""
+            colour = "#10b981" if delta > 0 else "#ef4444"
+            lines.append(
+                f"<li><strong>Biggest mover</strong> on your watchlist: "
+                f"<code style=\"font-family:'JetBrains Mono',monospace;\">"
+                f"{best['symbol']}</code> · score now "
+                f"<strong>{best.get('score', 0):.0f}</strong> "
+                f"(<span style=\"color:{colour};\">{sign}{delta:.1f}</span> "
+                f"since you added it).</li>"
+            )
+    picks = summary.get("scorecard_picks_during_trial") or 0
+    if picks > 0:
+        hit = summary.get("scorecard_hit_rate")
+        alpha = summary.get("scorecard_alpha_avg")
+        bits = [f"{picks} top-10 pick{'' if picks == 1 else 's'} logged"]
+        if hit is not None:
+            bits.append(f"{hit:.0f}% beat SPY next session")
+        if alpha is not None:
+            sign = "+" if alpha >= 0 else ""
+            bits.append(f"avg alpha {sign}{alpha:.2f}%")
+        lines.append(
+            "<li><strong>Public scorecard during your trial:</strong> "
+            + " · ".join(bits)
+            + " (full record at <a href=\"https://tapeline.io/scorecard\" "
+            "style=\"color:#3b82f6;\">/scorecard</a>).</li>"
+        )
+        best_pick = summary.get("scorecard_best")
+        if best_pick and best_pick.get("alpha") is not None:
+            alpha_v = best_pick["alpha"]
+            sign = "+" if alpha_v >= 0 else ""
+            lines.append(
+                "<li><strong>Best pick this trial:</strong> "
+                f"<code style=\"font-family:'JetBrains Mono',monospace;\">"
+                f"{best_pick['symbol']}</code> · alpha vs SPY "
+                f"<span style=\"color:#10b981;\">{sign}{alpha_v:.2f}%</span>.</li>"
+            )
+    if not lines:
+        return ""
+    return (
+        "<div style=\"background:#0a0a0a;border:1px solid #1f1f23;"
+        "border-radius:8px;padding:18px 22px;margin:16px 0;\">"
+        "<div style=\"color:#9ca3af;font-size:11px;text-transform:uppercase;"
+        "letter-spacing:0.1em;margin-bottom:10px;\">Your trial so far</div>"
+        "<ul style=\"color:#d1d5db;line-height:1.7;padding-left:18px;"
+        "margin:0;font-size:14px;\">"
+        + "".join(lines)
+        + "</ul></div>"
+    )
+
+
+def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
+    """Day 7 — halfway. Reminder + nudge to add a card.
+
+    `summary` is the optional per-user trial-period highlight dict from
+    `trial_summary_for_user`. When present, the email leads with concrete
+    user-specific evidence ("X watchlist names HIGH CONVICTION, Y scorecard
+    picks beat SPY") before the pricing block. Falls back gracefully.
+    """
+    summary_block = _render_trial_summary_block(summary)
     return _shell(f"""
     <h1 style="margin:0 0 12px;font-size:24px;">Halfway through your trial, {user_name}.</h1>
     <p style="color:#d1d5db;margin:0 0 16px;">Seven days left of full Premium access.</p>
+    {summary_block}
     <p style="color:#9ca3af;margin:0 0 20px;">When the trial ends, your account drops to Free — top 20 tickers, 24-hour delayed, no alerts. To keep what you have, add a card.</p>
     <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:20px;margin:16px 0;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
@@ -221,15 +306,135 @@ def render_trial_day7_email(user_name: str) -> str:
     """)
 
 
-def render_trial_day13_email(user_name: str) -> str:
-    """Day 13 — final urgency. Trial ends tomorrow."""
+def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str:
+    """Day 13 — final urgency. Trial ends tomorrow.
+
+    `summary` is the optional per-user trial-period highlight dict. When
+    present, the email reframes generic loss ("no alerts, no Telegram") as
+    specific loss anchored on the user's actual trial-period evidence — the
+    upgrade trigger the article called out as 10x more effective than
+    feature-checklist urgency.
+    """
+    summary_block = _render_trial_summary_block(summary)
     return _shell(f"""
     <h1 style="margin:0 0 12px;font-size:24px;color:#f59e0b;">Trial ends tomorrow.</h1>
     <p style="color:#d1d5db;margin:0 0 16px;">{user_name}, your Premium trial expires in less than 24 hours.</p>
+    {summary_block}
     <p style="color:#9ca3af;margin:0 0 20px;">If you don't add a card, your account drops to Free at expiry — the scanner shows yesterday's data on 20 tickers, no alerts, no Telegram, no Congress feed.</p>
     <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#f59e0b;color:#0a0a0a;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:8px;">Keep my account active &rarr;</a>
     <p style="color:#6b7280;margin-top:24px;font-size:13px;">7-day money back. One-click cancel. No phone calls.</p>
     """)
+
+
+async def trial_summary_for_user(session, user) -> dict | None:
+    """Pull per-user trial-period highlights for the day-7/day-13 emails.
+
+    Two data streams blended:
+      1. **Watchlist density** — how many tickers the user is watching, how
+         many of those currently sit in HIGH CONVICTION / STRONG SETUP, and
+         the watchlist ticker with the largest absolute score delta since
+         baseline. This is the personal signal.
+      2. **Public scorecard during trial** — how many top-10 picks Tapeline
+         logged between trial_start and now, the next-session hit rate vs
+         SPY, the average alpha, and the single highest-alpha pick. Same for
+         every user in the same trial cohort, but grounds the email in real
+         numbers instead of "trust us."
+
+    Returns None if both streams are empty (no watchlist and no scorecard
+    activity during the trial) — the renderer treats None as "no summary
+    block" and falls back to the prior generic-urgency text. Never raises:
+    errors are swallowed because a failed personalisation must not block the
+    drip.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import DailyScorecardEntry, Ticker, WatchlistItem
+
+    try:
+        # Trial window: from trial_ends_at - 14d (signup) to now.
+        trial_end = user.trial_ends_at
+        if trial_end is None:
+            return None
+        trial_start = trial_end - timedelta(days=14)
+        now = datetime.now(UTC)
+        days_so_far = max(0, (now - trial_start).days)
+
+        # ── Watchlist density ────────────────────────────────────────────
+        wl_r = await session.execute(
+            select(WatchlistItem, Ticker)
+            .outerjoin(Ticker, Ticker.symbol == WatchlistItem.symbol)
+            .where(WatchlistItem.user_id == user.id)
+        )
+        rows = wl_r.all()
+        wl_count = len(rows)
+        wl_strong = 0
+        best_wl = None
+        best_wl_abs = 0.0
+        for w, t in rows:
+            if t is None:
+                continue
+            if t.signal in ("HIGH CONVICTION", "STRONG SETUP"):
+                wl_strong += 1
+            if t.score is not None and w.baseline_score is not None:
+                delta = t.score - w.baseline_score
+                if abs(delta) > best_wl_abs:
+                    best_wl_abs = abs(delta)
+                    best_wl = {
+                        "symbol": w.symbol,
+                        "score": t.score,
+                        "signal": t.signal or "",
+                        "delta": delta,
+                    }
+
+        # ── Scorecard during trial window ────────────────────────────────
+        sc_r = await session.execute(
+            select(DailyScorecardEntry).where(
+                DailyScorecardEntry.as_of >= trial_start.date(),
+                DailyScorecardEntry.as_of <= now.date(),
+            )
+        )
+        picks = sc_r.scalars().all()
+        picks_n = len(picks)
+        scored = [p for p in picks if p.alpha_vs_spy is not None]
+        hit_rate = (
+            100.0 * sum(1 for p in scored if (p.alpha_vs_spy or 0) > 0) / len(scored)
+            if scored
+            else None
+        )
+        avg_alpha = (
+            sum(p.alpha_vs_spy or 0 for p in scored) / len(scored)
+            if scored
+            else None
+        )
+        best_pick = None
+        if scored:
+            b = max(scored, key=lambda p: p.alpha_vs_spy or 0)
+            best_pick = {
+                "symbol": b.symbol,
+                "as_of": b.as_of.isoformat(),
+                "alpha": b.alpha_vs_spy,
+            }
+
+        if wl_count == 0 and picks_n == 0:
+            return None
+
+        return {
+            "trial_start": trial_start.date().isoformat(),
+            "trial_end": trial_end.date().isoformat() if trial_end else None,
+            "days_so_far": days_so_far,
+            "watchlist_count": wl_count,
+            "watchlist_top_signals": wl_strong,
+            "watchlist_best": best_wl,
+            "scorecard_picks_during_trial": picks_n,
+            "scorecard_hit_rate": hit_rate,
+            "scorecard_alpha_avg": avg_alpha,
+            "scorecard_best": best_pick,
+        }
+    except Exception:
+        logger.exception("trial_summary.failed user=%s", user.id)
+        return None
 
 
 def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
@@ -404,16 +609,20 @@ async def run_daily_drip(session) -> dict[str, int]:
     now = datetime.now(UTC)
     counts = {"day3": 0, "day7": 0, "day13": 0}
 
+    # `personalise=True` means the renderer accepts a `summary` dict. Day 3 is
+    # too early for meaningful trial data so it stays generic. Day 7 and 13
+    # lead with the user's actual watchlist + scorecard evidence — the article
+    # called this out as the single highest-leverage CRO move for trial drips.
     windows = [
         ("3",  "day3",  now + timedelta(days=10), now + timedelta(days=11),
-         render_trial_day3_email,  "Tapeline — three days in"),
+         render_trial_day3_email,  "Tapeline — three days in", False),
         ("7",  "day7",  now + timedelta(days=6),  now + timedelta(days=7),
-         render_trial_day7_email,  "Tapeline — halfway through your trial"),
+         render_trial_day7_email,  "Tapeline — halfway through your trial", True),
         ("13", "day13", now,                       now + timedelta(days=1),
-         render_trial_day13_email, "Tapeline — your trial ends tomorrow"),
+         render_trial_day13_email, "Tapeline — your trial ends tomorrow", True),
     ]
     any_sent = False
-    for token, label, lower, upper, renderer, subject in windows:
+    for token, label, lower, upper, renderer, subject, personalise in windows:
         result = await session.execute(
             select(User).where(
                 User.trial_ends_at.isnot(None),
@@ -429,7 +638,12 @@ async def run_daily_drip(session) -> dict[str, int]:
             if token in sent_tokens:
                 continue  # already sent this stage to this user
             try:
-                res = await send_email(user.email, subject, renderer(user.name or "trader"))
+                if personalise:
+                    summary = await trial_summary_for_user(session, user)
+                    html = renderer(user.name or "trader", summary)
+                else:
+                    html = renderer(user.name or "trader")
+                res = await send_email(user.email, subject, html)
                 # Only mark as sent if Resend actually delivered (not skipped)
                 if not res.get("skipped", False):
                     sent_tokens.add(token)

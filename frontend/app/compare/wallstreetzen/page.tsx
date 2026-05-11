@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
   title: "Tapeline vs WallStreetZen (2026): Public Weights, Live Data, Per-Pick Scorecard",
@@ -127,6 +127,24 @@ export default function VsWallStreetZenPage() {
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
+      <script
+        {...jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Tapeline", url: "https://tapeline.io/" },
+            { name: "Compare", url: "https://tapeline.io/compare" },
+            { name: "vs WallStreetZen", url: "https://tapeline.io/compare/wallstreetzen" },
+          ]),
+        )}
+      />
+      {compareJsonLd({
+        competitorName: "WallStreetZen",
+        competitorUrl: "https://www.wallstreetzen.com",
+        competitorPriceMonthly: 24.5,
+        competitorAnnualNote: "Premium ~$24.50/mo billed annually",
+        pageUrl: "https://tapeline.io/compare/wallstreetzen",
+      }).map((g, i) => (
+        <script key={`wszld-${i}`} {...jsonLdScript(g)} />
+      ))}
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
