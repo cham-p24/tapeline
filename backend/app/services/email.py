@@ -167,8 +167,14 @@ def render_welcome_email(user_name: str, picks: list[dict[str, Any]] | None = No
     return _shell(body)
 
 
-def render_trial_day3_email(user_name: str) -> str:
-    """Day 3 — feature tour, what they may have missed."""
+def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str:
+    """Day 3 — feature tour, what they may have missed.
+
+    Signature matches day-7/day-13 so the drip dispatcher can call every
+    renderer with the same shape regardless of whether it personalises.
+    `_summary` is ignored on day 3 — it's too early for meaningful trial
+    data and the feature-tour copy doesn't need it.
+    """
     return _shell(f"""
     <h1 style="margin:0 0 12px;font-size:24px;">{user_name}, three days in.</h1>
     <p style="color:#d1d5db;margin:0 0 16px;">If you've only been on the scanner, here's what else is in your trial:</p>
