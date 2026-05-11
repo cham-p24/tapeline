@@ -129,12 +129,15 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
         async with httpx.AsyncClient(timeout=30) as client:
             for i in range(0, len(syms), 250):
                 batch = syms[i : i + 250]
+                # Massive's v3 snapshot endpoint (the v2 path returned the
+                # legacy {day,prevDay,lastTrade} shape that parsed to zeros
+                # after the 2026-Q1 schema migration to {session,last_minute}).
                 body = await _request(
                     client,
-                    "/v2/snapshot/locale/us/markets/stocks/tickers",
-                    params={"tickers": ",".join(batch)},
+                    "/v3/snapshot",
+                    params={"ticker.any_of": ",".join(batch), "limit": len(batch)},
                 )
-                for t in body.get("tickers", []):
+                for t in body.get("results", []):
                     naive = _to_scanner_row(t)
                     if naive is not None:
                         real_by_sym[naive["symbol"]] = naive
@@ -190,18 +193,33 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
 
 
 def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
-    """Reshape Polygon snapshot to our DB schema."""
-    ticker = snap.get("ticker")
-    day = snap.get("day", {}) or {}
-    prev_day = snap.get("prevDay", {}) or {}
-    last_trade = snap.get("lastTrade", {}) or {}
+    """Reshape Massive v3 snapshot result to our DB schema.
 
-    last_price = last_trade.get("p") or day.get("c")
+    v3 shape (post-2026-Q1 migration):
+        {"ticker": "AAPL", "session": {"price": 293.41, "previous_close": 293.32,
+         "change_percent": 0.0307, "volume": 5.27e7, "close": 293.32, "open": ...},
+         "last_minute": {...}}
+
+    `change_percent` is already in percent units (0.0307 means 0.0307%),
+    so use it as-is — no /100 or *100 conversion.
+    """
+    ticker = snap.get("ticker")
+    session = snap.get("session", {}) or {}
+    last_minute = snap.get("last_minute", {}) or {}
+
+    # `price` is the live mid; fall back to last-minute close or session close.
+    last_price = session.get("price") or last_minute.get("close") or session.get("close")
     if not ticker or last_price is None:
         return None
 
-    prev_close = prev_day.get("c") or day.get("o")
-    change_1d = ((last_price / prev_close) - 1) * 100 if prev_close else 0.0
+    # Massive provides change_percent directly — use it. Fall back to manual
+    # math if missing (e.g. just-listed tickers without a previous_close).
+    cp = session.get("change_percent")
+    if cp is None:
+        prev_close = session.get("previous_close") or session.get("open")
+        change_1d = ((last_price / prev_close) - 1) * 100 if prev_close else 0.0
+    else:
+        change_1d = float(cp)
 
     # Composite score requires historical aggregates — worker runs a secondary
     # pass to fill this in. For now, derive a naive score from today's move.
@@ -212,11 +230,11 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
         "symbol": ticker,
         "score": round(score, 1),
         "signal": signal,
-        "price": round(last_price, 2),
+        "price": round(float(last_price), 2),
         "change_pct_1d": round(change_1d, 2),
         "change_pct_5d": 0.0,   # filled by historical pass
         "change_pct_1m": 0.0,   # filled by historical pass
-        "volume": int(day.get("v", 0) or 0),
+        "volume": int(session.get("volume", 0) or 0),
         "last_timestamp": datetime.now(UTC).isoformat(),
     }
 
