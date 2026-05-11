@@ -19,6 +19,7 @@ from app.routers import (
     briefing,
     calendar_routes,
     congress,
+    contact,
     heatmap,
     holdings,
     internal,
@@ -356,6 +357,7 @@ app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"]
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
+app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(internal.router, prefix="/api/internal", tags=["internal"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
