@@ -335,11 +335,21 @@ export function blogIndexJsonLd(a: BlogIndexArgs) {
       "@type": "ItemList",
       "@id": "https://tapeline.io/blog#itemlist",
       itemListOrder: "https://schema.org/ItemListOrderDescending",
+      // Schema.org ListItem requires `item` — the URL/name shortcut isn't
+      // sufficient on its own. Embed the BlogPosting as the item so Google
+      // gets both the position and the post entity in one block.
       itemListElement: a.posts.map((p, i) => ({
         "@type": "ListItem",
         position: i + 1,
         url: `https://tapeline.io/blog/${p.slug}`,
         name: p.title,
+        item: {
+          "@type": "BlogPosting",
+          "@id": `https://tapeline.io/blog/${p.slug}`,
+          headline: p.title,
+          url: `https://tapeline.io/blog/${p.slug}`,
+          datePublished: p.publishedAt,
+        },
       })),
     },
   ];
