@@ -44,6 +44,7 @@ export function MarketingFooter() {
 
           <FooterCol title="Company">
             <FooterLink href="/about" desc="Who built Tapeline + transparency timeline">About</FooterLink>
+            <FooterLink href="/contact" desc="Email a human; usually inside 24h">Contact</FooterLink>
             <FooterLink href="/press" desc="Logos, fact sheet, founder bio">Press kit</FooterLink>
             <FooterLink href="/status" desc="Live API + worker uptime, refresh every 30s">System status</FooterLink>
             <FooterLink href="/security" desc="Encryption, payment data, vulnerability disclosure">Security</FooterLink>
