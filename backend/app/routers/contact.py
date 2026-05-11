@@ -103,9 +103,12 @@ async def submit_contact(body: ContactMessage, request: Request) -> dict:
             html=html,
             text=text,
         )
-    except Exception:
+    except Exception as err:
         logger.exception("contact.send_failed ip=%s from=%s", ip, body.email)
-        raise HTTPException(502, "Could not deliver right now — please email support@tapeline.io directly.")
+        raise HTTPException(
+            502,
+            "Could not deliver right now — please email support@tapeline.io directly.",
+        ) from err
 
     logger.info("contact.submitted ip=%s from=%s subject=%s", ip, body.email, subject[:60])
     return {"ok": True}

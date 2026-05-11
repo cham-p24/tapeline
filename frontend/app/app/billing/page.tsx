@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { track } from "@vercel/analytics";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
@@ -48,7 +47,6 @@ type TierKey = keyof typeof TIER_META;
 
 export default function BillingPage() {
   const { user } = useUser();
-  const qp = useSearchParams();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "info" | "err"; text: string } | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
@@ -68,19 +66,24 @@ export default function BillingPage() {
     if (tier === "free") setShowPlans(true);
   }, [tier]);
 
-  // Funnel event: trial → paid conversion. Stripe's success_url should redirect
-  // back to /app/billing?checkout=success&tier={tier}. We fire once per
-  // navigation when that param is present so the conversion is captured even
-  // if the user reloads the billing page later. The user object's tier reflects
-  // the new state by the time this effect runs.
+  // Funnel event: trial → paid conversion. Stripe's success_url redirects
+  // back to /app/billing?checkout=success&tier={tier}&billing_period={period}.
+  // We read the search params via `window.location.search` (inside the
+  // browser-only useEffect) rather than next/navigation's useSearchParams —
+  // that hook forces the whole page into a Suspense boundary for prerender,
+  // and a billing page is too central to bury behind a Suspense skeleton.
+  // Effect fires once on mount per navigation.
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const qp = new URLSearchParams(window.location.search);
     if (qp.get("checkout") === "success") {
       track("trial_converted", {
         tier: qp.get("tier") || tier,
         billing_period: qp.get("billing_period") || "annual",
       });
     }
-  }, [qp, tier]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Funnel event: trial -> free downgrade (the other side of trial_converted).
   // The downgrade itself runs server-side via the hourly _downgrade_expired_trials
