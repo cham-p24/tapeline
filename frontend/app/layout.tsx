@@ -116,16 +116,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // Coverage checklist + submission instructions live in
               // docs/OFFSITE.md. Update entries when a profile is created;
               // remove if a profile is genuinely abandoned.
-              // sameAs lists only profiles that actually resolve. A 404 here
-              // is a negative trust signal for the entity graph. Substack +
-              // YouTube were removed on 2026-05-11 after they HEAD-returned
-              // 404 — restore each when the profile is genuinely populated
-              // (see seo-tools/disclosure/README.md for the disclosure-day
-              // sequencing). The 403-returning entries are platform anti-
-              // scrape, not 404s — those still resolve in a browser and stay.
+              // sameAs lists only profiles that actually resolve AND
+              // belong to Tapeline (the stock scanner). A 404 is a negative
+              // trust signal; a 200 pointing at a DIFFERENT entity is worse
+              // — Google will learn the wrong Knowledge Graph link.
+              //
+              // Removed 2026-05-11: Substack, YouTube (HEAD-404).
+              // Removed 2026-05-12: linkedin.com/company/tapeline (it's a
+              //   European agroecology research project — different brand).
+              //   Restore once we claim a unique slug like /company/tapeline-io.
+              //
+              // Remaining entries should each be confirmed once before they
+              // can be assumed safe. See seo-tools/disclosure/profile_kits.md
+              // for the canonical paste-ready copy when claiming each.
               sameAs: [
                 "https://x.com/tapeline_io",
-                "https://www.linkedin.com/company/tapeline",
                 "https://github.com/cham-p24/tapeline",
                 "https://www.crunchbase.com/organization/tapeline",
                 "https://www.producthunt.com/products/tapeline",
