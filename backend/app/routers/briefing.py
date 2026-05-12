@@ -1,4 +1,16 @@
-"""/api/briefing — preview + trigger the daily briefing email."""
+"""/api/briefing — preview + trigger the daily briefing email.
+
+Preview behaviour:
+- Signed-in user → renders THEIR personalised briefing (watchlist-scoped).
+  Doubles as a "see what you'll get every morning" demo for the app's billing
+  page or the briefing settings panel.
+- Anonymous     → renders the site-wide briefing as a generic preview. Useful
+  on the marketing pages to show prospects what the daily mail looks like.
+
+Send behaviour:
+- POST /send is authenticated; sends THIS user's personalised briefing right
+  now to their own email. Used by the in-app "test the briefing" button.
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -18,9 +30,12 @@ async def preview_briefing(
     session: AsyncSession = Depends(get_session),
     user: User | None = Depends(current_user_optional),
 ) -> str:
-    """Public HTML preview of today's briefing — doubles as a landing-page demo."""
-    name = (user.name if user else None) or "trader"
-    return await generate_briefing_html(session, name)
+    """Public HTML preview of today's briefing — doubles as a landing-page demo.
+
+    Signed-in viewer → personalised briefing (watchlist-scoped).
+    Anonymous viewer → generic site-wide briefing.
+    """
+    return await generate_briefing_html(session, user)
 
 
 @router.post("/send")
@@ -28,8 +43,8 @@ async def send_test_briefing(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Send today's briefing to the current user's email right now."""
+    """Send today's personalised briefing to the current user's email right now."""
     from app.services.email import send_email
-    html = await generate_briefing_html(session, user.name or "trader")
+    html = await generate_briefing_html(session, user)
     await send_email(user.email, "Your Tapeline briefing (test)", html)
     return {"ok": True, "sent_to": user.email}
