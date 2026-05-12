@@ -168,19 +168,13 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `docs/DATA_SOURCES.md` — what's licensed vs not
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
-Full step-by-step in `docs/OPERATIONS.md`. Short list:
-1. Push the git repo to GitHub (init done, no remote yet)
-2. Register `tapeline.io` at Cloudflare (~$35/yr) + Turnstile keys
-3. Polygon.io Starter ($29/mo) → key in `.env` + manual import swap in `signal_publisher.py`
-4. Stripe account → 4 Price IDs (Pro/Premium × monthly/annual) + webhook secret
-5. Resend → API key (activates: alerts, welcome, day-3/7/13 drip, trial-ended)
-6. Telegram BotFather → `@TapelineBot` (activates customer Notifications card)
-7. Quiver QuantData free key (activates real 13F holdings)
-8. FRED API free key (activates live DXY / 10Y / VIX in regime endpoint)
-9. Google + Microsoft OAuth client IDs (buttons auto-appear when env vars set)
-10. Fly.io + Vercel deploy
-11. Postgres (Supabase Pro $25/mo or Neon $19/mo) for prod DB
-12. Lawyer consult — Holley Nethercote Melbourne ($400-800)
+Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Benzinga, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Vercel frontend.
+
+Short list of what's actually left:
+
+1. **Quiver QuantData** free key (activates real 13F holdings — currently `mock_elite_13f_holdings()` fallback per `services/quiver_feed.py`)
+2. **Microsoft OAuth** client ID + secret (Google is done; Microsoft setup steps in `docs/launch/LAUNCH_PLAYBOOK.md` §6)
+3. **Lawyer consult** — Holley Nethercote Melbourne ($400-800)
 
 ## Communication style
 - The user prefers tight, factual responses over long narration.
