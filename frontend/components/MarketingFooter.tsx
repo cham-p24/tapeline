@@ -49,6 +49,7 @@ export function MarketingFooter() {
           <FooterCol title="Company">
             <FooterLink href="/about" desc="Who built Tapeline + transparency timeline">About</FooterLink>
             <FooterLink href="/contact" desc="Email a human; usually inside 24h">Contact</FooterLink>
+            <FooterLink href="https://x.com/tapeline_io" desc="Daily top picks, scorecard receipts">Follow on X · @tapeline_io</FooterLink>
             <FooterLink href="/press" desc="Logos, fact sheet, founder bio">Press kit</FooterLink>
             <FooterLink href="/status" desc="Live API + worker uptime, refresh every 30s">System status</FooterLink>
             <FooterLink href="/security" desc="Encryption, payment data, vulnerability disclosure">Security</FooterLink>
@@ -108,12 +109,29 @@ function FooterLink({
   children: React.ReactNode;
   desc?: string;
 }) {
+  // Auto-detect external URLs (http(s)://) and render a plain anchor with
+  // target="_blank" so we don't kick visitors off Tapeline when they tap
+  // a social/profile link. Internal paths keep using Next.js <Link> for
+  // client-side navigation.
+  const isExternal = /^https?:\/\//i.test(href);
+  const cls = "block text-muted hover:text-fg transition-colors group";
+  const content = (
+    <>
+      <span className="block">{children}</span>
+      {desc && <span className="block text-[11px] text-subtle group-hover:text-muted leading-snug mt-0.5">{desc}</span>}
+    </>
+  );
   return (
     <li>
-      <Link href={href} className="block text-muted hover:text-fg transition-colors group">
-        <span className="block">{children}</span>
-        {desc && <span className="block text-[11px] text-subtle group-hover:text-muted leading-snug mt-0.5">{desc}</span>}
-      </Link>
+      {isExternal ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+          {content}
+        </a>
+      ) : (
+        <Link href={href} className={cls}>
+          {content}
+        </Link>
+      )}
     </li>
   );
 }
