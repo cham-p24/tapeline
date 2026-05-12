@@ -170,9 +170,7 @@ def get_recent_insider_transactions(
     symbol      — optional ticker filter (case-insensitive)
     buys_only   — if True, return only net positive share_change rows
     """
-    from datetime import date, timedelta as _td
-
-    cutoff = (date.today() - _td(days=max(1, days))).isoformat()
+    cutoff = (date.today() - timedelta(days=max(1, days))).isoformat()
     sym = symbol.upper() if symbol else None
     rows: list[dict[str, Any]] = []
     for t in _INSIDER_FEED:
