@@ -25,7 +25,7 @@ export const metadata = pageMeta({
 
 const FACT_SHEET = [
   { label: "Founded",         value: "2025 (engine), 2026 (public launch)" },
-  { label: "Headquarters",    value: "Remote — primary operations in Asia-Pacific timezone" },
+  { label: "Headquarters",    value: "Melbourne, Victoria, Australia" },
   { label: "Funding",         value: "Bootstrapped — no external investment" },
   { label: "Pricing",         value: "Free · Pro from $24.99/mo (annual) · Premium from $39.99/mo (annual)" },
   { label: "Free trial",      value: "14-day Premium, no credit card required" },

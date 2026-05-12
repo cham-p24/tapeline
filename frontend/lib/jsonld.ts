@@ -377,7 +377,15 @@ export function pressContactPageJsonLd() {
         name: "Tapeline",
         url: "https://tapeline.io",
         logo: "https://tapeline.io/favicon.svg",
-        foundingLocation: { "@type": "Place", name: "Asia-Pacific" },
+        foundingLocation: {
+          "@type": "Place",
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "Melbourne",
+            addressRegion: "VIC",
+            addressCountry: "AU",
+          },
+        },
         contactPoint: [
           {
             "@type": "ContactPoint",
