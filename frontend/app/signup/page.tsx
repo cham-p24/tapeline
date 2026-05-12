@@ -61,7 +61,19 @@ function SignUpForm() {
     e.preventDefault();
     setErr(null);
     if (password.length < 8) { setErr("Password must be at least 8 characters."); return; }
-    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+    // Race: Cloudflare Turnstile can auto-solve BEFORE the useEffect above
+    // registers `window.onTapelineTurnstile`. When that happens, React state
+    // `turnstileToken` stays empty even though the widget rendered "Success"
+    // and populated its hidden `cf-turnstile-response` input. Read from the
+    // DOM as a fallback so the user isn't blocked by the race.
+    let token = turnstileToken;
+    if (TURNSTILE_SITE_KEY && !token && typeof document !== "undefined") {
+      const hidden = document.querySelector<HTMLInputElement>(
+        'input[name="cf-turnstile-response"]',
+      );
+      token = hidden?.value || "";
+    }
+    if (TURNSTILE_SITE_KEY && !token) {
       setErr("Please complete the bot check above.");
       return;
     }
@@ -71,7 +83,7 @@ function SignUpForm() {
       const device_fp = await deviceFingerprint();
       await authApi.signup(email, password, name, {
         company: honeypot,
-        turnstile_token: turnstileToken || undefined,
+        turnstile_token: token || undefined,
         device_fingerprint: device_fp || undefined,
         ref: refCode || undefined,
       });
