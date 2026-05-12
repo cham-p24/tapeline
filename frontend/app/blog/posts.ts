@@ -17,6 +17,150 @@ export type BlogPost = {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "reading-a-tapeline-score",
+    title: "Reading a Tapeline Score: a 10-minute walkthrough on $NVDA.",
+    excerpt:
+      "Most scanner scores are a number with no instructions. This is the opposite: a worked example on NVIDIA showing what each of the six factors is saying, how to read the radar, and when the composite is telling you the trade is harder than it looks.",
+    publishedAt: "2026-05-12",
+    author: "Tapeline",
+    body: `
+      <p>Most stock scanners give you a score and call it done. The score is
+      the easy part — the hard part is knowing what it's actually telling you.
+      Two stocks can both score 58, and one is a textbook setup while the
+      other is a fundamentally strong name that the market hasn't priced in
+      yet. The composite hides the difference; the factor breakdown shows it.</p>
+
+      <p>So here's the walkthrough I wish every scanner gave you: a real
+      ticker, a real score, and what each of the six numbers underneath is
+      telling you. We'll do <a href="/t/NVDA"><strong>NVDA</strong></a> — at
+      the time of writing, it's sitting at a composite of <strong>57.9</strong>
+      with the signal <strong>CONSTRUCTIVE</strong>. That's a 58 with three
+      different stories inside it, and reading them all is the difference
+      between an action and a watch.</p>
+
+      <h2>Step 1 — Don't start with the composite</h2>
+      <p>The composite is a summary. It's where most traders stop. It's where
+      every other scanner stops too. The composite tells you "the data is
+      roughly net-positive on this name" — and that's about it. Same number
+      can come from a sleepy large-cap with strong fundamentals and a weak
+      chart, or from a momentum name where the trend is on fire but the
+      balance sheet is questionable. Same 58, two opposite trades.</p>
+
+      <p>So we ignore the headline for a minute and look at the six factors.
+      The Tapeline radar shows them as a hexagon — six axes, each one a
+      sub-score from 0–100, all weighted into the composite with the
+      <a href="/how-it-works">published weights</a>:</p>
+
+      <pre style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:18px;overflow-x:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.5;">
+NVDA — composite 57.9 (CONSTRUCTIVE)
+
+  Trend                41   weight 25%
+  Relative Strength    32   weight 20%
+  Fundamentals         55   weight 15%
+  Smart Money          97   weight 15%
+  Macro                65   weight 15%
+  Momentum             87   weight 10%</pre>
+
+      <p>That's where the actual signal lives. Now we read it.</p>
+
+      <h2>Step 2 — Look for the contradictions</h2>
+      <p>Most scores tell a single story. Strong trend, strong RS, strong
+      fundamentals — easy, the data points the same direction, you're in or
+      out. NVDA doesn't do that. Look at the spread:</p>
+
+      <ul>
+        <li><strong>Smart Money 97</strong> (top 3%) — institutions and
+        insiders are net-accumulating. Congressional disclosures, 13F changes,
+        Form 4 buying — all flowing in.</li>
+        <li><strong>Momentum 87</strong> (top 13%) — short-term price action
+        is accelerating, volume is confirming, breakouts are recent.</li>
+        <li><strong>Trend 41</strong> (below median) — but the multi-timeframe
+        trend isn't fully aligned yet. The weekly and monthly haven't caught
+        up to the burst the momentum factor is seeing.</li>
+        <li><strong>Relative Strength 32</strong> (bottom third) — and the
+        name is actually <em>lagging</em> tech peers on the multi-week view.</li>
+      </ul>
+
+      <p>That's a contradiction. Smart money is in. Short-term price is
+      ripping. But the longer-timeframe trend hasn't confirmed yet, and the
+      sector is running ahead of it on a 1M view. You read that as: the
+      institutional buying may be early to a move that hasn't fully started,
+      OR it's catching a bounce inside a chop and the bigger trend won't
+      cooperate. The score can't tell you which. You have to overlay your
+      own read of where we are in the regime.</p>
+
+      <h2>Step 3 — Use the macro factor to ground it</h2>
+      <p>This is the factor most other scanners don't expose at all. NVDA's
+      <strong>Macro 65</strong> says the broader regime is mildly supportive —
+      breadth is healthy, the 10Y isn't spiking, VIX is contained. That
+      matters. A 58 composite in a friendly regime reads very differently
+      from a 58 composite during a vol shock; the latter is a "wait and see"
+      and the former is closer to "this is a real setup the regime isn't
+      fighting."</p>
+
+      <p>You can think of macro as the gain on the whole signal. Same factor
+      configuration in a hostile regime gets a different verdict. We surface
+      it explicitly so you don't have to remember.</p>
+
+      <h2>Step 4 — Read the fundamentals factor like a quality filter</h2>
+      <p><strong>Fundamentals 55</strong> on NVDA is the least interesting
+      number in the row, which is itself informative. It says: this isn't a
+      fundamentals trade. The earnings quality, margin trend, balance-sheet
+      health — all sitting in the "supportive but not the reason to be here"
+      zone. If you're trading on a multi-quarter horizon, you'd want this
+      number higher. If you're trading the next two weeks, 55 is fine — it's
+      saying the name isn't fundamentally broken.</p>
+
+      <h2>Step 5 — What the composite actually meant</h2>
+      <p>So back to the headline number. 57.9 CONSTRUCTIVE on NVDA isn't
+      "buy this." It's "the data is net-positive but split between leading
+      and lagging factors, in a regime that's mildly helpful." If you were
+      already long, the composite says hold. If you were flat, the composite
+      says either wait for the trend factor to confirm (it'll climb when the
+      weekly catches up to the daily) or take a smaller-than-normal size
+      because the leading-vs-lagging spread is wide.</p>
+
+      <p>Every other scanner that gives you a "BUY" or a "7/10" hides this.
+      The composite hides it too. The six-factor radar is what shows it.</p>
+
+      <h2>Step 6 — Compare to what the scorecard recorded</h2>
+      <p>This part is the accountability check. On the
+      <a href="/scorecard">public scorecard</a>, every top-10 daily pick
+      we've flagged is logged with its composite, its signal label, its
+      one-sentence reason, and the next-day return vs SPY. So if NVDA
+      surfaces in tomorrow's top 10, we'll record what the model thought
+      tonight, and we'll know in 24 hours whether the read held up.</p>
+
+      <p>Most scanners never close that loop. They tell you the score
+      tonight and they're silent the next morning. We're the opposite:
+      tonight's score lives on the page tomorrow, with the realised return
+      next to it. If our reads are systematically wrong on a factor,
+      <em>you can see it</em>, and you can adjust.</p>
+
+      <h2>The five things to take from this</h2>
+      <ol>
+        <li>The composite is a summary. The factor row is the signal.</li>
+        <li>Look for contradictions between Trend, RS, Smart Money, and
+        Momentum — that's where the real read lives.</li>
+        <li>The Macro factor scales everything; same composite in different
+        regimes is not the same trade.</li>
+        <li>Fundamentals is a quality filter, not a directional vote — use
+        it to confirm the name isn't broken.</li>
+        <li>Cross-reference every read against the scorecard. If our model
+        is consistently wrong on the kind of setup you're looking at, the
+        scorecard will show it.</li>
+      </ol>
+
+      <p>Run the same walkthrough on any ticker you care about at
+      <a href="/t/AAPL">/t/&lt;TICKER&gt;</a>. Every page shows the
+      composite, the radar, the factor sub-scores, and the why sentence.
+      If you want them all in one view ranked by score, the live
+      <a href="/app/scanner">scanner</a> is the home for that — Free
+      gets the top 20 tickers 24h-delayed, the
+      <a href="/signup">14-day trial</a> opens the full universe live.</p>
+    `,
+  },
+  {
     slug: "evaluating-a-stock-scanner",
     title: "How to evaluate a stock scanner: 5 questions before you pay.",
     excerpt:
