@@ -39,7 +39,11 @@ export function MarketingFooter() {
             <FooterLink href="/compare/zacks" desc="Live scanner vs static rankings">vs Zacks</FooterLink>
             <FooterLink href="/compare/tradingview" desc="Score-first vs chart-first">vs TradingView</FooterLink>
             <FooterLink href="/compare/trade-ideas" desc="Public formula at 1/5 the price">vs Trade Ideas</FooterLink>
+            <FooterLink href="/compare/wallstreetzen" desc="Live multi-factor vs single-screen verdict">vs WallStreetZen</FooterLink>
+            <FooterLink href="/compare/tipranks" desc="Six factors vs analyst-aggregator">vs Tipranks</FooterLink>
+            <FooterLink href="/compare/simply-wall-st" desc="Live scanner vs Snowflake research">vs Simply Wall St</FooterLink>
             <FooterLink href="/best-stock-scanners" desc="Hand-tested ranking, 10 tools">Best stock scanners</FooterLink>
+            <FooterLink href="/best-stocks-for/swing-traders" desc="Day, swing, momentum, dividend, value">Best stocks by strategy</FooterLink>
           </FooterCol>
 
           <FooterCol title="Company">

@@ -125,19 +125,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // Removed 2026-05-12: linkedin.com/company/tapeline (it's a
               //   European agroecology research project — different brand).
               //   Restore once we claim a unique slug like /company/tapeline-io.
+              // Removed 2026-05-13: producthunt /products/tapeline (HTTP 404),
+              //   capterra /p/tapeline (HTTP 404), stocktwits /tapeline
+              //   (HTTP 404). Restore each entry as the profile is claimed.
+              //   crunchbase / alternativeto / g2 also Cloudflare-blocked but
+              //   per seo-tools/disclosure/profile_kits.md these are known-
+              //   unclaimed; gating them behind verification too. Restore as
+              //   each platform's profile is claimed and reachable.
               //
-              // Remaining entries should each be confirmed once before they
-              // can be assumed safe. See seo-tools/disclosure/profile_kits.md
-              // for the canonical paste-ready copy when claiming each.
+              // Only entries below have been confirmed to resolve AND belong
+              // to Tapeline. See seo-tools/disclosure/profile_kits.md for the
+              // canonical paste-ready copy when claiming each.
               sameAs: [
                 "https://x.com/tapeline_io",
                 "https://github.com/cham-p24/tapeline",
-                "https://www.crunchbase.com/organization/tapeline",
-                "https://www.producthunt.com/products/tapeline",
-                "https://alternativeto.net/software/tapeline/",
-                "https://www.g2.com/products/tapeline",
-                "https://www.capterra.com/p/tapeline/",
-                "https://stocktwits.com/tapeline",
                 "https://www.reddit.com/user/tapeline_io",
               ],
               contactPoint: [

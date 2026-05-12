@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SECTORS } from "./sector/sectors";
 import { SIGNALS } from "./signal/signals";
+import { STRATEGIES } from "./best-stocks-for/[strategy]/strategies";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
 // the day, without paying a DB roundtrip on every crawler hit.
@@ -66,14 +67,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/compare/tradingview`,       lastModified: now, priority: 0.8 },
     { url: `${base}/compare/trade-ideas`,       lastModified: now, priority: 0.8 },
     { url: `${base}/compare/koyfin`,            lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/tipranks`,          lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/simply-wall-st`,    lastModified: now, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: now, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: now, priority: 0.8 },
     { url: `${base}/signin`,                    lastModified: now, priority: 0.4 },
     { url: `${base}/signup`,                    lastModified: now, priority: 0.6 },
+    { url: `${base}/contact`,                   lastModified: now, priority: 0.4 },
     { url: `${base}/legal/risk`,                lastModified: now, priority: 0.3 },
     { url: `${base}/legal/terms`,               lastModified: now, priority: 0.3 },
     { url: `${base}/legal/privacy`,             lastModified: now, priority: 0.3 },
+    { url: `${base}/legal/refund`,              lastModified: now, priority: 0.3 },
     { url: `${base}/security`,                  lastModified: now, priority: 0.4 },
     { url: `${base}/support`,                   lastModified: now, priority: 0.4 },
   ];
@@ -91,6 +96,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: now,
     changeFrequency: "daily" as const,
     priority: 0.7,
+  }));
+  // Strategy listicle pages — /best-stocks-for/{day-traders, swing-traders,
+  // momentum, dividend, value}. Each page sorts/filters the live scanner
+  // differently so the table content is unique per slug (no dup-content risk).
+  const strategyEntries: MetadataRoute.Sitemap = STRATEGIES.map((s) => ({
+    url: `${base}/best-stocks-for/${s.slug}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.8,
   }));
 
   const tickers = await fetchTopTickers(500);
@@ -114,6 +128,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticEntries,
     ...sectorEntries,
     ...signalEntries,
+    ...strategyEntries,
     ...tickerEntries,
     ...postEntries,
   ];
