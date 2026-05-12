@@ -761,7 +761,9 @@ async def _refresh_insider_cache() -> None:
     from app.services.finnhub_feed import (
         compute_smart_money_score,
         fetch_insider_transactions,
+        insider_feed_size,
         set_cached_smart_money_score,
+        set_recent_insider_transactions,
         smart_money_cache_size,
     )
 
@@ -781,12 +783,18 @@ async def _refresh_insider_cache() -> None:
             if txns:
                 score = compute_smart_money_score(txns)
                 set_cached_smart_money_score(sym, score)
+                # Also feed the cross-universe insider activity stream that
+                # powers /app/holdings ("Recent Insider Buys").
+                set_recent_insider_transactions(sym, txns)
                 refreshed += 1
         except Exception:
             logger.exception("insider.fetch_failed symbol=%s", sym)
         await asyncio.sleep(1.1)  # stay well under 60/min
 
-    logger.info("insider.refreshed scored=%d cache_size=%d", refreshed, smart_money_cache_size())
+    logger.info(
+        "insider.refreshed scored=%d score_cache=%d feed_cache=%d",
+        refreshed, smart_money_cache_size(), insider_feed_size(),
+    )
 
 
 async def _backfill_sectors() -> None:

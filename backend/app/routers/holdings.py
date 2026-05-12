@@ -1,67 +1,82 @@
-"""GET /api/holdings — elite-fund 13F institutional holdings (Premium-only)."""
+"""GET /api/holdings — Recent Insider Buys feed (Premium-only).
+
+Replaces the legacy 13F holdings endpoint. The 13F path required a paid Quiver
+key that was never wired in production, so the page sat empty.
+
+Data source: Finnhub `/stock/insider-transactions` (SEC Form 4), already
+fetched daily by `_refresh_insider_cache` in the worker for the active scoring
+universe. The same data powers the Smart Money sub-score, so this endpoint
+is the visible "receipt" for the 15% Smart Money pillar of every Tapeline Score.
+
+Response shape (kept stable for the frontend that paginates/filters):
+    {
+      "count": int,
+      "items": [
+        {
+          "symbol": str,
+          "insider_name": str,
+          "transaction_date": str (YYYY-MM-DD),
+          "share_change": int (negative = sale, positive = buy),
+          "transaction_price": float,
+          "transaction_value": float (abs of shares * price),
+          "code": str (SEC Form 4 transaction code, e.g. "P"=buy, "S"=sale)
+        }
+      ]
+    }
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
-from app.models import InstitutionalHolding, User
+from app.models import User
 from app.services.auth import current_user_required
+from app.services.finnhub_feed import (
+    get_recent_insider_transactions,
+    insider_feed_size,
+)
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
 
 @router.get("")
-async def list_holdings(
+async def list_insider_buys(
     user: User = Depends(current_user_required),
-    session: AsyncSession = Depends(get_session),
     symbol: str | None = Query(None, description="Filter to one ticker"),
-    fund: str | None = Query(None, description="Filter to one fund (substring match)"),
-    limit: int = Query(50, ge=1, le=500),
+    days: int = Query(30, ge=1, le=180, description="Lookback window in days"),
+    buys_only: bool = Query(False, description="Only return net positive (buy) transactions"),
+    limit: int = Query(100, ge=1, le=500),
 ) -> dict:
     """
-    Latest 13F holdings for the eight tracked elite funds.
-    Refreshed every 24h via Quiver (mock fallback when no API key).
-    Premium-only.
+    Recent insider Form 4 transactions across the active universe.
+    Refreshed daily by the signal-publisher worker. Premium-only.
     """
     if not has_feature(Tier(user.tier), "holdings.elite"):
-        raise HTTPException(403, "Elite institutional holdings require Premium tier")
+        raise HTTPException(403, "Recent insider activity is a Premium feature")
 
-    stmt = select(InstitutionalHolding).order_by(desc(InstitutionalHolding.value_usd))
-    if symbol:
-        stmt = stmt.where(InstitutionalHolding.symbol == symbol.upper())
-    if fund:
-        stmt = stmt.where(InstitutionalHolding.fund_name.ilike(f"%{fund}%"))
-    stmt = stmt.limit(limit)
-
-    rows = (await session.execute(stmt)).scalars().all()
+    items = get_recent_insider_transactions(
+        days=days,
+        limit=limit,
+        symbol=symbol,
+        buys_only=buys_only,
+    )
     return {
-        "count": len(rows),
-        "items": [
-            {
-                "id": h.id,
-                "fund_name": h.fund_name,
-                "manager": h.manager,
-                "cik": h.cik,
-                "symbol": h.symbol,
-                "value_usd": h.value_usd,
-                "shares": h.shares,
-                "percent_portfolio": h.percent_portfolio,
-                "fetched_at": h.fetched_at.isoformat(),
-            }
-            for h in rows
-        ],
+        "count": len(items),
+        "items": items,
+        "feed_size": insider_feed_size(),
     }
 
 
 @router.get("/funds")
-async def list_funds(
+async def list_funds_legacy(
     user: User = Depends(current_user_required),
 ) -> dict:
-    """List the elite funds being tracked. Premium-only."""
+    """
+    Legacy endpoint kept for frontend compatibility. The "elite funds" concept
+    moved off-roadmap in 2026-05 when we replaced Quiver 13F with Finnhub
+    Form 4 insider data. Returns an empty list — the frontend's fund filter
+    is hidden when this is empty.
+    """
     if not has_feature(Tier(user.tier), "holdings.elite"):
-        raise HTTPException(403, "Elite institutional holdings require Premium tier")
-    from app.services.quiver_feed import get_tracked_funds
-    return {"items": get_tracked_funds()}
+        raise HTTPException(403, "Recent insider activity is a Premium feature")
+    return {"items": []}

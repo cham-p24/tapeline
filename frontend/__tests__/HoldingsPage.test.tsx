@@ -1,6 +1,9 @@
 /**
- * Holdings page should render the elite-fund table for Premium users
- * and the paywall overlay for non-Premium.
+ * Holdings page (Recent Insider Buys feed) should render the table for
+ * Premium users and the paywall overlay for non-Premium.
+ *
+ * Page was repurposed in 2026-05 from "Elite 13F holdings" (Quiver) to
+ * "Recent insider buys" (SEC Form 4 via Finnhub). Test updated to match.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -14,14 +17,18 @@ vi.mock("@/lib/api", () => ({
   api: {
     holdings: vi.fn().mockResolvedValue({
       count: 1,
-      items: [{
-        id: 1, fund_name: "Berkshire Hathaway", manager: "Buffett", cik: "0001067983",
-        symbol: "AAPL", value_usd: 1_500_000_000, shares: 905_000_000, percent_portfolio: 12.3,
-        fetched_at: "2026-04-27T00:00:00Z",
-      }],
-    }),
-    holdingsFunds: vi.fn().mockResolvedValue({
-      items: [{ name: "Berkshire Hathaway", manager: "Buffett", cik: "0001067983", slug: "berkshire-hathaway" }],
+      feed_size: 1,
+      items: [
+        {
+          symbol: "AAPL",
+          insider_name: "LEVINSON ARTHUR D",
+          transaction_date: "2026-05-06",
+          share_change: -100473,
+          transaction_price: 285.04,
+          transaction_value: 28639286.92,
+          code: "S",
+        },
+      ],
     }),
   },
 }));
@@ -34,18 +41,20 @@ describe("HoldingsPage", () => {
     mockedUseUser.mockReset();
   });
 
-  it("shows the holdings table for a Premium user", async () => {
+  it("shows the insider buys table for a Premium user", async () => {
     mockedUseUser.mockReturnValue({
       user: { id: "u1", email: "p@example.com", name: null, tier: "premium", created_at: null },
       loading: false, refresh: vi.fn(), signout: vi.fn(),
     });
     render(<HoldingsPage />);
-    expect(screen.getByText("Elite holdings")).toBeInTheDocument();
+    expect(screen.getByText("Recent insider buys")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText("Berkshire Hathaway")).toBeInTheDocument();
+      expect(screen.getByText("AAPL")).toBeInTheDocument();
     });
-    expect(screen.getByText("AAPL")).toBeInTheDocument();
-    expect(screen.getByText("$1.50B")).toBeInTheDocument();
+    // Insider name is title-cased on render
+    expect(screen.getByText(/Levinson Arthur D/i)).toBeInTheDocument();
+    // SELL action chip with the SEC code
+    expect(screen.getByText(/SELL · S/)).toBeInTheDocument();
   });
 
   it("blocks the data behind a paywall for a Pro user", () => {

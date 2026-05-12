@@ -46,7 +46,7 @@ const PLANS = [
     proPlus: true,
     highlights: [
       "Congressional trades feed (House + Senate)",
-      "Elite 13F holdings — Buffett, Burry, Tepper, Ackman + 4 more",
+      "Recent insider buys — live SEC Form 4 across ~2,500 tickers",
       "Telegram alerts · unlimited (Pro: none)",
       "Email alerts · unlimited (Pro: 10/day)",
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",

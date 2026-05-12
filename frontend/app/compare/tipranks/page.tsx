@@ -77,7 +77,7 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Hedge fund holdings tracker",
-    tapeline: "Eight elite-fund 13F tracker (Premium tier): Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer",
+    tapeline: "Live SEC Form 4 insider activity (Premium tier): officers, directors, and 10%+ owners trading their own stock",
     competitor: "Hedge Fund Sentiment is a Smart Score factor; broader fund coverage",
     note: "Tipranks' hedge-fund data is broader and feeds directly into the score. Tapeline's tracker is curated to eight elites we've explicitly chosen as signal-rich and surfaces them as a separate Premium feature, not as a hidden score input.",
   },
@@ -94,7 +94,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Tipranks?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). Tipranks Plus is around $30/mo annual, Premium around $43.93/mo annual, Ultimate around $76/mo annual. Tapeline's top tier (Premium) is roughly half the price of Tipranks' top tier (Ultimate) — and Tapeline includes Congressional trades and the elite 13F holdings tracker at that price.",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). Tipranks Plus is around $30/mo annual, Premium around $43.93/mo annual, Ultimate around $76/mo annual. Tapeline's top tier (Premium) is roughly half the price of Tipranks' top tier (Ultimate) — and Tapeline includes Congressional trades and a live insider activity feed (SEC Form 4) at that price.",
   },
   {
     q: "Does Tipranks publish a per-pick track record?",

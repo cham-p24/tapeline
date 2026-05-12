@@ -1,68 +1,63 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type HoldingItem, type TrackedFund } from "@/lib/api";
+import { api, type InsiderTxn } from "@/lib/api";
 import { Paywall } from "@/components/Paywall";
 import { TableSkeleton } from "@/components/Skeleton";
 import { userLocale } from "@/lib/datetime";
 
+/**
+ * Recent Insider Buys feed.
+ *
+ * Replaces the previous "Elite 13F holdings" page (which depended on a paid
+ * Quiver feed we never wired). Source is now SEC Form 4 filings via Finnhub,
+ * already powering the Smart Money sub-score on every Tapeline Score — so
+ * this page is the "receipt" for the 15% Smart Money pillar.
+ *
+ * Premium-only; same paywall feature flag as before.
+ */
 export default function HoldingsPage() {
-  const [rows, setRows] = useState<HoldingItem[]>([]);
-  const [funds, setFunds] = useState<TrackedFund[]>([]);
-  const [fundFilter, setFundFilter] = useState<string>("");
+  const [rows, setRows] = useState<InsiderTxn[]>([]);
   const [symbolFilter, setSymbolFilter] = useState<string>("");
+  const [buysOnly, setBuysOnly] = useState(false);
+  const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  const [feedSize, setFeedSize] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await api.holdings({
-        fund: fundFilter || undefined,
         symbol: symbolFilter.toUpperCase().trim() || undefined,
+        days,
+        buys_only: buysOnly || undefined,
         limit: 200,
       });
       setRows(r.items);
+      setFeedSize(r.feed_size || 0);
     } catch {
       /* paywall hides this for non-Premium */
     } finally {
       setLoading(false);
     }
-  }, [fundFilter, symbolFilter]);
+  }, [symbolFilter, days, buysOnly]);
 
   useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    api.holdingsFunds()
-      .then((r) => setFunds(r.items))
-      .catch(() => { /* ignore */ });
-  }, []);
 
   return (
     <div>
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Elite holdings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Recent insider buys</h1>
         <p className="text-sm text-muted">
-          Latest 13F positions for eight tracked funds. Refreshed every 24 hours.
-          SEC reporting window means filings lag ~45 days.
+          SEC Form 4 filings across the active universe — officers, directors and 10%+ owners
+          trading their own company's stock. Refreshed every 24 hours. This is the live data
+          behind the Smart Money pillar of every Tapeline Score.
         </p>
       </div>
 
-      <Paywall feature="holdings.elite" title="Elite institutional holdings">
+      <Paywall feature="holdings.elite" title="Recent insider activity">
         {/* Filters */}
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="card px-3 py-2">
-            <label className="block text-xs text-muted">Fund</label>
-            <select
-              value={fundFilter}
-              onChange={(e) => setFundFilter(e.target.value)}
-              className="bg-transparent text-sm"
-            >
-              <option value="">All funds</option>
-              {funds.map((f) => (
-                <option key={f.cik} value={f.name}>{f.name} ({f.manager})</option>
-              ))}
-            </select>
-          </div>
           <div className="card px-3 py-2">
             <label className="block text-xs text-muted">Symbol</label>
             <input
@@ -73,8 +68,30 @@ export default function HoldingsPage() {
               className="w-24 bg-transparent text-sm uppercase nums focus:outline-none"
             />
           </div>
+          <div className="card px-3 py-2">
+            <label className="block text-xs text-muted">Lookback</label>
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="bg-transparent text-sm"
+            >
+              <option value={7}>7 days</option>
+              <option value={30}>30 days</option>
+              <option value={90}>90 days</option>
+            </select>
+          </div>
+          <label className="card flex cursor-pointer items-center gap-2 px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={buysOnly}
+              onChange={(e) => setBuysOnly(e.target.checked)}
+              className="h-3.5 w-3.5"
+            />
+            <span>Buys only</span>
+          </label>
           <span className="ml-auto self-center text-xs text-muted">
-            Showing <strong className="text-fg">{rows.length}</strong> positions · refresh daily
+            Showing <strong className="text-fg">{rows.length}</strong> of{" "}
+            <strong className="text-fg">{feedSize}</strong> tracked · refresh daily
           </span>
         </div>
 
@@ -83,13 +100,13 @@ export default function HoldingsPage() {
           <table className="w-full text-sm nums">
             <thead className="text-xs uppercase text-muted">
               <tr>
-                <th className="px-4 py-2 text-left">Fund</th>
-                <th className="px-4 py-2 text-left">Manager</th>
+                <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Symbol</th>
-                <th className="px-4 py-2 text-right">Position value</th>
+                <th className="px-4 py-2 text-left">Insider</th>
+                <th className="px-4 py-2 text-center">Action</th>
                 <th className="px-4 py-2 text-right">Shares</th>
-                <th className="px-4 py-2 text-right">% portfolio</th>
-                <th className="px-4 py-2 text-left">As of</th>
+                <th className="px-4 py-2 text-right">Price</th>
+                <th className="px-4 py-2 text-right">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -97,42 +114,102 @@ export default function HoldingsPage() {
                 <tr><td colSpan={7}><TableSkeleton cols={7} rows={6} /></td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted">
-                  No holdings match. Clear the filters or wait for the next 24h refresh.
+                  No insider transactions match. Try widening the lookback window, clearing the symbol filter,
+                  or unchecking "Buys only".
                 </td></tr>
-              ) : rows.map((h) => (
-                <tr key={h.id} className="border-b border-border/20 hover:bg-black/20">
-                  <td className="px-4 py-2 font-medium">{h.fund_name}</td>
-                  <td className="px-4 py-2 text-muted">{h.manager}</td>
-                  <td className="px-4 py-2 font-medium">{h.symbol}</td>
-                  <td className="px-4 py-2 text-right text-up">{compactUSD(h.value_usd)}</td>
-                  <td className="px-4 py-2 text-right text-muted">{compact(h.shares)}</td>
-                  <td className="px-4 py-2 text-right">{h.percent_portfolio.toFixed(1)}%</td>
-                  <td className="px-4 py-2 text-xs text-muted">{new Date(h.fetched_at).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
-                </tr>
-              ))}
+              ) : rows.map((t, i) => {
+                const isBuy = t.share_change > 0;
+                return (
+                  <tr key={`${t.symbol}-${t.transaction_date}-${t.insider_name}-${i}`}
+                      className="border-b border-border/20 hover:bg-black/20">
+                    <td className="px-4 py-2 text-xs text-muted whitespace-nowrap">
+                      {formatDate(t.transaction_date)}
+                    </td>
+                    <td className="px-4 py-2 font-medium">{t.symbol}</td>
+                    <td className="px-4 py-2 text-muted truncate max-w-[16ch]" title={t.insider_name}>
+                      {titleCase(t.insider_name)}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <span className={
+                        "inline-block px-1.5 py-0.5 rounded text-xs font-medium " +
+                        (isBuy ? "bg-up/15 text-up" : "bg-down/15 text-down")
+                      } title={codeLabel(t.code)}>
+                        {isBuy ? "BUY" : "SELL"}{t.code ? ` · ${t.code}` : ""}
+                      </span>
+                    </td>
+                    <td className={"px-4 py-2 text-right " + (isBuy ? "text-up" : "text-down")}>
+                      {isBuy ? "+" : ""}{compact(t.share_change)}
+                    </td>
+                    <td className="px-4 py-2 text-right text-muted">
+                      {t.transaction_price > 0 ? "$" + t.transaction_price.toFixed(2) : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {t.transaction_value > 0 ? compactUSD(t.transaction_value) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         <p className="mt-4 text-xs text-subtle">
-          Source: Quiver QuantData 13F feed. SEC reporting window is 45 days, so filings reflect positions as of the last quarter-end.
-          Mock data shown when QUIVER_API_KEY is unset (dev only).
+          Source: SEC Form 4 filings via Finnhub. Updated daily for the top ~2,500 most-liquid US
+          tickers. Codes: P = open-market buy, S = open-market sale, A = grant/award,
+          M = option exercise, G = gift, F = payment of tax via shares.
         </p>
       </Paywall>
     </div>
   );
+
+  function formatDate(d: string): string {
+    if (!d) return "—";
+    try {
+      return new Date(d + "T00:00:00Z").toLocaleDateString(userLocale(), {
+        day: "numeric", month: "short",
+      });
+    } catch {
+      return d;
+    }
+  }
 }
 
-function compactUSD(n: number) {
+function compact(n: number): string {
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (a >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (a >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+}
+
+function compactUSD(n: number): string {
   if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
   if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M";
   if (n >= 1e3) return "$" + (n / 1e3).toFixed(0) + "K";
   return "$" + Math.round(n);
 }
 
-function compact(n: number) {
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(0) + "K";
-  return String(n);
+function titleCase(s: string): string {
+  if (!s) return "—";
+  // Finnhub returns insider names in uppercase ("LEVINSON ARTHUR D"). Title-case
+  // the first/last name, preserve middle initials.
+  return s
+    .toLowerCase()
+    .split(" ")
+    .map((w) => (w.length <= 1 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
+function codeLabel(code: string): string {
+  const map: Record<string, string> = {
+    P: "Open-market buy",
+    S: "Open-market sale",
+    A: "Grant / award",
+    M: "Option exercise",
+    G: "Gift",
+    F: "Payment of tax via shares",
+    D: "Disposition non-open-market",
+    C: "Conversion of derivative",
+  };
+  return code ? (map[code] || `Form 4 code: ${code}`) : "";
 }
