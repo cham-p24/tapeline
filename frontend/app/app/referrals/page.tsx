@@ -12,7 +12,11 @@ type ReferralStats = {
   share_url: string | null;
   signed_up: number;
   converted: number;
-  credit_months: number;
+  // Optional: the field was added to /api/referrals/me on 2026-05-13 alongside
+  // the credit-grant mechanic. The Vercel frontend deploys faster than Fly's
+  // manual `fly deploy`, so a freshly-deployed frontend can briefly talk to an
+  // older backend that omits this field — guard with `?? 0` at every read.
+  credit_months?: number;
   months_earned: number;
   referred_users: Array<{ email: string; tier: string; converted: boolean; joined: string | null }>;
 };
@@ -70,7 +74,7 @@ export default function ReferralsPage() {
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <Stat label="Signed up via your link" value={String(stats.signed_up)} />
             <Stat label="Free months earned" value={String(stats.months_earned)} tone="up" />
-            <Stat label="Unused credit (months)" value={String(stats.credit_months)} tone={stats.credit_months > 0 ? "up" : undefined} />
+            <Stat label="Unused credit (months)" value={String(stats.credit_months ?? 0)} tone={(stats.credit_months ?? 0) > 0 ? "up" : undefined} />
           </div>
 
           {stats.referred_users.length > 0 && (
