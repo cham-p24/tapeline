@@ -23,6 +23,7 @@ truthy in the string slot (or None) and you get the site-wide layout.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import desc, select
@@ -193,10 +194,10 @@ def _render_html(
     *,
     user_name: str,
     regime: RegimeState | None,
-    watchlist_rows: list,
+    watchlist_rows: Sequence[Ticker],
     baselines: dict[str, float | None],
     thresholds: dict[str, float],
-    squeezes: list,
+    squeezes: Sequence[SqueezeSetup],
     squeeze_label: str,
     cta_href: str,
     cta_label: str,
