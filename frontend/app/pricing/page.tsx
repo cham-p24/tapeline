@@ -3,6 +3,7 @@ import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { TrackPageView } from "@/components/TrackPageView";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -39,6 +40,8 @@ export default function PricingPage() {
     <main className="min-h-screen">
       {/* FAQPage schema — mirrors the on-page FAQ. */}
       <script {...jsonLdScript(faqJsonLd(FAQ_ITEMS))} />
+      {/* Impression event — pairs with checkout_started for click-rate. */}
+      <TrackPageView event="pricing_page_viewed" properties={{ surface: "marketing" }} />
       <MarketingNav />
 
       {/* Hero — single tight intro, no orphaned scroll links */}

@@ -146,7 +146,7 @@ def render_welcome_email(user_name: str, picks: list[dict[str, Any]] | None = No
         <h1 style="margin:0 0 12px;font-size:26px;">Welcome, {user_name}.</h1>
         <p style="color:#d1d5db;margin:0 0 24px;">Your <strong>14-day Premium trial</strong> is live. Three live scores from the scanner right now:</p>
         {picks_html}
-        <a href="https://tapeline.io/app/scanner" style="display:inline-block;margin-top:8px;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the full scanner &rarr;</a>
+        <a href="https://tapeline.io/app/scanner?utm_source=email&amp;utm_campaign=welcome&amp;utm_medium=transactional" style="display:inline-block;margin-top:8px;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the full scanner &rarr;</a>
         <p style="color:#9ca3af;margin-top:24px;font-size:13px;">Tap any card above to see the 6-factor breakdown for that ticker. The
         formula is public — see <a href="https://tapeline.io/how-it-works" style="color:#3b82f6;">how it works</a>.</p>
         <p style="color:#6b7280;margin-top:18px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
@@ -161,7 +161,7 @@ def render_welcome_email(user_name: str, picks: list[dict[str, Any]] | None = No
           <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
           <li><strong>Watchlist</strong> — add 5-10 tickers you're following, get smart alerts when scores shift</li>
         </ol>
-        <a href="https://tapeline.io/app/scanner" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
+        <a href="https://tapeline.io/app/scanner?utm_source=email&amp;utm_campaign=welcome&amp;utm_medium=transactional" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
         <p style="color:#6b7280;margin-top:24px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
         """
     return _shell(body)

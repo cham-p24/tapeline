@@ -66,6 +66,16 @@ export default function BillingPage() {
     if (tier === "free") setShowPlans(true);
   }, [tier]);
 
+  // Funnel event: pricing-page impression. Pairs with `checkout_started`
+  // (already wired in startCheckout below) to compute click-rate on the
+  // upgrade buttons. `surface: "app"` distinguishes the in-app upgrade
+  // flow from the marketing /pricing page, which fires the same event
+  // with surface="marketing".
+  useEffect(() => {
+    track("pricing_page_viewed", { surface: "app", tier });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Funnel event: trial → paid conversion. Stripe's success_url redirects
   // back to /app/billing?checkout=success&tier={tier}&billing_period={period}.
   // We read the search params via `window.location.search` (inside the
