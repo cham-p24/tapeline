@@ -271,7 +271,13 @@ async def signin(
 
 @router.post("/signout")
 async def signout(response: Response) -> dict:
-    response.delete_cookie(SESSION_COOKIE, path="/")
+    # delete_cookie only takes effect when its (path, domain) tuple matches
+    # the original Set-Cookie's scope. In prod the session cookie is set on
+    # domain=".tapeline.io" so it's shared between api.* and the apex —
+    # without passing the same domain here, the browser keeps the original
+    # cookie and the session stays alive after signout returns {ok: true}.
+    kw = session_cookie_kwargs()
+    response.delete_cookie(kw["key"], path=kw.get("path", "/"), domain=kw.get("domain"))
     return {"ok": True}
 
 
