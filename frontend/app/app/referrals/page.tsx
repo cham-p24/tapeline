@@ -12,6 +12,7 @@ type ReferralStats = {
   share_url: string | null;
   signed_up: number;
   converted: number;
+  credit_months: number;
   months_earned: number;
   referred_users: Array<{ email: string; tier: string; converted: boolean; joined: string | null }>;
 };
@@ -42,9 +43,9 @@ export default function ReferralsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Give a month, get a month</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Refer a friend, both get a free month</h1>
       <p className="text-sm text-muted">
-        Every friend who signs up and subscribes earns you 1 free month on your plan.
+        Every friend who signs up via your link earns you both 1 free month of Premium. Applied automatically at your next checkout.
       </p>
 
       {!stats ? (
@@ -68,8 +69,8 @@ export default function ReferralsPage() {
 
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <Stat label="Signed up via your link" value={String(stats.signed_up)} />
-            <Stat label="Converted to paid" value={String(stats.converted)} tone="up" />
             <Stat label="Free months earned" value={String(stats.months_earned)} tone="up" />
+            <Stat label="Unused credit (months)" value={String(stats.credit_months)} tone={stats.credit_months > 0 ? "up" : undefined} />
           </div>
 
           {stats.referred_users.length > 0 && (
@@ -104,9 +105,9 @@ export default function ReferralsPage() {
             <h3 className="font-semibold">How it works</h3>
             <ol className="mt-3 space-y-2 text-sm text-muted">
               <li><strong className="text-fg">1.</strong> Share your unique link anywhere.</li>
-              <li><strong className="text-fg">2.</strong> Friend signs up — they start on 14-day Pro trial.</li>
-              <li><strong className="text-fg">3.</strong> They subscribe after trial — you get 1 free month credited to your next invoice.</li>
-              <li><strong className="text-fg">4.</strong> Stack credits indefinitely. Refer 12, get a free year.</li>
+              <li><strong className="text-fg">2.</strong> Friend signs up via your link — both of you get +1 free month of Premium, credited immediately.</li>
+              <li><strong className="text-fg">3.</strong> Credit applies automatically at your next paid checkout (one-shot 100%-off coupon, no code to enter).</li>
+              <li><strong className="text-fg">4.</strong> Stack credits indefinitely. Refer 12 friends, get a free year.</li>
             </ol>
           </div>
         </>

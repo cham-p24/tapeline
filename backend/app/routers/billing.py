@@ -39,6 +39,9 @@ async def create_checkout(
         # sync with app/app/billing/page.tsx.
         success_url=f"{settings.app_url}/app/billing?checkout=success&tier={body.tier}&billing_period={body.billing_period}",
         cancel_url=f"{settings.app_url}/app/billing?checkout=cancelled",
+        # Pass the user's unspent referral credits; the billing service mints
+        # a one-shot 100%-off coupon for that many months when > 0.
+        referral_credit_months=user.referral_credit_months or 0,
     )
     return {"url": url}
 

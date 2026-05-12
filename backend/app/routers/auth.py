@@ -144,13 +144,14 @@ async def signup(
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
-    # Resolve referral code -> referring user's id
-    referred_by_id: str | None = None
+    # Resolve referral code -> referring user. A valid ref earns BOTH parties
+    # one month of free Premium, applied at the next paid checkout via a
+    # one-shot Stripe coupon. See services/billing.create_checkout_session.
+    referrer: User | None = None
     if body.ref:
         ref_q = await session.execute(select(User).where(User.referral_code == body.ref.upper()))
         referrer = ref_q.scalar_one_or_none()
-        if referrer:
-            referred_by_id = referrer.id
+    referred_by_id = referrer.id if referrer else None
 
     # Every new user starts a 14-day Pro trial automatically
     trial_ends = datetime.now(UTC) + timedelta(days=14)
@@ -174,8 +175,14 @@ async def signup(
         trial_ends_at=trial_ends,
         referral_code=ref_code,
         referred_by=referred_by_id,
+        referral_credit_months=1 if referrer else 0,
     )
     session.add(user)
+    # Credit the referrer too. Doing this in the same transaction guarantees
+    # that either both users get the bonus or neither does (e.g., constraint
+    # violation on the new user rolls back the referrer credit increment).
+    if referrer:
+        referrer.referral_credit_months = (referrer.referral_credit_months or 0) + 1
     await session.commit()
     await session.refresh(user)
 
@@ -189,33 +196,56 @@ async def signup(
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signup user=%s referred_by=%s", user.id, referred_by_id or "none")
 
-    # Day-0 welcome email. Fire-and-forget — failures don't block signup.
+    # Day-0 email. Fire-and-forget — failures don't block signup.
     # send_email is a no-op if RESEND_API_KEY isn't set, so this is safe in dev.
-    # Embeds the live top-3 scores from the scanner so the user sees the actual
-    # product in their inbox instead of "click here to see scores".
-    try:
-        from sqlalchemy import desc as _desc
+    # Referred users get a credit-acknowledgement email instead of the standard
+    # welcome — both carry the same trial-is-live framing, but the referral
+    # version surfaces the earned bonus front-and-centre.
+    if referrer:
+        try:
+            from app.services.email import (
+                render_referral_referee_email,
+                render_referral_referrer_email,
+                send_email,
+            )
+            await send_email(
+                user.email,
+                "Welcome to Tapeline — you've earned 1 free month of Premium",
+                render_referral_referee_email(user.name or "trader", referrer.name),
+            )
+            masked_referee = user.email[:3] + "***" + user.email[user.email.index("@"):]
+            await send_email(
+                referrer.email,
+                "Someone joined Tapeline via your link — 1 free month credited",
+                render_referral_referrer_email(referrer.name or "trader", masked_referee),
+            )
+        except Exception:
+            logger.exception("auth.referral_emails_failed user=%s referrer=%s",
+                             user.id, referrer.id)
+    else:
+        try:
+            from sqlalchemy import desc as _desc
 
-        from app.models import Ticker
-        from app.services.email import render_welcome_email, send_email
+            from app.models import Ticker
+            from app.services.email import render_welcome_email, send_email
 
-        top_result = await session.execute(
-            select(Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason)
-            .where(Ticker.score.is_not(None))
-            .order_by(_desc(Ticker.score))
-            .limit(3)
-        )
-        picks = [
-            {"symbol": r[0], "score": r[1], "signal": r[2], "reason": r[3]}
-            for r in top_result.all()
-        ]
-        await send_email(
-            user.email,
-            "Welcome to Tapeline — your trial is live",
-            render_welcome_email(user.name or "trader", picks=picks),
-        )
-    except Exception:
-        logger.exception("auth.welcome_email_failed user=%s", user.id)
+            top_result = await session.execute(
+                select(Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason)
+                .where(Ticker.score.is_not(None))
+                .order_by(_desc(Ticker.score))
+                .limit(3)
+            )
+            picks = [
+                {"symbol": r[0], "score": r[1], "signal": r[2], "reason": r[3]}
+                for r in top_result.all()
+            ]
+            await send_email(
+                user.email,
+                "Welcome to Tapeline — your trial is live",
+                render_welcome_email(user.name or "trader", picks=picks),
+            )
+        except Exception:
+            logger.exception("auth.welcome_email_failed user=%s", user.id)
 
     return {"user": _user_out(user)}
 

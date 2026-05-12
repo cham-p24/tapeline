@@ -33,10 +33,15 @@ async def create_checkout_session(
     billing_period: str,
     success_url: str,
     cancel_url: str,
+    referral_credit_months: int = 0,
 ) -> str:
     """Create a Stripe Checkout session and return the URL.
 
     `tier` is "pro" or "premium"; `billing_period` is "monthly" or "annual".
+    When `referral_credit_months > 0`, mint a one-shot 100%-off coupon for
+    that many months and attach it to the session. The credit is consumed
+    in the customer.subscription.created webhook so a cancelled checkout
+    doesn't burn the balance.
     """
     price_map = {
         ("pro", "monthly"):     settings.stripe_price_pro_monthly,
@@ -59,7 +64,10 @@ async def create_checkout_session(
         # checkout.stripe.com which Stripe pre-registers for Apple Pay, so no
         # extra domain verification step is needed. We list "link" explicitly
         # so Stripe Link's 1-click flow gets surfaced as its own option.
-        session = stripe.checkout.Session.create(
+        sub_metadata: dict[str, Any] = {
+            "user_id": user_id, "tier": tier, "billing_period": billing_period,
+        }
+        kwargs: dict[str, Any] = dict(
             mode="subscription",
             payment_method_types=["card", "link"],
             line_items=[{"price": price_id, "quantity": 1}],
@@ -67,9 +75,27 @@ async def create_checkout_session(
             client_reference_id=user_id,
             success_url=success_url,
             cancel_url=cancel_url,
-            subscription_data={"metadata": {"user_id": user_id, "tier": tier, "billing_period": billing_period}},
-            allow_promotion_codes=True,
         )
+
+        # Stripe rejects allow_promotion_codes + discounts in the same session.
+        # Referral credit takes precedence; manual promo codes are disabled for
+        # this one checkout. The customer can still apply a promo on a later
+        # checkout once the referral credit is spent.
+        if referral_credit_months > 0:
+            coupon = stripe.Coupon.create(
+                percent_off=100,
+                duration="repeating",
+                duration_in_months=referral_credit_months,
+                name=f"Tapeline referral credit ({referral_credit_months} mo)",
+                metadata={"user_id": user_id, "kind": "referral"},
+            )
+            kwargs["discounts"] = [{"coupon": coupon.id}]
+            sub_metadata["referral_credits_to_consume"] = str(referral_credit_months)
+        else:
+            kwargs["allow_promotion_codes"] = True
+
+        kwargs["subscription_data"] = {"metadata": sub_metadata}
+        session = stripe.checkout.Session.create(**kwargs)
         return session.url  # type: ignore[return-value]
     except stripe.error.StripeError as exc:
         logger.exception("stripe.checkout_create_failed")

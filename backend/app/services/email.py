@@ -577,6 +577,36 @@ def render_trial_ended_email(user_name: str) -> str:
     """)
 
 
+def render_referral_referee_email(user_name: str, referrer_name: str | None) -> str:
+    """Sent to a new user who signed up via a referral link."""
+    referrer_str = referrer_name or "your friend"
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;">Welcome, {user_name}.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;">You signed up via {referrer_str}'s referral link — that earned you <strong style="color:#10b981;">1 free month of Premium</strong> on top of your 14-day trial.</p>
+    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin:18px 0;">
+      <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Credit on your account</div>
+      <div style="font-size:24px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',ui-monospace,monospace;">1 month Premium</div>
+      <div style="color:#9ca3af;font-size:13px;margin-top:6px;">Applied automatically at your next checkout.</div>
+    </div>
+    <p style="color:#9ca3af;margin:0 0 20px;">Trial today, free month after — your first paid month is on us.</p>
+    <a href="https://tapeline.io/app/scanner" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
+    """)
+
+
+def render_referral_referrer_email(user_name: str, referee_email_masked: str) -> str:
+    """Sent to an existing user when someone joins via their referral link."""
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;">Nice, {user_name} — someone joined.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;"><code style="font-family:'JetBrains Mono',monospace;color:#f4f4f5;">{referee_email_masked}</code> just signed up with your referral link. That earned you <strong style="color:#10b981;">1 free month of Premium</strong>.</p>
+    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin:18px 0;">
+      <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Credit applied</div>
+      <div style="font-size:24px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',ui-monospace,monospace;">+1 month Premium</div>
+      <div style="color:#9ca3af;font-size:13px;margin-top:6px;">Auto-redeems at your next checkout. Stack credits — refer 12, get a free year.</div>
+    </div>
+    <a href="https://tapeline.io/app/referrals" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">See your referral page &rarr;</a>
+    """)
+
+
 # Drip orchestration — the worker hooks below. Wiring is intentionally minimal
 # until Resend is configured (no API key = send_email() returns {"skipped": True}).
 # When the key arrives, add this to signal_publisher.py tick():

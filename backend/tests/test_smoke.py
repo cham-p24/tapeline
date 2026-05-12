@@ -328,6 +328,108 @@ async def test_watchlist_crud_with_dev_bypass(client):
         assert "count" in r.json()
 
 
+def _patch_signup_gates(monkeypatch) -> None:
+    """Bypass the network-level signup defences inside the unit-test loopback.
+
+    Turnstile + IP cap + device fingerprint would otherwise block multi-signup
+    tests that legitimately drive several /api/auth/signup calls in a row
+    from 127.0.0.1.
+    """
+    from app.routers import auth as auth_module
+    from app.services import trial_abuse
+
+    async def _ok(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(auth_module, "verify_turnstile", _ok)
+    monkeypatch.setattr(trial_abuse, "signup_allowed", lambda *_a, **_k: True)
+    monkeypatch.setattr(trial_abuse, "fingerprint_allowed", lambda *_a, **_k: True)
+
+
+@pytest.mark.asyncio
+async def test_signup_with_referral_credits_both_parties(client, monkeypatch):
+    """The Channel 5 acceptance: when someone signs up via a referral link,
+    both the referrer and the referee get +1 referral_credit_months. The
+    credit is later consumed at first paid checkout via a Stripe coupon.
+
+    This test covers the in-DB credit grant. The coupon side is covered
+    separately by mocking stripe.Coupon.create — not in this smoke test
+    since live Stripe calls aren't available in CI.
+    """
+    _patch_signup_gates(monkeypatch)
+    password = "TestPassword!2026"
+
+    async with client:
+        # 1. Referrer signs up first (no ref code) — gets their own referral_code.
+        referrer_email = _random_email()
+        r_signup = await client.post(
+            "/api/auth/signup",
+            json={"email": referrer_email, "password": password, "name": "Referrer"},
+        )
+        assert r_signup.status_code == 200, r_signup.text
+        referrer = r_signup.json()["user"]
+        ref_code = referrer["referral_code"]
+        assert ref_code, "fresh signup must carry a referral_code"
+        referrer_cookies = r_signup.cookies
+
+        # Confirm referrer starts with 0 credits.
+        r_stats_before = await client.get("/api/referrals/me", cookies=referrer_cookies)
+        assert r_stats_before.status_code == 200
+        assert r_stats_before.json()["credit_months"] == 0
+
+        # 2. Referee signs up with ref=<referrer code>.
+        referee_email = _random_email()
+        r_signup2 = await client.post(
+            "/api/auth/signup",
+            json={
+                "email": referee_email, "password": password,
+                "name": "Referee", "ref": ref_code,
+            },
+        )
+        assert r_signup2.status_code == 200, r_signup2.text
+        referee_cookies = r_signup2.cookies
+
+        # 3. Both users now have credit_months == 1.
+        r_stats_referee = await client.get("/api/referrals/me", cookies=referee_cookies)
+        assert r_stats_referee.status_code == 200
+        assert r_stats_referee.json()["credit_months"] == 1, (
+            "referee must receive 1 free month for signing up via a referral link"
+        )
+
+        r_stats_referrer = await client.get("/api/referrals/me", cookies=referrer_cookies)
+        assert r_stats_referrer.status_code == 200
+        body = r_stats_referrer.json()
+        assert body["credit_months"] == 1, (
+            "referrer must receive 1 free month when someone uses their link"
+        )
+        assert body["signed_up"] == 1, "referrer's signed_up count must reflect the new referee"
+
+
+@pytest.mark.asyncio
+async def test_signup_with_unknown_ref_code_no_credit(client, monkeypatch):
+    """A bogus ref code (or one that doesn't match any user) must NOT grant
+    a free month — otherwise anyone could mint credits by typing random
+    strings into the ref query param."""
+    _patch_signup_gates(monkeypatch)
+
+    async with client:
+        r = await client.post(
+            "/api/auth/signup",
+            json={
+                "email": _random_email(), "password": "TestPassword!2026",
+                "name": "NoCredit", "ref": "BOGUSREF",
+            },
+        )
+        assert r.status_code == 200, r.text
+        cookies = r.cookies
+
+        r_stats = await client.get("/api/referrals/me", cookies=cookies)
+        assert r_stats.status_code == 200
+        assert r_stats.json()["credit_months"] == 0, (
+            "unknown referral code must not grant a credit"
+        )
+
+
 # NOTE: keep this test LAST. The rate-limiter is process-global and stays
 # triggered for ~60s after this test fires; subsequent tests would all 429.
 @pytest.mark.asyncio
