@@ -17,6 +17,170 @@ export type BlogPost = {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "what-smart-money-actually-means",
+    title: "What 'Smart Money' actually means in the Tapeline Score (and why it's not what you think).",
+    excerpt:
+      "'Smart money' is the most misused phrase in retail finance. It's not influencer alpha, not the latest hedge-fund headline, not yesterday's CNBC clip. Here's what Tapeline's Smart Money factor — 15% of the composite — actually measures, what the data sources are, and where the lags lie.",
+    publishedAt: "2026-05-13",
+    author: "Tapeline",
+    body: `
+      <p>"Smart money" is the most misused phrase in retail finance. Open
+      any trading subreddit, scroll any finance TikTok, look at any
+      newsletter sales page — somebody is selling you "what the smart
+      money is doing." Almost always, what they mean is "what one
+      famous person on CNBC said in a clip yesterday." That's not smart
+      money. That's TV.</p>
+
+      <p>Tapeline's Smart Money factor is 15% of the composite score
+      (<a href="/how-it-works">see the full formula</a>). It's a real
+      number, sourced from real filings, with real lags. This post is
+      the deep dive on what it actually measures and where the
+      limitations are — because a 15% weight in our scoring engine
+      deserves a paragraph more than "trust us, we're tracking the
+      smart money."</p>
+
+      <h2>The three data sources behind the factor</h2>
+      <p>Smart Money sums to a 0–100 sub-score from three independent
+      data streams, each with its own lag and signal-to-noise
+      characteristics:</p>
+      <ol>
+        <li><strong>Congressional disclosures</strong> — required by the
+        STOCK Act (Stop Trading on Congressional Knowledge Act, 2012).
+        US House and Senate members must disclose trades over $1,000
+        within 30–45 days. The signal: when multiple members on relevant
+        committees buy or sell the same name, that's information they
+        plausibly had access to that the market didn't.</li>
+        <li><strong>Elite 13F filings</strong> — quarterly position
+        disclosures by institutional managers with over $100M AUM,
+        required by the SEC. Tapeline tracks eight curated managers
+        whose long-horizon track records justify the lag:
+        Buffett (Berkshire), Burry (Scion), Tepper (Appaloosa),
+        Ackman (Pershing Square), Druckenmiller (Duquesne),
+        Laffont (Coatue), Coleman (Tiger Global), Singer (Elliott).
+        Lag: 45 days post quarter-end.</li>
+        <li><strong>Insider Form 4 filings</strong> — required by the
+        SEC within 2 business days of any insider transaction
+        (executives, directors, 10%+ owners). The signal: insiders are
+        the only buyers who know more about the company than the
+        market, by definition. Clusters of buying — multiple insiders
+        in the same window — are a stronger signal than single-buyer
+        events.</li>
+      </ol>
+
+      <h2>What "smart money buying" actually predicts</h2>
+      <p>Each data source has a different predictive horizon. Let me
+      walk through the cases that matter:</p>
+
+      <p><strong>Congressional buying</strong> works best on names
+      where committee members have informational access — defense
+      contractors near a relevant Armed Services committee member, healthcare names near
+      a Finance committee member, regulatory beneficiaries before a
+      relevant ruling. The base rate of edge is small but non-zero;
+      academic studies (Ziobrowski et al., Belmont & Sayers) have
+      shown weak positive alpha on a portfolio basis. The Tapeline
+      signal weights Congressional flow by relevance — committee
+      assignment + filing volume + recency — not raw transaction
+      count.</p>
+
+      <p><strong>Elite 13F changes</strong> are the strongest absolute
+      signal but the longest lag. When Buffett enters a new position,
+      the position was likely opened 30–90 days before the filing
+      becomes public. By the time you see it, the bigger move has
+      often happened. The Tapeline signal weights 13F deltas not by
+      the absolute position size but by <em>conviction</em> — new
+      positions vs adds-to-existing vs trims vs exits, scaled by
+      portfolio percentage. A new full position in Burry's Scion fund
+      is signal-rich; a 5% trim from a large Tiger Global position is
+      noise.</p>
+
+      <p><strong>Insider Form 4 filings</strong> have the shortest lag
+      (1–3 business days) and the highest signal-to-noise for cluster
+      events. Single-insider buys are weak — executives buy for
+      compensation reasons, exercising options is mechanical, charity
+      donations get filed too. Multi-insider buys in the same window
+      where the executives have no scheduled compensation event are
+      what the score weights. Selling clusters are downweighted (they
+      can mean tax planning, diversification, or genuine signal — hard
+      to disambiguate).</p>
+
+      <h2>Why Smart Money is 15% weight, not higher</h2>
+      <p>A natural retail-trader question: if Smart Money is so
+      signal-rich, why isn't it 30% of the composite or higher? Three
+      reasons:</p>
+
+      <p><strong>The lags compound.</strong> 13F is 45 days late. Insider
+      buys are sometimes timed to compensation cycles that look like
+      signal but aren't. Congressional filings can be 30–45 days late
+      and include trades that have already been unwound. By the time
+      the data is clean and public, much of the move has happened.</p>
+
+      <p><strong>It's a confirmation factor, not a leading one.</strong>
+      Smart money flow is most useful in confluence with the other
+      factors — when Trend, Relative Strength, and Smart Money all
+      agree, that's the highest-conviction setup. Smart Money alone is
+      late information; combined with leading factors it becomes
+      directional certainty.</p>
+
+      <p><strong>Survivorship in the source data.</strong> The 8 elite
+      13F filers we track were selected for long-term outperformance.
+      They're also the most-watched fund managers in the world — their
+      moves are crowded trades by the time the filing publishes.
+      Buffett buying Apple in 2016 was signal; Buffett buying Apple in
+      2024 was a market price-anchor, not new information.</p>
+
+      <h2>How the Tapeline score uses it differently from competitors</h2>
+      <p>Most "smart money" scoring in retail tools is broken in one of
+      two ways: either it's a single-source (just 13F, or just
+      Congressional) which misses the confluence signal, or it's
+      opaque (Tipranks' Hedge Fund Sentiment is a Smart Score input
+      but the weighting and the underlying fund list are not
+      published). Tapeline:</p>
+      <ul>
+        <li>Publishes the 8 elite-fund list on /app/holdings (Premium
+        feature).</li>
+        <li>Combines Congressional, 13F, and Form 4 into a single 0-100
+        sub-score with published methodology.</li>
+        <li>Weights the sub-score at 15% of the composite — high enough
+        to matter, low enough not to drown out the leading factors when
+        smart money is late or noisy.</li>
+        <li>Surfaces the actual data feeds: the Premium tier exposes
+        the underlying Congressional trades feed at /app/congress and
+        the elite 13F holdings at /app/holdings — not just the
+        aggregated score.</li>
+      </ul>
+
+      <h2>What to actually do with this</h2>
+      <p>Don't treat Smart Money as a trigger on its own. Treat it as
+      a confluence multiplier:</p>
+      <ul>
+        <li>A 90 Smart Money sub-score on a 40 composite is a value
+        signal — institutions are positioning before the market has
+        rerated it. Worth a watchlist add.</li>
+        <li>A 90 Smart Money sub-score on a 75 composite is confirmation
+        — the smart money is in a setup that's already showing up in
+        Trend, RS, and Momentum. Standard signal-of-signals.</li>
+        <li>A 30 Smart Money sub-score on a 75 composite is a yellow
+        flag — strong setup, but institutions and insiders aren't
+        confirming. Worth understanding why before sizing up.</li>
+        <li>A 90 Smart Money sub-score with no other factor confirming
+        is curious but not actionable. Maybe insiders are buying for a
+        reason the market hasn't seen yet; maybe they're wrong.</li>
+      </ul>
+
+      <p>The point of breaking out the sub-score is exactly this kind
+      of nuance. The composite gives you a summary; the breakdown lets
+      you read where the conviction actually lives, and where it's
+      conspicuously absent.</p>
+
+      <p>You can see live Smart Money sub-scores on any ticker page —
+      e.g. <a href="/t/NVDA">/t/NVDA</a>, <a href="/t/AAPL">/t/AAPL</a>
+      — or filter by it on the live scanner. The full Congressional
+      trades feed and elite 13F holdings are Premium features at
+      /app/congress and /app/holdings; the score weighting itself is
+      free for everyone, every row, every day.</p>
+    `,
+  },
+  {
     slug: "stock-screener-vs-stock-scanner",
     title: "Stock screener vs stock scanner: the difference matters in 2026.",
     excerpt:
