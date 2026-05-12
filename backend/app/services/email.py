@@ -332,6 +332,61 @@ def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str
     """)
 
 
+def render_trial_day11_email(user_name: str, summary: dict | None = None) -> str:
+    """T-3 — 3 days remaining on the 14-day trial.
+
+    Sits between day 7 (halfway) and day 13 (last day). Lead with specific
+    trial-period evidence from `summary` (when available), then a concrete
+    list of what stays vs what drops at expiry — same anchoring as day 13
+    but without the urgency colour.
+    """
+    summary_block = _render_trial_summary_block(summary)
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">3 days left on your trial.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;">{user_name}, you're 11 days into the 14-day Premium trial. Here's what you've actually been using:</p>
+    {summary_block}
+    <p style="color:#9ca3af;margin:0 0 20px;">If you decide to keep Premium, add a card before Friday — same price you signed up at ($39.99/mo or $39.99/mo billed annually saves $120/yr). If you don't, the account drops to Free at expiry (top 20 tickers, 24-hour delayed, no Telegram).</p>
+    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Keep Premium &rarr;</a>
+    <p style="color:#6b7280;margin-top:24px;font-size:13px;">7-day money back. One-click cancel. No phone calls.</p>
+    """)
+
+
+def render_trial_expired_email(user_name: str, summary: dict | None = None) -> str:
+    """T+0 — trial ended within the last 24 hours.
+
+    Honest framing: account is now on Free. Reactivation is one click, the
+    public scorecard stays open even at Free tier, and the trial benefits
+    never reset so this is the only "your previous setup is intact" moment.
+    """
+    summary_block = _render_trial_summary_block(summary)
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Your Tapeline trial ended.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;">{user_name}, your 14-day Premium trial ended overnight. Your account is now on the Free tier — top 20 tickers, 24-hour delayed, no Telegram or smart alerts.</p>
+    {summary_block}
+    <p style="color:#9ca3af;margin:0 0 20px;">A few things stay open regardless of tier: the <a href="https://tapeline.io/scorecard" style="color:#3b82f6;">public scorecard</a> (every top-10 call back-checked vs SPY), the <a href="https://tapeline.io/how-it-works" style="color:#3b82f6;">scoring formula</a>, and your watchlist (capped at 5 tickers on Free). If you want everything back, one click re-activates Premium at the same price — your watchlist + alerts come back intact.</p>
+    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Re-activate Premium &rarr;</a>
+    <p style="color:#6b7280;margin-top:24px;font-size:13px;">No more reminders unless you re-activate. One more note in 3 days then I'll stop emailing.</p>
+    """)
+
+
+def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None) -> str:
+    """T+3 — 3 days after trial expiry. Final touch.
+
+    No discount theatre, no fake urgency, no "wait we'll give you more time"
+    games. One direct question + the reactivation link + a polite goodbye.
+    The honesty is the differentiator here; most SaaS would offer 50% off
+    and a 6-month-extended trial, both of which read as desperate.
+    """
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Last note from Tapeline.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;">Hi {user_name} — it's been three days since your trial ended and you haven't reactivated. That's fine; not every tool fits every workflow.</p>
+    <p style="color:#d1d5db;margin:0 0 16px;">One ask, if you've got 30 seconds: <strong style="color:#f4f4f5;">what was missing?</strong> Reply to this email with whatever made you not keep it — a specific feature, the pricing, a bug, a confusing page. First-hand input from someone who actually tried Tapeline is more useful than any analytics dashboard. The address (chamara@tapeline.io) goes straight to me, not a support queue.</p>
+    <p style="color:#9ca3af;margin:0 0 20px;">If you change your mind, the trial benefits don't reset — re-activate any time and your watchlist + alerts come back. Otherwise, this is the last email; no more drip after this.</p>
+    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Re-activate Premium &rarr;</a>
+    <p style="color:#6b7280;margin-top:24px;font-size:13px;">— Chamara, founder. <a href="https://tapeline.io/scorecard" style="color:#6b7280;">Public scorecard stays free forever.</a></p>
+    """)
+
+
 async def trial_summary_for_user(session, user) -> dict | None:
     """Pull per-user trial-period highlights for the day-7/day-13 emails.
 
@@ -624,17 +679,24 @@ def render_referral_referrer_email(user_name: str, referee_email_masked: str) ->
 
 async def run_daily_drip(session) -> dict[str, int]:
     """
-    Send day-3 / day-7 / day-13 trial emails. Returns per-stage counts.
+    Send the full trial-drip series. Returns per-stage counts.
 
-    Dedup mechanism: each user has a `drip_state` string of comma-separated
-    day tokens already sent ("3,7,13"). We skip a user if their token is
-    already in their drip_state, and append it after a successful send.
-    Worker restarts within the same day no longer double-send.
+    Stages, all dedup'd via `User.drip_state` (comma-separated tokens):
 
-    Day calculation (14-day trial):
-      - Day 3 email:  trial_ends_at is between (now+10d, now+11d)
-      - Day 7 email:  trial_ends_at is between (now+6d,  now+7d)
-      - Day 13 email: trial_ends_at is between (now+0d,  now+1d)
+      Pre-expiry (trial_ends_at in the FUTURE — user is still on trial):
+        - "3"   day-3  email   — trial_ends_at in (now+10d, now+11d)
+        - "7"   day-7  email   — trial_ends_at in (now+6d,  now+7d )
+        - "11"  T-3    email   — trial_ends_at in (now+2d,  now+3d ) [NEW]
+        - "13"  T-1    email   — trial_ends_at in (now+0d,  now+1d )
+
+      Post-expiry (trial_ends_at in the PAST — user didn't convert):
+        - "expired" T+0  email — trial_ends_at in (now-1d, now)   [NEW]
+        - "post3"   T+3  email — trial_ends_at in (now-4d, now-3d) [NEW]
+
+    Tier filter: pre-expiry windows target users still on the trial
+    (tier in pro/premium, no Stripe customer). Post-expiry windows drop the
+    tier filter because auto-downgrade to Free may have already fired —
+    we just need "had a trial that ended recently and never added a card".
     """
     from datetime import UTC, datetime, timedelta
 
@@ -643,32 +705,53 @@ async def run_daily_drip(session) -> dict[str, int]:
     from app.models import User
 
     now = datetime.now(UTC)
-    counts = {"day3": 0, "day7": 0, "day13": 0}
+    counts = {"day3": 0, "day7": 0, "day11": 0, "day13": 0, "expired": 0, "post3": 0}
 
-    # `personalise=True` means the renderer accepts a `summary` dict. Day 3 is
-    # too early for meaningful trial data so it stays generic. Day 7 and 13
-    # lead with the user's actual watchlist + scorecard evidence — the article
-    # called this out as the single highest-leverage CRO move for trial drips.
+    # Each entry: (token, count_key, lower, upper, renderer, subject,
+    #              personalise, post_expiry_filter)
+    # `personalise=True`         → renderer takes a per-user summary dict
+    # `post_expiry_filter=True`  → drop the pro/premium tier filter
     windows = [
-        ("3",  "day3",  now + timedelta(days=10), now + timedelta(days=11),
-         render_trial_day3_email,  "Tapeline — three days in", False),
-        ("7",  "day7",  now + timedelta(days=6),  now + timedelta(days=7),
-         render_trial_day7_email,  "Tapeline — halfway through your trial", True),
-        ("13", "day13", now,                       now + timedelta(days=1),
-         render_trial_day13_email, "Tapeline — your trial ends tomorrow", True),
+        # Pre-expiry
+        ("3",   "day3",   now + timedelta(days=10), now + timedelta(days=11),
+         render_trial_day3_email,         "Tapeline — three days in",
+         False, False),
+        ("7",   "day7",   now + timedelta(days=6),  now + timedelta(days=7),
+         render_trial_day7_email,         "Tapeline — halfway through your trial",
+         True, False),
+        ("11",  "day11",  now + timedelta(days=2),  now + timedelta(days=3),
+         render_trial_day11_email,        "Tapeline — 3 days left on your trial",
+         True, False),
+        ("13",  "day13",  now,                      now + timedelta(days=1),
+         render_trial_day13_email,        "Tapeline — your trial ends tomorrow",
+         True, False),
+        # Post-expiry — trial_ends_at is in the past
+        ("expired", "expired", now - timedelta(days=1), now,
+         render_trial_expired_email,      "Your Tapeline trial ended",
+         True, True),
+        ("post3",   "post3",   now - timedelta(days=4), now - timedelta(days=3),
+         render_trial_post_expiry_email,  "Last note from Tapeline",
+         False, True),
     ]
+
     any_sent = False
-    for token, label, lower, upper, renderer, subject, personalise in windows:
-        result = await session.execute(
-            select(User).where(
-                User.trial_ends_at.isnot(None),
-                User.trial_ends_at >= lower,
-                User.trial_ends_at < upper,
-                User.tier.in_(["pro", "premium"]),
-                User.stripe_customer_id.is_(None),
-            )
-        )
+    for token, label, lower, upper, renderer, subject, personalise, post_expiry in windows:
+        filters = [
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at >= lower,
+            User.trial_ends_at < upper,
+            User.stripe_customer_id.is_(None),
+        ]
+        # Pre-expiry stages only target users still labelled as paid-tier
+        # (the no-card trial sets tier=premium until trial_ends_at fires).
+        # Post-expiry stages need to find users whose tier may have already
+        # auto-downgraded to free, so we skip that filter.
+        if not post_expiry:
+            filters.append(User.tier.in_(["pro", "premium"]))
+
+        result = await session.execute(select(User).where(*filters))
         users = result.scalars().all()
+
         for user in users:
             sent_tokens = set((user.drip_state or "").split(",")) - {""}
             if token in sent_tokens:
@@ -680,7 +763,6 @@ async def run_daily_drip(session) -> dict[str, int]:
                 else:
                     html = renderer(user.name or "trader")
                 res = await send_email(user.email, subject, html)
-                # Only mark as sent if Resend actually delivered (not skipped)
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
                     user.drip_state = ",".join(sorted(sent_tokens))
