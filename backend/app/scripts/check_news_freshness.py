@@ -3,9 +3,10 @@
 Hits https://api.tapeline.io/api/news?limit=1 and asserts the latest
 article is younger than a market-hours-aware threshold:
 
-    Market hours (NYSE 9:30 AM – 8:00 PM ET, Mon–Fri): < 30 min
-    Off-hours weekday:                                   < 4 h
-    Weekend:                                             < 16 h
+    Active session  (NYSE 9:30 AM – 4:00 PM ET, Mon–Fri):  < 30 min
+    Extended hours  (pre-market + after-hours):            < 90 min
+    Overnight       (8 PM – 4 AM ET, Mon–Fri):             < 4 h
+    Weekend:                                               < 16 h
 
 Designed to be run as a Fly cron (or GitHub Actions cron) every 15
 minutes. Exits 0 when fresh, 1 when stale. The 0 / 1 is the signal a
@@ -37,22 +38,46 @@ from datetime import UTC, datetime
 DEFAULT_BASE = "https://api.tapeline.io"
 
 
-def is_market_hours(now_utc: datetime) -> bool:
-    """NYSE-ish window in UTC. 9:30 AM ET = 13:30 UTC (winter) / 14:30 UTC
-    (summer DST). We're conservative — treat 13:00–24:00 UTC Mon–Fri as
-    "market or near-market hours". Weekend = always off-hours."""
+def session_phase(now_utc: datetime) -> str:
+    """Classify current time into NYSE session phase.
+
+    All times in UTC. NYSE DST shifts ET by 1 hour between summer/winter:
+        Summer (Mar–Nov, EDT, UTC−4): 9:30 AM ET = 13:30 UTC; 4 PM = 20:00; 8 PM = 24:00
+        Winter (Nov–Mar, EST, UTC−5): 9:30 AM ET = 14:30 UTC; 4 PM = 21:00; 8 PM = 25:00 (next-day 01:00)
+
+    To cover both without a tzdata lookup, we use a slightly wider envelope
+    that's still tight enough to flag real bugs:
+        active:    13 ≤ UTC < 21   (NYSE open + a 1h buffer for DST)
+        extended:  8  ≤ UTC < 13   (pre-market) OR 21 ≤ UTC < 25  (after-hours)
+        overnight: 1  ≤ UTC < 8    (late-night ET)
+        weekend:   Sat/Sun any time
+    """
     if now_utc.weekday() >= 5:  # Sat/Sun
-        return False
-    return 13 <= now_utc.hour < 24
+        return "weekend"
+    h = now_utc.hour
+    if 13 <= h < 21:
+        return "active"
+    if 8 <= h < 13 or 21 <= h < 24 or h == 0:
+        return "extended"
+    return "overnight"
 
 
 def threshold_seconds(now_utc: datetime) -> int:
-    """Pick the right freshness threshold based on when we're checking."""
-    if is_market_hours(now_utc):
-        return 30 * 60  # 30 min during market hours
-    if now_utc.weekday() < 5:
-        return 4 * 60 * 60  # 4 h off-hours weekday
-    return 16 * 60 * 60  # 16 h weekends — Benzinga goes very quiet
+    """Pick the right freshness threshold based on the current session phase."""
+    phase = session_phase(now_utc)
+    if phase == "active":
+        return 30 * 60        # 30 min during the regular NYSE session
+    if phase == "extended":
+        return 90 * 60        # 90 min during pre/post-market (sparser news)
+    if phase == "overnight":
+        return 4 * 60 * 60    # 4 h weekday overnight
+    return 16 * 60 * 60       # 16 h weekend — Benzinga goes very quiet
+
+
+# Backwards-compat alias used by some test/CLI code that imports it.
+def is_market_hours(now_utc: datetime) -> bool:
+    """True only during the active NYSE session (use session_phase for tiers)."""
+    return session_phase(now_utc) == "active"
 
 
 def main() -> int:
@@ -87,10 +112,10 @@ def main() -> int:
     fresh = age_sec < threshold
 
     label = "OK" if fresh else "FAIL"
-    market = "market-hrs" if is_market_hours(now) else "off-hrs"
+    phase = session_phase(now)
     print(
         f"{label} — latest article age {age_sec}s "
-        f"(threshold {threshold}s, {market}, "
+        f"(threshold {threshold}s, phase={phase}, "
         f"weekday={now.weekday()})"
     )
     if not fresh:
