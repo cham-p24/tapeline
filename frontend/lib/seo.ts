@@ -65,6 +65,11 @@ export function pageMeta(args: PageMetaArgs): Metadata {
     twitter: {
       card: "summary_large_image",
       site: TWITTER_HANDLE,
+      // creator = the X/Twitter account that authored this specific page's
+      // content. For Tapeline that's always @tapeline_io today (founder posts
+      // through the brand account, not a personal one). If we ever split into
+      // multi-author articles, override per-page from pageMeta args.
+      creator: TWITTER_HANDLE,
       title: args.title,
       description: args.description,
       ...(args.ogImage ? { images: [args.ogImage] } : {}),

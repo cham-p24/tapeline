@@ -103,6 +103,10 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
             href={`https://twitter.com/intent/tweet?${new URLSearchParams({
               text: `$${data.symbol} score: ${(data.score ?? 0).toFixed(0)}/100 (${data.signal ?? "—"})\n\nTransparent 6-factor formula, public scorecard.`,
               url: `https://tapeline.io/t/${data.symbol}`,
+              // `via=` adds "via @tapeline_io" to the tweet draft so every
+              // share attributes back to the brand account. Don't include the
+              // @ — X strips it. See https://x.com/tapeline_io
+              via: "tapeline_io",
             }).toString()}`}
             target="_blank"
             rel="noopener noreferrer"
