@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Tapeline edge middleware — three responsibilities:
+ * Tapeline edge middleware — two responsibilities:
  *
  * 1. Locale detection on every page request. Reads Vercel's edge geo
  *    data (request.geo.country — automatically populated, no API call)
@@ -16,10 +16,11 @@ import { NextResponse, type NextRequest } from "next/server";
  *    Cookie-level only (fast, no DB hit); backend enforces tier gates
  *    independently so this is defence-in-depth.
  *
- * 3. IndexNow key serving at /<INDEXNOW_KEY>.txt. The Bing/Yandex
- *    IndexNow protocol requires the key as plaintext at that exact
- *    URL. Serving it dynamically from env keeps the key out of git
- *    history.
+ * IndexNow key serving: the key file lives at
+ *   frontend/public/<KEY>.txt
+ * and Vercel's static-asset path serves it directly. The previous
+ * env-var-based dynamic handler was removed on 2026-05-12 because the
+ * matcher was swallowing the static file before it could serve.
  */
 
 // Country → BCP 47 locale. English-speaking countries get their own
@@ -79,28 +80,6 @@ export function middleware(request: NextRequest) {
 function handleAuth(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // IndexNow key verification. Spec requires the file at
-  //   https://<host>/<KEY>.txt
-  // with the key as plaintext content. The regex narrows to hex
-  // strings 8-128 chars long so legitimate .txt files (robots.txt,
-  // ads.txt, etc.) never collide here.
-  const indexnowMatch = pathname.match(/^\/([a-f0-9]{8,128})\.txt$/i);
-  if (indexnowMatch) {
-    const key = process.env.INDEXNOW_KEY;
-    if (key && indexnowMatch[1] === key) {
-      return new NextResponse(key, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Cache-Control": "public, max-age=3600",
-        },
-      });
-    }
-    // Anything matching the .txt key shape but NOT our key gets a
-    // clean 404 rather than a generic Next.js page.
-    return new NextResponse("Not Found", { status: 404 });
-  }
-
   // Auth redirect for /app/*.
   const isAppRoute = pathname.startsWith("/app");
   if (!isAppRoute) return NextResponse.next();
@@ -115,13 +94,8 @@ function handleAuth(request: NextRequest) {
 }
 
 export const config = {
-  // Run on every non-static page (locale needs to refresh anywhere)
-  // PLUS any single-segment hex .txt path (IndexNow). The first
-  // matcher excludes _next assets + favicon; the second matcher is
-  // more specific and overlaps cleanly because middleware is
-  // de-duplicated per-request.
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)",
-    "/:key([a-fA-F0-9]{8,128}).txt",
-  ],
+  // Run on every non-static page (locale + auth need to apply to all
+  // page requests). The exclusion list keeps Vercel's static-asset
+  // path uninterrupted — including the IndexNow key file in /public.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };
