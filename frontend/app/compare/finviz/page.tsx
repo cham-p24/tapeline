@@ -63,12 +63,12 @@ const WINS = [
   {
     label: "Congressional trades feed",
     tapeline: "✓ House + Senate disclosed trades, daily",
-    competitor: "—",
+    competitor: "Not available — Finviz Elite doesn't track Congressional disclosures",
   },
   {
     label: "Recent insider buys (SEC Form 4)",
     tapeline: "✓ Live SEC Form 4 insider activity across ~2,500 tickers",
-    competitor: "—",
+    competitor: "Insider screener present, but no curated activity feed",
   },
   {
     label: "Smart watchlist alerts",
@@ -148,10 +148,9 @@ export default function VsFinvizPage() {
           the second one if you want a tool that does the synthesis for you — and shows
           its work.
         </p>
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-up/30 bg-up/5 px-4 py-2 text-sm text-up">
-          <span className="text-base">✓</span>
-          <span><strong>9 categories</strong> Tapeline wins outright. <strong>3</strong> honest tradeoffs.</span>
-        </div>
+        {/* Hype pill removed 2026-05 — counting categories Tapeline "wins
+            outright" reads as marketing not honesty. The table below speaks
+            for itself; the tradeoffs section names the places Finviz wins. */}
       </section>
 
       {/* Where Tapeline wins */}
@@ -163,20 +162,36 @@ export default function VsFinvizPage() {
           <span className="text-[10px] uppercase tracking-wider text-subtle">All prices in USD</span>
         </div>
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+            {/* Explicit column widths so neither side hogs space on wide
+                screens. Feature column 32%, Tapeline 36%, Finviz 32%. */}
+            <colgroup>
+              <col style={{ width: "32%" }} />
+              <col style={{ width: "36%" }} />
+              <col style={{ width: "32%" }} />
+            </colgroup>
             <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">Feature</th>
-                <th className="px-4 py-3 text-left text-accent">Tapeline</th>
-                <th className="px-4 py-3 text-left">Finviz Elite</th>
+                <th className="px-4 py-3 text-left text-accent border-l border-border/40">Tapeline</th>
+                <th className="px-4 py-3 text-left border-l border-border/40">Finviz Elite</th>
               </tr>
             </thead>
             <tbody>
-              {WINS.map((r) => (
-                <tr key={r.label} className="border-b border-border/30">
-                  <td className="px-4 py-3 font-medium">{r.label}</td>
-                  <td className="px-4 py-3 font-medium text-accent">{r.tapeline}</td>
-                  <td className="px-4 py-3 text-subtle">{r.competitor}</td>
+              {WINS.map((r, i) => (
+                <tr
+                  key={r.label}
+                  // Alternating row tint for visual rhythm; subtle vertical
+                  // column dividers so the eye doesn't lose the column on
+                  // multi-line wraps.
+                  className={
+                    "border-b border-border/30 " +
+                    (i % 2 === 1 ? "bg-black/15" : "")
+                  }
+                >
+                  <td className="px-4 py-3 font-medium align-top">{r.label}</td>
+                  <td className="px-4 py-3 font-medium text-accent align-top border-l border-border/30">{r.tapeline}</td>
+                  <td className="px-4 py-3 text-muted align-top border-l border-border/30">{r.competitor}</td>
                 </tr>
               ))}
             </tbody>
