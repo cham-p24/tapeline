@@ -33,7 +33,7 @@ const TOOLS: Tool[] = [
       "Public 6-factor formula with exact weights",
       "Public scorecard back-checking every top-10 pick vs SPY",
       "Plain-English Why on every row",
-      "Congressional trades + elite 13F holdings on Premium",
+      "Congressional trades + recent insider buys on Premium",
       "14-day Premium trial, no credit card",
     ],
     cons: [
@@ -237,7 +237,7 @@ export default function BestFinvizAlternativesPage() {
         <p className="mt-4 text-lg text-muted">
           Finviz Elite is excellent if you want raw filter fields and you build your own thesis
           from the data. It's less useful if you want a synthesised composite score, an audit-able
-          public scorecard, or specialised feeds like Congressional trades and 13F holdings. Here
+          public scorecard, or specialised feeds like Congressional trades and recent insider buys. Here
           are the 8 alternatives we've actually used, ranked by what each does best.
         </p>
         <p className="mt-3 text-xs text-subtle">

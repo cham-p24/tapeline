@@ -35,8 +35,8 @@ const WINS: CompareRow[] = [
     competitor: "—",
   },
   {
-    label: "Elite 13F holdings",
-    tapeline: "✓ Buffett, Burry, Tepper, Ackman + 4 more",
+    label: "Recent insider buys (SEC Form 4)",
+    tapeline: "✓ Live SEC Form 4 insider activity across ~2,500 tickers",
     competitor: "—",
   },
   {

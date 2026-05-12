@@ -22,7 +22,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How does Tapeline pricing compare to Zacks Premium?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr); Premium is $39.99/mo billed annually ($479/yr). Zacks Premium is approximately $21/mo (annual-only, $249/yr). Tapeline offers month-to-month pricing as well; Zacks Premium is annual-only. Tapeline Premium adds Congressional trades and elite 13F holdings that Zacks does not include.",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr); Premium is $39.99/mo billed annually ($479/yr). Zacks Premium is approximately $21/mo (annual-only, $249/yr). Tapeline offers month-to-month pricing as well; Zacks Premium is annual-only. Tapeline Premium adds Congressional trades and a live insider activity feed (SEC Form 4) that Zacks does not include.",
   },
   {
     q: "Does Zacks publish a track record?",
@@ -68,8 +68,8 @@ const WINS = [
     competitor: "—",
   },
   {
-    label: "Elite 13F holdings",
-    tapeline: "✓ Buffett, Burry, Tepper, Ackman + 4 more",
+    label: "Recent insider buys (SEC Form 4)",
+    tapeline: "✓ Live SEC Form 4 insider activity across ~2,500 tickers",
     competitor: "—",
   },
   {

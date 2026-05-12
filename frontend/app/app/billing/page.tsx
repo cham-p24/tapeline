@@ -258,7 +258,7 @@ export default function BillingPage() {
               <ul className="mt-3 space-y-1 text-xs text-muted">
                 <li>· Full 2,500-ticker live universe</li>
                 <li>· Watchlist of 200 with smart alerts</li>
-                <li>· Congressional trades + 13F holdings</li>
+                <li>· Congressional trades + insider buys (SEC Form 4)</li>
                 <li>· Telegram alerts unlimited</li>
               </ul>
             </>
@@ -372,7 +372,7 @@ export default function BillingPage() {
               proPlus
               items={[
                 "Congressional trades feed (House + Senate)",
-                "Elite 13F — Buffett, Burry, Tepper, Ackman + 4 more",
+                "Recent insider buys — live SEC Form 4 across ~2,500 tickers",
                 "Telegram alerts · unlimited (Pro: none)",
                 "Email alerts · unlimited (Pro: 10/day)",
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",

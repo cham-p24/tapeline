@@ -122,6 +122,74 @@ def smart_money_cache_size() -> int:
     return len(_SMART_MONEY_SCORE_CACHE)
 
 
+# ---- Recent insider transactions feed cache ----------------------------------
+# Powers the /app/holdings page (rebranded from "Elite 13F holdings" to
+# "Recent Insider Buys") and the /api/insider-buys endpoint. Populated by the
+# same daily worker that builds the smart-money score cache — so we don't
+# double-hit Finnhub. Replaces the old Quiver 13F path entirely.
+_INSIDER_FEED: list[dict[str, Any]] = []
+_INSIDER_FEED_MAX = 5000  # cap memory; sorted by transaction_date desc
+
+
+def set_recent_insider_transactions(symbol: str, txns: list[dict[str, Any]]) -> None:
+    """Replace this symbol's slice of the feed with the latest pull.
+
+    Called from the daily insider-refresh worker. Keeps the feed bounded by
+    `_INSIDER_FEED_MAX` (newest entries win when over capacity).
+    """
+    sym = symbol.upper()
+    global _INSIDER_FEED
+    _INSIDER_FEED = [t for t in _INSIDER_FEED if t.get("symbol") != sym]
+    for t in txns or []:
+        share_change = int(t.get("share_change") or 0)
+        price = float(t.get("transaction_price") or 0)
+        _INSIDER_FEED.append({
+            "symbol": sym,
+            "insider_name": t.get("filer_name") or "",
+            "transaction_date": t.get("transaction_date") or "",
+            "share_change": share_change,
+            "transaction_price": round(price, 4),
+            "transaction_value": round(abs(share_change * price), 2),
+            "code": t.get("code") or "",
+        })
+    _INSIDER_FEED.sort(key=lambda r: r.get("transaction_date") or "", reverse=True)
+    if len(_INSIDER_FEED) > _INSIDER_FEED_MAX:
+        del _INSIDER_FEED[_INSIDER_FEED_MAX:]
+
+
+def get_recent_insider_transactions(
+    days: int = 30,
+    limit: int = 100,
+    symbol: str | None = None,
+    buys_only: bool = False,
+) -> list[dict[str, Any]]:
+    """Return recent insider transactions from the cached feed.
+
+    days        — only entries whose transaction_date is within this many days
+    limit       — max rows to return (post-filter, post-sort)
+    symbol      — optional ticker filter (case-insensitive)
+    buys_only   — if True, return only net positive share_change rows
+    """
+    cutoff = (date.today() - timedelta(days=max(1, days))).isoformat()
+    sym = symbol.upper() if symbol else None
+    rows: list[dict[str, Any]] = []
+    for t in _INSIDER_FEED:
+        if t.get("transaction_date", "") < cutoff:
+            continue
+        if sym and t.get("symbol") != sym:
+            continue
+        if buys_only and (t.get("share_change") or 0) <= 0:
+            continue
+        rows.append(t)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def insider_feed_size() -> int:
+    return len(_INSIDER_FEED)
+
+
 def compute_smart_money_score(transactions: list[dict[str, Any]] | None) -> float | None:
     """
     0-100 score from insider Form 4 transactions.
@@ -511,6 +579,9 @@ async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[d
             "transaction_date": it.get("transactionDate", ""),
             "share_change": int(it.get("change") or 0),
             "transaction_price": float(it.get("transactionPrice") or 0),
+            # SEC Form 4 transaction code (P/S/A/M/G/F/etc) — exposed so the
+            # /app/holdings UI can filter open-market buys ("P") from grants ("A").
+            "code": it.get("transactionCode", "") or "",
         })
     _save_cache(cache_key, rows)
     return rows

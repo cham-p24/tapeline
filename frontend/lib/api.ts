@@ -168,17 +168,24 @@ export type CongressTrade = {
   disclosed_at: string;
 };
 
-export type HoldingItem = {
-  id: number;
-  fund_name: string;
-  manager: string;
-  cik: string;
+/**
+ * One row of the Recent Insider Buys feed (SEC Form 4 via Finnhub).
+ * Replaces the legacy 13F HoldingItem shape — see /api/holdings router
+ * for the schema change rationale.
+ */
+export type InsiderTxn = {
   symbol: string;
-  value_usd: number;
-  shares: number;
-  percent_portfolio: number;
-  fetched_at: string;
+  insider_name: string;
+  transaction_date: string; // YYYY-MM-DD
+  share_change: number;     // negative = sale, positive = buy
+  transaction_price: number;
+  transaction_value: number; // abs(shares * price), pre-computed
+  code: string;              // SEC Form 4 code: P=open-market buy, S=sale, A=grant, M=option exercise, G=gift
 };
+
+// Re-exported for backwards-compat with components that imported the old name.
+// New code should import `InsiderTxn` directly.
+export type HoldingItem = InsiderTxn;
 
 export type TrackedFund = {
   name: string;
@@ -272,13 +279,20 @@ export const api = {
   watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
     post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),
   watchlistRemove: (id: number) => del<{ ok: boolean }>(`/api/watchlist/${id}`, DEV_TOKEN),
-  holdings: (params: { symbol?: string; fund?: string; limit?: number } = {}) => {
+  /**
+   * Recent Insider Buys feed. Backed by SEC Form 4 filings via Finnhub.
+   * Replaces the legacy 13F holdings call; URL `/api/holdings` is unchanged
+   * for backwards-compat but the response schema is now InsiderTxn[].
+   */
+  holdings: (params: { symbol?: string; days?: number; buys_only?: boolean; limit?: number } = {}) => {
     const qs = new URLSearchParams();
     if (params.symbol) qs.set("symbol", params.symbol);
-    if (params.fund) qs.set("fund", params.fund);
+    if (params.days) qs.set("days", String(params.days));
+    if (params.buys_only) qs.set("buys_only", "true");
     if (params.limit) qs.set("limit", String(params.limit));
-    return getAuth<{ count: number; items: HoldingItem[] }>(`/api/holdings?${qs}`, DEV_TOKEN);
+    return getAuth<{ count: number; items: InsiderTxn[]; feed_size: number }>(`/api/holdings?${qs}`, DEV_TOKEN);
   },
+  // Legacy endpoint kept for compatibility; returns empty list now.
   holdingsFunds: () => getAuth<{ items: TrackedFund[] }>("/api/holdings/funds", DEV_TOKEN),
   roadmap: {
     votes: () => get<{ counts: Record<string, number>; my_votes: string[] }>("/api/roadmap/votes"),
