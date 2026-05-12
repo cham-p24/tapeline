@@ -28,6 +28,9 @@ function SignUpForm() {
   const router = useRouter();
   const qp = useSearchParams();
   const next = qp.get("next") || "/app/scanner";
+  // Referral code from /signup?ref=ABCDEFGH. Backend grants both parties
+  // 1 free month of Premium when this resolves to a valid existing user.
+  const refCode = (qp.get("ref") || "").trim().toUpperCase();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -70,6 +73,7 @@ function SignUpForm() {
         company: honeypot,
         turnstile_token: turnstileToken || undefined,
         device_fingerprint: device_fp || undefined,
+        ref: refCode || undefined,
       });
       // Funnel events: signup landed cleanly. Trial auto-starts on signup
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
@@ -99,6 +103,12 @@ function SignUpForm() {
 
           <h1 className="mt-10 text-3xl font-bold tracking-tight">Start 14-day Pro trial</h1>
           <p className="mt-2 text-sm text-muted">No credit card. Cancel anytime.</p>
+
+          {refCode && (
+            <div className="mt-6 rounded-md border border-up/30 bg-up/5 p-3 text-sm text-up">
+              You&apos;re signing up with a referral code — you&apos;ll get <strong>1 free month of Premium</strong> credited at your next checkout.
+            </div>
+          )}
 
           <form onSubmit={submit} className="mt-8 space-y-4">
             {/* Honeypot field — offscreen, hidden from real users (and screen readers).

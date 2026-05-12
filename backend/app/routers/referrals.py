@@ -1,4 +1,4 @@
-"""Referral tracking — "Give a month, get a month" growth engine."""
+"""Referral tracking — "Refer a friend, both get a free month" growth engine."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -36,7 +36,11 @@ async def my_referral_stats(
         "share_url": share_url,
         "signed_up": signed_up,
         "converted": converted,
-        "months_earned": converted,  # 1 free month per paid conversion
+        # Credits still unused — both parties earn 1 month on signup; the
+        # credit is consumed at next paid checkout via a one-shot Stripe
+        # coupon (see services/billing.create_checkout_session).
+        "credit_months": user.referral_credit_months or 0,
+        "months_earned": signed_up,  # one earned per friend who signed up
         "referred_users": [
             {
                 "email": u.email[:3] + "***" + u.email[u.email.index("@"):],  # privacy-preserving

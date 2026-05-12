@@ -28,9 +28,15 @@ class User(Base):
     # Trial state — auto-started on signup, downgrades to free at end if no card
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Referral program — a user's own sharable code + who referred them
+    # Referral program — a user's own sharable code + who referred them.
+    # `referral_credit_months` accumulates 1-month-free credits earned via
+    # signup referrals; consumed at next Stripe checkout via a one-shot
+    # 100%-off coupon with duration_in_months=N. Zeroed in the
+    # customer.subscription.created webhook so partial-checkout failures
+    # don't burn the credit.
     referral_code: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True)
     referred_by: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    referral_credit_months: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Lifetime deal marker — never expires, never billed after purchase
     is_lifetime: Mapped[bool] = mapped_column(default=False, nullable=False)

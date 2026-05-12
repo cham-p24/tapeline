@@ -134,6 +134,25 @@ async def stripe_webhook(
             user.tier = p["tier"]
         else:
             user.tier = "free"
+
+        # Consume referral credits ONLY on the initial .created event —
+        # .updated also lands here and would otherwise double-consume from
+        # the same subscription. Replay protection at the top of this
+        # handler guards against duplicate deliveries of the same event_id.
+        if evt_type == "customer.subscription.created":
+            sub_metadata = obj.get("metadata") or {}
+            try:
+                to_consume = int(sub_metadata.get("referral_credits_to_consume") or 0)
+            except (TypeError, ValueError):
+                to_consume = 0
+            if to_consume > 0 and (user.referral_credit_months or 0) > 0:
+                consumed = min(to_consume, user.referral_credit_months)
+                user.referral_credit_months -= consumed
+                logger.info(
+                    "stripe.referral_credits_consumed user=%s consumed=%d remaining=%d",
+                    user.id, consumed, user.referral_credit_months,
+                )
+
         await session.commit()
         logger.info("stripe.subscription_synced user=%s tier=%s status=%s", user.id, p["tier"], p["status"])
 
