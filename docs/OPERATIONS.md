@@ -61,26 +61,60 @@ of Turnstile. Turnstile adds the third layer.
 
 ### Step 3 — Stripe ($0 to set up, ~30 minutes)
 
-1. Create a Stripe account (https://stripe.com)
-2. Create **four Price IDs** under Products → Pricing:
-   - `Pro Monthly` — $29 USD recurring monthly
-   - `Pro Annual` — $299 USD recurring yearly (charm price; displays as $24.99/mo)
-   - `Premium Monthly` — $49 USD recurring monthly
-   - `Premium Annual` — $479 USD recurring yearly (charm price; displays as $39.99/mo)
-3. Paste into `.env`:
-   ```
-   STRIPE_SECRET_KEY=sk_live_...
-   STRIPE_PUBLISHABLE_KEY=pk_live_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-   STRIPE_PRICE_PRO_MONTHLY=price_...
-   STRIPE_PRICE_PRO_ANNUAL=price_...
-   STRIPE_PRICE_PREMIUM_MONTHLY=price_...
-   STRIPE_PRICE_PREMIUM_ANNUAL=price_...
-   ```
-4. Add a webhook endpoint pointing at `https://tapeline.io/api/webhooks/stripe`. Subscribe to:
-   `customer.subscription.created`, `customer.subscription.updated`,
-   `customer.subscription.deleted`, `invoice.payment_succeeded`
-5. Test with the Stripe CLI: `stripe listen --forward-to localhost:8000/api/webhooks/stripe`
+Direct dashboard URLs, in the order you'll need them:
+
+| Step | URL | What to grab |
+|---|---|---|
+| 1. Confirm you're in **Live** mode (not Test) | https://dashboard.stripe.com/dashboard | toggle top-right |
+| 2. Create the four prices below | https://dashboard.stripe.com/products?create=product | 4 × `price_...` IDs |
+| 3. Copy the secret key | https://dashboard.stripe.com/apikeys | `sk_live_...` |
+| 4. Add the webhook + grab signing secret | https://dashboard.stripe.com/webhooks | `whsec_...` |
+
+**The four prices to create** (matches canonical pricing in `CLAUDE.md` — the `Pro/Premium $29/$49` numbers that appeared in earlier docs are stale, do NOT use them):
+
+| Product | Recurring | Amount | Lookup key (optional but handy) |
+|---|---|---|---|
+| Tapeline Pro | Monthly | $29.99 USD | `pro_monthly` |
+| Tapeline Pro | Yearly | $299.99 USD | `pro_annual` |
+| Tapeline Premium | Monthly | $49.99 USD | `premium_monthly` |
+| Tapeline Premium | Yearly | $479.99 USD | `premium_annual` |
+
+Annual rows are intentional "charm" prices — `$299.99/yr` displays in-app as `$24.99/mo billed annually` (saves $60 vs monthly), `$479.99/yr` displays as `$39.99/mo billed annually` (saves $120). The frontend pricing UI in `frontend/components/PricingTable.tsx` does that math; the Stripe-side amount stays the annual total.
+
+**Webhook endpoint**: `https://api.tapeline.io/api/webhooks/stripe` — subscribe to:
+- `checkout.session.completed` — links the Stripe customer_id back to the Tapeline user
+- `customer.subscription.created` — initial paid subscription; also where the referral-credit consumer fires (see `backend/app/routers/webhooks.py:111`)
+- `customer.subscription.updated` — tier changes, cancellation flags
+- `customer.subscription.deleted` — drops the user back to Free
+- `invoice.payment_succeeded` — optional, useful for renewal alerts later
+
+The webhook handler is idempotent (logs every processed event_id in `stripe_webhook_events`), so Stripe's automatic redeliveries are safe.
+
+**Set on Fly** (one command, triggers an automatic redeploy of api + worker):
+```powershell
+fly secrets set `
+  STRIPE_SECRET_KEY="sk_live_..." `
+  STRIPE_PUBLISHABLE_KEY="pk_live_..." `
+  STRIPE_WEBHOOK_SECRET="whsec_..." `
+  STRIPE_PRICE_PRO_MONTHLY="price_..." `
+  STRIPE_PRICE_PRO_ANNUAL="price_..." `
+  STRIPE_PRICE_PREMIUM_MONTHLY="price_..." `
+  STRIPE_PRICE_PREMIUM_ANNUAL="price_..." `
+  -a tapeline-backend
+```
+(Bash equivalent: replace each `` ` `` line-continuation with `\`.)
+
+**Local dev**: paste the same values into `.env` instead.
+
+**Local webhook testing**: `stripe listen --forward-to localhost:8000/api/webhooks/stripe` prints a temporary `whsec_...` you can use in `.env` for the duration of the CLI session.
+
+**Smoke test the referral coupon path** (post-wire):
+1. Sign up two users; the second uses `https://tapeline.io/signup?ref=<code-from-first>`.
+2. Confirm both `/app/referrals` pages show `Unused credit (months): 1`.
+3. As either user, click **Upgrade** in `/app/billing`. The Stripe Checkout page should show a `100% off for 1 month` line item (the coupon `create_checkout_session` minted).
+4. Complete the purchase with a real card. After `customer.subscription.created` fires, that user's credit drops to 0 and Stripe records the discount on the subscription.
+
+Without all six secrets above, `POST /api/billing/checkout` returns `400 No Stripe Price ID configured for ...` — that's the canary that something is missing.
 
 ### Step 4 — Resend (Free tier OK, 5 minutes)
 
