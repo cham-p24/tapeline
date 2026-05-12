@@ -17,6 +17,151 @@ export type BlogPost = {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "stock-screener-vs-stock-scanner",
+    title: "Stock screener vs stock scanner: the difference matters in 2026.",
+    excerpt:
+      "Everyone uses 'screener' and 'scanner' interchangeably. They're not the same thing — and the difference predicts whether your tool will earn its slot in your daily workflow or get cancelled in three months.",
+    publishedAt: "2026-05-13",
+    author: "Tapeline",
+    body: `
+      <p>Two of the most common Google queries in active retail trading
+      are "stock screener" and "stock scanner". Most people treat them as
+      synonyms. Most tools position themselves as both. They are not the
+      same thing, and conflating them is how traders end up with $30/mo
+      subscriptions they never open.</p>
+
+      <p>The difference, in one sentence: <strong>a screener gives you
+      filters; a scanner gives you a verdict.</strong> Both can be useful.
+      Only one of them earns daily reuse.</p>
+
+      <h2>What a screener actually does</h2>
+      <p>A screener is a multi-field filter. You pick fields (price, P/E,
+      RSI, market cap, sector, 20DMA distance, IV rank, insider ownership
+      …) and set thresholds. The screener returns the rows that match.
+      That's it. The output is a list of tickers; the synthesis — what
+      each row actually means — is on you.</p>
+
+      <p>Canonical example: Finviz. You can build a screen for "small-cap
+      tech, P/E under 15, RSI below 30, above the 200DMA, insider buying
+      last 6 months" and get a list back. The tool has done a database
+      query for you. It hasn't formed an opinion.</p>
+
+      <p>This is genuinely useful for a particular workflow: when you
+      already know what you're looking for and you need a fast database
+      query against the whole market. Anyone who's run a value-investing
+      checklist or scanned for option-IV outliers has used screeners well.</p>
+
+      <p>It is <em>not</em> what most retail traders actually need most
+      mornings. Most mornings, what a retail trader wants is "what
+      changed overnight that I should care about." Screening doesn't
+      answer that — you have to know in advance what filter to set.</p>
+
+      <h2>What a scanner actually does</h2>
+      <p>A scanner is opinionated. It runs a model — anything from a
+      simple weighted score to a deep-learning ensemble — and produces a
+      ranked list with a verdict per row. The output is a recommendation
+      shape: <em>this</em> is the top of the distribution today,
+      <em>here's</em> why, <em>here's</em> how the signal label maps to
+      the underlying score.</p>
+
+      <p>The point of a scanner isn't the filters. It's the synthesis.
+      The tool has decided what matters, weighted it, and surfaced the
+      conclusion. You can disagree with the weighting — but you can't
+      avoid <em>seeing</em> the conclusion.</p>
+
+      <p>This matters because the binding constraint on most retail
+      traders isn't data access. It's attention. The market has 2,500
+      liquid US tickers; nobody reads all of them. A screener helps you
+      find what you're looking for. A scanner helps you find what you
+      didn't know to look for.</p>
+
+      <h2>Why the distinction predicts six-month retention</h2>
+      <p>If you've subscribed to multiple finance tools, you've seen this
+      pattern: a screener gets daily use for the first week, then weekly
+      use, then monthly, then never. A good scanner gets daily use
+      indefinitely. The difference isn't the data behind them — most
+      tools use overlapping data feeds. The difference is the cognitive
+      load per session.</p>
+
+      <p>Screeners require you to bring the question. Scanners hand you
+      the question already formed. When you have 10 minutes before
+      market open and three personal-life things on your mind, the
+      cognitive cost of "construct a useful screen this morning"
+      outweighs the cost of opening the app at all. So you don't open it.</p>
+
+      <p>This isn't a problem with the user. It's a structural property
+      of the tool category. The scanner format has lower activation
+      energy and therefore higher retention.</p>
+
+      <h2>The "scanner that gives you a screener" trap</h2>
+      <p>Many tools position as both. TradingView calls itself a scanner;
+      the actual product is a charting platform with filter overlays.
+      Trade Ideas has Holly AI (scanner-shaped) AND a flexible filter
+      builder (screener-shaped). The marketing fudges the line.</p>
+
+      <p>That's fine as positioning. It does mean you need to look at
+      what the tool actually defaults to when you open it. If the
+      default view is a blank filter panel waiting for you to build
+      something, you have a screener. If the default view is a ranked
+      list with a verdict per row, you have a scanner.</p>
+
+      <p>By that test, Tipranks, Zacks, and WallStreetZen are scanners
+      (they default to a ranking with a per-row verdict — a Smart Score,
+      a Zacks Rank, a Zen Rating). Finviz, in spite of its premium tier,
+      is a screener (the default is a filterable table where you bring
+      the criteria). Most "AI stock scanners" in 2025/26 are also
+      scanners by this test — though many hide the formula behind that
+      verdict, which is its own problem
+      (<a href="/blog/the-formula-is-public">the formula is public</a>
+      goes deep on that).</p>
+
+      <h2>Which one Tapeline is</h2>
+      <p>Tapeline is a scanner. The default view at
+      <a href="/app/scanner">/app/scanner</a> is a ranked list of every
+      liquid US ticker with a 0–100 composite score and a plain-English
+      sentence per row. The
+      <a href="/how-it-works">six-factor formula</a> is public; the
+      <a href="/scorecard">scorecard</a> back-checks every top-10 daily
+      pick against the next session vs SPY.</p>
+
+      <p>You can also filter — by sector, by signal label, by minimum
+      score, etc. — and the score breakdown lets you reproduce screener-
+      shaped queries when you want to. But the default is the verdict.
+      That's the design choice, and it's deliberate. Five minutes a
+      morning, ranked list, one sentence per row. Click the names you
+      care about; ignore the rest.</p>
+
+      <h2>How to decide which you need</h2>
+      <p>Pick the screener if:</p>
+      <ul>
+        <li>You already have a defined strategy (value, momentum,
+        options-IV outliers, post-earnings drift) and you need to surface
+        candidates that fit it.</li>
+        <li>You enjoy designing filters and tuning them over time.</li>
+        <li>You're willing to do the synthesis work yourself.</li>
+      </ul>
+      <p>Pick the scanner if:</p>
+      <ul>
+        <li>You want a daily ranked starting point you didn't have to
+        build.</li>
+        <li>You want the tool to do the synthesis work and you'll bring
+        the discretion.</li>
+        <li>You want accountability — a scanner with a public scorecard
+        is the only way to tell whether the model is actually working
+        over time.</li>
+      </ul>
+
+      <p>Both can be useful. Don't pay for two if you only use one.
+      Don't subscribe to either if you can't tell which kind you have.</p>
+
+      <p>If you're not sure where to start, the
+      <a href="/compare/finviz">Tapeline vs Finviz comparison</a> goes
+      into the screener-vs-scanner question head-to-head with a real
+      $24.99/mo entry tier. Both products do useful work; they don't do
+      the same work.</p>
+    `,
+  },
+  {
     slug: "reading-a-tapeline-score",
     title: "Reading a Tapeline Score: a 10-minute walkthrough on $NVDA.",
     excerpt:
