@@ -67,15 +67,15 @@ async def create_checkout_session(
         sub_metadata: dict[str, Any] = {
             "user_id": user_id, "tier": tier, "billing_period": billing_period,
         }
-        kwargs: dict[str, Any] = dict(
-            mode="subscription",
-            payment_method_types=["card", "link"],
-            line_items=[{"price": price_id, "quantity": 1}],
-            customer_email=user_email,
-            client_reference_id=user_id,
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
+        kwargs: dict[str, Any] = {
+            "mode": "subscription",
+            "payment_method_types": ["card", "link"],
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "customer_email": user_email,
+            "client_reference_id": user_id,
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+        }
 
         # Stripe rejects allow_promotion_codes + discounts in the same session.
         # Referral credit takes precedence; manual promo codes are disabled for
