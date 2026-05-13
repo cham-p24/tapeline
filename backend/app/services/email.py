@@ -662,6 +662,47 @@ def render_referral_referrer_email(user_name: str, referee_email_masked: str) ->
     """)
 
 
+def render_payment_failed_email(user_name: str, tier: str, attempt_count: int = 1) -> str:
+    """Sent when Stripe reports invoice.payment_failed for a user's subscription.
+
+    The tone is calm + practical, not alarmist. Stripe retries automatically a
+    handful of times before giving up, so first-attempt failures are often
+    transient (bank fraud system declined the renewal, expired card, etc.).
+    We tell the user what happened, what we're doing about it, and how to fix
+    it in two clicks — that's better than scolding.
+
+    Idempotency is enforced upstream by the StripeWebhookEvent table — every
+    event_id is recorded so Stripe's auto-retries don't trigger duplicate
+    emails for the same failure.
+    """
+    tier_label = tier.capitalize()
+    urgency_line = (
+        "Stripe will retry automatically over the next few days."
+        if attempt_count == 1
+        else f"This is the {_ordinal(attempt_count)} attempt — if it fails again, your account drops to Free."
+    )
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;">{user_name}, your last payment didn't go through.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;">The renewal charge for your Tapeline {tier_label} subscription was declined. Usually it's a card on file that expired, or a bank fraud-system flag — not an actual problem with your account.</p>
+    <p style="color:#9ca3af;margin:0 0 20px;">{urgency_line} Nothing is paused on your end yet — you still have full {tier_label} access.</p>
+    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin:18px 0;">
+      <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Fix it in two clicks</div>
+      <p style="color:#d1d5db;margin:6px 0 12px;font-size:13px;line-height:1.5;">Open your billing page, click "Update payment method", paste a new card. Stripe will run the failed charge again immediately.</p>
+      <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">Open billing &rarr;</a>
+    </div>
+    <p style="color:#9ca3af;margin:18px 0 0;font-size:13px;">Anything weird? Reply to this email — chamara@tapeline.io reads every reply.</p>
+    """)
+
+
+def _ordinal(n: int) -> str:
+    """1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc."""
+    if 10 <= (n % 100) <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
 # Drip orchestration — the worker hooks below. Wiring is intentionally minimal
 # until Resend is configured (no API key = send_email() returns {"skipped": True}).
 # When the key arrives, add this to signal_publisher.py tick():
