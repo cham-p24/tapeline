@@ -264,24 +264,41 @@ These are all small CSS changes. Can ship as one PR (~1 hour) when you say go.
 
 ---
 
-## 6. Microsoft OAuth — needs your action first
+## 6. Microsoft OAuth — DEFERRED post-launch (2026-05-14)
 
-I can wire the Tapeline side (env vars on Fly, deploy) in 2 minutes once you have:
-- `OAUTH_MICROSOFT_CLIENT_ID`
-- `OAUTH_MICROSOFT_CLIENT_SECRET`
+**STATUS: Intentionally deferred. Not blocking launch.**
 
-To get those, **you** need to:
-1. Go to https://entra.microsoft.com — sign in with any Microsoft account (or create one free)
-2. Microsoft Entra ID → App registrations → New registration
-3. Name: `Tapeline`
-4. Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"
-5. Redirect URI: `Web` → `https://api.tapeline.io/api/auth/oauth/microsoft/callback`
-6. Click Register
-7. On the app overview page, copy the **Application (client) ID** — that's `OAUTH_MICROSOFT_CLIENT_ID`
-8. Left nav → Certificates & secrets → New client secret → 24-month expiry → copy the **Value** (not Secret ID) — that's `OAUTH_MICROSOFT_CLIENT_SECRET`
-9. Send me both. I set them on Fly and Microsoft sign-in starts working.
+The "Continue with Microsoft" button is **already hidden in production** — `OAuthButtons.tsx` only renders the button when the backend `/api/auth/oauth/providers` endpoint returns `microsoft: true`, and that endpoint only returns true when both `OAUTH_MICROSOFT_CLIENT_ID` and `OAUTH_MICROSOFT_CLIENT_SECRET` are set in Fly secrets. They aren't. So zero broken-UI risk.
 
-~10 min total on your side. Free, no card.
+### Why we hit a wall on 2026-05-14
+
+Tried two account paths, both blocked:
+
+1. **`tapeline.inbox@gmail.com`** (brand inbox, newly created as a personal Microsoft account): no Azure AD tenant attached → `login.microsoftonline.com/organizations/` endpoint that Entra admin center uses rejects it. To proceed, you'd need to provision a free Microsoft 365 Developer tenant first (~15-30 min signup at `developer.microsoft.com/microsoft-365/dev-program`).
+2. **`chamara.piyatilaka@hotmail.com`** (personal account, has prior tenant): Microsoft flagged it for "unusual activity" mid-session (because bot-driven), forcing a password-reset detour. And the sign-in requires passkey/biometric — device-bound, can't be MCP-driven.
+
+### When to revisit
+
+Recommended **after launch traction is real** — Microsoft OAuth is checkbox-feature territory for a fintech-prosumer audience (your HN/Reddit/X traffic is overwhelmingly Google/GitHub identity). Pick this up as a focused 30-min session when:
+- You have 50+ paying users and one of them specifically asks for Microsoft sign-in, OR
+- You're going B2B/enterprise and need it for procurement
+
+### When you DO pick it back up
+
+Path of least resistance:
+1. Provision a free Microsoft 365 Developer tenant under `tapeline.inbox@gmail.com` at `developer.microsoft.com/microsoft-365/dev-program` (free, renewable, brand-owned)
+2. Wait for tenant provisioning (~5 min)
+3. Sign into `entra.microsoft.com` with the new tenant credentials
+4. Entra → App registrations → New registration:
+   - Name: `Tapeline`
+   - Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**
+   - Redirect URI: `Web` → `https://api.tapeline.io/api/auth/oauth/microsoft/callback`
+5. After Register: copy **Application (client) ID** from overview page → that's `OAUTH_MICROSOFT_CLIENT_ID`
+6. Left nav → Certificates & secrets → New client secret → 24-month expiry → copy the **Value** column (not Secret ID) → that's `OAUTH_MICROSOFT_CLIENT_SECRET`
+7. `fly secrets set OAUTH_MICROSOFT_CLIENT_ID=... OAUTH_MICROSOFT_CLIENT_SECRET=... -a tapeline-api`
+8. Fly auto-restarts the API container, the `/oauth/providers` endpoint flips to `microsoft: true`, the button renders, done.
+
+~10 min after the tenant exists.
 
 ---
 
