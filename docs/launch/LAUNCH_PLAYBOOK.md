@@ -156,6 +156,25 @@ Happy to take fundamentals-specific critique. The Piotroski F-score implementati
 
 ## 3. X / Twitter pinned thread
 
+**STATUS — POSTED + PINNED 2026-05-13** ✅
+
+Live on [@tapeline_io](https://x.com/tapeline_io). Pinned tweet (1/6) is the first one below; tweets 2–6 are self-replies forming a thread chain.
+
+| # | URL |
+|---|---|
+| 1 (📌 pinned) | https://x.com/tapeline_io/status/2054350238891295068 |
+| 2 | https://x.com/tapeline_io/status/2054350575094120801 |
+| 3 | https://x.com/tapeline_io/status/2054350954573754577 |
+| 4 | https://x.com/tapeline_io/status/2054351264830697890 |
+| 5 | https://x.com/tapeline_io/status/2054351516954513647 |
+| 6 | https://x.com/tapeline_io/status/2054351713709310077 |
+
+Tweet 4 published with `+ Congress + insider Form 4 activity + unlimited Telegram alerts` (the playbook draft below still has the stale `13F` wording — left as-is for posterity; the *published* tweet matches the current product).
+
+The thread was published as **5 self-replies** (each reply chains the previous tweet), not via the multi-post composer — the composer dropped focus on long types and triggered X keyboard shortcuts mid-stream. Reply-chain works around that cleanly and renders identically as a thread on profile.
+
+---
+
 **Length**: 6 tweets max. People stop reading after 4.
 
 ```
