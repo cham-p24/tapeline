@@ -124,6 +124,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
+  // Per-ticker SEO landing pages at /blog/ticker/{symbol} — long-tail
+  // commercial-investigation traffic ("is AAPL a buy", "NVDA stock score 2026").
+  // 50 hand-picked tickers from scripts/generate-ticker-posts.mjs. The page
+  // template fetches live data per request with revalidate caching, so a
+  // changeFrequency of "daily" matches the underlying signal cadence.
+  const { TICKERS } = await import("./blog/ticker/tickers");
+  const tickerPostEntries: MetadataRoute.Sitemap = TICKERS.map((t) => ({
+    url: `${base}/blog/ticker/${t.symbol}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.7,
+  }));
+
   return [
     ...staticEntries,
     ...sectorEntries,
@@ -131,5 +144,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...strategyEntries,
     ...tickerEntries,
     ...postEntries,
+    ...tickerPostEntries,
   ];
 }
