@@ -5,7 +5,7 @@ article is younger than a market-hours-aware threshold:
 
     Active session  (NYSE 9:30 AM – 4:00 PM ET, Mon–Fri):  < 30 min
     Extended hours  (pre-market + after-hours):            < 90 min
-    Overnight       (8 PM – 4 AM ET, Mon–Fri):             < 4 h
+    Overnight       (1 AM – 4 AM ET, Mon–Fri):             < 5 h
     Weekend:                                               < 16 h
 
 Designed to be run as a Fly cron (or GitHub Actions cron) every 15
@@ -70,7 +70,13 @@ def threshold_seconds(now_utc: datetime) -> int:
     if phase == "extended":
         return 90 * 60        # 90 min during pre/post-market (sparser news)
     if phase == "overnight":
-        return 4 * 60 * 60    # 4 h weekday overnight
+        # 5 h weekday overnight. 1–4 AM ET is the deepest US news quiet window:
+        # Benzinga has zero output for hours on a normal weekday morning and a
+        # tighter 4h threshold ended up firing a borderline alert on 2026-05-14
+        # at 1:03 AM ET (article was 4h 28min old — 28 min past the threshold).
+        # 5h absorbs that without making the check toothless — if news genuinely
+        # breaks during this window we'll still catch it within ~75 min.
+        return 5 * 60 * 60
     return 16 * 60 * 60       # 16 h weekend — Benzinga goes very quiet
 
 
