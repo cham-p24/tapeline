@@ -165,6 +165,37 @@ async def stripe_webhook(
             await session.commit()
             logger.info("stripe.subscription_cancelled user=%s", user.id)
 
+    elif evt_type == "invoice.payment_failed":
+        # Card declined on a renewal charge. Email the user with a fix-it link.
+        # Idempotency is already enforced by the StripeWebhookEvent dedup at
+        # the top of this handler — Stripe's auto-retries for the same event_id
+        # will short-circuit before reaching this branch.
+        customer_id = obj.get("customer")
+        attempt_count = int(obj.get("attempt_count") or 1)
+        result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
+        user = result.scalar_one_or_none()
+        if user and user.email:
+            try:
+                from app.services.email import render_payment_failed_email, send_email
+                html = render_payment_failed_email(
+                    user.name or "trader",
+                    tier=user.tier or "Pro",
+                    attempt_count=attempt_count,
+                )
+                await send_email(
+                    user.email,
+                    "Your Tapeline payment didn't go through",
+                    html,
+                )
+                logger.info(
+                    "stripe.payment_failed_email_sent user=%s attempt=%d",
+                    user.id, attempt_count,
+                )
+            except Exception:
+                logger.exception("stripe.payment_failed_email_error user=%s", user.id)
+        else:
+            logger.warning("stripe.payment_failed_without_user customer=%s", customer_id)
+
     # Mark event as processed so the next delivery is treated as a replay
     if event_id:
         try:
