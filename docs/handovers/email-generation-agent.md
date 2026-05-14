@@ -93,7 +93,7 @@ Reminder: 4 days left in your trial. If the scanner has earned its
 keep, the Pro plan is $29/mo and Premium is $49/mo. Cancel in one
 click any time.
 
-— Chamara, Tapeline founder
+— Christian, Tapeline founder
 {watchlist_link}
 ```
 
@@ -172,7 +172,7 @@ interesting.
 Free to play with at /t/AAPL or /scorecard — no signup needed for
 either. Worth a 60-second look?
 
-— Chamara
+— Christian
 ```
 
 - [ ] Use case: warm intros, journalist pitches, podcast hosts,

@@ -380,10 +380,10 @@ def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None)
     return _shell(f"""
     <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Last note from Tapeline.</h1>
     <p style="color:#d1d5db;margin:0 0 16px;">Hi {user_name} — it's been three days since your trial ended and you haven't reactivated. That's fine; not every tool fits every workflow.</p>
-    <p style="color:#d1d5db;margin:0 0 16px;">One ask, if you've got 30 seconds: <strong style="color:#f4f4f5;">what was missing?</strong> Reply to this email with whatever made you not keep it — a specific feature, the pricing, a bug, a confusing page. First-hand input from someone who actually tried Tapeline is more useful than any analytics dashboard. The address (chamara@tapeline.io) goes straight to me, not a support queue.</p>
+    <p style="color:#d1d5db;margin:0 0 16px;">One ask, if you've got 30 seconds: <strong style="color:#f4f4f5;">what was missing?</strong> Reply to this email with whatever made you not keep it — a specific feature, the pricing, a bug, a confusing page. First-hand input from someone who actually tried Tapeline is more useful than any analytics dashboard. The address (christian@tapeline.io) goes straight to me, not a support queue.</p>
     <p style="color:#9ca3af;margin:0 0 20px;">If you change your mind, the trial benefits don't reset — re-activate any time and your watchlist + alerts come back. Otherwise, this is the last email; no more drip after this.</p>
     <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Re-activate Premium &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">— Chamara, founder. <a href="https://tapeline.io/scorecard" style="color:#6b7280;">Public scorecard stays free forever.</a></p>
+    <p style="color:#6b7280;margin-top:24px;font-size:13px;">— Christian, founder. <a href="https://tapeline.io/scorecard" style="color:#6b7280;">Public scorecard stays free forever.</a></p>
     """)
 
 
@@ -690,7 +690,7 @@ def render_payment_failed_email(user_name: str, tier: str, attempt_count: int = 
       <p style="color:#d1d5db;margin:6px 0 12px;font-size:13px;line-height:1.5;">Open your billing page, click "Update payment method", paste a new card. Stripe will run the failed charge again immediately.</p>
       <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">Open billing &rarr;</a>
     </div>
-    <p style="color:#9ca3af;margin:18px 0 0;font-size:13px;">Anything weird? Reply to this email — chamara@tapeline.io reads every reply.</p>
+    <p style="color:#9ca3af;margin:18px 0 0;font-size:13px;">Anything weird? Reply to this email — billing@tapeline.io reads every reply.</p>
     """)
 
 
