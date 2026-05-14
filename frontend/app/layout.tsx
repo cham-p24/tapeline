@@ -19,7 +19,7 @@ const PLAUSIBLE_SCRIPT =
 // Default title is used only when a page omits its own.
 export const metadata: Metadata = {
   title: {
-    default: "Tapeline — One score per stock · Live transparent stock scanner",
+    default: "Tapeline — Read the tape · Live quantitative stock scanner",
     template: "%s",
   },
   description:
@@ -41,9 +41,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "Tapeline — A scanner that shows its work",
+    title: "Tapeline — Read the tape",
     description:
-      "One score and one sentence per US ticker. Six-factor formula public. Track record back-checked vs SPY, daily. Pro from $24.99/mo, Premium from $39.99/mo.",
+      "Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro $24.99/mo, Premium $39.99/mo. 14-day Premium trial, no card.",
     url: "/",
     siteName: "Tapeline",
     type: "website",
@@ -52,9 +52,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: "@tapeline_io",
-    title: "Tapeline — A scanner that shows its work",
+    title: "Tapeline — Read the tape",
     description:
-      "Live quantitative scanner. One score per US ticker. Public formula. Public scorecard.",
+      "Read the tape. Public formula, public scorecard. → tapeline.io/scorecard",
   },
   robots: {
     index: true,
