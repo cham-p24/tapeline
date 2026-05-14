@@ -30,35 +30,25 @@ Every line below is verified live on `https://tapeline.io` / `https://api.tapeli
 
 ## Five things only you can do — priority order
 
-These are the launch blockers I cannot ship for you. Listed in the order to do them.
+These are the launch items only you can complete. Listed in the order to do them. **Several previously-listed items here were resolved in the 2026-05-13/14 session — see the updated status below.**
 
-### 1. Stripe activation (revenue path) — TODAY
+### 1. Stripe — technical integration ✅ DONE; account-side identity verification still pending
 
-Without this, paying customers can't actually pay.
+The technical wiring is **already deployed and green**:
+- All 6 Stripe env vars set in Fly (`STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, 4× `STRIPE_PRICE_*`)
+- Webhook endpoint live at `https://api.tapeline.io/api/webhooks/stripe` and **subscribed to all 6 relevant events** including `invoice.payment_failed` (added 2026-05-14 during secret rotation)
+- Idempotency table `stripe_webhook_events` deduplicating Stripe's automatic retries
+- `/api/status` shows `"stripe": true`
 
-1. Stripe dashboard → Settings → Account details
-2. **Pick "Sole Trader"** (not Company — you'll get stuck on the ACN field for hours otherwise)
-3. Complete onboarding — bank account + ID verification
-4. Products → Pricing → create **four prices** at the exact amounts:
-   - Pro Monthly: **$29.00 USD**, recurring monthly
-   - Pro Annual: **$299.00 USD**, recurring yearly (displays as $24.99/mo)
-   - Premium Monthly: **$49.00 USD**, recurring monthly
-   - Premium Annual: **$479.00 USD**, recurring yearly (displays as $39.99/mo)
-5. Webhook → endpoint `https://api.tapeline.io/api/webhooks/stripe`, subscribe to `customer.subscription.{created,updated,deleted}` + `invoice.payment_succeeded`
-6. Copy the four price IDs + secret key + publishable key + webhook secret
-7. `fly secrets set STRIPE_SECRET_KEY=sk_live_... STRIPE_PUBLISHABLE_KEY=pk_live_... STRIPE_WEBHOOK_SECRET=whsec_... STRIPE_PRICE_PRO_MONTHLY=price_... STRIPE_PRICE_PRO_ANNUAL=price_... STRIPE_PRICE_PREMIUM_MONTHLY=price_... STRIPE_PRICE_PREMIUM_ANNUAL=price_...`
-8. Verify: `curl -s https://api.tapeline.io/api/status | grep stripe` should show `"stripe": true`
+**What's still on you**: Stripe-side identity verification — bank account, ID upload, tax setup. Sign in to https://dashboard.stripe.com → Settings → Account details → finish the Sole Trader onboarding so payouts can leave Stripe and arrive in your account. **Once verified, your existing technical setup will let payments flow immediately — no code changes needed.**
 
-### 2. Plausible analytics — TODAY (5 min, $9/mo)
+If you ever need to rotate the webhook secret without dashboard access, see `OPERATIONS.md` "Rotating the webhook secret without the Stripe dashboard" — uses the Stripe REST API end-to-end. Last done 2026-05-14.
 
-Without this, you don't know which marketing post sent which signups.
+### 2. Analytics ✅ DONE (Vercel Web Analytics + Speed Insights, not Plausible)
 
-1. Sign up at `https://plausible.io` ($9/mo for one site, no card needed for trial)
-2. Add `tapeline.io` as a site
-3. Skip the script-tag step (already wired into `app/layout.tsx`, env-gated)
-4. Vercel → Project Settings → Environment Variables → add `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=tapeline.io` (Production)
-5. Redeploy: `vercel --prod` (or push any commit)
-6. Verify: open the Plausible dashboard, refresh tapeline.io in another tab, you should see one visitor
+**You do NOT need Plausible.** Tapeline already runs **Vercel Web Analytics + Speed Insights**, free on Vercel's Hobby tier, wired into `frontend/app/layout.tsx` at lines 266-267. No env var, no script tag, no $9/mo. Cookieless, IP-anonymised, GDPR-compliant by default.
+
+Open the Vercel project → Analytics tab to see traffic. If you ever outgrow it (Vercel's free tier caps at 100k events/month), then consider Plausible or self-hosted Umami — but you won't hit that ceiling for a long time.
 
 ### 3. Lawyer consult — THIS WEEK
 
@@ -80,14 +70,17 @@ To enable per-share `creator` / `site` meta tags.
 2. Same on LinkedIn
 3. DM me the handles and I'll wire them into `app/layout.tsx` `metadata.twitter.creator` + `site`
 
-### 5. First marketing post — WHENEVER YOU'RE READY
+### 5. First marketing post
 
-Your share previews look professional now. Go.
+**Launch thread is LIVE + PINNED** on https://x.com/tapeline_io as of 2026-05-13. See `LAUNCH_PLAYBOOK.md` section 3 for the full tweet-by-tweet URL list.
 
-- **X (best signal:noise)**: a screenshot of `/t/NVDA` + a tweet like "I built this because every other scanner gives you 500 filters and a blank stare. tapeline.io"
-- **IndieHackers** (`/launches/new`): the full origin story + screenshots + `tapeline.io`
-- **r/SecurityAnalysis** (Reddit): genuine value-add post like "I built a public scorecard for my stock scanner. 30 days of receipts so far. [link]"
-- **ProductHunt**: schedule for a Tuesday, 12:01 AM PT. Ask 5-10 friends to upvote in the first hour.
+Still to do (priority order):
+
+- **Show HN post** — copy is ready in `LAUNCH_PLAYBOOK.md` section 1. Submit Tue 19 May / Wed 20 May at **10 PM AEST = 8 AM ET** to land in the optimal HN traffic window. You must be online for the first 90 min of comments.
+- **Reddit** — three subs, three different post bodies (see `LAUNCH_PLAYBOOK.md` section 2). r/stocks first (Tue 9 AM ET), r/algotrading second (Thu 10 AM ET), r/SecurityAnalysis third (next Tue).
+- **Crunchbase profile** — SUBMITTED to moderation queue 2026-05-14. Goes live in 24-72h. You can add logo + founder Person profile via Edit once it's live.
+- **ProductHunt** — schedule for a Tuesday at 12:01 AM PT. Ask 5-10 friends to upvote in the first hour.
+- **IndieHackers** — `/launches/new` with the full origin story.
 
 ---
 

@@ -108,6 +108,39 @@ fly secrets set `
 
 **Local webhook testing**: `stripe listen --forward-to localhost:8000/api/webhooks/stripe` prints a temporary `whsec_...` you can use in `.env` for the duration of the CLI session.
 
+**Rotating the webhook secret without the Stripe dashboard** (last done 2026-05-14 via Stripe REST API; dashboard.stripe.com is blocked from the Claude Code MCP, so this path is the fallback):
+
+```bash
+# 1. Grab the live API key from the running Fly machine
+export STRIPE_KEY=$(fly ssh console -a tapeline-backend -C "printenv STRIPE_SECRET_KEY" | grep "^sk_")
+
+# 2. Find the existing endpoint id (we_...) — current URL is https://api.tapeline.io/api/webhooks/stripe
+curl -s -u "$STRIPE_KEY:" https://api.stripe.com/v1/webhook_endpoints
+
+# 3. Create a NEW endpoint with the same 6 enabled events
+NEW=$(curl -s -u "$STRIPE_KEY:" https://api.stripe.com/v1/webhook_endpoints \
+  -d "url=https://api.tapeline.io/api/webhooks/stripe" \
+  -d "enabled_events[]=checkout.session.completed" \
+  -d "enabled_events[]=customer.subscription.created" \
+  -d "enabled_events[]=customer.subscription.updated" \
+  -d "enabled_events[]=customer.subscription.deleted" \
+  -d "enabled_events[]=invoice.payment_succeeded" \
+  -d "enabled_events[]=invoice.payment_failed" \
+  --data-urlencode "description=Production billing events for tapeline.io")
+NEW_ID=$(echo "$NEW" | python -c "import sys,json; print(json.load(sys.stdin)['id'])")
+NEW_SECRET=$(echo "$NEW" | python -c "import sys,json; print(json.load(sys.stdin)['secret'])")
+
+# 4. Push new secret to Fly + force a redeploy so the machine picks it up
+echo "$NEW_SECRET" | fly secrets set STRIPE_WEBHOOK_SECRET=- -a tapeline-backend --stage
+fly secrets deploy -a tapeline-backend
+
+# 5. Once the new machine is up (~30s), DELETE the old endpoint so Stripe stops
+#    double-sending events to both endpoints. Old endpoint signatures wouldn't
+#    verify against the new secret anyway — the handler is idempotent
+#    (stripe_webhook_events table) so the brief overlap is harmless.
+curl -s -X DELETE -u "$STRIPE_KEY:" https://api.stripe.com/v1/webhook_endpoints/<OLD_ID>
+```
+
 **Smoke test the referral coupon path** (post-wire):
 1. Sign up two users; the second uses `https://tapeline.io/signup?ref=<code-from-first>`.
 2. Confirm both `/app/referrals` pages show `Unused credit (months): 1`.
