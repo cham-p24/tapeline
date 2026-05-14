@@ -24,6 +24,17 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-15",
+    version: "0.1.10",
+    tag: "improvement",
+    title: "New tagline, clearer privacy policy, payment-failed email",
+    body: [
+      "New product tagline across the site: Read the tape.",
+      "Privacy policy rewritten to match what Tapeline actually does today — no stale references to tools or sub-processors no longer in use, and a clear note that request IP addresses live in memory only, not in any persistent log.",
+      "New email when a renewal charge fails — a calm note with a one-click link to update your card, the moment the failure happens. Stripe's automatic retry behaviour is unchanged; the difference is you find out immediately rather than when access drops.",
+    ],
+  },
+  {
     date: "2026-05-14",
     version: "0.1.9",
     tag: "shipped",
