@@ -15,6 +15,7 @@ from app.db import get_session
 from app.models import NewsItem, SqueezeSetup, Ticker, User
 from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
+from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.tier import Tier, has_feature
 
@@ -149,6 +150,61 @@ async def ticker_ratings(
     if not has_feature(Tier(user.tier), "ratings.analyst"):
         raise HTTPException(403, "Analyst consensus requires Premium tier")
     return await fetch_analyst_ratings(symbol.upper())
+
+
+@router.get("/{symbol}/financials")
+async def ticker_financials(symbol: str) -> dict:
+    """Per-ticker financial metrics from Finnhub.
+
+    Returns P/E, net margin, ROE, EPS growth, revenue growth, debt-to-equity.
+    Public — same access surface as /{symbol} and /{symbol}/history. Cached
+    7 days at the adapter layer; fundamentals don't change tick-to-tick.
+
+    Most ETFs and funds have no Finnhub fundamentals coverage. The response
+    keeps a stable shape (`available: false`, empty `metrics`) so the
+    frontend can render a clean empty state instead of broken null fields.
+    """
+    sym = symbol.upper()
+    metrics = await fetch_basic_financials(sym)
+    return {
+        "symbol": sym,
+        "available": metrics is not None,
+        "metrics": metrics or {},
+    }
+
+
+@router.get("/{symbol}/insider")
+async def ticker_insider(
+    symbol: str,
+    days_back: int = 90,
+    user: User = Depends(current_user_required),
+) -> dict:
+    """Recent Form 4 insider transactions for a ticker — Premium only.
+
+    Returns insider buys/sells from Finnhub for the last `days_back` days
+    (default 90, clamped to [1, 365] to bound upstream cost). Each row
+    carries filer name, transaction date, share change, transaction price,
+    and the SEC transaction code (P=purchase, S=sale, A=award, M=option
+    exercise, G=gift, F=tax withholding).
+
+    Mirrors the Premium gating on /api/holdings — Form 4 is explicit
+    Premium territory per the tier model. The frontend Paywall handles the
+    upsell card; this endpoint also enforces the gate so the data can't be
+    sniffed via direct API call from a Free or Pro session.
+
+    Cached 24h at the adapter layer (per-symbol).
+    """
+    if not has_feature(Tier(user.tier), "insider.form4"):
+        raise HTTPException(403, "Insider transactions require Premium tier")
+
+    sym = symbol.upper()
+    days = max(1, min(days_back, 365))
+    rows = await fetch_insider_transactions(sym, days_back=days)
+    return {
+        "symbol": sym,
+        "days_back": days,
+        "transactions": rows or [],
+    }
 
 
 @router.get("/{symbol}/history")
