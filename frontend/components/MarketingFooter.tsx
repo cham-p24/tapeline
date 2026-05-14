@@ -22,7 +22,7 @@ export function MarketingFooter() {
               <span className="font-semibold">Tapeline</span>
             </Link>
             <p className="mt-3 text-xs text-muted leading-relaxed">
-              Live quantitative market scanner. One score, one sentence, public scorecard.
+              Read the tape — every US ticker scored on six public-weight factors, every call back-checked the next day.
             </p>
           </div>
 

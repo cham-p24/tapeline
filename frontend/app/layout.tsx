@@ -19,7 +19,7 @@ const PLAUSIBLE_SCRIPT =
 // Default title is used only when a page omits its own.
 export const metadata: Metadata = {
   title: {
-    default: "Tapeline — One score per stock · Live transparent stock scanner",
+    default: "Tapeline — Read the tape · Live quantitative stock scanner",
     template: "%s",
   },
   description:
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     site: "@tapeline_io",
     title: "Tapeline — A scanner that shows its work",
     description:
-      "Live quantitative scanner. One score per US ticker. Public formula. Public scorecard.",
+      "Read the tape. Every US ticker scored on six public-weight factors with a daily back-checked scorecard.",
   },
   robots: {
     index: true,
