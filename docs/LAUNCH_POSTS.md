@@ -165,7 +165,7 @@ first hour (the algorithm strongly favors early velocity).
 
 ### First comment (founder reply, post immediately after launch)
 ```
-Hey everyone — Chamara here, founder.
+Hey everyone — Christian here, founder.
 
 The short version: I've been building a personal stock scanner for years
 and got fed up watching every commercial scanner hide their formula and
@@ -278,7 +278,7 @@ Two specific things I'd love feedback on:
 
 Reply to this email with anything broken. I read every one.
 
-— Chamara
+— Christian
 ```
 
 ---
