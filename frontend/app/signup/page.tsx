@@ -15,6 +15,26 @@ declare global {
   }
 }
 
+// Module-scope Turnstile callback wiring. Registering at module scope (instead
+// of inside the component's useEffect) means the callback exists as soon as
+// the JS bundle parses — BEFORE React mounts. Cloudflare's widget script can
+// auto-solve and invoke the callback before useEffect runs; with the previous
+// effect-scoped registration, that auto-solved token was silently dropped on
+// the React-state side. The queue + live-setter pattern below buffers any
+// pre-mount token and drains it once the component subscribes.
+let _turnstileTokenQueue: string | null = null;
+let _setTurnstileTokenLive: ((t: string) => void) | null = null;
+
+if (typeof window !== "undefined") {
+  (window as { onTapelineTurnstile?: (token: string) => void }).onTapelineTurnstile = (token: string) => {
+    if (_setTurnstileTokenLive) {
+      _setTurnstileTokenLive(token);
+    } else {
+      _turnstileTokenQueue = token;
+    }
+  };
+}
+
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
 export default function SignUpPage() {
   return (
@@ -43,12 +63,17 @@ function SignUpForm() {
   const [busy, setBusy] = useState(false);
   const turnstileRef = useRef<HTMLDivElement | null>(null);
 
-  // Bridge Cloudflare's data-callback into React state. The widget calls
-  // window.onTapelineTurnstile(token) when the user solves the challenge.
+  // Subscribe React state into the module-scope Turnstile callback. The
+  // window.onTapelineTurnstile handler was already registered at module load
+  // (see top of file) — here we just point it at our setter and drain any
+  // token that arrived before this component mounted (auto-solve race).
   useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) return;
-    window.onTapelineTurnstile = (token: string) => setTurnstileToken(token);
-    return () => { delete window.onTapelineTurnstile; };
+    _setTurnstileTokenLive = setTurnstileToken;
+    if (_turnstileTokenQueue) {
+      setTurnstileToken(_turnstileTokenQueue);
+      _turnstileTokenQueue = null;
+    }
+    return () => { _setTurnstileTokenLive = null; };
   }, []);
 
   // Funnel event: fired once on mount when a real human sees the signup form.
