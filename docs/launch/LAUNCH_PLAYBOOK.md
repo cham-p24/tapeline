@@ -30,7 +30,7 @@ The thing I care most about: a public scorecard. Every day I log the top 10 name
 
 Free tier: top 20 tickers, 24-hour delay, 5-name watchlist.
 Pro $24.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
-Premium $39.99/mo: + Congress trades, elite 13F holdings, Telegram alerts.
+Premium $39.99/mo: + Congress trades, insider Form 4 activity, Telegram alerts.
 14-day Premium trial, no card required.
 
 Stack: Next.js 14 + FastAPI + Polygon (now Massive) + Finnhub + FRED + Benzinga. Deployed on Vercel + Fly.io.
