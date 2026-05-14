@@ -24,6 +24,18 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-14",
+    version: "0.1.9",
+    tag: "shipped",
+    title: "Referrals, signup hardening, 50 per-ticker SEO pages",
+    body: [
+      "Referral mechanic live. Share your code from /app/referrals — both you and the friend you refer get one free month of Premium, credited at the next paid checkout.",
+      "Signup form is more forgiving with intermittent Turnstile loads, so fewer real users get bounced. Signing out now reliably clears the session across every Tapeline subdomain.",
+      "50 new per-ticker landing pages at /blog/ticker/{SYMBOL} — AAPL, NVDA, MSFT and 47 others. Each renders the live Tapeline composite, the 6-factor breakdown, and a structured FAQ so the page is useful in search results.",
+      "Referrals page now shows 0 unused credits cleanly if you've never referred anyone, instead of a momentary blank.",
+    ],
+  },
+  {
     date: "2026-05-04",
     version: "0.1.8",
     tag: "improvement",
