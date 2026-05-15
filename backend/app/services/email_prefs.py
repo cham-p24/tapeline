@@ -25,7 +25,7 @@ from enum import IntFlag
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.models import User
+    from app.models import User  # noqa: F401
 
 
 class EmailPref(IntFlag):
@@ -45,7 +45,7 @@ DEFAULT_PREFS: int = int(
 )
 
 
-def wants(user: "User", category: EmailPref) -> bool:
+def wants(user: User, category: EmailPref) -> bool:
     """True if the user opts in to this email category.
 
     Defensive default: if `user.email_prefs` is unset (e.g. an in-memory

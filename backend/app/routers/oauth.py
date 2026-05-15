@@ -138,7 +138,17 @@ async def list_providers() -> dict:
 async def oauth_start(provider: str, response: Response) -> RedirectResponse:
     creds = _provider_creds(provider)
     if provider not in PROVIDERS or creds is None:
-        raise HTTPException(503, f"OAuth for '{provider}' not configured")
+        # 404, not 503, because:
+        # - The route exists generically, but the SPECIFIC provider is
+        #   either unknown or unconfigured — from a caller's perspective
+        #   this slot doesn't service their request.
+        # - sentry-sdk's starlette integration captures 5xx-mapped
+        #   HTTPException by default, so a 503 here flooded Sentry every
+        #   time a bot scanner hit /api/auth/oauth/microsoft/callback
+        #   (and we explicitly haven't configured Microsoft yet). 4xx is
+        #   not captured by default — quiets the noise without disabling
+        #   real OAuth error reporting elsewhere.
+        raise HTTPException(404, f"OAuth provider '{provider}' is not configured")
     cid, _, redirect_uri = creds
     state = secrets.token_urlsafe(24)
     params: dict[str, str] = {
@@ -175,7 +185,17 @@ async def oauth_callback(
 ) -> RedirectResponse:
     creds = _provider_creds(provider)
     if provider not in PROVIDERS or creds is None:
-        raise HTTPException(503, f"OAuth for '{provider}' not configured")
+        # 404, not 503, because:
+        # - The route exists generically, but the SPECIFIC provider is
+        #   either unknown or unconfigured — from a caller's perspective
+        #   this slot doesn't service their request.
+        # - sentry-sdk's starlette integration captures 5xx-mapped
+        #   HTTPException by default, so a 503 here flooded Sentry every
+        #   time a bot scanner hit /api/auth/oauth/microsoft/callback
+        #   (and we explicitly haven't configured Microsoft yet). 4xx is
+        #   not captured by default — quiets the noise without disabling
+        #   real OAuth error reporting elsewhere.
+        raise HTTPException(404, f"OAuth provider '{provider}' is not configured")
 
     # Apple POSTs form-encoded; others GET with query params.
     if request.method == "POST":
