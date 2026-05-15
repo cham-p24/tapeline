@@ -8,10 +8,14 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { recordTickerVisit } from "@/components/RecentTickers";
 import { AnalystRatings } from "@/components/AnalystRatings";
+import { FinancialsTab } from "@/components/FinancialsTab";
+import { InsiderTab } from "@/components/InsiderTab";
 import { Paywall } from "@/components/Paywall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
+
+type DetailTab = "financials" | "insider";
 
 export default function TickerPage({ params }: { params: { symbol: string } }) {
   const symbol = params.symbol.toUpperCase();
@@ -21,6 +25,7 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
   const [addMsg, setAddMsg] = useState<string | null>(null);
   const [newsAlerting, setNewsAlerting] = useState(false);
   const [newsAlertMsg, setNewsAlertMsg] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>("financials");
 
   const load = useCallback(async () => {
     try { setData(await api.ticker(symbol)); setError(null); }
@@ -237,6 +242,45 @@ export default function TickerPage({ params }: { params: { symbol: string } }) {
         <Paywall feature="ratings.analyst" title="Analyst consensus is Premium">
           <AnalystRatings symbol={data.symbol} currentPrice={data.price} />
         </Paywall>
+      </div>
+
+      {/* More on {symbol} — Financials tab is public (basic per-ticker
+          fundamentals from Finnhub). Insider tab is Premium-gated via
+          insider.form4 and shows the last 90 days of Form 4 filings.
+          Both endpoints have their own caching so tab-switching is cheap. */}
+      <div className="mt-6 card">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="font-semibold">More on {data.symbol}</h2>
+          <div className="flex gap-1 rounded-md border border-border p-1 text-xs">
+            <button
+              onClick={() => setDetailTab("financials")}
+              className={`rounded px-2.5 py-1 transition-colors ${
+                detailTab === "financials" ? "bg-accent/15 text-accent" : "text-muted hover:text-fg"
+              }`}
+              aria-pressed={detailTab === "financials"}
+            >
+              Financials
+            </button>
+            <button
+              onClick={() => setDetailTab("insider")}
+              className={`rounded px-2.5 py-1 transition-colors ${
+                detailTab === "insider" ? "bg-accent/15 text-accent" : "text-muted hover:text-fg"
+              }`}
+              aria-pressed={detailTab === "insider"}
+            >
+              Insider activity
+            </button>
+          </div>
+        </div>
+        <div className="p-4">
+          {detailTab === "financials" ? (
+            <FinancialsTab symbol={data.symbol} />
+          ) : (
+            <Paywall feature="insider.form4" title="Insider activity is Premium">
+              <InsiderTab symbol={data.symbol} />
+            </Paywall>
+          )}
+        </div>
       </div>
 
       {/* TradingView chart embed */}

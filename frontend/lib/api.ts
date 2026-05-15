@@ -155,6 +155,33 @@ export type AnalystRatings = {
   source: "benzinga" | "empty";
 };
 
+export type TickerFinancials = {
+  symbol: string;
+  available: boolean;
+  metrics: {
+    pe?: number | null;
+    margin?: number | null;
+    roe?: number | null;
+    eps_growth?: number | null;
+    revenue_growth?: number | null;
+    debt_to_equity?: number | null;
+  };
+};
+
+export type TickerInsiderRow = {
+  filer_name: string;
+  transaction_date: string;
+  share_change: number;
+  transaction_price: number;
+  code: string;   // SEC Form 4 transaction code (P/S/A/M/G/F)
+};
+
+export type TickerInsiderResponse = {
+  symbol: string;
+  days_back: number;
+  transactions: TickerInsiderRow[];
+};
+
 export type CongressTrade = {
   id: number;
   politician: string;
@@ -241,6 +268,10 @@ export const api = {
   congress: () => get<{ count: number; items: CongressTrade[] }>("/api/congress"),
   ticker: (symbol: string) => get<TickerDetail>(`/api/ticker/${symbol}`),
   tickerRatings: (symbol: string) => get<AnalystRatings>(`/api/ticker/${symbol}/ratings`),
+  tickerFinancials: (symbol: string) =>
+    get<TickerFinancials>(`/api/ticker/${symbol}/financials`),
+  tickerInsider: (symbol: string, daysBack = 90) =>
+    get<TickerInsiderResponse>(`/api/ticker/${symbol}/insider?days_back=${daysBack}`),
   news: (symbol?: string, limit = 20) => {
     const qs = new URLSearchParams({ limit: String(limit), ...(symbol ? { symbol } : {}) });
     return get<{ count: number; items: Array<{ id: string; title: string; publisher: string; published_at: string; url: string; description: string | null; tickers: string[]; sentiment: number | null }> }>(`/api/news?${qs}`);
