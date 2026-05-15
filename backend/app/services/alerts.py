@@ -313,19 +313,30 @@ async def _fire(
     rule.last_fired_at = datetime.now(UTC)
 
     if rule.channel == "email":
-        try:
-            html = render_alert_email(
-                user_name=user.name or "trader",
-                rule_name=rule.name,
-                symbol=symbol,
-                score=score,
-                message=message,
-            )
-            res = await send_email(user.email, f"[Tapeline] {rule.name}: {symbol}", html)
-            # send_email returns {"skipped": True} if Resend isn't configured
-            event.delivered = not res.get("skipped", False)
-        except Exception:
-            logger.exception("alert.email_failed user=%s rule=%s", user.id, rule.id)
+        # Respect per-user email-prefs — alert emails are opt-out-able.
+        # Other channels (telegram, web push) keep their own opt-out logic
+        # via the rule.channel field itself, so this gate is email-only.
+        from app.services.email_prefs import EmailPref, wants
+        if not wants(user, EmailPref.ALERT_EMAILS):
+            event.delivered = False
+            # Record the event so the user can see in /app/alerts/history
+            # that the rule DID fire — they just chose not to receive it
+            # by email. Helps debug "why am I getting fewer emails?".
+            event.message = f"[suppressed: email prefs] {message}"
+        else:
+            try:
+                html = render_alert_email(
+                    user_name=user.name or "trader",
+                    rule_name=rule.name,
+                    symbol=symbol,
+                    score=score,
+                    message=message,
+                )
+                res = await send_email(user.email, f"[Tapeline] {rule.name}: {symbol}", html)
+                # send_email returns {"skipped": True} if Resend isn't configured
+                event.delivered = not res.get("skipped", False)
+            except Exception:
+                logger.exception("alert.email_failed user=%s rule=%s", user.id, rule.id)
     elif rule.channel == "telegram" and user.telegram_chat_id:
         try:
             from app.services.telegram import send_message

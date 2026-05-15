@@ -182,6 +182,21 @@ export type TickerInsiderResponse = {
   transactions: TickerInsiderRow[];
 };
 
+export type EmailPrefKey =
+  | "trial_drip"
+  | "re_engagement"
+  | "daily_digest"
+  | "alert_emails";
+
+export type EmailPrefsResponse = {
+  prefs: Record<EmailPrefKey, boolean>;
+  categories: Array<{
+    key: EmailPrefKey;
+    label: string;
+    description: string;
+  }>;
+};
+
 export type CongressTrade = {
   id: number;
   politician: string;
@@ -272,6 +287,18 @@ export const api = {
     get<TickerFinancials>(`/api/ticker/${symbol}/financials`),
   tickerInsider: (symbol: string, daysBack = 90) =>
     get<TickerInsiderResponse>(`/api/ticker/${symbol}/insider?days_back=${daysBack}`),
+  emailPrefsGet: () =>
+    get<EmailPrefsResponse>(`/api/me/email-prefs`),
+  emailPrefsPatch: async (partial: Partial<Record<EmailPrefKey, boolean>>) => {
+    const res = await fetch(`/api/me/email-prefs`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(partial),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    return res.json() as Promise<{ prefs: Record<EmailPrefKey, boolean> }>;
+  },
   news: (symbol?: string, limit = 20) => {
     const qs = new URLSearchParams({ limit: String(limit), ...(symbol ? { symbol } : {}) });
     return get<{ count: number; items: Array<{ id: string; title: string; publisher: string; published_at: string; url: string; description: string | null; tickers: string[]; sentiment: number | null }> }>(`/api/news?${qs}`);
