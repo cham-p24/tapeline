@@ -71,7 +71,13 @@ def render_alert_email(user_name: str, rule_name: str, symbol: str, score: float
 
 
 def _shell(body_html: str) -> str:
-    """Wrap body content in the standard Tapeline email shell."""
+    """Wrap body content in the standard Tapeline email shell.
+
+    Every non-transactional email rendered through this shell carries the
+    "Manage email prefs" link in the footer pointing at /app/settings/email
+    so the user can opt out of specific categories without unsubscribing
+    entirely. CAN-SPAM / GDPR hygiene.
+    """
     return f"""<!doctype html>
 <html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;margin:0;">
   <div style="max-width:560px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
@@ -84,7 +90,9 @@ def _shell(body_html: str) -> str:
     <p style="color:#6b7280;font-size:11px;margin:0;">
       <strong>Not investment advice.</strong> For informational purposes only.
       <br><br>
-      <a href="https://tapeline.io/app/account" style="color:#9ca3af;">Manage notifications</a>
+      <a href="https://tapeline.io/app/settings/email" style="color:#9ca3af;">Manage email prefs</a>
+      &nbsp;·&nbsp;
+      <a href="https://tapeline.io/app/account" style="color:#9ca3af;">Account</a>
       &nbsp;·&nbsp;
       <a href="https://tapeline.io/app/billing" style="color:#9ca3af;">Billing</a>
     </p>
@@ -588,6 +596,10 @@ async def run_eod_watchlist_digest(session) -> int:
 
     sent = 0
     for user in users:
+        # Respect per-user email-prefs — daily digest is opt-out-able.
+        from app.services.email_prefs import EmailPref, wants
+        if not wants(user, EmailPref.DAILY_DIGEST):
+            continue
         wl_r = await session.execute(
             select(WatchlistItem, Ticker)
             .outerjoin(Ticker, Ticker.symbol == WatchlistItem.symbol)
@@ -818,6 +830,10 @@ async def run_daily_drip(session) -> dict[str, int]:
             sent_tokens = set((user.drip_state or "").split(",")) - {""}
             if token in sent_tokens:
                 continue  # already sent this stage to this user
+            # Respect per-user email-prefs — trial-drip is one bit.
+            from app.services.email_prefs import EmailPref, wants
+            if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
             try:
                 if personalise:
                     summary = await trial_summary_for_user(session, user)
@@ -879,6 +895,10 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
     for user in users:
         sent_tokens = set((user.drip_state or "").split(",")) - {""}
         if "re14" in sent_tokens:
+            continue
+        # Respect per-user email-prefs — re-engagement is opt-out-able.
+        from app.services.email_prefs import EmailPref, wants
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
         try:
             html = render_re_engagement_email(user.name or "trader")

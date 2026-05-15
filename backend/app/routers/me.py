@@ -240,6 +240,67 @@ async def telegram_start_token(
     }
 
 
+# ---- Email preferences ------------------------------------------------------
+
+class EmailPrefsBody(BaseModel):
+    """{key: bool} dict where keys come from categories_for_ui(). Unknown
+    keys are silently dropped server-side — the categories list is the
+    source of truth, not the request body."""
+
+    trial_drip: bool | None = None
+    re_engagement: bool | None = None
+    daily_digest: bool | None = None
+    alert_emails: bool | None = None
+
+
+@router.get("/email-prefs")
+async def get_email_prefs(
+    user: User = Depends(current_user_required),
+) -> dict:
+    """Read the current user's email-preference toggles + the category
+    metadata the UI needs to render the settings page."""
+    from app.services.email_prefs import categories_for_ui, prefs_to_dict
+
+    return {
+        "prefs": prefs_to_dict(int(user.email_prefs or 0)),
+        "categories": [
+            {"key": c.key, "label": c.label, "description": c.description}
+            for c in categories_for_ui()
+        ],
+    }
+
+
+@router.patch("/email-prefs")
+async def set_email_prefs(
+    body: EmailPrefsBody,
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Update email preferences. Body is a partial dict — only keys
+    present in the request are updated, missing keys keep their previous
+    value. PATCH semantics, not PUT, so a frontend can toggle one bit
+    without round-tripping all four.
+    """
+    from app.services.email_prefs import categories_for_ui, prefs_to_dict
+
+    incoming = body.model_dump(exclude_none=True)
+    current = int(user.email_prefs or 0)
+
+    for cat in categories_for_ui():
+        if cat.key in incoming:
+            if incoming[cat.key]:
+                current |= cat.bit
+            else:
+                current &= ~cat.bit
+
+    user.email_prefs = current
+    await session.commit()
+    logger.info("me.email_prefs_updated user=%s prefs=%d", user.id, current)
+    return {"prefs": prefs_to_dict(current)}
+
+
+# ---- Telegram test ----------------------------------------------------------
+
 @router.post("/telegram/test")
 async def test_telegram_message(
     user: User = Depends(current_user_required),

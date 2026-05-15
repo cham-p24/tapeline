@@ -64,6 +64,12 @@ class User(Base):
         DateTime(timezone=True), nullable=True, index=True,
     )
 
+    # Per-user email preferences bitmask. See app.services.email_prefs for
+    # the bit constants. Default 15 = all four suppressable categories on.
+    # Transactional emails (welcome, payment-failed, referral) ignore this
+    # field — they're not user-suppressable.
+    email_prefs: Mapped[int] = mapped_column(Integer, default=15, nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )
