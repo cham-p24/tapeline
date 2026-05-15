@@ -52,7 +52,17 @@ class User(Base):
     # Drip-email dedupe — comma-separated day tokens already sent ("3,7,13,end").
     # The daily worker checks this before sending so a worker restart mid-day
     # doesn't double-send. Welcome (day 0) is fire-once on signup, not tracked here.
+    # Also stores the re-engagement token "re14" so the dormant-user email
+    # only fires once per user (see services/email.run_re_engagement_drip).
     drip_state: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+
+    # Bumped on every authenticated request via current_user_optional (throttled
+    # to once per hour to avoid write amplification). Drives the re-engagement
+    # drip — a user with last_seen_at >= 14 days ago is dormant and gets a
+    # founder-signed nudge once. Indexed for the daily range-scan.
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
