@@ -700,6 +700,30 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
+def render_re_engagement_email(user_name: str) -> str:
+    """14-days-dormant nudge — fires once per user when last_seen_at slips
+    past 14 days.
+
+    Voice is the same calm/factual register as the post-expiry drip. Lead
+    with one concrete data point ("here's what the scorecard has done
+    since you last logged in") would be ideal but pre-computing that for
+    every dormant user is expensive — the simpler version just points at
+    /scorecard so they can self-check. If the metric becomes worth the
+    cost, swap the body to a personalised summary later.
+
+    Sender: christian@tapeline.io (founder-personal). No drip after this —
+    one shot, then silence unless they re-engage.
+    """
+    return _shell(f"""
+    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Tapeline missed you, {user_name}.</h1>
+    <p style="color:#d1d5db;margin:0 0 16px;">It's been two weeks since you last opened the scanner. That's fine — life and the market both move on — but two weeks is also long enough that what you'd see today is meaningfully different from what was there when you stepped away.</p>
+    <p style="color:#d1d5db;margin:0 0 16px;">The fastest catch-up is the public <a href="https://tapeline.io/scorecard?utm_source=email&amp;utm_campaign=re_engagement&amp;utm_medium=transactional" style="color:#3b82f6;">scorecard</a> — every top-10 daily pick we published while you were gone, back-checked against SPY the next session. No survivor bias; every miss is still on the page.</p>
+    <a href="https://tapeline.io/app/scanner?utm_source=email&amp;utm_campaign=re_engagement&amp;utm_medium=transactional" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Open the scanner &rarr;</a>
+    <p style="color:#9ca3af;margin:24px 0 0;font-size:13px;">If Tapeline isn't what you need, no follow-up — this is the only nudge.</p>
+    <p style="color:#6b7280;margin-top:18px;font-size:13px;">&mdash; Christian, founder. <a href="https://tapeline.io/how-it-works" style="color:#6b7280;">The formula is still public.</a></p>
+    """)
+
+
 # Drip orchestration — the worker hooks below. Wiring is intentionally minimal
 # until Resend is configured (no API key = send_email() returns {"skipped": True}).
 # When the key arrives, add this to signal_publisher.py tick():
@@ -808,6 +832,64 @@ async def run_daily_drip(session) -> dict[str, int]:
                     any_sent = True
             except Exception:
                 logger.exception("drip.send_failed user=%s stage=%s", user.id, label)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_re_engagement_drip(session) -> dict[str, int]:
+    """Send the re-engagement email to users dormant for ~14 days.
+
+    Window: last_seen_at in [now-15d, now-14d). One-shot, deduplicated via
+    the "re14" token in User.drip_state — so a user only ever receives
+    this email once even if they fall back into dormancy later.
+
+    Trial users are EXCLUDED — the trial drip is the right re-engagement
+    channel for them. This kicks in only for users who:
+      - Have a non-null last_seen_at (so we know when they last visited)
+      - Have no trial_ends_at, OR trial_ends_at is in the past
+      - Don't already have "re14" in drip_state
+
+    Returns the count of sends, keyed by "re14".
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import or_, select
+
+    from app.models import User
+
+    now = datetime.now(UTC)
+    counts = {"re14": 0}
+
+    lower = now - timedelta(days=15)
+    upper = now - timedelta(days=14)
+
+    filters = [
+        User.last_seen_at.isnot(None),
+        User.last_seen_at >= lower,
+        User.last_seen_at < upper,
+        or_(User.trial_ends_at.is_(None), User.trial_ends_at < now),
+    ]
+
+    result = await session.execute(select(User).where(*filters))
+    users = result.scalars().all()
+
+    any_sent = False
+    for user in users:
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if "re14" in sent_tokens:
+            continue
+        try:
+            html = render_re_engagement_email(user.name or "trader")
+            res = await send_email(user.email, "Tapeline missed you", html)
+            if not res.get("skipped", False):
+                sent_tokens.add("re14")
+                user.drip_state = ",".join(sorted(sent_tokens))
+                counts["re14"] += 1
+                any_sent = True
+        except Exception:
+            logger.exception("re_engagement.send_failed user=%s", user.id)
 
     if any_sent:
         await session.commit()

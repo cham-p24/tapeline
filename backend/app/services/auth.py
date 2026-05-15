@@ -108,6 +108,33 @@ async def verify_jwt(token: str) -> dict[str, Any]:
     return payload
 
 
+async def _bump_last_seen(session: AsyncSession, user: User) -> None:
+    """Bump User.last_seen_at if it's been > 1h since the last bump.
+
+    Throttled to one DB write per user per hour so the re-engagement drip
+    has fresh enough data to find dormant users without hammering Postgres
+    on every authenticated request. Exception-swallowed because a missed
+    bump should never break an actual request.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+    last = user.last_seen_at
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=UTC)
+    if last is None or (now - last) >= timedelta(hours=1):
+        try:
+            user.last_seen_at = now
+            await session.commit()
+        except Exception:
+            # Don't let bookkeeping kill an actual request. Roll back the
+            # bump and let downstream handlers continue.
+            try:
+                await session.rollback()
+            except Exception:
+                pass
+
+
 async def current_user_optional(
     request: Request,
     session: AsyncSession = Depends(get_session),
@@ -119,6 +146,9 @@ async def current_user_optional(
       3. Authorization: Bearer <clerk-jwt> — used when Clerk is wired in prod
 
     Returns None if anonymous (= free tier, public endpoints only).
+
+    Side effect: bumps User.last_seen_at via _bump_last_seen() — throttled
+    to one write per user per hour. Drives the re-engagement drip.
     """
     # 1. Cookie session (primary in native-auth mode)
     from app.services.session import SESSION_COOKIE, verify_session_token
@@ -130,6 +160,7 @@ async def current_user_optional(
             result = await session.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
             if user is not None:
+                await _bump_last_seen(session, user)
                 return user
 
     # 2. Bearer token
@@ -146,6 +177,7 @@ async def current_user_optional(
             user = User(id="dev_user", email="dev@tapeline.io", name="Dev", tier="premium")
             session.add(user)
             await session.commit()
+        await _bump_last_seen(session, user)
         return user
 
     # Production Clerk JWT
@@ -157,7 +189,10 @@ async def current_user_optional(
     if not user_id:
         return None
     result = await session.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if user is not None:
+        await _bump_last_seen(session, user)
+    return user
 
 
 async def current_user_required(
