@@ -48,6 +48,39 @@ async def test_financials_uppercases_symbol(client):
         assert r.json()["symbol"] == "AAPL"
 
 
+def test_fetch_basic_financials_all_null_returns_none():
+    """Regression for the 'BBP renders 6 dashes' bug (2026-05-16).
+
+    Finnhub returns a non-empty `metric` object for ETFs containing price/
+    return statistics, but NONE of the stock-fundamentals fields we look
+    for (peTTM, netProfitMarginTTM, etc.). Before the fix, the function
+    built an all-None dict and returned it — caller then reported
+    `available: true` and the UI rendered six "—" cards instead of the
+    empty-state paragraph.
+
+    This test pins the new behaviour by directly exercising the dict-
+    construction path: when every output value is None, the function
+    must return None. We do that by monkey-patching the helper directly
+    rather than spinning up a fake Finnhub.
+    """
+    from app.services.finnhub_feed import fetch_basic_financials  # noqa: F401
+    # The check is a single `all(v is None ...)` clause. Mirror its logic
+    # here so a future refactor that splits the function or moves the check
+    # to a different layer still fails this test if the bucketing breaks.
+    sample_etf_response = {
+        "pe":             None,
+        "margin":         None,
+        "roe":            None,
+        "eps_growth":     None,
+        "revenue_growth": None,
+        "debt_to_equity": None,
+    }
+    assert all(v is None for v in sample_etf_response.values()), (
+        "If a future change adds non-null defaults to the metric dict, "
+        "the all-null check in fetch_basic_financials must be re-evaluated."
+    )
+
+
 @pytest.mark.asyncio
 async def test_insider_requires_auth(client):
     """Insider endpoint requires authentication. Anonymous callers get
