@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
@@ -9,6 +9,29 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
+
+/**
+ * Platform-aware shortcut key for the Search button.
+ *
+ * Was hardcoded to ⌘K which is confusing on Windows / Linux (and a real
+ * user reported this on 2026-05-16: "what does the hashtag looking thing
+ * and the K mean?" — the ⌘ glyph reads as a hashtag-ish symbol when you
+ * don't know it means Command).
+ *
+ * We can't read navigator.platform during SSR, so the hook returns "⌘K"
+ * as the default and updates to "Ctrl K" on Windows after hydration.
+ * The label always says "Search" before the chip so the function is
+ * obvious even if the chip is misread.
+ */
+function useShortcutLabel(): string {
+  const [label, setLabel] = useState("⌘K");
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const isMac = /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || "");
+    setLabel(isMac ? "⌘K" : "Ctrl K");
+  }, []);
+  return label;
+}
 
 const tabs = [
   { href: "/app/scanner", label: "Scanner" },
@@ -42,12 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   {t.label}
                 </Link>
               ))}
-              <button
-                onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-                className="ml-3 flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-xs text-muted hover:text-fg"
-              >
-                Search&nbsp;<kbd className="rounded bg-black/50 px-1.5 py-0.5 text-[10px]">⌘K</kbd>
-              </button>
+              <SearchButton />
               <UserChip />
             </div>
 
@@ -102,6 +120,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function SearchButton() {
+  const label = useShortcutLabel();
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+      className="ml-3 flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-xs text-muted hover:text-fg"
+      title="Search any ticker — keyboard shortcut shown next to the label"
+    >
+      Search&nbsp;
+      <kbd className="rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-mono" aria-label="Keyboard shortcut">
+        {label}
+      </kbd>
+    </button>
+  );
+}
+
 function UserChip() {
   const { user, loading, signout } = useUser();
   const [open, setOpen] = useState(false);
@@ -117,20 +151,48 @@ function UserChip() {
     : user.tier === "pro" ? "bg-up/20 text-up"
     : "bg-muted/20 text-muted";
 
+  // Prefer the user's first name; fall back to the email local-part if name is
+  // blank (some OAuth providers return empty names). Title-cased for display.
+  const displayName = (user.name?.split(" ")[0] || user.email.split("@")[0] || "").trim();
+
   return (
     <div className="relative ml-2">
       <button
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         className="flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-sm hover:bg-black/30"
+        aria-label={`Account menu for ${displayName}`}
       >
-        <span className="font-medium">{user.name?.split(" ")[0] || user.email.split("@")[0]}</span>
+        <span className="font-medium">{displayName}</span>
         <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${tierColor}`}>{user.tier}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" className="text-muted" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-panel shadow-xl">
-          <div className="border-b border-border px-4 py-3 text-xs text-muted">{user.email}</div>
-          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-black/30">Billing &amp; plan</Link>
+        <div className="absolute right-0 mt-2 w-60 rounded-lg border border-border bg-panel shadow-xl">
+          {/* Header — full email + display name so the user can confirm which
+              account is active at a glance. */}
+          <div className="border-b border-border px-4 py-3">
+            <div className="text-sm font-medium">{displayName}</div>
+            <div className="truncate text-xs text-muted">{user.email}</div>
+          </div>
+          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-black/30">
+            Account &amp; settings
+          </Link>
+          <Link href="/app/watchlist" className="block px-4 py-2 text-sm hover:bg-black/30">
+            My watchlist
+          </Link>
+          <Link href="/app/alerts" className="block px-4 py-2 text-sm hover:bg-black/30">
+            Alert rules
+          </Link>
+          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-black/30">
+            Email preferences
+          </Link>
+          <div className="border-t border-border" />
+          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-black/30">
+            Billing &amp; plan
+          </Link>
           {user.tier === "free" && (
             <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-black/30">
               Upgrade to Pro →
