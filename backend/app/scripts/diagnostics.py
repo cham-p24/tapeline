@@ -68,25 +68,25 @@ async def main() -> None:
         )).scalar_one()
         total_subs = (await s.execute(select(func.count(Subscription.id)))).scalar_one()
 
-        # ---- Stripe webhooks
+        # ---- Stripe webhooks (StripeWebhookEvent uses `processed_at`, not received_at)
         total_webhooks = (await s.execute(select(func.count(StripeWebhookEvent.id)))).scalar_one()
         recent_webhooks = (await s.execute(
-            select(StripeWebhookEvent.event_type, StripeWebhookEvent.received_at)
-            .order_by(desc(StripeWebhookEvent.received_at))
+            select(StripeWebhookEvent.event_type, StripeWebhookEvent.processed_at)
+            .order_by(desc(StripeWebhookEvent.processed_at))
             .limit(5)
         )).all()
 
-        # ---- Engagement
+        # ---- Engagement (AlertEvent uses `created_at`, not fired_at)
         total_watchlist = (await s.execute(select(func.count(WatchlistItem.id)))).scalar_one()
         total_rules = (await s.execute(select(func.count(AlertRule.id)))).scalar_one()
         rules_24h = (await s.execute(
-            select(func.count(AlertEvent.id)).where(AlertEvent.fired_at >= last_24h)
+            select(func.count(AlertEvent.id)).where(AlertEvent.created_at >= last_24h)
         )).scalar_one()
 
-        # ---- Universe / data freshness
-        total_tickers = (await s.execute(select(func.count(Ticker.id)))).scalar_one()
+        # ---- Universe / data freshness — Ticker primary key is `symbol`, not `id`
+        total_tickers = (await s.execute(select(func.count(Ticker.symbol)))).scalar_one()
         scored = (await s.execute(
-            select(func.count(Ticker.id)).where(Ticker.score.isnot(None))
+            select(func.count(Ticker.symbol)).where(Ticker.score.isnot(None))
         )).scalar_one()
         sectors = (await s.execute(
             select(func.count(func.distinct(Ticker.sector)))
@@ -94,9 +94,9 @@ async def main() -> None:
 
         # Sector breakdown
         sector_rows = (await s.execute(
-            select(Ticker.sector, func.count(Ticker.id))
+            select(Ticker.sector, func.count(Ticker.symbol))
             .group_by(Ticker.sector)
-            .order_by(desc(func.count(Ticker.id)))
+            .order_by(desc(func.count(Ticker.symbol)))
         )).all()
 
         # Most recent ticker update
