@@ -7,7 +7,15 @@ SaaS quantitative market scanner for retail stock pickers. Lives at `C:\Project 
 **Domain:** `tapeline.io` — **REGISTERED + LIVE** (Cloudflare DNS, Vercel frontend, Fly.io backend at `api.tapeline.io`).
 
 ## Boundary — do not touch
-The personal trading system at `C:\signal-system\` is a separate project. Tapeline reuses the *scoring approach* but does NOT share files with it. Never edit anything outside `C:\Project 1\`.
+The personal trading system at `C:\signal-system\` is a separate project. Tapeline does NOT share **files** with it (no imports, no symlinks, no cross-repo dependencies — never edit anything outside `C:\Project 1\`). **Tapeline DOES share data** with it via the signal-system's published Google Sheet ("Live Dashboard - Stocks"). The sheet is the bridge:
+
+- signal-system writes to the sheet (scoring + ranking + per-ticker sub-scores for ~200-500 tickers)
+- Tapeline reads `ALL SIGNALS` tab via `backend/app/services/sheet_feed.py` and upserts the universe into the `Ticker` table
+- Configured via `SIGNAL_SHEET_CSV_URL` (Fly secret); dormant when unset (falls back to `mock_feed.TICKER_UNIVERSE`)
+- 5-min refresh throttle (`SIGNAL_SHEET_REFRESH_SECONDS`)
+- Sheet's prescriptive labels (BUY NOW / ACCUMULATE / HOLD / WATCH / AVOID) are NEVER passed through — `sheet_feed.score_to_signal()` re-derives Tapeline's descriptive labels (HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK) from the composite score per the publisher-exemption posture
+
+Phase 2+ will pull the other tabs (SPIKE INTELLIGENCE, MARKET INTELLIGENCE, SMART MONEY & CONGRESS, ETF BENCHMARKS) into matching Tapeline tables. The sheet's column order is documented in `services/sheet_feed.parse_all_signals_csv()`.
 
 ## Operational facts
 - **Git is live** at https://github.com/cham-p24/tapeline. CI deploys main → Fly.io (backend) + Vercel (frontend). Use normal commit/push flow.
