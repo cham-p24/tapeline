@@ -145,7 +145,7 @@ export default async function SignalsPage() {
   return (
     <main className="min-h-screen">
       <MarketingNav />
-      {jsonLdScript(breadcrumb)}
+      <script {...jsonLdScript(breadcrumb)} />
 
       <section className="mx-auto max-w-6xl px-6 py-12">
         <p className="eyebrow">Public universe</p>
