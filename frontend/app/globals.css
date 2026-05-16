@@ -2,69 +2,161 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * --- Theme tokens (light + dark) ---------------------------------------
+ *
+ * Every colour in the app now resolves through one of these CSS variables,
+ * so flipping the `data-theme` attribute on <html> switches the whole UI
+ * with no per-component changes. Tailwind config maps token names to
+ * `var(--token)`, so utilities like `bg-background` / `text-fg` / `border-border`
+ * pick up the active theme automatically.
+ *
+ * Design direction (2026-05-17, per user feedback):
+ *   - "Apple iOS feel" — translucent surfaces, soft gradients, vibrant
+ *     accent over muted neutrals, generous corner radii, subtle shadows
+ *     instead of hard borders.
+ *   - Light + dark mode with `system` as the default — respects
+ *     `prefers-color-scheme` until the user explicitly chooses one.
+ *
+ * Light palette mirrors macOS / iOS — near-white background (#fafafa),
+ * crisp text (#0a0a0a), soft tinted panels.
+ * Dark palette stays close to the existing one but with token semantics
+ * (so future tweaks are one-place).
+ */
+:root,
+[data-theme="light"] {
+  --background:  255 255 255;        /* page bg                        */
+  --surface:     250 250 252;        /* subtle elevation tier 1        */
+  --panel:       0 0 0 / 0.04;       /* inset panel (rgba on bg)       */
+  --panel-hover: 0 0 0 / 0.07;       /* panel on hover                 */
+  --fg:          10 10 10;           /* primary text                   */
+  --muted:       113 113 122;        /* secondary text                 */
+  --subtle:      161 161 170;        /* tertiary text                  */
+  --border:      0 0 0 / 0.08;       /* hairline divider (rgba)        */
+  --accent:      0 122 255;          /* iOS systemBlue                 */
+  --accent-hover: 0 100 220;
+  --up:          52 199 89;          /* iOS systemGreen                */
+  --down:        255 59 48;          /* iOS systemRed                  */
+  --shadow:      0 0 0 / 0.06;
+}
+
+[data-theme="dark"] {
+  --background:  10 10 10;
+  --surface:     18 18 20;
+  --panel:       255 255 255 / 0.04;
+  --panel-hover: 255 255 255 / 0.07;
+  --fg:          244 244 245;
+  --muted:       156 163 175;
+  --subtle:      113 113 122;
+  --border:      255 255 255 / 0.06;
+  --accent:      10 132 255;          /* iOS systemBlue (dark mode tint) */
+  --accent-hover: 64 156 255;
+  --up:          48 209 88;
+  --down:        255 69 58;
+  --shadow:      0 0 0 / 0.45;
+}
+
+/*
+ * `system` mode: default until user picks a theme. Inherits from
+ * prefers-color-scheme — dark when the OS reports dark, light otherwise.
+ * ThemeProvider sets data-theme to "light" or "dark" once the user has
+ * an explicit choice, after which prefers-color-scheme is ignored.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background:  10 10 10;
+    --surface:     18 18 20;
+    --panel:       255 255 255 / 0.04;
+    --panel-hover: 255 255 255 / 0.07;
+    --fg:          244 244 245;
+    --muted:       156 163 175;
+    --subtle:      113 113 122;
+    --border:      255 255 255 / 0.06;
+    --accent:      10 132 255;
+    --accent-hover: 64 156 255;
+    --up:          48 209 88;
+    --down:        255 69 58;
+    --shadow:      0 0 0 / 0.45;
+  }
+}
+
 @layer base {
   html {
     @apply bg-background text-fg;
     /*
      * Fluid type — scales the root font size between 13px and 16px based on
-     * viewport width. Every Tailwind utility that uses rem (text-xs, text-sm,
-     * spacing-1, etc.) scales proportionally, so the whole UI gets denser on
-     * narrower windows without per-component breakpoint juggling.
-     *
-     * Breakpoints implied:
-     *   320px viewport:  font-size ≈ 13.0px  (small phone)
-     *   768px viewport:  font-size ≈ 13.6px  (tablet)
-     *  1280px viewport:  font-size ≈ 16.0px  (desktop full)
-     *  1920px+ viewport: font-size = 16px (clamped)
+     * viewport width. Every Tailwind utility that uses rem scales proportionally,
+     * so the whole UI gets denser on narrower windows.
      */
     font-size: clamp(13px, 0.78vw + 8px, 16px);
+    /* Smooth theme transitions so toggling light/dark doesn't flash. */
+    color-scheme: light dark;
+    transition: background-color 0.18s ease, color 0.18s ease;
   }
   body {
     @apply font-sans antialiased;
     font-feature-settings: "cv11", "ss01";
+    /* iOS-style font smoothing on macOS / Webkit. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   .nums {
     font-variant-numeric: tabular-nums;
   }
-  /* Native <select> dropdowns render <option>s with browser default
-     styling (usually white bg + black text). Force the dark-theme palette
-     so the dropdown menu is readable on the dark UI. */
+  /* Native <select> dropdowns render <option>s with browser default styling.
+     Use the dynamic theme tokens so options match the active palette. */
   select option {
-    background-color: #0a0a0a;
-    color: #f4f4f5;
+    background-color: rgb(var(--background));
+    color: rgb(var(--fg));
+  }
+  /* iOS-style focus ring — soft accent halo rather than browser default. */
+  *:focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
 @layer components {
   /*
-   * `.card` was previously `rounded-lg border border-border bg-panel` which
-   * read as a hard-edged box around every filter/table on the dashboard. A
-   * real user said the borders looked like "boxed template" output —
-   * everything should blend with the page background.
-   *
-   * New approach: a soft inset panel — no border, just a slightly lighter
-   * background tone (rgba 4% white) on top of the page bg. Rounded corners
-   * stay so child content has a defined region; visible "line" goes away.
-   * Pages that genuinely need a divider can still use border-t/border-b
-   * utilities one-off.
+   * `.card` was previously a hard-edged border box. Now: soft translucent
+   * inset that blends into the page bg, with a hint of backdrop blur for
+   * the iOS frosted-glass feel on overlapping surfaces.
    */
   .card {
-    @apply rounded-lg bg-white/[0.025];
+    background-color: rgb(var(--panel));
+    border-radius: 14px;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
   }
+  /* iOS-style pill button — fully rounded, generous horizontal padding,
+     subtle scale + opacity on press. */
   .btn {
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition;
+    @apply inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-medium transition;
+    transition: transform 0.1s ease, background-color 0.15s ease, opacity 0.15s ease;
+  }
+  .btn:active {
+    transform: scale(0.97);
+    opacity: 0.92;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-blue-500;
+    @apply btn text-white;
+    background-color: rgb(var(--accent));
+  }
+  .btn-primary:hover {
+    background-color: rgb(var(--accent-hover));
   }
   .btn-ghost {
-    @apply btn text-muted hover:text-fg hover:bg-panel;
+    @apply btn;
+    color: rgb(var(--muted));
+  }
+  .btn-ghost:hover {
+    color: rgb(var(--fg));
+    background-color: rgb(var(--panel));
   }
 }
 
-/* Radial polygon mount animation — used by <ScoreRadial>. The polygon's
-   stroke draws in, then the fill + vertex dots fade in. Skipped when the
-   user has prefers-reduced-motion set (handled by the media query below). */
+/* Radial polygon mount animation — used by <ScoreRadial>. */
 @keyframes radial-draw {
   0%   { stroke-dashoffset: 600; opacity: 0; }
   40%  { opacity: 1; }
@@ -86,5 +178,8 @@
   .radial-fade-in {
     animation: none;
     stroke-dasharray: 0;
+  }
+  html {
+    transition: none;
   }
 }
