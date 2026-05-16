@@ -1,7 +1,29 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+/**
+ * Every fetch in this file passes `credentials: "include"` so the
+ * `tapeline_session` cookie travels with the request.
+ *
+ * Why this matters: the frontend lives at `tapeline.io` and the API at
+ * `api.tapeline.io`. Even though the cookie is set with Domain=tapeline.io
+ * (which makes it visible to both), `fetch()` defaults to
+ * `credentials: "same-origin"` — which considers `api.*` subdomain a
+ * different origin from `tapeline.io` and DROPS the cookie. Result:
+ * every authenticated POST/DELETE/GET-with-auth returned 401 in production
+ * even though the user was clearly signed in. Live bug observed
+ * 2026-05-17 on "Add to watchlist" and "Notify me on news" buttons.
+ *
+ * The Bearer-dev-bypass header below is still sent for local dev (where
+ * the backend honours it). In production the backend ignores it
+ * (auth.py:142 only accepts it when `app_env=development`), so the cookie
+ * is the only auth signal that actually applies. Cookie + dev-bypass
+ * together is harmless in prod and works in dev.
+ */
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -239,6 +261,7 @@ export type TrackedFund = {
 async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -252,6 +275,7 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
 async function del<T>(path: string, token?: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
+    credentials: "include",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -261,6 +285,7 @@ async function del<T>(path: string, token?: string): Promise<T> {
 async function getAuth<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
