@@ -188,6 +188,80 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
     return {"count": len(symbols), "symbols": symbols}
 
 
+@app.get("/api/public/signals")
+async def public_signals(
+    limit: int = 1000,
+    offset: int = 0,
+    min_score: float = 0,
+    signal: str | None = None,
+) -> dict[str, object]:
+    """Public, no-auth, no-tier-cap view of EVERY scored ticker.
+
+    The companion to the /signals frontend page. Returns the full
+    universe (or a sorted/filtered slice of it) so unauthenticated
+    visitors can see exactly what Tapeline is scoring — same "public
+    formula, public scorecard, public everything" stance as /scorecard
+    and /how-it-works.
+
+    Distinct from /api/scanner which tier-gates row count (Free → 10)
+    AND applies the 24h delay for unauth/free visitors. /api/public/signals
+    has neither cap nor delay — every visitor sees the same scores the
+    paid scanner does. The paid scanner's value moves to its features
+    (filter UX, watchlist, alerts, exports), not data access.
+
+    Sorted desc by score. Capped at 2000 rows per request to keep the
+    JSON payload reasonable; the full universe is currently ~500 names,
+    so a single call returns everything.
+    """
+    from sqlalchemy import desc, select
+
+    from app.db import session_scope
+    from app.models import Ticker
+
+    capped = max(1, min(limit, 2000))
+    stmt = (
+        select(Ticker)
+        .where(Ticker.score.is_not(None))
+        .where(Ticker.score >= min_score)
+    )
+    if signal:
+        stmt = stmt.where(Ticker.signal == signal)
+    stmt = stmt.order_by(desc(Ticker.score)).limit(capped).offset(max(0, offset))
+
+    async with session_scope() as session:
+        result = await session.execute(stmt)
+        rows = result.scalars().all()
+
+    return {
+        "count": len(rows),
+        "limit": capped,
+        "offset": offset,
+        "items": [
+            {
+                "symbol": r.symbol,
+                "name": r.name,
+                "sector": r.sector,
+                "asset_class": r.asset_class,
+                "score": r.score,
+                "signal": r.signal,
+                "price": r.price,
+                "change_pct_1d": r.change_pct_1d,
+                "change_pct_5d": r.change_pct_5d,
+                "change_pct_1m": r.change_pct_1m,
+                "confidence_pct": r.confidence_pct,
+                "sub_trend": r.sub_trend,
+                "sub_rs": r.sub_rs,
+                "sub_fundamentals": r.sub_fundamentals,
+                "sub_momentum": r.sub_momentum,
+                "sub_macro": r.sub_macro,
+                "sub_smart_money": r.sub_smart_money,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     """Bare-bones liveness probe — must stay cheap (no DB, no external calls).
