@@ -27,3 +27,24 @@ def _create_tables() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     asyncio.run(_run())
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:
+    """Reset the process-global token-bucket limiter before EVERY test.
+
+    Without this, `test_zz_rate_limit_kicks_in` (in test_smoke.py) hammers
+    /api/scanner 150 times to trigger the limiter, leaving the buckets
+    dry. Any test that pytest collects alphabetically AFTER test_smoke.py
+    — including everything in test_t*.py, test_w*.py, and the new
+    test_ticker_*.py / test_news_*.py / test_re_*.py / test_email_*.py
+    — picks up the same module-global limiter and 429s on its first hit.
+    Manifested as a 429 in test_financials_public_no_auth that took an
+    embarrassingly long time to diagnose in PR #50.
+
+    Resetting per-test isolates the limiter cleanly. The limiter's own
+    behaviour is exercised by test_zz_rate_limit_kicks_in itself.
+    """
+    from app.services.rate_limit import limiter
+
+    limiter._buckets.clear()
