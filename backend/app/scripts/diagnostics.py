@@ -124,14 +124,14 @@ async def main() -> None:
     print(f"\n[USERS]   total={total_users}  organic={non_owner}  last_24h={recent_24h}  last_7d={recent_7d}")
     print(f"          tiers: free={tier_counts['free']}  pro={tier_counts['pro']}  premium={tier_counts['premium']}")
 
-    print(f"\n[SIGNUPS] last 10:")
+    print("\n[SIGNUPS] last 10:")
     for email, tier, created, last_seen in recent_signups:
         last_seen_str = f"  last_seen={last_seen.isoformat()}" if last_seen else "  never-seen-again"
         print(f"  {created.isoformat()}  [{tier:7s}]  {email}{last_seen_str}")
 
     print(f"\n[PAID]    subscriptions: active={paid_subs}  total={total_subs}")
     print(f"          stripe_webhook_events_total={total_webhooks}")
-    print(f"          recent webhooks:")
+    print("          recent webhooks:")
     for evt, ts in recent_webhooks:
         print(f"            {ts.isoformat()}  {evt}")
 
@@ -140,11 +140,11 @@ async def main() -> None:
     print(f"\n[DATA]    tickers={total_tickers}  scored={scored}  distinct_sectors={sectors}")
     print(f"          worker_lag={worker_lag:.1f} min" if worker_lag is not None else "          worker_lag=NEVER_RAN")
     print(f"          news_items={total_news}  insider_transactions={total_insider}")
-    print(f"          latest news:")
+    print("          latest news:")
     for pub_at, pub in latest_news:
         print(f"            {pub_at.isoformat()}  {pub}")
 
-    print(f"\n[SECTORS] (top 10 by ticker count):")
+    print("\n[SECTORS] (top 10 by ticker count):")
     for sector, n in sector_rows[:10]:
         print(f"  {sector or '<null>':30s} {n:5d}")
     if len(sector_rows) > 10:
