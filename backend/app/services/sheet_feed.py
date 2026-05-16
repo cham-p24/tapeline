@@ -315,3 +315,162 @@ async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
         counts["total"], counts["inserted"], counts["updated"],
     )
     return counts
+
+
+# =============================================================================
+# Phase 2 — additional tabs (SPIKE / SMART MONEY & CONGRESS / MARKET / ETF)
+# =============================================================================
+# Each tab follows the same pattern as ALL SIGNALS: parse the CSV into
+# normalized dicts, then upsert into the matching Tapeline table. Tab-level
+# env vars (spike_intelligence_csv_url etc.) gate each independently so the
+# user can light them up one at a time. RUN HEALTH is intentionally NOT
+# pulled — user explicitly dropped it from Phase 2 scope.
+
+
+# ---- SPIKE INTELLIGENCE -----------------------------------------------------
+
+def parse_spike_intelligence_csv(text: str) -> list[dict[str, Any]]:
+    """Parse the SPIKE INTELLIGENCE tab into normalized squeeze rows.
+
+    Column order in the sheet (as of 2026-05-16):
+      A ticker, B last, C move_bar_pc, D move_day_pc, E volume_multipl,
+      F source, G (unused), H score, I signal, J last_timestamp,
+      K snapshot_time, L yahoo_sym, M data_provid, N prev_bar,
+      O day_open, P last_volume, Q data_age_minute, R data_status,
+      S ref_price, T source_confidence, U decision_gate
+
+    Maps to Tapeline's SqueezeSetup model:
+      ticker            → symbol
+      move_day_pc       → spike_score (clamped 0-100 from the absolute %)
+      volume_multipl    → volume_multiple
+      source_confidence → obv_trend (rough proxy; we strip the "(N/100)" suffix)
+      decision_gate     → breakout_type
+      source            → suggested_window (the tab classifies windows)
+      decision_gate     → reason (verbatim)
+
+    squeeze_days isn't in the sheet — the signal-system doesn't expose how
+    many days a ticker has been in a tight range. We default to 0 and rely
+    on Tapeline's own squeeze detection (services/squeeze.py) to fill that
+    in for the tickers it independently flags.
+    """
+    rows: list[dict[str, Any]] = []
+    reader = csv.DictReader(io.StringIO(text))
+    for raw in reader:
+        symbol = (raw.get("ticker") or "").strip().upper()
+        if not symbol or symbol == "TICKER" or len(symbol) > 12:
+            continue
+
+        move_day = _parse_float(raw.get("move_day_pc"))
+        # spike_score: absolute day move, clamped 0-100. A 5% move scores 50,
+        # 10%+ scores 100. Direction is folded in via decision_gate text so
+        # the spike_score itself measures intensity not direction.
+        spike_score = None
+        if move_day is not None:
+            spike_score = max(0.0, min(100.0, abs(move_day) * 10.0))
+
+        rows.append({
+            "symbol":         symbol,
+            "spike_score":    spike_score if spike_score is not None else 0.0,
+            "squeeze_days":   0,           # not exposed by the sheet
+            "volume_multiple": _parse_float(raw.get("volume_multipl")) or 1.0,
+            "obv_trend":      _strip_confidence_suffix(raw.get("source_confidence")),
+            "breakout_type":  _short(raw.get("decision_gate"), 40),
+            "suggested_window": _short(raw.get("source"), 40) or "—",
+            "reason":         _short(raw.get("decision_gate"), 300) or "Flagged by signal-system spike intelligence",
+        })
+    return rows
+
+
+def _strip_confidence_suffix(v: Any) -> str:
+    """The sheet's source_confidence is 'HIGH (88/100)' / 'TECHNICAL-LED (54/100)'.
+    For SqueezeSetup.obv_trend (capped at String(20)) we strip the trailing
+    score-in-parens and uppercase the prefix.
+    """
+    if not v:
+        return "NEUTRAL"
+    s = str(v).strip().upper()
+    # Drop the "(N/100)" tail
+    if "(" in s:
+        s = s.split("(", 1)[0].strip()
+    return s[:20] or "NEUTRAL"
+
+
+def _short(v: Any, cap: int) -> str:
+    """Truncate a sheet cell to fit a tight VARCHAR — same defensive pattern
+    as news_feed.clip_news_row but inline because callers vary in cap."""
+    if not v:
+        return ""
+    s = str(v).strip()
+    return s[:cap]
+
+
+async def upsert_spikes(
+    session: AsyncSession, rows: list[dict[str, Any]]
+) -> dict[str, int]:
+    """Insert-or-update SqueezeSetup rows from sheet data.
+
+    The sheet's SPIKE INTELLIGENCE is broader than Tapeline's previous
+    squeeze detection — it catches movement-confirmed setups (volume +
+    intraday range) in addition to compression-release squeezes. We let
+    the sheet drive all of them; Tapeline's services/squeeze.py logic
+    layers ON TOP via a separate symbol set, not overlapping.
+    """
+    from app.models import SqueezeSetup
+
+    inserted = updated = 0
+    for r in rows:
+        existing = await session.execute(
+            select(SqueezeSetup).where(SqueezeSetup.symbol == r["symbol"])
+        )
+        sq = existing.scalar_one_or_none()
+        if sq is None:
+            sq = SqueezeSetup(
+                symbol=r["symbol"],
+                spike_score=r["spike_score"],
+                squeeze_days=r["squeeze_days"],
+                volume_multiple=r["volume_multiple"],
+                obv_trend=r["obv_trend"],
+                breakout_type=r["breakout_type"],
+                suggested_window=r["suggested_window"],
+                reason=r["reason"],
+            )
+            session.add(sq)
+            inserted += 1
+        else:
+            sq.spike_score = r["spike_score"]
+            sq.volume_multiple = r["volume_multiple"]
+            sq.obv_trend = r["obv_trend"]
+            sq.breakout_type = r["breakout_type"]
+            sq.suggested_window = r["suggested_window"]
+            sq.reason = r["reason"]
+            updated += 1
+
+    await session.commit()
+    return {"inserted": inserted, "updated": updated, "total": inserted + updated}
+
+
+async def refresh_spikes_from_workbook(session: AsyncSession) -> dict[str, int]:
+    """Entrypoint paralleling refresh_from_workbook for the SPIKE tab."""
+    url = get_settings().spike_intelligence_csv_url
+    if not url:
+        return {"inserted": 0, "updated": 0, "total": 0, "skipped": 1}
+    try:
+        text = await fetch_csv(url)
+    except Exception:
+        logger.exception("sheet_feed.spike_fetch_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        rows = parse_spike_intelligence_csv(text)
+    except Exception:
+        logger.exception("sheet_feed.spike_parse_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        counts = await upsert_spikes(session, rows)
+    except Exception:
+        logger.exception("sheet_feed.spike_upsert_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    logger.info(
+        "sheet_feed.spikes_refreshed rows=%d ins=%d upd=%d",
+        counts["total"], counts["inserted"], counts["updated"],
+    )
+    return counts

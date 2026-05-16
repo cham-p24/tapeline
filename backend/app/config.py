@@ -52,6 +52,18 @@ class Settings(BaseSettings):
     # (5 min) — well under Google's public-CSV quota, fresh enough for a sheet
     # that updates from the signal-system every few hours.
     signal_sheet_refresh_seconds: int = 300
+    # Phase 2 sheet tabs — each is its own published-CSV URL. The signal-system
+    # workbook has one tab per intelligence layer; Tapeline reads them
+    # separately so each tab can be cached + parsed + upserted on its own
+    # cadence without one slow tab blocking the others.
+    #
+    # All four use the same 5-min throttle as signal_sheet_refresh_seconds.
+    # Dormant when each respective URL is unset; configured independently so
+    # the user can light up tabs one at a time as the data quality firms up.
+    spike_intelligence_csv_url: str = ""
+    market_intelligence_csv_url: str = ""
+    smart_money_congress_csv_url: str = ""
+    etf_benchmarks_csv_url: str = ""
 
     # ---- Auth (Clerk) ----
     clerk_secret_key: str = ""
