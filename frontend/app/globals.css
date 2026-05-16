@@ -5,6 +5,19 @@
 @layer base {
   html {
     @apply bg-background text-fg;
+    /*
+     * Fluid type — scales the root font size between 13px and 16px based on
+     * viewport width. Every Tailwind utility that uses rem (text-xs, text-sm,
+     * spacing-1, etc.) scales proportionally, so the whole UI gets denser on
+     * narrower windows without per-component breakpoint juggling.
+     *
+     * Breakpoints implied:
+     *   320px viewport:  font-size ≈ 13.0px  (small phone)
+     *   768px viewport:  font-size ≈ 13.6px  (tablet)
+     *  1280px viewport:  font-size ≈ 16.0px  (desktop full)
+     *  1920px+ viewport: font-size = 16px (clamped)
+     */
+    font-size: clamp(13px, 0.78vw + 8px, 16px);
   }
   body {
     @apply font-sans antialiased;
@@ -23,8 +36,20 @@
 }
 
 @layer components {
+  /*
+   * `.card` was previously `rounded-lg border border-border bg-panel` which
+   * read as a hard-edged box around every filter/table on the dashboard. A
+   * real user said the borders looked like "boxed template" output —
+   * everything should blend with the page background.
+   *
+   * New approach: a soft inset panel — no border, just a slightly lighter
+   * background tone (rgba 4% white) on top of the page bg. Rounded corners
+   * stay so child content has a defined region; visible "line" goes away.
+   * Pages that genuinely need a divider can still use border-t/border-b
+   * utilities one-off.
+   */
   .card {
-    @apply rounded-lg border border-border bg-panel;
+    @apply rounded-lg bg-white/[0.025];
   }
   .btn {
     @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition;

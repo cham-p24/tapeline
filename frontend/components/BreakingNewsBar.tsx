@@ -88,7 +88,7 @@ export function BreakingNewsBar() {
 
   return (
     <div
-      className="mb-4 rounded-lg border border-border bg-panel/60 px-3 py-2"
+      className="mb-4 rounded-lg bg-white/[0.025] px-3 py-2"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -143,7 +143,7 @@ function NewsCard({ item }: { item: Headline }) {
   const sentTone = sentimentTone(item.sentiment);
   const linkTarget = singleTicker(item.tickers);
   return (
-    <div className="flex items-start gap-2 rounded-md border border-border/40 bg-black/20 px-2.5 py-2 transition hover:border-border">
+    <div className="flex items-start gap-2 rounded-md bg-black/20 px-2.5 py-2 transition hover:bg-black/30">
       <span
         className={`mt-1 flex-shrink-0 h-1.5 w-1.5 rounded-full ${sentTone.dot}`}
         title={sentTone.label}
