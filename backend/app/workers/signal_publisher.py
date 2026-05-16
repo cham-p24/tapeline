@@ -265,7 +265,10 @@ async def tick() -> None:
     ):
         try:
             from app.services.sheet_feed import (
+                refresh_etfs_from_workbook,
                 refresh_from_workbook,
+                refresh_market_from_workbook,
+                refresh_smart_money_from_workbook,
                 refresh_spikes_from_workbook,
             )
             async with session_scope() as sheet_session:
@@ -283,9 +286,24 @@ async def tick() -> None:
                             "sheet_feed.spikes_tick rows=%d ins=%d upd=%d",
                             spike_counts["total"], spike_counts["inserted"], spike_counts["updated"],
                         )
-                # Phase 2B/2C/2D — additional tabs follow the same pattern;
-                # adding them here when their refresh_X_from_workbook()
-                # functions land.
+                if settings.etf_benchmarks_csv_url:
+                    etf_counts = await refresh_etfs_from_workbook(sheet_session)
+                    if etf_counts.get("total"):
+                        logger.info(
+                            "sheet_feed.etfs_tick rows=%d ins=%d upd=%d",
+                            etf_counts["total"], etf_counts["inserted"], etf_counts["updated"],
+                        )
+                if settings.market_intelligence_csv_url:
+                    market_counts = await refresh_market_from_workbook(sheet_session)
+                    if market_counts.get("total"):
+                        logger.info("sheet_feed.market_tick total=%d", market_counts["total"])
+                if settings.smart_money_congress_csv_url:
+                    smart_counts = await refresh_smart_money_from_workbook(sheet_session)
+                    if smart_counts.get("total"):
+                        logger.info(
+                            "sheet_feed.smart_money_tick rows=%d (skipped=%d)",
+                            smart_counts["total"], smart_counts.get("skipped", 0),
+                        )
         except Exception:
             logger.exception("sheet_feed.tick_failed")
         _last_sheet_refresh = started

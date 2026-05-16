@@ -474,3 +474,391 @@ async def refresh_spikes_from_workbook(session: AsyncSession) -> dict[str, int]:
         counts["total"], counts["inserted"], counts["updated"],
     )
     return counts
+
+
+# ---- ETF BENCHMARKS ---------------------------------------------------------
+
+def parse_etf_benchmarks_csv(text: str) -> list[dict[str, Any]]:
+    """Parse ETF BENCHMARKS tab.
+
+    Column order (as of 2026-05-16):
+      A Ticker, B Name, C (note continuation), D Note, E Score, F Signal,
+      G 3M Return %, H 6M Return %, I 1Y Return %, J Above 200DMA,
+      K Beats SPY (6M), L vs SPY 6M %, M Action
+
+    Maps to the same Ticker schema as parse_all_signals_csv but with
+    asset_class='etf'. Tapeline doesn't need a separate EtfBenchmark
+    table — ETFs are tickers too, just with a different asset_class.
+    The /signals public page already groups by signal tier so ETFs
+    naturally surface alongside equities.
+
+    Section-header rows (text in column A like "--- 3. INTERNATIONAL ---")
+    + the "Not in scan" rows (score = 0, no real data) are filtered out
+    so the upsert doesn't poison real ticker rows.
+    """
+    rows: list[dict[str, Any]] = []
+    reader = csv.DictReader(io.StringIO(text))
+    for raw in reader:
+        symbol = (raw.get("Ticker") or "").strip().upper()
+        if not symbol or symbol == "TICKER" or len(symbol) > 12:
+            continue
+        # Section headers have non-ticker-looking content
+        if symbol.startswith("-") or symbol.startswith("="):
+            continue
+
+        signal_raw = (raw.get("Signal") or "").strip().upper()
+        # Skip "Not in scan" — those are ETFs flagged by the sheet but
+        # without real score data; upserting them would create junk rows.
+        if signal_raw == "NOT IN SCAN" or not signal_raw:
+            continue
+
+        score = _parse_float(raw.get("Score"))
+        rows.append({
+            "symbol":         symbol,
+            "name":           (raw.get("Name") or "").strip() or symbol,
+            "asset_class":    "etf",
+            "score":          score,
+            "signal":         score_to_signal(score),   # descriptive labels
+            "change_pct_3m":  _parse_float(raw.get("3M Return %")),
+            "change_pct_6m":  _parse_float(raw.get("6M Return %")),
+            "change_pct_1y":  _parse_float(raw.get("1Y Return %")),
+            "vs_spy_6m":      _parse_float(raw.get("vs SPY 6M %")),
+            "above_200dma":   (raw.get("Above 200DMA") or "").strip().upper() == "TRUE",
+            "note":           _short(raw.get("Note"), 300),
+            "sector":         _short(raw.get("Name"), 80),  # ETF "sector" = its theme name
+        })
+    return rows
+
+
+async def upsert_etfs(
+    session: AsyncSession, rows: list[dict[str, Any]]
+) -> dict[str, int]:
+    """Upsert ETF BENCHMARKS rows into Ticker table with asset_class='etf'.
+
+    Reuses the same Ticker model as equities (no separate EtfBenchmark
+    table). The /signals public page renders ETFs and equities in the
+    same table; users can mentally filter by symbol shape (3-4 letter
+    funds like SPY, VTI vs equity tickers) or via the future sector
+    filter once asset_class is exposed to clients.
+    """
+    inserted = updated = 0
+    for r in rows:
+        existing_q = await session.execute(
+            select(Ticker).where(Ticker.symbol == r["symbol"])
+        )
+        t = existing_q.scalar_one_or_none()
+        if t is None:
+            t = Ticker(
+                symbol=r["symbol"],
+                name=r["name"],
+                asset_class="etf",
+                sector=r["sector"],
+            )
+            session.add(t)
+            inserted += 1
+        else:
+            # Don't downgrade asset_class — if a symbol exists as 'equity'
+            # somehow (mock-feed seed) but the sheet flags it as ETF, the
+            # sheet wins. The asset_class column was meant to distinguish.
+            t.asset_class = "etf"
+            t.name = r["name"]
+            if r["sector"]:
+                t.sector = r["sector"]
+            updated += 1
+
+        t.score = r["score"]
+        t.signal = r["signal"]
+        # 1M proxy from 3M / 3 (ETFs barely move intraday; coarser is fine)
+        if r["change_pct_3m"] is not None:
+            t.change_pct_1m = r["change_pct_3m"] / 3.0
+
+    await session.commit()
+    return {"inserted": inserted, "updated": updated, "total": inserted + updated}
+
+
+async def refresh_etfs_from_workbook(session: AsyncSession) -> dict[str, int]:
+    url = get_settings().etf_benchmarks_csv_url
+    if not url:
+        return {"inserted": 0, "updated": 0, "total": 0, "skipped": 1}
+    try:
+        text = await fetch_csv(url)
+    except Exception:
+        logger.exception("sheet_feed.etf_fetch_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        rows = parse_etf_benchmarks_csv(text)
+    except Exception:
+        logger.exception("sheet_feed.etf_parse_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        counts = await upsert_etfs(session, rows)
+    except Exception:
+        logger.exception("sheet_feed.etf_upsert_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    logger.info("sheet_feed.etfs_refreshed rows=%d ins=%d upd=%d",
+                counts["total"], counts["inserted"], counts["updated"])
+    return counts
+
+
+# ---- MARKET INTELLIGENCE ----------------------------------------------------
+
+def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
+    """Parse the MARKET INTELLIGENCE tab — key-value layout, not row-per-ticker.
+
+    The sheet is a vertical dashboard of macro indicators with a *hybrid*
+    layout: column A is the indicator name, but the numeric value can live
+    in EITHER column B ('Value / Details') OR column C ('Note'). Two
+    flavours of row:
+
+      narrative rows (top of tab) — value is descriptive text in column B,
+        with optional commentary in C. e.g.
+          Market mode | "STRONG BULL. VIX is 18.4, ..."   | controls aggression
+          Rates + inflation | "Fed funds is 3.64%; CPI YoY is 3.95%. Rates moderate" |
+
+      macro rows (lower in tab) — column A is the indicator, column B
+        REPEATS the indicator name, and column C holds the bare number.
+        e.g.
+          10Y Treasury Yield | 10Y Treasury Yield | 4.47
+          VIX Fear Index     | VIX Fear Index     | 18.4
+
+    Reading only column B would silently corrupt macro rows: `_extract_number`
+    pulls "10" out of "10Y Treasury Yield" instead of "4.47" from Note.
+    Codex flagged this on PR #55. Fix: store both columns per indicator and,
+    when extracting numbers, prefer Note (column C) and fall back to
+    Value/Details (column B).
+
+    We map to RegimeState columns:
+      'Market mode'          → regime (BULL/BEAR/CAUTIOUS/NEUTRAL from text)
+      'VIX Fear Index'       → vix
+      'US Dollar Index (DXY)' → dxy
+      '10Y Treasury Yield'   → yield_10y
+      'Rates + inflation'    → rate_direction inference
+
+    Returns a dict that upsert_market_regime can write to the single-row
+    RegimeState table. Missing fields default to safe values so an
+    incomplete sheet doesn't crash the upsert.
+    """
+    import re
+
+    reader = csv.DictReader(io.StringIO(text))
+    # indicator -> (value_details, note) — store both so number extraction
+    # can prefer the column that actually holds the digit.
+    kv: dict[str, tuple[str, str]] = {}
+    for raw in reader:
+        # The header is "Indicator / Field" + "Value / Details" + "Note"
+        indicator = (raw.get("Indicator / Field") or "").strip()
+        value = (raw.get("Value / Details") or "").strip()
+        note = (raw.get("Note") or "").strip()
+        if not indicator or indicator.startswith("-"):
+            continue
+        kv[indicator] = (value, note)
+
+    _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+    def _extract_from(s: str) -> float | None:
+        """Pull the first float out of a free-form string."""
+        m = _NUMBER_RE.search(s or "")
+        if not m:
+            return None
+        try:
+            return float(m.group(0))
+        except ValueError:
+            return None
+
+    def _number_for(indicator_key: str) -> float | None:
+        """Look up an indicator and return its numeric value.
+
+        Prefers the Note column (column C) over Value/Details (column B) —
+        the macro rows put the number in C and repeat the label in B, so
+        reading C-first avoids picking the leading digits out of labels
+        like '10Y Treasury Yield'. Falls back to B if C is blank/non-numeric.
+        """
+        pair = kv.get(indicator_key)
+        if not pair:
+            return None
+        value, note = pair
+        return _extract_from(note) if _extract_from(note) is not None else _extract_from(value)
+
+    # Market mode — text classification from Value/Details (column B). The
+    # column-B narrative is where the BULL/BEAR/CAUTIOUS verdict actually lives.
+    mode_pair = kv.get("Market mode")
+    mode = (mode_pair[0] if mode_pair else "").upper()
+    if "BULL" in mode:
+        regime = "BULL"
+    elif "BEAR" in mode:
+        regime = "BEAR"
+    elif "CAUTIOUS" in mode or "CAUTION" in mode:
+        regime = "CAUTIOUS"
+    else:
+        regime = "NEUTRAL"
+
+    # Rate direction — derive from the 'Rates + inflation' narrative text in B.
+    rate_pair = kv.get("Rates + inflation")
+    rate_text = (rate_pair[0] if rate_pair else "").lower()
+    if "rising" in rate_text or "hik" in rate_text:
+        rate_direction = "RISING"
+    elif "fall" in rate_text or "cut" in rate_text:
+        rate_direction = "FALLING"
+    else:
+        rate_direction = "SIDEWAYS"
+
+    return {
+        "regime":         regime,
+        "vix":            _number_for("VIX Fear Index") or 18.0,
+        "dxy":            _number_for("US Dollar Index (DXY)") or 100.0,
+        "yield_10y":      _number_for("10Y Treasury Yield") or 4.0,
+        "rate_direction": rate_direction,
+        # breadth_pct + sector_leaders aren't in the sheet — keep existing
+        # values if a row exists, otherwise default.
+        "breadth_pct_default":  50.0,
+        "sector_leaders_default": "—",
+    }
+
+
+async def upsert_market_regime(session: AsyncSession, parsed: dict[str, Any]) -> dict[str, int]:
+    """Update the single-row RegimeState table from the parsed sheet values."""
+    from app.models import RegimeState
+
+    existing = (await session.execute(select(RegimeState))).scalar_one_or_none()
+    if existing is None:
+        rs = RegimeState(
+            id=1,
+            regime=parsed["regime"],
+            vix=parsed["vix"],
+            dxy=parsed["dxy"],
+            yield_10y=parsed["yield_10y"],
+            rate_direction=parsed["rate_direction"],
+            breadth_pct=parsed["breadth_pct_default"],
+            sector_leaders=parsed["sector_leaders_default"],
+        )
+        session.add(rs)
+        await session.commit()
+        return {"inserted": 1, "updated": 0, "total": 1}
+
+    existing.regime = parsed["regime"]
+    existing.vix = parsed["vix"]
+    existing.dxy = parsed["dxy"]
+    existing.yield_10y = parsed["yield_10y"]
+    existing.rate_direction = parsed["rate_direction"]
+    await session.commit()
+    return {"inserted": 0, "updated": 1, "total": 1}
+
+
+async def refresh_market_from_workbook(session: AsyncSession) -> dict[str, int]:
+    url = get_settings().market_intelligence_csv_url
+    if not url:
+        return {"inserted": 0, "updated": 0, "total": 0, "skipped": 1}
+    try:
+        text = await fetch_csv(url)
+    except Exception:
+        logger.exception("sheet_feed.market_fetch_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        parsed = parse_market_intelligence_csv(text)
+    except Exception:
+        logger.exception("sheet_feed.market_parse_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        counts = await upsert_market_regime(session, parsed)
+    except Exception:
+        logger.exception("sheet_feed.market_upsert_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    logger.info("sheet_feed.market_refreshed regime=%s vix=%.1f yield=%.2f rate=%s",
+                parsed["regime"], parsed["vix"], parsed["yield_10y"], parsed["rate_direction"])
+    return counts
+
+
+# ---- SMART MONEY & CONGRESS -------------------------------------------------
+
+def parse_smart_money_csv(text: str) -> list[dict[str, Any]]:
+    """Parse SMART MONEY & CONGRESS rows into ticker boost signals.
+
+    The tab has multiple categories of smart-money signal:
+      - Congress STOCK Act trades (Nancy Pelosi, Josh Gottheimer, ...)
+      - Committee × industry overlap conflicts
+      - Elite hedge fund holdings (Coatue, Pershing Square, Appaloosa,
+        Tiger Global, Duquesne, ...)
+      - Elite 13F investor activity (Activist, macro, tech/growth)
+      - SEC Form 4 insider buying (Corporate insiders / TICKER)
+
+    Rather than try to parse each row's free-text "Recent Buy / Holding
+    Signal" into a fully-typed CongressTrade or InsiderTransaction row
+    (the sheet's data is descriptive, not structured), we **boost
+    sub_smart_money** for tickers that appear in the tab. Multiple
+    appearances mean stronger conviction across smart-money signals.
+
+    Returns list of {symbol, signal_count, sub_smart_money_score} dicts.
+    Score formula:
+      base 60 + 10 per additional signal, capped at 100
+      (1 signal = 60, 2 = 70, ..., 5+ = 100)
+    """
+    appearances: dict[str, int] = {}
+    reader = csv.DictReader(io.StringIO(text))
+    for raw in reader:
+        symbol = (raw.get("Ticker") or "").strip().upper()
+        category = (raw.get("Category") or "").strip()
+        # Skip section headers, data-source explainers, blank rows
+        if not symbol or symbol == "TICKER" or symbol == "—" or len(symbol) > 12:
+            continue
+        if "Section header" in category or "Data freshness" in category:
+            continue
+        appearances[symbol] = appearances.get(symbol, 0) + 1
+
+    rows: list[dict[str, Any]] = []
+    for symbol, n in appearances.items():
+        score = min(100.0, 60.0 + (n - 1) * 10.0)
+        rows.append({
+            "symbol":   symbol,
+            "signal_count":      n,
+            "sub_smart_money":   score,
+        })
+    return rows
+
+
+async def upsert_smart_money(
+    session: AsyncSession, rows: list[dict[str, Any]]
+) -> dict[str, int]:
+    """Update Ticker.sub_smart_money for symbols flagged by the SMART MONEY tab.
+
+    Only WRITES to sub_smart_money — leaves all other Ticker columns alone.
+    If a symbol in the sheet doesn't exist in Ticker yet (rare — the
+    universe is already broader after PR #52 lit up ALL SIGNALS), we skip
+    it rather than insert a stub. The ALL SIGNALS feed is responsible
+    for universe membership; SMART MONEY just enriches.
+    """
+    updated = skipped = 0
+    for r in rows:
+        existing_q = await session.execute(
+            select(Ticker).where(Ticker.symbol == r["symbol"])
+        )
+        t = existing_q.scalar_one_or_none()
+        if t is None:
+            skipped += 1
+            continue
+        t.sub_smart_money = r["sub_smart_money"]
+        updated += 1
+    await session.commit()
+    return {"inserted": 0, "updated": updated, "total": updated, "skipped": skipped}
+
+
+async def refresh_smart_money_from_workbook(session: AsyncSession) -> dict[str, int]:
+    url = get_settings().smart_money_congress_csv_url
+    if not url:
+        return {"inserted": 0, "updated": 0, "total": 0, "skipped": 1}
+    try:
+        text = await fetch_csv(url)
+    except Exception:
+        logger.exception("sheet_feed.smart_money_fetch_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        rows = parse_smart_money_csv(text)
+    except Exception:
+        logger.exception("sheet_feed.smart_money_parse_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    try:
+        counts = await upsert_smart_money(session, rows)
+    except Exception:
+        logger.exception("sheet_feed.smart_money_upsert_failed")
+        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    logger.info("sheet_feed.smart_money_refreshed rows=%d", counts["total"])
+    return counts
