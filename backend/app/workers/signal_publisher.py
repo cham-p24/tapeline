@@ -876,45 +876,70 @@ async def _refresh_insider_cache() -> None:
     )
 
 
-async def _backfill_sectors() -> None:
+async def _backfill_sectors(cap: int = 2500) -> None:
     """
-    Find Tickers with sector="Unknown" or NULL and fetch their sector from
-    Finnhub /stock/profile2. Useful after universe-discovery adds new tickers
-    (which arrive with sector="Unknown" because Finnhub /stock/profile2 is
-    too slow to call inline during discovery).
+    Find Tickers with sector="Unknown" / "N/A" / NULL and fetch their sector
+    from Finnhub /stock/profile2. Useful after universe-discovery adds new
+    tickers (which arrive with sector="Unknown" because Finnhub /stock/profile2
+    is too slow to call inline during discovery).
+
+    Cap bumped from 200 → 2500 on 2026-05-16 after a user observed 1,430
+    tickers stuck in "Uncategorized" on the heatmap. At 200/day the catch-up
+    would take 7+ days; at 2,500 it's one ~46-minute run. Finnhub free tier
+    is 60 req/min so 2,500 × 1.1s = ~46 min stays well under the rate cap.
+
+    Whatever sector string Finnhub returns is normalised through
+    services/sector.canonical_sector before being written, so the DB
+    stores GICS-canonical strings ("Information Technology" not
+    "Software—Application", "Health Care" not "Biotechnology"). The
+    heatmap can then render them directly without re-canonicalizing
+    every read.
     """
     from sqlalchemy import or_, update
 
     from app.services.finnhub_feed import fetch_company_profile
+    from app.services.sector import canonical_sector
 
     async with session_scope() as session:
         result = await session.execute(
-            select(Ticker.symbol).where(
-                or_(Ticker.sector.is_(None), Ticker.sector == "Unknown")
-            ).limit(200)  # cap per-day work to avoid burning rate limits
+            select(Ticker.symbol, Ticker.asset_class).where(
+                or_(
+                    Ticker.sector.is_(None),
+                    Ticker.sector == "Unknown",
+                    Ticker.sector == "N/A",
+                    Ticker.sector == "Uncategorized",
+                )
+            ).limit(cap)
         )
-        symbols = [row[0] for row in result.all()]
+        rows = result.all()
 
-    if not symbols:
+    if not rows:
         logger.info("sector_backfill.no_unknown_tickers")
         return
 
     backfilled = 0
     async with session_scope() as session:
-        for sym in symbols:
+        for sym, asset_class in rows:
             try:
                 profile = await fetch_company_profile(sym)
-                if profile and profile.get("sector"):
-                    await session.execute(
-                        update(Ticker).where(Ticker.symbol == sym)
-                        .values(sector=profile["sector"])
-                    )
-                    backfilled += 1
+                raw_sector = (profile or {}).get("sector") if profile else None
+                # Apply the canonical mapping at write time so storage matches
+                # the heatmap's render-time grouping. If Finnhub returned no
+                # sector, canonical_sector still routes by asset_class (e.g.
+                # ETFs → Funds & ETFs) instead of leaving "Unknown" in the DB.
+                target = canonical_sector(raw_sector, asset_class)
+                await session.execute(
+                    update(Ticker).where(Ticker.symbol == sym)
+                    .values(sector=target)
+                )
+                backfilled += 1
             except Exception:
                 logger.exception("sector_backfill.fetch_failed symbol=%s", sym)
             await asyncio.sleep(1.1)
+        await session.commit()
 
-    logger.info("sector_backfill.done backfilled=%d candidates=%d", backfilled, len(symbols))
+    logger.info("sector_backfill.done backfilled=%d candidates=%d cap=%d",
+                backfilled, len(rows), cap)
 
 
 async def _refresh_universe() -> None:
