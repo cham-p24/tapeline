@@ -411,6 +411,12 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
     cache_key = f"fund_{sym}"
     cached = _load_cache(cache_key, CACHE_TTL_FUNDAMENTALS_HOURS)
     if cached is not None:
+        # Defensive: prior versions of this function (pre-2026-05-16) cached an
+        # all-null dict for ETFs because the explicit all-None check below
+        # wasn't here. Treat any cached value where every field is None as
+        # "no coverage" so the bug doesn't haunt us until the 7-day TTL clears.
+        if isinstance(cached, dict) and cached and all(v is None for v in cached.values()):
+            return None
         return cached
 
     params = {"symbol": sym, "metric": "all", "token": _api_key()}
@@ -437,6 +443,15 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
         "revenue_growth": _f(metric.get("revenueGrowth5Y") or metric.get("revenueGrowthTTMYoy")),
         "debt_to_equity": _f(metric.get("totalDebt/totalEquityAnnual")),
     }
+    # ETFs and funds: Finnhub returns a non-empty `metric` object (price/return
+    # stats) but NONE of the stock-fundamentals fields we look for. Without
+    # this check we cache an all-None dict and the router reports
+    # available=true, which makes the frontend render 6 cards full of "—"
+    # dashes — exactly what the user reported on /app/ticker/BBP. Treat
+    # all-null as no coverage.
+    if all(v is None for v in out.values()):
+        _save_cache(cache_key, None)
+        return None
     _save_cache(cache_key, out)
     return out
 
