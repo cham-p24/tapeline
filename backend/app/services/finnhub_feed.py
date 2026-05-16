@@ -648,7 +648,10 @@ async def fetch_news_for_ticker(
         except Exception:
             published = datetime.now(UTC)
         article_id = f"fh-{a.get('id') or ts}"
-        rows.append({
+        # clip_news_row caps every column to its DB length so a Finnhub
+        # tracking-URL >500 chars can't poison the session.
+        from app.services.news_feed import clip_news_row
+        rows.append(clip_news_row({
             "id": article_id,
             "title": str(a.get("headline") or "").strip()[:300],
             "publisher": (a.get("source") or "Finnhub").strip(),
@@ -658,7 +661,7 @@ async def fetch_news_for_ticker(
             "description": (a.get("summary") or "").strip()[:300] or None,
             "tickers": sym,
             "sentiment": None,
-        })
+        }))
     _save_cache(cache_key, rows)
     return rows
 
