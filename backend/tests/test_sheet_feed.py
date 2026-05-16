@@ -201,3 +201,115 @@ async def test_upsert_inserts_new_and_updates_existing():
             if row is not None:
                 await s.delete(row)
         await s.commit()
+
+
+# ============================================================================
+# Phase 2A — SPIKE INTELLIGENCE
+# ============================================================================
+
+_SPIKE_FIXTURE_CSV = """ticker,last,move_bar_pc,move_day_pc,volume_multipl,source,unused,score,signal,last_timestamp,snapshot_time,yahoo_sym,data_provid,prev_bar,day_open,last_volume,data_age_minute,data_status,ref_price,source_confidence,decision_gate
+CLH,303.56,0,-1.37,1.2,"Execution List, All Signals universe",,100,BUY NOW,2026-05-15T20:03:00Z,2026-05-16 10:25:23,CLH,Alpaca SIP,303.56,307.79,4922,862.2,stale/no timestamp,303.76,HIGH (88/100),HIGH-CONFIDENCE CANDIDATE - okay to plan entry but timing is not urg
+ECPG,61.62,0,0.46,2.5,"Execution List, All Signals universe",,100,BUY NOW,2026-05-15T20:03:00Z,2026-05-16 10:25:23,ECPG,Alpaca SIP,61.62,61.25,54107,865.2,stale/no timestamp,61.62,HIGH (91/100),HIGH-CONFIDENCE CANDIDATE - okay to plan entry but timing is not urg
+ENS,236.88,0.03,2.06,4.1,"Execution List, All Signals universe",,100,BUY NOW,2026-05-15T20:03:00Z,2026-05-16 10:25:23,ENS,Alpaca SIP,236.88,232.2,198369,865.2,stale/no timestamp,236.88,HIGH (91/100),EARNINGS RISK - reduce size or wait until the report clears
+,,,,,,,,,,,,,,,,,,,,
+TICKER,,,,,,,,,,,,,,,,,,,,
+"""
+
+
+def test_spike_parser_extracts_rows_and_clamps_score():
+    """SPIKE INTELLIGENCE parser must:
+      - skip header re-declaration + blank rows
+      - clamp spike_score to [0, 100] using abs(move_day_pc) * 10
+      - default missing volume_multiple to 1.0 (not zero — divides badly downstream)"""
+    from app.services.sheet_feed import parse_spike_intelligence_csv
+
+    rows = parse_spike_intelligence_csv(_SPIKE_FIXTURE_CSV)
+    symbols = {r["symbol"] for r in rows}
+    assert symbols == {"CLH", "ECPG", "ENS"}
+
+    clh = next(r for r in rows if r["symbol"] == "CLH")
+    # move_day_pc = -1.37 → abs(1.37)*10 = 13.7
+    assert clh["spike_score"] == pytest.approx(13.7, abs=0.01)
+    assert clh["volume_multiple"] == 1.2
+    assert clh["obv_trend"] == "HIGH"
+    assert "HIGH-CONFIDENCE CANDIDATE" in clh["breakout_type"]
+    assert clh["reason"].startswith("HIGH-CONFIDENCE CANDIDATE")
+
+
+def test_spike_parser_caps_breakout_type_and_obv_trend_lengths():
+    """SqueezeSetup has tight VARCHAR limits (obv_trend 20, breakout_type 40,
+    suggested_window 40, reason 300). The parser truncates so the
+    StringDataRightTruncation bug from PR #50 can't repeat at this layer."""
+    from app.services.sheet_feed import parse_spike_intelligence_csv
+
+    rows = parse_spike_intelligence_csv(_SPIKE_FIXTURE_CSV)
+    for r in rows:
+        assert len(r["obv_trend"]) <= 20
+        assert len(r["breakout_type"]) <= 40
+        assert len(r["suggested_window"]) <= 40
+        assert len(r["reason"]) <= 300
+
+
+@pytest.mark.asyncio
+async def test_spike_upsert_round_trip():
+    """Run upsert, verify row exists, mutate score, re-run, verify update."""
+    from app.models import SqueezeSetup
+    from app.services.sheet_feed import (
+        parse_spike_intelligence_csv,
+        upsert_spikes,
+    )
+
+    rows = parse_spike_intelligence_csv(_SPIKE_FIXTURE_CSV)
+    async with session_scope() as s:
+        # Pre-clean
+        for sym in ("CLH", "ECPG", "ENS"):
+            existing = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == sym))).scalar_one_or_none()
+            if existing is not None:
+                await s.delete(existing)
+        await s.commit()
+
+        counts = await upsert_spikes(s, rows)
+        assert counts["inserted"] == 3
+        assert counts["updated"] == 0
+
+        # Round-trip
+        clh = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "CLH"))).scalar_one()
+        assert clh.volume_multiple == 1.2
+        assert clh.spike_score == pytest.approx(13.7, abs=0.01)
+
+        # Mutate and re-upsert — should now be all updates
+        rows[0]["spike_score"] = 95.0
+        counts2 = await upsert_spikes(s, rows)
+        assert counts2["inserted"] == 0
+        assert counts2["updated"] == 3
+
+        clh2 = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "CLH"))).scalar_one()
+        assert clh2.spike_score == 95.0
+
+        # Cleanup
+        for sym in ("CLH", "ECPG", "ENS"):
+            row = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == sym))).scalar_one_or_none()
+            if row is not None:
+                await s.delete(row)
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_refresh_spikes_dormant_without_env(monkeypatch):
+    """refresh_spikes_from_workbook is dormant when the spike URL env var
+    is unset — caller gets a skipped result, no HTTP call."""
+    from app.services import sheet_feed
+
+    settings = get_settings_for_tests()
+    monkeypatch.setattr(settings, "spike_intelligence_csv_url", "")
+
+    async with session_scope() as s:
+        result = await sheet_feed.refresh_spikes_from_workbook(s)
+    assert result.get("skipped") == 1
+    assert result.get("total") == 0
+
+
+def get_settings_for_tests():
+    """Helper to grab the cached settings singleton for monkeypatching."""
+    from app.config import get_settings
+    return get_settings()

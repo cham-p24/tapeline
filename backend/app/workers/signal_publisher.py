@@ -247,27 +247,45 @@ async def tick() -> None:
             logger.exception("drip.run_failed")
         _last_drip_check = started
 
-    # Signal-system Google Sheet refresh — pulls ALL SIGNALS tab and
-    # upserts the canonical universe + composite scores. Throttled to
-    # SIGNAL_SHEET_REFRESH_SECONDS (default 300s = 5 min). No-ops cleanly
-    # if SIGNAL_SHEET_CSV_URL is unset; falls back to the mock_feed
-    # universe in that case. This is the long-term replacement for the
-    # 112-ticker hardcoded universe — see services/sheet_feed.py for
-    # the why.
+    # Signal-system Google Sheet refresh — pulls ALL SIGNALS + the Phase 2
+    # intelligence tabs (SPIKE / MARKET / SMART MONEY / ETF) and upserts to
+    # the matching Tapeline tables. Each tab is gated by its own env var so
+    # the user can light them up independently. Same 5-min throttle for all.
+    # Bypasses cleanly when no URLs are set (worker continues with mock_feed).
     global _last_sheet_refresh
-    if settings.signal_sheet_csv_url and (
+    if (
+        settings.signal_sheet_csv_url
+        or settings.spike_intelligence_csv_url
+        or settings.market_intelligence_csv_url
+        or settings.smart_money_congress_csv_url
+        or settings.etf_benchmarks_csv_url
+    ) and (
         _last_sheet_refresh is None
         or (started - _last_sheet_refresh).total_seconds() >= settings.signal_sheet_refresh_seconds
     ):
         try:
-            from app.services.sheet_feed import refresh_from_workbook
+            from app.services.sheet_feed import (
+                refresh_from_workbook,
+                refresh_spikes_from_workbook,
+            )
             async with session_scope() as sheet_session:
-                counts = await refresh_from_workbook(sheet_session)
-            if counts.get("total"):
-                logger.info(
-                    "sheet_feed.tick rows=%d ins=%d upd=%d",
-                    counts["total"], counts["inserted"], counts["updated"],
-                )
+                if settings.signal_sheet_csv_url:
+                    counts = await refresh_from_workbook(sheet_session)
+                    if counts.get("total"):
+                        logger.info(
+                            "sheet_feed.tick rows=%d ins=%d upd=%d",
+                            counts["total"], counts["inserted"], counts["updated"],
+                        )
+                if settings.spike_intelligence_csv_url:
+                    spike_counts = await refresh_spikes_from_workbook(sheet_session)
+                    if spike_counts.get("total"):
+                        logger.info(
+                            "sheet_feed.spikes_tick rows=%d ins=%d upd=%d",
+                            spike_counts["total"], spike_counts["inserted"], spike_counts["updated"],
+                        )
+                # Phase 2B/2C/2D — additional tabs follow the same pattern;
+                # adding them here when their refresh_X_from_workbook()
+                # functions land.
         except Exception:
             logger.exception("sheet_feed.tick_failed")
         _last_sheet_refresh = started
