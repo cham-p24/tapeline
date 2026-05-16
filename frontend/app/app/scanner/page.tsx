@@ -118,15 +118,40 @@ export default function ScannerPage() {
         </div>
         <div className="card px-3 py-2">
           <label className="block text-xs text-muted">Sector</label>
+          {/*
+           * 2026-05-17: dropdown values must match the canonical sector
+           * strings written by services/sector.canonical_sector() — the
+           * backend now stores GICS-canonical labels ("Information
+           * Technology", "Health Care", "Funds & ETFs") rather than the
+           * Finnhub-raw or pre-cleanup labels ("Technology", "Healthcare",
+           * "ETF"). User selecting a stale dropdown option returned zero
+           * rows because the WHERE clause never matched.
+           *
+           * Source of truth: backend/app/services/sector.py CANONICAL_ORDER.
+           * Same 14 buckets the heatmap renders.
+           */}
           <select
             value={sector}
             onChange={(e) => setSector(e.target.value)}
             className="bg-transparent text-sm"
           >
             <option value="">All sectors</option>
-            {["Technology", "Financials", "Healthcare", "Energy", "Consumer Discretionary",
-              "Consumer Staples", "Industrials", "Communication Services", "Utilities",
-              "Materials", "Commodities", "ETF"].map((s) => <option key={s} value={s}>{s}</option>)}
+            {[
+              "Information Technology",
+              "Health Care",
+              "Financials",
+              "Industrials",
+              "Consumer Discretionary",
+              "Consumer Staples",
+              "Communication Services",
+              "Energy",
+              "Materials",
+              "Utilities",
+              "Real Estate",
+              "Commodities",
+              "Funds & ETFs",
+              "Uncategorized",
+            ].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="card px-3 py-2">
