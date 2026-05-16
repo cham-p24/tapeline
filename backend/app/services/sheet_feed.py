@@ -605,36 +605,59 @@ async def refresh_etfs_from_workbook(session: AsyncSession) -> dict[str, int]:
 def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
     """Parse the MARKET INTELLIGENCE tab — key-value layout, not row-per-ticker.
 
-    The sheet is a vertical dashboard of macro indicators. Column A is the
-    indicator name; column B is the value (which may be a string with a
-    number embedded, like 'STRONG BULL. VIX is 18.4...' or 'Fed funds is
-    3.64%').
+    The sheet is a vertical dashboard of macro indicators with a *hybrid*
+    layout: column A is the indicator name, but the numeric value can live
+    in EITHER column B ('Value / Details') OR column C ('Note'). Two
+    flavours of row:
 
-    We extract the values we know how to map to RegimeState columns:
-      'Market mode'          → regime (extract BULL/NEUTRAL/CAUTIOUS/BEAR from value)
+      narrative rows (top of tab) — value is descriptive text in column B,
+        with optional commentary in C. e.g.
+          Market mode | "STRONG BULL. VIX is 18.4, ..."   | controls aggression
+          Rates + inflation | "Fed funds is 3.64%; CPI YoY is 3.95%. Rates moderate" |
+
+      macro rows (lower in tab) — column A is the indicator, column B
+        REPEATS the indicator name, and column C holds the bare number.
+        e.g.
+          10Y Treasury Yield | 10Y Treasury Yield | 4.47
+          VIX Fear Index     | VIX Fear Index     | 18.4
+
+    Reading only column B would silently corrupt macro rows: `_extract_number`
+    pulls "10" out of "10Y Treasury Yield" instead of "4.47" from Note.
+    Codex flagged this on PR #55. Fix: store both columns per indicator and,
+    when extracting numbers, prefer Note (column C) and fall back to
+    Value/Details (column B).
+
+    We map to RegimeState columns:
+      'Market mode'          → regime (BULL/BEAR/CAUTIOUS/NEUTRAL from text)
       'VIX Fear Index'       → vix
       'US Dollar Index (DXY)' → dxy
       '10Y Treasury Yield'   → yield_10y
-      'Rates + inflation' or 'Fed Funds Rate' → rate_direction inference
+      'Rates + inflation'    → rate_direction inference
 
     Returns a dict that upsert_market_regime can write to the single-row
     RegimeState table. Missing fields default to safe values so an
     incomplete sheet doesn't crash the upsert.
     """
+    import re
+
     reader = csv.DictReader(io.StringIO(text))
-    kv: dict[str, str] = {}
+    # indicator -> (value_details, note) — store both so number extraction
+    # can prefer the column that actually holds the digit.
+    kv: dict[str, tuple[str, str]] = {}
     for raw in reader:
         # The header is "Indicator / Field" + "Value / Details" + "Note"
         indicator = (raw.get("Indicator / Field") or "").strip()
         value = (raw.get("Value / Details") or "").strip()
+        note = (raw.get("Note") or "").strip()
         if not indicator or indicator.startswith("-"):
             continue
-        kv[indicator] = value
+        kv[indicator] = (value, note)
 
-    def _extract_number(s: str) -> float | None:
+    _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+    def _extract_from(s: str) -> float | None:
         """Pull the first float out of a free-form string."""
-        import re
-        m = re.search(r"-?\d+(?:\.\d+)?", s or "")
+        m = _NUMBER_RE.search(s or "")
         if not m:
             return None
         try:
@@ -642,8 +665,24 @@ def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
         except ValueError:
             return None
 
-    # Market mode — "STRONG BULL. VIX is 18.4..." → BULL
-    mode = (kv.get("Market mode") or "").upper()
+    def _number_for(indicator_key: str) -> float | None:
+        """Look up an indicator and return its numeric value.
+
+        Prefers the Note column (column C) over Value/Details (column B) —
+        the macro rows put the number in C and repeat the label in B, so
+        reading C-first avoids picking the leading digits out of labels
+        like '10Y Treasury Yield'. Falls back to B if C is blank/non-numeric.
+        """
+        pair = kv.get(indicator_key)
+        if not pair:
+            return None
+        value, note = pair
+        return _extract_from(note) if _extract_from(note) is not None else _extract_from(value)
+
+    # Market mode — text classification from Value/Details (column B). The
+    # column-B narrative is where the BULL/BEAR/CAUTIOUS verdict actually lives.
+    mode_pair = kv.get("Market mode")
+    mode = (mode_pair[0] if mode_pair else "").upper()
     if "BULL" in mode:
         regime = "BULL"
     elif "BEAR" in mode:
@@ -653,8 +692,9 @@ def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
     else:
         regime = "NEUTRAL"
 
-    # Rate direction — derive from "Rates + inflation" or fall back to neutral
-    rate_text = (kv.get("Rates + inflation") or "").lower()
+    # Rate direction — derive from the 'Rates + inflation' narrative text in B.
+    rate_pair = kv.get("Rates + inflation")
+    rate_text = (rate_pair[0] if rate_pair else "").lower()
     if "rising" in rate_text or "hik" in rate_text:
         rate_direction = "RISING"
     elif "fall" in rate_text or "cut" in rate_text:
@@ -664,9 +704,9 @@ def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
 
     return {
         "regime":         regime,
-        "vix":            _extract_number(kv.get("VIX Fear Index", "")) or 18.0,
-        "dxy":            _extract_number(kv.get("US Dollar Index (DXY)", "")) or 100.0,
-        "yield_10y":      _extract_number(kv.get("10Y Treasury Yield", "")) or 4.0,
+        "vix":            _number_for("VIX Fear Index") or 18.0,
+        "dxy":            _number_for("US Dollar Index (DXY)") or 100.0,
+        "yield_10y":      _number_for("10Y Treasury Yield") or 4.0,
         "rate_direction": rate_direction,
         # breadth_pct + sector_leaders aren't in the sheet — keep existing
         # values if a row exists, otherwise default.
