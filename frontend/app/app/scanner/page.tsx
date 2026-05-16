@@ -160,17 +160,19 @@ export default function ScannerPage() {
         <table className="w-full text-sm nums">
           <thead className="text-xs uppercase text-muted">
             <tr>
-              <th className="px-4 py-2 text-left">Ticker</th>
-              <th className="px-4 py-2 text-left">Sector</th>
-              <th className="px-4 py-2 text-right">Score</th>
-              <th className="px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
-              <th className="px-4 py-2 text-left">Signal</th>
-              <th className="px-4 py-2 text-right">Price</th>
-              <th className="px-4 py-2 text-right">1D</th>
-              <th className="px-4 py-2 text-right">5D</th>
-              <th className="px-4 py-2 text-right">1M</th>
-              <th className="px-4 py-2 text-right">Volume</th>
-              <th className="px-4 py-2 text-left min-w-[260px]">Why</th>
+              <th className="px-2 sm:px-4 py-2 text-left">Ticker</th>
+              <th className="px-2 sm:px-4 py-2 text-left">Sector</th>
+              <th className="px-2 sm:px-4 py-2 text-right">Score</th>
+              <th className="px-2 sm:px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
+              <th className="px-2 sm:px-4 py-2 text-left">Signal</th>
+              <th className="px-2 sm:px-4 py-2 text-right">Price</th>
+              <th className="px-2 sm:px-4 py-2 text-right">1D</th>
+              <th className="px-2 sm:px-4 py-2 text-right">5D</th>
+              <th className="px-2 sm:px-4 py-2 text-right">1M</th>
+              <th className="px-2 sm:px-4 py-2 text-right">Volume</th>
+              {/* `Why` is the widest column; hide on narrow viewports so the
+                  numeric grid stays the focus, re-appears at md+ where there's room. */}
+              <th className="hidden md:table-cell px-2 sm:px-4 py-2 text-left min-w-[200px]">Why</th>
             </tr>
           </thead>
           <tbody>
@@ -228,7 +230,7 @@ export default function ScannerPage() {
                 <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}%</td>
                 <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}%</td>
                 <td className="px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
-                <td className="px-4 py-2 text-xs text-muted leading-snug max-w-[520px]" title={r.reason ?? ""}>
+                <td className="hidden md:table-cell px-2 sm:px-4 py-2 text-xs text-muted leading-snug max-w-[520px]" title={r.reason ?? ""}>
                   {r.reason || "—"}
                 </td>
               </tr>

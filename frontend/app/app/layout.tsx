@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="min-h-screen">
-        <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+        <nav className="sticky top-0 z-40 border-b border-white/5 bg-background/90 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
             <Link href="/" className="flex items-center gap-2">
               <div className="h-2 w-6 rounded-full bg-accent" />
