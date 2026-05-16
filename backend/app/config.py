@@ -36,6 +36,23 @@ class Settings(BaseSettings):
     # ---- Market data (Massive — replaces Polygon for Tapeline) ----
     massive_api_key: str = Field("", description="Massive.com API key")
 
+    # ---- Signal-system sheet (Phase 1: canonical universe + composite score) ----
+    # The signal-system at C:\signal-system\ publishes its ranked ticker universe
+    # to a Google Sheet ("Live Dashboard - Stocks"). Tapeline pulls the
+    # ALL SIGNALS tab as the source of truth for: (a) which tickers to track,
+    # (b) the composite 6-factor score per ticker. Without this URL set,
+    # services/sheet_feed.refresh_from_workbook() no-ops and the worker
+    # falls back to mock_feed (the 112-ticker hardcoded universe).
+    #
+    # To configure: in the Google Sheet, File → Share → Publish to web →
+    # select ALL SIGNALS tab + CSV format → copy URL, set:
+    #   fly secrets set SIGNAL_SHEET_CSV_URL="https://docs.google.com/..." -a tapeline-backend
+    signal_sheet_csv_url: str = ""
+    # Throttle: only pull from the sheet at most every N seconds. Default 300s
+    # (5 min) — well under Google's public-CSV quota, fresh enough for a sheet
+    # that updates from the signal-system every few hours.
+    signal_sheet_refresh_seconds: int = 300
+
     # ---- Auth (Clerk) ----
     clerk_secret_key: str = ""
     clerk_publishable_key: str = ""
