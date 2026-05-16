@@ -25,7 +25,7 @@ from enum import IntFlag
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.models import User  # noqa: F401
+    from app.models import User
 
 
 class EmailPref(IntFlag):

@@ -167,7 +167,10 @@ def _normalise(a: dict[str, Any]) -> dict[str, Any]:
         cutoff = tickers_str.rfind(",", 0, 1900)
         tickers_str = tickers_str[:cutoff] if cutoff > 0 else tickers_str[:1900]
 
-    return {
+    # clip_news_row caps every column to its DB length so a Benzinga
+    # syndicated URL >500 chars can't poison the session.
+    from app.services.news_feed import clip_news_row
+    return clip_news_row({
         "id": article_id,
         "title": str(a.get("title") or "").strip()[:300],
         "publisher": "Benzinga",
@@ -177,7 +180,7 @@ def _normalise(a: dict[str, Any]) -> dict[str, Any]:
         "description": a.get("teaser"),
         "tickers": tickers_str,
         "sentiment": None,  # not in the base news endpoint
-    }
+    })
 
 
 # ---------------------------------------------------------------------------

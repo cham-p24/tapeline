@@ -45,6 +45,37 @@ _MOCK_HEADLINES = [
 _MOCK_PUBLISHERS = ["Reuters", "Bloomberg", "Seeking Alpha", "Barrons", "WSJ", "CNBC", "MarketWatch"]
 
 
+# Column lengths from app.models.news.NewsItem — kept in sync manually.
+# Bumping the model means bumping these.
+_NEWS_FIELD_CAPS = {
+    "id":         80,
+    "title":      300,
+    "publisher":  100,
+    "author":     120,
+    "url":        500,
+    "tickers":    2000,
+    # description is Text (unbounded) — no cap needed.
+}
+
+
+def clip_news_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Defensively truncate string fields so a vendor sending an oversized
+    URL/title doesn't trigger PostgreSQL's StringDataRightTruncation and
+    poison the SQLAlchemy session for the rest of the request.
+
+    Vendors will sometimes return URLs >1500 chars (tracking-heavy news
+    aggregator links). The route used to swallow the resulting flush
+    failure but the session was already dirty, so every subsequent query
+    in the same request died with PendingRollbackError — that was the
+    98-event Sentry storm. We catch the bad input upstream now.
+    """
+    for key, cap in _NEWS_FIELD_CAPS.items():
+        v = row.get(key)
+        if isinstance(v, str) and len(v) > cap:
+            row[key] = v[:cap]
+    return row
+
+
 def _vendor_key() -> str:
     """Massive (formerly Polygon) accepts either env var. Prefer the new one."""
     return settings.massive_api_key or settings.polygon_api_key or ""
@@ -183,7 +214,7 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
         if len(tickers_str) > 1900:
             cutoff = tickers_str.rfind(",", 0, 1900)
             tickers_str = tickers_str[:cutoff] if cutoff > 0 else tickers_str[:1900]
-        rows.append({
+        rows.append(clip_news_row({
             "id": a["id"],
             "title": a["title"],
             "publisher": (a.get("publisher") or {}).get("name", ""),
@@ -193,7 +224,7 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
             "description": a.get("description"),
             "tickers": tickers_str,
             "sentiment": (a.get("insights", [{}])[0] or {}).get("sentiment_score") if a.get("insights") else None,
-        })
+        }))
     return rows
 
 

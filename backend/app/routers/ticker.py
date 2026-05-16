@@ -68,7 +68,19 @@ async def ticker_detail(
         await session.flush()
     except Exception:
         # Live fetch failure isn't fatal — fall through to cached news.
-        pass
+        # CRITICAL: roll the session back too. SQLAlchemy marks the
+        # session as dirty after a failed flush, and every subsequent
+        # query on the same session raises PendingRollbackError until we
+        # explicitly clear it. Without this rollback, a single oversized
+        # news URL or an upstream ReadTimeout cascades into a 500 for
+        # the entire ticker page request. (Was the 12-event Sentry
+        # PendingRollbackError storm — fixed defensively at the news
+        # builder layer in news_feed.clip_news_row, and again here so a
+        # future regression at the vendor level can't re-cascade.)
+        try:
+            await session.rollback()
+        except Exception:
+            pass
 
     news_result = await session.execute(
         select(NewsItem)
