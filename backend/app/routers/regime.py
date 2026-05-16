@@ -1,4 +1,9 @@
-"""GET /api/regime — current market regime snapshot."""
+"""GET /api/regime — current market regime snapshot. Pro+ only.
+
+Pre-2026-05-16 this was anonymous-readable. Locked down to match
+services/tier.FEATURES["regime.full"]. The /how-it-works marketing page
+already shows BULL/BEAR descriptively without hitting this endpoint.
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,13 +11,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import RegimeState
+from app.models import RegimeState, User
+from app.services.auth import current_user_required
+from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
 
 @router.get("")
-async def get_regime(session: AsyncSession = Depends(get_session)) -> dict:
+async def get_regime(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
+) -> dict:
+    if not has_feature(Tier(user.tier), "regime.full"):
+        raise HTTPException(403, "Regime widget is a Pro feature")
     result = await session.execute(select(RegimeState).where(RegimeState.id == 1))
     row = result.scalar_one_or_none()
     if row is None:

@@ -1,12 +1,18 @@
-"""GET /api/squeeze — current BB squeeze setups."""
+"""GET /api/squeeze — current BB squeeze setups. Pro+ only.
+
+Pre-2026-05-16 this was anonymous-readable. Locked down to match
+services/tier.FEATURES["squeeze.full"].
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import SqueezeSetup
+from app.models import SqueezeSetup, User
+from app.services.auth import current_user_required
+from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
@@ -14,9 +20,12 @@ router = APIRouter()
 @router.get("")
 async def list_squeezes(
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
     min_score: float = Query(0, ge=0, le=100),
     limit: int = Query(50, ge=1, le=200),
 ) -> dict:
+    if not has_feature(Tier(user.tier), "squeeze.full"):
+        raise HTTPException(403, "Squeeze scanner is a Pro feature")
     stmt = (
         select(SqueezeSetup)
         .where(SqueezeSetup.spike_score >= min_score)
