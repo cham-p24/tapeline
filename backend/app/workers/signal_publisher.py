@@ -184,6 +184,20 @@ async def tick() -> None:
     global _last_news_refresh, _last_backcheck
     if _last_news_refresh is None or (started - _last_news_refresh).total_seconds() > 300:
         await _refresh_news()
+        # SEC EDGAR 8-K direct — runs alongside the wire-news refresh so material
+        # filings hit the news bar ~5-30 min earlier than they would via Benzinga/
+        # Massive. Free + zero-API-key. Idempotent (uses EDGAR accession number
+        # as the NewsItem.id PK) so re-runs don't duplicate rows.
+        try:
+            from app.services.edgar_feed import refresh_8k_into_news_items
+            counts = await refresh_8k_into_news_items()
+            if counts.get("inserted"):
+                logger.info(
+                    "edgar.8k_added inserted=%d fetched=%d",
+                    counts["inserted"], counts["fetched"],
+                )
+        except Exception:
+            logger.exception("edgar.8k_tick_failed")
         _last_news_refresh = started
 
     # Scorecard back-check: run once per day, within ~10 minutes of boot
