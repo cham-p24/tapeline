@@ -26,6 +26,9 @@ export function MarketingNav() {
           <Link href="/scorecard" className="hidden text-sm text-muted hover:text-fg sm:inline">
             Scorecard
           </Link>
+          <Link href="/signals" className="hidden text-sm text-muted hover:text-fg sm:inline">
+            Signals
+          </Link>
           <Link href="/signin" className="hidden text-sm text-muted hover:text-fg sm:inline">
             Sign in
           </Link>

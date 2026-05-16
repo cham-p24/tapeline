@@ -30,6 +30,7 @@ export function MarketingFooter() {
             <FooterLink href="/how-it-works" desc="The 6-factor formula, public weights">How it works</FooterLink>
             <FooterLink href="/pricing" desc="Three tiers, charm-priced annual">Pricing</FooterLink>
             <FooterLink href="/scorecard" desc="Every call, back-checked vs SPY">Public scorecard</FooterLink>
+            <FooterLink href="/signals" desc="Every Tapeline-scored ticker, live">All signals</FooterLink>
             <FooterLink href="/blog" desc="Methodology + market notes">Blog</FooterLink>
             <FooterLink href="/changelog" desc="Every release, ordered newest first">Changelog</FooterLink>
           </FooterCol>
