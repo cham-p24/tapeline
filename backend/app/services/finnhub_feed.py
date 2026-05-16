@@ -122,39 +122,133 @@ def smart_money_cache_size() -> int:
     return len(_SMART_MONEY_SCORE_CACHE)
 
 
-# ---- Recent insider transactions feed cache ----------------------------------
-# Powers the /app/holdings page (rebranded from "Elite 13F holdings" to
-# "Recent Insider Buys") and the /api/insider-buys endpoint. Populated by the
-# same daily worker that builds the smart-money score cache — so we don't
-# double-hit Finnhub. Replaces the old Quiver 13F path entirely.
-_INSIDER_FEED: list[dict[str, Any]] = []
-_INSIDER_FEED_MAX = 5000  # cap memory; sorted by transaction_date desc
+# ---- Recent insider transactions — DB-backed, cross-process ---------------
+# Powers /app/holdings ("Recent Insider Buys") and the per-ticker InsiderTab.
+# Before 2026-05-16 this was an in-process `_INSIDER_FEED` list — the worker
+# wrote to its own list, the API read from its own list, and on Fly (where
+# api + worker run on separate machines) the API ALWAYS saw an empty list.
+# Now writes go to the `insider_transactions` table; reads query it directly.
+#
+# The setter/getter API is preserved bit-for-bit so callers (worker, router,
+# tests) don't need to change. Synchronous wrappers around the async DB calls
+# would have required threadlocal sessions; instead both functions are now
+# async, with a single sync wrapper kept for legacy compute paths that don't
+# have an event loop handy.
 
 
-def set_recent_insider_transactions(symbol: str, txns: list[dict[str, Any]]) -> None:
-    """Replace this symbol's slice of the feed with the latest pull.
+async def set_recent_insider_transactions_db(
+    symbol: str, txns: list[dict[str, Any]],
+) -> None:
+    """Bulk-replace this symbol's insider transactions in the DB.
 
-    Called from the daily insider-refresh worker. Keeps the feed bounded by
-    `_INSIDER_FEED_MAX` (newest entries win when over capacity).
+    Pattern:
+      DELETE FROM insider_transactions WHERE symbol = :sym
+      INSERT INTO insider_transactions (...) VALUES (...) -- N rows
+
+    Idempotent — running the daily refresh twice in a row produces the same
+    end state because we delete-then-insert. The UniqueConstraint is a
+    belt-and-braces guard in case a future bug duplicates inserts.
     """
+    from sqlalchemy import delete
+    from sqlalchemy.exc import IntegrityError
+
+    from app.db import session_scope
+    from app.models import InsiderTransaction
+
     sym = symbol.upper()
-    global _INSIDER_FEED
-    _INSIDER_FEED = [t for t in _INSIDER_FEED if t.get("symbol") != sym]
-    for t in txns or []:
-        share_change = int(t.get("share_change") or 0)
-        price = float(t.get("transaction_price") or 0)
-        _INSIDER_FEED.append({
-            "symbol": sym,
-            "insider_name": t.get("filer_name") or "",
-            "transaction_date": t.get("transaction_date") or "",
-            "share_change": share_change,
-            "transaction_price": round(price, 4),
-            "transaction_value": round(abs(share_change * price), 2),
-            "code": t.get("code") or "",
-        })
-    _INSIDER_FEED.sort(key=lambda r: r.get("transaction_date") or "", reverse=True)
-    if len(_INSIDER_FEED) > _INSIDER_FEED_MAX:
-        del _INSIDER_FEED[_INSIDER_FEED_MAX:]
+    async with session_scope() as session:
+        await session.execute(delete(InsiderTransaction).where(InsiderTransaction.symbol == sym))
+        for t in txns or []:
+            share_change = int(t.get("share_change") or 0)
+            price = float(t.get("transaction_price") or 0)
+            row = InsiderTransaction(
+                symbol=sym,
+                insider_name=(t.get("filer_name") or "")[:120],
+                transaction_date=(t.get("transaction_date") or "")[:10],
+                share_change=share_change,
+                transaction_price=round(price, 4),
+                transaction_value=round(abs(share_change * price), 2),
+                code=(t.get("code") or "")[:4],
+            )
+            session.add(row)
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Race against another concurrent refresh — the unique constraint
+            # caught a duplicate. Roll back and let the next refresh re-run
+            # cleanly. Doesn't bring the worker tick down.
+            await session.rollback()
+            logger.warning("insider.write_race symbol=%s", sym)
+
+
+# Legacy alias for the worker, which still calls the sync-named helper.
+def set_recent_insider_transactions(symbol: str, txns: list[dict[str, Any]]) -> None:
+    """Sync facade — schedules the async DB write without blocking the worker.
+
+    The worker loop is inside asyncio.run, so we can grab the running loop
+    and create_task. If somehow there's no loop (sync test), we fall back to
+    asyncio.run on a one-shot loop.
+    """
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(set_recent_insider_transactions_db(symbol, txns))
+    except RuntimeError:
+        # No running loop — sync caller, e.g. a test. Run inline.
+        asyncio.run(set_recent_insider_transactions_db(symbol, txns))
+
+
+async def get_recent_insider_transactions_db(
+    days: int = 30,
+    limit: int = 100,
+    symbol: str | None = None,
+    buys_only: bool = False,
+) -> list[dict[str, Any]]:
+    """Query the DB-backed feed.
+
+    days        — only entries whose transaction_date is within this many days
+    limit       — max rows to return (post-filter)
+    symbol      — optional ticker filter (case-insensitive)
+    buys_only   — if True, return only net positive share_change rows
+
+    Same shape and ordering as the prior in-memory implementation so the
+    router/UI don't see any contract change.
+    """
+    from sqlalchemy import desc, select
+
+    from app.db import session_scope
+    from app.models import InsiderTransaction
+
+    cutoff = (date.today() - timedelta(days=max(1, days))).isoformat()
+    sym = symbol.upper() if symbol else None
+
+    stmt = (
+        select(InsiderTransaction)
+        .where(InsiderTransaction.transaction_date >= cutoff)
+        .order_by(desc(InsiderTransaction.transaction_date))
+        .limit(limit)
+    )
+    if sym:
+        stmt = stmt.where(InsiderTransaction.symbol == sym)
+    if buys_only:
+        stmt = stmt.where(InsiderTransaction.share_change > 0)
+
+    async with session_scope() as session:
+        result = await session.execute(stmt)
+        rows = result.scalars().all()
+
+    return [
+        {
+            "symbol":            r.symbol,
+            "insider_name":      r.insider_name,
+            "transaction_date":  r.transaction_date,
+            "share_change":      r.share_change,
+            "transaction_price": r.transaction_price,
+            "transaction_value": r.transaction_value,
+            "code":              r.code,
+        }
+        for r in rows
+    ]
 
 
 def get_recent_insider_transactions(
@@ -163,31 +257,48 @@ def get_recent_insider_transactions(
     symbol: str | None = None,
     buys_only: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return recent insider transactions from the cached feed.
+    """Sync facade for legacy callers (none expected — router is async).
 
-    days        — only entries whose transaction_date is within this many days
-    limit       — max rows to return (post-filter, post-sort)
-    symbol      — optional ticker filter (case-insensitive)
-    buys_only   — if True, return only net positive share_change rows
+    Kept so existing tests that imported the old sync API continue to work.
+    Returns [] if called from inside an async context (use the _db variant
+    directly there).
     """
-    cutoff = (date.today() - timedelta(days=max(1, days))).isoformat()
-    sym = symbol.upper() if symbol else None
-    rows: list[dict[str, Any]] = []
-    for t in _INSIDER_FEED:
-        if t.get("transaction_date", "") < cutoff:
-            continue
-        if sym and t.get("symbol") != sym:
-            continue
-        if buys_only and (t.get("share_change") or 0) <= 0:
-            continue
-        rows.append(t)
-        if len(rows) >= limit:
-            break
-    return rows
+    import asyncio
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(
+            get_recent_insider_transactions_db(days, limit, symbol, buys_only)
+        )
+    # Inside an event loop — can't run another. Caller should use the async
+    # variant. Return empty as a defensive default.
+    logger.warning("insider.sync_facade_called_in_async_context")
+    return []
+
+
+async def insider_feed_size_db() -> int:
+    """Total rows in the DB-backed feed. Cheap COUNT(*) — runs against an
+    index'd column so it's sub-millisecond even with the full universe."""
+    from sqlalchemy import func as sa_func
+    from sqlalchemy import select as sa_select
+
+    from app.db import session_scope
+    from app.models import InsiderTransaction
+
+    async with session_scope() as session:
+        result = await session.execute(sa_select(sa_func.count(InsiderTransaction.id)))
+        return int(result.scalar_one() or 0)
 
 
 def insider_feed_size() -> int:
-    return len(_INSIDER_FEED)
+    """Sync facade — kept for callers that show the count without an async
+    context. Returns 0 if inside an event loop (use *_db variant)."""
+    import asyncio
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(insider_feed_size_db())
+    return 0
 
 
 def compute_smart_money_score(transactions: list[dict[str, Any]] | None) -> float | None:

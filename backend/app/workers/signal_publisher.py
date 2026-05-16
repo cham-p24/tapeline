@@ -826,9 +826,9 @@ async def _refresh_insider_cache() -> None:
     from app.services.finnhub_feed import (
         compute_smart_money_score,
         fetch_insider_transactions,
-        insider_feed_size,
+        insider_feed_size_db,
         set_cached_smart_money_score,
-        set_recent_insider_transactions,
+        set_recent_insider_transactions_db,
         smart_money_cache_size,
     )
 
@@ -848,17 +848,17 @@ async def _refresh_insider_cache() -> None:
             if txns:
                 score = compute_smart_money_score(txns)
                 set_cached_smart_money_score(sym, score)
-                # Also feed the cross-universe insider activity stream that
-                # powers /app/holdings ("Recent Insider Buys").
-                set_recent_insider_transactions(sym, txns)
+                # Persist to the DB-backed insider feed (cross-process, so
+                # the api machine can read what the worker writes).
+                await set_recent_insider_transactions_db(sym, txns)
                 refreshed += 1
         except Exception:
             logger.exception("insider.fetch_failed symbol=%s", sym)
         await asyncio.sleep(1.1)  # stay well under 60/min
 
     logger.info(
-        "insider.refreshed scored=%d score_cache=%d feed_cache=%d",
-        refreshed, smart_money_cache_size(), insider_feed_size(),
+        "insider.refreshed scored=%d score_cache=%d feed_size=%d",
+        refreshed, smart_money_cache_size(), await insider_feed_size_db(),
     )
 
 

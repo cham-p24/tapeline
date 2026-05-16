@@ -2,6 +2,7 @@
 from app.models.calendar_events import EarningsEvent, IPOEvent
 from app.models.congress import CongressTrade
 from app.models.holdings import InstitutionalHolding
+from app.models.insider_transaction import InsiderTransaction
 from app.models.news import NewsItem
 from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
@@ -21,6 +22,7 @@ __all__ = [
     "DailyScorecardEntry",
     "EarningsEvent",
     "IPOEvent",
+    "InsiderTransaction",
     "InstitutionalHolding",
     "NewsItem",
     "RegimeState",

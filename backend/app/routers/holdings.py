@@ -31,8 +31,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.models import User
 from app.services.auth import current_user_required
 from app.services.finnhub_feed import (
-    get_recent_insider_transactions,
-    insider_feed_size,
+    get_recent_insider_transactions_db,
+    insider_feed_size_db,
 )
 from app.services.tier import Tier, has_feature
 
@@ -54,7 +54,7 @@ async def list_insider_buys(
     if not has_feature(Tier(user.tier), "holdings.elite"):
         raise HTTPException(403, "Recent insider activity is a Premium feature")
 
-    items = get_recent_insider_transactions(
+    items = await get_recent_insider_transactions_db(
         days=days,
         limit=limit,
         symbol=symbol,
@@ -63,7 +63,7 @@ async def list_insider_buys(
     return {
         "count": len(items),
         "items": items,
-        "feed_size": insider_feed_size(),
+        "feed_size": await insider_feed_size_db(),
     }
 
 
