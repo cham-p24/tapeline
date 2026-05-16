@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
+import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { TrialBanner } from "@/components/TrialBanner";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
@@ -190,6 +191,11 @@ function UserChip() {
             Email preferences
           </Link>
           <div className="border-t border-border" />
+          {/* Theme picker — iOS-style three-segment group. System mode
+              respects OS prefers-color-scheme so a user who has Dark Mode
+              scheduled at sunset on their Mac gets it automatically. */}
+          <ThemeSwitcher />
+          <div className="border-t border-border" />
           <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-black/30">
             Billing &amp; plan
           </Link>
@@ -209,6 +215,44 @@ function UserChip() {
     </div>
   );
 }
+
+/**
+ * Three-segment theme picker. iOS-style — pill background, sliding selected
+ * state via just a different bg class. No external dependency.
+ */
+function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme();
+  const options: { value: Theme; label: string; icon: string }[] = [
+    { value: "light",  label: "Light",  icon: "☀" },
+    { value: "dark",   label: "Dark",   icon: "☾" },
+    { value: "system", label: "System", icon: "⚙" },
+  ];
+  return (
+    <div className="px-4 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-subtle mb-1.5">Appearance</div>
+      <div className="flex gap-1 rounded-full bg-fg/5 p-1">
+        {options.map((opt) => {
+          const active = theme === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setTheme(opt.value)}
+              className={`flex-1 rounded-full px-2 py-1 text-xs font-medium transition ${
+                active
+                  ? "bg-fg/10 text-fg"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              <span className="mr-1" aria-hidden="true">{opt.icon}</span>
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 
 function MobileUserChip() {
   const { user, signout } = useUser();

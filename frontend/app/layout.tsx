@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
+import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
@@ -73,8 +74,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
+        {/* Theme boot — runs synchronously in <head> before React mounts so
+            users with a saved "light" preference don't flash dark on first
+            paint. Pulls from localStorage('tapeline_theme'). */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -256,7 +261,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }),
           }}
         />
-        <UserProvider>{children}</UserProvider>
+        <ThemeProvider>
+          <UserProvider>{children}</UserProvider>
+        </ThemeProvider>
         {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
             config needed — auto-detects when deployed on Vercel and is a
             no-op in local dev. Page-view + custom-event tracking +
