@@ -61,6 +61,35 @@ async def test_scanner_responds(client):
 
 
 @pytest.mark.asyncio
+async def test_scanner_q_param_accepted(client):
+    """The `q` symbol-search param must be accepted by the scanner endpoint
+    and return a 200 with the same envelope as the unfiltered call. CI runs
+    against an empty DB so we can't assert the filter ACTUALLY narrows
+    results — but we can confirm the contract holds.
+    """
+    async with client:
+        # Lowercase input — backend uppercases before matching
+        r = await _get(client, "/api/scanner?q=aapl&limit=10")
+        assert r.status_code == 200
+        body = r.json()
+        assert "items" in body
+        assert "count" in body
+        # Each item, if any, must have a symbol containing AAPL (case-insensitive).
+        # Empty DB → empty items, which is also fine for this contract check.
+        for row in body["items"]:
+            assert "AAPL" in row["symbol"].upper()
+
+
+@pytest.mark.asyncio
+async def test_scanner_q_param_rejects_oversized_input(client):
+    """`q` is capped at 20 chars so a malicious caller can't paste a megabyte
+    of substring into the LIKE clause. Anything longer must 422."""
+    async with client:
+        r = await _get(client, "/api/scanner?q=" + "A" * 50 + "&limit=1")
+        assert r.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_watchlist_requires_auth(client):
     async with client:
         r = await _get(client, "/api/watchlist")

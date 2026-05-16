@@ -21,16 +21,24 @@ export default function ScannerPage() {
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [sector, setSector] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  // Symbol search — debounced 250ms so typing "NVDA" fires one request not 4.
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(id);
+  }, [search]);
 
   const load = useCallback(async () => {
     try {
       const params: Record<string, string | number> = { min_score: minScore, sort, order, limit: 100 };
       if (sector) params.sector = sector;
+      if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       const r = await api.scanner(params);
       setRows(r.items);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [minScore, sort, order, sector]);
+  }, [minScore, sort, order, sector, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
@@ -69,6 +77,34 @@ export default function ScannerPage() {
 
       {/* Filters */}
       <div className="mt-6 flex flex-wrap items-center gap-3">
+        {/* Symbol search — first filter, widest, so it's clearly the primary way
+            to find a specific ticker. Server-side substring match. */}
+        <div className="card flex items-center gap-2 px-3 py-2 min-w-[220px]">
+          <svg className="h-4 w-4 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ticker (AAPL, NVDA, TSLA...)"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={20}
+            aria-label="Search ticker symbol"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="text-xs text-muted hover:text-fg"
+              aria-label="Clear search"
+            >
+              clear
+            </button>
+          )}
+        </div>
         <div className="card px-3 py-2">
           <label className="block text-xs text-muted">Min score</label>
           <input

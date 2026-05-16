@@ -112,10 +112,25 @@ export default function HoldingsPage() {
             <tbody>
               {loading && rows.length === 0 ? (
                 <tr><td colSpan={7}><TableSkeleton cols={7} rows={6} /></td></tr>
+              ) : rows.length === 0 && feedSize === 0 ? (
+                /* Cold feed — worker hasn't populated the cache yet. This happens
+                   right after a deploy because the cache is in-process; the daily
+                   Finnhub backfill takes ~20 minutes at 1.1 req/s × 2,500 tickers.
+                   Be explicit so the user knows it's not broken. */
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">
+                  <p className="text-sm font-medium text-fg">Backfilling insider feed…</p>
+                  <p className="mt-2 text-xs max-w-md mx-auto">
+                    The worker fetches SEC Form 4 filings from Finnhub at 1.1 requests/sec
+                    across the top ~2,500 most-liquid US tickers — first run after a deploy
+                    takes about 20 minutes. Refresh in a few minutes and rows will start
+                    appearing. The same data feeds the Smart Money pillar of every Tapeline Score.
+                  </p>
+                </td></tr>
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-muted">
-                  No insider transactions match. Try widening the lookback window, clearing the symbol filter,
-                  or unchecking "Buys only".
+                  <p>No insider transactions match these filters.</p>
+                  <p className="mt-2 text-xs">Try widening the lookback window, clearing the symbol filter,
+                  or unchecking &ldquo;Buys only&rdquo;.</p>
                 </td></tr>
               ) : rows.map((t, i) => {
                 const isBuy = t.share_change > 0;

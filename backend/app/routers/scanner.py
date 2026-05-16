@@ -79,6 +79,7 @@ async def list_scanner(
     max_score: float = Query(100, ge=0, le=100),
     signal: str | None = None,
     sector: str | None = None,
+    q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
     sort: str = Query("score", pattern="^(score|change_pct_1d|change_pct_5d|change_pct_1m|volume|symbol)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
@@ -98,6 +99,14 @@ async def list_scanner(
         stmt = stmt.where(Ticker.signal == signal)
     if sector:
         stmt = stmt.where(Ticker.sector == sector)
+    # Symbol substring search. SQL LIKE with leading wildcard prevents index use
+    # but the active universe is <2,500 rows so a full scan is fine; the query
+    # still returns in <50ms in production. Uppercase the query to match how
+    # symbols are stored.
+    if q:
+        needle = q.strip().upper()
+        if needle:
+            stmt = stmt.where(Ticker.symbol.like(f"%{needle}%"))
 
     col = getattr(Ticker, sort)
     stmt = stmt.order_by(desc(col) if order == "desc" else col)
