@@ -1043,7 +1043,7 @@ async def main() -> None:
         try:
             await asyncio.wait_for(tick(), timeout=TICK_TIMEOUT_SECONDS)
             consecutive_timeouts = 0
-        except asyncio.TimeoutError:
+        except TimeoutError:
             consecutive_timeouts += 1
             elapsed = (datetime.now(UTC) - cycle_started).total_seconds()
             logger.error(
