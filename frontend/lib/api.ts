@@ -1,5 +1,12 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+// Only attach the dev-bypass bearer when the API base is local. In production
+// the backend ignores it (auth.py only accepts it when app_env=development),
+// so sending it cross-origin is harmless but pointless — and it's the kind
+// of token-shaped string that's confusing to see in prod request logs.
+const IS_DEV_API = /localhost|127\.0\.0\.1/.test(API_BASE);
+const DEV_TOKEN = IS_DEV_API ? "dev-bypass" : "";
+
 /**
  * Every fetch in this file passes `credentials: "include"` so the
  * `tapeline_session` cookie travels with the request.
@@ -12,12 +19,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
  * every authenticated POST/DELETE/GET-with-auth returned 401 in production
  * even though the user was clearly signed in. Live bug observed
  * 2026-05-17 on "Add to watchlist" and "Notify me on news" buttons.
- *
- * The Bearer-dev-bypass header below is still sent for local dev (where
- * the backend honours it). In production the backend ignores it
- * (auth.py:142 only accepts it when `app_env=development`), so the cookie
- * is the only auth signal that actually applies. Cookie + dev-bypass
- * together is harmless in prod and works in dev.
  */
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -258,6 +259,28 @@ export type TrackedFund = {
   slug: string;
 };
 
+export type AlertRule = {
+  id: number;
+  name: string;
+  rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
+  symbol: string | null;
+  threshold: number | null;
+  channel: "email" | "telegram" | "web_push";
+  enabled: boolean;
+  last_fired_at: string | null;
+  created_at: string;
+};
+
+export type AlertEvent = {
+  id: number;
+  rule_id: number;
+  symbol: string | null;
+  message: string;
+  channel: string;
+  delivered: boolean;
+  created_at: string;
+};
+
 async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -286,15 +309,11 @@ async function getAuth<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
     credentials: "include",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
-
-// For dev: all authenticated calls use "dev-bypass" to hit the premium dev user.
-// Production swaps this for the Clerk session token.
-const DEV_TOKEN = "dev-bypass";
 
 export const api = {
   scanner: (params: Record<string, string | number> = {}) => {
@@ -315,7 +334,7 @@ export const api = {
   emailPrefsGet: () =>
     get<EmailPrefsResponse>(`/api/me/email-prefs`),
   emailPrefsPatch: async (partial: Partial<Record<EmailPrefKey, boolean>>) => {
-    const res = await fetch(`/api/me/email-prefs`, {
+    const res = await fetch(`${API_BASE}/api/me/email-prefs`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -388,11 +407,17 @@ export const api = {
   },
   alertRuleCreate: (body: {
     name: string;
-    rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
+    rule_type: AlertRule["rule_type"];
     symbol?: string | null;
     threshold?: number | null;
-    channel?: "email" | "telegram" | "web_push";
-  }) => post<{ id: number; rule_type: string; symbol: string | null }>(
-    "/api/alerts/rules", body, DEV_TOKEN,
+    channel?: AlertRule["channel"];
+  }) => post<AlertRule>("/api/alerts/rules", body, DEV_TOKEN),
+  alertRules: () => getAuth<{ count: number; items: AlertRule[] }>(
+    "/api/alerts/rules", DEV_TOKEN,
+  ),
+  alertRuleDelete: (id: number) =>
+    del<{ ok: boolean }>(`/api/alerts/rules/${id}`, DEV_TOKEN),
+  alertEvents: (limit = 50) => getAuth<{ count: number; items: AlertEvent[] }>(
+    `/api/alerts/events?limit=${limit}`, DEV_TOKEN,
   ),
 };
