@@ -10,13 +10,14 @@ export async function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const post = findPost(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = findPost(slug);
   if (!post) {
     return pageMeta({
       title: "Post not found — Tapeline",
       description: "This post no longer exists or has moved. Browse the latest at /blog.",
-      path: `/blog/${params.slug}`,
+      path: `/blog/${slug}`,
     });
   }
   return pageMeta({
@@ -28,8 +29,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   });
 }
 
-export default function BlogPost({ params }: { params: { slug: string } }) {
-  const post = findPost(params.slug);
+export default async function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = findPost(slug);
   if (!post) notFound();
 
   return (

@@ -12,8 +12,9 @@ export const size = ogSize;
 export const contentType = "image/png";
 export const alt = "Best stocks ranked by Tapeline";
 
-export default async function OG({ params }: { params: { strategy: string } }) {
-  const s = findStrategy(params.strategy);
+export default async function OG({ params }: { params: Promise<{ strategy: string }> }) {
+  const { strategy } = await params;
+  const s = findStrategy(strategy);
   if (!s) {
     return ogResponse({
       eyebrow: "BEST STOCKS FOR",

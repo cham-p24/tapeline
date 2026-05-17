@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type TickerDetail } from "@/lib/api";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
@@ -17,8 +17,9 @@ import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 
 type DetailTab = "financials" | "insider";
 
-export default function TickerPage({ params }: { params: { symbol: string } }) {
-  const symbol = params.symbol.toUpperCase();
+export default function TickerPage({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol: rawSymbol } = use(params);
+  const symbol = rawSymbol.toUpperCase();
   const [data, setData] = useState<TickerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);

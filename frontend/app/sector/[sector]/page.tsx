@@ -55,13 +55,14 @@ export function generateStaticParams() {
   return SECTORS.map((s) => ({ sector: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { sector: string } }) {
-  const sector = SECTORS.find((s) => s.slug === params.sector);
+export async function generateMetadata({ params }: { params: Promise<{ sector: string }> }) {
+  const { sector: sectorSlug } = await params;
+  const sector = SECTORS.find((s) => s.slug === sectorSlug);
   if (!sector) {
     return pageMeta({
       title: "Sector not found — Tapeline",
       description: "The sector you requested isn't covered. See the full sector list at /scorecard.",
-      path: `/sector/${params.sector}`,
+      path: `/sector/${sectorSlug}`,
     });
   }
   return pageMeta({
@@ -92,8 +93,9 @@ function sectorFaq(display: string) {
   ];
 }
 
-export default async function SectorPage({ params }: { params: { sector: string } }) {
-  const sector = SECTORS.find((s) => s.slug === params.sector);
+export default async function SectorPage({ params }: { params: Promise<{ sector: string }> }) {
+  const { sector: sectorSlug } = await params;
+  const sector = SECTORS.find((s) => s.slug === sectorSlug);
   if (!sector) notFound();
 
   const tickers = await fetchSectorTickers(sector.api);

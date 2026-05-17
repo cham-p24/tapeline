@@ -50,13 +50,14 @@ export function generateStaticParams() {
   return SIGNALS.map((s) => ({ signal: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { signal: string } }) {
-  const signal = SIGNALS.find((s) => s.slug === params.signal);
+export async function generateMetadata({ params }: { params: Promise<{ signal: string }> }) {
+  const { signal: signalSlug } = await params;
+  const signal = SIGNALS.find((s) => s.slug === signalSlug);
   if (!signal) {
     return pageMeta({
       title: "Signal not found — Tapeline",
       description: "Browse all signal labels at /how-it-works.",
-      path: `/signal/${params.signal}`,
+      path: `/signal/${signalSlug}`,
     });
   }
   return pageMeta({
@@ -91,8 +92,9 @@ function signalFaq(display: string, range: string, blurb: string) {
   ];
 }
 
-export default async function SignalPage({ params }: { params: { signal: string } }) {
-  const signal = SIGNALS.find((s) => s.slug === params.signal);
+export default async function SignalPage({ params }: { params: Promise<{ signal: string }> }) {
+  const { signal: signalSlug } = await params;
+  const signal = SIGNALS.find((s) => s.slug === signalSlug);
   if (!signal) notFound();
 
   const tickers = await fetchSignalTickers(signal.display);
