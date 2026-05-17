@@ -164,6 +164,16 @@ class Settings(BaseSettings):
     # containing the full URL: https://api.tapeline.io/api/internal/alert?token=<secret>
     internal_alert_secret: str = ""
 
+    # ---- Sheet webhook (live-push from signal-system Google Sheet) ----
+    # Random shared secret used by the Apps Script onChange trigger on the
+    # "Live Dashboard - Stocks" sheet to authenticate against
+    # /api/internal/sheet-changed. Generate with the same recipe as above;
+    # paste into Fly AND into the sheet's Script properties as
+    # TAPELINE_WEBHOOK_SECRET. Until set, the endpoint 503s — the worker's
+    # 5-min CSV poll stays the primary refresh path.
+    # See docs/PHASE_1_EXECUTION_PLAN.md §A3 + §F1 for the full wire-up.
+    sheet_webhook_secret: str = ""
+
     # ---- Bot protection (Cloudflare Turnstile, optional) ----
     # When secret key is unset, Turnstile verification passes through (dev mode).
     # Honeypot field + disposable-email block always run regardless.
