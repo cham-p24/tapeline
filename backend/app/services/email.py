@@ -1,8 +1,28 @@
-"""Email delivery via Resend."""
+"""Email delivery via Resend with per-persona sender routing.
+
+Tapeline sends 14 distinct email categories. Recipients are confused (and
+deliverability suffers) when every email comes from a single From: alias.
+This module dispatches by `persona`:
+
+    "default"   transactional onboarding (welcome, referrals, activation)
+                    From: hello@tapeline.io
+    "sales"     conversion nurture (trial drip day-7+, re-engagement, win-back)
+                    From: christian@tapeline.io
+    "billing"   Stripe payment failures, invoices
+                    From: billing@tapeline.io
+    "alerts"    automated digests + user alert rules
+                    From: alerts@tapeline.io
+
+Reply-To always points at support@tapeline.io which IS routed via Cloudflare
+Email Routing → tapeline.inbox@gmail.com. So replies always land somewhere
+real, even before per-persona aliases get their own routing rules. Override
+via EMAIL_REPLY_TO env var per-persona reply targets if you eventually want
+sales replies to literally land at christian@.
+"""
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -13,26 +33,58 @@ settings = get_settings()
 
 RESEND_API = "https://api.resend.com"
 
+EmailPersona = Literal["default", "sales", "billing", "alerts"]
 
-async def send_email(to: str, subject: str, html: str, text: str | None = None) -> dict[str, Any]:
-    """Send a single email. Returns the Resend response or raises.
 
-    `from` is set from the EMAIL_FROM env var (can be any address under the
-    Resend-verified tapeline.io domain — e.g. christian@tapeline.io for the
-    founder-fronted persona). `reply_to` is set explicitly to a known-routed
-    address (support@tapeline.io, forwarded via Cloudflare Email Routing to
-    tapeline.inbox@gmail.com) so replies don't bounce even if the sender
-    address itself hasn't been wired into the routing rules yet. Override
-    via EMAIL_REPLY_TO env var.
+def _persona_addresses(persona: EmailPersona) -> tuple[str, str]:
+    """Return (from_address, reply_to_address) for the given persona.
+
+    All four addresses live under the Resend-verified tapeline.io domain —
+    no extra DNS work is needed to start sending from any of them. Reply-To
+    is shared across personas (support@tapeline.io, already routed) so we
+    have a single bounce-safe reply hub.
+    """
+    sender = {
+        "default": settings.email_from,
+        "sales":   settings.email_from_sales,
+        "billing": settings.email_from_billing,
+        "alerts":  settings.email_from_alerts,
+    }[persona]
+    return sender, settings.email_reply_to
+
+
+async def send_email(
+    to: str,
+    subject: str,
+    html: str,
+    text: str | None = None,
+    *,
+    persona: EmailPersona = "default",
+) -> dict[str, Any]:
+    """Send a single email via Resend. Returns the Resend response or raises.
+
+    Pick `persona` based on what category of email this is:
+
+        send_email(..., persona="sales")     # trial drip day 7+, re-engagement
+        send_email(..., persona="billing")   # Stripe events
+        send_email(..., persona="alerts")    # automated digests
+        send_email(..., )                    # everything else (transactional)
+
+    The From line shows the persona's address; Reply-To always points at
+    support@tapeline.io so replies don't bounce even if a persona's alias
+    hasn't been wired into Cloudflare Email Routing yet.
     """
     if not settings.resend_api_key:
-        logger.warning("email.skipped reason=no_api_key to=%s subject=%s", to, subject)
+        logger.warning(
+            "email.skipped reason=no_api_key persona=%s to=%s subject=%s",
+            persona, to, subject,
+        )
         return {"skipped": True}
 
-    reply_to = getattr(settings, "email_reply_to", None) or "support@tapeline.io"
+    sender, reply_to = _persona_addresses(persona)
 
     payload = {
-        "from": f"Tapeline <{settings.email_from}>",
+        "from": f"Tapeline <{sender}>",
         "to": [to],
         "subject": subject,
         "html": html,
@@ -635,7 +687,10 @@ async def run_eod_watchlist_digest(session) -> int:
 
         try:
             html = render_eod_watchlist_digest(user.name or "trader", items)
-            res = await send_email(user.email, f"Tapeline EOD · {_today_short()}", html)
+            res = await send_email(
+                user.email, f"Tapeline EOD · {_today_short()}", html,
+                persona="alerts",
+            )
             if not res.get("skipped", False):
                 sent += 1
         except Exception:
@@ -852,7 +907,11 @@ async def run_daily_drip(session) -> dict[str, int]:
                     html = renderer(user.name or "trader", summary)
                 else:
                     html = renderer(user.name or "trader")
-                res = await send_email(user.email, subject, html)
+                # Day 3 is soft activation ("have you tried the scanner") — keep
+                # under the default transactional sender. Day 7 onwards is the
+                # conversion push, sender Christian (sales persona).
+                drip_persona: EmailPersona = "default" if token == "3" else "sales"
+                res = await send_email(user.email, subject, html, persona=drip_persona)
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
                     user.drip_state = ",".join(sorted(sent_tokens))
@@ -914,7 +973,10 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
             continue
         try:
             html = render_re_engagement_email(user.name or "trader")
-            res = await send_email(user.email, "Tapeline missed you", html)
+            res = await send_email(
+                user.email, "Tapeline missed you", html,
+                persona="sales",
+            )
             if not res.get("skipped", False):
                 sent_tokens.add("re14")
                 user.drip_state = ",".join(sorted(sent_tokens))

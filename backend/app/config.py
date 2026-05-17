@@ -97,8 +97,25 @@ class Settings(BaseSettings):
     stripe_price_premium_annual: str = ""
 
     # ---- Email (Resend) ----
+    # Multiple sender personas so users see a sensible From line per email
+    # category. All addresses live under the Resend-verified tapeline.io
+    # domain so no per-address DNS work is required.
+    #
+    #   default       transactional (welcome, referrals, day-3 activation)
+    #   sales         conversion-y (trial drip day 7+, re-engagement, win-back)
+    #   billing       Stripe payment failures / invoices
+    #   alerts        automated (alert rules, EOD digest, daily briefing)
+    #
+    # Reply-To always points at support@tapeline.io (already routed via
+    # Cloudflare Email Routing to tapeline.inbox@gmail.com) so replies
+    # never bounce — even if a per-persona alias hasn't been wired into
+    # the Cloudflare routing rules yet.
     resend_api_key: str = ""
-    email_from: str = "alerts@tapeline.io"
+    email_from: str = "hello@tapeline.io"                  # default / transactional
+    email_from_sales: str = "christian@tapeline.io"        # conversion-y trial drip + re-engagement
+    email_from_billing: str = "billing@tapeline.io"        # Stripe events
+    email_from_alerts: str = "alerts@tapeline.io"          # automated digests + alert rules
+    email_reply_to: str = "support@tapeline.io"            # bounce-safe reply hub
 
     # ---- Telegram ----
     telegram_bot_token: str = ""

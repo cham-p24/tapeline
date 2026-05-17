@@ -46,5 +46,5 @@ async def send_test_briefing(
     """Send today's personalised briefing to the current user's email right now."""
     from app.services.email import send_email
     html = await generate_briefing_html(session, user)
-    await send_email(user.email, "Your Tapeline briefing (test)", html)
+    await send_email(user.email, "Your Tapeline briefing (test)", html, persona="alerts")
     return {"ok": True, "sent_to": user.email}
