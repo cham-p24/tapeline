@@ -115,7 +115,7 @@ export default async function OG({ params }: { params: Promise<{ symbol: string 
             style={{
               width: "56px",
               height: "12px",
-              background: "linear-gradient(90deg, #22c55e 0%, #14b8a6 100%)",
+              background: "#3b82f6",
               borderRadius: "999px",
               display: "flex",
             }}
