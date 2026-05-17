@@ -1,11 +1,11 @@
 /**
- * LinkedIn banner image - 1584x396 PNG.
+ * LinkedIn PERSONAL profile banner - 1584x396 PNG.
  *
- * Served at /banner-linkedin. Upload to either the Christian Piyatilaka
- * personal profile header OR a Tapeline company page header. Spec is
- * the LinkedIn personal banner size; for a company page header (1128x191)
- * a different route would be needed - this banner can also be center-
- * cropped to that aspect by LinkedIn if uploaded there.
+ * Served at /banner-linkedin. Upload to the Christian Piyatilaka personal
+ * LinkedIn profile cover slot. DO NOT upload to a LinkedIn company page -
+ * the company-page cover uses a much wider ~6:1 aspect (1128x191) and
+ * uploading this 4:1 banner letterboxes + trips LinkedIn's upload-size
+ * validator. The company-page banner is at /banner-linkedin-company.
  *
  * Wider + shorter than the X banner. Layout shifts to single-row with
  * brand mark left, tagline right, since vertical real estate is tighter.
