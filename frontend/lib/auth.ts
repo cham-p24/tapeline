@@ -17,6 +17,10 @@ export type SessionUser = {
   phone_number?: string | null;
   discord_webhook_url?: string | null;
   created_at: string | null;
+  // Null until the user has submitted (or skipped) /app/onboarding. The
+  // frontend post-signup redirect uses this to decide whether to bounce
+  // through onboarding before /app/scanner.
+  onboarding_completed_at?: string | null;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";

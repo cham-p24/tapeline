@@ -459,6 +459,106 @@ async def test_signup_with_unknown_ref_code_no_credit(client, monkeypatch):
         )
 
 
+@pytest.mark.asyncio
+async def test_onboarding_requires_auth(client):
+    """POST /api/me/onboarding without a session must 401. The endpoint
+    writes to user.* columns and must not accept unauthenticated bodies."""
+    async with client:
+        r = await client.post(
+            "/api/me/onboarding",
+            json={"experience_level": "beginner"},
+        )
+        assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_onboarding_persists_profile_fields(client, monkeypatch):
+    """Submitting onboarding sets the profile columns + stamps the
+    completed_at timestamp. Sectors outside the allowed set are dropped.
+    GET /api/me reflects the new state on the next call."""
+    _patch_signup_gates(monkeypatch)
+
+    async with client:
+        # Fresh user — onboarding starts null.
+        signup_email = _random_email()
+        r_signup = await client.post(
+            "/api/auth/signup",
+            json={
+                "email": signup_email, "password": "TestPassword!2026",
+                "name": "Onboarder",
+            },
+        )
+        assert r_signup.status_code == 200, r_signup.text
+        cookies = r_signup.cookies
+        assert r_signup.json()["user"]["onboarding_completed_at"] is None
+
+        # Submit a filled body. One unknown sector slug is included to verify
+        # the server drops it rather than persisting arbitrary text.
+        r_post = await client.post(
+            "/api/me/onboarding",
+            json={
+                "experience_level": "intermediate",
+                "trading_style": "swing",
+                "portfolio_band": "10_50k",
+                "referral_source": "twitter_x",
+                "marketing_opt_in": True,
+                "sectors_of_interest": ["technology", "healthcare", "made_up_sector"],
+                "skipped": False,
+            },
+            cookies=cookies,
+        )
+        assert r_post.status_code == 200, r_post.text
+        assert r_post.json()["onboarding_completed_at"] is not None
+
+        # /api/me reflects the new state, with the bogus sector filtered out.
+        r_me = await client.get("/api/me", cookies=cookies)
+        assert r_me.status_code == 200
+        me = r_me.json()
+        assert me["onboarding_completed_at"] is not None
+        profile = me["profile"]
+        assert profile["experience_level"] == "intermediate"
+        assert profile["trading_style"] == "swing"
+        assert profile["portfolio_band"] == "10_50k"
+        assert profile["referral_source"] == "twitter_x"
+        assert profile["marketing_opt_in"] is True
+        assert set(profile["sectors_of_interest"]) == {"technology", "healthcare"}
+
+
+@pytest.mark.asyncio
+async def test_onboarding_skip_stamps_completion(client, monkeypatch):
+    """An empty (skipped) onboarding body must still stamp completed_at so
+    the user isn't re-prompted, but no profile fields should be set."""
+    _patch_signup_gates(monkeypatch)
+
+    async with client:
+        r_signup = await client.post(
+            "/api/auth/signup",
+            json={
+                "email": _random_email(), "password": "TestPassword!2026",
+                "name": "Skipper",
+            },
+        )
+        assert r_signup.status_code == 200
+        cookies = r_signup.cookies
+
+        r_post = await client.post(
+            "/api/me/onboarding",
+            json={"skipped": True},
+            cookies=cookies,
+        )
+        assert r_post.status_code == 200
+        assert r_post.json()["onboarding_completed_at"] is not None
+
+        r_me = await client.get("/api/me", cookies=cookies)
+        me = r_me.json()
+        assert me["onboarding_completed_at"] is not None
+        profile = me["profile"]
+        assert profile["experience_level"] is None
+        assert profile["trading_style"] is None
+        assert profile["marketing_opt_in"] is False
+        assert profile["sectors_of_interest"] == []
+
+
 # NOTE: keep this test LAST. The rate-limiter is process-global and stays
 # triggered for ~60s after this test fires; subsequent tests would all 429.
 @pytest.mark.asyncio

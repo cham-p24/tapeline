@@ -63,6 +63,11 @@ def _user_out(u: User) -> dict:
         "trial_ends_at": u.trial_ends_at.isoformat() if u.trial_ends_at else None,
         "referral_code": u.referral_code,
         "created_at": u.created_at.isoformat() if u.created_at else None,
+        # Drives the post-signup redirect — frontend sends users with a NULL
+        # onboarding_completed_at through /app/onboarding before /app/scanner.
+        "onboarding_completed_at": (
+            u.onboarding_completed_at.isoformat() if u.onboarding_completed_at else None
+        ),
     }
 
 
