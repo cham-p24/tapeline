@@ -323,7 +323,7 @@ async def send_daily_briefing_to_all(session: AsyncSession) -> int:
     for u in users:
         try:
             html = await generate_briefing_html(session, u)
-            await send_email(u.email, "Your Tapeline briefing", html)
+            await send_email(u.email, "Your Tapeline briefing", html, persona="alerts")
             sent += 1
         except Exception:
             logger.exception("briefing.send_failed user=%s", u.id)
