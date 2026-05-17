@@ -15,9 +15,12 @@ This module dispatches by `persona`:
 
 Reply-To always points at support@tapeline.io which IS routed via Cloudflare
 Email Routing → tapeline.inbox@gmail.com. So replies always land somewhere
-real, even before per-persona aliases get their own routing rules. Override
-via EMAIL_REPLY_TO env var per-persona reply targets if you eventually want
-sales replies to literally land at christian@.
+real, even before per-persona aliases get their own routing rules.
+
+Every renderer here composes its body via the helpers in
+`app.services.email_design` and wraps with `shell(...)`. Inline raw HTML
+is reserved for one-off pricing/header layouts that don't fit a primitive
+yet. See email_design.py for the design system rationale.
 """
 from __future__ import annotations
 
@@ -27,6 +30,32 @@ from typing import Any, Literal
 import httpx
 
 from app.config import get_settings
+from app.services.email_design import (
+    ACCENT,
+    FONT_MONO,
+    FONT_SANS,
+    LIGHT_BORDER,
+    LIGHT_FG,
+    LIGHT_MUTED,
+    LIGHT_SUBTLE,
+    SIG_BEAR,
+    SIG_BULL,
+    button,
+    card,
+    divider,
+    footnote,
+    h1,
+    h2,
+    lead,
+    muted_paragraph,
+    paragraph,
+    score_color,
+    secondary_link,
+    shell,
+    stat_row,
+    ticker_card,
+    watchlist_table,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -69,10 +98,6 @@ async def send_email(
         send_email(..., persona="billing")   # Stripe events
         send_email(..., persona="alerts")    # automated digests
         send_email(..., )                    # everything else (transactional)
-
-    The From line shows the persona's address; Reply-To always points at
-    support@tapeline.io so replies don't bounce even if a persona's alias
-    hasn't been wired into Cloudflare Email Routing yet.
     """
     if not settings.resend_api_key:
         logger.warning(
@@ -104,6 +129,37 @@ async def send_email(
         return resp.json()
 
 
+# ── Alert emails ────────────────────────────────────────────────────────────
+
+def render_alert_email(
+    user_name: str, rule_name: str, symbol: str, score: float, message: str,
+) -> str:
+    """User-rule alert (score / squeeze / regime / congress / news).
+
+    Single CTA → /app/scanner since these are usually market-wide signals;
+    if the alert is symbol-specific the receiver can click into the ticker
+    from the scanner.
+    """
+    body = (
+        h1(f"Alert: {rule_name}")
+        + lead(
+            f"Hi {user_name}, one of your alert rules just triggered. "
+            f"Score and signal below — open the scanner for the full breakdown."
+        )
+        + card(
+            f'<div class="tl-fg" style="font-family:{FONT_MONO};font-size:24px;font-weight:700;color:{LIGHT_FG};line-height:1;">{symbol}</div>'
+            f'<div style="margin-top:6px;color:{score_color(score)};font-weight:600;font-size:14px;font-family:{FONT_SANS};">Score · {score:.1f}</div>'
+            f'<div class="tl-muted" style="margin-top:10px;color:{LIGHT_MUTED};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">{message}</div>',
+            accent=True,
+        )
+        + button("Open the scanner", "https://tapeline.io/app/scanner")
+    )
+    return shell(
+        body,
+        preheader=f"{rule_name} triggered on {symbol} (score {score:.0f}).",
+    )
+
+
 def render_watchlist_alert_email(
     user_name: str,
     symbol: str,
@@ -112,170 +168,61 @@ def render_watchlist_alert_email(
     signal: str | None,
     reason: str | None,
 ) -> str:
-    """Smart alert when a watchlisted ticker's score crosses the user's
-    delta threshold relative to where they added it.
+    """Smart alert: a watchlisted ticker's score moved past the user's delta
+    threshold relative to where they added it.
 
-    Routed via the `alerts` persona (alerts@tapeline.io). Distinct from
-    the EOD digest in that it's per-ticker, intra-day, and only fires on
-    significant moves — see app.services.alerts.evaluate_watchlist_alerts
-    for the gating logic.
+    Distinct from the EOD digest — this is per-ticker, intra-day, and only
+    fires on significant moves. Debounced 24h via WatchlistItem.last_alert_at.
     """
     delta = current_score - baseline_score
     sign = "+" if delta >= 0 else ""
-    delta_color = "#10b981" if delta >= 0 else "#ef4444"
-    score_color = (
-        "#22c55e" if current_score >= 70
-        else "#14b8a6" if current_score >= 55
-        else "#a1a1aa" if current_score >= 40
-        else "#fbbf24" if current_score >= 25
-        else "#ef4444"
+    direction = "moved up past" if delta >= 0 else "dropped past"
+    delta_col = SIG_BULL if delta >= 0 else SIG_BEAR
+    return shell(
+        h1(f"Watchlist alert · {symbol}")
+        + lead(
+            f"Hi {user_name}, <strong>{symbol}</strong> {direction} your alert "
+            f"threshold. Here's where it sits right now."
+        )
+        + card(
+            f"""
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <div class="tl-fg" style="font-family:{FONT_MONO};font-size:26px;font-weight:700;color:{LIGHT_FG};line-height:1;">{symbol}</div>
+                  <div style="margin-top:6px;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:{score_color(current_score)};font-family:{FONT_SANS};font-weight:600;">{signal or "—"}</div>
+                </td>
+                <td align="right" style="vertical-align:middle;">
+                  <div style="font-family:{FONT_MONO};font-size:32px;font-weight:700;color:{score_color(current_score)};line-height:1;">{current_score:.0f}</div>
+                  <div style="margin-top:6px;font-family:{FONT_MONO};font-size:13px;color:{delta_col};font-weight:600;">{sign}{delta:.1f}</div>
+                </td>
+              </tr>
+            </table>
+            <div class="tl-divider" style="height:1px;background:{LIGHT_BORDER};margin:14px 0;"></div>
+            """
+            + stat_row("Baseline (when you added)", f"{baseline_score:.0f}")
+            + stat_row("Threshold crossed", f"{sign}{delta:.1f} pts", value_color=delta_col)
+        )
+        + (muted_paragraph(reason.strip()[:240]) if reason else "")
+        + button(f"Open {symbol}", f"https://tapeline.io/app/ticker/{symbol}")
+        + footnote(
+            f"You're seeing this because <strong>{symbol}</strong> is on your watchlist. "
+            f"We won't re-alert on this ticker for at least 24 hours."
+        ),
+        preheader=(
+            f"{symbol} score now {current_score:.0f} ({sign}{delta:.1f} from baseline)."
+        ),
     )
-    sig = signal or "—"
-    why = (reason or "").strip()[:200]
-    why_block = (
-        f'<p style="color:#9ca3af;margin:0 0 16px;font-size:13px;line-height:1.5;">{why}</p>'
-        if why else ""
-    )
-    return f"""<!doctype html>
-<html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;margin:0;">
-  <div style="max-width:560px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
-      <div style="width:24px;height:8px;border-radius:999px;background:#3b82f6;"></div>
-      <strong style="font-size:18px;">Tapeline</strong>
-    </div>
-    <h1 style="margin:0 0 8px;font-size:22px;">Watchlist alert: {symbol}</h1>
-    <p style="color:#9ca3af;margin:0 0 20px;">Hi {user_name}, a ticker you&rsquo;re watching just moved past your alert threshold.</p>
-
-    <div style="background:#0a0a0a;border-radius:8px;padding:20px;border:1px solid #1f1f23;margin-bottom:18px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
-        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:28px;font-weight:700;">{symbol}</div>
-        <div style="text-align:right;">
-          <div style="font-size:30px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,monospace;color:{score_color};line-height:1;">{current_score:.0f}</div>
-          <div style="margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:{score_color};">{sig}</div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:12px;margin-top:14px;">
-        <span>Baseline (when you added): <strong style="color:#d1d5db;">{baseline_score:.0f}</strong></span>
-        <span>Change: <strong style="color:{delta_color};">{sign}{delta:.1f}</strong></span>
-      </div>
-    </div>
-
-    {why_block}
-
-    <a href="https://tapeline.io/app/ticker/{symbol}" style="display:inline-block;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;">Open {symbol} &rarr;</a>
-
-    <hr style="border:0;border-top:1px solid #1f1f23;margin:32px 0 16px;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">
-      <strong>Not investment advice.</strong> For informational purposes only. You&rsquo;re receiving this because <strong>{symbol}</strong> moved past the alert threshold on your watchlist. We won&rsquo;t re-alert on this ticker for at least 24 hours.
-      <br><br>
-      <a href="https://tapeline.io/app/watchlist" style="color:#9ca3af;">Manage watchlist</a>
-      &nbsp;·&nbsp;
-      <a href="https://tapeline.io/app/settings/email" style="color:#9ca3af;">Email preferences</a>
-    </p>
-  </div>
-</body></html>"""
 
 
-def render_alert_email(user_name: str, rule_name: str, symbol: str, score: float, message: str) -> str:
-    """Render an alert email. Minimal branded HTML."""
-    return f"""<!doctype html>
-<html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;">
-  <div style="max-width:560px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
-      <div style="width:24px;height:8px;border-radius:999px;background:#3b82f6;"></div>
-      <strong style="font-size:18px;">Tapeline</strong>
-    </div>
-    <h1 style="margin:0 0 8px;font-size:22px;">Alert: {rule_name}</h1>
-    <p style="color:#9ca3af;margin:0 0 24px;">Hi {user_name}, one of your rules just triggered.</p>
+# ── Welcome / day-0 ─────────────────────────────────────────────────────────
 
-    <div style="background:#0a0a0a;border-radius:8px;padding:20px;border:1px solid #1f1f23;">
-      <div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;">{symbol}</div>
-      <div style="margin-top:4px;color:#10b981;font-weight:500;">Score: {score:.1f}</div>
-      <div style="margin-top:12px;color:#f4f4f5;">{message}</div>
-    </div>
-
-    <a href="https://tapeline.io/app/scanner" style="display:inline-block;margin-top:24px;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;">Open dashboard &rarr;</a>
-
-    <hr style="border:0;border-top:1px solid #1f1f23;margin:32px 0 16px;">
-    <p style="color:#9ca3af;font-size:12px;margin:0;">
-      <strong>Not investment advice.</strong> For informational purposes only. You're receiving this because you set up an alert at tapeline.io.
-      <br><br>
-      <a href="https://tapeline.io/app/alerts" style="color:#9ca3af;">Manage alerts</a>
-    </p>
-  </div>
-</body></html>"""
-
-
-def _shell(body_html: str) -> str:
-    """Wrap body content in the standard Tapeline email shell.
-
-    Every non-transactional email rendered through this shell carries the
-    "Manage email prefs" link in the footer pointing at /app/settings/email
-    so the user can opt out of specific categories without unsubscribing
-    entirely. CAN-SPAM / GDPR hygiene.
-    """
-    return f"""<!doctype html>
-<html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;margin:0;">
-  <div style="max-width:560px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
-      <div style="width:24px;height:8px;border-radius:999px;background:#3b82f6;"></div>
-      <strong style="font-size:18px;">Tapeline</strong>
-    </div>
-    {body_html}
-    <hr style="border:0;border-top:1px solid #1f1f23;margin:32px 0 16px;">
-    <p style="color:#6b7280;font-size:11px;margin:0;">
-      <strong>Not investment advice.</strong> For informational purposes only.
-      <br><br>
-      <a href="https://tapeline.io/app/settings/email" style="color:#9ca3af;">Manage email prefs</a>
-      &nbsp;·&nbsp;
-      <a href="https://tapeline.io/app/account" style="color:#9ca3af;">Account</a>
-      &nbsp;·&nbsp;
-      <a href="https://tapeline.io/app/billing" style="color:#9ca3af;">Billing</a>
-    </p>
-  </div>
-</body></html>"""
-
-
-def _render_pick_card(symbol: str, score: float | None, signal: str | None, reason: str | None) -> str:
-    """Single ticker row used inside the welcome email's "live picks" block."""
-    score_str = f"{score:.0f}" if score is not None else "—"
-    signal_str = signal or "—"
-    # Score-tier colour matches /how-it-works.
-    if score is None:
-        col = "#a1a1aa"
-    elif score >= 70:
-        col = "#22c55e"
-    elif score >= 55:
-        col = "#14b8a6"
-    elif score >= 40:
-        col = "#a1a1aa"
-    elif score >= 25:
-        col = "#fbbf24"
-    else:
-        col = "#ef4444"
-    why = (reason or "")[:120]
-    return f"""
-    <a href="https://tapeline.io/t/{symbol}"
-       style="display:block;text-decoration:none;background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:14px 16px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-        <div>
-          <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:18px;font-weight:700;color:#f4f4f5;">{symbol}</div>
-          <div style="margin-top:4px;color:#9ca3af;font-size:12px;">{why}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:26px;font-weight:700;color:{col};font-family:'JetBrains Mono',ui-monospace,monospace;line-height:1;">{score_str}</div>
-          <div style="margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:{col};">{signal_str}</div>
-        </div>
-      </div>
-    </a>
-    """
-
-
-def render_welcome_email(user_name: str, picks: list[dict[str, Any]] | None = None) -> str:
+def render_welcome_email(
+    user_name: str, picks: list[dict[str, Any]] | None = None,
+) -> str:
     """Day 0 — sent immediately on signup.
 
-    `picks` is an optional list of {symbol, score, signal, reason} dicts the
-    auth handler fetches from the live DB before calling this renderer.
+    `picks` is the top-3 currently-scored tickers from the live scanner.
     Embedding 3 actual scores here lets the user see the product in their
     inbox, not just a "click here to see scores" CTA. Falls back to the
     static three-things checklist if picks is empty (worker hasn't ticked
@@ -283,78 +230,149 @@ def render_welcome_email(user_name: str, picks: list[dict[str, Any]] | None = No
     """
     if picks:
         picks_html = "".join(
-            _render_pick_card(p.get("symbol", "?"), p.get("score"), p.get("signal"), p.get("reason"))
+            ticker_card(
+                p.get("symbol", "?"),
+                p.get("score"),
+                p.get("signal"),
+                p.get("reason"),
+            )
             for p in picks[:3]
         )
-        body = f"""
-        <h1 style="margin:0 0 12px;font-size:26px;">Welcome, {user_name}.</h1>
-        <p style="color:#d1d5db;margin:0 0 24px;">Your <strong>14-day Premium trial</strong> is live. Three live scores from the scanner right now:</p>
-        {picks_html}
-        <a href="https://tapeline.io/app/scanner?utm_source=email&amp;utm_campaign=welcome&amp;utm_medium=transactional" style="display:inline-block;margin-top:8px;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the full scanner &rarr;</a>
-        <p style="color:#9ca3af;margin-top:24px;font-size:13px;">Tap any card above to see the 6-factor breakdown for that ticker. The
-        formula is public — see <a href="https://tapeline.io/how-it-works" style="color:#3b82f6;">how it works</a>.</p>
-        <p style="color:#6b7280;margin-top:18px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
-        """
+        body = (
+            h1(f"Welcome, {user_name}.")
+            + lead(
+                "Your <strong>14-day Premium trial</strong> is live — everything's "
+                "unlocked. Three live scores from the scanner right now:"
+            )
+            + picks_html
+            + button(
+                "Open the full scanner",
+                "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=welcome&utm_medium=transactional",
+            )
+            + muted_paragraph(
+                'Tap any card above to see the 6-factor breakdown. The formula '
+                'is public — see <a href="https://tapeline.io/how-it-works" '
+                f'style="color:{ACCENT};">how it works</a>.'
+            )
+            + footnote("No card on file. We'll remind you before the trial ends.")
+        )
     else:
-        body = f"""
-        <h1 style="margin:0 0 12px;font-size:26px;">Welcome, {user_name}.</h1>
-        <p style="color:#d1d5db;margin:0 0 16px;">Your <strong>14-day Premium trial</strong> is live. Everything's unlocked.</p>
-        <p style="color:#9ca3af;margin:0 0 20px;">Three things to try in the first five minutes:</p>
-        <ol style="color:#d1d5db;line-height:1.7;padding-left:20px;margin:0 0 24px;">
-          <li><strong>Scanner</strong> — see every ticker scored, hover any score for the 6-factor breakdown</li>
-          <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
-          <li><strong>Watchlist</strong> — add 5-10 tickers you're following, get smart alerts when scores shift</li>
-        </ol>
-        <a href="https://tapeline.io/app/scanner?utm_source=email&amp;utm_campaign=welcome&amp;utm_medium=transactional" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
-        <p style="color:#6b7280;margin-top:24px;font-size:13px;">No card on file. We'll remind you before the trial ends.</p>
-        """
-    return _shell(body)
+        body = (
+            h1(f"Welcome, {user_name}.")
+            + lead(
+                "Your <strong>14-day Premium trial</strong> is live. Everything's unlocked."
+            )
+            + muted_paragraph("Three things to try in the first five minutes:")
+            + card(
+                f"""
+                <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
+                  <li><strong>Scanner</strong> — every ticker scored; hover any score for the 6-factor breakdown</li>
+                  <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
+                  <li><strong>Watchlist</strong> — add 5-10 tickers, get smart alerts when scores shift past your threshold</li>
+                </ol>
+                """
+            )
+            + button(
+                "Open the scanner",
+                "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=welcome&utm_medium=transactional",
+            )
+            + footnote("No card on file. We'll remind you before the trial ends.")
+        )
+    return shell(
+        body,
+        preheader=(
+            "Your 14-day Premium trial is live — three live scores inside."
+            if picks else "Your 14-day Premium trial is live — open the scanner."
+        ),
+    )
 
+
+def render_referral_referee_email(
+    user_name: str, referrer_name: str | None,
+) -> str:
+    """Sent to a new user who signed up via a referral link."""
+    referrer_str = referrer_name or "your friend"
+    return shell(
+        h1(f"Welcome, {user_name}.")
+        + lead(
+            f"You signed up via {referrer_str}'s referral link — that earned you "
+            f"<strong>1 free month of Premium</strong> on top of your 14-day trial."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-family:{FONT_SANS};font-weight:600;">Credit applied</div>'
+            f'<div style="margin-top:6px;font-family:{FONT_MONO};font-size:26px;font-weight:700;color:{SIG_BULL};">+1 month Premium</div>'
+            f'<div class="tl-muted" style="margin-top:6px;color:{LIGHT_MUTED};font-size:13px;font-family:{FONT_SANS};">Auto-redeems at your next checkout.</div>',
+            accent=True,
+        )
+        + muted_paragraph(
+            "Trial today, free month after — your first paid month is on us."
+        )
+        + button("Open the scanner", "https://tapeline.io/app/scanner"),
+        preheader="You earned 1 free month of Premium — applied at your next checkout.",
+    )
+
+
+def render_referral_referrer_email(
+    user_name: str, referee_email_masked: str,
+) -> str:
+    """Sent to an existing user when someone joins via their referral link."""
+    return shell(
+        h1(f"Nice, {user_name} — someone joined.")
+        + lead(
+            f'<code style="font-family:{FONT_MONO};">{referee_email_masked}</code> '
+            f'just signed up with your referral link. That earned you '
+            f'<strong>1 free month of Premium</strong>.'
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-family:{FONT_SANS};font-weight:600;">Credit applied</div>'
+            f'<div style="margin-top:6px;font-family:{FONT_MONO};font-size:26px;font-weight:700;color:{SIG_BULL};">+1 month Premium</div>'
+            f'<div class="tl-muted" style="margin-top:6px;color:{LIGHT_MUTED};font-size:13px;font-family:{FONT_SANS};">Auto-redeems at your next checkout. Stack credits — refer 12, get a free year.</div>',
+            accent=True,
+        )
+        + button("See your referral page", "https://tapeline.io/app/referrals"),
+        preheader=f"Someone joined via your link — +1 free month of Premium credited.",
+    )
+
+
+# ── Trial drip ──────────────────────────────────────────────────────────────
 
 def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str:
-    """Day 3 — feature tour, what they may have missed.
-
-    Signature matches day-7/day-13 so the drip dispatcher can call every
-    renderer with the same shape regardless of whether it personalises.
-    `_summary` is ignored on day 3 — it's too early for meaningful trial
-    data and the feature-tour copy doesn't need it.
-    """
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">{user_name}, three days in.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">If you've only been on the scanner, here's what else is in your trial:</p>
-    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:18px;margin:16px 0;">
-      <div style="margin-bottom:14px;">
-        <strong style="color:#3b82f6;">🔥 Squeeze Watch</strong>
-        <p style="color:#9ca3af;margin:4px 0 0;font-size:14px;">Bollinger Band compressions flagged before they break. Eight setups updated live.</p>
-      </div>
-      <div style="margin-bottom:14px;">
-        <strong style="color:#3b82f6;">🏛️ Congress Trades</strong>
-        <p style="color:#9ca3af;margin:4px 0 0;font-size:14px;">Politicians' disclosed buys and sells. House and Senate, by ticker.</p>
-      </div>
-      <div style="margin-bottom:14px;">
-        <strong style="color:#3b82f6;">💼 Elite Holdings</strong>
-        <p style="color:#9ca3af;margin:4px 0 0;font-size:14px;">Latest 13F positions from Buffett, Burry, Tepper, Ackman, and four more.</p>
-      </div>
-      <div>
-        <strong style="color:#3b82f6;">📲 Telegram alerts</strong>
-        <p style="color:#9ca3af;margin:4px 0 0;font-size:14px;">Hourly digest of your watchlist + market regime, delivered to your phone.</p>
-      </div>
-    </div>
-    <a href="https://tapeline.io/app/holdings" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Try a Premium feature &rarr;</a>
-    """)
+    """Day 3 — feature tour."""
+    return shell(
+        h1(f"{user_name}, three days in.")
+        + lead(
+            "If you've only been on the scanner, here's what else is in your trial."
+        )
+        + card(
+            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Squeeze Watch</div>'
+            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Bollinger Band compressions flagged before they break. Eight setups updated live.</div>'
+        )
+        + card(
+            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Congress Trades</div>'
+            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Politicians\' disclosed buys and sells. House and Senate, by ticker.</div>'
+        )
+        + card(
+            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Recent insider buys</div>'
+            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">SEC Form 4 transactions across the universe — date, insider, shares, value.</div>'
+        )
+        + card(
+            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Telegram alerts</div>'
+            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Hourly digest of your watchlist + market regime, delivered to your phone.</div>'
+        )
+        + button("Try a Premium feature", "https://tapeline.io/app/holdings"),
+        preheader="Squeeze Watch, Congress Trades, Insider Buys, Telegram — inside your trial.",
+    )
 
 
-def _render_trial_summary_block(summary: dict | None) -> str:
-    """Render a per-user trial-period highlights block for the day-7/13 emails.
+def _trial_summary_block(summary: dict | None) -> str:
+    """Per-user trial-period highlights block. Replaces the legacy
+    _render_trial_summary_block with the new design tokens.
 
-    Pulls together:
-      - the user's watchlist density (how many high-signal names they're
-        currently watching, and the best score-delta mover)
-      - the public-scorecard cadence during their trial window (how many
-        top-10 picks logged, hit rate vs SPY, best alpha pick)
-
-    Falls back to an empty string when there's no usable signal — so the
-    email is never worse than the prior generic-urgency version.
+    Two streams blended:
+      1. Watchlist density (count, HIGH/STRONG signals, biggest mover)
+      2. Public scorecard during the trial window (picks logged, hit rate
+         vs SPY, avg alpha, best pick)
+    Empty → empty string; renderer drops the block silently.
     """
     if not summary:
         return ""
@@ -363,173 +381,339 @@ def _render_trial_summary_block(summary: dict | None) -> str:
     wl_strong = summary.get("watchlist_top_signals") or 0
     if wl_count > 0:
         lines.append(
-            f"<li><strong>Watchlist:</strong> {wl_count} ticker"
-            f"{'' if wl_count == 1 else 's'} on watch, "
-            f"<span style=\"color:#10b981;\">{wl_strong}</span> currently "
-            f"HIGH CONVICTION or STRONG SETUP.</li>"
+            f'<li><strong>Watchlist:</strong> {wl_count} ticker'
+            f'{"" if wl_count == 1 else "s"} on watch, '
+            f'<span style="color:{SIG_BULL};font-weight:600;">{wl_strong}</span> '
+            f'currently HIGH CONVICTION or STRONG SETUP.</li>'
         )
         best = summary.get("watchlist_best")
         if best and best.get("delta") is not None and abs(best["delta"]) >= 1:
             delta = best["delta"]
             sign = "+" if delta > 0 else ""
-            colour = "#10b981" if delta > 0 else "#ef4444"
+            colour = SIG_BULL if delta > 0 else SIG_BEAR
             lines.append(
-                f"<li><strong>Biggest mover</strong> on your watchlist: "
-                f"<code style=\"font-family:'JetBrains Mono',monospace;\">"
-                f"{best['symbol']}</code> · score now "
-                f"<strong>{best.get('score', 0):.0f}</strong> "
-                f"(<span style=\"color:{colour};\">{sign}{delta:.1f}</span> "
-                f"since you added it).</li>"
+                f'<li><strong>Biggest mover</strong> on your watchlist: '
+                f'<code style="font-family:{FONT_MONO};">{best["symbol"]}</code> · '
+                f'score now <strong>{best.get("score", 0):.0f}</strong> '
+                f'(<span style="color:{colour};font-weight:600;">{sign}{delta:.1f}</span> '
+                f'since you added it).</li>'
             )
     picks = summary.get("scorecard_picks_during_trial") or 0
     if picks > 0:
         hit = summary.get("scorecard_hit_rate")
         alpha = summary.get("scorecard_alpha_avg")
-        bits = [f"{picks} top-10 pick{'' if picks == 1 else 's'} logged"]
+        bits = [f'{picks} top-10 pick{"" if picks == 1 else "s"} logged']
         if hit is not None:
             bits.append(f"{hit:.0f}% beat SPY next session")
         if alpha is not None:
             sign = "+" if alpha >= 0 else ""
             bits.append(f"avg alpha {sign}{alpha:.2f}%")
         lines.append(
-            "<li><strong>Public scorecard during your trial:</strong> "
+            '<li><strong>Public scorecard during your trial:</strong> '
             + " · ".join(bits)
-            + " (full record at <a href=\"https://tapeline.io/scorecard\" "
-            "style=\"color:#3b82f6;\">/scorecard</a>).</li>"
+            + f' (full record at <a href="https://tapeline.io/scorecard" '
+              f'style="color:{ACCENT};">/scorecard</a>).</li>'
         )
         best_pick = summary.get("scorecard_best")
         if best_pick and best_pick.get("alpha") is not None:
             alpha_v = best_pick["alpha"]
             sign = "+" if alpha_v >= 0 else ""
             lines.append(
-                "<li><strong>Best pick this trial:</strong> "
-                f"<code style=\"font-family:'JetBrains Mono',monospace;\">"
-                f"{best_pick['symbol']}</code> · alpha vs SPY "
-                f"<span style=\"color:#10b981;\">{sign}{alpha_v:.2f}%</span>.</li>"
+                f'<li><strong>Best pick this trial:</strong> '
+                f'<code style="font-family:{FONT_MONO};">{best_pick["symbol"]}</code> · '
+                f'alpha vs SPY <span style="color:{SIG_BULL};font-weight:600;">{sign}{alpha_v:.2f}%</span>.</li>'
             )
     if not lines:
         return ""
-    return (
-        "<div style=\"background:#0a0a0a;border:1px solid #1f1f23;"
-        "border-radius:8px;padding:18px 22px;margin:16px 0;\">"
-        "<div style=\"color:#9ca3af;font-size:11px;text-transform:uppercase;"
-        "letter-spacing:0.1em;margin-bottom:10px;\">Your trial so far</div>"
-        "<ul style=\"color:#d1d5db;line-height:1.7;padding-left:18px;"
-        "margin:0;font-size:14px;\">"
-        + "".join(lines)
-        + "</ul></div>"
+    return card(
+        f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;'
+        f'letter-spacing:0.1em;color:{LIGHT_MUTED};margin-bottom:10px;font-weight:600;font-family:{FONT_SANS};">Your trial so far</div>'
+        f'<ul class="tl-fg" style="color:{LIGHT_FG};line-height:1.75;padding-left:18px;'
+        f'margin:0;font-size:14px;font-family:{FONT_SANS};">' + "".join(lines) + '</ul>'
     )
 
 
+def _pricing_card(
+    tier_label: str, monthly: str, annual_monthly: str,
+    annual_yearly: str, savings: str, blurb: str, *, accent: bool,
+) -> str:
+    """One pricing tile used in the day-7 email. Pro card uses subtle
+    styling; Premium card uses the accent stripe to draw the eye."""
+    return f"""
+    <div class="tl-card" style="background:#ffffff;border:1px solid {LIGHT_BORDER};{('border-left:3px solid ' + ACCENT + ';') if accent else ''}border-radius:8px;padding:18px 20px;margin:0 0 12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td class="tl-fg" style="font-size:16px;font-weight:600;color:{LIGHT_FG};font-family:{FONT_SANS};">{tier_label}</td>
+          <td align="right" class="tl-fg" style="font-family:{FONT_MONO};font-size:20px;font-weight:700;color:{LIGHT_FG};">{monthly}<span class="tl-muted" style="font-size:13px;font-weight:400;color:{LIGHT_MUTED};">/mo</span></td>
+        </tr>
+      </table>
+      <div style="margin-top:6px;font-size:13px;color:{SIG_BULL};font-family:{FONT_SANS};">
+        or <strong>{annual_monthly}/mo</strong> billed annually ({annual_yearly}/yr · save {savings})
+      </div>
+      <div class="tl-muted" style="margin-top:8px;font-size:13px;line-height:1.5;color:{LIGHT_MUTED};font-family:{FONT_SANS};">{blurb}</div>
+    </div>
+    """
+
+
 def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
-    """Day 7 — halfway. Reminder + nudge to add a card.
-
-    `summary` is the optional per-user trial-period highlight dict from
-    `trial_summary_for_user`. When present, the email leads with concrete
-    user-specific evidence ("X watchlist names HIGH CONVICTION, Y scorecard
-    picks beat SPY") before the pricing block. Falls back gracefully.
-    """
-    summary_block = _render_trial_summary_block(summary)
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">Halfway through your trial, {user_name}.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">Seven days left of full Premium access.</p>
-    {summary_block}
-    <p style="color:#9ca3af;margin:0 0 20px;">When the trial ends, your account drops to Free — top 20 tickers, 24-hour delayed, no alerts. To keep what you have, add a card.</p>
-    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:20px;margin:16px 0;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-        <strong style="font-size:18px;">Pro</strong>
-        <span style="font-size:22px;font-weight:700;">$29.99<span style="font-size:14px;color:#9ca3af;">/mo</span></span>
-      </div>
-      <p style="color:#22c55e;margin:0 0 8px;font-size:13px;">or <strong>$24.99/mo billed annually</strong> — save $60/yr</p>
-      <p style="color:#9ca3af;margin:0;font-size:13px;">Full live scanner, squeeze, regime, watchlist, email alerts, daily briefing.</p>
-    </div>
-    <div style="background:#121214;border:1px solid #3b82f6;border-radius:8px;padding:20px;margin:16px 0;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-        <strong style="font-size:18px;color:#3b82f6;">Premium</strong>
-        <span style="font-size:22px;font-weight:700;">$49.99<span style="font-size:14px;color:#9ca3af;">/mo</span></span>
-      </div>
-      <p style="color:#22c55e;margin:0 0 8px;font-size:13px;">or <strong>$39.99/mo billed annually</strong> — save $120/yr</p>
-      <p style="color:#9ca3af;margin:0;font-size:13px;">Everything in Pro + Congress + Telegram unlimited + API + elite 13F holdings.</p>
-    </div>
-    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Add a card &rarr;</a>
-    <p style="color:#6b7280;margin-top:18px;font-size:13px;">7-day money back, cancel anytime in one click.</p>
-    """)
-
-
-def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str:
-    """Day 13 — final urgency. Trial ends tomorrow.
-
-    `summary` is the optional per-user trial-period highlight dict. When
-    present, the email reframes generic loss ("no alerts, no Telegram") as
-    specific loss anchored on the user's actual trial-period evidence — the
-    upgrade trigger the article called out as 10x more effective than
-    feature-checklist urgency.
-    """
-    summary_block = _render_trial_summary_block(summary)
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;color:#f59e0b;">Trial ends tomorrow.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">{user_name}, your Premium trial expires in less than 24 hours.</p>
-    {summary_block}
-    <p style="color:#9ca3af;margin:0 0 20px;">If you don't add a card, your account drops to Free at expiry — the scanner shows yesterday's data on 20 tickers, no alerts, no Telegram, no Congress feed.</p>
-    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#f59e0b;color:#0a0a0a;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:8px;">Keep my account active &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">7-day money back. One-click cancel. No phone calls.</p>
-    """)
+    """Day 7 — halfway. Reminder + nudge to add a card."""
+    return shell(
+        h1(f"Halfway through your trial, {user_name}.")
+        + lead("Seven days left of full Premium access.")
+        + _trial_summary_block(summary)
+        + muted_paragraph(
+            "When the trial ends, your account drops to Free — top 20 tickers, "
+            "24-hour delayed, no alerts. To keep what you have, add a card."
+        )
+        + _pricing_card(
+            "Pro", "$29.99", "$24.99", "$299.99", "$60",
+            "Full live scanner, squeeze, regime, watchlist, email alerts, daily briefing.",
+            accent=False,
+        )
+        + _pricing_card(
+            "Premium", "$49.99", "$39.99", "$479.99", "$120",
+            "Everything in Pro + Congress + Telegram unlimited + insider Form 4 + analyst ratings.",
+            accent=True,
+        )
+        + button("Add a card", "https://tapeline.io/app/billing")
+        + footnote("7-day money back, cancel anytime in one click."),
+        preheader="Seven days left on your trial — add a card to keep Premium.",
+    )
 
 
 def render_trial_day11_email(user_name: str, summary: dict | None = None) -> str:
-    """T-3 — 3 days remaining on the 14-day trial.
+    """T-3 — 3 days remaining."""
+    return shell(
+        h1("3 days left on your trial.")
+        + lead(
+            f"{user_name}, you're 11 days into the 14-day Premium trial. "
+            f"Here's what you've actually been using."
+        )
+        + _trial_summary_block(summary)
+        + muted_paragraph(
+            "If you decide to keep Premium, add a card before Friday — same "
+            "price you signed up at ($49.99/mo or $39.99/mo billed annually). "
+            "If you don't, the account drops to Free at expiry."
+        )
+        + button("Keep Premium", "https://tapeline.io/app/billing")
+        + footnote("7-day money back. One-click cancel. No phone calls."),
+        preheader="Three days left of Premium — add a card to keep it.",
+    )
 
-    Sits between day 7 (halfway) and day 13 (last day). Lead with specific
-    trial-period evidence from `summary` (when available), then a concrete
-    list of what stays vs what drops at expiry — same anchoring as day 13
-    but without the urgency colour.
-    """
-    summary_block = _render_trial_summary_block(summary)
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">3 days left on your trial.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">{user_name}, you're 11 days into the 14-day Premium trial. Here's what you've actually been using:</p>
-    {summary_block}
-    <p style="color:#9ca3af;margin:0 0 20px;">If you decide to keep Premium, add a card before Friday — same price you signed up at ($39.99/mo or $39.99/mo billed annually saves $120/yr). If you don't, the account drops to Free at expiry (top 20 tickers, 24-hour delayed, no Telegram).</p>
-    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Keep Premium &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">7-day money back. One-click cancel. No phone calls.</p>
-    """)
+
+def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str:
+    """T-1 — final urgency. Trial ends tomorrow.
+
+    Uses the urgent button variant (amber) — the only place we do."""
+    return shell(
+        h1("Trial ends tomorrow.")
+        + lead(
+            f"{user_name}, your Premium trial expires in less than 24 hours."
+        )
+        + _trial_summary_block(summary)
+        + muted_paragraph(
+            "If you don't add a card, your account drops to Free at expiry — "
+            "the scanner shows yesterday's data on 20 tickers, no alerts, "
+            "no Telegram, no Congress feed."
+        )
+        + button("Keep my account active", "https://tapeline.io/app/billing", variant="urgent")
+        + footnote("7-day money back. One-click cancel. No phone calls."),
+        preheader="Your Premium trial expires in less than 24 hours.",
+    )
 
 
 def render_trial_expired_email(user_name: str, summary: dict | None = None) -> str:
-    """T+0 — trial ended within the last 24 hours.
-
-    Honest framing: account is now on Free. Reactivation is one click, the
-    public scorecard stays open even at Free tier, and the trial benefits
-    never reset so this is the only "your previous setup is intact" moment.
-    """
-    summary_block = _render_trial_summary_block(summary)
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Your Tapeline trial ended.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">{user_name}, your 14-day Premium trial ended overnight. Your account is now on the Free tier — top 20 tickers, 24-hour delayed, no Telegram or smart alerts.</p>
-    {summary_block}
-    <p style="color:#9ca3af;margin:0 0 20px;">A few things stay open regardless of tier: the <a href="https://tapeline.io/scorecard" style="color:#3b82f6;">public scorecard</a> (every top-10 call back-checked vs SPY), the <a href="https://tapeline.io/how-it-works" style="color:#3b82f6;">scoring formula</a>, and your watchlist (capped at 5 tickers on Free). If you want everything back, one click re-activates Premium at the same price — your watchlist + alerts come back intact.</p>
-    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Re-activate Premium &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">No more reminders unless you re-activate. One more note in 3 days then I'll stop emailing.</p>
-    """)
+    """T+0 — trial ended within the last 24 hours."""
+    return shell(
+        h1("Your Tapeline trial ended.")
+        + lead(
+            f"{user_name}, your 14-day Premium trial ended overnight. Your "
+            f"account is now on the Free tier — top 20 tickers, 24-hour "
+            f"delayed, no Telegram or smart alerts."
+        )
+        + _trial_summary_block(summary)
+        + muted_paragraph(
+            'A few things stay open regardless of tier: the '
+            f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
+            '(every top-10 call back-checked vs SPY), the '
+            f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring formula</a>, '
+            'and your watchlist (capped at 5 tickers on Free). One click '
+            're-activates Premium at the same price — your watchlist + '
+            'alerts come back intact.'
+        )
+        + button("Re-activate Premium", "https://tapeline.io/app/billing")
+        + footnote("No more reminders unless you re-activate. One more note in 3 days then I'll stop emailing."),
+        preheader="Trial ended — re-activate to bring your watchlist + alerts back.",
+    )
 
 
 def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None) -> str:
     """T+3 — 3 days after trial expiry. Final touch.
 
-    No discount theatre, no fake urgency, no "wait we'll give you more time"
-    games. One direct question + the reactivation link + a polite goodbye.
-    The honesty is the differentiator here; most SaaS would offer 50% off
-    and a 6-month-extended trial, both of which read as desperate.
+    No discount theatre. One direct ask + the reactivation link + a polite
+    goodbye. Honest framing is the differentiator — most SaaS would offer
+    50% off and an extended trial, both of which read as desperate.
     """
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Last note from Tapeline.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">Hi {user_name} — it's been three days since your trial ended and you haven't reactivated. That's fine; not every tool fits every workflow.</p>
-    <p style="color:#d1d5db;margin:0 0 16px;">One ask, if you've got 30 seconds: <strong style="color:#f4f4f5;">what was missing?</strong> Reply to this email with whatever made you not keep it — a specific feature, the pricing, a bug, a confusing page. First-hand input from someone who actually tried Tapeline is more useful than any analytics dashboard. The address (christian@tapeline.io) goes straight to me, not a support queue.</p>
-    <p style="color:#9ca3af;margin:0 0 20px;">If you change your mind, the trial benefits don't reset — re-activate any time and your watchlist + alerts come back. Otherwise, this is the last email; no more drip after this.</p>
-    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Re-activate Premium &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">— Christian, founder. <a href="https://tapeline.io/scorecard" style="color:#6b7280;">Public scorecard stays free forever.</a></p>
-    """)
+    return shell(
+        h1("Last note from Tapeline.")
+        + lead(
+            f"Hi {user_name} — it's been three days since your trial ended "
+            f"and you haven't reactivated. That's fine; not every tool fits "
+            f"every workflow."
+        )
+        + paragraph(
+            'One ask, if you\'ve got 30 seconds: <strong>what was missing?</strong> '
+            'Reply to this email with whatever made you not keep it — a specific '
+            'feature, the pricing, a bug, a confusing page. First-hand input from '
+            'someone who actually tried Tapeline is more useful than any analytics '
+            'dashboard. The address (christian@tapeline.io) goes straight to me, '
+            'not a support queue.'
+        )
+        + muted_paragraph(
+            "If you change your mind, the trial benefits don't reset — re-activate "
+            "any time and your watchlist + alerts come back. Otherwise, this is "
+            "the last email; no more drip after this."
+        )
+        + button("Re-activate Premium", "https://tapeline.io/app/billing")
+        + footnote(
+            '— Christian, founder. '
+            f'<a href="https://tapeline.io/scorecard" style="color:{LIGHT_SUBTLE};text-decoration:underline;">Public scorecard stays free forever.</a>'
+        ),
+        preheader="Last note — what was missing? Reply and tell me.",
+    )
 
+
+def render_trial_ended_email(user_name: str) -> str:
+    """Sent on actual downgrade — soft re-engagement (separate code path
+    from the drip series; preserved for the legacy webhook hook)."""
+    return shell(
+        h1(f"Your trial just ended, {user_name}.")
+        + lead(
+            "Your account is now on the Free plan. Your watchlist and settings "
+            "are intact — only the data feed changes."
+        )
+        + muted_paragraph(
+            "If you want live data + alerts back, the door is always open."
+        )
+        + button("See plans", "https://tapeline.io/app/billing")
+        + footnote(
+            "No hard feelings if not. The public scorecard stays free for everyone, forever."
+        ),
+        preheader="You're on the Free plan now — settings + watchlist intact.",
+    )
+
+
+# ── Payment-failed ──────────────────────────────────────────────────────────
+
+def _ordinal(n: int) -> str:
+    """1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc."""
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def render_payment_failed_email(
+    user_name: str, tier: str, attempt_count: int = 1,
+) -> str:
+    """Stripe `invoice.payment_failed`. Tone is calm + practical, not
+    alarmist. First-attempt failures are usually transient (bank fraud
+    flag, expired card)."""
+    tier_label = tier.capitalize()
+    urgency_line = (
+        "Stripe will retry automatically over the next few days."
+        if attempt_count == 1
+        else f"This is the {_ordinal(attempt_count)} attempt — if it fails again, your account drops to Free."
+    )
+    return shell(
+        h1(f"{user_name}, your last payment didn't go through.")
+        + lead(
+            f"The renewal charge for your Tapeline {tier_label} subscription "
+            f"was declined. Usually it's a card on file that expired, or a "
+            f"bank fraud-system flag — not an actual problem with your account."
+        )
+        + muted_paragraph(
+            f"{urgency_line} Nothing is paused on your end yet — you still "
+            f"have full {tier_label} access."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Fix it in two clicks</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">Open your billing page, click "Update payment method", paste a new card. Stripe will run the failed charge again immediately.</p>'
+            + button("Open billing", "https://tapeline.io/app/billing"),
+            accent=True,
+        )
+        + footnote("Anything weird? Reply to this email — billing@tapeline.io reads every reply."),
+        preheader=f"Your {tier_label} renewal charge was declined — fix it in two clicks.",
+    )
+
+
+# ── EOD watchlist digest ────────────────────────────────────────────────────
+
+def _today_short() -> str:
+    from datetime import UTC, datetime
+    return datetime.now(UTC).strftime("%a %b %d")
+
+
+def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
+    """End-of-day watchlist summary — one email per Pro+ user per day."""
+    if not items:
+        return shell(
+            h1(f"End of day · {_today_short()}")
+            + lead("Your watchlist is empty. Add tickers to see them here tomorrow.")
+            + button("Open watchlist", "https://tapeline.io/app/watchlist"),
+            preheader="Your Tapeline watchlist is empty — add tickers to get a daily digest.",
+        )
+    return shell(
+        h1(f"End of day · {_today_short()}")
+        + lead(
+            f"Hi {user_name}, here's where your {len(items)} watchlist "
+            f"ticker{'' if len(items) == 1 else 's'} closed today."
+        )
+        + watchlist_table(items)
+        + button("Open watchlist", "https://tapeline.io/app/watchlist"),
+        preheader=(
+            f"Watchlist EOD · {len(items)} ticker"
+            f"{'' if len(items) == 1 else 's'} · {_today_short()}"
+        ),
+    )
+
+
+# ── Re-engagement (14-day dormant) ──────────────────────────────────────────
+
+def render_re_engagement_email(user_name: str) -> str:
+    """One-shot nudge for users dormant ~14 days. Calm/factual voice; no
+    drip after this."""
+    return shell(
+        h1(f"Tapeline missed you, {user_name}.")
+        + lead(
+            "It's been two weeks since you last opened the scanner. That's "
+            "fine — life and the market both move on — but two weeks is "
+            "also long enough that what you'd see today is meaningfully "
+            "different from what was there when you stepped away."
+        )
+        + paragraph(
+            'The fastest catch-up is the public '
+            f'<a href="https://tapeline.io/scorecard?utm_source=email&utm_campaign=re_engagement&utm_medium=transactional" style="color:{ACCENT};">scorecard</a> — '
+            'every top-10 daily pick we published while you were gone, '
+            'back-checked against SPY the next session. No survivor bias; '
+            'every miss is still on the page.'
+        )
+        + button(
+            "Open the scanner",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=re_engagement&utm_medium=transactional",
+        )
+        + footnote(
+            'If Tapeline isn\'t what you need, no follow-up — this is the only nudge.'
+            '<br><br>— Christian, founder. '
+            f'<a href="https://tapeline.io/how-it-works" style="color:{LIGHT_SUBTLE};text-decoration:underline;">The formula is still public.</a>'
+        ),
+        preheader="Two weeks since you last opened the scanner — the scorecard kept running.",
+    )
+
+
+# ── Worker orchestration ────────────────────────────────────────────────────
+#
+# These functions drive the trial drip, EOD digest, and re-engagement
+# email cadences. Called from app.workers.signal_publisher; idempotent
+# per-day via User.drip_state tokens.
 
 async def trial_summary_for_user(session, user) -> dict | None:
     """Pull per-user trial-period highlights for the day-7/day-13 emails.
@@ -541,15 +725,12 @@ async def trial_summary_for_user(session, user) -> dict | None:
          baseline. This is the personal signal.
       2. **Public scorecard during trial** — how many top-10 picks Tapeline
          logged between trial_start and now, the next-session hit rate vs
-         SPY, the average alpha, and the single highest-alpha pick. Same for
-         every user in the same trial cohort, but grounds the email in real
-         numbers instead of "trust us."
+         SPY, the average alpha, and the single highest-alpha pick.
 
-    Returns None if both streams are empty (no watchlist and no scorecard
-    activity during the trial) — the renderer treats None as "no summary
-    block" and falls back to the prior generic-urgency text. Never raises:
-    errors are swallowed because a failed personalisation must not block the
-    drip.
+    Returns None if both streams are empty — the renderer treats None as
+    "no summary block" and falls back to the prior generic-urgency text.
+    Never raises: errors are swallowed because a failed personalisation
+    must not block the drip.
     """
     from datetime import UTC, datetime, timedelta
 
@@ -558,7 +739,6 @@ async def trial_summary_for_user(session, user) -> dict | None:
     from app.models import DailyScorecardEntry, Ticker, WatchlistItem
 
     try:
-        # Trial window: from trial_ends_at - 14d (signup) to now.
         trial_end = user.trial_ends_at
         if trial_end is None:
             return None
@@ -605,13 +785,11 @@ async def trial_summary_for_user(session, user) -> dict | None:
         scored = [p for p in picks if p.alpha_vs_spy is not None]
         hit_rate = (
             100.0 * sum(1 for p in scored if (p.alpha_vs_spy or 0) > 0) / len(scored)
-            if scored
-            else None
+            if scored else None
         )
         avg_alpha = (
             sum(p.alpha_vs_spy or 0 for p in scored) / len(scored)
-            if scored
-            else None
+            if scored else None
         )
         best_pick = None
         if scored:
@@ -642,79 +820,6 @@ async def trial_summary_for_user(session, user) -> dict | None:
         return None
 
 
-def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
-    """End-of-day watchlist summary. Rendered into the standard email shell.
-
-    Items shape: each dict has {symbol, score, signal, change_pct_1d, baseline_score?, score_delta?, reason}.
-    """
-    if not items:
-        body = f"""
-        <h1 style="margin:0 0 12px;font-size:24px;">End of day · {_today_short()}</h1>
-        <p style="color:#9ca3af;margin:0 0 20px;">Your watchlist is empty. Add tickers to see them here tomorrow.</p>
-        <a href="https://tapeline.io/app/watchlist" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open watchlist &rarr;</a>
-        """
-        return _shell(body)
-
-    rows_html = []
-    for it in items:
-        sym = it.get("symbol", "")
-        score = it.get("score") or 0
-        sig = it.get("signal") or ""
-        change = it.get("change_pct_1d") or 0
-        delta = it.get("score_delta")
-        sig_color = (
-            "#10b981" if sig in ("HIGH CONVICTION", "STRONG SETUP")
-            else "#3b82f6" if sig == "CONSTRUCTIVE"
-            else "#f59e0b" if sig == "CAUTION"
-            else "#ef4444" if sig == "WEAK"
-            else "#9ca3af"
-        )
-        change_color = "#10b981" if change > 0 else "#ef4444" if change < 0 else "#9ca3af"
-        change_str = f"{'+' if change >= 0 else ''}{change:.2f}%"
-        delta_str = ""
-        if delta is not None and abs(delta) >= 1:
-            delta_color = "#10b981" if delta > 0 else "#ef4444"
-            delta_sign = "+" if delta > 0 else ""
-            delta_str = f"<span style=\"color:{delta_color};font-size:11px;margin-left:6px;\">Δ {delta_sign}{delta:.1f}</span>"
-        reason = (it.get("reason") or "").replace("<", "&lt;").replace(">", "&gt;")
-        rows_html.append(f"""
-        <tr style="border-bottom:1px solid #1f1f23;">
-          <td style="padding:10px 6px;font-family:'JetBrains Mono',monospace;font-weight:600;">
-            <a href="https://tapeline.io/app/ticker/{sym}" style="color:#f4f4f5;text-decoration:none;">{sym}</a>
-          </td>
-          <td style="padding:10px 6px;text-align:right;font-weight:600;">{score:.1f}{delta_str}</td>
-          <td style="padding:10px 6px;text-align:left;color:{sig_color};font-size:12px;font-weight:500;">{sig}</td>
-          <td style="padding:10px 6px;text-align:right;color:{change_color};font-weight:500;">{change_str}</td>
-        </tr>
-        <tr style="border-bottom:1px solid #1f1f23;">
-          <td colspan="4" style="padding:0 6px 10px;color:#9ca3af;font-size:12px;font-style:italic;">{reason}</td>
-        </tr>
-        """)
-
-    body = f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">End of day · {_today_short()}</h1>
-    <p style="color:#9ca3af;margin:0 0 16px;">Hi {user_name}, here's where your {len(items)} watchlist ticker{'' if len(items) == 1 else 's'} closed today.</p>
-    <table style="width:100%;border-collapse:collapse;background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;margin:16px 0;">
-      <thead>
-        <tr style="border-bottom:1px solid #1f1f23;">
-          <th style="padding:10px 6px;text-align:left;color:#9ca3af;font-size:11px;text-transform:uppercase;">Ticker</th>
-          <th style="padding:10px 6px;text-align:right;color:#9ca3af;font-size:11px;text-transform:uppercase;">Score</th>
-          <th style="padding:10px 6px;text-align:left;color:#9ca3af;font-size:11px;text-transform:uppercase;">Signal</th>
-          <th style="padding:10px 6px;text-align:right;color:#9ca3af;font-size:11px;text-transform:uppercase;">1D</th>
-        </tr>
-      </thead>
-      <tbody>{''.join(rows_html)}</tbody>
-    </table>
-    <a href="https://tapeline.io/app/watchlist" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Open watchlist &rarr;</a>
-    """
-    return _shell(body)
-
-
-def _today_short() -> str:
-    from datetime import UTC, datetime
-    return datetime.now(UTC).strftime("%a %b %d")
-
-
 async def run_eod_watchlist_digest(session) -> int:
     """Send EOD watchlist email to every Pro+ user with watchlist items.
 
@@ -732,7 +837,6 @@ async def run_eod_watchlist_digest(session) -> int:
 
     sent = 0
     for user in users:
-        # Respect per-user email-prefs — daily digest is opt-out-able.
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.DAILY_DIGEST):
             continue
@@ -747,7 +851,11 @@ async def run_eod_watchlist_digest(session) -> int:
         for w, t in rows:
             if t is None:
                 continue
-            delta = (t.score - w.baseline_score) if (t.score is not None and w.baseline_score is not None) else None
+            delta = (
+                (t.score - w.baseline_score)
+                if (t.score is not None and w.baseline_score is not None)
+                else None
+            )
             items.append({
                 "symbol": w.symbol,
                 "score": t.score,
@@ -772,144 +880,26 @@ async def run_eod_watchlist_digest(session) -> int:
     return sent
 
 
-def render_trial_ended_email(user_name: str) -> str:
-    """Sent on actual downgrade — soft re-engagement."""
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">Your trial just ended, {user_name}.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">Your account is now on the Free plan. Your watchlist and settings are intact — only the data feed changes.</p>
-    <p style="color:#9ca3af;margin:0 0 20px;">If you want live data + alerts back, the door is always open:</p>
-    <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">See plans &rarr;</a>
-    <p style="color:#6b7280;margin-top:24px;font-size:13px;">No hard feelings if not. The public scorecard stays free for everyone, forever.</p>
-    """)
-
-
-def render_referral_referee_email(user_name: str, referrer_name: str | None) -> str:
-    """Sent to a new user who signed up via a referral link."""
-    referrer_str = referrer_name or "your friend"
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">Welcome, {user_name}.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">You signed up via {referrer_str}'s referral link — that earned you <strong style="color:#10b981;">1 free month of Premium</strong> on top of your 14-day trial.</p>
-    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin:18px 0;">
-      <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Credit on your account</div>
-      <div style="font-size:24px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',ui-monospace,monospace;">1 month Premium</div>
-      <div style="color:#9ca3af;font-size:13px;margin-top:6px;">Applied automatically at your next checkout.</div>
-    </div>
-    <p style="color:#9ca3af;margin:0 0 20px;">Trial today, free month after — your first paid month is on us.</p>
-    <a href="https://tapeline.io/app/scanner" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">Open the scanner &rarr;</a>
-    """)
-
-
-def render_referral_referrer_email(user_name: str, referee_email_masked: str) -> str:
-    """Sent to an existing user when someone joins via their referral link."""
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">Nice, {user_name} — someone joined.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;"><code style="font-family:'JetBrains Mono',monospace;color:#f4f4f5;">{referee_email_masked}</code> just signed up with your referral link. That earned you <strong style="color:#10b981;">1 free month of Premium</strong>.</p>
-    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin:18px 0;">
-      <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Credit applied</div>
-      <div style="font-size:24px;font-weight:700;color:#10b981;font-family:'JetBrains Mono',ui-monospace,monospace;">+1 month Premium</div>
-      <div style="color:#9ca3af;font-size:13px;margin-top:6px;">Auto-redeems at your next checkout. Stack credits — refer 12, get a free year.</div>
-    </div>
-    <a href="https://tapeline.io/app/referrals" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;">See your referral page &rarr;</a>
-    """)
-
-
-def render_payment_failed_email(user_name: str, tier: str, attempt_count: int = 1) -> str:
-    """Sent when Stripe reports invoice.payment_failed for a user's subscription.
-
-    The tone is calm + practical, not alarmist. Stripe retries automatically a
-    handful of times before giving up, so first-attempt failures are often
-    transient (bank fraud system declined the renewal, expired card, etc.).
-    We tell the user what happened, what we're doing about it, and how to fix
-    it in two clicks — that's better than scolding.
-
-    Idempotency is enforced upstream by the StripeWebhookEvent table — every
-    event_id is recorded so Stripe's auto-retries don't trigger duplicate
-    emails for the same failure.
-    """
-    tier_label = tier.capitalize()
-    urgency_line = (
-        "Stripe will retry automatically over the next few days."
-        if attempt_count == 1
-        else f"This is the {_ordinal(attempt_count)} attempt — if it fails again, your account drops to Free."
-    )
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;">{user_name}, your last payment didn't go through.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">The renewal charge for your Tapeline {tier_label} subscription was declined. Usually it's a card on file that expired, or a bank fraud-system flag — not an actual problem with your account.</p>
-    <p style="color:#9ca3af;margin:0 0 20px;">{urgency_line} Nothing is paused on your end yet — you still have full {tier_label} access.</p>
-    <div style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin:18px 0;">
-      <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Fix it in two clicks</div>
-      <p style="color:#d1d5db;margin:6px 0 12px;font-size:13px;line-height:1.5;">Open your billing page, click "Update payment method", paste a new card. Stripe will run the failed charge again immediately.</p>
-      <a href="https://tapeline.io/app/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">Open billing &rarr;</a>
-    </div>
-    <p style="color:#9ca3af;margin:18px 0 0;font-size:13px;">Anything weird? Reply to this email — billing@tapeline.io reads every reply.</p>
-    """)
-
-
-def _ordinal(n: int) -> str:
-    """1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, etc."""
-    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-    return f"{n}{suffix}"
-
-
-def render_re_engagement_email(user_name: str) -> str:
-    """14-days-dormant nudge — fires once per user when last_seen_at slips
-    past 14 days.
-
-    Voice is the same calm/factual register as the post-expiry drip. Lead
-    with one concrete data point ("here's what the scorecard has done
-    since you last logged in") would be ideal but pre-computing that for
-    every dormant user is expensive — the simpler version just points at
-    /scorecard so they can self-check. If the metric becomes worth the
-    cost, swap the body to a personalised summary later.
-
-    Sender: christian@tapeline.io (founder-personal). No drip after this —
-    one shot, then silence unless they re-engage.
-    """
-    return _shell(f"""
-    <h1 style="margin:0 0 12px;font-size:24px;color:#f4f4f5;">Tapeline missed you, {user_name}.</h1>
-    <p style="color:#d1d5db;margin:0 0 16px;">It's been two weeks since you last opened the scanner. That's fine — life and the market both move on — but two weeks is also long enough that what you'd see today is meaningfully different from what was there when you stepped away.</p>
-    <p style="color:#d1d5db;margin:0 0 16px;">The fastest catch-up is the public <a href="https://tapeline.io/scorecard?utm_source=email&amp;utm_campaign=re_engagement&amp;utm_medium=transactional" style="color:#3b82f6;">scorecard</a> — every top-10 daily pick we published while you were gone, back-checked against SPY the next session. No survivor bias; every miss is still on the page.</p>
-    <a href="https://tapeline.io/app/scanner?utm_source=email&amp;utm_campaign=re_engagement&amp;utm_medium=transactional" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:500;margin-top:8px;">Open the scanner &rarr;</a>
-    <p style="color:#9ca3af;margin:24px 0 0;font-size:13px;">If Tapeline isn't what you need, no follow-up — this is the only nudge.</p>
-    <p style="color:#6b7280;margin-top:18px;font-size:13px;">&mdash; Christian, founder. <a href="https://tapeline.io/how-it-works" style="color:#6b7280;">The formula is still public.</a></p>
-    """)
-
-
-# Drip orchestration — the worker hooks below. Wiring is intentionally minimal
-# until Resend is configured (no API key = send_email() returns {"skipped": True}).
-# When the key arrives, add this to signal_publisher.py tick():
-#
-#   global _last_drip_check
-#   if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
-#       from app.services.email import run_daily_drip
-#       async with session_scope() as s:
-#           await run_daily_drip(s)
-#       _last_drip_check = started
-#
-# Note: this MVP version may double-send if the worker restarts mid-day.
-# To guard against that, add a `drip_state` JSON column to User and check it
-# before each send. That's a one-line migration but waits until Resend lands.
-
 async def run_daily_drip(session) -> dict[str, int]:
-    """
-    Send the full trial-drip series. Returns per-stage counts.
+    """Send the full trial-drip series. Returns per-stage counts.
 
     Stages, all dedup'd via `User.drip_state` (comma-separated tokens):
 
       Pre-expiry (trial_ends_at in the FUTURE — user is still on trial):
         - "3"   day-3  email   — trial_ends_at in (now+10d, now+11d)
         - "7"   day-7  email   — trial_ends_at in (now+6d,  now+7d )
-        - "11"  T-3    email   — trial_ends_at in (now+2d,  now+3d ) [NEW]
+        - "11"  T-3    email   — trial_ends_at in (now+2d,  now+3d )
         - "13"  T-1    email   — trial_ends_at in (now+0d,  now+1d )
 
       Post-expiry (trial_ends_at in the PAST — user didn't convert):
-        - "expired" T+0  email — trial_ends_at in (now-1d, now)   [NEW]
-        - "post3"   T+3  email — trial_ends_at in (now-4d, now-3d) [NEW]
+        - "expired" T+0  email — trial_ends_at in (now-1d, now)
+        - "post3"   T+3  email — trial_ends_at in (now-4d, now-3d)
 
     Tier filter: pre-expiry windows target users still on the trial
-    (tier in pro/premium, no Stripe customer). Post-expiry windows drop the
-    tier filter because auto-downgrade to Free may have already fired —
-    we just need "had a trial that ended recently and never added a card".
+    (tier in pro/premium, no Stripe customer). Post-expiry windows drop
+    the tier filter because auto-downgrade to Free may have already
+    fired — we just need "had a trial that ended recently and never
+    added a card".
     """
     from datetime import UTC, datetime, timedelta
 
@@ -920,10 +910,6 @@ async def run_daily_drip(session) -> dict[str, int]:
     now = datetime.now(UTC)
     counts = {"day3": 0, "day7": 0, "day11": 0, "day13": 0, "expired": 0, "post3": 0}
 
-    # Each entry: (token, count_key, lower, upper, renderer, subject,
-    #              personalise, post_expiry_filter)
-    # `personalise=True`         → renderer takes a per-user summary dict
-    # `post_expiry_filter=True`  → drop the pro/premium tier filter
     windows = [
         # Pre-expiry
         ("3",   "day3",   now + timedelta(days=10), now + timedelta(days=11),
@@ -938,7 +924,7 @@ async def run_daily_drip(session) -> dict[str, int]:
         ("13",  "day13",  now,                      now + timedelta(days=1),
          render_trial_day13_email,        "Tapeline — your trial ends tomorrow",
          True, False),
-        # Post-expiry — trial_ends_at is in the past
+        # Post-expiry
         ("expired", "expired", now - timedelta(days=1), now,
          render_trial_expired_email,      "Your Tapeline trial ended",
          True, True),
@@ -955,10 +941,6 @@ async def run_daily_drip(session) -> dict[str, int]:
             User.trial_ends_at < upper,
             User.stripe_customer_id.is_(None),
         ]
-        # Pre-expiry stages only target users still labelled as paid-tier
-        # (the no-card trial sets tier=premium until trial_ends_at fires).
-        # Post-expiry stages need to find users whose tier may have already
-        # auto-downgraded to free, so we skip that filter.
         if not post_expiry:
             filters.append(User.tier.in_(["pro", "premium"]))
 
@@ -968,8 +950,7 @@ async def run_daily_drip(session) -> dict[str, int]:
         for user in users:
             sent_tokens = set((user.drip_state or "").split(",")) - {""}
             if token in sent_tokens:
-                continue  # already sent this stage to this user
-            # Respect per-user email-prefs — trial-drip is one bit.
+                continue
             from app.services.email_prefs import EmailPref, wants
             if not wants(user, EmailPref.TRIAL_DRIP):
                 continue
@@ -979,9 +960,8 @@ async def run_daily_drip(session) -> dict[str, int]:
                     html = renderer(user.name or "trader", summary)
                 else:
                     html = renderer(user.name or "trader")
-                # Day 3 is soft activation ("have you tried the scanner") — keep
-                # under the default transactional sender. Day 7 onwards is the
-                # conversion push, sender Christian (sales persona).
+                # Day 3 is soft activation — keep under the default
+                # transactional sender. Day 7 onwards is the conversion push.
                 drip_persona: EmailPersona = "default" if token == "3" else "sales"
                 res = await send_email(user.email, subject, html, persona=drip_persona)
                 if not res.get("skipped", False):
@@ -1005,12 +985,7 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
     this email once even if they fall back into dormancy later.
 
     Trial users are EXCLUDED — the trial drip is the right re-engagement
-    channel for them. This kicks in only for users who:
-      - Have a non-null last_seen_at (so we know when they last visited)
-      - Have no trial_ends_at, OR trial_ends_at is in the past
-      - Don't already have "re14" in drip_state
-
-    Returns the count of sends, keyed by "re14".
+    channel for them.
     """
     from datetime import UTC, datetime, timedelta
 
@@ -1039,7 +1014,6 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
         sent_tokens = set((user.drip_state or "").split(",")) - {""}
         if "re14" in sent_tokens:
             continue
-        # Respect per-user email-prefs — re-engagement is opt-out-able.
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
