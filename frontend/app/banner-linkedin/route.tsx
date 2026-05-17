@@ -7,8 +7,14 @@
  * uploading this 4:1 banner letterboxes + trips LinkedIn's upload-size
  * validator. The company-page banner is at /banner-linkedin-company.
  *
- * Wider + shorter than the X banner. Layout shifts to single-row with
- * brand mark left, tagline right, since vertical real estate is tighter.
+ * Layout - matches every other Tapeline brand surface (X banner, email
+ * logo, all OG images): stripe INLINE with the "Tapeline" wordmark, NOT
+ * stacked above it. Same hierarchy as banner-x.
+ *
+ * Safe area: the personal-profile avatar circle pops up from below the
+ * banner with the top ~25% of the circle clipping into the bottom ~120px
+ * of the canvas at bottom-left. Content is anchored to the TOP of the
+ * canvas so the avatar can't reach it.
  */
 import { ImageResponse } from "next/og";
 import { loadInter } from "@/lib/og-fonts";
@@ -25,9 +31,11 @@ export async function GET() {
           height: "100%",
           background:
             "linear-gradient(135deg, #07090c 0%, #0d1218 50%, #0a0f15 100%)",
-          padding: "0 96px",
+          padding: "60px 96px 0 96px",
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
+          justifyContent: "flex-start",
+          gap: "24px",
           fontFamily: "Inter, system-ui, sans-serif",
           color: "#f4f4f5",
           position: "relative",
@@ -46,19 +54,20 @@ export async function GET() {
             display: "flex",
           }}
         />
-        {/* Left: brand mark stacked */}
+        {/* Brand mark - stripe + wordmark INLINE, same row.
+            Matches banner-x, email-logo, and the og.tsx helper layout
+            so the brand reads consistent across every surface. */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: "16px",
-            flex: "0 0 auto",
+            alignItems: "center",
+            gap: "26px",
           }}
         >
           <div
             style={{
-              width: "100px",
-              height: "20px",
+              width: "120px",
+              height: "26px",
               background: "#3b82f6",
               borderRadius: "999px",
               display: "flex",
@@ -66,30 +75,29 @@ export async function GET() {
           />
           <span
             style={{
-              fontSize: "76px",
+              fontSize: "92px",
               fontWeight: 700,
-              letterSpacing: "-0.035em",
+              letterSpacing: "-0.04em",
               lineHeight: 1,
             }}
           >
             Tapeline
           </span>
         </div>
-        {/* Right: tagline */}
+        {/* Tagline - one line, sits at y~180 well clear of where the
+            avatar circle clips in at y~280+. */}
         <div
           style={{
-            marginLeft: "80px",
-            fontSize: "34px",
+            fontSize: "36px",
             fontWeight: 500,
             color: "#a1a1aa",
             lineHeight: 1.25,
             letterSpacing: "-0.02em",
-            maxWidth: "780px",
+            maxWidth: "1392px",
             display: "flex",
           }}
         >
-          Open-formula stock scanner. Public scorecard back-checks every
-          call vs SPY.
+          One score per US stock. Public scorecard. Public formula.
         </div>
       </div>
     ),
