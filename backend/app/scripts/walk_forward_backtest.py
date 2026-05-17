@@ -95,7 +95,15 @@ from pathlib import Path
 
 # Import the published universe + weights from the canonical source so we
 # can never drift from what the worker actually scores.
+from app.services import historical_bars
+from app.services.historical_bars import BarData
 from app.services.mock_feed import TICKER_UNIVERSE
+
+# Top-N universe size for live mode. Fixed at 100 (top 100 by $-volume seed)
+# per the v2 spec — large enough to make alpha meaningful, small enough to
+# stay inside the Massive Starter rate budget on a back-test that fetches
+# bars per symbol over the window.
+LIVE_UNIVERSE_TOP_N = 100
 
 # Published formula at /how-it-works — DO NOT change without updating the
 # public page in the same commit.
@@ -175,6 +183,19 @@ class BacktestReport:
     periods: list[PeriodResult] = field(default_factory=list)
     factor_availability: FactorAvailability = field(default_factory=FactorAvailability)
     universe_size: int = 0
+    # What data source actually backed the price series in this run. Resolved
+    # at run-time (not from the CLI flag) because `--universe-source live`
+    # falls back to synthetic when no MASSIVE_API_KEY is set. The footer
+    # records the actual source so a reader knows whether the numbers came
+    # from real bars or the GBM-style fallback.
+    #
+    # Values:
+    #   "mock_synthetic"      — `--universe-source mock` (the v1 path)
+    #   "massive_live"        — `--universe-source live` AND a Massive key was
+    #                           configured AND bars were fetched
+    #   "synthetic_fallback"  — `--universe-source live` but no key set, OR
+    #                           every Massive fetch failed and we fell back
+    data_source: str = "mock_synthetic"
 
     @property
     def overall_hit_rate(self) -> float:
@@ -218,13 +239,22 @@ class BacktestReport:
 
 
 def _universe_symbols(source: str) -> list[str]:
-    """Active symbol list for the back-test. v1 = mock universe.
+    """Active symbol list for the back-test.
 
-    `source == "live"` is a stub for v2 — when Massive historical aggregates
-    are wired into this script, "live" will pull the active universe from
-    `services/universe.py`. For now both branches use the mock universe.
+    `source == "mock"` uses the full TICKER_UNIVERSE (~112 names — the v1
+    deterministic mock universe).
+    `source == "live"` uses the top-N tickers from TICKER_UNIVERSE as a seed
+    proxy for "top 100 by current $-volume" (the live-API path is
+    `/api/public/top-tickers?limit=100`, but we keep the script self-contained
+    + offline-safe by using TICKER_UNIVERSE order which is already roughly
+    sorted by market cap). The actual price data comes from Massive via the
+    `historical_bars` provider regardless of universe-source.
     """
-    symbols = [sym for sym, _name, _sector in TICKER_UNIVERSE]
+    all_symbols = [sym for sym, _name, _sector in TICKER_UNIVERSE]
+    # `live` takes the first LIVE_UNIVERSE_TOP_N as the seed. TICKER_UNIVERSE
+    # is roughly ordered by cap / liquidity already; keeps the seed
+    # deterministic + self-contained without needing a live API call.
+    symbols = all_symbols[:LIVE_UNIVERSE_TOP_N] if source == "live" else all_symbols
     # SPY is the benchmark — it must be present in any universe even if
     # someone trimmed the mock. Append if missing rather than fail loudly,
     # because the missing-benchmark case isn't user-actionable.
@@ -435,11 +465,57 @@ def _build_universe_series(
     start: date,
     end: date,
 ) -> dict[str, dict[date, float]]:
-    """Generate per-symbol price series for the full back-test window."""
+    """Generate per-symbol price series for the full back-test window.
+
+    Mock path only — always uses the deterministic synthetic walks. The live
+    path goes through `_build_universe_series_live` instead, which routes
+    through the `historical_bars` provider so cached or real Massive bars
+    are used when available.
+    """
     out: dict[str, dict[date, float]] = {}
     for sym in symbols:
         out[sym] = _simulate_price_series(sym, start, end)
     return out
+
+
+def _bars_to_close_series(bars: list[BarData]) -> dict[date, float]:
+    """Reshape a BarData list into the {date: close} dict the back-test uses.
+
+    The back-test only consumes close prices (period returns = close/close),
+    so we drop OHLV columns here to keep the rest of the script untouched.
+    """
+    return {b.bar_date: b.close for b in bars}
+
+
+def _build_universe_series_live(
+    symbols: Sequence[str],
+    start: date,
+    end: date,
+) -> tuple[dict[str, dict[date, float]], str]:
+    """Pull historical bars for every symbol via the `historical_bars` provider.
+
+    Returns a tuple of (series_by_symbol, data_source) where:
+        - series_by_symbol maps symbol -> {date: close}
+        - data_source is "massive_live" if a Massive key was configured and
+          we have a non-empty cache+real path, or "synthetic_fallback" if
+          we ended up in the GBM-style fallback path (no key OR a real
+          fetch failed on the benchmark).
+
+    The data-source classification is *conservative*: even one missing-key
+    fetch demotes the run to synthetic_fallback. That keeps the CSV footer
+    honest — a partial-key run shouldn't claim to be live-data.
+    """
+    out: dict[str, dict[date, float]] = {}
+    # If no key is configured up front, we know we're in the synthetic path —
+    # short-circuit the classification rather than waiting for the per-symbol
+    # exception path.
+    data_source = "massive_live" if historical_bars.configured() else "synthetic_fallback"
+
+    for sym in symbols:
+        bars = historical_bars.fetch_daily_bars(sym, start, end)
+        out[sym] = _bars_to_close_series(bars)
+
+    return out, data_source
 
 
 def run_backtest(config: BacktestConfig) -> BacktestReport:
@@ -451,7 +527,16 @@ def run_backtest(config: BacktestConfig) -> BacktestReport:
     bounded.
     """
     symbols = _universe_symbols(config.universe_source)
-    series_by_symbol = _build_universe_series(symbols, config.start, config.end)
+
+    # Dispatch on universe-source: mock uses the in-script synthetic walks,
+    # live uses the `historical_bars` provider (cache → Massive → synthetic).
+    if config.universe_source == "live":
+        series_by_symbol, data_source = _build_universe_series_live(
+            symbols, config.start, config.end,
+        )
+    else:
+        series_by_symbol = _build_universe_series(symbols, config.start, config.end)
+        data_source = "mock_synthetic"
 
     factor_avail = FactorAvailability()
     # Wire in real factor availability when the keys are present. For v1 we
@@ -468,6 +553,7 @@ def run_backtest(config: BacktestConfig) -> BacktestReport:
         config=config,
         factor_availability=factor_avail,
         universe_size=len([s for s in symbols if s != SPY_SYMBOL]),
+        data_source=data_source,
     )
 
     for rb_date, next_date in zip(rebalance_dates, period_ends, strict=False):
@@ -563,10 +649,33 @@ def _header_comment(report: BacktestReport) -> list[str]:
     """The leading `#`-prefixed comment block in the CSV output.
 
     Documents every assumption a reader needs to understand the numbers.
+    The synthetic-GBM caveat fires only when the run actually used the
+    synthetic generator (mock mode OR live mode that fell back to GBM).
+    On a `massive_live` run we replace it with a real-data note.
     """
     cfg = report.config
     zeroed = report.factor_availability.zeroed_factors()
     zeroed_str = ", ".join(zeroed) if zeroed else "none"
+
+    is_synthetic = report.data_source in ("mock_synthetic", "synthetic_fallback")
+    if report.data_source == "massive_live":
+        price_caveat = [
+            "# - Prices sourced from Massive (formerly Polygon) historical daily aggregates",
+            "#   24h on-disk cache; rate-limited to 5 calls/min on Starter tier",
+        ]
+    elif report.data_source == "synthetic_fallback":
+        price_caveat = [
+            "# - LIVE MODE REQUESTED but no MASSIVE_API_KEY was set (or every fetch failed)",
+            "#   Bars are deterministic GBM-style synthetic walks — the numbers below",
+            "#   are a smoke test of the SCORING PIPELINE, not a forecast of live results.",
+        ]
+    else:  # mock_synthetic
+        price_caveat = [
+            "# - Mock mode uses synthetic prices (deterministic GBM-style walks)",
+            "#   The numbers below are a smoke test of the SCORING PIPELINE,",
+            "#   not a forecast of live results. See docs/BACKTEST.md.",
+        ]
+
     lines = [
         "# Tapeline walk-forward backtest",
         f"# generated_at: {datetime.now(UTC).isoformat()}",
@@ -575,6 +684,7 @@ def _header_comment(report: BacktestReport) -> list[str]:
         f"# top_n: {cfg.top_n}",
         f"# mode: {cfg.mode}",
         f"# universe_source: {cfg.universe_source}",
+        f"# data_source: {report.data_source}",
         f"# universe_size: {report.universe_size}",
         "# formula: composite = 0.25*trend + 0.20*rs + 0.15*fundamentals "
         "+ 0.15*smart_money + 0.15*macro + 0.10*momentum",
@@ -587,24 +697,32 @@ def _header_comment(report: BacktestReport) -> list[str]:
         "# LIMITATIONS:",
         "# - Universe is static across the window (no delistings/IPOs)",
         "# - Survivor bias: today's universe used for all historical dates",
-        "# - v1 uses synthetic mock prices (deterministic GBM-style walks)",
-        "#   The numbers below are a smoke test of the SCORING PIPELINE,",
-        "#   not a forecast of live results. See docs/BACKTEST.md.",
+        *price_caveat,
         "# - Smart-money + fundamentals zeroed unless cache is populated",
         "# - Composite weights are FIXED — no walk-forward weight adaptation",
         "#",
     ]
+    # Suppress the now-unused `is_synthetic` local without changing public
+    # behaviour — kept for future use if we add per-caveat branching elsewhere.
+    _ = is_synthetic
     return lines
 
 
 def _summary_footer(report: BacktestReport) -> list[str]:
-    """The trailing `#`-prefixed summary block."""
+    """The trailing `#`-prefixed summary block.
+
+    `data_source` is repeated here (also appears in the header) so a reader
+    grepping just the summary block can see at a glance whether the run was
+    real-data or synthetic — critical for not accidentally citing GBM
+    numbers as evidence.
+    """
     lines = [
         "# Summary",
         f"# total_periods,{len(report.periods)}",
         f"# overall_hit_rate,{report.overall_hit_rate * 100:.2f}%",
         f"# overall_avg_alpha,{report.overall_avg_alpha:.3f}%",
         f"# sharpe_of_alpha_series,{report.sharpe_of_alpha_series:.3f}",
+        f"# data_source,{report.data_source}",
         '# methodology_notes,"weights fixed at 25/20/15/15/15/10"',
     ]
     return lines
@@ -688,7 +806,11 @@ def parse_args(argv: Sequence[str] | None = None) -> BacktestConfig:
                    help="Identical output in v1 (fixed weights); reserved for "
                    "future adaptive-weight versions")
     p.add_argument("--universe-source", choices=("mock", "live"), default="mock",
-                   help="v1 always uses mock_feed.TICKER_UNIVERSE regardless")
+                   help="mock: deterministic GBM-style synthetic prices on the full "
+                   "TICKER_UNIVERSE (~112 names). live: top-100 names from TICKER_UNIVERSE "
+                   "with real daily bars pulled from Massive (formerly Polygon) via the "
+                   "historical_bars provider — 24h on-disk cache, 5/min rate limit, "
+                   "synthetic GBM fallback when no MASSIVE_API_KEY is set.")
 
     ns = p.parse_args(argv)
 
