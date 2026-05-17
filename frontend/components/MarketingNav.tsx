@@ -4,6 +4,7 @@
  * Extracted out of app/page.tsx so the look + link list stays in sync.
  */
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function MarketingNav() {
   return (
@@ -32,6 +33,10 @@ export function MarketingNav() {
           <Link href="/signin" className="hidden text-sm text-muted hover:text-fg sm:inline">
             Sign in
           </Link>
+          {/* Theme toggle — parity with the app-shell control. Hidden on
+              the smallest mobile widths so "Start free" stays the visual
+              priority CTA; users on sm+ get it inline. */}
+          <ThemeToggle className="hidden sm:inline-flex" />
           <Link href="/signup" className="btn-primary text-sm whitespace-nowrap">
             Start free
           </Link>
