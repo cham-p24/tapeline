@@ -25,6 +25,17 @@ type Entry = {
 const ENTRIES: Entry[] = [
   {
     date: "2026-05-17",
+    version: "0.1.13",
+    tag: "shipped",
+    title: "Public /data-sources page; squeeze list back to populating",
+    body: [
+      "New /data-sources page lists every feed that powers a Tapeline score — what it's used for, where it shows up in the product, how often it refreshes, and whether it's public-domain or licensed. Six feeds covered end-to-end: prices, fundamentals, SEC filings, macro, news, and the composite scoring workbook. Linked from the footer's transparency strip.",
+      "Squeeze list on /app/squeeze now populates again. An upstream schema change meant the page was rendering an empty table for ~12 hours; the parser now reads the new format and the spike scores are back live.",
+      "Licensing posture written into the data-sources page as a Public domain vs Licensed badge per feed — same standard as the public scorecard and signal-methodology disclosures.",
+    ],
+  },
+  {
+    date: "2026-05-17",
     version: "0.1.12",
     tag: "improvement",
     title: "Honest about what powers Premium — insider Form 4, not elite 13F",
