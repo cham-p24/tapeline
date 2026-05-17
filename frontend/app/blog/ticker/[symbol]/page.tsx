@@ -74,13 +74,14 @@ export function generateStaticParams() {
   return TICKERS.map((t) => ({ symbol: t.symbol }));
 }
 
-export async function generateMetadata({ params }: { params: { symbol: string } }) {
-  const t = findTicker(params.symbol);
+export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol } = await params;
+  const t = findTicker(symbol);
   if (!t) {
     return pageMeta({
       title: "Ticker not found — Tapeline",
       description: "This per-ticker analysis page no longer exists or has moved.",
-      path: `/blog/ticker/${params.symbol}`,
+      path: `/blog/ticker/${symbol}`,
     });
   }
   return pageMeta({
@@ -127,8 +128,9 @@ function FactorRow({ label, factor, why }: { label: string; factor: FactorEntry 
   );
 }
 
-export default async function TickerBlogPost({ params }: { params: { symbol: string } }) {
-  const t = findTicker(params.symbol);
+export default async function TickerBlogPost({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol } = await params;
+  const t = findTicker(symbol);
   if (!t) notFound();
 
   const data = await fetchTicker(t.symbol);

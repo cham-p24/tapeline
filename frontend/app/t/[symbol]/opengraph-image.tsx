@@ -57,8 +57,9 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   }
 }
 
-export default async function OG({ params }: { params: { symbol: string } }) {
-  const sym = params.symbol.toUpperCase();
+export default async function OG({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol } = await params;
+  const sym = symbol.toUpperCase();
   const data = await fetchTicker(sym);
 
   // Score-tier accent (mirrors /how-it-works tier colours)

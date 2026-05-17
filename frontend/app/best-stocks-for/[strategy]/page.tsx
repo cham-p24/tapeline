@@ -53,13 +53,14 @@ export function generateStaticParams() {
   return STRATEGIES.map((s) => ({ strategy: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { strategy: string } }) {
-  const s = findStrategy(params.strategy);
+export async function generateMetadata({ params }: { params: Promise<{ strategy: string }> }) {
+  const { strategy } = await params;
+  const s = findStrategy(strategy);
   if (!s) {
     return pageMeta({
       title: "Strategy not found — Tapeline",
       description: "The trading strategy you requested isn't covered. See the full strategy list at /best-stocks-for.",
-      path: `/best-stocks-for/${params.strategy}`,
+      path: `/best-stocks-for/${strategy}`,
     });
   }
   return pageMeta({
@@ -72,9 +73,10 @@ export async function generateMetadata({ params }: { params: { strategy: string 
 export default async function BestStocksForStrategyPage({
   params,
 }: {
-  params: { strategy: string };
+  params: Promise<{ strategy: string }>;
 }) {
-  const s = findStrategy(params.strategy);
+  const { strategy } = await params;
+  const s = findStrategy(strategy);
   if (!s) notFound();
 
   const rows = await fetchStrategyTickers(s.apiParams);

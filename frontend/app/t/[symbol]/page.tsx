@@ -77,8 +77,9 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
 // its own social-share text. The sibling opengraph-image.tsx auto-wires
 // og:image. The root layout's title.template is "%s" so the brand suffix
 // in the title here is NOT double-applied.
-export async function generateMetadata({ params }: { params: { symbol: string } }) {
-  const sym = params.symbol.toUpperCase();
+export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol } = await params;
+  const sym = symbol.toUpperCase();
   const data = await fetchTicker(sym);
   if (!data) {
     return {
@@ -164,8 +165,9 @@ function buildFaq(sym: string, name: string, score: string, signal: string): { q
   ];
 }
 
-export default async function PublicTickerPage({ params }: { params: { symbol: string } }) {
-  const sym = params.symbol.toUpperCase();
+export default async function PublicTickerPage({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol } = await params;
+  const sym = symbol.toUpperCase();
   const data = await fetchTicker(sym);
 
   if (!data) notFound();

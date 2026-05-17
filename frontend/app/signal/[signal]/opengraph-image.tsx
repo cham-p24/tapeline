@@ -11,8 +11,9 @@ export const size = ogSize;
 export const contentType = "image/png";
 export const alt = "Tapeline signal tier";
 
-export default async function OG({ params }: { params: { signal: string } }) {
-  const signal = SIGNALS.find((s) => s.slug === params.signal);
+export default async function OG({ params }: { params: Promise<{ signal: string }> }) {
+  const { signal: signalSlug } = await params;
+  const signal = SIGNALS.find((s) => s.slug === signalSlug);
   if (!signal) {
     return ogResponse({
       eyebrow: "SIGNAL TIER",

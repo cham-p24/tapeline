@@ -10,8 +10,9 @@ export const size = ogSize;
 export const contentType = "image/png";
 export const alt = "Tapeline blog post";
 
-export default async function OG({ params }: { params: { slug: string } }) {
-  const post = POSTS.find((p) => p.slug === params.slug);
+export default async function OG({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = POSTS.find((p) => p.slug === slug);
   if (!post) {
     return ogResponse({
       eyebrow: "BLOG",
