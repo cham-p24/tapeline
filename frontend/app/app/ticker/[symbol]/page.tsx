@@ -238,7 +238,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           Finnhub aggregate fallback (UK / international ADRs). Trial users
           see this for free since trial = Premium for 14 days; post-trial
           Free + Pro users see the Paywall instead. Mirrors how other
-          Premium intelligence (Congress, 13F, Telegram) is gated. */}
+          Premium intelligence (Congress, insider Form 4, Telegram) is gated. */}
       <div className="mt-6">
         <Paywall feature="ratings.analyst" title="Analyst consensus is Premium">
           <AnalystRatings symbol={data.symbol} currentPrice={data.price} />

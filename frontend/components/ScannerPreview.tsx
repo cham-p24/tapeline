@@ -27,7 +27,7 @@ const INITIAL_ROWS: Row[] = [
   { sym: "NVDA", sector: "Tech",        score: 92.4, conf: 94, sig: "HIGH CONVICTION", d1:  2.14, why: "Trend strength at a fresh cycle high; insider net buying over the last 90 days; momentum accelerating into the move." },
   { sym: "MSFT", sector: "Tech",        score: 88.7, conf: 91, sig: "HIGH CONVICTION", d1:  1.02, why: "Leadership uptrend with steepening slope; outperforming the sector by a wide margin; smart-money flow positive." },
   { sym: "LLY",  sector: "Healthcare",  score: 81.3, conf: 88, sig: "STRONG SETUP",    d1:  0.74, why: "Outperforming the sector on every timeframe — fundamentals top decile (revenue + margin trend + ROE)." },
-  { sym: "CAT",  sector: "Industrials", score: 76.1, conf: 82, sig: "STRONG SETUP",    d1:  0.45, why: "Primary trend decisively up across all timeframes; institutions adding (recent 13F filings); favourable macro backdrop." },
+  { sym: "CAT",  sector: "Industrials", score: 76.1, conf: 82, sig: "STRONG SETUP",    d1:  0.45, why: "Primary trend decisively up across all timeframes; insider Form 4 buying picking up; favourable macro backdrop." },
   { sym: "XOM",  sector: "Energy",      score: 68.9, conf: 78, sig: "CONSTRUCTIVE",    d1: -0.32, why: "Insider buying picking up; macro tailwind on rates + crude; trend lagging on the 1M but improving." },
   { sym: "AAPL", sector: "Tech",        score: 58.4, conf: 91, sig: "NEUTRAL",         d1: -0.15, why: "Mixed signals across factors — fundamentals fine, trend rolling under the 50DMA, smart-money flat." },
 ];

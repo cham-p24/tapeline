@@ -29,7 +29,7 @@ const HOW_FAQ = [
   },
   {
     q: "What is the per-ticker confidence percentage?",
-    a: "Confidence reflects how many of the underlying data feeds returned data for a given ticker — not every name has Quiver 13F coverage, P/E, or recent insider filings. 95%+ means full data on every signal feature; under 40% means sparse data and the score should be deprioritised.",
+    a: "Confidence reflects how many of the underlying data feeds returned data for a given ticker — not every name has fundamentals coverage, recent insider filings, or analyst coverage. 95%+ means full data on every signal feature; under 40% means sparse data and the score should be deprioritised.",
   },
   {
     q: "Is the formula really public?",
@@ -116,8 +116,8 @@ export default function HowItWorksPage() {
             <h3 className="mt-2 text-lg font-semibold">Not every signal has the same evidence behind it.</h3>
             <p className="mt-3 text-sm text-muted leading-relaxed">
               We surface a confidence percentage on every row. It varies based on which underlying
-              data feeds returned data for that ticker — not every name has Quiver 13F coverage,
-              not every ETF has a P/E, not every stock has recent insider filings.
+              data feeds returned data for that ticker — not every ETF has a P/E, not every
+              stock has recent insider filings, not every name has analyst coverage.
             </p>
             <div className="mt-4 grid gap-2 text-sm">
               <div className="flex justify-between border-b border-border py-2">

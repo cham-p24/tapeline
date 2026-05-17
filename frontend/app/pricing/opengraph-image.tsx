@@ -92,7 +92,7 @@ export default async function OG() {
             tier="Premium"
             price="$39.99"
             sub="/mo annual"
-            note="+ Congress · 13F · API · SMS"
+            note="+ Congress · Insider · API · Telegram"
             highlight
           />
         </div>

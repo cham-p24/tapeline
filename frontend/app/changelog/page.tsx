@@ -25,6 +25,17 @@ type Entry = {
 const ENTRIES: Entry[] = [
   {
     date: "2026-05-17",
+    version: "0.1.12",
+    tag: "improvement",
+    title: "Honest about what powers Premium — insider Form 4, not elite 13F",
+    body: [
+      "Premium feature line updated across pricing, comparison pages, and per-ticker share pages: 'Elite 13F holdings' replaced with 'Recent insider buys (SEC Form 4)'. What's on the /app/holdings page hasn't changed — same SEC Form 4 transactions via Finnhub that have been live for weeks — the marketing copy just now matches what's actually delivered.",
+      "Smart Money factor explanation updated everywhere: Form 4 insider transactions + Congressional disclosures. No mention of 13F.",
+      "Open API roadmap, comparison tables, and the LLM-readable site facts all reconciled. No promise the product can't deliver.",
+    ],
+  },
+  {
+    date: "2026-05-17",
     version: "0.1.11",
     tag: "shipped",
     title: "Live signal-system universe, iOS-feel design, light + dark mode",

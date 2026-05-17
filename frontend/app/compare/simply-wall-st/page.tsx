@@ -27,7 +27,7 @@ const WINS: CompareRow[] = [
   {
     label: "Smart-money factor (institutional + insider + Congressional)",
     tapeline: "✓ 15% weight, blended with public weight disclosure",
-    competitor: "Some insider transaction visibility; no Congressional, no 13F tracking by elite-fund",
+    competitor: "Some insider transaction visibility; no Congressional disclosures",
   },
   {
     label: "Macro-regime overlay",
@@ -45,9 +45,9 @@ const WINS: CompareRow[] = [
     competitor: "—",
   },
   {
-    label: "Elite 13F fund tracker (8 named managers)",
-    tapeline: "✓ Buffett, Burry, Tepper, Ackman + 4 more, Premium",
-    competitor: "Insider transactions only; no curated fund tracker",
+    label: "Recent insider buys (SEC Form 4)",
+    tapeline: "✓ Premium — top ~2,500 most-liquid US tickers, refreshed daily",
+    competitor: "Insider transactions included",
   },
   {
     label: "Try without a card",
@@ -79,7 +79,7 @@ const TRADEOFFS: CompareTradeoff[] = [
     label: "Pricing at top tier (annual)",
     tapeline: "$39.99/mo (Premium)",
     competitor: "~$33/mo (Unlimited) — slightly cheaper",
-    note: "Simply Wall St Unlimited at the annual price is a bit cheaper than Tapeline Premium. If price is the deciding factor and you don't need live updates / Congressional / 13F tracker, Simply Wall St wins. Tapeline Premium adds the live multi-factor synthesis and the public scorecard for the extra ~$7/mo.",
+    note: "Simply Wall St Unlimited at the annual price is a bit cheaper than Tapeline Premium. If price is the deciding factor and you don't need live updates or Congressional disclosures, Simply Wall St wins. Tapeline Premium adds the live multi-factor synthesis and the public scorecard for the extra ~$7/mo.",
   },
 ];
 
@@ -94,7 +94,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How do prices compare?",
-    a: "Tapeline Pro is $24.99/mo annual; Premium is $39.99/mo annual. Simply Wall St Premium is roughly $20/mo annual, Unlimited around $33/mo annual. Simply Wall St is meaningfully cheaper at the entry tier; Tapeline Premium at $39.99 vs SWS Unlimited at $33 adds live updates, congressional trades, elite 13F holdings, and the public scorecard for the ~$7/mo difference.",
+    a: "Tapeline Pro is $24.99/mo annual; Premium is $39.99/mo annual. Simply Wall St Premium is roughly $20/mo annual, Unlimited around $33/mo annual. Simply Wall St is meaningfully cheaper at the entry tier; Tapeline Premium at $39.99 vs SWS Unlimited at $33 adds live updates, congressional trades, insider Form 4 buys, and the public scorecard for the ~$7/mo difference.",
   },
   {
     q: "Does Simply Wall St publish a per-pick track record?",

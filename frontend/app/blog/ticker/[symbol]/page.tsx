@@ -265,7 +265,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             <FactorRow
               label="Smart Money"
               factor={data?.breakdown?.smart_money}
-              why="Form 4 insider transactions (net 90-day), elite 13F holdings (8 curated managers), and Congressional disclosures. Confirmation factor — most useful in confluence with leading factors."
+              why="SEC Form 4 insider transactions (net 90-day) and Congressional disclosures. Confirmation factor — most useful in confluence with leading factors."
             />
             <FactorRow
               label="Macro"
@@ -306,7 +306,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering ~2,500 US tickers is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
           </p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            Tapeline Free covers the top 20 tickers with a 24-hour data delay — enough to evaluate the methodology, not enough for daily trading. Pro ($24.99/mo billed annually, or $29.99 monthly) unlocks the full universe with live data, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($39.99/mo annually, $49.99 monthly) adds Congressional trades, elite 13F holdings, and unlimited Telegram alerts. 14-day Premium trial, no card.
+            Tapeline Free covers the top 20 tickers with a 24-hour data delay — enough to evaluate the methodology, not enough for daily trading. Pro ($24.99/mo billed annually, or $29.99 monthly) unlocks the full universe with live data, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($39.99/mo annually, $49.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4), and unlimited Telegram alerts. 14-day Premium trial, no card.
           </p>
         </section>
 
