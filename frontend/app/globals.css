@@ -154,6 +154,31 @@
     color: rgb(var(--fg));
     background-color: rgb(var(--panel));
   }
+
+  /* `.eyebrow` — small, all-caps, tracked-out label that sits above a
+     section heading. Used across marketing + app pages but previously
+     undefined (no-op). Now a real visual signal. */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--subtle));
+  }
+
+  /* `.link` — accent-coloured inline link with subtle hover underline.
+     Used in body copy where a default Tailwind link would be too quiet. */
+  .link {
+    color: rgb(var(--accent));
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+  }
+  .link:hover {
+    color: rgb(var(--accent-hover));
+    text-decoration-color: currentColor;
+  }
 }
 
 /* Radial polygon mount animation — used by <ScoreRadial>. */
