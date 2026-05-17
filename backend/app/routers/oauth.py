@@ -29,8 +29,10 @@ from __future__ import annotations
 
 import logging
 import secrets
+import string
 import time
 import uuid
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
@@ -48,6 +50,16 @@ from app.services.session import issue_session_token, session_cookie_kwargs
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+
+
+def _generate_referral_code() -> str:
+    """Short, human-readable referral code. Mirrors auth.py's generator —
+    inlined here so OAuth-created users get one without taking a circular
+    import dependency on the routers package."""
+    alphabet = string.ascii_uppercase + string.digits
+    for ch in "0O1IL":
+        alphabet = alphabet.replace(ch, "")
+    return "".join(secrets.choice(alphabet) for _ in range(8))
 
 
 PROVIDERS = {
@@ -283,17 +295,34 @@ async def oauth_callback(
     user = result.scalar_one_or_none()
     is_new = user is None
     if user is None:
+        # Mirror the native-signup trial grant — OAuth signups land on Premium
+        # for 14 days with no card, then get dropped to Free by
+        # `_downgrade_expired_trials` if they never add a Stripe customer.
+        # Without this, Google/Microsoft/Apple signups land directly on Free
+        # and never see the product the marketing copy promised.
+        trial_ends = datetime.now(UTC) + timedelta(days=14)
+        ref_code = _generate_referral_code()
+        for _ in range(5):  # retry on the (unlikely) referral-code collision
+            conflict = await session.execute(
+                select(User).where(User.referral_code == ref_code)
+            )
+            if conflict.scalar_one_or_none() is None:
+                break
+            ref_code = _generate_referral_code()
         user = User(
             id=f"u_{uuid.uuid4().hex}",
             email=email,
             name=name,
-            tier="free",
+            tier="premium",
             password_hash=None,  # OAuth-only account
+            trial_ends_at=trial_ends,
+            referral_code=ref_code,
         )
         session.add(user)
         await session.commit()
         await session.refresh(user)
-        logger.info("oauth.user_created provider=%s email=%s", provider, email)
+        logger.info("oauth.user_created provider=%s email=%s trial_ends=%s",
+                    provider, email, trial_ends.isoformat())
     else:
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
