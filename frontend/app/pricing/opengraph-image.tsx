@@ -32,7 +32,7 @@ export default async function OG() {
             right: "-150px",
             width: "500px",
             height: "500px",
-            background: "radial-gradient(circle, rgba(34, 197, 94, 0.18) 0%, transparent 70%)",
+            background: "radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%)",
             display: "flex",
           }}
         />
@@ -43,7 +43,7 @@ export default async function OG() {
             style={{
               width: "56px",
               height: "12px",
-              background: "linear-gradient(90deg, #22c55e 0%, #14b8a6 100%)",
+              background: "#3b82f6",
               borderRadius: "999px",
               display: "flex",
             }}

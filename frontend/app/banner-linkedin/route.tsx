@@ -40,7 +40,7 @@ export async function GET() {
             width: "560px",
             height: "560px",
             background:
-              "radial-gradient(circle, rgba(34, 197, 94, 0.20) 0%, transparent 70%)",
+              "radial-gradient(circle, rgba(59, 130, 246, 0.20) 0%, transparent 70%)",
             display: "flex",
           }}
         />
@@ -57,8 +57,7 @@ export async function GET() {
             style={{
               width: "100px",
               height: "20px",
-              background:
-                "linear-gradient(90deg, #22c55e 0%, #14b8a6 100%)",
+              background: "#3b82f6",
               borderRadius: "999px",
               display: "flex",
             }}

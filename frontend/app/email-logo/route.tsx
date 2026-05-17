@@ -33,7 +33,7 @@ export async function GET() {
           style={{
             width: "32px",
             height: "8px",
-            background: "linear-gradient(90deg, #22c55e 0%, #14b8a6 100%)",
+            background: "#3b82f6",
             borderRadius: "999px",
             display: "flex",
             marginRight: "14px",
