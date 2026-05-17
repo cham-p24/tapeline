@@ -39,8 +39,42 @@ const TITLE_CURRENT: Record<Theme, string> = {
   system: "Theme: system",
 };
 
-export function ThemeToggle({ className = "" }: { className?: string }) {
+const VISIBLE_LABEL: Record<Theme, string> = {
+  light: "Light",
+  dark: "Dark",
+  system: "Auto",
+};
+
+export function ThemeToggle({
+  className = "",
+  variant = "labeled",
+}: {
+  className?: string;
+  // "labeled" — pill with the visible label "Light / Dark / Auto" + icon.
+  //             Used in MarketingNav so anonymous visitors can spot it.
+  // "icon"    — original 32px square icon-only. Used inside menus where
+  //             space is tight and the surrounding rows have their own
+  //             labels (e.g. the app-shell user dropdown).
+  variant?: "labeled" | "icon";
+}) {
   const { theme, setTheme } = useTheme();
+  const Icon =
+    theme === "light" ? SunIcon : theme === "dark" ? MoonIcon : SystemIcon;
+  const common = `transition-colors hover:text-fg`;
+
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        onClick={() => setTheme(NEXT[theme])}
+        aria-label={LABEL_NEXT[theme]}
+        title={`${TITLE_CURRENT[theme]} · click to ${LABEL_NEXT[theme].toLowerCase().replace("switch to ", "")}`}
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-muted ${common} hover:bg-panel/70 ${className}`}
+      >
+        <Icon />
+      </button>
+    );
+  }
 
   return (
     <button
@@ -48,9 +82,10 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={() => setTheme(NEXT[theme])}
       aria-label={LABEL_NEXT[theme]}
       title={`${TITLE_CURRENT[theme]} · click to ${LABEL_NEXT[theme].toLowerCase().replace("switch to ", "")}`}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-panel/70 hover:text-fg ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-panel/60 px-3 py-1.5 text-xs font-medium text-muted ${common} hover:bg-panel ${className}`}
     >
-      {theme === "light" ? <SunIcon /> : theme === "dark" ? <MoonIcon /> : <SystemIcon />}
+      <Icon />
+      <span>{VISIBLE_LABEL[theme]}</span>
     </button>
   );
 }

@@ -33,10 +33,10 @@ export function MarketingNav() {
           <Link href="/signin" className="hidden text-sm text-muted hover:text-fg sm:inline">
             Sign in
           </Link>
-          {/* Theme toggle — parity with the app-shell control. Hidden on
-              the smallest mobile widths so "Start free" stays the visual
-              priority CTA; users on sm+ get it inline. */}
-          <ThemeToggle className="hidden sm:inline-flex" />
+          {/* Theme toggle — labeled pill so anonymous visitors can spot it.
+              Visible on every breakpoint; the previous icon-only version
+              hidden behind sm+ was invisible in practice. */}
+          <ThemeToggle />
           <Link href="/signup" className="btn-primary text-sm whitespace-nowrap">
             Start free
           </Link>
