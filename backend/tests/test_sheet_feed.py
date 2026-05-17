@@ -207,33 +207,36 @@ async def test_upsert_inserts_new_and_updates_existing():
 # Phase 2A — SPIKE INTELLIGENCE
 # ============================================================================
 
-_SPIKE_FIXTURE_CSV = """ticker,last,move_bar_pc,move_day_pc,volume_multipl,source,unused,score,signal,last_timestamp,snapshot_time,yahoo_sym,data_provid,prev_bar,day_open,last_volume,data_age_minute,data_status,ref_price,source_confidence,decision_gate
-CLH,303.56,0,-1.37,1.2,"Execution List, All Signals universe",,100,BUY NOW,2026-05-15T20:03:00Z,2026-05-16 10:25:23,CLH,Alpaca SIP,303.56,307.79,4922,862.2,stale/no timestamp,303.76,HIGH (88/100),HIGH-CONFIDENCE CANDIDATE - okay to plan entry but timing is not urg
-ECPG,61.62,0,0.46,2.5,"Execution List, All Signals universe",,100,BUY NOW,2026-05-15T20:03:00Z,2026-05-16 10:25:23,ECPG,Alpaca SIP,61.62,61.25,54107,865.2,stale/no timestamp,61.62,HIGH (91/100),HIGH-CONFIDENCE CANDIDATE - okay to plan entry but timing is not urg
-ENS,236.88,0.03,2.06,4.1,"Execution List, All Signals universe",,100,BUY NOW,2026-05-15T20:03:00Z,2026-05-16 10:25:23,ENS,Alpaca SIP,236.88,232.2,198369,865.2,stale/no timestamp,236.88,HIGH (91/100),EARNINGS RISK - reduce size or wait until the report clears
-,,,,,,,,,,,,,,,,,,,,
-TICKER,,,,,,,,,,,,,,,,,,,,
+_SPIKE_FIXTURE_CSV = """Spike Rank,Ticker,Buy By,Time Window,Stage,Entry Trigger,Stop / Risk,Price,Spike Score,Spike Direction,Type,Spike Urgency,Suggested Window,Buy Timing,Decision,Score,Source Confidence,Source Notes,Volume Expansion,RSI14,OBV Trend,Breakout Type,Spike Reasons,Why This May Move,Main Risk,Core Signal,Hold Duration
+1,SOC,Fri 29 May,Watch next 2 weeks,READY TO MOVE,close above 16.40,12.48 (-17.5%),15.13,96,UPSIDE,STOCK,HIGH,1-4 weeks,Possible entry,Entry timing,100,TECHNICAL-LED (54/100),price live,1.5,60.6,Rising +12% accumulating,Breaking above upper BB,Tight BB squeeze 14d coiled spring,RSI in momentum zone OBV rising,Spike signals predict movement pressure not direction,BUY NOW,6-12 months
+2,APPS,Mon 1 Jun,Watch next 3 weeks,ARMED,close above 8.20,6.55 (-20%),7.85,82,UPSIDE,STOCK,MED,2-4 weeks,Possible entry,Entry timing,88,HIGH (88/100),price live,2.1,68.4,Rising +18% strong accumulation,Range breakout pending,Volume 2.1x avg coiled price,Volume confirming RSI healthy,Macro risk softening,STRONG SETUP,3-6 months
+3,RGTI,Thu 21 May,Within 1 week,IMMINENT,close above 17.50,14.20 (-15%),17.05,73,UPSIDE,STOCK,LOW,1-2 weeks,Possible entry,Entry timing,73,TECHNICAL-LED (62/100),price live,1.3,55.2,Flat,Tightening range,BB bandwidth contracting volume basing,Compression release setup,Sector rotation risk,CONSTRUCTIVE,2-4 weeks
+,,,,,,,,,,,,,,,,,,,,,,,,,,
+TICKER,,,,,,,,,,,,,,,,,,,,,,,,,,
+=== SECTION HEADER ===,,,,,,,,,,,,,,,,,,,,,,,,,,
 """
 
 
 def test_spike_parser_extracts_rows_and_clamps_score():
-    """SPIKE INTELLIGENCE parser must:
-      - skip header re-declaration + blank rows
-      - clamp spike_score to [0, 100] using abs(move_day_pc) * 10
-      - default missing volume_multiple to 1.0 (not zero — divides badly downstream)"""
+    """SPIKE INTELLIGENCE parser (post-2026-05-17 schema) must:
+      - skip header re-declaration + blank rows + section headers
+      - parse Spike Score directly (already on 0-100 scale from the sheet)
+      - default missing Volume Expansion to 1.0 (zero divides badly downstream)
+      - clean OBV Trend + truncate Breakout Type / Suggested Window / Reasons"""
     from app.services.sheet_feed import parse_spike_intelligence_csv
 
     rows = parse_spike_intelligence_csv(_SPIKE_FIXTURE_CSV)
     symbols = {r["symbol"] for r in rows}
-    assert symbols == {"CLH", "ECPG", "ENS"}
+    assert symbols == {"SOC", "APPS", "RGTI"}
 
-    clh = next(r for r in rows if r["symbol"] == "CLH")
-    # move_day_pc = -1.37 → abs(1.37)*10 = 13.7
-    assert clh["spike_score"] == pytest.approx(13.7, abs=0.01)
-    assert clh["volume_multiple"] == 1.2
-    assert clh["obv_trend"] == "HIGH"
-    assert "HIGH-CONFIDENCE CANDIDATE" in clh["breakout_type"]
-    assert clh["reason"].startswith("HIGH-CONFIDENCE CANDIDATE")
+    soc = next(r for r in rows if r["symbol"] == "SOC")
+    assert soc["spike_score"] == 96.0
+    assert soc["volume_multiple"] == 1.5
+    # OBV Trend "Rising +12% accumulating" gets cleaned + truncated to <=20
+    assert soc["obv_trend"].startswith("RISING")
+    assert "Breaking above upper BB" in soc["breakout_type"]
+    # `reason` falls back to "Spike Reasons" column
+    assert "BB squeeze" in soc["reason"] or "coiled spring" in soc["reason"]
 
 
 def test_spike_parser_caps_breakout_type_and_obv_trend_lengths():
@@ -262,7 +265,7 @@ async def test_spike_upsert_round_trip():
     rows = parse_spike_intelligence_csv(_SPIKE_FIXTURE_CSV)
     async with session_scope() as s:
         # Pre-clean
-        for sym in ("CLH", "ECPG", "ENS"):
+        for sym in ("SOC", "APPS", "RGTI"):
             existing = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == sym))).scalar_one_or_none()
             if existing is not None:
                 await s.delete(existing)
@@ -273,18 +276,18 @@ async def test_spike_upsert_round_trip():
         assert counts["updated"] == 0
 
         # Round-trip
-        clh = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "CLH"))).scalar_one()
-        assert clh.volume_multiple == 1.2
-        assert clh.spike_score == pytest.approx(13.7, abs=0.01)
+        soc = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "SOC"))).scalar_one()
+        assert soc.volume_multiple == 1.5
+        assert soc.spike_score == 96.0
 
         # Mutate and re-upsert — should now be all updates
-        rows[0]["spike_score"] = 95.0
+        rows[0]["spike_score"] = 88.0
         counts2 = await upsert_spikes(s, rows)
         assert counts2["inserted"] == 0
         assert counts2["updated"] == 3
 
-        clh2 = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "CLH"))).scalar_one()
-        assert clh2.spike_score == 95.0
+        soc2 = (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "SOC"))).scalar_one()
+        assert soc2.spike_score == 88.0
 
         # Cleanup
         for sym in ("CLH", "ECPG", "ENS"):
