@@ -138,8 +138,23 @@ function SignUpForm() {
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
           </Link>
 
-          <h1 className="mt-10 text-3xl font-bold tracking-tight">Start 14-day Pro trial</h1>
+          <h1 className="mt-10 text-3xl font-bold tracking-tight">Try Premium free for 14 days</h1>
           <p className="mt-2 text-sm text-muted">No credit card. Cancel anytime.</p>
+
+          <ul className="mt-6 space-y-2 text-sm text-muted">
+            <li className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span><span className="text-fg">Full universe, live scores</span> — not the 20-ticker, 24-hour-delayed free view</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span><span className="text-fg">Smart-money signals</span> — Congressional trades + recent insider buys (SEC Form 4)</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push, Telegram</span>
+            </li>
+          </ul>
 
           {refCode && (
             <div className="mt-6 rounded-md border border-up/30 bg-up/5 p-3 text-sm text-up">
