@@ -24,7 +24,7 @@ export default function ScorecardPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [data, setData] = useState<{
-    summary: { days_tracked: number; entries_scored: number; avg_1d_return: number | null; avg_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null };
+    summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null };
     days: Record<string, ScorecardEntry[]>;
   } | null>(null);
 
@@ -137,13 +137,37 @@ export default function ScorecardPage() {
         </div>
       )}
 
-      {/* Summary stats */}
+      {/* Summary stats.
+          We surface MEDIAN as the headline 1D / alpha because:
+            1. Median is robust to vendor-data outliers (unadjusted-for-split
+               closes, halt-reopen reference prices) that the back-check
+               sometimes ingests as +1000%+ moves.
+            2. Median reads less like a marketing claim than mean — it's
+               literally "the middle row" rather than a portfolio-return
+               implication.
+            3. The backend already excludes |1d| > 50% from BOTH median and
+               mean (see _is_outlier in routers/scorecard.py); the median
+               here is therefore robust within a clean subset.
+          The exclusion count is disclosed inline so the filter is auditable. */}
       <div className="mt-8 grid gap-4 sm:grid-cols-4">
         <Stat label="Days tracked" value={String(data.summary.days_tracked)} />
-        <Stat label="Avg 1D return" value={data.summary.avg_1d_return != null ? `${data.summary.avg_1d_return.toFixed(2)}%` : "pending"} tone={data.summary.avg_1d_return != null ? (data.summary.avg_1d_return > 0 ? "up" : "down") : undefined} />
-        <Stat label="Avg alpha vs SPY" value={data.summary.avg_alpha_vs_spy != null ? `${data.summary.avg_alpha_vs_spy.toFixed(2)}%` : "pending"} tone={data.summary.avg_alpha_vs_spy != null ? (data.summary.avg_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
+        <Stat label="Median 1D return" value={data.summary.median_1d_return != null ? `${data.summary.median_1d_return.toFixed(2)}%` : "pending"} tone={data.summary.median_1d_return != null ? (data.summary.median_1d_return > 0 ? "up" : "down") : undefined} />
+        <Stat label="Median alpha vs SPY" value={data.summary.median_alpha_vs_spy != null ? `${data.summary.median_alpha_vs_spy.toFixed(2)}%` : "pending"} tone={data.summary.median_alpha_vs_spy != null ? (data.summary.median_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
         <Stat label="Beat SPY rate" value={data.summary.hit_rate_beat_spy != null ? `${data.summary.hit_rate_beat_spy.toFixed(0)}%` : "pending"} />
       </div>
+      {/* Methodology + exclusions disclosure. Lives directly under the
+          summary cards so visitors can audit the filter without scrolling. */}
+      {data.summary.entries_scored > 0 && (
+        <p className="mt-3 text-xs text-subtle">
+          Aggregates use the median of {data.summary.entries_scored - data.summary.entries_excluded_outliers} back-checked entries
+          {data.summary.entries_excluded_outliers > 0 ? (
+            <> &middot; <span className="text-muted">{data.summary.entries_excluded_outliers} row{data.summary.entries_excluded_outliers === 1 ? "" : "s"} excluded as data outliers (&gt;50% 1-day move; usually unadjusted-for-split vendor prices, still shown in the per-day tables below)</span></>
+          ) : null}
+          {data.summary.avg_1d_return != null ? (
+            <> &middot; <span className="text-muted">mean 1D return {data.summary.avg_1d_return.toFixed(2)}% &middot; mean alpha {data.summary.avg_alpha_vs_spy != null ? `${data.summary.avg_alpha_vs_spy.toFixed(2)}%` : "—"}</span></>
+          ) : null}
+        </p>
+      )}
 
       {dates.length === 0 ? (
         <div className="card mt-8 p-8 text-center text-muted">
@@ -244,6 +268,26 @@ export default function ScorecardPage() {
         </>
       )}
 
+      {/* Regulatory disclaimer.
+          Required posture for AU operation under the publisher exemption +
+          ASIC s12DA misleading-conduct rules. Sits at the bottom of every
+          /scorecard view so visitors can't see performance stats without
+          also seeing the disclaimer. Language is factual / non-promotional
+          to keep us in the "general information" lane rather than personal
+          advice. Update wording only after legal review (see
+          docs/launch/LAWYER_CONSULT_EMAIL.md). */}
+      <div className="mt-12 rounded-lg border border-border bg-panel/40 p-5 text-xs text-subtle">
+        <p className="font-semibold uppercase tracking-wider text-muted">Important — general information only</p>
+        <p className="mt-2 leading-relaxed">
+          The scorecard is a transparent record of historical model output. It is <strong className="text-muted">not personal financial advice, not a recommendation to buy or sell any security, and not a forecast of future returns.</strong> Past performance does not predict future results. Any return figures shown reflect the realised next-day price moves of the top-10 ranked tickers vs. SPY on the dates listed — they are not the return of any investable portfolio or strategy.
+        </p>
+        <p className="mt-2 leading-relaxed">
+          Composite scores are derived from a published 6-factor formula (see <Link href="/how-it-works" className="text-muted underline hover:text-fg">/how-it-works</Link>). Vendor data occasionally contains errors (unadjusted-for-split closes, halt-reopen reference prices); aggregate statistics exclude entries where the 1-day move exceeds 50% as a defensible heuristic for data-quality outliers. Raw rows remain visible in the per-day tables above.
+        </p>
+        <p className="mt-2 leading-relaxed">
+          Tapeline operates from Melbourne, Australia under the publisher exemption from AFSL requirements. We do not hold an Australian Financial Services Licence. You should consider your own circumstances, read any relevant product disclosure documents, and obtain advice from a licensed adviser before making investment decisions.
+        </p>
+      </div>
       </div>
       <MarketingFooter />
     </main>
