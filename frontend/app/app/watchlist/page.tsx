@@ -50,7 +50,13 @@ export default function WatchlistPage() {
       setSymbol("");
       load();
     } catch (e: any) {
-      alert(e.message?.includes("409") ? "Already in watchlist" : `Failed: ${e.message}`);
+      const m = String(e.message || e);
+      if (m.includes("401")) {
+        // Session probably expired. Send them through signin and come back here.
+        window.location.href = `/signin?next=${encodeURIComponent("/app/watchlist")}`;
+        return;
+      }
+      alert(m.includes("409") ? "Already in watchlist" : `Failed: ${m}`);
     }
   }
   async function remove(id: number) {

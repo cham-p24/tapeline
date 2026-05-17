@@ -45,7 +45,12 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       await api.watchlistAdd(symbol);
       setAddMsg(`${symbol} added to watchlist`);
     } catch (e: any) {
-      setAddMsg(e.message?.includes("409") ? "Already in watchlist" : `Failed: ${e.message}`);
+      const m = String(e.message || e);
+      if (m.includes("401")) {
+        window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
+        return;
+      }
+      setAddMsg(m.includes("409") ? "Already in watchlist" : `Failed: ${m}`);
     }
     setAdding(false);
   }
@@ -66,7 +71,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
     } catch (e: any) {
       const m = String(e.message || e);
-      // Friendly messages for the obvious cases:
+      if (m.includes("401")) {
+        window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
+        return;
+      }
       if (m.includes("403")) setNewsAlertMsg("Pro plan required for email alerts");
       else if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
       else setNewsAlertMsg(`Failed: ${m}`);

@@ -8,7 +8,7 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
-  tier: "free" | "starter" | "pro" | "premium";
+  tier: "free" | "pro" | "premium";
   is_admin?: boolean;
   is_lifetime?: boolean;
   trial_ends_at?: string | null;
@@ -58,7 +58,7 @@ export const authApi = {
 };
 
 // Feature-gating helpers mirroring backend tier.py
-const TIER_ORDER: Record<SessionUser["tier"], number> = { free: 0, starter: 1, pro: 2, premium: 3 };
+const TIER_ORDER: Record<SessionUser["tier"], number> = { free: 0, pro: 1, premium: 2 };
 
 export function hasMinTier(user: SessionUser | null, minTier: SessionUser["tier"]): boolean {
   if (!user) return minTier === "free";
