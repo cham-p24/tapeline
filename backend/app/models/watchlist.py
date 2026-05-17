@@ -22,6 +22,14 @@ class WatchlistItem(Base):
     baseline_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     alert_threshold_delta: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)
 
+    # Last time the smart-alert evaluator fired an email/Telegram/push for
+    # this item. Used to debounce: while a ticker stays above the threshold,
+    # we re-fire at most once every 24h (the EOD digest carries the steady-
+    # state cadence; this column ensures we don't spam mid-day).
+    last_alert_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

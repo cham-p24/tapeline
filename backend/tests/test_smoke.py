@@ -559,6 +559,134 @@ async def test_onboarding_skip_stamps_completion(client, monkeypatch):
         assert profile["sectors_of_interest"] == []
 
 
+@pytest.mark.asyncio
+async def test_watchlist_alert_fires_on_threshold_cross_then_debounces():
+    """The watchlist smart-alert evaluator fires once when a Pro+ user's
+    watchlisted ticker moves past their alert_threshold_delta, then stays
+    silent for the 24h debounce window even if the score remains elevated.
+
+    Hits the evaluator directly (not through HTTP) so we can seed state
+    without driving the full signup + add-to-watchlist flow.
+    """
+    import uuid as _uuid
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from sqlalchemy import select as _sel
+
+    from app.db import session_scope
+    from app.models import Ticker, User, WatchlistItem
+    from app.services.alerts import evaluate_watchlist_alerts
+
+    user_id = f"u_{_uuid.uuid4().hex}"
+    symbol = "WTST"  # unique to this test so reruns don't collide
+
+    async with session_scope() as s:
+        s.add(User(
+            id=user_id,
+            email=f"wl-{_uuid.uuid4().hex[:8]}@example.com",
+            name="Watcher",
+            tier="pro",
+            password_hash="not-used",
+            email_prefs=15,  # all bits on
+        ))
+        s.add(Ticker(
+            symbol=symbol,
+            name="Watchlist Test Co",
+            sector="Technology",
+            asset_class="stock",
+            price=100.0,
+            score=80.0,  # 15 above baseline
+            signal="STRONG SETUP",
+            reason="Test fixture — score moved past delta threshold",
+            updated_at=_dt.now(_UTC),
+        ))
+        s.add(WatchlistItem(
+            user_id=user_id,
+            symbol=symbol,
+            baseline_score=65.0,
+            alert_threshold_delta=10.0,  # 80 - 65 = 15 > 10
+        ))
+        await s.commit()
+
+    async with session_scope() as s:
+        n = await evaluate_watchlist_alerts(s)
+    assert n == 1, "first eval should fire one watchlist alert"
+
+    async with session_scope() as s:
+        r = await s.execute(
+            _sel(WatchlistItem).where(
+                WatchlistItem.user_id == user_id, WatchlistItem.symbol == symbol,
+            )
+        )
+        item = r.scalar_one()
+        assert item.last_alert_at is not None, "fire should stamp last_alert_at"
+
+    # Immediate re-run inside the 24h debounce window: must NOT re-fire.
+    async with session_scope() as s:
+        n2 = await evaluate_watchlist_alerts(s)
+    assert n2 == 0, "second eval within debounce window must not re-fire"
+
+
+@pytest.mark.asyncio
+async def test_watchlist_alert_skips_free_tier_and_below_threshold():
+    """Free-tier users don't get watchlist emails (alerts.email is Pro+).
+    Items with a delta below threshold are also skipped."""
+    import uuid as _uuid
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    from app.db import session_scope
+    from app.models import Ticker, User, WatchlistItem
+    from app.services.alerts import evaluate_watchlist_alerts
+
+    free_user_id = f"u_{_uuid.uuid4().hex}"
+    pro_user_id = f"u_{_uuid.uuid4().hex}"
+    sym_below = "WBLW"   # delta below threshold
+    sym_free = "WFRE"   # delta above threshold but user is free
+
+    async with session_scope() as s:
+        # Free user — watchlisted ticker moved 20 points (would fire if Pro).
+        s.add(User(
+            id=free_user_id,
+            email=f"free-{_uuid.uuid4().hex[:8]}@example.com",
+            name="FreeUser", tier="free", password_hash="x", email_prefs=15,
+        ))
+        s.add(Ticker(
+            symbol=sym_free, name="Free Test Co", sector="Tech",
+            asset_class="stock", price=10.0, score=85.0,
+            signal="HIGH CONVICTION", reason="moved 20",
+            updated_at=_dt.now(_UTC),
+        ))
+        s.add(WatchlistItem(
+            user_id=free_user_id, symbol=sym_free,
+            baseline_score=65.0, alert_threshold_delta=10.0,
+        ))
+
+        # Pro user — watchlisted ticker only moved 5 points (below threshold).
+        s.add(User(
+            id=pro_user_id,
+            email=f"pro-{_uuid.uuid4().hex[:8]}@example.com",
+            name="ProUser", tier="pro", password_hash="x", email_prefs=15,
+        ))
+        s.add(Ticker(
+            symbol=sym_below, name="Below Threshold Co", sector="Tech",
+            asset_class="stock", price=10.0, score=70.0,
+            signal="STRONG SETUP", reason="moved 5",
+            updated_at=_dt.now(_UTC),
+        ))
+        s.add(WatchlistItem(
+            user_id=pro_user_id, symbol=sym_below,
+            baseline_score=65.0, alert_threshold_delta=10.0,
+        ))
+        await s.commit()
+
+    async with session_scope() as s:
+        n = await evaluate_watchlist_alerts(s)
+    # Neither row should fire — free user's tier blocks, pro user's delta is too small.
+    assert n == 0
+
+
 # NOTE: keep this test LAST. The rate-limiter is process-global and stays
 # triggered for ~60s after this test fires; subsequent tests would all 429.
 @pytest.mark.asyncio

@@ -104,6 +104,78 @@ async def send_email(
         return resp.json()
 
 
+def render_watchlist_alert_email(
+    user_name: str,
+    symbol: str,
+    current_score: float,
+    baseline_score: float,
+    signal: str | None,
+    reason: str | None,
+) -> str:
+    """Smart alert when a watchlisted ticker's score crosses the user's
+    delta threshold relative to where they added it.
+
+    Routed via the `alerts` persona (alerts@tapeline.io). Distinct from
+    the EOD digest in that it's per-ticker, intra-day, and only fires on
+    significant moves — see app.services.alerts.evaluate_watchlist_alerts
+    for the gating logic.
+    """
+    delta = current_score - baseline_score
+    sign = "+" if delta >= 0 else ""
+    delta_color = "#10b981" if delta >= 0 else "#ef4444"
+    score_color = (
+        "#22c55e" if current_score >= 70
+        else "#14b8a6" if current_score >= 55
+        else "#a1a1aa" if current_score >= 40
+        else "#fbbf24" if current_score >= 25
+        else "#ef4444"
+    )
+    sig = signal or "—"
+    why = (reason or "").strip()[:200]
+    why_block = (
+        f'<p style="color:#9ca3af;margin:0 0 16px;font-size:13px;line-height:1.5;">{why}</p>'
+        if why else ""
+    )
+    return f"""<!doctype html>
+<html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;margin:0;">
+  <div style="max-width:560px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
+      <div style="width:24px;height:8px;border-radius:999px;background:#3b82f6;"></div>
+      <strong style="font-size:18px;">Tapeline</strong>
+    </div>
+    <h1 style="margin:0 0 8px;font-size:22px;">Watchlist alert: {symbol}</h1>
+    <p style="color:#9ca3af;margin:0 0 20px;">Hi {user_name}, a ticker you&rsquo;re watching just moved past your alert threshold.</p>
+
+    <div style="background:#0a0a0a;border-radius:8px;padding:20px;border:1px solid #1f1f23;margin-bottom:18px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:28px;font-weight:700;">{symbol}</div>
+        <div style="text-align:right;">
+          <div style="font-size:30px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,monospace;color:{score_color};line-height:1;">{current_score:.0f}</div>
+          <div style="margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:{score_color};">{sig}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:12px;margin-top:14px;">
+        <span>Baseline (when you added): <strong style="color:#d1d5db;">{baseline_score:.0f}</strong></span>
+        <span>Change: <strong style="color:{delta_color};">{sign}{delta:.1f}</strong></span>
+      </div>
+    </div>
+
+    {why_block}
+
+    <a href="https://tapeline.io/app/ticker/{symbol}" style="display:inline-block;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:500;">Open {symbol} &rarr;</a>
+
+    <hr style="border:0;border-top:1px solid #1f1f23;margin:32px 0 16px;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">
+      <strong>Not investment advice.</strong> For informational purposes only. You&rsquo;re receiving this because <strong>{symbol}</strong> moved past the alert threshold on your watchlist. We won&rsquo;t re-alert on this ticker for at least 24 hours.
+      <br><br>
+      <a href="https://tapeline.io/app/watchlist" style="color:#9ca3af;">Manage watchlist</a>
+      &nbsp;·&nbsp;
+      <a href="https://tapeline.io/app/settings/email" style="color:#9ca3af;">Email preferences</a>
+    </p>
+  </div>
+</body></html>"""
+
+
 def render_alert_email(user_name: str, rule_name: str, symbol: str, score: float, message: str) -> str:
     """Render an alert email. Minimal branded HTML."""
     return f"""<!doctype html>
