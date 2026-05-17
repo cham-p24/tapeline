@@ -12,10 +12,12 @@
  * 80% of the canvas.
  */
 import { ImageResponse } from "next/og";
+import { loadInter } from "@/lib/og-fonts";
 
 export const runtime = "edge";
 
 export async function GET() {
+  const fonts = await loadInter([500, 700]);
   return new ImageResponse(
     (
       <div
@@ -91,6 +93,6 @@ export async function GET() {
         </div>
       </div>
     ),
-    { width: 1500, height: 500 },
+    { width: 1500, height: 500, fonts },
   );
 }

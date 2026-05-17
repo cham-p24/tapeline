@@ -11,10 +11,12 @@
  * brand mark left, tagline right, since vertical real estate is tighter.
  */
 import { ImageResponse } from "next/og";
+import { loadInter } from "@/lib/og-fonts";
 
 export const runtime = "edge";
 
 export async function GET() {
+  const fonts = await loadInter([500, 700]);
   return new ImageResponse(
     (
       <div
@@ -91,6 +93,6 @@ export async function GET() {
         </div>
       </div>
     ),
-    { width: 1584, height: 396 },
+    { width: 1584, height: 396, fonts },
   );
 }

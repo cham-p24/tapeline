@@ -11,10 +11,12 @@
  * email render.
  */
 import { ImageResponse } from "next/og";
+import { loadInter } from "@/lib/og-fonts";
 
 export const runtime = "edge";
 
 export async function GET() {
+  const fonts = await loadInter([600]);
   return new ImageResponse(
     (
       <div
@@ -51,6 +53,6 @@ export async function GET() {
         </span>
       </div>
     ),
-    { width: 220, height: 60 },
+    { width: 220, height: 60, fonts },
   );
 }

@@ -13,10 +13,12 @@
  * Edge-rendered + cached at the CDN so every avatar fetch is free.
  */
 import { ImageResponse } from "next/og";
+import { loadInter } from "@/lib/og-fonts";
 
 export const runtime = "edge";
 
 export async function GET() {
+  const fonts = await loadInter([700]);
   return new ImageResponse(
     (
       <div
@@ -68,6 +70,6 @@ export async function GET() {
         />
       </div>
     ),
-    { width: 400, height: 400 },
+    { width: 400, height: 400, fonts },
   );
 }
