@@ -149,7 +149,12 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 ## Things NOT to change without thinking
 - 6-factor scoring formula and weights
 - Descriptive (not prescriptive) signal labels
-- Public scorecard from day 1 (the trust mechanism)
+- Public scorecard SUMMARY from day 1 (the trust mechanism). Per-day picks
+  are gated since 2026-05-18: anonymous + Free see picks delayed 7 days,
+  Pro + Premium see live. Summary stats (hit rate, median alpha, days
+  tracked) stay live for everyone so the JSON-LD Dataset markup and
+  marketing trust signal don't degrade. Gate lives in
+  `backend/app/routers/scorecard.py` (`_FREE_DELAY_DAYS`).
 - Three-tier price points ($29.99 Pro / $49.99 Premium) — only revisit with conversion data
 - Free tier shows real product (delayed) — not a feature-stripped version
 - Owner login mechanism (only seeded via `seed_owner.py`, never via signup form)

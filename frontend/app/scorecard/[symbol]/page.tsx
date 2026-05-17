@@ -86,6 +86,26 @@ export default function TickerScorecardPage() {
               </div>
             )}
 
+            {/* Same tier-gate banner as /scorecard. Summary stats above the row
+                list stay live regardless of viewer tier; only the per-row data
+                below is delayed for non-payers. Backend (`routers/scorecard.py`)
+                resolves the gate from the session cookie. */}
+            {data.summary.is_delayed && data.summary.appearances > 0 && (
+              <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <strong className="text-fg">Rows shown are delayed {data.summary.delay_days} days.</strong>{" "}
+                    <span className="text-muted">
+                      Live rows are a Pro / Premium feature. Summary stats above are real-time.
+                    </span>
+                  </div>
+                  <Link href="/pricing" className="btn-primary whitespace-nowrap text-sm">
+                    See live rows &rarr;
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {data.summary.appearances > 0 && (
               <>
                 <div className="mt-8 grid gap-4 sm:grid-cols-4">

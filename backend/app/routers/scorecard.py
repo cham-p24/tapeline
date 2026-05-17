@@ -1,7 +1,18 @@
-"""Public daily scorecard — builds trust via historical transparency."""
+"""Public daily scorecard — builds trust via historical transparency.
+
+Tiering posture:
+- Summary stats (hit rate, alpha, median 1D return) are always computed
+  from ALL back-checked entries and returned to everyone. They're the
+  trust signal that powers the JSON-LD Dataset markup and the marketing
+  funnel.
+- Per-day picks are gated: anonymous + Free users get rows older than
+  `_FREE_DELAY_DAYS`; Pro/Premium see live. This stops the scorecard
+  cannibalising the live scanner — which is the actual product.
+"""
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime, timedelta
 from statistics import median
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,9 +20,23 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import DailyScorecardEntry, Ticker
+from app.models import DailyScorecardEntry, Ticker, User
+from app.services.auth import current_user_optional
 
 router = APIRouter()
+
+# Free + anonymous viewers see scorecard picks delayed by this many days.
+# Pro and Premium see live. The summary stats stay live for everyone.
+_FREE_DELAY_DAYS = 7
+
+
+def _can_see_live_picks(user: User | None) -> bool:
+    """True if `user` is entitled to the un-delayed scorecard picks."""
+    if user is None:
+        return False
+    if user.tier in ("pro", "premium"):
+        return True
+    return False
 
 # Tickers are 1-6 alpha + optional dot-suffix (e.g. BRK.B). Reject anything else
 # at the URL boundary so a typo can't trigger an expensive query path.
@@ -84,9 +109,16 @@ def _summary_stats(scored: list[DailyScorecardEntry]) -> dict:
 @router.get("")
 async def get_scorecard(
     session: AsyncSession = Depends(get_session),
+    user: User | None = Depends(current_user_optional),
     days: int = 30,
 ) -> dict:
-    """Return the last N days of top-10 picks with their realized performance."""
+    """Return the last N days of top-10 picks with their realized performance.
+
+    Summary stats always reflect ALL back-checked data so the public trust
+    signal stays accurate. Per-day picks are filtered to entries older than
+    `_FREE_DELAY_DAYS` when the caller isn't on a paying tier — the gate
+    that makes the live scanner the actual product.
+    """
     # Latest N unique dates
     dates_result = await session.execute(
         select(DailyScorecardEntry.as_of).distinct().order_by(desc(DailyScorecardEntry.as_of)).limit(days)
@@ -116,16 +148,33 @@ async def get_scorecard(
 
     # Aggregate stats across all scored entries, with outlier filtering and
     # median alongside mean. See `_summary_stats` + `_is_outlier` docstrings.
+    # Computed BEFORE the delay filter so the public trust signal stays the
+    # same regardless of viewer tier.
     scored = [e for e in entries if e.alpha_vs_spy is not None]
     summary = {"days_tracked": len(dates), **_summary_stats(scored)}
 
+    # Non-paying viewers see picks delayed N days. Filter `by_date` after the
+    # summary is built so the headline stats are tier-invariant.
+    can_see_live = _can_see_live_picks(user)
+    summary["is_delayed"] = not can_see_live
+    summary["delay_days"] = 0 if can_see_live else _FREE_DELAY_DAYS
+    if not can_see_live:
+        cutoff = datetime.now(UTC).date() - timedelta(days=_FREE_DELAY_DAYS)
+        by_date = {d: rows for d, rows in by_date.items() if _parse_iso_date(d) <= cutoff}
+
     return {"summary": summary, "days": by_date}
+
+
+def _parse_iso_date(s: str):
+    """Parse a YYYY-MM-DD scorecard date string back to a date object."""
+    return datetime.fromisoformat(s).date() if "T" in s else datetime.strptime(s, "%Y-%m-%d").date()
 
 
 @router.get("/symbol/{symbol}")
 async def get_scorecard_for_symbol(
     symbol: str,
     session: AsyncSession = Depends(get_session),
+    user: User | None = Depends(current_user_optional),
     limit_rows: int = 365,
 ) -> dict:
     """All historical scorecard rows for a single ticker.
@@ -136,6 +185,10 @@ async def get_scorecard_for_symbol(
 
     Returns 404 if the symbol is malformed; returns 200 with empty `rows`
     if the symbol exists in our universe but has never been a top-10 pick.
+
+    Same tier gate as the universe-wide endpoint: summary stats reflect all
+    history, but rows newer than `_FREE_DELAY_DAYS` are hidden for
+    non-paying viewers.
     """
     sym = symbol.strip().upper()
     if not _SYMBOL_RE.match(sym):
@@ -153,6 +206,22 @@ async def get_scorecard_for_symbol(
     )
     rows = rows_result.scalars().all()
 
+    # Summary stats reflect ALL rows so the per-ticker proof signal is
+    # tier-invariant. The row list itself is filtered below for non-payers.
+    scored = [e for e in rows if e.alpha_vs_spy is not None]
+    # Per-ticker best/worst alpha is computed across ALL scored rows so a
+    # genuine outlier (e.g. a real biotech catalyst day) still surfaces as
+    # the best/worst. The mean/median use the same outlier-filtered helper
+    # as the universe-wide endpoint, so headline averages are robust.
+    stats = _summary_stats(scored)
+
+    can_see_live = _can_see_live_picks(user)
+    if can_see_live:
+        visible_rows = rows
+    else:
+        cutoff = datetime.now(UTC).date() - timedelta(days=_FREE_DELAY_DAYS)
+        visible_rows = [e for e in rows if e.as_of <= cutoff]
+
     serialised = [
         {
             "as_of": e.as_of.isoformat(),
@@ -164,15 +233,9 @@ async def get_scorecard_for_symbol(
             "spy_change_pct_1d": e.spy_change_pct_1d,
             "alpha_vs_spy": e.alpha_vs_spy,
         }
-        for e in rows
+        for e in visible_rows
     ]
 
-    scored = [e for e in rows if e.alpha_vs_spy is not None]
-    # Per-ticker best/worst alpha is computed across ALL scored rows so a
-    # genuine outlier (e.g. a real biotech catalyst day) still surfaces as
-    # the best/worst. The mean/median use the same outlier-filtered helper
-    # as the universe-wide endpoint, so headline averages are robust.
-    stats = _summary_stats(scored)
     summary = {
         "symbol": sym,
         "in_universe": in_universe,
@@ -190,6 +253,8 @@ async def get_scorecard_for_symbol(
         "hit_rate_beat_spy": stats["hit_rate_beat_spy"],
         "best_alpha": max((e.alpha_vs_spy for e in scored), default=None),
         "worst_alpha": min((e.alpha_vs_spy for e in scored), default=None),
+        "is_delayed": not can_see_live,
+        "delay_days": 0 if can_see_live else _FREE_DELAY_DAYS,
     }
 
     return {"summary": summary, "rows": serialised}

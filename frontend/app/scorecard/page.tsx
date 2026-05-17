@@ -24,7 +24,7 @@ export default function ScorecardPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [data, setData] = useState<{
-    summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null };
+    summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number };
     days: Record<string, ScorecardEntry[]>;
   } | null>(null);
 
@@ -103,6 +103,27 @@ export default function ScorecardPage() {
         Every day we log our top-10 composite scores at market close. The next day we record how each name performed vs SPY.
         No cherry-picking, no survivor bias &mdash; this is the full public record.
       </p>
+
+      {/* Tier-gate banner — shown when the viewer is anonymous or on Free.
+          The summary stats above stay live for everyone; only the per-day
+          picks below are delayed. Inline upgrade CTA points at /pricing.
+          Backend (`routers/scorecard.py`) sets `is_delayed` based on the
+          caller's session cookie. */}
+      {data.summary.is_delayed && (
+        <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <strong className="text-fg">Picks shown are delayed {data.summary.delay_days} days.</strong>{" "}
+              <span className="text-muted">
+                Live picks are a Pro / Premium feature. Summary stats above are real-time.
+              </span>
+            </div>
+            <Link href="/pricing" className="btn-primary whitespace-nowrap text-sm">
+              See live picks &rarr;
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Symbol search — jumps to /scorecard/[symbol] for the per-ticker history.
           Doubles as an SEO surface (one indexable page per ticker history). */}

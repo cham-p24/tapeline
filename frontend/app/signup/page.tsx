@@ -166,7 +166,15 @@ function SignUpForm() {
             </div>
           )}
 
-          <form onSubmit={submit} className="mt-8 space-y-4">
+          {/* OAuth above the email form. One-click signup is the highest-leverage
+              conversion lever on this page; we used to bury it below. The
+              OAuthButtons component renders nothing if no provider is configured
+              so the layout collapses cleanly in environments without OAuth. */}
+          <div className="mt-8">
+            <OAuthButtons position="top" />
+          </div>
+
+          <form onSubmit={submit} className="space-y-4">
             {/* Honeypot field — offscreen, hidden from real users (and screen readers).
                 Bots that auto-fill every input will populate it; if non-empty, the
                 backend silently rejects the signup. */}
@@ -219,9 +227,21 @@ function SignUpForm() {
             </p>
           </form>
 
-          <OAuthButtons />
+          {/* After-trial transparency footer. The single most common pre-signup
+              objection is "what happens at day 14 — will I get auto-charged?"
+              Spelling out the off-ramp here defuses that anxiety. Wording is
+              kept tight: free fallback first (loss-aversion-light), upgrade
+              path second, explicit no-charge guarantee third. */}
+          <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
+            <div className="font-medium text-fg">After your 14 days</div>
+            <p className="mt-1.5">
+              Stay on Free (top 20 tickers, 24-hour delayed) — or upgrade to{" "}
+              <span className="text-fg">Pro from $24.99/mo</span> for the full
+              live universe. No card on file means no surprise charge.
+            </p>
+          </div>
 
-          <p className="mt-8 text-center text-sm text-muted">
+          <p className="mt-6 text-center text-sm text-muted">
             Already have an account?{" "}
             <Link href={`/signin?next=${encodeURIComponent(next)}`} className="link">Sign in</Link>
           </p>
