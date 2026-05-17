@@ -70,6 +70,24 @@ class User(Base):
     # field — they're not user-suppressable.
     email_prefs: Mapped[int] = mapped_column(Integer, default=15, nullable=False)
 
+    # Onboarding profile — collected on /app/onboarding, the post-signup step.
+    # All nullable + skippable. `onboarding_completed_at` is set on either
+    # submit or skip so the user only gets prompted once. See migration 0020
+    # for the allowed string-enum values per field.
+    experience_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    trading_style: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    portfolio_band: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    referral_source: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Explicit GDPR-style consent for the weekly newsletter. Default False —
+    # not the same as `email_prefs` (which governs transactional drips the
+    # user implicitly opts into by signing up). Newsletter sends MUST check
+    # this column, not email_prefs.
+    marketing_opt_in: Mapped[bool] = mapped_column(default=False, nullable=False)
+    sectors_of_interest: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

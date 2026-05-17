@@ -118,7 +118,11 @@ function SignUpForm() {
       // form-vs-OAuth conversion later when OAuth tracking lands.
       track("signup_completed", { method: "email", next });
       track("trial_started", { tier: "premium", days: 14, method: "email" });
-      router.push(next);
+      // Route through /app/onboarding first — captures investor profile +
+      // attribution + marketing-opt-in before they hit the product. The
+      // onboarding page redirects to `next` after submit or skip. Existing
+      // users (signin) never pass through here.
+      router.push(`/app/onboarding?next=${encodeURIComponent(next)}`);
       router.refresh();
     } catch (e: any) {
       setErr(e.message || "Sign up failed");

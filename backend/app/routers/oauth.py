@@ -281,6 +281,7 @@ async def oauth_callback(
     # Find or create user
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
+    is_new = user is None
     if user is None:
         user = User(
             id=f"u_{uuid.uuid4().hex}",
@@ -296,9 +297,14 @@ async def oauth_callback(
     else:
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
-    # Issue session cookie + redirect to app
+    # Issue session cookie + redirect to app. New OAuth signups pass through
+    # /app/onboarding first (same flow as native signup). Existing users skip
+    # straight to the scanner.
     token = issue_session_token(user.id)
-    redirect_url = f"{settings.app_url}/app/scanner"
+    if is_new:
+        redirect_url = f"{settings.app_url}/app/onboarding?next=/app/scanner"
+    else:
+        redirect_url = f"{settings.app_url}/app/scanner"
     resp = RedirectResponse(redirect_url)
     resp.set_cookie(value=token, **session_cookie_kwargs())
     resp.delete_cookie(f"oauth_state_{provider}", path="/")
