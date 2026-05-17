@@ -5,20 +5,25 @@
  * tapeline.io's X account (@tapeline_io), LinkedIn personal + company
  * page, GitHub, and any other "round/square avatar" surface.
  *
- * Design: bold white "T" centered on the brand dark bg, with the
- * green->teal gradient stripe sitting as an underline accent. At small
- * profile sizes (~32px in feeds) the "T" reads cleanly; the stripe
- * adds the brand colour cue.
+ * Design: the canonical Tapeline brand mark is the blue pill stripe -
+ * SAME mark used in the favicon (/icon.tsx), the email-logo, every OG
+ * image, and both social banners. No letterform. The stripe alone is the
+ * identity; an inserted "T" would split the brand into two competing
+ * marks at different surfaces.
+ *
+ * Stripe is centered + sized so the inscribed circle (X / LinkedIn crop
+ * the 400x400 to a circle of radius 200) shows the full pill. A subtle
+ * top-right glow gives the dark square visual interest at the larger
+ * sizes (profile page, "Edit profile" preview) without competing with
+ * the stripe at small feed sizes.
  *
  * Edge-rendered + cached at the CDN so every avatar fetch is free.
  */
 import { ImageResponse } from "next/og";
-import { loadInter } from "@/lib/og-fonts";
 
 export const runtime = "edge";
 
 export async function GET() {
-  const fonts = await loadInter([700]);
   return new ImageResponse(
     (
       <div
@@ -27,14 +32,15 @@ export async function GET() {
           height: "100%",
           background: "#0a0a0a",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "Inter, system-ui, sans-serif",
           position: "relative",
         }}
       >
-        {/* Subtle accent glow top-right - same as opengraph-image */}
+        {/* Subtle accent glow top-right - matches the OG image + banner
+            glow so the avatar feels visually consistent with the wider
+            brand surface. Kept faint so it never competes with the
+            stripe at small (~32px) feed render sizes. */}
         <div
           style={{
             position: "absolute",
@@ -47,22 +53,14 @@ export async function GET() {
             display: "flex",
           }}
         />
-        <span
-          style={{
-            color: "#f4f4f5",
-            fontSize: "260px",
-            fontWeight: 700,
-            letterSpacing: "-0.05em",
-            lineHeight: 0.85,
-            marginBottom: "20px",
-          }}
-        >
-          T
-        </span>
+        {/* The mark. 4:1 ratio matches /icon.tsx exactly - same brand
+            stripe just scaled to the avatar canvas. Sized to fit
+            comfortably inside the inscribed circle (radius 200) that
+            X / LinkedIn / GitHub use for circle-cropped avatars. */}
         <div
           style={{
-            width: "150px",
-            height: "22px",
+            width: "260px",
+            height: "65px",
             background: "#3b82f6",
             borderRadius: "999px",
             display: "flex",
@@ -70,6 +68,6 @@ export async function GET() {
         />
       </div>
     ),
-    { width: 400, height: 400, fonts },
+    { width: 400, height: 400 },
   );
 }
