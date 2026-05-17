@@ -12,6 +12,7 @@
  * and `subtitle` (one-line value prop).
  */
 import { ImageResponse } from "next/og";
+import { loadInter } from "@/lib/og-fonts";
 
 export const ogSize = { width: 1200, height: 630 } as const;
 
@@ -26,18 +27,19 @@ type OgParams = {
   footerLeft?: string;
   /** Footer-right URL fragment. Defaults to "tapeline.io". */
   footerRight?: string;
-  /** Accent color override (defaults to the brand green #22c55e). */
+  /** Accent color override (defaults to the brand blue #3b82f6). */
   accent?: string;
 };
 
-export function ogResponse({
+export async function ogResponse({
   eyebrow,
   title,
   subtitle,
   footerLeft = "Six-factor formula · Public scorecard · Live sub-60s refresh",
   footerRight = "tapeline.io",
-  accent = "#22c55e",
+  accent = "#3b82f6",
 }: OgParams) {
+  const fonts = await loadInter([400, 600, 700]);
   return new ImageResponse(
     (
       <div
@@ -72,7 +74,7 @@ export function ogResponse({
             style={{
               width: "56px",
               height: "12px",
-              background: `linear-gradient(90deg, ${accent} 0%, #14b8a6 100%)`,
+              background: accent,
               borderRadius: "999px",
               display: "flex",
             }}
@@ -142,6 +144,6 @@ export function ogResponse({
         </div>
       </div>
     ),
-    { ...ogSize },
+    { ...ogSize, fonts },
   );
 }
