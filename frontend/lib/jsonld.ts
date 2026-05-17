@@ -517,7 +517,7 @@ export function compareJsonLd(a: CompareArgs) {
         "Plain-English reasoning per ticker (free tier included)",
         "~2,500 actively scored liquid US tickers, 5,757 tracked",
         "Squeeze + market-regime detection",
-        "Congressional trades + elite 13F holdings (Premium)",
+        "Congressional trades + recent insider buys via SEC Form 4 (Premium)",
       ],
     },
     {

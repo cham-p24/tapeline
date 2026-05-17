@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     "live market scanner",
     "squeeze detection",
     "congressional trades",
-    "13F holdings",
+    "insider Form 4",
     "market regime",
     "retail trading",
   ],

@@ -50,14 +50,6 @@ export const POSTS: BlogPost[] = [
         within 30–45 days. The signal: when multiple members on relevant
         committees buy or sell the same name, that's information they
         plausibly had access to that the market didn't.</li>
-        <li><strong>Elite 13F filings</strong> — quarterly position
-        disclosures by institutional managers with over $100M AUM,
-        required by the SEC. Tapeline tracks eight curated managers
-        whose long-horizon track records justify the lag:
-        Buffett (Berkshire), Burry (Scion), Tepper (Appaloosa),
-        Ackman (Pershing Square), Druckenmiller (Duquesne),
-        Laffont (Coatue), Coleman (Tiger Global), Singer (Elliott).
-        Lag: 45 days post quarter-end.</li>
         <li><strong>Insider Form 4 filings</strong> — required by the
         SEC within 2 business days of any insider transaction
         (executives, directors, 10%+ owners). The signal: insiders are
@@ -82,17 +74,6 @@ export const POSTS: BlogPost[] = [
       assignment + filing volume + recency — not raw transaction
       count.</p>
 
-      <p><strong>Elite 13F changes</strong> are the strongest absolute
-      signal but the longest lag. When Buffett enters a new position,
-      the position was likely opened 30–90 days before the filing
-      becomes public. By the time you see it, the bigger move has
-      often happened. The Tapeline signal weights 13F deltas not by
-      the absolute position size but by <em>conviction</em> — new
-      positions vs adds-to-existing vs trims vs exits, scaled by
-      portfolio percentage. A new full position in Burry's Scion fund
-      is signal-rich; a 5% trim from a large Tiger Global position is
-      noise.</p>
-
       <p><strong>Insider Form 4 filings</strong> have the shortest lag
       (1–3 business days) and the highest signal-to-noise for cluster
       events. Single-insider buys are weak — executives buy for
@@ -108,11 +89,11 @@ export const POSTS: BlogPost[] = [
       signal-rich, why isn't it 30% of the composite or higher? Three
       reasons:</p>
 
-      <p><strong>The lags compound.</strong> 13F is 45 days late. Insider
-      buys are sometimes timed to compensation cycles that look like
-      signal but aren't. Congressional filings can be 30–45 days late
-      and include trades that have already been unwound. By the time
-      the data is clean and public, much of the move has happened.</p>
+      <p><strong>The lags compound.</strong> Insider Form 4 filings
+      arrive 1–3 days after the trade. Congressional STOCK Act filings
+      can be 30–45 days late and include trades that have already been
+      unwound. By the time the data is clean and public, much of the
+      move has happened.</p>
 
       <p><strong>It's a confirmation factor, not a leading one.</strong>
       Smart money flow is most useful in confluence with the other
@@ -121,31 +102,32 @@ export const POSTS: BlogPost[] = [
       late information; combined with leading factors it becomes
       directional certainty.</p>
 
-      <p><strong>Survivorship in the source data.</strong> The 8 elite
-      13F filers we track were selected for long-term outperformance.
-      They're also the most-watched fund managers in the world — their
-      moves are crowded trades by the time the filing publishes.
-      Buffett buying Apple in 2016 was signal; Buffett buying Apple in
-      2024 was a market price-anchor, not new information.</p>
+      <p><strong>Survivorship and crowding.</strong> The fund managers
+      most retail tools point at — Buffett, Burry, Tepper — are also
+      the most-watched in the world. Their moves are crowded trades by
+      the time any 13F filing publishes. Buffett buying Apple in 2016
+      was signal; Buffett buying Apple in 2024 was a market price-anchor,
+      not new information. This is one reason Tapeline doesn't fold 13F
+      filings into the Smart Money sub-score directly — by the time a
+      filing is public, the edge is largely priced.</p>
 
       <h2>How the Tapeline score uses it differently from competitors</h2>
       <p>Most "smart money" scoring in retail tools is broken in one of
-      two ways: either it's a single-source (just 13F, or just
-      Congressional) which misses the confluence signal, or it's
-      opaque (Tipranks' Hedge Fund Sentiment is a Smart Score input
-      but the weighting and the underlying fund list are not
+      two ways: either it's a single-source (just hedge fund holdings,
+      or just Congressional) which misses the confluence signal, or
+      it's opaque (Tipranks' Hedge Fund Sentiment is a Smart Score
+      input but the weighting and the underlying fund list are not
       published). Tapeline:</p>
       <ul>
-        <li>Publishes the 8 elite-fund list on /app/holdings (Premium
-        feature).</li>
-        <li>Combines Congressional, 13F, and Form 4 into a single 0-100
-        sub-score with published methodology.</li>
+        <li>Combines Congressional STOCK Act disclosures and SEC Form 4
+        insider transactions into a single 0-100 sub-score with
+        published methodology.</li>
         <li>Weights the sub-score at 15% of the composite — high enough
         to matter, low enough not to drown out the leading factors when
         smart money is late or noisy.</li>
         <li>Surfaces the actual data feeds: the Premium tier exposes
         the underlying Congressional trades feed at /app/congress and
-        the elite 13F holdings at /app/holdings — not just the
+        the recent insider buys at /app/holdings — not just the
         aggregated score.</li>
       </ul>
 
@@ -175,7 +157,7 @@ export const POSTS: BlogPost[] = [
       <p>You can see live Smart Money sub-scores on any ticker page —
       e.g. <a href="/t/NVDA">/t/NVDA</a>, <a href="/t/AAPL">/t/AAPL</a>
       — or filter by it on the live scanner. The full Congressional
-      trades feed and elite 13F holdings are Premium features at
+      trades feed and recent insider buys are Premium features at
       /app/congress and /app/holdings; the score weighting itself is
       free for everyone, every row, every day.</p>
     `,
@@ -378,9 +360,9 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       out. NVDA doesn't do that. Look at the spread:</p>
 
       <ul>
-        <li><strong>Smart Money 97</strong> (top 3%) — institutions and
-        insiders are net-accumulating. Congressional disclosures, 13F changes,
-        Form 4 buying — all flowing in.</li>
+        <li><strong>Smart Money 97</strong> (top 3%) — insiders are
+        net-accumulating. Congressional disclosures and SEC Form 4 buying
+        — both flowing in.</li>
         <li><strong>Momentum 87</strong> (top 13%) — short-term price action
         is accelerating, volume is confirming, breakouts are recent.</li>
         <li><strong>Trend 41</strong> (below median) — but the multi-timeframe
@@ -611,12 +593,12 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
 
       <h2>The factors aren't equally available below the cutoff</h2>
       <p>Trend, momentum, and macro work fine on any ticker with a year
-      of bars. Fundamentals (Finnhub) and insider Form 4 are sparse for
-      sub-$200M caps. Smart-money via Quiver tracks 8 elite funds — they
-      don't hold $50M micro-caps. Forcing a score across the entire
-      5,757-row universe would mean ~3,200 confidence values landing
-      under 40%. That's noise, not signal — exactly the experience we're
-      trying to replace.</p>
+      of bars. Fundamentals and insider Form 4 are sparse for sub-$200M
+      caps — small companies just file less often, and analyst coverage
+      thins out. Forcing a score across the entire 5,757-row universe
+      would mean ~3,200 confidence values landing under 40%. That's
+      noise, not signal — exactly the experience we're trying to
+      replace.</p>
 
       <h2>What we do with the other 3,200</h2>
       <p>The full 5,757-row universe table is auto-populated weekly from

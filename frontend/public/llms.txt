@@ -32,7 +32,7 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 
 - **Free** — top 20 tickers, 24-hour delayed, watchlist (5, no alerts). Real product, narrower.
 - **Pro** — $29.99/mo OR $24.99/mo billed annually ($299.99/yr) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push.
-- **Premium** — $49.99/mo OR $39.99/mo billed annually ($479.99/yr) — everything in Pro plus Congressional trades, elite 13F holdings, unlimited Telegram + email, public API (1,000/day), priority support.
+- **Premium** — $49.99/mo OR $39.99/mo billed annually ($479.99/yr) — everything in Pro plus Congressional trades, recent insider buys (SEC Form 4), unlimited Telegram + email, public API (1,000/day), priority support.
 
 14-day Premium trial on signup, no credit card required.
 
@@ -106,9 +106,9 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 
 ## Data sources
 
-- **Massive (formerly Polygon.io)** — equities + ETFs (15-min delayed for free tier; sub-60s on Pro+); options chain
+- **Massive (formerly Polygon.io)** — equities + ETFs (15-min delayed for free tier; sub-60s on Pro+)
 - **Finnhub** — fundamentals, earnings + IPO calendars, insider Form 4
-- **Quiver QuantData** — 13F holdings for 8 elite funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
+- **SEC EDGAR direct** — 8-K material event filings (real-time)
 - **FRED** — macro indicators (DXY, 10Y yield, VIX) for the macro factor
 - **Benzinga** — news feed + analyst ratings (analyst ratings displayed alongside, not folded into the score)
 
