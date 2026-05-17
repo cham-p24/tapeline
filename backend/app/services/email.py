@@ -910,7 +910,7 @@ async def run_daily_drip(session) -> dict[str, int]:
                 # Day 3 is soft activation ("have you tried the scanner") — keep
                 # under the default transactional sender. Day 7 onwards is the
                 # conversion push, sender Christian (sales persona).
-                drip_persona = "default" if token == "3" else "sales"
+                drip_persona: EmailPersona = "default" if token == "3" else "sales"
                 res = await send_email(user.email, subject, html, persona=drip_persona)
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
