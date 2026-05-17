@@ -34,9 +34,7 @@ def _can_see_live_picks(user: User | None) -> bool:
     """True if `user` is entitled to the un-delayed scorecard picks."""
     if user is None:
         return False
-    if user.tier in ("pro", "premium"):
-        return True
-    return False
+    return user.tier in ("pro", "premium")
 
 # Tickers are 1-6 alpha + optional dot-suffix (e.g. BRK.B). Reject anything else
 # at the URL boundary so a typo can't trigger an expensive query path.
