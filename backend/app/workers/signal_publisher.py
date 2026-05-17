@@ -1029,9 +1029,37 @@ async def main() -> None:
     # Seed universe on first boot (idempotent)
     await seed_universe()
 
+    # Watchdog: a healthy tick completes in ~6s. If one ever stalls past
+    # TICK_TIMEOUT_SECONDS we kill it and continue — better to drop one
+    # cycle than to hang the worker indefinitely. The 2026-05-17 outage
+    # froze tick() for 20+ minutes (worker process alive, tick coroutine
+    # stuck waiting on something async that never resolved) before a
+    # manual `fly machine restart` cleared it. wait_for prevents that.
+    TICK_TIMEOUT_SECONDS = 60
+    consecutive_timeouts = 0
+
     while True:
+        cycle_started = datetime.now(UTC)
         try:
-            await tick()
+            await asyncio.wait_for(tick(), timeout=TICK_TIMEOUT_SECONDS)
+            consecutive_timeouts = 0
+        except asyncio.TimeoutError:
+            consecutive_timeouts += 1
+            elapsed = (datetime.now(UTC) - cycle_started).total_seconds()
+            logger.error(
+                "tick.timeout elapsed=%.1fs limit=%ds consecutive=%d — "
+                "killing this cycle and moving on",
+                elapsed, TICK_TIMEOUT_SECONDS, consecutive_timeouts,
+            )
+            # If we're racking up timeouts something is fundamentally
+            # broken — surface to Sentry so it pages instead of silently
+            # dropping cycles.
+            if consecutive_timeouts >= 3:
+                logger.critical(
+                    "tick.timeout_streak count=%d — worker appears wedged, "
+                    "consider `fly machine restart`",
+                    consecutive_timeouts,
+                )
         except Exception:
             logger.exception("tick.failure")
         await asyncio.sleep(settings.score_refresh_seconds)
