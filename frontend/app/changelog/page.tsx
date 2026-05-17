@@ -24,6 +24,28 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-05-17",
+    version: "0.1.11",
+    tag: "shipped",
+    title: "Live signal-system universe, iOS-feel design, light + dark mode",
+    body: [
+      "Tapeline now reads the full ranked ticker universe live from its source of truth — refreshed every 5 minutes. The scanner went from 112 mock tickers to 7,162 tickers tracked, 4,399 of them actively scored, including names like HYLN that were missing before.",
+      "Light, Dark, and System appearance modes — toggle in your account menu (top-right). System mode follows your Mac/Windows theme automatically as you change it.",
+      "Heatmap rebuilt around 14 clean GICS sectors (Information Technology, Health Care, Financials, Industrials, Consumer Discretionary, Consumer Staples, Communication Services, Energy, Materials, Utilities, Real Estate, Commodities, Funds & ETFs, Uncategorized). Was 51 fragmented labels; the dropdown filter now actually matches what's on the page.",
+      "Search box on both the scanner and the heatmap — type any ticker substring, results filter live.",
+      "Material event filings from SEC EDGAR now appear in the breaking-news bar ~5-30 minutes before they're re-reported by the news wires. 8-Ks, item codes, the lot. Free, regulatory-quality, no marketing fluff.",
+      "Recent insider buys page (Premium) populates correctly now — was showing empty regardless of the data behind it.",
+      "Per-ticker page shows the proper 'No fundamentals coverage for ETFs and funds' message instead of six empty cards when a ticker is an ETF.",
+      "New design language across the dashboard: translucent surfaces, frosted-glass cards, system-font stack, pill buttons. No more boxed-template borders.",
+      "Fluid type — the whole UI compresses cleanly as you narrow the window. Cell padding tightens on the scanner table so the numeric grid stays the focus on laptops and small screens.",
+      "News bar now shows 3 headlines at once (was 1 rotating) and pulls 20 per refresh (was 8) so the feed actually feels active.",
+      "Authenticated actions like Add to Watchlist and Notify on News no longer return errors — a cross-origin cookie issue that affected most dashboard buttons.",
+      "Four Pro/Premium endpoints (Congress, Heatmap, Squeeze, Regime) that were accidentally accessible without authentication despite the UI gating them — now properly gated end-to-end.",
+      "Top-right search shortcut chip now reads 'Ctrl K' on Windows and Linux. Was the Mac Command symbol everywhere.",
+      "New /app/account hub — your username menu links here for a single home for billing, watchlist, alerts, email preferences, and the new appearance toggle.",
+    ],
+  },
+  {
     date: "2026-05-15",
     version: "0.1.10",
     tag: "improvement",
