@@ -679,6 +679,7 @@ async def _downgrade_expired_trials() -> None:
                     email,
                     "Tapeline — your trial just ended",
                     render_trial_ended_email(name),
+                    persona="sales",  # win-back, fronted by Christian
                 )
     except Exception:
         logger.exception("trial.downgrade_email_failed")

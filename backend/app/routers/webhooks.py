@@ -186,6 +186,7 @@ async def stripe_webhook(
                     user.email,
                     "Your Tapeline payment didn't go through",
                     html,
+                    persona="billing",
                 )
                 logger.info(
                     "stripe.payment_failed_email_sent user=%s attempt=%d",

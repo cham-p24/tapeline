@@ -72,7 +72,7 @@ async def receive_alert(
             f".github/workflows/news-freshness-cron.yml to silence."
             f"</p>"
         )
-        result = await send_email(recipient, subject, html)
+        result = await send_email(recipient, subject, html, persona="alerts")
         if result.get("skipped"):
             # Resend not configured — log + return 503 so the caller knows
             # the alert didn't actually go anywhere.

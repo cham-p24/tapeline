@@ -332,7 +332,10 @@ async def _fire(
                     score=score,
                     message=message,
                 )
-                res = await send_email(user.email, f"[Tapeline] {rule.name}: {symbol}", html)
+                res = await send_email(
+                    user.email, f"[Tapeline] {rule.name}: {symbol}", html,
+                    persona="alerts",
+                )
                 # send_email returns {"skipped": True} if Resend isn't configured
                 event.delivered = not res.get("skipped", False)
             except Exception:
