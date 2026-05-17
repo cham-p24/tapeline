@@ -36,9 +36,9 @@ export const metadata = pageMeta({
 // (highest first) — that's the order they should be created and linked.
 const PROFILES: { name: string; url: string; handle: string; live?: boolean }[] = [
   { name: "X / Twitter",      url: "https://x.com/tapeline_io",                              handle: "@tapeline_io" },
-  { name: "LinkedIn",         url: "https://www.linkedin.com/company/tapeline",              handle: "/company/tapeline" },
+  { name: "LinkedIn",         url: "https://www.linkedin.com/company/tapelineio",            handle: "/company/tapelineio", live: true },
   { name: "GitHub",           url: "https://github.com/cham-p24/tapeline",                   handle: "cham-p24/tapeline", live: true },
-  { name: "Crunchbase",       url: "https://www.crunchbase.com/organization/tapeline",       handle: "tapeline" },
+  { name: "Crunchbase",       url: "https://www.crunchbase.com/organization/tapeline-191a",  handle: "tapeline-191a", live: true },
   { name: "Product Hunt",     url: "https://www.producthunt.com/products/tapeline",          handle: "tapeline" },
   { name: "AlternativeTo",    url: "https://alternativeto.net/software/tapeline/",           handle: "tapeline" },
   { name: "G2",               url: "https://www.g2.com/products/tapeline",                   handle: "tapeline" },
