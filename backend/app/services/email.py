@@ -15,16 +15,28 @@ RESEND_API = "https://api.resend.com"
 
 
 async def send_email(to: str, subject: str, html: str, text: str | None = None) -> dict[str, Any]:
-    """Send a single email. Returns the Resend response or raises."""
+    """Send a single email. Returns the Resend response or raises.
+
+    `from` is set from the EMAIL_FROM env var (can be any address under the
+    Resend-verified tapeline.io domain — e.g. christian@tapeline.io for the
+    founder-fronted persona). `reply_to` is set explicitly to a known-routed
+    address (support@tapeline.io, forwarded via Cloudflare Email Routing to
+    tapeline.inbox@gmail.com) so replies don't bounce even if the sender
+    address itself hasn't been wired into the routing rules yet. Override
+    via EMAIL_REPLY_TO env var.
+    """
     if not settings.resend_api_key:
         logger.warning("email.skipped reason=no_api_key to=%s subject=%s", to, subject)
         return {"skipped": True}
+
+    reply_to = getattr(settings, "email_reply_to", None) or "support@tapeline.io"
 
     payload = {
         "from": f"Tapeline <{settings.email_from}>",
         "to": [to],
         "subject": subject,
         "html": html,
+        "reply_to": [reply_to],
     }
     if text:
         payload["text"] = text

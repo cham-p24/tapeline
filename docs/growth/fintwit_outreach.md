@@ -1,93 +1,216 @@
 # Fintwit Outreach — Companion Guide for `fintwit_list.csv`
 
-Drafted 2026-05-14. Pairs with `fintwit_list.csv` which has 30 specific X/Twitter accounts to DM, each with a hook template.
+Drafted 2026-05-14. Refreshed 2026-05-17 after a live audit invalidated the original "30 cold DMs in 6 days" plan.
 
-**Goal**: drive trial signups by reaching the small-fund and analyst tier of fintwit (5K-100K followers) where reply rates are highest and one positive engagement compounds via that account's followers seeing it.
-
-**Founder cadence**: 5 DMs per day for 6 days. Not 30 in one day — fintwit reads bulk-DM patterns and rate-limits. Spread across mornings 9-10 AM ET (US trading session start, when these accounts check their inbox before market open).
+**Goal**: drive trial signups by reaching the small-fund and analyst tier of fintwit (5K-100K followers) where one substantive engagement compounds via that account's followers seeing Tapeline mentioned.
 
 ---
 
-## Mandatory pre-flight per DM (do NOT skip)
+## 2026-05-17 audit — what the original plan got wrong
 
-The list in `fintwit_list.csv` was sourced from public lists (The Bear Cave's "100 Must Follow Financial Twitter Accounts" + Capital Employed's microcap list). Account state changes — handles get renamed, accounts go dormant, focuses shift. Each DM needs three checks before you send:
+The CSV was sourced from The Bear Cave's "100 Must Follow Financial Twitter Accounts" (2024). 18 months later, account state has drifted hard. A live audit of the five priority-1 entries:
 
-1. **Account still active?** Open the profile. Most recent tweet date should be ≤ 7 days old. If older, skip them and move to the next.
-2. **Posts about specific tickers?** Scroll their last 20 tweets. At least 3-5 should be ticker-specific (cashtags or named companies) not pure macro. If they pivoted to macro-only, the hook won't land — skip.
-3. **A recent ticker take you can reference?** The hook template starts with "Saw your [DATE] thread on $[TICKER]." If you can't fill those bracketed values from their actual recent tweets, the DM is generic and gets ignored. Pick a specific tweet to anchor on.
+| Handle           | Reality on 2026-05-17                                                          |
+|------------------|--------------------------------------------------------------------------------|
+| @AltaFoxCapital  | Last tweet Apr 29 — 3 weeks stale. Fails the 7-day activity filter.            |
+| @SuperMugatu     | Protected profile. Can't see tweets without follow approval.                   |
+| @Citrini7        | Protected profile. Same.                                                       |
+| @1MainCapital    | Public but DMs closed (no message icon on profile). Dormant since Oct 2025.    |
+| @BillBrewsterSCG | Handle transferred / abandoned — now "Nair Har" with 0 posts.                  |
 
-If all three pass, run the ticker through Tapeline:
-```powershell
-$d = irm "https://api.tapeline.io/api/ticker/[SYMBOL]"
-"{0} composite={1} | trend={2} rs={3} fund={4} sm={5} macro={6} mom={7} | {8}" -f $d.symbol, $d.score, $d.breakdown.trend.value, $d.breakdown.rs.value, $d.breakdown.fundamentals.value, $d.breakdown.smart_money.value, $d.breakdown.macro.value, $d.breakdown.momentum.value, $d.reason
-```
+5 of 5 priority-1 entries are unworkable for cold DM. Extrapolating: most of the 30 are stale, protected, or closed-DM, and a fresh `@tapeline_io` account with 0 followers can't DM strangers anyway — those messages land in Message Requests where they go unseen.
 
-That gives you the live numbers to fill into the hook template. Total time per DM: ~5 minutes including verification.
+The plan has to change. The list still has value as a discovery layer; the vehicle changes.
 
-## The DM structure (every template in the CSV follows this)
+---
 
-```
-Saw your [DATE] [thread/post/thesis] on $[TICKER]. Ran it through Tapeline's 6-factor composite — score [X], [signal label] driven mainly by [factor1] and [factor2]. [One-sentence specific observation that ties their thesis to a factor reading]. Public scorecard: tapeline.io/scorecard. Curious what factor weighting you'd argue for in this name.
-```
+## The new operating model — public replies, not cold DMs
 
-Three things make this work:
+**The pivot**: substantive public replies on recent tweets, not bulk DMs.
 
-1. **Specific tweet reference** = proves you actually read them, not bulk-DMing.
-2. **Live numbers** = proves the tool actually works (and gives them a concrete data point).
-3. **Question at the end** = makes the DM something to reply to, not just acknowledge. Asking for their opinion on factor weighting is genuinely flattering (you're treating them as someone whose framework matters) and is hard to ignore politely.
+Why this works better than DMs from a 0-follower account in 2026:
+
+- DMs from a fresh account to someone they don't follow go straight to Message Requests. Typical fund manager doesn't check that folder.
+- Public replies bypass the closed-DM wall entirely. A protected account still can't see the reply unless they're following you, but the broader fintwit audience that scrolls the original poster's replies can.
+- A substantive reply with live Tapeline numbers under a 500-like tweet is seen by hundreds of the OP's followers. That's leverage cold DM never gets.
+- One quality reply per week beats 30 ignored DMs.
+
+---
+
+## Filter — when an account is reply-worthy
+
+All four must be true before you draft a reply:
+
+1. **Account is public.** (Protected = skip; you can't see the post.)
+2. **Last tweet ≤ 7 days old.** (Stale account = no recent material to anchor a reply on.)
+3. **Posts US-listed-ticker theses.** (Macro-only / crypto-only / non-US accounts = the Tapeline data won't land.)
+4. **Recent tweet (≤ 72h) contains a specific cashtag or named US-listed company.** No specific ticker, no reply opportunity this round.
+
+Open DMs OR follow-back are nice-to-have, not required — replies don't need either.
+
+---
+
+## The vehicle — a substantive reply with live data
+
+Workflow per reply (~5 minutes):
+
+1. Open the account, find a recent (≤ 72h) tweet about a specific US ticker.
+2. Curl the live Tapeline score for that ticker:
+   ```powershell
+   $d = irm "https://api.tapeline.io/api/ticker/[SYMBOL]"
+   "{0} composite={1} | trend={2} rs={3} fund={4} sm={5} macro={6} mom={7} | {8}" -f $d.symbol, $d.score, $d.breakdown.trend.value, $d.breakdown.rs.value, $d.breakdown.fundamentals.value, $d.breakdown.smart_money.value, $d.breakdown.macro.value, $d.breakdown.momentum.value, $d.reason
+   ```
+3. Draft the reply using the structure below.
+4. Post.
+
+---
+
+## Reply structure
+
+Three components, in this order:
+
+1. **One specific data point** from the live Tapeline read. Not the full breakdown — one number that's actually relevant to what the OP said. ("Smart Money is reading 78 right now on the back of a 3-cluster insider buy in the last 30 days.")
+2. **An honest opinion.** Agree, disagree, or add a nuance. Not "wow great thread." This is the part that has to add to the conversation — otherwise it's spam dressed as a reply.
+3. **A `/scorecard` link only if it naturally fits.** If the reply works without the link, don't add the link. If the link is the entire point of the reply, don't post the reply. Most quality replies will include the link 1 in 3 times, not every time.
+
+Example of a reply that works:
+
+> Tapeline read on $XYZ is composite 72 right now — Smart Money 78 is the standout (3 Form-4 clusters in 30 days) but Trend's only 58, hasn't confirmed. Lines up with your "early but right" framing. Full breakdown if useful: tapeline.io/t/XYZ
+
+Example of a reply that doesn't:
+
+> Great thesis! Tapeline rates this a strong setup at 72 — check us out at tapeline.io! [link]
+
+The second example reads as promo. The first reads as someone who actually has data on the thing being discussed.
+
+---
 
 ## What NOT to do
 
-- **Don't open with "Hi, I built Tapeline."** Cold intro = ignore. The recipient doesn't care what you built; they care that you read their work.
-- **Don't link to /signup or /pricing in the DM.** Link to /scorecard. Sales-y links trigger the "this is a bulk-DM" pattern recognition.
-- **Don't follow up if they don't respond within 7 days.** One follow-up message reads as desperation. Move on.
-- **Don't quote-tweet their posts to promote Tapeline.** That reads as parasitic to their audience. DMs are the right vehicle.
-- **Don't DM the same person twice for different tickers.** One shot per account.
-- **Don't mention pricing in the first DM.** Save it for if they ask. The hook is the methodology; the conversion is on your /signup page after they click /scorecard.
+- **No bulk reply.** One reply per account per week max. Repeated replies to the same person from a 0-follower account reads as harassment.
+- **No quote-tweet promotion.** "Saw @SuperMugatu's $XYZ thesis — Tapeline scored it 78" with no @ reply to the original is parasitic. Reply on the actual tweet, not a separate broadcast.
+- **No copy-pasted templates.** Every reply has to reference the specific thing the OP said. Generic "ran it through Tapeline" replies get muted.
+- **No `/pricing` links in replies.** `/scorecard` and `/t/[SYMBOL]` are legitimate. `/pricing` is promotional and gets you blocked.
+- **No promotional language that doesn't add to the conversation.** "Check us out," "we built X," "DM me to learn more" — none of that. If the reply doesn't stand on its own as a useful contribution, don't post.
+- **No follow-up tweet badgering the OP.** They saw the reply. If they didn't engage, move on.
 
-## What to do if they reply
+---
 
-| Reply type | Response |
-|---|---|
-| "Interesting, what's the formula?" | Link to /how-it-works directly. Don't paste the formula in DM — getting them onto the site lets Vercel Analytics attribute the click. |
-| "Have you back-tested this?" | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the live forward-test — that's the one that counts for trust. Every miss stays on the page." |
-| "What about [different ticker]?" | Run the curl, paste the breakdown. Be willing to spend 2-3 messages going deep on their actual ticker of interest before any soft CTA. |
-| "Are you the founder?" | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula." |
-| "How do I try it?" | "Free tier covers top 20 tickers (24h delayed). 14-day Premium trial for the full ~2,500-ticker universe, no card. tapeline.io if you want to give it a shot." |
-| Pushback / methodological critique | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently. Would you write the case for a different weighting?" |
-| Silence after 7 days | Move on. Don't re-DM. |
+## Cadence
+
+**5-10 substantive replies per week, not 30 cold DMs in 6 days.**
+
+This is a sustainable founder-cadence channel, not a sprint. The metric that matters is **conversations the reply starts** (OP replies back, or another fintwit account quote-tweets the exchange). Volume isn't the goal; resonance is.
+
+Recommended pattern:
+
+- Mon/Wed/Fri morning (45 min each): scan the CSV's `verification_status = verified-active` rows + any fresh discoveries, draft 2-3 replies, post.
+- Track replies in a flat text log (see Tracking section below).
+
+If a reply starts a conversation in DMs (rare but happens), the existing DM-response table in the previous version of this doc still applies — drop into the same reply tables.
+
+---
+
+## What about DMs at all?
+
+Reserve DMs for accounts where:
+
+- **The account follows `@tapeline_io` back** (DM lands in the primary inbox, not Message Requests).
+- **DMs are explicitly open AND the OP has previously engaged with a Tapeline reply.** A reply that got a like is a soft signal the door is open.
+
+For those narrow cases the original DM template (preserved in git history if needed) is still fine. Cold DMs to strangers from a 0-follower account is not the play.
+
+---
+
+## What if they reply to your reply?
+
+| Reply type                              | Response                                                                                                                                                                              |
+|-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| "Interesting, what's the formula?"      | Link to /how-it-works. Don't paste the formula — getting them onto the site lets Vercel Analytics attribute the click.                                                                |
+| "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the live forward-test — every miss stays on the page."                                                                |
+| "What about $[other ticker]?"           | Run the curl, paste the breakdown in the thread. Be willing to spend 2-3 replies going deep on their actual ticker of interest before any soft CTA.                                   |
+| "Are you the founder?"                  | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula."                                                             |
+| "How do I try it?"                      | "Free tier covers top 20 tickers (24h delayed). 14-day Premium trial for the full universe, no card. tapeline.io if you want to give it a shot."                                      |
+| Pushback / methodological critique      | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently."           |
+| Silence after the OP reads it           | Move on. The followers who saw the exchange got the value either way.                                                                                                                 |
+
+---
 
 ## Tracking
 
-Append to a simple text file as you go:
+Append to a flat text file as you go:
 
 ```
-2026-05-14 09:15 | @AltaFoxCapital | DMed re: $XYZ thread | sent
-2026-05-14 09:22 | @1MainCapital  | DMed re: $ABC thesis | sent
-2026-05-14 09:30 | @JohnHuber72   | account dormant 12d | SKIPPED
-...
-2026-05-16 14:00 | @AltaFoxCapital | replied, asked about back-test | replied with /how-it-works
-2026-05-18 11:00 | @SuperMugatu   | replied, asked about $TICKER short signal | back-and-forth 4 msgs, soft CTA on /scorecard
+2026-05-17 09:15 | @SomeAccount    | replied re: $XYZ thread          | live, 0 replies
+2026-05-17 09:22 | @AnotherAccount | replied re: $ABC thesis          | live, OP liked
+2026-05-19 14:00 | @SomeAccount    | OP replied asking back-test      | replied with /how-it-works
 ```
 
-At end of the 6-day cadence, count:
-- DMs sent / DMs replied / replies that engaged 3+ messages / replies that visited the site (Vercel Analytics will show `?utm_source=fintwit_dm` traffic)
+End of week, count:
 
-The metric that matters: **conversations that engaged 3+ messages**. That's the leading indicator of viral mention (the account is now anchored on Tapeline; they're plausibly going to reference it in a public tweet).
+- Replies posted / replies that got the OP to engage / replies that pulled traffic (Vercel Analytics `?utm_source=fintwit_reply`).
+
+**The metric that matters**: conversations the OP engaged with (3+ exchanges) and / or quote-tweets of the exchange. Those are leading indicators of viral mention.
+
+---
 
 ## UTM tags
 
-If you need to send a URL in DM, append: `?utm_source=fintwit_dm&utm_content=<their_handle_short>`. Example:
+If you include a link in a reply, append:
+
 ```
-https://tapeline.io/scorecard?utm_source=fintwit_dm&utm_content=altafox
+?utm_source=fintwit_reply&utm_content=<their_handle_short>
+```
+
+Example:
+
+```
+https://tapeline.io/t/XYZ?utm_source=fintwit_reply&utm_content=supermugatu
 ```
 
 Vercel Analytics segments these automatically.
 
-## Account-selection criteria for swapping out dormant entries
+---
 
-If you skip ≥ 10 of the 30 for dormancy or focus shift, refill from the canonical sources:
+## Brand-safety rules (non-negotiable)
 
-1. **The Bear Cave's "100 Must Follow Financial Twitter Accounts"** (thebearcave.substack.com/p/100-must-follow-financial-twitter) — periodically refreshed list of small-fund + analyst accounts. Most accounts on it fit the 5K-100K range and post ticker-specific work.
-2. **Capital Employed's "49 Fintwit Accounts to Follow for Small/Micro Cap Investors"** (capitalemployed.com/p/49-fintwit-accounts-to-follow-for) — microcap-tilted list.
-3. **Filter rule for swaps**: 5K-100K followers, ≥ 3 ticker-specific tweets in the last 7 days, US-market focus (Australia / Asia / Europe are valid but lower-priority since Tapeline is currently US-only).
+- Never reply with a `/pricing` link.
+- Never reply with promotional language that doesn't add substance to the conversation.
+- Never reply twice to the same OP in the same week.
+- Never argue in a public reply. If the OP is hostile, stop — let them be hostile in front of their own audience.
+- Never auto-reply / template-reply. Every reply is hand-crafted off the OP's actual recent tweet.
+
+---
+
+## Account-selection criteria for adding new entries
+
+The CSV still has 30 rows. Most are unworkable as of today, but the column structure carries names worth re-checking quarterly. If you want to grow the active set:
+
+1. **The Bear Cave's "100 Must Follow Financial Twitter Accounts"** (thebearcave.substack.com/p/100-must-follow-financial-twitter) — periodically refreshed.
+2. **Capital Employed's "49 Fintwit Accounts to Follow for Small/Micro Cap Investors"** (capitalemployed.com/p/49-fintwit-accounts-to-follow-for) — microcap-tilted.
+3. **Filter rule for new adds**: 5K-100K followers, ≥ 3 ticker-specific tweets in the last 7 days, US-market focus, public profile.
+
+Add as `verification_status = unverified` until you've personally opened the profile and confirmed it passes the four filter criteria above.
+
+---
+
+## Re-audit cadence
+
+Re-audit `fintwit_list.csv` every 2-3 months. Account state on fintwit drifts heavily — handles get transferred, profiles flip to protected, accounts go dormant for a quarter then come back. The 2026-05-17 audit found 5 of 5 priority-1 entries unworkable; a 2024 list aged that hard in 18 months.
+
+Per re-audit:
+
+1. Open each row's profile.
+2. Update `verification_status` based on the rubric:
+   - `verified-active` — public, posts ≤ 7 days ago, posts US tickers.
+   - `verified-stale` — public but no posts > 7 days.
+   - `verified-protected` — protected profile.
+   - `verified-closed-dms` — public but no DM icon (DMs disabled).
+   - `verified-handle-transferred` — handle is no longer the original owner.
+   - `unverified` — not yet audited.
+3. Update `recommended_action`:
+   - `reply` — passes all four filter criteria (default for verified-active accounts).
+   - `dm-if-open` — reserve for accounts following `@tapeline_io` back AND have open DMs (extremely rare for a fresh account).
+   - `skip` — verified-stale, verified-protected, verified-closed-dms, verified-handle-transferred.
+
+Don't delete rows — mark status so a future re-audit can re-check.
