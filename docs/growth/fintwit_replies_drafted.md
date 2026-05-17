@@ -127,6 +127,21 @@ moderation concerns. Marked `verified-inactive` in
 
 ---
 
+## Live state — 2026-05-17 (Sunday, ready to post)
+
+All four reply boxes are **pre-filled in Chrome tabs** on @tapeline_io. One
+click each to post.
+
+| Account | Target tweet URL | Final reply (typed in-box) | Char count |
+| --- | --- | --- | --- |
+| @JohnHuber72 | [/status/2054750425400725579](https://x.com/JohnHuber72/status/2054750425400725579) | "HFs are loaded, but the tape's softening — NVDA 52, AVGO 47, AMD 56 on our composite. Momentum sub-scores 23 / 50 / 25 across the three; NVDA reads "thrust fading on lighter volume." Crowd quadrupling allocation while leadership thins is a classic late-cycle pattern." | 267 |
+| @TSOH_Investing | [/status/2055302355197771901](https://x.com/TSOH_Investing/status/2055302355197771901) | "Same divergence in our composite: ABNB 60 CONSTRUCTIVE (momentum at 6-month high, RS tilting up vs peers) vs BKNG 41 NEUTRAL ("breakdown from prior support, no reclaim," macro sub-score 19). Operational data and the tape are agreeing for once — usually they argue." | 264 |
+| @HaydenCapital | [/status/2047689738237485368](https://x.com/HaydenCapital/status/2047689738237485368) | "Caught the @DrewCohenMoney pod. $APP composite reads 64 CONSTRUCTIVE today — momentum 100, macro 85, smart-money 80, thrust signal triggered. Concentrated-compounder thesis still showing up in the smart-money sub-score 3 weeks later." | 233 |
+| @TidefallCapital | [/status/2055841202059030786](https://x.com/TidefallCapital/status/2055841202059030786) | "US software comp echoes it: MSFT 58 CONSTRUCTIVE (uptrend intact, RS tilting up), CRM 40 NEUTRAL ("underperforming sector every timeframe"), ORCL 44 NEUTRAL ("breakdown, no reclaim"). "More than code" is printing as a widening gap between compounders and the tail." | 264 |
+
+Founder: click Reply on each tab to post. If you want to edit before posting,
+the text is already in the box.
+
 ## Posting order + cadence
 
 PR #80 strategy: 5–10 substantive replies per week, hand-crafted, no
