@@ -332,51 +332,71 @@ async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
 def parse_spike_intelligence_csv(text: str) -> list[dict[str, Any]]:
     """Parse the SPIKE INTELLIGENCE tab into normalized squeeze rows.
 
-    Column order in the sheet (as of 2026-05-16):
-      A ticker, B last, C move_bar_pc, D move_day_pc, E volume_multipl,
-      F source, G (unused), H score, I signal, J last_timestamp,
-      K snapshot_time, L yahoo_sym, M data_provid, N prev_bar,
-      O day_open, P last_volume, Q data_age_minute, R data_status,
-      S ref_price, T source_confidence, U decision_gate
+    Schema changed by the signal-system around 2026-05-17 — the tab is now
+    per-ticker-spike (not per-day-spike), with columns:
+
+      A Spike Rank, B Ticker, C Buy By, D Time Window, E Stage,
+      F Entry Trigger, G Stop / Risk, H Price, I Spike Score,
+      J Spike Direction, K Type, L Spike Urgency, M Suggested Window,
+      N Buy Timing, O Decision, P Score, Q Source Confidence,
+      R Source Notes, S Volume Expansion, T RSI14, U OBV Trend,
+      V Breakout Type, W Spike Reasons, X Why This May Move,
+      Y Main Risk, Z Core Signal, AA Hold Duration
 
     Maps to Tapeline's SqueezeSetup model:
-      ticker            → symbol
-      move_day_pc       → spike_score (clamped 0-100 from the absolute %)
-      volume_multipl    → volume_multiple
-      source_confidence → obv_trend (rough proxy; we strip the "(N/100)" suffix)
-      decision_gate     → breakout_type
-      source            → suggested_window (the tab classifies windows)
-      decision_gate     → reason (verbatim)
+      Ticker              → symbol
+      Spike Score         → spike_score (already 0-100 from the sheet)
+      Volume Expansion    → volume_multiple
+      OBV Trend           → obv_trend (cleaned, capped at 20 chars)
+      Breakout Type       → breakout_type (capped at 40 chars)
+      Suggested Window    → suggested_window
+      Spike Reasons       → reason (the customer-facing "why")
 
-    squeeze_days isn't in the sheet — the signal-system doesn't expose how
-    many days a ticker has been in a tight range. We default to 0 and rely
-    on Tapeline's own squeeze detection (services/squeeze.py) to fill that
-    in for the tickers it independently flags.
+    Rows where Spike Score is blank (header re-declarations, section
+    separators, or "no rank yet" rows from the signal-system) are
+    filtered out so the upsert doesn't write junk.
+
+    squeeze_days still isn't in the sheet — signal-system doesn't track
+    days-in-tight-range. Default to 0 and let Tapeline's own
+    services/squeeze.py layer that in for tickers it independently flags.
     """
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = (raw.get("ticker") or "").strip().upper()
+        symbol = (raw.get("Ticker") or "").strip().upper()
         if not symbol or symbol == "TICKER" or len(symbol) > 12:
             continue
+        # Skip section headers / blank rows. The sheet sometimes has
+        # category dividers with non-ticker-looking content in column B.
+        if symbol.startswith("-") or symbol.startswith("="):
+            continue
 
-        move_day = _parse_float(raw.get("move_day_pc"))
-        # spike_score: absolute day move, clamped 0-100. A 5% move scores 50,
-        # 10%+ scores 100. Direction is folded in via decision_gate text so
-        # the spike_score itself measures intensity not direction.
-        spike_score = None
-        if move_day is not None:
-            spike_score = max(0.0, min(100.0, abs(move_day) * 10.0))
+        spike_score = _parse_float(raw.get("Spike Score"))
+        # Rows without a spike score are not actionable signals (headers,
+        # blanks, or "in-progress" placeholders). Skip them entirely.
+        if spike_score is None:
+            continue
+
+        # Volume Expansion comes through as a number like "1.5" (multiplier).
+        # If blank, default 1.0 (= "average volume") rather than 0 so the
+        # downstream UI doesn't render a misleading "0x volume" badge.
+        volume_mult = _parse_float(raw.get("Volume Expansion")) or 1.0
 
         rows.append({
-            "symbol":         symbol,
-            "spike_score":    spike_score if spike_score is not None else 0.0,
-            "squeeze_days":   0,           # not exposed by the sheet
-            "volume_multiple": _parse_float(raw.get("volume_multipl")) or 1.0,
-            "obv_trend":      _strip_confidence_suffix(raw.get("source_confidence")),
-            "breakout_type":  _short(raw.get("decision_gate"), 40),
-            "suggested_window": _short(raw.get("source"), 40) or "—",
-            "reason":         _short(raw.get("decision_gate"), 300) or "Flagged by signal-system spike intelligence",
+            "symbol":           symbol,
+            "spike_score":      max(0.0, min(100.0, spike_score)),
+            "squeeze_days":     0,
+            "volume_multiple":  volume_mult,
+            "obv_trend":        _strip_confidence_suffix(raw.get("OBV Trend")),
+            "breakout_type":    _short(raw.get("Breakout Type"), 40),
+            "suggested_window": _short(raw.get("Suggested Window"), 40) or "—",
+            # "Spike Reasons" is the customer-facing summary string; fall
+            # back to "Why This May Move" if Reasons is blank.
+            "reason": (
+                _short(raw.get("Spike Reasons"), 300)
+                or _short(raw.get("Why This May Move"), 300)
+                or "Flagged by signal-system spike intelligence"
+            ),
         })
     return rows
 
