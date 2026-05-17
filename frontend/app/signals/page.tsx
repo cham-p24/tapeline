@@ -1,22 +1,21 @@
 /**
- * PUBLIC universe view — every Tapeline-scored ticker, no auth required.
+ * PUBLIC universe view — preview of every Tapeline-scored ticker.
  *
- * Companion to /scorecard. Where /scorecard shows the daily top-10 picks
- * back-checked against SPY (trust mechanism for the picks), /signals
- * shows the FULL UNIVERSE with current composite scores (trust mechanism
- * for the breadth). Together they're the "public formula, public
- * scorecard, public everything" brand stance made literal.
+ * Anonymous visitors see the top 10 rows + signup CTA. Signed-in users
+ * see the full universe. The aggregate counts row stays visible to all
+ * (it sells the breadth of coverage without giving the actual rows away).
  *
- * Distinct from /app/scanner: the paid scanner's value moves to its
- * features (filter UX, watchlist, alerts, exports). This page is
- * read-only — no filter chips, no sort dropdowns, no save-screener.
- * Sorting via URL param (?sort=score) keeps it crawlable; users who
- * want richer slicing convert to Pro.
+ * Pivoted 2026-05-17 from fully-public to a preview wall. The trust
+ * mechanism (public formula, public scorecard) stays intact on /scorecard;
+ * /signals is the "what's live right now" demo, and the preview wall
+ * gives anonymous visitors a real taste while turning every scroll
+ * past row 10 into a signup CTA.
  *
- * Server-rendered for SEO. Revalidates every 5 minutes (matches the
- * sheet-feed refresh cadence in services/sheet_feed.py so the page
- * never shows staler data than the sheet itself).
+ * Now dynamic (per-request) because we read the session cookie to decide
+ * which view to render. Previously had `revalidate = 300` for static
+ * caching — that's gone; the page is cheap enough to render fresh.
  */
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
@@ -24,14 +23,17 @@ import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-export const revalidate = 300;
+// Number of rows shown to anonymous visitors before the signup gate.
+// Big enough to demonstrate the product (top 10 = clear ranking with
+// real signals and prices); small enough that the rest of the universe
+// is genuinely behind the wall.
+const PREVIEW_ROWS = 10;
 
 export const metadata = pageMeta({
   title: "All Tapeline-Scored Tickers — Live Universe with Public 6-Factor Score",
   description:
     "Every US stock Tapeline scores, ranked by the live 0-100 composite. " +
-    "Same published formula as our public scorecard; no signup, no paywall. " +
-    "Each ticker links to its score breakdown.",
+    "Same published formula as our public scorecard. Sign up to see the full universe.",
   path: "/signals",
 });
 
@@ -125,7 +127,19 @@ export default async function SignalsPage() {
   const data = await fetchSignals();
   const items = data?.items ?? [];
 
+  // Gate: signed-in users see everything, anonymous visitors see the top
+  // PREVIEW_ROWS. The session cookie is set by /api/auth/signup + signin
+  // on the api.tapeline.io subdomain with Domain=tapeline.io, so it's
+  // visible here. We don't validate the JWT — that's the backend's job
+  // on the actual /api/* calls. Presence is enough to decide the gate.
+  const isSignedIn = !!(await cookies()).get("tapeline_session")?.value;
+  const visibleItems = isSignedIn ? items : items.slice(0, PREVIEW_ROWS);
+  const hiddenCount = Math.max(0, items.length - visibleItems.length);
+
   // Bucket the universe by signal tier for the headline counts row.
+  // Always computed on the FULL universe — anonymous visitors still
+  // see the total breadth, which sells the gate ('580 high-conviction
+  // names, sign up to see them all').
   const bucket = (label: string) =>
     items.filter((r) => r.signal === label).length;
   const counts = {
@@ -161,8 +175,15 @@ export default async function SignalsPage() {
           <Link href="/scorecard" className="link">
             back-checked scorecard
           </Link>
-          . Read the page or tap any ticker for the score breakdown. No signup
-          required.
+          .{" "}
+          {isSignedIn ? (
+            "Read the page or tap any ticker for the score breakdown."
+          ) : (
+            <>
+              Anonymous visitors see the top {PREVIEW_ROWS} —{" "}
+              <Link href="/signup" className="link">sign up free</Link> for the full universe.
+            </>
+          )}
         </p>
 
         {/* Aggregate counts by tier — gives a snapshot of the universe at
@@ -204,7 +225,7 @@ export default async function SignalsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {items.map((r) => (
+                {visibleItems.map((r) => (
                   <tr key={r.symbol} className="hover:bg-panel/40">
                     <td className="py-2 pl-4 pr-3">
                       <Link
@@ -267,6 +288,36 @@ export default async function SignalsPage() {
           </div>
         )}
 
+        {/* Anonymous visitors get the conversion-shaped CTA right under the
+            preview rows. Signed-in users get the lower-key 'want filters?'
+            upsell instead. Two distinct asks — don't merge them. */}
+        {!isSignedIn && hiddenCount > 0 ? (
+          <div className="mt-6 overflow-hidden rounded-xl border border-accent/30 bg-gradient-to-br from-accent/10 via-panel to-panel">
+            <div className="p-6 sm:p-8 text-center">
+              <p className="eyebrow text-accent">{hiddenCount.toLocaleString()} more tickers behind the wall</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                Sign up free to see the full universe.
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
+                You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
+                Free account unlocks the rest, with a 14-day Premium trial — no card,
+                same public 6-factor formula on every row.
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <Link href="/signup?next=/signals" className="btn-primary">
+                  Start free trial &rarr;
+                </Link>
+                <Link href="/pricing" className="btn-ghost">
+                  See pricing
+                </Link>
+              </div>
+              <p className="mt-4 text-xs text-subtle">
+                Already have an account? <Link href="/signin?next=/signals" className="link">Sign in</Link>.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         <p className="mt-6 text-sm text-muted">
           <strong className="text-fg">Reading this page.</strong>{" "}
           <em>Score</em> is the composite 6-factor 0–100. <em>Signal</em> is the
@@ -281,19 +332,21 @@ export default async function SignalsPage() {
           .
         </p>
 
-        <div className="mt-8 rounded-xl border border-border bg-panel p-6">
-          <p className="text-sm text-muted">
-            Want to filter, sort, screen, and set alerts on these signals?
-          </p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <Link href="/signup" className="btn-primary">
-              Start a free Premium trial &rarr;
-            </Link>
-            <Link href="/pricing" className="btn-ghost">
-              See pricing
-            </Link>
+        {isSignedIn && (
+          <div className="mt-8 rounded-xl border border-border bg-panel p-6">
+            <p className="text-sm text-muted">
+              Want to filter, sort, screen, and set alerts on these signals?
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link href="/app/scanner" className="btn-primary">
+                Open the live scanner &rarr;
+              </Link>
+              <Link href="/pricing" className="btn-ghost">
+                See pricing
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <TransparencyStrip current="/signals" />

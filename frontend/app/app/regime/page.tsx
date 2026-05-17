@@ -81,7 +81,11 @@ export default function RegimePage() {
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Kpi label="VIX" value={r.vix.toFixed(2)} />
-            <Kpi label="Dollar Index (DXY)" value={r.dxy.toFixed(2)} />
+            {/* FRED series DTWEXBGS — broad trade-weighted USD index, not
+                ICE DXY. Reads ~115-125 right now; ICE DXY (the futures
+                contract most traders watch) is ~100-110. Label kept honest
+                to the source. */}
+            <Kpi label="USD Broad Index" value={r.dxy.toFixed(2)} />
             <Kpi label="10Y Yield" value={r.yield_10y.toFixed(3) + "%"} />
             <Kpi label="Rate direction" value={r.rate_direction} />
             <Kpi label="Breadth (above 200DMA)" value={r.breadth_pct.toFixed(1) + "%"} />
