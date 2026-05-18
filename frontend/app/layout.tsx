@@ -15,6 +15,14 @@ const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "";
 const PLAUSIBLE_SCRIPT =
   process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT || "https://plausible.io/js/script.js";
 
+// Google Analytics 4 measurement ID. Defaults to the production property
+// (G-YRK73W9NS9) so prod tracks without env config; override via
+// NEXT_PUBLIC_GA4_ID for staging/preview deploys, or set to empty string
+// to disable on a specific environment. GA4 powers the GSC ↔ signup
+// attribution loop — Search Console shows what query brought a visitor,
+// GA4 shows what they did after (event "sign_up" on the success page).
+const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
+
 // Title template is "%s" so each page owns its full <title>. Putting the
 // brand suffix in the template double-applies it on pages that already
 // include " — Tapeline" in their own title (most of them do, for SEO).
@@ -286,6 +294,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             view; Vercel adds per-route + Web Vitals). */}
         <Analytics />
         <SpeedInsights />
+        {/* Google Analytics 4 — loaded after-interactive so it never blocks
+            first paint or interactivity. Two scripts per Google docs: (1)
+            the gtag loader; (2) the inline config. Once mounted, fire events
+            with `gtag('event','sign_up')` from any client component (see
+            lib/gtag.ts for the typed helper). Cross-references with Search
+            Console under GSC → Settings → Associations so query data flows
+            into GA4's Acquisition reports. */}
+        {GA4_ID && (
+          <>
+            <Script
+              id="ga4-loader"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script
+              id="ga4-config"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${GA4_ID}');
+                `,
+              }}
+            />
+          </>
+        )}
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)
             via <div className="cf-turnstile">. The script self-discovers them. */}

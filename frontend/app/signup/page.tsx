@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/gtag";
 import { authApi } from "@/lib/auth";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
@@ -77,9 +78,11 @@ function SignUpForm() {
   }, []);
 
   // Funnel event: fired once on mount when a real human sees the signup form.
-  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics.
+  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics
+  // + GA4 (typed event names — see lib/gtag.ts).
   useEffect(() => {
     track("signup_started", { next });
+    trackEvent("sign_up_started", { next });
   }, [next]);
 
   async function submit(e: React.FormEvent) {
@@ -116,8 +119,12 @@ function SignUpForm() {
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
       // trial event on the same beat. Property `oauth: false` lets us segment
       // form-vs-OAuth conversion later when OAuth tracking lands.
+      // Mirror to GA4 so Search Console can attribute the query → signup
+      // chain via Acquisition reports.
       track("signup_completed", { method: "email", next });
       track("trial_started", { tier: "premium", days: 14, method: "email" });
+      trackEvent("sign_up", { method: "email" });
+      trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
       // Route through /app/onboarding first — captures investor profile +
       // attribution + marketing-opt-in before they hit the product. The
       // onboarding page redirects to `next` after submit or skip. Existing
