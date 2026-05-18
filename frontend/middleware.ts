@@ -51,6 +51,15 @@ function localeForCountry(country: string | undefined): string {
 }
 
 export function middleware(request: NextRequest) {
+  // Case-normalize ticker URLs first — catches lowercase backlinks like
+  // /t/aapl → 301 to /t/AAPL. Without this, every lowercase variant
+  // 404s and shows up in GSC's "Not found" report. Permanent redirect
+  // (308) so search engines treat the uppercase form as canonical and
+  // pass any backlink equity through. Returns early so auth+locale
+  // don't run on the rewrite request.
+  const normalized = normalizeTickerCase(request);
+  if (normalized) return normalized;
+
   const response = handleAuth(request);
 
   // Set/refresh the locale cookie on every response. Vercel injects
@@ -75,6 +84,38 @@ export function middleware(request: NextRequest) {
     }
   }
   return response;
+}
+
+/**
+ * Routes whose final path segment is a ticker symbol. Lowercase variants
+ * (e.g. /t/aapl) 404 because Next's dynamic segments are case-sensitive
+ * and our generated params + render path use uppercase. Redirect to the
+ * uppercase canonical so backlinks from the wild (which often lowercase
+ * symbols out of habit) don't burn link equity into a 404.
+ *
+ * Patterns covered:
+ *   /t/{SYMBOL}
+ *   /scorecard/{SYMBOL}
+ *   /blog/ticker/{SYMBOL}
+ *
+ * Symbols are 1-6 alpha + optional dot-suffix (BRK.B). The matcher
+ * tolerates anything in that shape; non-ticker garbage (e.g. /t/foo-bar)
+ * falls through to Next's normal 404 handling.
+ */
+const TICKER_ROUTE_RE = /^\/(t|scorecard|blog\/ticker)\/([a-z]{1,6}(?:\.[a-z])?)$/;
+
+function normalizeTickerCase(request: NextRequest): NextResponse | null {
+  const pathname = request.nextUrl.pathname;
+  const m = TICKER_ROUTE_RE.exec(pathname);
+  if (!m) return null;
+  const [, prefix, symbol] = m;
+  const upper = `/${prefix}/${symbol.toUpperCase()}`;
+  if (upper === pathname) return null;
+  const target = new URL(upper, request.url);
+  // Preserve query + hash so links like /t/aapl?ref=hn keep their UTM.
+  target.search = request.nextUrl.search;
+  target.hash = request.nextUrl.hash;
+  return NextResponse.redirect(target, 308);
 }
 
 function handleAuth(request: NextRequest) {

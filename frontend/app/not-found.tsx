@@ -1,4 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+// Tell crawlers not to index the 404 page itself. Without this, Google's
+// "soft 404" detector will sometimes index the page template and report
+// "Not found (404)" indexing issues even when the URL was a legitimate
+// 404 result. Explicit noindex closes that loop.
+export const metadata: Metadata = {
+  title: "Not found — Tapeline",
+  robots: { index: false, follow: true },
+};
 
 export default function NotFound() {
   return (
