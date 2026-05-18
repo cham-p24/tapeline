@@ -608,6 +608,92 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
+def render_subscription_started_email(
+    user_name: str,
+    tier: str,
+    billing_period: str = "monthly",
+    amount_cents: int | None = None,
+    currency: str = "usd",
+    next_charge_iso: str | None = None,
+) -> str:
+    """Welcome-to-paid. Fires once on the FIRST `customer.subscription.created`
+    Stripe webhook for a user (replay-safe via stripe_webhook_events dedup +
+    the "no prior Subscription row" check at the webhook site).
+
+    Tone:
+      - Receipt-clean (acknowledge what they just paid for)
+      - Quietly celebratory ("you're in")
+      - Two concrete next steps, not three (less overwhelming than the day-0
+        welcome which is for trial users with no commitment yet)
+      - Acknowledges the 7-day refund window without leading with it
+
+    Arguments map directly to fields available on the Stripe subscription
+    object in the webhook handler — see routers/webhooks.py.
+    """
+    tier_label = tier.capitalize()
+    period_label = "year" if billing_period == "annual" else "month"
+    if amount_cents is not None and amount_cents > 0:
+        dollars = amount_cents / 100
+        price_line = f"${dollars:.2f} {currency.upper()} per {period_label}"
+    else:
+        # Fallback to the canonical sticker prices if the webhook didn't carry
+        # an amount (shouldn't happen but better than printing nothing).
+        sticker = {
+            ("pro", "monthly"): "$29.99/mo",
+            ("pro", "annual"): "$299.99/yr",
+            ("premium", "monthly"): "$49.99/mo",
+            ("premium", "annual"): "$479.99/yr",
+        }.get((tier.lower(), billing_period), "")
+        price_line = sticker
+    next_charge_line = ""
+    if next_charge_iso:
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(next_charge_iso.replace("Z", "+00:00"))
+            next_charge_line = f"Next charge: {dt.strftime('%b %d, %Y')}."
+        except Exception:
+            next_charge_line = ""
+    return shell(
+        h1(f"You're in, {user_name}.")
+        + lead(
+            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your full data "
+            f"feed is live — every score live-updating, every alert channel on, "
+            f"the full universe scanner unlocked."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your subscription</div>'
+            f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">Tapeline {tier_label} · {price_line}</div>'
+            f'<div class="tl-muted" style="margin-top:4px;font-size:13px;color:{LIGHT_MUTED};font-family:{FONT_SANS};">{next_charge_line}</div>',
+            accent=True,
+        )
+        + muted_paragraph(
+            "Two things worth doing in the first session:"
+        )
+        + card(
+            f"""
+            <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
+              <li><strong>Build your watchlist</strong> — add the names you actually
+                  trade. Alerts fire the moment any score crosses your threshold.</li>
+              <li><strong>Pick a notification channel</strong> — email's on by default,
+                  but {tier_label} can also fire {("Telegram " if tier.lower() == "premium" else "")}browser push and
+                  the daily briefing. <a href="https://tapeline.io/app/settings/email"
+                  style="color:{ACCENT};">Channel settings</a>.</li>
+            </ol>
+            """
+        )
+        + button(
+            "Open the scanner",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=subscription_started&utm_medium=transactional",
+        )
+        + footnote(
+            "Changed your mind? <a href=\"https://tapeline.io/legal/refund\" "
+            f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">7-day money "
+            "back, no questions</a> — just reply to this email and we'll refund in full."
+        ),
+        preheader=f"Welcome to Tapeline {tier_label} — your full data feed is live.",
+    )
+
+
 def render_payment_failed_email(
     user_name: str, tier: str, attempt_count: int = 1,
 ) -> str:

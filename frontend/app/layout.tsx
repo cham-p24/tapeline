@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
+import { PostHogProvider } from "@/components/PostHogProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
@@ -273,7 +274,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <ThemeProvider>
-          <UserProvider>{children}</UserProvider>
+          <UserProvider>
+            <PostHogProvider>{children}</PostHogProvider>
+          </UserProvider>
         </ThemeProvider>
         {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
             config needed — auto-detects when deployed on Vercel and is a
