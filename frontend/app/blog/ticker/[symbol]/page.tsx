@@ -320,7 +320,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
               Open the live {t.symbol} page &rarr;
             </Link>
             <Link href="/signup" className="btn-ghost">
-              Start 14-day trial
+              Try Premium free
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

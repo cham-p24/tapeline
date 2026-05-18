@@ -240,7 +240,7 @@ export default function AboutPage() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Start 14-day trial →
+              Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the scorecard

@@ -237,7 +237,7 @@ export default function BillingPage() {
           {tier === "free" && (
             <div className="mt-6">
               <Link href="/signup" className="btn-accent text-sm">
-                Start 14-day Premium trial →
+                Try Premium free for 14 days →
               </Link>
             </div>
           )}

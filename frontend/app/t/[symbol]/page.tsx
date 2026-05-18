@@ -348,7 +348,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href={`/signup?next=${encodeURIComponent(`/app/ticker/${sym}`)}`} className="btn-accent">
-              Start 14-day Premium trial →
+              Try Premium free for 14 days →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

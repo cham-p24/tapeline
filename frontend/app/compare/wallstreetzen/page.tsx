@@ -221,7 +221,7 @@ export default function VsWallStreetZenPage() {
           Free tier is hard-capped on purpose (20 tickers, 24h delayed). Start the trial to see the live product properly. No card.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup" className="btn-primary">Start free trial →</Link>
+          <Link href="/signup" className="btn-primary">Try Premium free →</Link>
           <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">

@@ -45,7 +45,7 @@ export function Paywall({
               <Link href="/app/billing" className="btn-primary">Upgrade &rarr;</Link>
             ) : (
               <Link href={`/signup?next=${encodeURIComponent("/app/billing")}`} className="btn-primary">
-                Start free trial &rarr;
+                Try Premium free &rarr;
               </Link>
             )}
             <Link href="/#pricing" className="btn-ghost">See all plans</Link>
@@ -68,7 +68,7 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
       <span className="text-muted">
         Upgrade to unlock this data.{" "}
         <Link href={user ? "/app/billing" : "/signup"} className="text-accent underline">
-          {user ? "Upgrade" : "Start 14-day trial"} &rarr;
+          {user ? "Upgrade" : "Try Premium free"} &rarr;
         </Link>
       </span>
     </div>
