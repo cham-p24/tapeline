@@ -42,7 +42,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn-primary text-base">
-                Start 14-day trial &rarr;
+                Try Premium free for 14 days &rarr;
               </Link>
               <Link href="/scorecard" className="btn-ghost text-base">
                 See the record
@@ -249,7 +249,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
-              Start free trial &rarr;
+              Try Premium free &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost text-base">
               See pricing

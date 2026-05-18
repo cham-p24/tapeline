@@ -92,7 +92,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/signup" className="btn-accent">
-              Start free trial &rarr;
+              Try Premium free &rarr;
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

@@ -102,7 +102,7 @@ export default function PricingPage() {
 
           <div className="mt-10 text-center">
             <Link href="/signup" className="btn-accent inline-flex h-11 px-6 text-base">
-              Start 14-day trial &rarr;
+              Try Premium free for 14 days &rarr;
             </Link>
             <p className="mt-3 text-xs text-subtle">
               No credit card required ·{" "}

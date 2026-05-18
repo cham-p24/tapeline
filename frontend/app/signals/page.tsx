@@ -305,7 +305,7 @@ export default async function SignalsPage() {
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">
-                  Start free trial &rarr;
+                  Try Premium free &rarr;
                 </Link>
                 <Link href="/pricing" className="btn-ghost">
                   See pricing

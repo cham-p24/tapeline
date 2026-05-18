@@ -198,7 +198,7 @@ export default function HowItWorksPage() {
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
         <p className="mt-3 text-muted">14-day Premium trial. No credit card.</p>
         <Link href="/signup" className="btn-accent mt-8 inline-flex h-11 px-6 text-base">
-          Start free trial &rarr;
+          Try Premium free &rarr;
         </Link>
       </section>
 
