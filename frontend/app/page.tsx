@@ -4,6 +4,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { LiveCounters } from "@/components/LiveCounters";
 import { FadeIn } from "@/components/FadeIn";
+import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
   return (
@@ -168,6 +169,58 @@ export default function LandingPage() {
                 cherry-picking, no hindsight edits.
               </Step>
             </FadeIn>
+          </div>
+        </div>
+      </section>
+
+      {/* FROM THE BLOG — surfaces every methodology + transparency post
+          from the homepage. Two jobs:
+          (1) Visitor: deeper reads for the curious before they sign up.
+          (2) Google crawler: internal-link path from the highest-PageRank
+              page on the site (homepage) to every blog post. Without this
+              widget the blog posts were stranded in "Discovered - currently
+              not indexed" because no high-authority page linked to them
+              and Google's crawl budget for a new domain never reached
+              /blog → individual post. Posts are sorted newest-first; show
+              the most recent 6 inline + "see all" link to /blog. */}
+      <section className="border-t border-border bg-panel/10">
+        <div className="mx-auto max-w-6xl px-6 py-24">
+          <p className="eyebrow text-accent">From the blog</p>
+          <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+            How the score works, on the record.
+          </h2>
+          <p className="mt-4 max-w-2xl text-muted">
+            Methodology notes, design choices, and accountability writeups.
+            Every post is anchored to public data — no opinion-only takes.
+          </p>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {POSTS.slice(0, 6).map((p) => (
+              <FadeIn key={p.slug} delayMs={0}>
+                <Link
+                  href={`/blog/${p.slug}`}
+                  className="block h-full rounded-2xl border border-border bg-panel/40 p-6 transition hover:border-accent/40 hover:bg-panel/60"
+                >
+                  <p className="text-xs font-mono text-subtle">
+                    {new Date(p.publishedAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <h3 className="mt-3 text-lg font-semibold tracking-tight leading-snug">
+                    {p.title}
+                  </h3>
+                  <p className="mt-3 text-sm text-muted leading-relaxed line-clamp-4">
+                    {p.excerpt}
+                  </p>
+                </Link>
+              </FadeIn>
+            ))}
+          </div>
+          <div className="mt-10">
+            <Link href="/blog" className="link text-sm">
+              See all {POSTS.length} posts &rarr;
+            </Link>
           </div>
         </div>
       </section>
