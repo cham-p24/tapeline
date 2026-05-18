@@ -239,6 +239,11 @@ function SignUpForm() {
               <span className="text-fg">Pro from $24.99/mo</span> for the full
               live universe. No card on file means no surprise charge.
             </p>
+            <p className="mt-2 text-[11px] text-subtle">
+              <span className="text-muted">7-day money back</span> if you change your mind ·
+              Cancel in one click ·{" "}
+              <Link href="/legal/refund" className="link">Full refund policy</Link>
+            </p>
           </div>
 
           <p className="mt-6 text-center text-sm text-muted">
