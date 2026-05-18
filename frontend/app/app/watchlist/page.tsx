@@ -53,11 +53,14 @@ export default function WatchlistPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api.watchlist();
+      // Phase A: pass activeId so the items table narrows to the active
+      // tab. activeId=null → no filter → all items across all lists
+      // (matches the legacy single-list behaviour exactly).
+      const r = await api.watchlist(activeId);
       setItems(r.items);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, []);
+  }, [activeId]);
 
   // Refresh the user's lists. Called on mount + after creating a new list.
   const loadLists = useCallback(async () => {
