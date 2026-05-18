@@ -254,7 +254,7 @@ export default function BestFinvizAlternativesPage() {
           <h2 className="text-xl font-semibold">At a glance</h2>
           <div className="mt-4 card overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
                 <tr>
                   <th className="px-3 py-3 text-left">#</th>
                   <th className="px-3 py-3 text-left">Tool</th>

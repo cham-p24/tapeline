@@ -186,7 +186,7 @@ export default function BillingPage() {
         <div className={`rounded-lg border p-4 text-sm ${
           msg.kind === "err"
             ? "border-down/40 bg-down/5 text-down"
-            : "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
+            : "border-warn/30 bg-warn/5 text-warn"
         }`}>
           {msg.text}
         </div>
@@ -815,7 +815,7 @@ function Plan({
       {/* "Everything in Pro" anchor strip — makes the upgrade reason
           obviously the additions, not a duplicated bullet list. */}
       {proPlus && (
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-border bg-black/30 px-2.5 py-1.5 text-[11px] text-muted">
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-border bg-panel px-2.5 py-1.5 text-[11px] text-muted">
           <span className="text-up">✓</span>
           <span>Everything in Pro</span>
           <span className="ml-auto text-accent font-medium">+ all of:</span>

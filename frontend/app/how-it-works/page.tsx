@@ -51,7 +51,7 @@ const SIGNALS = [
   { label: "STRONG SETUP",    range: "70–84",  tone: "text-up/80",         desc: "Most factors favourable." },
   { label: "CONSTRUCTIVE",    range: "55–69",  tone: "text-accent",        desc: "Net positive, not decisive." },
   { label: "NEUTRAL",         range: "40–54",  tone: "text-muted",         desc: "Factors cancel out." },
-  { label: "CAUTION",         range: "25–39",  tone: "text-yellow-400",    desc: "More factors negative." },
+  { label: "CAUTION",         range: "25–39",  tone: "text-warn",    desc: "More factors negative." },
   { label: "WEAK",            range: "0–24",   tone: "text-down",          desc: "Broadly negative." },
 ];
 
@@ -133,7 +133,7 @@ export default function HowItWorksPage() {
                 <span className="text-muted">Core scoring data + most fundamentals — typical liquid stock</span>
               </div>
               <div className="flex justify-between border-b border-border py-2">
-                <span className="text-yellow-400 font-medium">40–60%</span>
+                <span className="text-warn font-medium">40–60%</span>
                 <span className="text-muted">Only basic price/trend data — caution</span>
               </div>
               <div className="flex justify-between py-2">

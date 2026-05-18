@@ -67,7 +67,7 @@ export default function SqueezePage() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.symbol} className="border-b border-border/20 hover:bg-black/20">
+              <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">{r.symbol}</td>
                 <td className={`px-4 py-2 text-right ${r.spike_score >= 75 ? "text-up font-semibold" : ""}`}>
                   {r.spike_score.toFixed(1)}

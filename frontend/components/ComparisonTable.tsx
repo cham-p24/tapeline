@@ -87,7 +87,7 @@ export function ComparisonTable() {
           <col style={{ width: "20%" }} />
           <col style={{ width: "20%" }} />
         </colgroup>
-        <thead className="border-b border-border bg-black/40">
+        <thead className="border-b border-border bg-panel">
           <tr>
             <th className="px-4 py-3 text-left text-xs uppercase text-muted align-bottom">Feature</th>
             <th className="px-4 py-3 text-center text-xs uppercase text-muted align-bottom">Free</th>

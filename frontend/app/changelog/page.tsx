@@ -175,7 +175,7 @@ const ENTRIES: Entry[] = [
 const TAG_STYLE: Record<Entry["tag"], string> = {
   shipped:     "bg-up/15 text-up border-up/30",
   improvement: "bg-accent/15 text-accent border-accent/30",
-  fix:         "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  fix:         "bg-warn/15 text-warn border-warn/30",
 };
 
 export default function ChangelogPage() {

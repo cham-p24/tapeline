@@ -88,7 +88,7 @@ function scoreColor(score: number | null): string {
   if (score >= 70) return "text-up/80";
   if (score >= 55) return "text-accent";
   if (score >= 40) return "text-muted";
-  if (score >= 25) return "text-yellow-400";
+  if (score >= 25) return "text-warn";
   return "text-down";
 }
 
@@ -103,7 +103,7 @@ function signalBadge(signal: string | null): string {
     case "NEUTRAL":
       return "bg-muted/20 text-muted border-border";
     case "CAUTION":
-      return "bg-yellow-500/15 text-yellow-400 border-yellow-500/30";
+      return "bg-warn/15 text-warn border-warn/30";
     case "WEAK":
       return "bg-down/15 text-down border-down/30";
     default:
@@ -194,7 +194,7 @@ export default async function SignalsPage() {
           <CountTile label="Strong setup" count={counts.strong} tone="bg-up/10 text-up/90" />
           <CountTile label="Constructive" count={counts.constructive} tone="bg-accent/15 text-accent" />
           <CountTile label="Neutral" count={counts.neutral} tone="bg-muted/20 text-muted" />
-          <CountTile label="Caution" count={counts.caution} tone="bg-yellow-500/15 text-yellow-400" />
+          <CountTile label="Caution" count={counts.caution} tone="bg-warn/15 text-warn" />
           <CountTile label="Weak" count={counts.weak} tone="bg-down/15 text-down" />
         </div>
       </section>

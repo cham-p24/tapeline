@@ -109,9 +109,9 @@ export default function AdminPage() {
         <>
           <h2 className="mt-10 text-xl font-semibold">Trials expiring in next 7 days</h2>
           <p className="text-xs text-muted">No card on file. These are the highest-leverage outreach targets in the first 100 customers.</p>
-          <div className="card mt-4 overflow-x-auto border-yellow-500/30">
+          <div className="card mt-4 overflow-x-auto border-warn/30">
             <table className="w-full text-sm nums">
-              <thead className="border-b border-border bg-yellow-500/5 text-xs uppercase text-muted">
+              <thead className="border-b border-border bg-warn/5 text-xs uppercase text-muted">
                 <tr>
                   <th className="px-4 py-2 text-left">Email</th>
                   <th className="px-4 py-2 text-left">Name</th>
@@ -127,7 +127,7 @@ export default function AdminPage() {
                     <td className="px-4 py-2 font-medium">{u.email}</td>
                     <td className="px-4 py-2 text-muted">{u.name || "—"}</td>
                     <td className="px-4 py-2"><TierBadge tier={u.tier} /></td>
-                    <td className={`px-4 py-2 text-right font-semibold ${u.days_left <= 1 ? "text-down" : u.days_left <= 3 ? "text-yellow-400" : ""}`}>
+                    <td className={`px-4 py-2 text-right font-semibold ${u.days_left <= 1 ? "text-down" : u.days_left <= 3 ? "text-warn" : ""}`}>
                       {u.days_left}d
                     </td>
                     <td className="px-4 py-2 text-xs text-muted nums">{u.drip_state || "—"}</td>
@@ -157,7 +157,7 @@ export default function AdminPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="border-b border-border/20 hover:bg-black/20">
+              <tr key={u.id} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">
                   {u.email}
                   {u.is_admin && <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] uppercase text-accent">admin</span>}
@@ -167,7 +167,7 @@ export default function AdminPage() {
                 <td className="px-4 py-2"><TierBadge tier={u.tier} /></td>
                 <td className="px-4 py-2 text-right text-xs">
                   {u.trial_days_left !== null
-                    ? <span className={u.trial_days_left <= 1 ? "text-down" : u.trial_days_left <= 3 ? "text-yellow-400" : "text-muted"}>{u.trial_days_left}d</span>
+                    ? <span className={u.trial_days_left <= 1 ? "text-down" : u.trial_days_left <= 3 ? "text-warn" : "text-muted"}>{u.trial_days_left}d</span>
                     : <span className="text-subtle">—</span>}
                 </td>
                 <td className="px-4 py-2 text-center text-xs">{u.has_stripe ? "✓" : "—"}</td>
@@ -197,7 +197,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
   const cls =
     tone === "up" ? "text-up"
     : tone === "accent" ? "text-accent"
-    : tone === "warn" ? "text-yellow-400"
+    : tone === "warn" ? "text-warn"
     : "";
   return (
     <div className="card p-4">

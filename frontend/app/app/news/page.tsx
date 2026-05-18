@@ -38,7 +38,7 @@ export default function NewsPage() {
           value={symbol}
           onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           placeholder="Filter by ticker (e.g. NVDA)"
-          className="rounded-md border border-border bg-black/40 px-3 py-2 text-sm nums font-mono w-64"
+          className="rounded-md border border-border bg-panel px-3 py-2 text-sm nums font-mono w-64"
         />
         {symbol && <button onClick={() => setSymbol("")} className="btn-ghost text-sm">Clear</button>}
       </div>

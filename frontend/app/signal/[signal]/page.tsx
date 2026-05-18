@@ -116,7 +116,7 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
         : signal.slug === "neutral"
           ? "text-muted"
           : signal.slug === "caution"
-            ? "text-yellow-400"
+            ? "text-warn"
             : "text-down";
 
   return (
@@ -152,7 +152,7 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
           ) : (
             <div className="card overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+                <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
                   <tr>
                     <th className="px-3 py-3 text-left">#</th>
                     <th className="px-3 py-3 text-left">Ticker</th>

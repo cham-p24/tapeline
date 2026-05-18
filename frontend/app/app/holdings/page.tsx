@@ -136,7 +136,7 @@ export default function HoldingsPage() {
                 const isBuy = t.share_change > 0;
                 return (
                   <tr key={`${t.symbol}-${t.transaction_date}-${t.insider_name}-${i}`}
-                      className="border-b border-border/20 hover:bg-black/20">
+                      className="border-b border-border/20 hover:bg-panel/60">
                     <td className="px-4 py-2 text-xs text-muted whitespace-nowrap">
                       {formatDate(t.transaction_date)}
                     </td>

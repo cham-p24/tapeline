@@ -37,6 +37,8 @@
   --accent-hover: 0 100 220;
   --up:          52 199 89;          /* iOS systemGreen                */
   --down:        255 59 48;          /* iOS systemRed                  */
+  /* iOS systemYellow at darker shade for legible contrast on white. */
+  --warn:        180 83 9;           /* amber-700                      */
   --shadow:      0 0 0 / 0.06;
 }
 
@@ -53,6 +55,7 @@
   --accent-hover: 64 156 255;
   --up:          48 209 88;
   --down:        255 69 58;
+  --warn:        250 204 21;          /* amber-400, legible on near-black */
   --shadow:      0 0 0 / 0.45;
 }
 
@@ -76,6 +79,7 @@
     --accent-hover: 64 156 255;
     --up:          48 209 88;
     --down:        255 69 58;
+    --warn:        250 204 21;
     --shadow:      0 0 0 / 0.45;
   }
 }

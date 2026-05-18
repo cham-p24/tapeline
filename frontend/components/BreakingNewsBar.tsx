@@ -88,7 +88,7 @@ export function BreakingNewsBar() {
 
   return (
     <div
-      className="mb-4 rounded-lg bg-white/[0.025] px-3 py-2"
+      className="mb-4 rounded-lg bg-panel/60 px-3 py-2"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -143,7 +143,7 @@ function NewsCard({ item }: { item: Headline }) {
   const sentTone = sentimentTone(item.sentiment);
   const linkTarget = singleTicker(item.tickers);
   return (
-    <div className="flex items-start gap-2 rounded-md bg-black/20 px-2.5 py-2 transition hover:bg-black/30">
+    <div className="flex items-start gap-2 rounded-md bg-panel/60 px-2.5 py-2 transition hover:bg-panel-hover">
       <span
         className={`mt-1 flex-shrink-0 h-1.5 w-1.5 rounded-full ${sentTone.dot}`}
         title={sentTone.label}
@@ -153,13 +153,13 @@ function NewsCard({ item }: { item: Headline }) {
           {linkTarget ? (
             <Link
               href={`/app/ticker/${linkTarget}`}
-              className="flex-shrink-0 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] hover:text-accent"
+              className="flex-shrink-0 rounded bg-panel px-1.5 py-0.5 font-mono text-[10px] hover:text-accent"
             >
               {linkTarget}
             </Link>
           ) : (
             item.tickers.length > 0 && (
-              <span className="flex-shrink-0 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-muted">
+              <span className="flex-shrink-0 rounded bg-panel px-1.5 py-0.5 font-mono text-[10px] text-muted">
                 {item.tickers.slice(0, 2).join("·")}
                 {item.tickers.length > 2 && "+"}
               </span>

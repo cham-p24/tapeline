@@ -56,9 +56,9 @@ export default function HeatmapPage() {
       </div>
 
       {/* Filter bar — sticky so it stays visible as the user scrolls the heatmap */}
-      <div className="sticky top-0 z-10 mt-4 -mx-4 border-b border-white/5 bg-bg/90 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 mt-4 -mx-4 border-b border-border bg-bg/90 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-1 min-w-[200px] items-center gap-2 rounded-md border border-white/10 bg-black/30 px-3 py-1.5">
+          <div className="flex flex-1 min-w-[200px] items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5">
             <svg className="h-4 w-4 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
             </svg>
@@ -87,7 +87,7 @@ export default function HeatmapPage() {
           <select
             value={sectorFilter}
             onChange={(e) => setSectorFilter(e.target.value)}
-            className="rounded-md border border-white/10 bg-black/30 px-3 py-1.5 text-sm outline-none"
+            className="rounded-md border border-border bg-panel px-3 py-1.5 text-sm outline-none"
           >
             <option value="ALL">All sectors</option>
             {availableSectors.map((s) => (
@@ -124,7 +124,7 @@ export default function HeatmapPage() {
                 const bg =
                   t.change_pct_1d > 2 ? "bg-up/40"
                   : t.change_pct_1d > 0.5 ? "bg-up/20"
-                  : t.change_pct_1d > -0.5 ? "bg-black/40"
+                  : t.change_pct_1d > -0.5 ? "bg-panel"
                   : t.change_pct_1d > -2 ? "bg-down/20"
                   : "bg-down/40";
                 return (

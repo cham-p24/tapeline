@@ -188,7 +188,7 @@ export default function VsFinvizPage() {
                 <tr
                   key={r.label}
                   // Alternating row tint — uses bg-panel so it adapts to the
-                  // active theme (was bg-black/15 which was invisible in light
+                  // active theme (was bg-panel/40 which was invisible in light
                   // mode after the marketing-nav theme toggle shipped).
                   // Subtle vertical column dividers + a per-row min-height
                   // (via min-h on each cell) keep the rhythm consistent even

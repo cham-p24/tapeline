@@ -193,7 +193,7 @@ export default function DataSourcesPage() {
               </div>
 
               {s.note && (
-                <p className="mt-4 rounded-md bg-white/[0.025] p-3 text-xs text-muted leading-relaxed">
+                <p className="mt-4 rounded-md bg-panel/60 p-3 text-xs text-muted leading-relaxed">
                   {s.note}
                 </p>
               )}
@@ -201,7 +201,7 @@ export default function DataSourcesPage() {
           ))}
         </ol>
 
-        <div className="mt-12 rounded-xl bg-white/[0.025] p-6">
+        <div className="mt-12 rounded-xl bg-panel/60 p-6">
           <h2 className="text-lg font-semibold">Transparency note</h2>
           <p className="mt-3 text-sm text-muted whitespace-pre-line leading-relaxed">
             {TRANSPARENCY_NOTE}

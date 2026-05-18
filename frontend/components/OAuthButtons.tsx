@@ -42,7 +42,7 @@ export function OAuthButtons({
       {providers.google && (
         <a
           href={`${API_BASE}/api/auth/oauth/google/start`}
-          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-black/30"
+          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
         >
           <GoogleGlyph /> Continue with Google
         </a>
@@ -50,7 +50,7 @@ export function OAuthButtons({
       {providers.microsoft && (
         <a
           href={`${API_BASE}/api/auth/oauth/microsoft/start`}
-          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-black/30"
+          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
         >
           <MicrosoftGlyph /> Continue with Microsoft
         </a>

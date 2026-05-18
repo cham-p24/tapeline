@@ -10,7 +10,7 @@ export function ScannerLegend() {
     { label: "STRONG SETUP",    range: "70–84",  tone: "bg-up/10 text-up", desc: "Most factors favorable, one or two mixed." },
     { label: "CONSTRUCTIVE",    range: "55–69",  tone: "bg-accent/10 text-accent", desc: "Net positive but not decisive. Worth watching." },
     { label: "NEUTRAL",         range: "40–54",  tone: "bg-muted/20 text-muted", desc: "Factors cancel out. No edge either way." },
-    { label: "CAUTION",         range: "25–39",  tone: "bg-yellow-500/10 text-yellow-400", desc: "More factors negative than positive." },
+    { label: "CAUTION",         range: "25–39",  tone: "bg-warn/10 text-warn", desc: "More factors negative than positive." },
     { label: "WEAK",            range: "0–24",   tone: "bg-down/10 text-down", desc: "Factors broadly negative. Avoid longs, consider shorts." },
   ];
   return (
@@ -60,7 +60,7 @@ export function ScannerLegend() {
 
 function Factor({ name, weight, desc }: { name: string; weight: string; desc: string }) {
   return (
-    <div className="rounded-md border border-border bg-black/40 px-3 py-2">
+    <div className="rounded-md border border-border bg-panel px-3 py-2">
       <div className="flex items-baseline gap-2">
         <span className="font-semibold">{name}</span>
         <span className="font-mono text-accent">{weight}</span>

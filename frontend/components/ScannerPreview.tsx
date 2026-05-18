@@ -101,7 +101,7 @@ export function ScannerPreview() {
       {/* Filter row — visual only on the marketing surface; the auth'd
           page wires these to query params. Faded so the eye lands on the
           rows below, not these controls. */}
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-black/30 px-4 py-2 text-[11px]">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-panel px-4 py-2 text-[11px]">
         <div className="flex items-center gap-3 text-muted">
           <span className="rounded border border-border bg-panel px-2 py-1">Min score · 0</span>
           <span className="rounded border border-border bg-panel px-2 py-1">All sectors</span>
@@ -140,7 +140,7 @@ export function ScannerPreview() {
                     r.sig === "HIGH CONVICTION" ? "bg-up/20 text-up"
                     : r.sig === "STRONG SETUP" ? "bg-up/10 text-up"
                     : r.sig === "CONSTRUCTIVE" ? "bg-accent/10 text-accent"
-                    : r.sig === "CAUTION" ? "bg-yellow-500/10 text-yellow-400"
+                    : r.sig === "CAUTION" ? "bg-warn/10 text-warn"
                     : r.sig === "WEAK" ? "bg-down/10 text-down"
                     : "bg-muted/20 text-muted"
                   }`}>{r.sig}</span>

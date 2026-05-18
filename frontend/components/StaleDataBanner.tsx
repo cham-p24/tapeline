@@ -75,7 +75,7 @@ export function StaleDataBanner() {
       : `Scanner data is ~${warn.minutes} min old (worker hasn't ticked recently).`;
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-2 text-sm text-yellow-400">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn/30 bg-warn/5 px-4 py-2 text-sm text-warn">
       <span className="flex items-center gap-2">
         <span className="relative flex h-2.5 w-2.5">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-50" />

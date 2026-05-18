@@ -18,7 +18,7 @@ export function TrialBanner() {
 
   const daysLeft = Math.ceil(msLeft / (24 * 3600 * 1000));
   const tone = daysLeft <= 3 ? "bg-down/10 border-down/30 text-down"
-    : daysLeft <= 7 ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+    : daysLeft <= 7 ? "bg-warn/10 border-warn/30 text-warn"
     : "bg-accent/10 border-accent/30 text-accent";
 
   return (

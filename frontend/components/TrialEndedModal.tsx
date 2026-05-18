@@ -81,7 +81,7 @@ export function TrialEndedModal() {
               track("trial_ended_modal_dismissed");
               setOpen(false);
             }}
-            className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-black/30"
+            className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover"
           >
             Continue with Free
           </button>

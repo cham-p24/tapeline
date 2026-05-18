@@ -62,7 +62,7 @@ export default function ReferralsPage() {
               <input
                 readOnly
                 value={stats.share_url || ""}
-                className="flex-1 rounded-md border border-border bg-black/40 px-3 py-2 text-sm font-mono"
+                className="flex-1 rounded-md border border-border bg-panel px-3 py-2 text-sm font-mono"
               />
               <button onClick={copyLink} className="btn-primary text-sm">Copy</button>
             </div>
@@ -82,7 +82,7 @@ export default function ReferralsPage() {
               <h2 className="mt-10 text-xl font-semibold">People you&apos;ve referred</h2>
               <div className="card mt-4 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-black/40 text-xs uppercase text-muted">
+                  <thead className="bg-panel text-xs uppercase text-muted">
                     <tr>
                       <th className="px-4 py-2 text-left">Email</th>
                       <th className="px-4 py-2 text-left">Tier</th>

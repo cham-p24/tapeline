@@ -153,7 +153,7 @@ export default function WatchlistPage() {
             onChange={(e) => setSymbol(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="AAPL"
-            className="mt-1 w-32 rounded-md bg-black/40 px-3 py-2 text-sm nums font-mono"
+            className="mt-1 w-32 rounded-md bg-panel px-3 py-2 text-sm nums font-mono"
           />
         </div>
         <div>
@@ -164,7 +164,7 @@ export default function WatchlistPage() {
             max={50}
             value={threshold}
             onChange={(e) => setThreshold(Number(e.target.value))}
-            className="mt-1 w-20 rounded-md bg-black/40 px-3 py-2 text-sm nums"
+            className="mt-1 w-20 rounded-md bg-panel px-3 py-2 text-sm nums"
           />
         </div>
         <button onClick={add} className="btn-primary text-sm">Add</button>
@@ -229,10 +229,10 @@ export default function WatchlistPage() {
               <tr><td colSpan={9}><TableSkeleton cols={9} rows={5} /></td></tr>
             )}
             {items.map((w) => (
-              <tr key={w.id} className={`border-b border-border/20 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
+              <tr key={w.id} className={`border-b border-border/20 hover:bg-panel/60 ${w.alert_triggered ? "bg-warn/5" : ""}`}>
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${w.symbol}`} className="hover:text-accent">{w.symbol}</Link>
-                  {w.alert_triggered && <span className="ml-2 text-xs text-yellow-400">⚠ alert</span>}
+                  {w.alert_triggered && <span className="ml-2 text-xs text-warn">⚠ alert</span>}
                 </td>
                 <td className="px-4 py-2 text-right">{w.price != null ? `$${w.price.toFixed(2)}` : "—"}</td>
                 <td className={`px-4 py-2 text-right ${(w.change_pct_1d ?? 0) > 0 ? "text-up" : (w.change_pct_1d ?? 0) < 0 ? "text-down" : ""}`}>

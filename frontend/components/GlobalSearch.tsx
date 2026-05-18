@@ -82,7 +82,7 @@ export function GlobalSearch() {
                 key={r.symbol}
                 onMouseEnter={() => setCursor(i)}
                 onClick={() => go(r.symbol)}
-                className={`flex cursor-pointer items-center justify-between gap-4 px-5 py-3 text-sm ${cursor === i ? "bg-black/40" : ""}`}
+                className={`flex cursor-pointer items-center justify-between gap-4 px-5 py-3 text-sm ${cursor === i ? "bg-panel" : ""}`}
               >
                 <div>
                   <span className="font-mono font-semibold">{r.symbol}</span>
