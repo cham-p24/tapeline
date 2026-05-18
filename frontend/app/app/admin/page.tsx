@@ -87,6 +87,10 @@ export default function AdminPage() {
       <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
       <p className="text-sm text-muted">Owner-only operational dashboard.</p>
 
+      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+        <a href="/app/admin/email-preview" className="link">Email preview &rarr;</a>
+      </div>
+
       {stats && (
         <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-8">
           <Stat label="Users" value={String(stats.users_total)} />
