@@ -82,9 +82,14 @@ export default function WatchlistPage() {
   async function add() {
     if (!symbol.trim()) return;
     try {
-      await api.watchlistAdd(symbol.trim().toUpperCase(), threshold);
+      // Phase A: items land in the currently-active tab's list. When
+      // viewing "all items" (activeId=null), the backend resolves to
+      // the user's default list ("My Watchlist") — auto-creates on
+      // first add for new users.
+      await api.watchlistAdd(symbol.trim().toUpperCase(), threshold, activeId);
       setSymbol("");
       load();
+      loadLists();  // refresh list counts shown in the tab strip
     } catch (e: any) {
       const m = String(e.message || e);
       if (m.includes("401")) {
@@ -98,6 +103,22 @@ export default function WatchlistPage() {
   async function remove(id: number) {
     await api.watchlistRemove(id);
     load();
+    loadLists();
+  }
+
+  // Phase A: move an item between lists. Called by the Move dropdown
+  // on each row. Server validates that both the item and the
+  // destination list belong to the caller; we re-fetch the items + list
+  // counts after the move lands so the UI converges without a hard
+  // reload.
+  async function moveTo(itemId: number, newListId: number) {
+    try {
+      await api.watchlistMove(itemId, newListId);
+      load();
+      loadLists();
+    } catch (e) {
+      console.error("watchlistMove failed", e);
+    }
   }
 
   async function seedStarter() {
@@ -246,7 +267,32 @@ export default function WatchlistPage() {
                 <td className="px-4 py-2"><span className="text-xs">{w.signal ?? "—"}</span></td>
                 <td className="px-4 py-2 text-xs text-muted">{w.reason}</td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => remove(w.id)} className="text-xs text-muted hover:text-down">remove</button>
+                  <div className="inline-flex items-center gap-2">
+                    {/* Phase A: Move-to-list dropdown. Hidden when the
+                        user has < 2 lists (no destination to move to).
+                        The current list is rendered as the selected
+                        option but disabled so onChange always fires
+                        with a real destination. */}
+                    {lists.length >= 2 ? (
+                      <select
+                        value={w.watchlist_id ?? ""}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isNaN(v) && v !== w.watchlist_id) moveTo(w.id, v);
+                        }}
+                        className="rounded-md border border-border bg-panel px-1.5 py-1 text-[10px] text-muted hover:text-fg"
+                        aria-label={`Move ${w.symbol} to a different list`}
+                        title="Move to a different list"
+                      >
+                        {lists.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.id === w.watchlist_id ? `↳ ${l.name}` : `→ ${l.name}`}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    <button onClick={() => remove(w.id)} className="text-xs text-muted hover:text-down">remove</button>
+                  </div>
                 </td>
               </tr>
             ))}
