@@ -31,20 +31,32 @@ def _create_tables() -> None:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter() -> None:
-    """Reset the process-global token-bucket limiter before EVERY test.
+    """Reset every process-global rate-limit / abuse log before EVERY test.
 
-    Without this, `test_zz_rate_limit_kicks_in` (in test_smoke.py) hammers
-    /api/scanner 150 times to trigger the limiter, leaving the buckets
-    dry. Any test that pytest collects alphabetically AFTER test_smoke.py
-    — including everything in test_t*.py, test_w*.py, and the new
-    test_ticker_*.py / test_news_*.py / test_re_*.py / test_email_*.py
-    — picks up the same module-global limiter and 429s on its first hit.
-    Manifested as a 429 in test_financials_public_no_auth that took an
-    embarrassingly long time to diagnose in PR #50.
+    Three module-globals leak state across tests if not cleared:
 
-    Resetting per-test isolates the limiter cleanly. The limiter's own
-    behaviour is exercised by test_zz_rate_limit_kicks_in itself.
+    1. `rate_limit.limiter._buckets` — the /api/* token bucket.
+       `test_zz_rate_limit_kicks_in` hammers /api/scanner 150 times to
+       trip the limiter; without a reset, subsequent tests 429 on their
+       first request.
+
+    2. `trial_abuse._signup_log` — the per-IP signup cap (3 per 24h).
+       Multi-signup tests (`test_signup_with_referral_credits_both_parties`
+       etc.) bypass the GATE via monkeypatching `signup_allowed`, but the
+       backend still calls `record_signup(ip)` after a successful signup —
+       which bumps the shared counter regardless. Without a reset, the
+       4th unbypassed signup from 127.0.0.1 hits the cap.
+
+    3. `trial_abuse._fingerprint_log` — the per-device fingerprint cap
+       (1 per 30d). Same leak shape as above.
+
+    Resetting per-test isolates each one cleanly. The limiter's own
+    behaviour is exercised by test_zz_rate_limit_kicks_in; the trial-
+    abuse caps by tests in test_trial_throttle.py.
     """
     from app.services.rate_limit import limiter
+    from app.services import trial_abuse
 
     limiter._buckets.clear()
+    trial_abuse._signup_log.clear()
+    trial_abuse._fingerprint_log.clear()
