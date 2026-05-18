@@ -51,7 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="min-h-screen">
-        <nav className="sticky top-0 z-40 border-b border-white/5 bg-background/90 backdrop-blur">
+        <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
             <Link href="/" className="flex items-center gap-2">
               <div className="h-2 w-6 rounded-full bg-accent" />
@@ -140,7 +140,7 @@ function SearchButton() {
       title="Search any ticker — keyboard shortcut shown next to the label"
     >
       Search&nbsp;
-      <kbd className="rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-mono" aria-label="Keyboard shortcut">
+      <kbd className="rounded bg-panel px-1.5 py-0.5 text-[10px] font-mono" aria-label="Keyboard shortcut">
         {label}
       </kbd>
     </button>
@@ -171,7 +171,7 @@ function UserChip() {
       <button
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        className="flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-sm hover:bg-black/30"
+        className="flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-sm hover:bg-panel-hover"
         aria-label={`Account menu for ${displayName}`}
       >
         <span className="font-medium">{displayName}</span>
@@ -188,16 +188,16 @@ function UserChip() {
             <div className="text-sm font-medium">{displayName}</div>
             <div className="truncate text-xs text-muted">{user.email}</div>
           </div>
-          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Account &amp; settings
           </Link>
-          <Link href="/app/watchlist" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/watchlist" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             My watchlist
           </Link>
-          <Link href="/app/alerts" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/alerts" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Alert rules
           </Link>
-          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Email preferences
           </Link>
           <div className="border-t border-border" />
@@ -206,11 +206,11 @@ function UserChip() {
               scheduled at sunset on their Mac gets it automatically. */}
           <ThemeSwitcher />
           <div className="border-t border-border" />
-          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Billing &amp; plan
           </Link>
           {user.tier === "free" && (
-            <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-black/30">
+            <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-panel-hover">
               Upgrade to Pro →
             </Link>
           )}

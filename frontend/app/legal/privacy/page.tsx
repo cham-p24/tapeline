@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
         </p>
 
-        <div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-400">
+        <div className="mt-6 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm text-warn">
           ⚠ This policy is accurate to the system as of the date above but has not yet been reviewed by qualified counsel. A pre-launch legal review is in progress — material changes will be reflected here with an updated date.
         </div>
 

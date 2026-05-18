@@ -97,7 +97,7 @@ export function TrialEarlyCapture() {
           <button
             onClick={() => dismiss("x")}
             aria-label="Dismiss"
-            className="-mr-1 -mt-1 rounded p-1 text-lg leading-none text-muted hover:bg-black/30 hover:text-fg"
+            className="-mr-1 -mt-1 rounded p-1 text-lg leading-none text-muted hover:bg-panel-hover hover:text-fg"
           >
             &times;
           </button>

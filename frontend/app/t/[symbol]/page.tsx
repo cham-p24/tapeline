@@ -179,7 +179,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
 
   // Score-tier colours mirror /how-it-works.
   const scoreColor =
-    score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-yellow-400" : "text-down";
+    score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-warn" : "text-down";
 
   const b = data.breakdown ?? {};
   const factors: { label: string; value: number | null | undefined; weight: number }[] = [

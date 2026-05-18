@@ -102,7 +102,7 @@ const SIGNAL_COLOR: Record<string, string> = {
   "STRONG SETUP": "text-up",
   "CONSTRUCTIVE": "text-fg",
   "NEUTRAL": "text-muted",
-  "CAUTION": "text-yellow-400",
+  "CAUTION": "text-warn",
   "WEAK": "text-down",
 };
 

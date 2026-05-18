@@ -168,7 +168,7 @@ export default function VsZacksPage() {
         </div>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+            <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">Feature</th>
                 <th className="px-4 py-3 text-left text-accent">Tapeline</th>

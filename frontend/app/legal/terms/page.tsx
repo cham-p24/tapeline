@@ -18,7 +18,7 @@ export default function TermsPage() {
       <h1 className="text-4xl font-bold tracking-tight">Terms of Service</h1>
       <p className="mt-3 text-sm text-muted">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
 
-      <div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-400">
+      <div className="mt-6 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm text-warn">
         ⚠ This is a placeholder ToS for development. Before public launch, this document must
         be reviewed by a qualified attorney licensed in the applicable jurisdiction. The
         operator is responsible for final legal review.

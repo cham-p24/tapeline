@@ -53,6 +53,11 @@ const config: Config = {
         accent:     tokenRgb("accent"),
         up:         tokenRgb("up"),
         down:       tokenRgb("down"),
+        // iOS systemYellow / amber. Used for CAUTION-tier signal pills,
+        // warning banners, trial-ending callouts. Adapts per theme:
+        // darker amber on light bg (for readable contrast against white),
+        // brighter amber on dark bg (matches iOS dark-mode systemYellow).
+        warn:       tokenRgb("warn"),
         // Tokens that ship with built-in alpha — surface tints + the
         // hairline divider. Alpha modifiers won't compose on these; use a
         // different utility (`bg-fg/10` etc.) if you need a custom alpha.

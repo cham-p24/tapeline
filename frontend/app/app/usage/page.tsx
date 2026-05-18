@@ -110,7 +110,7 @@ function UsageCard({
         {cap === 0 && <span className="text-sm text-muted">{unit}</span>}
       </div>
       {cap > 0 && (
-        <div className="mt-3 h-2 w-full rounded-full bg-black/40">
+        <div className="mt-3 h-2 w-full rounded-full bg-panel">
           <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
         </div>
       )}

@@ -90,7 +90,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     : data.signal === "STRONG SETUP" ? "text-up bg-up/10"
     : data.signal === "CONSTRUCTIVE" ? "text-accent bg-accent/10"
     : data.signal === "NEUTRAL" ? "text-muted bg-muted/20"
-    : data.signal === "CAUTION" ? "text-yellow-400 bg-yellow-500/10"
+    : data.signal === "CAUTION" ? "text-warn bg-warn/10"
     : "text-down bg-down/10";
 
   return (
@@ -365,7 +365,7 @@ function compact(n: number) {
 function confColor(c: number) {
   if (c >= 80) return "text-up";
   if (c >= 60) return "text-fg";
-  if (c >= 40) return "text-yellow-400";
+  if (c >= 40) return "text-warn";
   return "text-down";
 }
 function confLabel(c: number) {

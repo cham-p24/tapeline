@@ -269,7 +269,7 @@ export default function ScannerPage() {
                 )}
               </td></tr>
             ) : rows.map((r) => (
-              <tr key={r.symbol} className="border-b border-border/20 hover:bg-black/20">
+              <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
                 </td>
@@ -319,7 +319,7 @@ function SignalPill({ v }: { v: string }) {
     : v === "STRONG SETUP" ? "bg-up/10 text-up"
     : v === "CONSTRUCTIVE" ? "bg-accent/10 text-accent"
     : v === "NEUTRAL" ? "bg-muted/20 text-muted"
-    : v === "CAUTION" ? "bg-yellow-500/10 text-yellow-400"
+    : v === "CAUTION" ? "bg-warn/10 text-warn"
     : "bg-down/10 text-down";
   return <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${tone}`}>{v}</span>;
 }
@@ -338,7 +338,7 @@ function confidenceColor(c: number | null | undefined) {
   if (c == null) return "text-muted";
   if (c >= 80) return "text-up";
   if (c >= 60) return "text-fg";
-  if (c >= 40) return "text-yellow-400";
+  if (c >= 40) return "text-warn";
   return "text-down";
 }
 function confidenceLabel(c: number | null | undefined) {

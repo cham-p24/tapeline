@@ -121,7 +121,7 @@ export default function AlertsPage() {
             <select
               value={ruleType}
               onChange={(e) => setRuleType(e.target.value as RuleType)}
-              className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm"
             >
               {RULE_TYPES.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
@@ -135,7 +135,7 @@ export default function AlertsPage() {
             <select
               value={channel}
               onChange={(e) => setChannel(e.target.value as Channel)}
-              className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm"
             >
               <option value="email">Email {isPro ? "" : "(Pro)"}</option>
               <option value="web_push">Web push {isPro ? "" : "(Pro)"}</option>
@@ -150,7 +150,7 @@ export default function AlertsPage() {
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
                 placeholder="AAPL"
-                className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-sm nums font-mono uppercase"
+                className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm nums font-mono uppercase"
               />
             </div>
           )}
@@ -164,7 +164,7 @@ export default function AlertsPage() {
                 max={100}
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
-                className="mt-1 w-full rounded-md bg-black/40 px-3 py-2 text-sm nums"
+                className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm nums"
               />
               <p className="mt-1 text-xs text-subtle">Fires when score crosses this in either direction.</p>
             </div>
@@ -210,7 +210,7 @@ export default function AlertsPage() {
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.id} className="border-b border-border/20 hover:bg-black/20">
+                <tr key={r.id} className="border-b border-border/20 hover:bg-panel/60">
                   <td className="px-4 py-2">{ruleTypeLabel(r.rule_type)}</td>
                   <td className="px-4 py-2 font-mono">{r.symbol || <span className="text-subtle">any</span>}</td>
                   <td className="px-4 py-2 text-right nums">{r.threshold ?? "—"}</td>
