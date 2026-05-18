@@ -2,24 +2,43 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type WatchlistItem } from "@/lib/api";
+import { api, type WatchlistItem, type WatchlistRow } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
+import { WatchlistTabs } from "@/components/WatchlistTabs";
+import { useUser } from "@/components/UserContext";
 
 // Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
 // start before the worker has populated any scored tickers). Same shape
 // as the API response so the seed-button code path is identical.
 const STARTER_FALLBACK = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY"];
 
+// Mirror of `watchlists` caps from backend/app/services/tier.py.
+// Kept in sync manually — the canonical source is the server-side
+// TIER_LIMITS dict (server enforces the cap with a 403 regardless).
+const WATCHLISTS_CAP_BY_TIER: Record<string, number> = {
+  free: 1,
+  pro: 5,
+  premium: 20,
+};
+
 export default function WatchlistPage() {
+  const { user } = useUser();
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [symbol, setSymbol] = useState("");
   const [threshold, setThreshold] = useState(10);
   const [seeding, setSeeding] = useState(false);
   const [starter, setStarter] = useState<string[]>(STARTER_FALLBACK);
+  // Phase A: multi-list state. `lists` is the user's named watchlists;
+  // `activeId` is the currently-selected tab (null = "All items" view).
+  // Items table is not yet filtered by activeId — the legacy /api/watchlist
+  // endpoint returns ALL items today. Filtering ships in a follow-up PR
+  // that extends GET /api/watchlist with `?list_id=X`.
+  const [lists, setLists] = useState<WatchlistRow[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
 
   // Refresh the starter pack from the API on mount. Falls back to the
   // hardcoded mega-cap list if the call fails for any reason.
@@ -40,8 +59,22 @@ export default function WatchlistPage() {
     finally { setLoading(false); }
   }, []);
 
+  // Refresh the user's lists. Called on mount + after creating a new list.
+  const loadLists = useCallback(async () => {
+    try {
+      const r = await api.watchlists();
+      setLists(r.items);
+    } catch {
+      // Silent — multi-list UI is additive; if it fails the legacy single-
+      // list view continues to work unchanged.
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadLists(); }, [loadLists]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  const watchlistsCap = WATCHLISTS_CAP_BY_TIER[user?.tier ?? "free"] ?? 1;
 
   async function add() {
     if (!symbol.trim()) return;
@@ -96,6 +129,17 @@ export default function WatchlistPage() {
       <div className="mt-4">
         <RecentTickers />
       </div>
+
+      {/* Phase A: list tabs. Hidden for Free tier (cap=1) and for any
+          Pro+ user who hasn't created a second list yet — see
+          WatchlistTabs's internal showTabs check. */}
+      <WatchlistTabs
+        lists={lists}
+        activeId={activeId}
+        cap={watchlistsCap}
+        onChange={setActiveId}
+        onCreated={loadLists}
+      />
 
       {/* Add ticker */}
       <div className="card mt-6 flex flex-wrap items-end gap-3 p-4">
