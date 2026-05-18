@@ -446,3 +446,12 @@ from app.routers import usage
 
 app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
 app.include_router(roadmap.router, prefix="/api/roadmap", tags=["roadmap"])
+
+# Phase A — multi-watchlists + scanner presets (PR Phase A1, 2026-05-18).
+# Mounted alongside the legacy `/api/watchlist` (singular, item-level)
+# router. `/api/watchlists` (plural) manages the list objects themselves;
+# `/api/presets` manages saved scanner filter blobs.
+from app.routers import presets, watchlists  # noqa: E402
+
+app.include_router(watchlists.router, prefix="/api/watchlists", tags=["watchlists"])
+app.include_router(presets.router, prefix="/api/presets", tags=["presets"])
