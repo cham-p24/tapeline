@@ -122,6 +122,62 @@ async def test_watchlists_cap_enforced_returns_403(client):
 
 
 @pytest.mark.asyncio
+async def test_watchlist_get_filters_by_list_id(client):
+    """GET /api/watchlist?list_id=X narrows items to that list only;
+    without the param, returns items across all of the user's lists."""
+    from sqlalchemy import select
+    from app.models import WatchlistItem
+
+    user, headers = await _make_user()
+    async with client:
+        # Clean slate — wipe any inherited dev-bypass user state.
+        r = await client.get("/api/watchlists", headers=headers)
+        for item in r.json()["items"]:
+            await client.delete(f"/api/watchlists/{item['id']}", headers=headers)
+
+        # Two lists with one item each, owned by the dev-bypass user. Look
+        # up that user's id from the items the GET endpoint will return.
+        r = await client.post("/api/watchlists", json={"name": "List A filter"}, headers=headers)
+        list_a = r.json()["id"]
+        r = await client.post("/api/watchlists", json={"name": "List B filter"}, headers=headers)
+        list_b = r.json()["id"]
+
+        # Direct DB insert so we control watchlist_id precisely. The dev-
+        # bypass user_id is hardcoded to "dev_user" in services/auth.py;
+        # reuse that here.
+        async with SessionLocal() as s:
+            s.add(WatchlistItem(user_id="dev_user", watchlist_id=list_a, symbol="AAPL"))
+            s.add(WatchlistItem(user_id="dev_user", watchlist_id=list_b, symbol="MSFT"))
+            await s.commit()
+
+        # Unfiltered — both items.
+        r = await client.get("/api/watchlist", headers=headers)
+        symbols = {it["symbol"] for it in r.json()["items"]}
+        assert "AAPL" in symbols and "MSFT" in symbols
+
+        # Filtered to list A — only AAPL.
+        r = await client.get(f"/api/watchlist?list_id={list_a}", headers=headers)
+        symbols = {it["symbol"] for it in r.json()["items"]}
+        assert "AAPL" in symbols
+        assert "MSFT" not in symbols
+
+        # Filtered to list B — only MSFT.
+        r = await client.get(f"/api/watchlist?list_id={list_b}", headers=headers)
+        symbols = {it["symbol"] for it in r.json()["items"]}
+        assert "MSFT" in symbols
+        assert "AAPL" not in symbols
+
+        # Cleanup
+        async with SessionLocal() as s:
+            res = await s.execute(
+                select(WatchlistItem).where(WatchlistItem.user_id == "dev_user", WatchlistItem.symbol.in_(["AAPL", "MSFT"]))
+            )
+            for w in res.scalars().all():
+                await s.delete(w)
+            await s.commit()
+
+
+@pytest.mark.asyncio
 async def test_presets_unauth_401(client):
     async with client:
         r = await client.get("/api/presets")

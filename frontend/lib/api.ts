@@ -421,7 +421,12 @@ export const api = {
       alpha_vs_spy: number | null;
     }>;
   }>(`/api/scorecard/symbol/${encodeURIComponent(symbol.toUpperCase())}`),
-  watchlist: () => getAuth<{ count: number; items: WatchlistItem[] }>("/api/watchlist", DEV_TOKEN),
+  // `list_id` (Phase A): when set, narrows the result to one named list.
+  // Omitted → all of the caller's items (matches pre-Phase-A behaviour).
+  watchlist: (list_id?: number | null) => {
+    const qs = list_id != null ? `?list_id=${list_id}` : "";
+    return getAuth<{ count: number; items: WatchlistItem[] }>(`/api/watchlist${qs}`, DEV_TOKEN);
+  },
   watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
     post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),
   watchlistRemove: (id: number) => del<{ ok: boolean }>(`/api/watchlist/${id}`, DEV_TOKEN),

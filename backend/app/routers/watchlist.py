@@ -24,13 +24,26 @@ class WatchlistAdd(BaseModel):
 async def list_watchlist(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
+    list_id: int | None = None,
 ) -> dict:
-    result = await session.execute(
+    """List the caller's watchlist items.
+
+    `list_id` (optional, Phase A) narrows the result to a single named
+    list — used by the /app/watchlist multi-tab UI. Omitted → returns
+    items across ALL of the user's lists (preserves the pre-Phase-A
+    single-list behaviour for any API consumer that hasn't been updated).
+    Cross-user access is blocked because the WHERE clause always pins
+    `WatchlistItem.user_id == user.id` regardless of list_id.
+    """
+    stmt = (
         select(WatchlistItem, Ticker)
         .outerjoin(Ticker, Ticker.symbol == WatchlistItem.symbol)
         .where(WatchlistItem.user_id == user.id)
         .order_by(desc(WatchlistItem.added_at))
     )
+    if list_id is not None:
+        stmt = stmt.where(WatchlistItem.watchlist_id == list_id)
+    result = await session.execute(stmt)
     rows = result.all()
     items = []
     for w, t in rows:
