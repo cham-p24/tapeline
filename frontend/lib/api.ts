@@ -103,6 +103,27 @@ export type WatchlistItem = {
   alert_triggered: boolean;
 };
 
+// Phase A — one row returned by /api/watchlists (the LIST CRUD, not the
+// per-item watchlist). `item_count` is the number of WatchlistItems
+// currently attached to this list (computed server-side).
+export type WatchlistRow = {
+  id: number;
+  name: string;
+  sort_order: number;
+  item_count: number;
+  created_at: string | null;
+};
+
+// Phase A — one row returned by /api/presets. `filters_json` is an opaque
+// blob the scanner page serialises via JSON.stringify on save and parses
+// back on apply.
+export type ScannerPresetRow = {
+  id: number;
+  name: string;
+  filters_json: string;
+  created_at: string | null;
+};
+
 export type ScorecardEntry = {
   rank: number;
   symbol: string;
@@ -305,6 +326,20 @@ async function del<T>(path: string, token?: string): Promise<T> {
   return res.json();
 }
 
+async function patch<T>(path: string, body: unknown, token?: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
 async function getAuth<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
@@ -390,6 +425,25 @@ export const api = {
   watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
     post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),
   watchlistRemove: (id: number) => del<{ ok: boolean }>(`/api/watchlist/${id}`, DEV_TOKEN),
+
+  // --- Phase A: multi-watchlists (lists CRUD) + scanner presets ----------
+  // Pluralised /api/watchlists is the LIST CRUD; the singular /api/watchlist
+  // above remains the ITEM CRUD. Two routers, one tier (`watchlists` cap
+  // Free=1 / Pro=5 / Premium=20 enforced server-side; the matching frontend
+  // cap is read off /api/me's `tier` field).
+  watchlists: () => getAuth<{ count: number; items: WatchlistRow[] }>("/api/watchlists", DEV_TOKEN),
+  watchlistCreate: (name: string) =>
+    post<WatchlistRow>("/api/watchlists", { name }, DEV_TOKEN),
+  watchlistRename: (id: number, name: string) =>
+    patch<{ id: number; name: string }>(`/api/watchlists/${id}`, { name }, DEV_TOKEN),
+  watchlistDelete: (id: number) =>
+    del<{ ok: boolean }>(`/api/watchlists/${id}`, DEV_TOKEN),
+
+  presets: () => getAuth<{ count: number; items: ScannerPresetRow[] }>("/api/presets", DEV_TOKEN),
+  presetCreate: (name: string, filters_json: string) =>
+    post<ScannerPresetRow>("/api/presets", { name, filters_json }, DEV_TOKEN),
+  presetDelete: (id: number) =>
+    del<{ ok: boolean }>(`/api/presets/${id}`, DEV_TOKEN),
   /**
    * Recent Insider Buys feed. Backed by SEC Form 4 filings via Finnhub.
    * Replaces the legacy 13F holdings call; URL `/api/holdings` is unchanged
