@@ -42,15 +42,12 @@ from app.services.email_design import (
     SIG_BULL,
     button,
     card,
-    divider,
     footnote,
     h1,
-    h2,
     lead,
     muted_paragraph,
     paragraph,
     score_color,
-    secondary_link,
     shell,
     stat_row,
     ticker_card,
@@ -330,7 +327,7 @@ def render_referral_referrer_email(
             accent=True,
         )
         + button("See your referral page", "https://tapeline.io/app/referrals"),
-        preheader=f"Someone joined via your link — +1 free month of Premium credited.",
+        preheader="Someone joined via your link — +1 free month of Premium credited.",
     )
 
 
