@@ -20,11 +20,17 @@ const PLAUSIBLE_SCRIPT =
 // Default title is used only when a page omits its own.
 export const metadata: Metadata = {
   title: {
-    default: "Tapeline — Read the tape · Live quantitative stock scanner",
+    // Brand-first title keeps the "Read the tape" tagline (recognisable to
+    // existing audience on X/LinkedIn) while adding the explicit category +
+    // public-formula differentiator that addresses the GSC brand-search audit
+    // (the old "Live quantitative stock scanner" suffix wasn't winning brand
+    // CTR — 11 imp / 0 clicks on "tapeline" over 3mo per GSC). Reads cleanly
+    // in the 60-char SERP truncation window.
+    default: "Tapeline — Read the tape · Stock scanner with public formula",
     template: "%s",
   },
   description:
-    "Live quantitative stock scanner. Every US ticker gets one 0-100 score and a plain-English sentence from a public 6-factor formula. Pro from $24.99/mo, Premium from $39.99/mo (USD, annual). 14-day free trial, no credit card.",
+    "Tapeline.io is a transparent quantitative stock scanner: every US ticker gets one 0-100 score from a public 6-factor formula, and every top-10 pick is logged at /scorecard with the next-day return. Pro from $24.99/mo. 14-day Premium trial, no card.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -42,6 +48,8 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
+    // OG card is share-context — keep the punchy "Read the tape" line
+    // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
       "Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro $24.99/mo, Premium $39.99/mo. 14-day Premium trial, no card.",
@@ -63,10 +71,10 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   },
   icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
+    // favicon.ico isn't shipped (we use SVG only). Referencing a non-existent
+    // .ico made Google log a 404 against /favicon.ico in Search Console; SVG
+    // alone is supported in every modern browser + Googlebot.
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
     apple: "/favicon.svg",
   },
@@ -175,11 +183,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               url: "https://tapeline.io",
               potentialAction: {
                 "@type": "SearchAction",
-                // Search box currently routes to ticker page; once a real
-                // /search exists, swap target to /search?q={search_term_string}
+                // SearchAction must point at a URL Googlebot can actually
+                // crawl with a substituted query. /t/{search_term_string} was
+                // logging a literal-placeholder 404 in Search Console because
+                // Google was test-fetching the template URL itself. /search
+                // accepts ?q=, validates as a ticker, and redirects to /t/.
                 target: {
                   "@type": "EntryPoint",
-                  urlTemplate: "https://tapeline.io/t/{search_term_string}",
+                  urlTemplate: "https://tapeline.io/search?q={search_term_string}",
                 },
                 "query-input": "required name=search_term_string",
               },

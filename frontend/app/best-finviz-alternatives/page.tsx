@@ -5,9 +5,13 @@ import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "8 Best Finviz Alternatives in 2026 (Free + Paid, Honest Comparison)",
+  // Title leads with "Finviz Alternative" (singular) to capture the exact-match
+  // query showing 7 imp / 0 clicks in GSC. The number "8" + the bracket text
+  // give the snippet an information-density signal that lifts CTR. Brand suffix
+  // | Tapeline at the end so the brand also shows in the result.
+  title: "Finviz Alternative — 8 Stock Scanners Compared (Free + Paid, 2026) | Tapeline",
   description:
-    "Hand-tested Finviz alternatives ranked by what each does best: composite scoring, intraday speed, charting, fundamentals depth, AI signals, and price. Includes free and paid options.",
+    "Looking for a Finviz alternative? Hand-tested comparison of 8 stock scanners — Tapeline, TradingView, Trade Ideas, Zacks, Koyfin, WallStreetZen, Tipranks, Simply Wall St. Ranked by composite scoring, intraday speed, charting, fundamentals depth, AI signals, and price.",
   path: "/best-finviz-alternatives",
 });
 

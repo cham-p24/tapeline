@@ -446,6 +446,63 @@ export function aboutProfilePageJsonLd() {
   };
 }
 
+export type ItemListTickerArgs = {
+  /** Page URL (e.g. https://tapeline.io/best-stocks-for/swing-traders). */
+  pageUrl: string;
+  /** Page name, e.g. "Best Stocks to Swing Trade". */
+  name: string;
+  description: string;
+  /** Stocks in ranked order. score may be null if not yet scored. */
+  items: Array<{ symbol: string; name: string; score: number | null }>;
+};
+
+/**
+ * Schema.org ItemList for a ranked stock listicle (/best-stocks-for/*).
+ *
+ * Why: Google's quality filter rejects "thin/templated" programmatic pages
+ * unless the page has unique, structured data per slug. Emitting an explicit
+ * ItemList with the 30 actual ranked tickers per strategy (sourced live from
+ * the scanner) gives Google an unambiguous "these are different lists, with
+ * different items, each holding its own ranking" signal — the exact pattern
+ * Google docs recommend for ranked content.
+ */
+export function tickerItemListJsonLd(a: ItemListTickerArgs) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${a.pageUrl}#itemlist`,
+    name: a.name,
+    description: a.description,
+    itemListOrder: "https://schema.org/ItemListOrderDescending",
+    numberOfItems: a.items.length,
+    url: a.pageUrl,
+    itemListElement: a.items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `https://tapeline.io/t/${it.symbol}`,
+      name: `${it.name} (${it.symbol})`,
+      item: {
+        "@type": "FinancialProduct",
+        "@id": `https://tapeline.io/t/${it.symbol}`,
+        name: `${it.name} (${it.symbol})`,
+        category: "Stock",
+        url: `https://tapeline.io/t/${it.symbol}`,
+        ...(it.score != null
+          ? {
+              additionalProperty: {
+                "@type": "PropertyValue",
+                name: "Tapeline Score",
+                value: it.score,
+                minValue: 0,
+                maxValue: 100,
+              },
+            }
+          : {}),
+      },
+    })),
+  };
+}
+
 export type CompareArgs = {
   competitorName: string;
   competitorUrl: string;

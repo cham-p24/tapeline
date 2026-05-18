@@ -15,7 +15,7 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
 
 const API_BASE =
@@ -88,10 +88,29 @@ export default async function BestStocksForStrategyPage({
     { name: s.display, url },
   ]);
 
+  // ItemList JSON-LD with the actual ranked tickers from the live scanner.
+  // Critical for the "discovered/crawled not indexed" 496-page backlog —
+  // Google's quality filter rejects templated pages without unique structured
+  // data per slug; emitting different ItemList content per strategy proves
+  // the pages are distinct ranked lists, not duplicate boilerplate.
+  const itemList = rows.length > 0
+    ? tickerItemListJsonLd({
+        pageUrl: url,
+        name: s.h1,
+        description: s.metaDescription,
+        items: rows.map((r) => ({
+          symbol: r.symbol,
+          name: r.name,
+          score: r.score,
+        })),
+      })
+    : null;
+
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(s.faq))} />
+      {itemList ? <script {...jsonLdScript(itemList)} /> : null}
       <MarketingNav />
 
       <article className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
