@@ -220,3 +220,126 @@ async def test_presets_duplicate_name_409(client):
             "/api/presets", json={"name": "Dup", "filters_json": blob}, headers=headers
         )
         assert r2.status_code == 409
+
+
+# --- POST /api/watchlist list_id + PATCH /api/watchlist/{id} (Drive 2) -----
+
+async def _wipe_dev_user_watchlist(client_inst, headers):
+    """Wipe both lists and items for the dev-bypass user so the
+    next test starts with a known empty state."""
+    r = await client_inst.get("/api/watchlist", headers=headers)
+    for it in r.json()["items"]:
+        await client_inst.delete(f"/api/watchlist/{it['id']}", headers=headers)
+    r = await client_inst.get("/api/watchlists", headers=headers)
+    for wl in r.json()["items"]:
+        await client_inst.delete(f"/api/watchlists/{wl['id']}", headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_watchlist_add_creates_default_list_when_user_has_none(client):
+    """First POST /api/watchlist for a user with zero lists auto-creates
+    'My Watchlist' and attaches the item to it. Preserves the legacy
+    single-list UX exactly for new users."""
+    _, headers = await _make_user()
+    async with client:
+        await _wipe_dev_user_watchlist(client, headers)
+
+        r = await client.post(
+            "/api/watchlist", json={"symbol": "AAPL"}, headers=headers
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["watchlist_id"] is not None
+
+        r = await client.get("/api/watchlists", headers=headers)
+        names = {l["name"] for l in r.json()["items"]}
+        assert "My Watchlist" in names
+
+
+@pytest.mark.asyncio
+async def test_watchlist_add_with_explicit_list_id(client):
+    """POST with explicit list_id puts the item in that list."""
+    _, headers = await _make_user()
+    async with client:
+        await _wipe_dev_user_watchlist(client, headers)
+        r = await client.post(
+            "/api/watchlists", json={"name": "Tech"}, headers=headers
+        )
+        tech_id = r.json()["id"]
+
+        r = await client.post(
+            "/api/watchlist",
+            json={"symbol": "NVDA", "list_id": tech_id},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["watchlist_id"] == tech_id
+
+        # Item shows when filtered to that list
+        r = await client.get(f"/api/watchlist?list_id={tech_id}", headers=headers)
+        symbols = {i["symbol"] for i in r.json()["items"]}
+        assert "NVDA" in symbols
+
+
+@pytest.mark.asyncio
+async def test_watchlist_add_404_on_foreign_list_id(client):
+    """POST with a list_id that doesn't belong to the caller returns 404."""
+    _, headers = await _make_user()
+    async with client:
+        await _wipe_dev_user_watchlist(client, headers)
+        # 99999 is a list id that definitely doesn't belong to dev_user
+        r = await client.post(
+            "/api/watchlist",
+            json={"symbol": "TSLA", "list_id": 99999},
+            headers=headers,
+        )
+        assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_watchlist_move_item_to_different_list(client):
+    """PATCH /api/watchlist/{id} { watchlist_id } moves the item.
+    Verified by re-fetching with ?list_id and confirming presence shifts."""
+    _, headers = await _make_user()
+    async with client:
+        await _wipe_dev_user_watchlist(client, headers)
+        a = (await client.post("/api/watchlists", json={"name": "A"}, headers=headers)).json()["id"]
+        b = (await client.post("/api/watchlists", json={"name": "B"}, headers=headers)).json()["id"]
+
+        added = (await client.post(
+            "/api/watchlist", json={"symbol": "MSFT", "list_id": a}, headers=headers
+        )).json()
+        item_id = added["id"]
+        assert added["watchlist_id"] == a
+
+        # Move A → B
+        r = await client.patch(
+            f"/api/watchlist/{item_id}",
+            json={"watchlist_id": b},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["watchlist_id"] == b
+
+        # Confirm via filter
+        in_a = (await client.get(f"/api/watchlist?list_id={a}", headers=headers)).json()
+        in_b = (await client.get(f"/api/watchlist?list_id={b}", headers=headers)).json()
+        assert all(i["symbol"] != "MSFT" for i in in_a["items"])
+        assert any(i["symbol"] == "MSFT" for i in in_b["items"])
+
+
+@pytest.mark.asyncio
+async def test_watchlist_move_404_on_foreign_list_id(client):
+    """PATCH with a destination list that doesn't belong to caller 404s."""
+    _, headers = await _make_user()
+    async with client:
+        await _wipe_dev_user_watchlist(client, headers)
+        a = (await client.post("/api/watchlists", json={"name": "Solo"}, headers=headers)).json()["id"]
+        item = (await client.post(
+            "/api/watchlist", json={"symbol": "GOOG", "list_id": a}, headers=headers
+        )).json()
+        r = await client.patch(
+            f"/api/watchlist/{item['id']}",
+            json={"watchlist_id": 88888},  # not the caller's
+            headers=headers,
+        )
+        assert r.status_code == 404

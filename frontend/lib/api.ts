@@ -90,6 +90,11 @@ export type TickerDetail = {
 export type WatchlistItem = {
   id: number;
   symbol: string;
+  // Phase A: which named list this item belongs to. Null only for
+  // items that pre-date migration 0022's backfill (no such rows in
+  // production after the deploy ran); allowed null in the type for
+  // safety.
+  watchlist_id: number | null;
   note: string | null;
   baseline_score: number | null;
   alert_threshold_delta: number;
@@ -427,8 +432,22 @@ export const api = {
     const qs = list_id != null ? `?list_id=${list_id}` : "";
     return getAuth<{ count: number; items: WatchlistItem[] }>(`/api/watchlist${qs}`, DEV_TOKEN);
   },
-  watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
-    post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),
+  // Phase A: optional list_id. When provided, the new item lands in
+  // that list; when omitted, the backend resolves to the user's default
+  // list (auto-creates "My Watchlist" on first add for new users).
+  watchlistAdd: (symbol: string, alert_threshold_delta = 10, list_id?: number | null) =>
+    post<{ id: number; symbol: string; watchlist_id: number | null; baseline_score: number | null }>(
+      "/api/watchlist",
+      { symbol, alert_threshold_delta, ...(list_id != null ? { list_id } : {}) },
+      DEV_TOKEN,
+    ),
+  // Move an existing item to a different named list.
+  watchlistMove: (id: number, watchlist_id: number) =>
+    patch<{ id: number; symbol: string; watchlist_id: number }>(
+      `/api/watchlist/${id}`,
+      { watchlist_id },
+      DEV_TOKEN,
+    ),
   watchlistRemove: (id: number) => del<{ ok: boolean }>(`/api/watchlist/${id}`, DEV_TOKEN),
 
   // --- Phase A: multi-watchlists (lists CRUD) + scanner presets ----------
