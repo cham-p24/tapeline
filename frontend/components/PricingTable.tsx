@@ -183,7 +183,7 @@ export function PricingTable() {
       <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
         <span>14-day Premium trial · no card</span>
         <span className="text-subtle">·</span>
-        <span>30-day money back</span>
+        <span>7-day money back</span>
         <span className="text-subtle">·</span>
         <span>Annual price locked forever</span>
         <span className="text-subtle">·</span>

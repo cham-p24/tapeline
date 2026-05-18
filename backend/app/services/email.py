@@ -488,8 +488,8 @@ def render_trial_day11_email(user_name: str, summary: dict | None = None) -> str
         )
         + _trial_summary_block(summary)
         + muted_paragraph(
-            "If you decide to keep Premium, add a card before Friday — same "
-            "price you signed up at ($49.99/mo or $39.99/mo billed annually). "
+            "If you decide to keep Premium, add a card before Friday — at the "
+            "standard Premium price ($49.99/mo, or $39.99/mo billed annually). "
             "If you don't, the account drops to Free at expiry."
         )
         + button("Keep Premium", "https://tapeline.io/app/billing")

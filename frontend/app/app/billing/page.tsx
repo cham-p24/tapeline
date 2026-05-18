@@ -280,7 +280,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted">
                 {billingPeriod === "annual"
-                  ? `Effective $${meta.annualMonthly}/mo · 30-day money-back, no questions.`
+                  ? `Effective $${meta.annualMonthly}/mo · 7-day money back, cancel in one click.`
                   : "Switch to annual to save ~14-19% and lock the price forever."}
               </p>
             </>
@@ -323,7 +323,7 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                30-day money-back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
+                7-day money back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
