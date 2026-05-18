@@ -7,6 +7,8 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { TrialBanner } from "@/components/TrialBanner";
+import { TrialEndedModal } from "@/components/TrialEndedModal";
+import { TrialEarlyCapture } from "@/components/TrialEarlyCapture";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
@@ -109,6 +111,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <OnboardingTip />
           {children}
         </div>
+
+        {/* Card-capture moments. Both are self-gating on user/tier state:
+            - TrialEndedModal fires once when an expired-trial user lands on /app.
+            - TrialEarlyCapture fires once mid-trial (days 5-9 remaining).
+            They render nothing when their conditions aren't met, so they're
+            safe to mount globally. */}
+        <TrialEndedModal />
+        <TrialEarlyCapture />
 
         <footer className="mt-16 border-t border-border">
           <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted">
