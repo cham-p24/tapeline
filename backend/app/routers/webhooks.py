@@ -156,6 +156,57 @@ async def stripe_webhook(
         await session.commit()
         logger.info("stripe.subscription_synced user=%s tier=%s status=%s", user.id, p["tier"], p["status"])
 
+        # Welcome-to-paid email. Fires ONCE on the first time we ever see this
+        # specific subscription (`existing` was None going into the upsert)
+        # AND only on the .created event (not .updated, which fires on every
+        # downstream change). Replay protection at the top of the handler
+        # already covers duplicate webhook deliveries.
+        # Fire-and-forget — a Resend outage must not fail the webhook.
+        if (
+            evt_type == "customer.subscription.created"
+            and existing is None
+            and p["status"] in ("active", "trialing")
+            and user.email
+        ):
+            try:
+                from app.services.email import (
+                    render_subscription_started_email,
+                    send_email,
+                )
+                # Pull amount + billing period inline from the Stripe payload.
+                # subscription_payload() doesn't capture them — they're only
+                # needed for the receipt line in the email, not the DB row.
+                item = obj.get("items", {}).get("data", [{}])[0]
+                price = item.get("price", {}) or {}
+                amount_cents = price.get("unit_amount") or None
+                currency = (price.get("currency") or "usd").lower()
+                interval = (price.get("recurring") or {}).get("interval", "month")
+                billing_period = "annual" if interval == "year" else "monthly"
+                next_charge_iso: str | None = None
+                try:
+                    from datetime import UTC, datetime
+                    next_charge_iso = datetime.fromtimestamp(
+                        obj["current_period_end"], UTC,
+                    ).isoformat()
+                except Exception:
+                    next_charge_iso = None
+                html = render_subscription_started_email(
+                    user_name=(user.name or "trader"),
+                    tier=p["tier"],
+                    billing_period=billing_period,
+                    amount_cents=amount_cents,
+                    currency=currency,
+                    next_charge_iso=next_charge_iso,
+                )
+                subject = f"You're in — welcome to Tapeline {p['tier'].capitalize()}"
+                await send_email(user.email, subject, html, persona="billing")
+                logger.info(
+                    "stripe.welcome_to_paid_sent user=%s tier=%s billing=%s",
+                    user.id, p["tier"], billing_period,
+                )
+            except Exception:
+                logger.exception("stripe.welcome_to_paid_send_failed user=%s", user.id)
+
     elif evt_type == "customer.subscription.deleted":
         customer_id = obj["customer"]
         result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
