@@ -82,6 +82,10 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
         # is a frustration vector that nudges toward upgrade rather than utility.
         "scanner_rows": 20,
         "watchlist_tickers": 5,
+        # `watchlists` (Phase A): how many named lists the user can have.
+        # Free=1 preserves the current single-list UX exactly; Pro+ can split
+        # into themed buckets like "Tech" / "AI Plays" / "My Core".
+        "watchlists": 1,
         "email_alerts_per_day": 0,
         "telegram_alerts_per_day": 0,
         "api_requests_per_day": 0,
@@ -91,6 +95,7 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
     Tier.PRO: {
         "scanner_rows": 1000,
         "watchlist_tickers": 50,
+        "watchlists": 5,
         "email_alerts_per_day": 10,
         "telegram_alerts_per_day": 0,
         "api_requests_per_day": 0,
@@ -100,6 +105,7 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
     Tier.PREMIUM: {
         "scanner_rows": 1000,
         "watchlist_tickers": 200,
+        "watchlists": 20,
         "email_alerts_per_day": 10_000,    # effectively unlimited
         "telegram_alerts_per_day": 10_000, # effectively unlimited
         "api_requests_per_day": 1_000,
