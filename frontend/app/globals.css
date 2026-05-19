@@ -180,6 +180,16 @@
   .btn-primary:hover {
     background-color: rgb(var(--accent-hover));
   }
+  /*
+   * `.btn-accent` was being used on 7 marketing pages (CTA on
+   * /how-it-works, /pricing, /not-found, /t/[symbol], /blog/[slug],
+   * /blog/ticker/[symbol], /app/watchlist, /app/billing) without ever
+   * being defined — rendered as unstyled text. Alias to btn-primary
+   * so every CTA gets the proper iOS-blue pill button.
+   */
+  .btn-accent {
+    @apply btn-primary;
+  }
   .btn-ghost {
     @apply btn;
     color: rgb(var(--muted));

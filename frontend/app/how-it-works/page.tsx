@@ -194,10 +194,10 @@ export default function HowItWorksPage() {
       </section>
 
       {/* CTA */}
-      <section className="section py-16 sm:py-24 text-center">
+      <section className="section py-10 sm:py-14 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
         <p className="mt-3 text-muted">14-day Premium trial. No credit card.</p>
-        <Link href="/signup" className="btn-accent mt-8 inline-flex h-11 px-6 text-base">
+        <Link href="/signup" className="btn-primary mt-6 inline-flex h-11 px-6 text-base">
           Try Premium free &rarr;
         </Link>
       </section>
