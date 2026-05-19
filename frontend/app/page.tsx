@@ -334,9 +334,12 @@ export default function LandingPage() {
 
       {/* FINAL CTA — mirrors the hero promise rather than a generic
           "Stop scrolling" line. Restated specifically: one score, one
-          sentence, one public record. */}
-      <section className="bg-gradient-to-b from-panel/20 to-transparent">
-        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-20 text-center">
+          sentence, one public record.
+          No section bg — body::before gradient (globals.css) is the
+          continuous canvas now; the old `from-panel/20 to-transparent`
+          here created a visible seam against the FAQ above. */}
+      <section>
+        <div className="mx-auto max-w-3xl px-6 py-10 sm:py-14 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />
             <span className="text-accent">One public record.</span>
