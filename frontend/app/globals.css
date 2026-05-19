@@ -28,12 +28,15 @@
   --background:  255 255 255;        /* page bg                        */
   --surface:     250 250 252;        /* subtle elevation tier 1        */
   --panel:       0 0 0 / 0.04;       /* inset panel (rgba on bg)       */
+  --panel2:      0 0 0 / 0.07;       /* nested panel (one shade deeper)*/
   --panel-hover: 0 0 0 / 0.07;       /* panel on hover                 */
   --fg:          10 10 10;           /* primary text                   */
   --muted:       113 113 122;        /* secondary text                 */
   --subtle:      161 161 170;        /* tertiary text                  */
   --border:      0 0 0 / 0.08;       /* hairline divider (rgba)        */
+  --border2:     0 0 0 / 0.14;       /* emphasised divider (rgba)      */
   --accent:      0 122 255;          /* iOS systemBlue                 */
+  --accent2:     88 86 214;          /* iOS systemIndigo — gradient end*/
   --accent-hover: 0 100 220;
   --up:          52 199 89;          /* iOS systemGreen                */
   --down:        255 59 48;          /* iOS systemRed                  */
@@ -46,12 +49,15 @@
   --background:  10 10 10;
   --surface:     18 18 20;
   --panel:       255 255 255 / 0.04;
+  --panel2:      255 255 255 / 0.07;
   --panel-hover: 255 255 255 / 0.07;
   --fg:          244 244 245;
   --muted:       156 163 175;
   --subtle:      113 113 122;
   --border:      255 255 255 / 0.06;
+  --border2:     255 255 255 / 0.14;
   --accent:      10 132 255;          /* iOS systemBlue (dark mode tint) */
+  --accent2:     94 92 230;           /* iOS systemIndigo (dark mode tint) */
   --accent-hover: 64 156 255;
   --up:          48 209 88;
   --down:        255 69 58;
@@ -70,12 +76,15 @@
     --background:  10 10 10;
     --surface:     18 18 20;
     --panel:       255 255 255 / 0.04;
+    --panel2:      255 255 255 / 0.07;
     --panel-hover: 255 255 255 / 0.07;
     --fg:          244 244 245;
     --muted:       156 163 175;
     --subtle:      113 113 122;
     --border:      255 255 255 / 0.06;
+    --border2:     255 255 255 / 0.14;
     --accent:      10 132 255;
+    --accent2:     94 92 230;
     --accent-hover: 64 156 255;
     --up:          48 209 88;
     --down:        255 69 58;
@@ -152,6 +161,18 @@
 }
 
 @layer components {
+  /* `.section` — centred page section with the standard max-width and
+     horizontal gutter. Used by /pricing and /how-it-works. Previously
+     undefined (only the `py-*` padding utilities actually applied),
+     which is why those pages were edge-bleeding on wide screens. */
+  .section {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 72rem;       /* matches `max-w-6xl` used elsewhere */
+    padding-left: 1.5rem;   /* matches `px-6` */
+    padding-right: 1.5rem;
+  }
+
   /*
    * `.card` was previously a hard-edged border box. Now: soft translucent
    * inset that blends into the page bg, with a hint of backdrop blur for
