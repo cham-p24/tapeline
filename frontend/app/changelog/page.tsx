@@ -185,7 +185,7 @@ export default function ChangelogPage() {
 
       <section className="mx-auto max-w-3xl px-6 py-12">
         <p className="eyebrow">Changelog</p>
-        <h1 className="mt-3 text-5xl font-bold tracking-tight">What we shipped, when.</h1>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What we shipped, when.</h1>
         <p className="mt-4 text-lg text-muted">
           Every release, ordered newest first. Past entries are never edited.
           For every signal call we&rsquo;ve made, see the <Link href="/scorecard" className="link">public scorecard</Link>.
