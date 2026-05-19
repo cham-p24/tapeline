@@ -29,7 +29,7 @@ export default function LandingPage() {
           Right: live mock table (ScannerPreview). Nothing else competes.
           The TickerSearch previously sat under the preview, doing the same
           job twice; removed so the eye lands on one demo, not two. */}
-      <section className="relative overflow-hidden px-6 pt-12 pb-12 sm:pt-20 sm:pb-16">
+      <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
         {/* Decorative gradient blobs — positioned relative to the full viewport
             (no max-w-6xl wrapper) so they bleed full-bleed rather than creating
             a visible "boxed-in" rectangle on wide screens. Two soft, oversized
@@ -106,7 +106,7 @@ export default function LandingPage() {
         >
           <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-24">
         <p className="eyebrow text-accent">Why Tapeline</p>
         <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           Three things every other scanner won&rsquo;t do.
@@ -169,7 +169,7 @@ export default function LandingPage() {
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
           because each step is sequential and self-contained. */}
       <section className="bg-panel/10">
-        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-24">
           <p className="eyebrow text-accent">How it works</p>
           <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
             From data to decision in one glance.
@@ -221,7 +221,7 @@ export default function LandingPage() {
         >
           <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-24">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
             How the score works, on the record.
@@ -230,7 +230,12 @@ export default function LandingPage() {
             Methodology notes, design choices, and accountability writeups.
             Every post is anchored to public data — no opinion-only takes.
           </p>
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Mobile: cap at 3 cards (≈600px) instead of 6 cards stacked
+              vertically (≈1200px) so the page scroll doesn't bloat. Posts
+              4-6 reappear at sm+ where they fit in a 2-col grid without
+              adding scroll length. The "see all posts" link below still
+              gives mobile users a path to the full blog index. */}
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:block">
             {POSTS.slice(0, 6).map((p) => (
               <FadeIn key={p.slug} delayMs={0}>
                 <Link
@@ -276,7 +281,7 @@ export default function LandingPage() {
         >
           <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-24">
         <p className="eyebrow text-accent">Common questions</p>
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
           Things people ask before signing up.
@@ -339,7 +344,7 @@ export default function LandingPage() {
           "Stop scrolling" line. Restated specifically: one score, one
           sentence, one public record. */}
       <section className="bg-gradient-to-b from-panel/20 to-transparent">
-        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24 text-center">
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-24 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />
             <span className="text-accent">One public record.</span>
