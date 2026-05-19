@@ -30,12 +30,17 @@ function looksLikeTicker(raw: string): string | null {
   return TICKER_PATTERN.test(normalised) ? normalised : null;
 }
 
-export default function SearchPage({
+export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string | string[] };
+  // Next 16 made searchParams async — the prop is a Promise that must be
+  // awaited before reading. The old sync shape compiles (it's a valid TS
+  // type) but at runtime `.q` reads off the Promise object as undefined,
+  // so the ticker-redirect would silently never fire. Caught in audit.
+  searchParams: Promise<{ q?: string | string[] }>;
 }) {
-  const rawQ = Array.isArray(searchParams.q) ? searchParams.q[0] : searchParams.q;
+  const { q } = await searchParams;
+  const rawQ = Array.isArray(q) ? q[0] : q;
   if (rawQ) {
     const symbol = looksLikeTicker(rawQ);
     if (symbol) {
