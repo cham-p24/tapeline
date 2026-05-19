@@ -18,8 +18,12 @@ export function MarketingFooter() {
             previously underneath each link were dropping visual signal-to-
             noise; SEO weight stays the same and hover still shows intent
             via the title attr. */}
-        <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
-          <div>
+        {/* Mobile = 2 columns so the footer fits in one viewport instead
+            of stacking 4 columns vertically (was ~900px tall on phones).
+            Brand block spans both columns on mobile so the columns of
+            actual links balance properly. */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4">
+          <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2">
               <div className="h-2 w-6 rounded-full bg-accent" />
               <span className="font-semibold">Tapeline</span>

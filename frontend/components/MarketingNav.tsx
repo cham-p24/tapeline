@@ -13,7 +13,7 @@
  * Stripe / Vercel).
  */
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const LINKS = [
@@ -27,14 +27,11 @@ const LINKS = [
 export function MarketingNav() {
   const [open, setOpen] = useState(false);
 
-  // Lock body scroll while the sheet is open so the page behind doesn't
-  // scroll out from under the menu when the user drags inside the sheet.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
+  // No body-scroll-lock — early feedback was that locking the page felt
+  // broken ("hamburger doesn't allow you to keep scrolling"). The sheet
+  // is fixed-positioned below the nav so it stays attached when the page
+  // scrolls underneath; the user can dismiss it via tap-outside or a link.
+  // Standard iOS / Linear mobile-nav behaviour.
 
   // Close on route change — Next.js Link navigation doesn't unmount the nav,
   // so we listen for clicks anywhere inside the sheet's link list and close
