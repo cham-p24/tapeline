@@ -107,7 +107,7 @@ export function LiveCounters() {
       <Counter
         label="Tickers tracked"
         value={tickersAnim != null ? tickersAnim.toLocaleString() : "—"}
-        sub="from Massive reference"
+        sub="active universe"
       />
       <Counter
         label="News items indexed"

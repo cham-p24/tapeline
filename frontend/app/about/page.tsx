@@ -178,8 +178,8 @@ export default function AboutPage() {
               <h3 className="mt-1 font-semibold">Engine running in production for personal use</h3>
               <p className="mt-1 text-sm text-muted">
                 The scoring engine that powers Tapeline ran for ~12 months as a personal
-                trading bot, including paper-trading via Alpaca and live-data feeds from
-                Massive (formerly Polygon.io), Finnhub, Quiver, and FRED.
+                trading bot, paper-trading against live market data, fundamentals,
+                macro indicators, and SEC filings.
               </p>
             </li>
           </ol>

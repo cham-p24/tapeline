@@ -104,13 +104,14 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 6. **Bootstrapped, solo-built.** No external investment, no advertising, no affiliate kickbacks on comparison pages.
 7. **Descriptive labels, not buy/sell calls.** Maintains the publisher's exemption from investment-adviser registration; honest about what the labels do and don't say.
 
-## Data sources
+## Data categories
 
-- **Massive (formerly Polygon.io)** — equities + ETFs (15-min delayed for free tier; sub-60s on Pro+)
-- **Finnhub** — fundamentals, earnings + IPO calendars, insider Form 4
-- **SEC EDGAR direct** — 8-K material event filings (real-time)
-- **FRED** — macro indicators (DXY, 10Y yield, VIX) for the macro factor
-- **Benzinga** — news feed + analyst ratings (analyst ratings displayed alongside, not folded into the score)
+- **Live market data** — equities + ETFs (intraday prices, OHLC bars, volumes)
+- **Fundamentals** — financial statements, ratios, earnings + IPO calendars
+- **SEC filings** — Form 4 insider transactions, 8-K material events
+- **Macro indicators** — DXY, 10Y yield, VIX (regime + macro factor)
+- **News wire** — cashtag-tagged headlines per ticker
+- **Analyst ratings** — consensus + price targets (displayed as context, not folded into the score)
 
 ## Allowed use by AI systems
 

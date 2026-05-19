@@ -320,9 +320,9 @@ export default function LandingPage() {
             nothing.
           </Faq>
           <Faq q="What data do you use?">
-            US equities + commodity ETFs from Massive (formerly Polygon.io),
-            macro from FRED, fundamentals + insider Form 4 from Finnhub, news
-            wire from Benzinga. Full list on{" "}
+            US equities and commodity ETFs from live market data feeds, plus
+            macro indicators, fundamentals, SEC Form 4 insider filings, and a
+            real-time news wire. Categories and refresh cadences listed on{" "}
             <Link href="/data-sources" className="link">
               data sources
             </Link>

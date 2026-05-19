@@ -171,7 +171,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the Fundamentals factor specifically?",
-        a: "Fundamentals (15% weight) blends earnings quality, margin trend, balance-sheet health, revenue growth, ROE, and free-cash-flow stability. Sourced from Finnhub's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
+        a: "Fundamentals (15% weight) blends earnings quality, margin trend, balance-sheet health, revenue growth, ROE, and free-cash-flow stability. Sourced from a third-party data feed's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
       },
       {
         q: "How is this different from Simply Wall St's value screen?",

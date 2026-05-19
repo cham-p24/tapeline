@@ -64,7 +64,7 @@ export function InsiderTab({ symbol }: { symbol: string }) {
         </tbody>
       </table>
       <p className="mt-3 text-xs text-muted">
-        Source: SEC Form 4 filings via Finnhub. Codes: P = open-market purchase, S = sale,
+        Source: SEC Form 4 filings. Codes: P = open-market purchase, S = sale,
         A = grant/award, M = option exercise, G = gift, F = tax withholding.
       </p>
     </div>

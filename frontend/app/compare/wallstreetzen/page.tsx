@@ -87,7 +87,7 @@ const WINS = [
   },
   {
     label: "Macro regime + sector heatmap in same tool",
-    tapeline: "✓ Live VIX / DXY / 10Y from FRED, breadth + sector rotation",
+    tapeline: "✓ Live VIX / DXY / 10Y macro indicators, breadth + sector rotation",
     competitor: "—",
   },
 ];

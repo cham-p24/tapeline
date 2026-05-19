@@ -82,7 +82,7 @@ export default function SupportPage() {
             a={
               <>
                 The STOCK Act gives politicians up to 45 days to disclose a trade. The data IS up to
-                date — we sync from Quiver multiple times per day. The "trade date" can be weeks before
+                date — we sync multiple times per day. The "trade date" can be weeks before
                 the "disclosed date" because of the legal disclosure delay, not a sync lag.
               </>
             }
