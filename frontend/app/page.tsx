@@ -11,7 +11,7 @@ export default function LandingPage() {
     // Page-wide atmospheric layer — a vertical accent gradient that's
     // visible on mobile (where there's no hero blob halo to carry the
     // tint). The values were 3-4% opacity originally but feedback was
-    // "blue tinge missing on mobile" — bumped to 7% top / 5% mid / 6%
+    // "blue tinge missing on mobile" — bumped to 7% top / 3% mid / 5%
     // bottom so the colour reads on a phone display without being
     // overpowering on desktop. `relative overflow-x-hidden` clip wide
     // blob halos that would otherwise create a horizontal scrollbar.
