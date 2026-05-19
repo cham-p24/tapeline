@@ -150,6 +150,7 @@ export default function LandingPage() {
             />
           </FadeIn>
         </div>
+        </div>
       </section>
 
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
@@ -317,6 +318,7 @@ export default function LandingPage() {
             </Link>
             .
           </Faq>
+        </div>
         </div>
       </section>
 
