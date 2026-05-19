@@ -1060,6 +1060,325 @@ async def run_daily_drip(session) -> dict[str, int]:
     return counts
 
 
+# ── Weekly market digest (newsletter) ───────────────────────────────────────
+
+def render_weekly_market_digest(
+    user_name: str,
+    *,
+    week_label: str,
+    regime: dict | None,
+    movers: list[dict],
+    scorecard: dict | None,
+    headlines: list[dict],
+) -> str:
+    """Monday newsletter — what the market did, what the public scorecard
+    did, and the top scores right now.
+
+    `regime`     {regime, vix, yield_10y, breadth_pct, sector_leaders} | None
+    `movers`     list of {symbol, score, signal, reason} — top 5 by score
+    `scorecard`  {picks, hit_rate_pct, avg_alpha_pct, best:{symbol,alpha}} | None
+    `headlines`  list of {title, publisher, url, published_at} — top 3
+
+    Every section degrades gracefully — if the regime row or scorecard
+    data is missing the renderer just drops that block instead of
+    failing the whole send.
+    """
+    # Regime block ------------------------------------------------------------
+    if regime:
+        regime_label = regime.get("regime", "—") or "—"
+        regime_col = (
+            SIG_BULL if regime_label == "BULL"
+            else SIG_BEAR if regime_label == "BEAR"
+            else "#f59e0b" if regime_label == "CAUTIOUS"
+            else LIGHT_MUTED
+        )
+        regime_html = card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Market regime</div>'
+            f'<div style="margin-top:8px;font-family:{FONT_MONO};font-size:24px;font-weight:700;color:{regime_col};line-height:1;">{regime_label}</div>'
+            f'<div style="height:12px;"></div>'
+            + stat_row("VIX", f"{regime.get('vix', 0):.2f}")
+            + stat_row("10Y yield", f"{regime.get('yield_10y', 0):.2f}%")
+            + stat_row("Breadth (% > 200DMA)", f"{regime.get('breadth_pct', 0):.0f}%"),
+            accent=True,
+        )
+    else:
+        regime_html = ""
+
+    # Top movers --------------------------------------------------------------
+    if movers:
+        movers_html = (
+            f'<div class="tl-fg" style="margin:24px 0 10px;font-size:14px;font-weight:600;color:{LIGHT_FG};font-family:{FONT_SANS};">Top 5 scores right now</div>'
+        )
+        movers_html += "".join(
+            ticker_card(
+                m.get("symbol", "?"), m.get("score"),
+                m.get("signal"), m.get("reason"),
+            )
+            for m in movers[:5]
+        )
+    else:
+        movers_html = ""
+
+    # Scorecard block ---------------------------------------------------------
+    if scorecard and scorecard.get("picks", 0) > 0:
+        bits: list[str] = []
+        picks = scorecard.get("picks", 0)
+        bits.append(
+            f'<li><strong>{picks}</strong> top-10 pick'
+            f'{"" if picks == 1 else "s"} logged last week.</li>'
+        )
+        hr = scorecard.get("hit_rate_pct")
+        if hr is not None:
+            bits.append(f'<li><strong>{hr:.0f}%</strong> beat SPY the next session.</li>')
+        aa = scorecard.get("avg_alpha_pct")
+        if aa is not None:
+            sign = "+" if aa >= 0 else ""
+            col = SIG_BULL if aa >= 0 else SIG_BEAR
+            bits.append(
+                f'<li>Average alpha vs SPY: <span style="color:{col};font-weight:600;">{sign}{aa:.2f}%</span>.</li>'
+            )
+        best = scorecard.get("best")
+        if best and best.get("alpha") is not None:
+            ba = best["alpha"]
+            sign = "+" if ba >= 0 else ""
+            bits.append(
+                f'<li>Best pick: <code style="font-family:{FONT_MONO};">{best["symbol"]}</code> · '
+                f'alpha <span style="color:{SIG_BULL};font-weight:600;">{sign}{ba:.2f}%</span>.</li>'
+            )
+        scorecard_html = card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Public scorecard last week</div>'
+            f'<ul class="tl-fg" style="color:{LIGHT_FG};line-height:1.75;padding-left:18px;margin:10px 0 0;font-size:14px;font-family:{FONT_SANS};">'
+            + "".join(bits)
+            + f'</ul><div class="tl-muted" style="margin-top:10px;font-size:12px;color:{LIGHT_MUTED};font-family:{FONT_SANS};">'
+            f'Full record at <a href="https://tapeline.io/scorecard" style="color:{ACCENT};">tapeline.io/scorecard</a> — every miss is still on the page.</div>'
+        )
+    else:
+        scorecard_html = ""
+
+    # Headlines ---------------------------------------------------------------
+    if headlines:
+        rows = []
+        for hd in headlines[:3]:
+            title = (hd.get("title") or "").strip()[:120]
+            pub = hd.get("publisher") or ""
+            url = hd.get("url") or "https://tapeline.io/app/scanner"
+            rows.append(f"""
+            <a href="{url}" target="_blank" style="display:block;text-decoration:none;color:inherit;">
+              <div class="tl-card" style="background:#ffffff;border:1px solid {LIGHT_BORDER};border-radius:8px;padding:14px 18px;margin:0 0 8px;">
+                <div class="tl-fg" style="font-size:14px;font-weight:600;color:{LIGHT_FG};line-height:1.4;font-family:{FONT_SANS};">{title}</div>
+                <div class="tl-muted" style="margin-top:4px;font-size:12px;color:{LIGHT_MUTED};font-family:{FONT_SANS};">{pub}</div>
+              </div>
+            </a>
+            """)
+        headlines_html = (
+            f'<div class="tl-fg" style="margin:24px 0 10px;font-size:14px;font-weight:600;color:{LIGHT_FG};font-family:{FONT_SANS};">Headlines worth a click</div>'
+            + "".join(rows)
+        )
+    else:
+        headlines_html = ""
+
+    body = (
+        h1(f"Weekly digest · {week_label}")
+        + lead(
+            f"Hi {user_name}, here's the week through Tapeline's eyes — "
+            f"regime, the names the scanner is loudest on, and what the "
+            f"public scorecard did."
+        )
+        + regime_html
+        + movers_html
+        + scorecard_html
+        + headlines_html
+        + button(
+            "Open the scanner",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=weekly_digest&utm_medium=newsletter",
+        )
+        + footnote(
+            "You're getting this because you opted into the weekly market "
+            "digest. Toggle off any time at "
+            f'<a href="https://tapeline.io/app/settings/email" '
+            f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">/app/settings/email</a>.'
+        )
+    )
+    return shell(
+        body,
+        preheader=f"Weekly digest · {week_label} — regime, top scores, scorecard week-in-review.",
+    )
+
+
+async def _build_newsletter_payload(session) -> dict:
+    """Pull the four content blocks the newsletter renderer needs.
+
+    Each block is wrapped in its own try/except so a failure in one
+    (e.g. the regime row doesn't exist yet) degrades gracefully — the
+    email still sends with whatever's available rather than failing the
+    whole batch.
+    """
+    from datetime import date, timedelta
+
+    from sqlalchemy import desc, select
+
+    from app.models import DailyScorecardEntry, NewsItem, RegimeState, Ticker
+
+    out: dict = {
+        "regime": None, "movers": [], "scorecard": None, "headlines": [],
+    }
+
+    # Regime
+    try:
+        r = await session.execute(select(RegimeState).where(RegimeState.id == 1))
+        rg = r.scalar_one_or_none()
+        if rg is not None:
+            out["regime"] = {
+                "regime": rg.regime,
+                "vix": rg.vix,
+                "yield_10y": rg.yield_10y,
+                "breadth_pct": rg.breadth_pct,
+                "sector_leaders": rg.sector_leaders,
+            }
+    except Exception:
+        logger.exception("newsletter.regime_failed")
+
+    # Top movers — top 5 by current score
+    try:
+        r = await session.execute(
+            select(Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason)
+            .where(Ticker.score.is_not(None))
+            .order_by(desc(Ticker.score))
+            .limit(5)
+        )
+        out["movers"] = [
+            {"symbol": s, "score": sc, "signal": sg, "reason": rs}
+            for s, sc, sg, rs in r.all()
+        ]
+    except Exception:
+        logger.exception("newsletter.movers_failed")
+
+    # Scorecard last 7 days
+    try:
+        today = date.today()
+        week_ago = today - timedelta(days=7)
+        sc_r = await session.execute(
+            select(DailyScorecardEntry).where(
+                DailyScorecardEntry.as_of >= week_ago,
+                DailyScorecardEntry.as_of <= today,
+            )
+        )
+        picks = sc_r.scalars().all()
+        if picks:
+            scored = [p for p in picks if p.alpha_vs_spy is not None]
+            hit_rate = (
+                100.0 * sum(1 for p in scored if (p.alpha_vs_spy or 0) > 0) / len(scored)
+                if scored else None
+            )
+            avg_alpha = (
+                sum(p.alpha_vs_spy or 0 for p in scored) / len(scored)
+                if scored else None
+            )
+            best = None
+            if scored:
+                b = max(scored, key=lambda p: p.alpha_vs_spy or 0)
+                best = {"symbol": b.symbol, "alpha": b.alpha_vs_spy}
+            out["scorecard"] = {
+                "picks": len(picks),
+                "hit_rate_pct": hit_rate,
+                "avg_alpha_pct": avg_alpha,
+                "best": best,
+            }
+    except Exception:
+        logger.exception("newsletter.scorecard_failed")
+
+    # Headlines — 3 most recent
+    try:
+        r = await session.execute(
+            select(NewsItem).order_by(desc(NewsItem.published_at)).limit(3)
+        )
+        items = r.scalars().all()
+        out["headlines"] = [
+            {
+                "title": it.title,
+                "publisher": it.publisher,
+                "url": it.url,
+                "published_at": it.published_at.isoformat() if it.published_at else None,
+            }
+            for it in items
+        ]
+    except Exception:
+        logger.exception("newsletter.headlines_failed")
+
+    return out
+
+
+async def run_weekly_newsletter(session, *, now=None) -> int:
+    """Send the Monday market digest to every eligible user.
+
+    Eligibility = both gates pass:
+      1. `User.marketing_opt_in == True` (explicit GDPR consent at signup)
+      2. `EmailPref.WEEKLY_NEWSLETTER` bit set (day-to-day toggle)
+
+    Dedupe: a "weekly_{ISO-year}W{ISO-week}" token is added to
+    User.drip_state on successful send, so a worker restart on the same
+    Monday doesn't double-send. Returns the count of emails sent. Pure
+    no-op when RESEND_API_KEY isn't set (send_email returns skipped:True).
+
+    `now` is an optional override for tests — defaults to datetime.now(UTC).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+
+    now = now or datetime.now(UTC)
+    iso_year, iso_week, _ = now.isocalendar()
+    token = f"weekly_{iso_year}W{iso_week:02d}"
+    monday = now - timedelta(days=now.weekday())
+    week_label = monday.strftime("%b %d, %Y")
+
+    payload = await _build_newsletter_payload(session)
+
+    result = await session.execute(
+        select(User).where(User.marketing_opt_in.is_(True))
+    )
+    users = result.scalars().all()
+
+    sent = 0
+    any_changes = False
+    for user in users:
+        if not wants(user, EmailPref.WEEKLY_NEWSLETTER):
+            continue
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if token in sent_tokens:
+            continue
+        try:
+            html = render_weekly_market_digest(
+                user.name or "trader",
+                week_label=week_label,
+                regime=payload["regime"],
+                movers=payload["movers"],
+                scorecard=payload["scorecard"],
+                headlines=payload["headlines"],
+            )
+            res = await send_email(
+                user.email,
+                f"Tapeline weekly · {week_label}",
+                html,
+                persona="alerts",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add(token)
+                user.drip_state = ",".join(sorted(sent_tokens))
+                sent += 1
+                any_changes = True
+        except Exception:
+            logger.exception("weekly_newsletter.send_failed user=%s", user.id)
+
+    if any_changes:
+        await session.commit()
+    logger.info("weekly_newsletter.sent count=%d token=%s", sent, token)
+    return sent
+
+
 async def run_re_engagement_drip(session) -> dict[str, int]:
     """Send the re-engagement email to users dormant for ~14 days.
 

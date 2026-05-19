@@ -292,6 +292,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_trial_expired_email,
         render_trial_post_expiry_email,
         render_watchlist_alert_email,
+        render_weekly_market_digest,
         render_welcome_email,
     )
 
@@ -396,6 +397,39 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "re_engagement": (
             "14-day dormant re-engagement",
             lambda: render_re_engagement_email("Alex"),
+        ),
+        "weekly_newsletter": (
+            "Weekly market digest (Monday newsletter)",
+            lambda: render_weekly_market_digest(
+                "Alex",
+                week_label="May 19, 2026",
+                regime={
+                    "regime": "BULL", "vix": 14.32, "yield_10y": 4.21,
+                    "breadth_pct": 68.0,
+                    "sector_leaders": "Tech, Healthcare, Industrials",
+                },
+                movers=[
+                    *sample_picks,
+                    {"symbol": "AMD", "score": 84, "signal": "STRONG SETUP",
+                     "reason": "Momentum and RS both inflecting up"},
+                    {"symbol": "PLTR", "score": 77, "signal": "STRONG SETUP",
+                     "reason": "Earnings beat, contract pipeline expanding"},
+                ],
+                scorecard={
+                    "picks": 50,
+                    "hit_rate_pct": 62.0,
+                    "avg_alpha_pct": 0.41,
+                    "best": {"symbol": "NVDA", "alpha": 4.8},
+                },
+                headlines=[
+                    {"title": "Fed holds rates, signals patience on inflation",
+                     "publisher": "Reuters", "url": "https://tapeline.io"},
+                    {"title": "Nvidia earnings crush estimates, guidance lifted",
+                     "publisher": "Bloomberg", "url": "https://tapeline.io"},
+                    {"title": "Oil rallies 3% on inventory draw",
+                     "publisher": "WSJ", "url": "https://tapeline.io"},
+                ],
+            ),
         ),
     }
 

@@ -18,13 +18,10 @@ from app.db import session_scope
 from app.models import Ticker
 from app.services.sheet_feed import (
     _parse_float,
-    configured,
     parse_all_signals_csv,
-    refresh_from_workbook,
     score_to_signal,
     upsert_tickers,
 )
-
 
 # ---- score_to_signal --------------------------------------------------------
 

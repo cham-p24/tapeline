@@ -29,12 +29,24 @@ if TYPE_CHECKING:
 
 
 class EmailPref(IntFlag):
-    """Bits of users.email_prefs. Default = all four set (= 15)."""
+    """Bits of users.email_prefs. Default = all five set (= 31).
+
+    `WEEKLY_NEWSLETTER` was added in migration 0023 — the bit is set by
+    default on new signups, but real delivery is gated by *both* this bit
+    AND `User.marketing_opt_in` (the explicit GDPR consent flag captured
+    on the onboarding step). So a user who skips onboarding sees the
+    toggle on at /app/settings/email, but won't receive the newsletter
+    until they tick the marketing-opt-in checkbox there or re-run
+    onboarding. The decoupling is intentional — `email_prefs` is "do you
+    want this category, day-to-day"; `marketing_opt_in` is "do I have
+    explicit consent on file".
+    """
 
     TRIAL_DRIP = 1
     RE_ENGAGEMENT = 2
     DAILY_DIGEST = 4
     ALERT_EMAILS = 8
+    WEEKLY_NEWSLETTER = 16
 
 
 DEFAULT_PREFS: int = int(
@@ -42,6 +54,7 @@ DEFAULT_PREFS: int = int(
     | EmailPref.RE_ENGAGEMENT
     | EmailPref.DAILY_DIGEST
     | EmailPref.ALERT_EMAILS
+    | EmailPref.WEEKLY_NEWSLETTER
 )
 
 
@@ -98,6 +111,12 @@ def categories_for_ui() -> list[PrefCategory]:
             bit=int(EmailPref.ALERT_EMAILS),
             label="Alert emails",
             description="The score / squeeze / regime / news rules you set up on /app/alerts. Disabling this disables ALL email alerts but doesn't touch Telegram or browser push.",
+        ),
+        PrefCategory(
+            key="weekly_newsletter",
+            bit=int(EmailPref.WEEKLY_NEWSLETTER),
+            label="Weekly market digest",
+            description="One email every Monday — top score movers of the week, current market regime, scorecard hit rate, latest headlines. Requires you to have ticked marketing-opt-in at onboarding (or here, when we add the consent toggle).",
         ),
     ]
 

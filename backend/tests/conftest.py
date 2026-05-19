@@ -15,9 +15,9 @@ import asyncio
 
 import pytest
 
-from app.db import Base, engine
 # Importing the models package registers all tables on Base.metadata
 import app.models  # noqa: F401
+from app.db import Base, engine
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -54,8 +54,8 @@ def _reset_rate_limiter() -> None:
     behaviour is exercised by test_zz_rate_limit_kicks_in; the trial-
     abuse caps by tests in test_trial_throttle.py.
     """
-    from app.services.rate_limit import limiter
     from app.services import trial_abuse
+    from app.services.rate_limit import limiter
 
     limiter._buckets.clear()
     trial_abuse._signup_log.clear()
