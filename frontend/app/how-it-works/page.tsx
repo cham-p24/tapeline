@@ -120,19 +120,19 @@ export default function HowItWorksPage() {
               stock has recent insider filings, not every name has analyst coverage.
             </p>
             <div className="mt-4 grid gap-2 text-sm">
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="text-up font-medium">95%+</span>
                 <span className="text-muted">Full data on every signal feature — strongest evidence</span>
               </div>
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="text-up font-medium">80–95%</span>
                 <span className="text-muted">Most features present, missing 1–3 minor data points</span>
               </div>
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="font-medium">60–80%</span>
                 <span className="text-muted">Core scoring data + most fundamentals — typical liquid stock</span>
               </div>
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="text-warn font-medium">40–60%</span>
                 <span className="text-muted">Only basic price/trend data — caution</span>
               </div>
@@ -146,7 +146,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Signals */}
-      <section className="border-t border-border/60 bg-panel/20">
+      <section className="bg-panel/20">
         <div className="section py-14 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Signal labels</p>
@@ -160,7 +160,7 @@ export default function HowItWorksPage() {
               {SIGNALS.map((s) => (
                 <div
                   key={s.label}
-                  className="grid grid-cols-[minmax(8.5rem,auto)_1fr_auto] items-center gap-x-4 gap-y-1 border-b border-border py-4 last:border-b-0"
+                  className="grid grid-cols-[minmax(8.5rem,auto)_1fr_auto] items-center gap-x-4 gap-y-1 py-4"
                 >
                   <span className={`font-mono text-sm font-medium ${s.tone}`}>{s.label}</span>
                   <span className="text-sm text-muted">{s.desc}</span>
@@ -173,12 +173,12 @@ export default function HowItWorksPage() {
       </section>
 
       {/* FAQ — visible content that mirrors HOW_FAQ JSON-LD above. */}
-      <section className="border-t border-border/60 bg-panel/20">
+      <section className="bg-panel/20">
         <div className="section py-16">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Common questions</p>
             <h2 className="mt-3 text-3xl font-semibold">Methodology FAQ</h2>
-            <div className="mt-8 divide-y divide-border border-y border-border">
+            <div className="mt-8 divide-y divide-border/60">
               {HOW_FAQ.map((item) => (
                 <details key={item.q} className="group py-4">
                   <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">

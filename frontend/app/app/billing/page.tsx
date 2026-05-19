@@ -405,7 +405,7 @@ export default function BillingPage() {
                 </div>
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
-              <div className="border-t border-border/60 p-5 pt-2">
+              <div className="p-5 pt-2">
                 <ComparisonTable />
               </div>
             </details>
@@ -455,7 +455,7 @@ export default function BillingPage() {
       </section>
 
       {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border/60 pt-6 text-xs text-muted">
+      <footer className="pt-6 text-xs text-muted">
         Questions about a charge or want to cancel?
         Email <a href="mailto:support@tapeline.io" className="text-accent hover:underline">support@tapeline.io</a>
         — usually replied to within a business day.

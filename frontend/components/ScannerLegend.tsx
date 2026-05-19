@@ -22,7 +22,7 @@ export function ScannerLegend() {
         </div>
         <span className="text-accent transition group-open:rotate-45">+</span>
       </summary>
-      <div className="border-t border-border p-4">
+      <div className="p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {signals.map((s) => (
             <div key={s.label} className="flex items-start gap-3">
@@ -35,7 +35,7 @@ export function ScannerLegend() {
           ))}
         </div>
 
-        <div className="mt-4 border-t border-border pt-4">
+        <div className="mt-4 pt-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Score = weighted sum of 6 factors</p>
           <div className="flex flex-wrap gap-3 text-xs">
             <Factor name="Trend" weight="25%" desc="Moving averages + MACD direction" />
@@ -50,7 +50,7 @@ export function ScannerLegend() {
           </p>
         </div>
 
-        <p className="mt-4 border-t border-border pt-3 text-xs text-muted italic">
+        <p className="mt-4 pt-3 text-xs text-muted italic">
           Scores are descriptive of factor data, not prescriptive of trading actions. Tapeline is not investment advice.
         </p>
       </div>

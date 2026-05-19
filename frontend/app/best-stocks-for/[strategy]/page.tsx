@@ -213,7 +213,7 @@ export default async function BestStocksForStrategyPage({
           <h2 className="text-2xl font-semibold tracking-tight">
             Questions about {s.display.toLowerCase()} on Tapeline
           </h2>
-          <div className="mt-6 divide-y divide-border border-y border-border">
+          <div className="mt-6 divide-y divide-border/60">
             {s.faq.map((item) => (
               <details key={item.q} className="group py-4">
                 <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">

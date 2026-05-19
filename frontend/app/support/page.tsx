@@ -55,7 +55,7 @@ export default function SupportPage() {
 
         {/* Quick links to the things people email about most */}
         <h2 className="mt-14 text-2xl font-semibold tracking-tight">Before you email — quick answers</h2>
-        <div className="mt-6 divide-y divide-border border-y border-border">
+        <div className="mt-6 divide-y divide-border/60">
           <Faq
             q="Is Tapeline live and healthy right now?"
             a={
