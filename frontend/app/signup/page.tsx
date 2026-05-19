@@ -348,7 +348,7 @@ function Field({
         minLength={minLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm transition-colors focus:border-accent focus:outline-none"
+        className="mt-1.5 block h-11 w-full rounded-md border border-border bg-panel px-3 text-base transition-colors focus:border-accent focus:outline-none"
       />
       {hint && <span className="mt-1 block text-xs text-subtle">{hint}</span>}
     </label>

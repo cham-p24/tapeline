@@ -82,7 +82,7 @@ export function MarketingNav() {
               onClick={() => setOpen((o) => !o)}
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
-              className="ml-1 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-panel text-fg transition-colors hover:bg-panel/80"
+              className="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-panel text-fg transition-colors hover:bg-panel/80"
             >
               {open ? (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">

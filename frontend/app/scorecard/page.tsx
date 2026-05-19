@@ -134,7 +134,7 @@ export default function ScorecardPage() {
           onChange={(e) => setQuery(e.target.value.toUpperCase().slice(0, 10))}
           placeholder="Look up any ticker (e.g. AAPL, TSLA)"
           aria-label="Search ticker history"
-          className="block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm focus:border-accent focus:outline-none nums uppercase"
+          className="block h-11 w-full rounded-md border border-border bg-panel px-3 text-base focus:border-accent focus:outline-none nums uppercase"
           autoCapitalize="characters"
           autoComplete="off"
           spellCheck={false}
