@@ -95,9 +95,18 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const title = `${sym} Stock Score ${score}/100 · ${signal} · Tapeline`;
   // Long-tail-friendly description hits queries traders actually run:
   // "TICKER stock score", "TICKER analysis", "TICKER technical rating", etc.
+  // The Finviz-alternative phrasing at the end is deliberate — GSC shows a
+  // strong "[ticker] finviz" pattern (snowflake finviz, clrb finviz, auud
+  // finviz, etc.) across the ~2,500-ticker universe. Mentioning "free
+  // Finviz alternative" in the description lets every per-ticker page
+  // compete for "${sym} finviz" without keyword stuffing the title.
   // Keeps copy honest (no return claims, descriptive not prescriptive).
-  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. Updated live with public formula and back-checked scorecard.`;
+  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. A free Finviz alternative for ${sym} — public formula, back-checked scorecard, live updates.`;
   // Keyword set for crawlers — narrow, ticker-specific, no spam stuffing.
+  // Finviz keywords added 2026-05-19: GSC shows ~half a dozen "{ticker}
+  // finviz" queries per 90 days where we already accidentally rank but
+  // weren't explicitly targeting. Per-ticker keyword inclusion makes that
+  // an intentional surface.
   const keywords = [
     `${sym} stock score`,
     `${sym} stock analysis`,
@@ -105,8 +114,11 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
     `${sym} technical rating`,
     `${sym} fundamental analysis`,
     `is ${sym} a buy`,
+    `${sym} finviz`,
+    `${sym} finviz alternative`,
     "Tapeline Score",
     "stock scanner",
+    "Finviz alternative",
   ];
   const url = `https://tapeline.io/t/${sym}`;
   return {
