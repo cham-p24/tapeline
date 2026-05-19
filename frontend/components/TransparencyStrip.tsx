@@ -23,7 +23,7 @@ const ITEMS: Item[] = [
 export function TransparencyStrip({ current }: { current?: string }) {
   const others = ITEMS.filter((i) => i.slug !== current);
   return (
-    <section className="border-t border-border mt-16">
+    <section className="mt-16">
       <div className="mx-auto max-w-5xl px-6 py-12">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
           More transparency artefacts

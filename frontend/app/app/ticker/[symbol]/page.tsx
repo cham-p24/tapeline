@@ -226,7 +226,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
               <Kv k="Pattern" v={data.squeeze.breakout_type} />
               <Kv k="Window" v={data.squeeze.suggested_window} />
             </dl>
-            <p className="border-t border-border p-4 text-xs text-muted italic">{data.squeeze.reason}</p>
+            <p className="p-4 text-xs text-muted italic">{data.squeeze.reason}</p>
           </div>
         ) : (
           <div className="card p-5">

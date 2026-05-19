@@ -84,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {mobileOpen && (
-            <div className="border-t border-border md:hidden">
+            <div className="md:hidden">
               <div className="mx-auto flex max-w-7xl flex-col gap-1 px-6 py-3">
                 {tabs.map((t) => (
                   <Link
@@ -120,7 +120,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <TrialEndedModal />
         <TrialEarlyCapture />
 
-        <footer className="mt-16 border-t border-border">
+        <footer className="mt-16">
           <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted">
             Not investment advice. For informational purposes only.&nbsp;
             <Link href="/legal/risk" className="hover:text-fg">Risk disclosure</Link>
@@ -216,7 +216,7 @@ function UserChip() {
           )}
           <button
             onClick={async () => { await signout(); window.location.href = "/"; }}
-            className="block w-full border-t border-border px-4 py-2 text-left text-sm text-muted hover:text-down"
+            className="block w-full px-4 py-2 text-left text-sm text-muted hover:text-down"
           >
             Sign out
           </button>
@@ -275,7 +275,7 @@ function MobileUserChip() {
   }
   return (
     <>
-      <div className="mt-2 border-t border-border pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
+      <div className="mt-2 pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
       <Link href="/app/billing" className="px-3 py-2 text-sm text-muted">Billing &amp; plan</Link>
       <button onClick={async () => { await signout(); window.location.href = "/"; }} className="px-3 py-2 text-left text-sm text-down">
         Sign out

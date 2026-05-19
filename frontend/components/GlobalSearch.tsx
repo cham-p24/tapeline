@@ -98,7 +98,7 @@ export function GlobalSearch() {
             ))}
           </ul>
         )}
-        <div className="flex items-center justify-between border-t border-border px-5 py-2 text-xs text-muted">
+        <div className="flex items-center justify-between px-5 py-2 text-xs text-muted">
           <span>&uarr; &darr; navigate</span>
           <span>&crarr; open</span>
           <span>Esc close</span>

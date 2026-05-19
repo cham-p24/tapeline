@@ -121,7 +121,7 @@ export function MarketingNav() {
                   {l.label}
                 </Link>
               ))}
-              <div className="mt-2 border-t border-border/60 px-3 pt-3">
+              <div className="mt-2 px-3 pt-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-muted">Appearance</span>
                   <ThemeToggle />

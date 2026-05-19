@@ -246,7 +246,7 @@ export default function VsFinvizPage() {
           reflects on-page content (Google's rich-result requirement). */}
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <h2 className="text-2xl font-semibold tracking-tight">Tapeline vs Finviz — questions</h2>
-        <div className="mt-6 divide-y divide-border border-y border-border">
+        <div className="mt-6 divide-y divide-border/60">
           {COMPARE_FAQ.map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">

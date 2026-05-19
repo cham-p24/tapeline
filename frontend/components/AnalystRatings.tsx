@@ -118,7 +118,7 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
           but consensus is non-zero, show a short note instead of a header
           + empty list. */}
       {events.length === 0 ? (
-        <div className="border-t border-border px-5 py-4 text-xs text-muted">
+        <div className="px-5 py-4 text-xs text-muted">
           Aggregate consensus from a wire feed — individual firm-by-firm rating
           changes aren't surfaced for {symbol}. Total above reflects the latest
           published period.
@@ -178,7 +178,7 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
       </div>
       ) : null}
 
-      <p className="border-t border-border p-3 text-[11px] text-subtle text-center">
+      <p className="p-3 text-[11px] text-subtle text-center">
         Ratings via Benzinga + Finnhub fallback · informational only · Tapeline does
         not factor analyst consensus into the 6-factor score
       </p>

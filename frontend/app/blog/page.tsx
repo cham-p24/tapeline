@@ -51,7 +51,7 @@ export default function BlogIndex() {
           Posts are short. Newest first. <a href="/blog/rss.xml" className="text-accent hover:underline">RSS</a>.
         </p>
 
-        <div className="mt-12 divide-y divide-border border-y border-border">
+        <div className="mt-12 divide-y divide-border/60">
           {sorted.map((p) => (
             <article key={p.slug} className="py-6">
               <Link href={`/blog/${p.slug}`} className="group block">

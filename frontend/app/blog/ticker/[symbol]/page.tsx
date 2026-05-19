@@ -274,7 +274,7 @@ function FactorRow({ label, factor, why }: { label: string; factor: FactorEntry 
   const v = factor?.value;
   const weight = factor?.weight ?? 0;
   return (
-    <div className="border-t border-border py-4">
+    <div className="py-4">
       <div className="flex items-baseline justify-between gap-4">
         <div className="text-base font-medium">{label} <span className="text-xs text-muted">· {weight}% weight</span></div>
         <div className="font-mono text-xl font-bold nums">{fmtFactor(v)}</div>
@@ -553,7 +553,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
           <p className="mt-3 text-sm text-muted">
             FAQ — the same answers are encoded as structured data on this page so search engines can surface them as rich results.
           </p>
-          <div className="mt-4 divide-y divide-border border-y border-border">
+          <div className="mt-4 divide-y divide-border/60">
             <details className="group py-4">
               <summary className="flex cursor-pointer items-baseline justify-between gap-4 list-none">
                 <h3 className="text-sm font-medium">Does Tapeline factor {t.sector ?? "sector"} dynamics into the {t.symbol} score?</h3>
@@ -621,7 +621,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
           </div>
         </div>
 
-        <nav className="mt-14 border-t border-border pt-8">
+        <nav className="mt-14 pt-8">
           <div className="text-xs uppercase tracking-wider text-subtle">Other ticker analyses</div>
           <ul className="mt-3 flex flex-wrap gap-2 text-sm">
             {TICKERS.filter((x: TickerPost) => x.symbol !== t.symbol).slice(0, 8).map((x) => (
