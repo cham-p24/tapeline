@@ -103,6 +103,36 @@
     /* iOS-style font smoothing on macOS / Webkit. */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Make body the positioning parent for the ::before atmospheric layer. */
+    position: relative;
+    min-height: 100vh;
+  }
+
+  /*
+   * Page-wide blue atmospheric layer. Fixed-position pseudo-element so it
+   * stays on every page, regardless of which route or how long the page
+   * is, without us having to add the gradient to each page's <main> tag.
+   *
+   * Values mirror what was on the homepage <main> in PR #138 — 14% / 8% /
+   * 12% iOS systemBlue. Subtle on white in light mode, faint navy wash
+   * on near-black in dark mode (per founder feedback "blue tinge must
+   * be on all the pages").
+   *
+   * pointer-events:none so the overlay never blocks clicks; z-index:-1
+   * keeps it behind every page element including <main>.
+   */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgb(var(--accent) / 0.14),
+      rgb(var(--accent) / 0.08),
+      rgb(var(--accent) / 0.12)
+    );
   }
   .nums {
     font-variant-numeric: tabular-nums;

@@ -51,7 +51,15 @@ from __future__ import annotations
 # (green = bullish, red = bearish, amber = caution, slate = neutral).
 
 # Light mode
-LIGHT_BG = "#ffffff"           # outer canvas
+# LIGHT_BG was pure white #ffffff until 2026-05-19 — bumped to a soft
+# blue tint so emails carry the brand atmosphere we ship on the website
+# (body::before page-wide gradient at ~14% accent). Hex #f4f8ff is
+# basically white with a hint of iOS systemBlue — invisible to anyone
+# scanning quickly, recognisable as "the Tapeline emails look like
+# Tapeline" to anyone who's been on the site. Email clients vary in
+# CSS gradient support (Outlook desktop renders nothing) so a solid
+# tint is more reliable than a gradient.
+LIGHT_BG = "#f4f8ff"           # soft blue-tinted canvas (was #ffffff)
 LIGHT_PANEL = "#fafafa"        # container/card background
 LIGHT_BORDER = "#e5e7eb"       # hairline borders
 LIGHT_FG = "#111827"           # primary text
@@ -59,7 +67,10 @@ LIGHT_MUTED = "#6b7280"        # secondary text
 LIGHT_SUBTLE = "#9ca3af"       # footnote / footer text
 
 # Dark mode (used in `@media (prefers-color-scheme: dark)`)
-DARK_BG = "#0a0a0a"
+# DARK_BG was #0a0a0a — bumped to a faint blue-shifted near-black for
+# parity with the light-mode blue tint above. Still effectively dark
+# but with the same brand hue at the canvas level.
+DARK_BG = "#0a0d14"
 DARK_PANEL = "#121214"
 DARK_BORDER = "#1f1f23"
 DARK_FG = "#f4f4f5"
