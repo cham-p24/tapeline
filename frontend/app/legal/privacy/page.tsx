@@ -76,7 +76,7 @@ export default function PrivacyPage() {
             <li><strong>Sentry</strong> — error tracking. May capture stack traces with limited non-PII context when something breaks.</li>
             <li><strong>Telegram</strong> — only if you connect your Telegram for alerts. Sees the chat ID you provided and the alert content.</li>
             <li><strong>Twilio</strong> — only if you enable SMS alerts on Premium. Sees your phone number and the alert content.</li>
-            <li><strong>Massive (formerly Polygon.io)</strong>, <strong>Finnhub</strong>, <strong>FRED</strong>, <strong>Benzinga</strong> — market-data feeds. <em>No user data is sent to any of them.</em> They power the scanner; they never see you.</li>
+            <li><strong>Third-party market-data feeds</strong> — power the scanner with prices, fundamentals, macro indicators, SEC filings, and news. <em>No user data is sent to any of them.</em> They power the scanner; they never see you.</li>
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Cookies</h2>

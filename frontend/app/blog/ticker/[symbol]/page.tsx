@@ -190,8 +190,8 @@ function confidenceContext(symbol: string, conf: number | null): string {
     return (
       `${symbol}'s ${Math.round(conf)}% confidence reflects near-full data ` +
       `coverage across the six factor inputs — Trend + RS pull from real ` +
-      `historical bars, Fundamentals from Finnhub quarterly statements, Smart ` +
-      `Money from SEC Form 4 + Congressional disclosures, Macro from FRED, ` +
+      `historical bars, Fundamentals from a third-party data feed quarterly statements, Smart ` +
+      `Money from SEC Form 4 + Congressional disclosures, Macro from a public macro feed, ` +
       `Momentum from primary OHLCV. The composite is as well-informed as the ` +
       `data plumbing allows for a US-listed equity at this scale.`
     );

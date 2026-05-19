@@ -19,7 +19,7 @@ const SECTIONS: Section[] = [
     rows: [
       { label: "Ticker universe", free: "Top 20", pro: "~2,500 US equities, ETFs & commodity ETFs", premium: "~2,500 US equities, ETFs & commodity ETFs" },
       { label: "Data freshness", free: "24-hour delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
-      { label: "News feed", free: "Headlines only", pro: "Real-time Massive + sentiment", premium: "Real-time Massive + sentiment" },
+      { label: "News feed", free: "Headlines only", pro: "Real-time news + sentiment", premium: "Real-time news + sentiment" },
     ],
   },
   {

@@ -179,7 +179,7 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
       ) : null}
 
       <p className="p-3 text-[11px] text-subtle text-center">
-        Ratings via Benzinga + Finnhub fallback · informational only · Tapeline does
+        Analyst-ratings summary · informational only · Tapeline does
         not factor analyst consensus into the 6-factor score
       </p>
     </div>

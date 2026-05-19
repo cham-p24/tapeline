@@ -65,7 +65,7 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Earnings transcripts library",
-    tapeline: "Earnings dates from Finnhub calendar; transcripts via external link only",
+    tapeline: "Earnings dates from a calendar feed; transcripts via external link only",
     competitor: "Full transcript library back ~10+ years, searchable, with quant-grade key-quote highlights on Premium",
     note: "SA's transcript library is genuinely one of the best on the retail internet. Pair it with Tapeline for the multi-factor synthesis. Standalone Tapeline isn't trying to be your fundamental-research archive.",
   },

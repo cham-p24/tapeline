@@ -50,7 +50,7 @@ export default function CongressPage() {
             <p>
               We sort newest-disclosed first because that's the actionable signal:
               this is when the public (and price discovery) actually finds out.
-              Quiver Quantitative is our source; we sync multiple times per day.
+              We sync multiple times per day.
             </p>
           </div>
         </details>

@@ -40,7 +40,7 @@ const ENTRIES: Entry[] = [
     tag: "improvement",
     title: "Honest about what powers Premium — insider Form 4, not elite 13F",
     body: [
-      "Premium feature line updated across pricing, comparison pages, and per-ticker share pages: 'Elite 13F holdings' replaced with 'Recent insider buys (SEC Form 4)'. What's on the /app/holdings page hasn't changed — same SEC Form 4 transactions via Finnhub that have been live for weeks — the marketing copy just now matches what's actually delivered.",
+      "Premium feature line updated across pricing, comparison pages, and per-ticker share pages: 'Elite 13F holdings' replaced with 'Recent insider buys (SEC Form 4)'. What's on the /app/holdings page hasn't changed — same SEC Form 4 transactions that have been live for weeks — the marketing copy just now matches what's actually delivered.",
       "Smart Money factor explanation updated everywhere: Form 4 insider transactions + Congressional disclosures. No mention of 13F.",
       "Open API roadmap, comparison tables, and the LLM-readable site facts all reconciled. No promise the product can't deliver.",
     ],
@@ -110,7 +110,7 @@ const ENTRIES: Entry[] = [
     body: [
       "Earnings calendar now reflects 1,500 upcoming reports across the next two weeks, not a sample.",
       "IPO calendar shows actual upcoming listings (Rare Earths Americas, HawkEye 360, etc.) sorted by expected date.",
-      "Macro tile (DXY, 10-year, VIX) on the regime page now pulls live from the Federal Reserve's FRED feed instead of static defaults.",
+      "Macro tile (DXY, 10-year, VIX) on the regime page now pulls live macro indicators instead of static defaults.",
       "Per-ticker confidence pill on the scanner — mega-caps with full coverage land 90+; less-followed names sit lower so you can deprioritise signals built on thin data.",
     ],
   },

@@ -420,7 +420,7 @@ export default function BillingPage() {
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
               title="Bloomberg-grade data"
-              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
+              body="Same shape of inputs quant funds use — live market data, macro indicators, fundamentals, SEC filings. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
             />
             <Selling
               title="Public scorecard, day 1"

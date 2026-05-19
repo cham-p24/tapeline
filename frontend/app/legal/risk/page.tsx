@@ -64,7 +64,7 @@ export default function RiskPage() {
         <section>
           <h2 className="text-lg font-semibold text-fg">4. Data can be wrong or delayed</h2>
           <p>
-            Market data is sourced from Polygon.io. Despite reasonable care, data feeds can
+            Market data is sourced from third-party data feeds. Despite reasonable care, data feeds can
             contain errors, corporate-action adjustments may lag, and prices can be delayed
             during outages or market-wide disruptions. Always verify any time-sensitive datum
             with your broker before acting.

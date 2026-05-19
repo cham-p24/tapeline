@@ -68,7 +68,7 @@ const TRADEOFFS: CompareTradeoff[] = [
     label: "Pre-built equity research reports",
     tapeline: "Per-ticker page with score breakdown, news, analyst ratings widget (Premium tiers)",
     competitor: "Bundled equity research reports on Premium tiers from select third-party providers",
-    note: "If you read pre-written research as part of your process, Stock Rover bundles some on its paid tiers. Tapeline's per-ticker page is built around the live score + the reason + analyst ratings via Benzinga — different shape, no narrative reports.",
+    note: "If you read pre-written research as part of your process, Stock Rover bundles some on its paid tiers. Tapeline's per-ticker page is built around the live score + the reason + an analyst-ratings summary — different shape, no narrative reports.",
   },
   {
     label: "Coverage breadth",

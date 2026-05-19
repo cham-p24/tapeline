@@ -49,9 +49,9 @@ const WINS: CompareRow[] = [
 const TRADEOFFS: CompareTradeoff[] = [
   {
     label: "Real-time news + audio squawk",
-    tapeline: "Per-ticker news (Benzinga + Massive feeds) on ticker pages; no audio squawk",
+    tapeline: "Per-ticker news headlines on ticker pages; no audio squawk",
     competitor: "Live audio squawk + millisecond-fast newswire — the original product, still the best in retail",
-    note: "If you're a discretionary intraday trader who reacts to news catalysts, Benzinga's squawk is genuinely faster than any consumer news source. Tapeline reads the same Benzinga news feed for ticker-page headlines, but we're not an alternative to the audio squawk — that's a different product category.",
+    note: "If you're a discretionary intraday trader who reacts to news catalysts, Benzinga's squawk is genuinely faster than any consumer news source. Tapeline shows news headlines per ticker for context, but we're not an alternative to the audio squawk — that's a different product category.",
   },
   {
     label: "Why-Is-It-Moving (WIM) commentary",

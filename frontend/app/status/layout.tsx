@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline System Status — Live Uptime + Data Feed Health",
   description:
-    "Live status of Tapeline systems: scanner engine, public API, data feeds (Massive, Finnhub, Quiver), and live worker tick. Updated in real time.",
+    "Live status of Tapeline systems: scanner engine, public API, upstream data feeds, and live worker tick. Updated in real time.",
   path: "/status",
 });
 

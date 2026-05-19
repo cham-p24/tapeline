@@ -484,12 +484,12 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <a href="/scorecard">/scorecard</a>; almost nobody else does.</p>
 
       <h2>3. What does the data come from?</h2>
-      <p>"AI-powered signals" usually means "we bought a feed from Polygon
+      <p>"AI-powered signals" usually means "we bought a feed from a third-party market-data feed
       and slapped a score on top." Which is fine — that's also our spine.
       But know it. Bloomberg Terminal at $32k/yr uses similar feeds; the
       premium is the speed and breadth of their proprietary chat and
       curated news, not the raw data. Anyone charging $200/month for
-      "exclusive AI signals" is reselling Polygon and Finnhub.</p>
+      "exclusive AI signals" is reselling a third-party market-data feed and a third-party data feed.</p>
 
       <h2>4. Is the cheapest tier real?</h2>
       <p>Test it. If the free or cheapest paid tier strips out so many
@@ -572,11 +572,11 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
     slug: "why-we-score-2500-not-5000",
     title: "Why we score 2,500 tickers, not 5,000.",
     excerpt:
-      "The Massive feed gives us 5,757 US tickers. We actively score 2,500. Here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
+      "The a third-party market-data feed feed gives us 5,757 US tickers. We actively score 2,500. Here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
     publishedAt: "2026-05-03",
     author: "Tapeline",
     body: `
-      <p>The data feed (Massive, formerly Polygon.io) gives us coverage of
+      <p>The data feed (a third-party market-data feed) gives us coverage of
       every listed US security. About 5,757 tickers, after filtering out
       OTC. We actively score the top 2,500 by daily dollar-volume.
       Roughly half the new-user feedback is "why isn't $XYZ scored?" — so
@@ -602,16 +602,16 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
 
       <h2>What we do with the other 3,200</h2>
       <p>The full 5,757-row universe table is auto-populated weekly from
-      Massive's reference API. We use it for: watchlist tracking (you
+      a third-party market-data feed's reference API. We use it for: watchlist tracking (you
       can watch any ticker, scored or not), per-ticker pages with price
       and 1-day change, news feeds with sentiment tagging, and ranking —
       so when liquidity grows on a name, it gets promoted into the
       active 2,500 automatically on the next refresh cycle.</p>
 
       <h2>Why not just score all 5,757?</h2>
-      <p>Two reasons. First, the noise above. Second, Finnhub's free tier
+      <p>Two reasons. First, the noise above. Second, a third-party data feed's free tier
       is 60 calls/minute — enough for the fundamentals refresh on 2,500
-      names but not 5,000+. A bigger universe means a bigger Finnhub bill,
+      names but not 5,000+. A bigger universe means a bigger a third-party data feed bill,
       not a better product. We'll only expand if customer behaviour says
       the marginal names are actually being scanned.</p>
 
