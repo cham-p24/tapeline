@@ -281,7 +281,7 @@ def test_email_normalisation():
 
 def test_ip_signup_rate_limit():
     """3 signups per IP per 24h is the hard cap."""
-    from app.services.trial_abuse import signup_allowed, record_signup, signup_count_24h
+    from app.services.trial_abuse import record_signup, signup_allowed, signup_count_24h
     ip = "10.20.30.40"  # never used elsewhere in tests
     assert signup_count_24h(ip) == 0
     for _ in range(3):

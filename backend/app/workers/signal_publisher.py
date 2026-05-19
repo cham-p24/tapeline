@@ -55,6 +55,7 @@ _last_universe_refresh: datetime | None = None
 _last_sheet_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
+_last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
@@ -414,6 +415,28 @@ async def tick() -> None:
         except Exception:
             logger.exception("eod_digest.run_failed")
         _last_eod_digest_date = today_str
+
+    # Weekly market digest (newsletter). Fires Monday at/after 13:00 UTC
+    # (~9am ET pre-open / ~11pm Sydney post-Monday-close). Per-week dedupe
+    # is also enforced inside run_weekly_newsletter via User.drip_state, so
+    # the process-level token here is a cheap short-circuit — DB stays
+    # the source of truth for "did THIS user get THIS week's edition".
+    global _last_weekly_newsletter_token
+    iso_year, iso_week, iso_dow = started.isocalendar()
+    weekly_token = f"weekly_{iso_year}W{iso_week:02d}"
+    if (
+        iso_dow == 1                                    # Monday
+        and started.hour >= 13                          # 13:00 UTC onward
+        and _last_weekly_newsletter_token != weekly_token
+    ):
+        try:
+            from app.services.email import run_weekly_newsletter
+            async with session_scope() as nl_session:
+                count = await run_weekly_newsletter(nl_session, now=started)
+            logger.info("weekly_newsletter.sent count=%d token=%s", count, weekly_token)
+        except Exception:
+            logger.exception("weekly_newsletter.run_failed")
+        _last_weekly_newsletter_token = weekly_token
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(

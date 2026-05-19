@@ -131,6 +131,19 @@ async def submit_onboarding(
     user.marketing_opt_in = bool(body.marketing_opt_in)
     user.sectors_of_interest = ",".join(sectors) if sectors else None
     user.onboarding_completed_at = datetime.now(UTC)
+    # Keep the weekly-newsletter bit in sync with the marketing-opt-in
+    # checkbox: opting in turns it on, opting out turns it off. The bit
+    # alone never delivers — the orchestrator double-gates on
+    # marketing_opt_in too — but keeping them aligned at the consent
+    # moment means /app/settings/email shows the toggle in the state
+    # the user just chose.
+    from app.services.email_prefs import EmailPref
+    bit = int(EmailPref.WEEKLY_NEWSLETTER)
+    current = int(user.email_prefs or 0)
+    if user.marketing_opt_in:
+        user.email_prefs = current | bit
+    else:
+        user.email_prefs = current & ~bit
     await session.commit()
     logger.info(
         "me.onboarding_submitted user=%s skipped=%s sectors=%d marketing_opt_in=%s",
@@ -340,6 +353,7 @@ class EmailPrefsBody(BaseModel):
     re_engagement: bool | None = None
     daily_digest: bool | None = None
     alert_emails: bool | None = None
+    weekly_newsletter: bool | None = None
 
 
 @router.get("/email-prefs")
@@ -383,6 +397,14 @@ async def set_email_prefs(
                 current &= ~cat.bit
 
     user.email_prefs = current
+    # Toggling the weekly-newsletter ON here is itself an act of consent —
+    # mirror it onto the marketing_opt_in column so the orchestrator's
+    # double-gate clears. Toggling OFF leaves marketing_opt_in alone:
+    # email_prefs is "do I want this category"; marketing_opt_in is "do I
+    # have consent on file". A user can pause delivery without revoking
+    # consent, but a user can't START delivery without granting it.
+    if incoming.get("weekly_newsletter") is True:
+        user.marketing_opt_in = True
     await session.commit()
     logger.info("me.email_prefs_updated user=%s prefs=%d", user.id, current)
     return {"prefs": prefs_to_dict(current)}

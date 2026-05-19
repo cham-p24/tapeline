@@ -76,6 +76,29 @@ def _all_html_outputs() -> list[tuple[str, str]]:
         )),
         ("digest_empty", e.render_eod_watchlist_digest("Alex", [])),
         ("re_engagement", e.render_re_engagement_email("Alex")),
+        ("weekly_newsletter_full", e.render_weekly_market_digest(
+            "Alex",
+            week_label="May 19, 2026",
+            regime={"regime": "BULL", "vix": 14.3, "yield_10y": 4.2,
+                    "breadth_pct": 67.0, "sector_leaders": "Tech, Healthcare"},
+            movers=[
+                {"symbol": "NVDA", "score": 88, "signal": "HIGH CONVICTION",
+                 "reason": "Smart money + squeeze"},
+                {"symbol": "AAPL", "score": 82, "signal": "STRONG SETUP",
+                 "reason": "Trend + RS"},
+            ],
+            scorecard={"picks": 50, "hit_rate_pct": 62.0, "avg_alpha_pct": 0.41,
+                       "best": {"symbol": "NVDA", "alpha": 4.8}},
+            headlines=[
+                {"title": "Fed holds rates",
+                 "publisher": "Reuters", "url": "https://tapeline.io"},
+            ],
+        )),
+        ("weekly_newsletter_empty", e.render_weekly_market_digest(
+            "Alex",
+            week_label="May 19, 2026",
+            regime=None, movers=[], scorecard=None, headlines=[],
+        )),
     ]
 
 

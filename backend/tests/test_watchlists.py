@@ -18,7 +18,7 @@ import pytest
 
 from app.db import SessionLocal
 from app.main import app
-from app.models import User, Watchlist
+from app.models import User
 
 
 @pytest.fixture
@@ -126,6 +126,7 @@ async def test_watchlist_get_filters_by_list_id(client):
     """GET /api/watchlist?list_id=X narrows items to that list only;
     without the param, returns items across all of the user's lists."""
     from sqlalchemy import select
+
     from app.models import WatchlistItem
 
     user, headers = await _make_user()

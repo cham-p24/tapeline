@@ -24,11 +24,12 @@ def client():
 async def _make_admin_cookies(client: httpx.AsyncClient, monkeypatch) -> dict:
     """Create a fresh signed-up user, then flip is_admin to True so admin
     endpoints accept them. Returns the session cookies."""
+    from sqlalchemy import select
+
     from app.db import session_scope
     from app.models import User
     from app.routers import auth as auth_module
     from app.services import trial_abuse
-    from sqlalchemy import select
 
     async def _ok(*_a, **_k):
         return True

@@ -14,7 +14,6 @@ These tests pin the contract that aggregation:
 """
 from __future__ import annotations
 
-from datetime import date
 from types import SimpleNamespace
 
 from app.routers.scorecard import _is_outlier, _summary_stats
