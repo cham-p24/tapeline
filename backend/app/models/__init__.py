@@ -1,6 +1,7 @@
 """SQLAlchemy ORM models."""
 from app.models.calendar_events import EarningsEvent, IPOEvent
 from app.models.congress import CongressTrade
+from app.models.email_verification_token import EmailVerificationToken
 from app.models.holdings import InstitutionalHolding
 from app.models.insider_transaction import InsiderTransaction
 from app.models.news import NewsItem
@@ -22,6 +23,7 @@ __all__ = [
     "CongressTrade",
     "DailyScorecardEntry",
     "EarningsEvent",
+    "EmailVerificationToken",
     "IPOEvent",
     "InsiderTransaction",
     "InstitutionalHolding",

@@ -317,6 +317,10 @@ async def oauth_callback(
             password_hash=None,  # OAuth-only account
             trial_ends_at=trial_ends,
             referral_code=ref_code,
+            # OAuth providers proved ownership of this address — auto-stamp
+            # email_verified_at so the user doesn't see a redundant
+            # "verify your email" banner.
+            email_verified_at=datetime.now(UTC),
         )
         session.add(user)
         await session.commit()
@@ -324,6 +328,12 @@ async def oauth_callback(
         logger.info("oauth.user_created provider=%s email=%s trial_ends=%s",
                     provider, email, trial_ends.isoformat())
     else:
+        # Returning OAuth user. If they were never verified (signed up
+        # natively first, then later via OAuth), stamp it now — the
+        # provider just re-proved ownership.
+        if user.email_verified_at is None:
+            user.email_verified_at = datetime.now(UTC)
+            await session.commit()
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
     # Issue session cookie + redirect to app. New OAuth signups pass through

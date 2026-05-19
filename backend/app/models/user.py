@@ -22,6 +22,14 @@ class User(Base):
     # Native auth — bcrypt hash. Null means user was created via Clerk webhook.
     password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Stamped when the user clicks the verification link in their welcome
+    # email (native signup) OR auto-set on OAuth signup (the provider already
+    # proved ownership). Null = unverified. Currently informational — no
+    # feature gates depend on it, but logging/auditing surfaces show it.
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     # Owner/operator flag. Set via seed script or DB update, never via signup.
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
 

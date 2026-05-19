@@ -279,11 +279,13 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
     """
     from app.services.email import (
         render_alert_email,
+        render_email_verification_email,
         render_eod_watchlist_digest,
         render_payment_failed_email,
         render_re_engagement_email,
         render_referral_referee_email,
         render_referral_referrer_email,
+        render_subscription_started_email,
         render_trial_day3_email,
         render_trial_day7_email,
         render_trial_day11_email,
@@ -397,6 +399,30 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "re_engagement": (
             "14-day dormant re-engagement",
             lambda: render_re_engagement_email("Alex"),
+        ),
+        "email_verification": (
+            "Email verification (signup security)",
+            lambda: render_email_verification_email(
+                "Alex",
+                verify_url="https://tapeline.io/verify-email?token=demo123",
+                cancel_url="https://tapeline.io/verify-email?token=demo123&action=cancel",
+            ),
+        ),
+        "subscription_started_pro_monthly": (
+            "Subscription started · Pro monthly",
+            lambda: render_subscription_started_email(
+                "Alex", tier="pro", billing_period="monthly",
+                amount_cents=2999, currency="usd",
+                next_charge_iso="2026-06-19T00:00:00+00:00",
+            ),
+        ),
+        "subscription_started_premium_annual": (
+            "Subscription started · Premium annual",
+            lambda: render_subscription_started_email(
+                "Alex", tier="premium", billing_period="annual",
+                amount_cents=47999, currency="usd",
+                next_charge_iso="2027-05-19T00:00:00+00:00",
+            ),
         ),
         "weekly_newsletter": (
             "Weekly market digest (Monday newsletter)",

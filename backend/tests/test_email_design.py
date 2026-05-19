@@ -99,6 +99,16 @@ def _all_html_outputs() -> list[tuple[str, str]]:
             week_label="May 19, 2026",
             regime=None, movers=[], scorecard=None, headlines=[],
         )),
+        ("email_verification", e.render_email_verification_email(
+            "Alex",
+            verify_url="https://tapeline.io/verify-email?token=demo",
+            cancel_url="https://tapeline.io/verify-email?token=demo&action=cancel",
+        )),
+        ("subscription_started_pro", e.render_subscription_started_email(
+            "Alex", tier="pro", billing_period="monthly",
+            amount_cents=2999, currency="usd",
+            next_charge_iso="2026-06-19T00:00:00+00:00",
+        )),
     ]
 
 

@@ -21,6 +21,10 @@ export type SessionUser = {
   // frontend post-signup redirect uses this to decide whether to bounce
   // through onboarding before /app/scanner.
   onboarding_completed_at?: string | null;
+  // Null until the user clicks the link in their verification email.
+  // OAuth signups are auto-verified at the moment of account creation.
+  // The /app/* layout uses this to render a "verify your email" banner.
+  email_verified_at?: string | null;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
