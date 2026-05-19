@@ -8,20 +8,12 @@ import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
   return (
-    // Page-wide atmospheric layer — a vertical accent gradient. Bumped
-    // twice now after founder feedback "the blue tinge is not there":
-    // original 0.04/0.03 → 0.07/0.03/0.05 → 0.14/0.08/0.12. Even at 14%
-    // accent overlay it's still subtle (the accent is iOS systemBlue at
-    // RGB 0/122/255 or 10/132/255 dark — 14% of that on white = a soft
-    // ice-blue tint, on dark = a faint navy wash). Both modes now show
-    // a clearly readable colour.
-    //
-    // Note: section-level `bg-panel/20` / `bg-panel/10` overlays don't
-    // currently render (Tailwind /alpha modifier collides with the
-    // pre-aliased rgba in the --panel CSS var). That's a separate bug
-    // but it actually HELPS here — without those panel overlays
-    // covering the <main>, the gradient shows through every section.
-    <main className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-accent/[0.14] via-accent/[0.08] to-accent/[0.12]">
+    // The page-wide blue atmospheric gradient now lives on `body::before`
+    // in globals.css (PR #141) so EVERY route gets it consistently
+    // without per-page wiring. <main> here just needs the structural
+    // container styles. `overflow-x-hidden` clips any wide blob halos
+    // from the hero section so they can't create a horizontal scrollbar.
+    <main className="relative min-h-screen overflow-x-hidden">
       <MarketingNav />
 
       {/* HERO — single-purpose fold.
@@ -106,7 +98,7 @@ export default function LandingPage() {
         >
           <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-24">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
         <p className="eyebrow text-accent">Why Tapeline</p>
         <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           Three things every other scanner won&rsquo;t do.
@@ -169,7 +161,7 @@ export default function LandingPage() {
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
           because each step is sequential and self-contained. */}
       <section className="bg-panel/10">
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-24">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
           <p className="eyebrow text-accent">How it works</p>
           <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
             From data to decision in one glance.
@@ -221,7 +213,7 @@ export default function LandingPage() {
         >
           <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-24">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
             How the score works, on the record.
@@ -281,7 +273,7 @@ export default function LandingPage() {
         >
           <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-24">
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-20">
         <p className="eyebrow text-accent">Common questions</p>
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
           Things people ask before signing up.
@@ -344,7 +336,7 @@ export default function LandingPage() {
           "Stop scrolling" line. Restated specifically: one score, one
           sentence, one public record. */}
       <section className="bg-gradient-to-b from-panel/20 to-transparent">
-        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-24 text-center">
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-20 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />
             <span className="text-accent">One public record.</span>
