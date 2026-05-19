@@ -63,7 +63,7 @@ export default function HowItWorksPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="relative section py-20">
+      <section className="relative section py-14 sm:py-20">
         <div className="pointer-events-none absolute inset-0 bg-hero opacity-60" />
         <div className="relative mx-auto max-w-3xl text-center">
           <p className="eyebrow">Methodology</p>
@@ -76,7 +76,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Factors */}
-      <section className="section py-20">
+      <section className="section py-14 sm:py-20">
         <div className="mx-auto max-w-4xl">
           <p className="eyebrow">The six factors</p>
           <h2 className="mt-3 text-3xl font-semibold">Composite = weighted sum of 6 sub-scores</h2>
@@ -147,7 +147,7 @@ export default function HowItWorksPage() {
 
       {/* Signals */}
       <section className="border-t border-border/60 bg-panel/20">
-        <div className="section py-20">
+        <div className="section py-14 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Signal labels</p>
             <h2 className="mt-3 text-3xl font-semibold">Descriptive, not prescriptive.</h2>
@@ -194,7 +194,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* CTA */}
-      <section className="section py-24 text-center">
+      <section className="section py-16 sm:py-24 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
         <p className="mt-3 text-muted">14-day Premium trial. No credit card.</p>
         <Link href="/signup" className="btn-accent mt-8 inline-flex h-11 px-6 text-base">
