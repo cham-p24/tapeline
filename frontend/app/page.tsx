@@ -17,12 +17,17 @@ export default function LandingPage() {
           The TickerSearch previously sat under the preview, doing the same
           job twice; removed so the eye lands on one demo, not two. */}
       <section className="relative overflow-hidden px-6 pt-20 pb-16">
+        {/* Decorative gradient blobs — positioned relative to the full viewport
+            (no max-w-6xl wrapper) so they bleed full-bleed rather than creating
+            a visible "boxed-in" rectangle on wide screens. Two soft, oversized
+            blobs read as ambient atmosphere, the way Linear / Stripe / Vercel
+            heroes do — page first, container second. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 mx-auto h-[640px] max-w-6xl"
+          className="pointer-events-none absolute inset-0 -z-10"
         >
-          <div className="absolute left-1/2 top-0 h-[480px] w-[920px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
-          <div className="absolute left-[12%] top-32 h-[280px] w-[420px] rounded-full bg-up/5 blur-3xl" />
+          <div className="absolute left-1/2 top-[-15%] h-[680px] w-[1400px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
+          <div className="absolute left-[-8%] top-[20%] h-[420px] w-[640px] rounded-full bg-up/[0.04] blur-3xl" />
         </div>
         <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
           <div className="lg:col-span-2 lg:pt-6">
@@ -68,7 +73,7 @@ export default function LandingPage() {
       {/* LIVE COUNTERS — concrete numbers from /api/status, refreshed every 60s.
           Replaces vague "live" with specifics: how many tickers, how many
           news items, current regime, last tick. */}
-      <section className="border-y border-border bg-panel/20">
+      <section className="bg-panel/20">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <LiveCounters />
         </div>
@@ -140,7 +145,7 @@ export default function LandingPage() {
 
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
           because each step is sequential and self-contained. */}
-      <section className="border-t border-border bg-panel/10">
+      <section className="bg-panel/10">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <p className="eyebrow text-accent">How it works</p>
           <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
@@ -183,7 +188,7 @@ export default function LandingPage() {
               and Google's crawl budget for a new domain never reached
               /blog → individual post. Posts are sorted newest-first; show
               the most recent 6 inline + "see all" link to /blog. */}
-      <section className="border-t border-border bg-panel/10">
+      <section className="bg-panel/10">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
@@ -234,7 +239,7 @@ export default function LandingPage() {
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
           Things people ask before signing up.
         </h2>
-        <div className="mt-10 divide-y divide-border border-t border-b border-border">
+        <div className="mt-10 divide-y divide-border/60">
           <Faq q="Is this financial advice?">
             No. Tapeline publishes a quantitative score derived from public
             market data. Scores describe what the data is doing &mdash; they
@@ -290,7 +295,7 @@ export default function LandingPage() {
       {/* FINAL CTA — mirrors the hero promise rather than a generic
           "Stop scrolling" line. Restated specifically: one score, one
           sentence, one public record. */}
-      <section className="border-t border-border bg-gradient-to-b from-panel/20 to-transparent">
+      <section className="bg-gradient-to-b from-panel/20 to-transparent">
         <div className="mx-auto max-w-3xl px-6 py-24 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />

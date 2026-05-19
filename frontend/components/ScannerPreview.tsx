@@ -148,7 +148,16 @@ export function ScannerPreview() {
                 <td className={`px-3 py-2 text-right ${r.d1 > 0 ? "text-up" : r.d1 < 0 ? "text-down" : "text-muted"}`}>
                   {r.d1 >= 0 ? "+" : ""}{r.d1.toFixed(2)}%
                 </td>
-                <td className="hidden px-3 py-2 text-xs text-muted lg:table-cell max-w-[280px] truncate">{r.why}</td>
+                {/* WHY column — 2-line clamp instead of 1-line truncate so the
+                    sentence reads as a finished thought rather than ".." mid-word.
+                    line-clamp-2 caps at 2 lines and adds ellipsis; whitespace-normal
+                    and break-words let the text wrap naturally instead of being
+                    cut on a single line. */}
+                <td className="hidden px-3 py-2 align-top text-xs text-muted lg:table-cell">
+                  <span className="line-clamp-2 whitespace-normal break-words leading-snug">
+                    {r.why}
+                  </span>
+                </td>
               </tr>
             );
           })}
