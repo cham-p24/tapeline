@@ -58,14 +58,19 @@ export const STRATEGIES: StrategyConfig[] = [
     slug: "swing-traders",
     display: "Swing Traders",
     h1: "Best Stocks to Swing Trade — Live Top 30 by Composite Score",
-    // metaTitle targets exact-match for the cluster: "best stocks to swing
-    // trade" (5 imp), "best swing trade stocks" (4 imp), "top momentum stocks
-    // for swing trading may 2026" (4 imp). Front-loaded with the verb form
-    // ("to Swing Trade") that the queries actually use; trailing freshness
-    // signal ("Updated Daily") + specific number ("Top 30") improves CTR.
-    metaTitle: "Best Stocks to Swing Trade — Live Top 30 Composite Scores (Updated Daily) | Tapeline",
+    // metaTitle / metaDescription rewritten 2026-05-19 against GSC data:
+    // page sat at position 12.4 with 304 impressions over 90 days (biggest
+    // single-page impression bucket on the site), but the previous 87-char
+    // title was truncating in the SERP and burying the keyword. New title is
+    // 60 chars, front-loads "Best Stocks to Swing Trade 2026" verbatim
+    // (matches "best swing trading stocks 2026", "best us stocks for swing
+    // trading 2026", "top swing trade stocks 2026" — all queries we already
+    // rank for), keeps the specific number "Top 30" + brand. New description
+    // is 142 chars (well under desktop truncation), leads with "today" for
+    // freshness and ends with the public-scorecard credibility hook.
+    metaTitle: "Best Stocks to Swing Trade 2026 — Top 30 by Score | Tapeline",
     metaDescription:
-      "30 US stocks currently scoring highest for swing trading on Tapeline's 6-factor composite — trend, relative strength, fundamentals, smart money, macro, momentum. Updated daily. Public scorecard tracks every pick vs SPY, no edits.",
+      "Today's 30 best US stocks to swing trade, ranked by Tapeline's public 6-factor composite. Live scores, daily refresh, public scorecard vs SPY.",
     lede:
       "Swing trading rewards the names where multiple factors line up over multiple sessions. The list below ranks US tickers by Tapeline composite score — the six factors weighted at exact published percentages — filtered to a minimum score of 65 (top third of the distribution). Sorted by composite descending. The composite is the best summary number for a multi-day setup.",
     apiParams: { sort: "score", order: "desc", min_score: "65", limit: "30" },
@@ -93,13 +98,19 @@ export const STRATEGIES: StrategyConfig[] = [
     slug: "momentum",
     display: "Momentum Trading",
     h1: "Top Momentum Stocks — Live Top 30 by 5-Day Move with Score Confluence",
-    // metaTitle targets: "top momentum stocks 2026" (4), "top 5 momentum stocks
-    // may 2026" (10), "top momentum stocks for swing trading may 2026" (4) —
-    // a strong cluster. Updated to lead with "Top Momentum Stocks" (matches
-    // 3 of the top 10 queries) and add "5-Day" specificity.
-    metaTitle: "Top Momentum Stocks Right Now — Live 5-Day Movers with Score Confluence | Tapeline",
+    // metaTitle / metaDescription rewritten 2026-05-19 against GSC data:
+    // page sat at position 11.3 with 160 impressions over 90 days — right
+    // at the page-1/page-2 border, where a sharper title is the highest-
+    // leverage move. The previous 84-char title was truncating; new title
+    // is 63 chars and leads with the exact query string the cluster uses:
+    // "Top Momentum Stocks 2026" (4 imp), "top 5 momentum stocks may 2026"
+    // (12 imp), "top momentum stocks for swing trading may 2026" (4 imp),
+    // "momentum stocks 2026" (1 imp pos 6.0). Description trimmed to
+    // 138 chars, leads with the "biggest 5-day movers WITH score 60+"
+    // differentiator and ends with the public-scorecard credibility hook.
+    metaTitle: "Top Momentum Stocks 2026 — Top 30 5-Day Movers + Score | Tapeline",
     metaDescription:
-      "30 US stocks with the biggest 5-day moves that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend, relative strength, and fundamentals. Updated daily. Public scorecard, no edits.",
+      "30 biggest 5-day US movers also scoring 60+ on Tapeline's public 6-factor composite. Live, daily refresh, public scorecard tracks each pick.",
     lede:
       "Momentum without score confirmation is a coin flip. Pure 'biggest 5-day movers' lists are dominated by news pops, short squeezes, and reversals that fail in the next session. The list below filters to composite 60+ before sorting by 5-day change — the move PLUS the underlying factor confluence. Trend, relative strength, smart money: if those agree with the recent momentum, you've got a structural runner. If they don't, you've got a name to fade.",
     apiParams: { sort: "change_pct_5d", order: "desc", min_score: "60", limit: "30" },

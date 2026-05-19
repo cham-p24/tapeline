@@ -129,8 +129,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               "@context": "https://schema.org",
               "@type": "Organization",
               name: "Tapeline",
+              // Entity disambiguation for brand-name SERP. Per Search Console
+              // (2026-05-19 audit) the bare query "tapeline" returns us at
+              // position 15.1 with 13 imp / 0 clicks over 90 days — the
+              // measuring-tool brands and a UK insurance broker outrank us
+              // for our own name. The fix is heavier entity signal: legalName,
+              // explicit description, slogan, knowsAbout, and country so
+              // Google's Knowledge Graph learns "Tapeline = US stock scanner
+              // SaaS" rather than "Tapeline = generic word."
+              legalName: "Tapeline",
+              alternateName: "Tapeline.io",
+              slogan: "Read the tape",
+              description:
+                "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from a publicly-documented six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
               url: "https://tapeline.io",
               logo: "https://tapeline.io/favicon.svg",
+              foundingDate: "2026",
+              // Country-only address — full street suppressed per founder
+              // privacy. Country signal alone is enough to help Google
+              // localise the brand entity vs the UK/AU "tapeline" measuring-
+              // tool sellers.
+              address: {
+                "@type": "PostalAddress",
+                addressCountry: "AU",
+              },
+              // knowsAbout teaches the Knowledge Graph what topics this
+              // entity is about — strongest available signal for brand-query
+              // disambiguation. Each entry is a topic Google has its own
+              // entity page for.
+              knowsAbout: [
+                "Stock scanner",
+                "Quantitative trading",
+                "US equities",
+                "Exchange-traded fund",
+                "Technical analysis",
+                "Fundamental analysis",
+                "Market data",
+                "Financial technology",
+              ],
               // sameAs is the canonical "this is the same entity" graph that
               // feeds Google's Knowledge Panel and Knowledge Graph. Each URL
               // here should be the actual public profile page on an
