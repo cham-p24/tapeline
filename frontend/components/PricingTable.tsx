@@ -106,7 +106,7 @@ export function PricingTable() {
           return (
             <div
               key={p.name}
-              className={`relative rounded-2xl border p-8 transition-all ${
+              className={`relative rounded-2xl border p-6 sm:p-8 transition-all ${
                 p.highlight
                   ? "border-accent/60 bg-gradient-to-b from-accent/10 via-panel to-panel shadow-lg shadow-accent/20"
                   : "border-border bg-panel"
