@@ -600,6 +600,104 @@ def render_trial_ended_email(user_name: str) -> str:
     )
 
 
+# ── Email verification ──────────────────────────────────────────────────────
+
+def render_email_verification_email(
+    user_name: str, verify_url: str, cancel_url: str,
+) -> str:
+    """Sent immediately after the welcome email at native signup.
+
+    Two CTAs side by side: the primary "verify" link consumes the token
+    and stamps `User.email_verified_at`; the secondary "this wasn't me"
+    link cancels the account before any further damage. Both flow through
+    the same `/api/auth/verify-email` and `/api/auth/cancel-account`
+    endpoints which the frontend `/verify-email` page consumes.
+
+    Tone: calm + procedural. No urgency, no fake "ACT NOW" — this is a
+    routine security step.
+    """
+    return shell(
+        h1(f"Confirm your email, {user_name}.")
+        + lead(
+            "One quick step to lock down your Tapeline account: confirm "
+            "this is your address. Click the button below — the link is "
+            "good for 24 hours."
+        )
+        + button("Confirm my email", verify_url)
+        + muted_paragraph(
+            f'Didn\'t sign up for Tapeline? <a href="{cancel_url}" '
+            f'style="color:{ACCENT};">Tell us this wasn\'t you</a> and '
+            f'we\'ll cancel the account immediately. No further emails.'
+        )
+        + footnote(
+            "Confirming protects against someone signing up with your "
+            "address by mistake (or on purpose). If you ignore this email, "
+            "your account stays unverified and we'll nudge you once more."
+        ),
+        preheader="Confirm your Tapeline email — link good for 24 hours.",
+    )
+
+
+async def mint_and_send_verification(session, user) -> bool:
+    """Helper: create a fresh 24h verification token for `user`, send the
+    verification email, return True on success.
+
+    Idempotent: wipes any prior unused tokens for this user before issuing
+    a new one — clicking "Resend verification" later is safe and doesn't
+    leave a forest of dead tokens in the DB.
+
+    Used by both the signup hook (auto-send) and the resend-verification
+    endpoint (manual trigger).
+    """
+    from sqlalchemy import delete
+
+    from app.config import get_settings as _settings_factory
+    from app.models import EmailVerificationToken
+
+    s = _settings_factory()
+
+    # Wipe any prior unused tokens — the latest is the only valid one.
+    await session.execute(
+        delete(EmailVerificationToken).where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used_at.is_(None),
+        )
+    )
+
+    import secrets
+    from datetime import UTC, datetime, timedelta
+
+    token = secrets.token_urlsafe(48)
+    expires = datetime.now(UTC) + timedelta(hours=24)
+    session.add(EmailVerificationToken(
+        token=token, user_id=user.id, expires_at=expires,
+    ))
+    await session.commit()
+
+    # Build the two links the email points at. The frontend `/verify-email`
+    # page consumes the token and shows the result; both verify + cancel
+    # flow through the same `?token=` URL so the bounce-back UI can decide
+    # what to show based on the user's click.
+    base = s.app_url.rstrip("/")
+    verify_url = f"{base}/verify-email?token={token}"
+    cancel_url = f"{base}/verify-email?token={token}&action=cancel"
+
+    try:
+        html = render_email_verification_email(
+            user.name or "trader", verify_url, cancel_url,
+        )
+        res = await send_email(
+            user.email,
+            "Confirm your Tapeline email",
+            html,
+            persona="default",
+        )
+        return not res.get("skipped", False)
+    except Exception:
+        logger.exception("verification.send_failed user=%s", user.id)
+        return False
+
+
 # ── Payment-failed ──────────────────────────────────────────────────────────
 
 def _ordinal(n: int) -> str:
