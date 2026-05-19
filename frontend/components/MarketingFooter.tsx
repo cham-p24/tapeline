@@ -11,8 +11,8 @@ import { LiveStatusPill } from "@/components/LiveStatusPill";
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-border">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+    <footer>
+      <div className="mx-auto max-w-6xl px-6 py-6 sm:py-8">
         {/* Top row: brand + nav columns. Mobile = 1 col stack, tablet = 2x2,
             desktop = 4 across. Compact single-line links — descriptions
             previously underneath each link were dropping visual signal-to-
@@ -63,7 +63,7 @@ export function MarketingFooter() {
         </div>
 
         {/* Disclaimer — trimmed to the essentials. Full text lives at /legal/risk. */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-5 text-xs text-muted">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pt-4 text-xs text-muted">
           <p>
             <strong className="text-fg">Not investment advice.</strong> Scores are descriptive, not prescriptive.{" "}
             <Link href="/legal/risk" className="text-accent hover:underline">Risk disclosure</Link>.
