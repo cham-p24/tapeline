@@ -14,7 +14,7 @@ need to tick marketing-opt-in at onboarding for the newsletter to
 actually deliver — `email_prefs` is the day-to-day toggle, but
 marketing_opt_in is the GDPR consent record.
 
-Revision ID: 0023_email_prefs_weekly_newsletter
+Revision ID: 0023_weekly_newsletter_pref
 Revises: 0022_watchlists_and_presets
 Create Date: 2026-05-19 09:00:00
 """
@@ -26,7 +26,7 @@ from typing import Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0023_email_prefs_weekly_newsletter"
+revision: str = "0023_weekly_newsletter_pref"
 down_revision: Union[str, None] = "0022_watchlists_and_presets"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
