@@ -8,14 +8,20 @@ import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
   return (
-    // Page-wide atmospheric layer — a vertical accent gradient that's
-    // visible on mobile (where there's no hero blob halo to carry the
-    // tint). The values were 3-4% opacity originally but feedback was
-    // "blue tinge missing on mobile" — bumped to 7% top / 3% mid / 5%
-    // bottom so the colour reads on a phone display without being
-    // overpowering on desktop. `relative overflow-x-hidden` clip wide
-    // blob halos that would otherwise create a horizontal scrollbar.
-    <main className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-accent/[0.07] via-accent/[0.03] to-accent/[0.05]">
+    // Page-wide atmospheric layer — a vertical accent gradient. Bumped
+    // twice now after founder feedback "the blue tinge is not there":
+    // original 0.04/0.03 → 0.07/0.03/0.05 → 0.14/0.08/0.12. Even at 14%
+    // accent overlay it's still subtle (the accent is iOS systemBlue at
+    // RGB 0/122/255 or 10/132/255 dark — 14% of that on white = a soft
+    // ice-blue tint, on dark = a faint navy wash). Both modes now show
+    // a clearly readable colour.
+    //
+    // Note: section-level `bg-panel/20` / `bg-panel/10` overlays don't
+    // currently render (Tailwind /alpha modifier collides with the
+    // pre-aliased rgba in the --panel CSS var). That's a separate bug
+    // but it actually HELPS here — without those panel overlays
+    // covering the <main>, the gradient shows through every section.
+    <main className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-accent/[0.14] via-accent/[0.08] to-accent/[0.12]">
       <MarketingNav />
 
       {/* HERO — single-purpose fold.
