@@ -4,10 +4,19 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
+// Title / description retuned 2026-05-19 against GSC data: page sat at
+// position 18.6 with 30 imp over 90 days. Previous title was 68 chars
+// with no brand suffix — fix front-loads "Best Stock Scanners 2026" (the
+// query string that "best stock scanners 2026" / "best stock scanner"
+// users actually type, pos 14.5 / 52.5 in GSC respectively) and adds the
+// "| Tapeline" brand suffix so brand impressions accrue alongside
+// category CTR. Description leads with the user's job-to-be-done
+// ("actually worth paying for") and ends with the public-evidence hook
+// (scorecard + public formula) — the Tapeline-specific differentiators.
 export const metadata = pageMeta({
-  title: "10 Best Stock Scanners in 2026 (Free + Paid, Hand-Tested Comparison)",
+  title: "Best Stock Scanners 2026 — 10 Tools Hand-Tested + Compared | Tapeline",
   description:
-    "The 10 stock scanners actually worth paying for in 2026. Multi-factor composite scoring, intraday signals, fundamentals, and AI tools — ranked by transparency, evidence, and value at price.",
+    "10 stock scanners actually worth paying for in 2026 — composite scoring, intraday signals, fundamentals, AI tools. Ranked by transparency, public evidence, and value at price.",
   path: "/best-stock-scanners",
 });
 
