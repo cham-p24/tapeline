@@ -16,7 +16,7 @@ export default function LandingPage() {
           Right: live mock table (ScannerPreview). Nothing else competes.
           The TickerSearch previously sat under the preview, doing the same
           job twice; removed so the eye lands on one demo, not two. */}
-      <section className="relative overflow-hidden px-6 pt-20 pb-16">
+      <section className="relative overflow-hidden px-6 pt-12 pb-12 sm:pt-20 sm:pb-16">
         {/* Decorative gradient blobs — positioned relative to the full viewport
             (no max-w-6xl wrapper) so they bleed full-bleed rather than creating
             a visible "boxed-in" rectangle on wide screens. Two soft, oversized
@@ -35,7 +35,7 @@ export default function LandingPage() {
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
               Live market scanning
             </div>
-            <h1 className="mt-6 text-5xl font-bold tracking-tight sm:text-6xl">
+            <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">
               A scanner that
               <br />
               <span className="text-accent">shows its work.</span>
@@ -83,8 +83,17 @@ export default function LandingPage() {
           The trust pillars used to be a 3-card grid, identical in shape to
           the "How it works" cards below — same rhythm twice. Now: typography-
           led statements with thin dividers, then cards for the process. Two
-          different visual treatments for two different jobs. */}
-      <section className="mx-auto max-w-6xl px-6 py-24">
+          different visual treatments for two different jobs.
+          Section is `relative overflow-hidden` so we can drop in a soft
+          right-side accent blob that picks up the atmosphere from the hero. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
         <p className="eyebrow text-accent">Why Tapeline</p>
         <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           Three things every other scanner won&rsquo;t do.
@@ -146,7 +155,7 @@ export default function LandingPage() {
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
           because each step is sequential and self-contained. */}
       <section className="bg-panel/10">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
           <p className="eyebrow text-accent">How it works</p>
           <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
             From data to decision in one glance.
@@ -188,8 +197,17 @@ export default function LandingPage() {
               and Google's crawl budget for a new domain never reached
               /blog → individual post. Posts are sorted newest-first; show
               the most recent 6 inline + "see all" link to /blog. */}
-      <section className="bg-panel/10">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+      <section className="relative overflow-hidden bg-panel/10">
+        {/* Mid-page atmospheric accent — opposite side from the "Why" section
+            blob so the eye traces a soft accent zigzag down the page rather
+            than seeing a single column of colour. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
             How the score works, on the record.
@@ -233,8 +251,18 @@ export default function LandingPage() {
       {/* OBJECTION HANDLING / FAQ — five short answers to the questions every
           first-time visitor asks before they sign up. Conversion best
           practice: anticipate the doubt that's actually killing the signup
-          and answer it before they need to ask. */}
-      <section className="mx-auto max-w-3xl px-6 py-24">
+          and answer it before they need to ask.
+          Wrapped in a relative-positioned container so we can drop a soft
+          accent blob behind the FAQ for visual continuity with the rest of
+          the page. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
         <p className="eyebrow text-accent">Common questions</p>
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
           Things people ask before signing up.
@@ -296,7 +324,7 @@ export default function LandingPage() {
           "Stop scrolling" line. Restated specifically: one score, one
           sentence, one public record. */}
       <section className="bg-gradient-to-b from-panel/20 to-transparent">
-        <div className="mx-auto max-w-3xl px-6 py-24 text-center">
+        <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />
             <span className="text-accent">One public record.</span>
