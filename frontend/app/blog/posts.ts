@@ -665,6 +665,335 @@ score = 0.25 × trend
       see why. That's the whole product, in one paragraph.</p>
     `,
   },
+  // ---- 2026-05-20: educational long-tail posts ----
+  // Each post targets a high-volume "explain this concept" search query
+  // that retail traders type into Google constantly. Internal links back to
+  // /how-it-works, /scorecard, and the relevant /best-stocks-for/ slug so
+  // the educational traffic warm-funnels into the product.
+  {
+    slug: "what-is-rsi",
+    title: "What is RSI in stocks? A retail trader's plain-English guide (with examples).",
+    excerpt:
+      "RSI stands for Relative Strength Index — a 0–100 momentum oscillator that signals overbought vs oversold conditions. Here's how it actually works, what the 70/30 thresholds mean, and the three mistakes retail traders make using it.",
+    publishedAt: "2026-05-20",
+    author: "Tapeline",
+    body: `
+      <p>RSI is one of those acronyms every trading YouTube channel mentions
+      and almost no one explains properly. Here's the plain-English version:
+      what it is, how it's computed, what the 70/30 thresholds mean, and the
+      three mistakes retail traders make using it.</p>
+
+      <h2>What RSI actually measures</h2>
+      <p><strong>RSI = Relative Strength Index</strong>. It's a momentum
+      oscillator that compares the magnitude of recent gains to the magnitude
+      of recent losses over a lookback period (default: 14 trading days).
+      The output is a 0–100 number, where:</p>
+      <ul>
+        <li><strong>RSI &gt; 70</strong> — traditionally read as "overbought".
+        The stock has rallied hard and may be due for a pause or pullback.</li>
+        <li><strong>RSI &lt; 30</strong> — traditionally read as "oversold".
+        The stock has dropped hard and may be due for a bounce.</li>
+        <li><strong>RSI 30–70</strong> — neutral zone. Most of the time RSI
+        sits here and isn't telling you much on its own.</li>
+      </ul>
+
+      <h2>How RSI is computed</h2>
+      <p>The formula is straightforward. Over the lookback window (14 days
+      standard):</p>
+      <pre>
+RS = average gain / average loss
+RSI = 100 - (100 / (1 + RS))</pre>
+      <p>Average gain = sum of positive daily changes / 14. Average loss =
+      sum of absolute negative daily changes / 14. The 100 / (1 + RS) part
+      bounds the output to 0–100. The exact arithmetic doesn't matter for
+      trading; the intuition does: <strong>RSI rises when up-days outweigh
+      down-days, and falls when down-days outweigh up-days.</strong></p>
+
+      <h2>The three mistakes retail traders make with RSI</h2>
+
+      <h3>1. Trading the 70/30 cross mechanically</h3>
+      <p>"RSI hit 70, time to short" is the most common — and the most
+      reliably wrong — RSI rule. Strong uptrends ride RSI in the 70–90 range
+      for weeks. Selling every time RSI crosses 70 means selling every
+      strong rally early. Strong downtrends similarly camp out at RSI 20–30.
+      Mechanical 70/30 trades work in choppy range-bound markets and lose
+      in trending ones.</p>
+
+      <h3>2. Ignoring the timeframe</h3>
+      <p>RSI on a 1-minute chart is noise. RSI on a daily chart is signal.
+      RSI on a weekly chart is a long-term sentiment gauge. Same number,
+      wildly different meanings. Most retail traders look at RSI on whatever
+      timeframe their chart happens to be open to, then trade as if the
+      signal is universal. It isn't. Pick your timeframe deliberately.</p>
+
+      <h3>3. Treating RSI as a standalone signal</h3>
+      <p>RSI is most useful in confluence with other indicators — trend,
+      relative strength vs the market, volume, fundamentals. Pure-RSI
+      trading is gambling on mean reversion in a market that mostly
+      trends. RSI as part of a broader composite (like
+      <a href="/how-it-works">Tapeline's 6-factor score</a>) is a far more
+      reliable filter.</p>
+
+      <h2>How Tapeline uses RSI</h2>
+      <p>RSI feeds into the <strong>Momentum</strong> factor (10% weight in
+      the composite). Specifically, the Momentum factor looks at RSI
+      position (where in the 0–100 range), the rate of change of RSI (is
+      momentum accelerating or decelerating), and divergences between RSI
+      and price (rare, but high-signal when they appear).</p>
+
+      <p>The reason Momentum is only 10% of the composite — and not, say,
+      30% — is exactly because pure-momentum signals like RSI mean-revert
+      so reliably. The composite balances RSI against
+      <a href="/how-it-works">Trend, Relative Strength, Fundamentals,
+      Smart Money, and Macro</a> so you're not betting your account on a
+      single overbought reading.</p>
+
+      <h2>Practical use cases</h2>
+      <ul>
+        <li><strong>Pullback entries</strong> — in a confirmed uptrend
+        (price above 200DMA, rising RS line), an RSI dip into 35–45 is a
+        higher-probability pullback entry than a random pullback to a
+        chart level. Confluence with the bigger trend.</li>
+        <li><strong>Exhaustion warning</strong> — RSI above 80 on the
+        daily, sustained for multiple sessions, is a yellow flag that the
+        rally is running on fumes. Doesn't mean short; means don't add.</li>
+        <li><strong>Divergence</strong> — when price makes a new high but
+        RSI makes a lower high (or vice versa), the underlying momentum
+        isn't confirming the price action. Rare but high-quality when
+        you spot it.</li>
+      </ul>
+
+      <h2>The bottom line</h2>
+      <p>RSI is a useful tool — not a crystal ball. Treat the 70/30
+      thresholds as warnings, not triggers. Pair RSI with trend and
+      relative-strength context. Don't fight strong trends because RSI
+      is "overbought" — that's how retail traders blow up.</p>
+
+      <p>Want to see RSI in context for every US ticker? The Tapeline
+      composite blends RSI into a single 0–100 score along with five other
+      factors. <a href="/signup">Try the 14-day Premium trial</a> — no
+      credit card.</p>
+    `,
+  },
+  {
+    slug: "how-to-find-momentum-stocks",
+    title: "How to find momentum stocks (without buying every spike).",
+    excerpt:
+      "Momentum investing rewards stocks where price is sustainably accelerating up. The problem: pure 'biggest movers' lists are mostly noise. Here's how to filter for real momentum, including the three confluence checks that separate runners from head-fakes.",
+    publishedAt: "2026-05-20",
+    author: "Tapeline",
+    body: `
+      <p>Every retail trader wants to find momentum stocks early. The problem:
+      pure "biggest movers today" lists are mostly noise — small-caps spiking
+      on rumours, short squeezes that fail by tomorrow, news-pop reversals.
+      Finding <em>real</em> momentum means filtering for stocks where the
+      move is backed by trend, volume, and underlying fundamentals — not
+      stocks where the move <em>is</em> the trade.</p>
+
+      <p>This post is the practical playbook. Three confluence checks to
+      apply to any momentum candidate before you take a position.</p>
+
+      <h2>What "momentum" actually means</h2>
+      <p>Academic finance defines momentum as the tendency of stocks that
+      have outperformed over a 3–12 month window to continue outperforming
+      over the next 1–3 months. Retail finance uses "momentum" more loosely
+      — usually to mean "a stock that's moving up right now." Both are valid
+      but they're not the same thing.</p>
+
+      <p>For trading purposes, momentum is the combination of: <strong>price
+      acceleration</strong> (the rate of price change is increasing),
+      <strong>volume confirmation</strong> (more shares trading on up-days
+      than down-days), and <strong>relative strength</strong> (the stock is
+      outperforming its sector and the broader market). Without all three,
+      what you have is a price spike, not momentum.</p>
+
+      <h2>The three confluence checks</h2>
+
+      <h3>1. Is the stock above its 200-day moving average?</h3>
+      <p>Simple but devastating. Real momentum almost always happens in
+      stocks already in established uptrends — meaning price is above the
+      200-day moving average and the 200DMA itself is sloping up. A stock
+      surging 15% in a day while still below its 200DMA is more often a
+      dead-cat bounce than a momentum breakout. The 200DMA filter cuts the
+      list by 60–70% and removes most of the false signals.</p>
+
+      <h3>2. Is volume confirming the move?</h3>
+      <p>Real momentum moves on above-average volume. A 5% up-day on 0.5×
+      average volume is suspicious — somebody's chasing the price but the
+      institutional flow isn't there. A 5% up-day on 2× average volume is
+      structural — real demand is showing up. Always check the volume
+      multiple (day's volume / 20-day average) before treating a price
+      move as actionable. Below 1.2× is weak; above 1.5× is real.</p>
+
+      <h3>3. Is the stock outperforming its sector AND the S&amp;P 500?</h3>
+      <p>The relative-strength check. If the stock is up 10% but the sector
+      ETF is also up 8%, what you have is sector beta — the stock isn't
+      actually doing anything special, the whole sector is moving. Real
+      momentum stocks show meaningful spread between the stock's return
+      and the sector's return, AND between the sector's return and SPY's.
+      That's leadership. Without it, you're just buying the sector at a
+      slight markup.</p>
+
+      <h2>The mistakes to avoid</h2>
+
+      <h3>Buying after the gap</h3>
+      <p>Most momentum trades fail because the trader sees the move, buys
+      at the top of the daily range, and watches it mean-revert. The
+      structural setup is identified the day <em>before</em> the spike —
+      stocks already in uptrends with rising relative strength and
+      accumulating volume, that haven't yet had their breakout day.
+      Tapeline's composite is built to catch these <em>before</em> the
+      spike, not after.</p>
+
+      <h3>Ignoring fundamentals</h3>
+      <p>Pure-momentum scans pick up junk stocks too. A $2 small-cap with
+      no revenue spiking 80% on a press release isn't momentum — it's a
+      pump. Real momentum tends to come with at least decent fundamentals
+      (positive cash flow, manageable debt, sector tailwind). When a
+      momentum scan and a fundamentals scan disagree, trust the
+      fundamentals scan.</p>
+
+      <h3>Treating every list the same</h3>
+      <p>A "top 30 by 1-day move" list and a "top 30 by 1-month move" list
+      are wildly different universes. Day-trading momentum lives in the
+      1-day list. Swing-trading momentum lives in the 5-day to 1-month
+      list. Long-term position momentum lives in the 3-month to 12-month
+      list. Pick the timeframe that matches how long you intend to hold,
+      then filter that specific list.</p>
+
+      <h2>How Tapeline filters momentum</h2>
+      <p>The Tapeline composite includes a Momentum factor (10% weight)
+      that captures price acceleration, RSI position, MACD posture, and
+      volume confirmation in a single 0–100 sub-score. But Momentum alone
+      isn't enough — the composite balances it against Trend (25%),
+      Relative Strength (20%), and Fundamentals (15%) precisely because
+      pure-momentum signals mean-revert.</p>
+
+      <p>The pre-filtered momentum lists are at
+      <a href="/best-stocks-for/momentum">/best-stocks-for/momentum</a>
+      (5-day move + composite 60+),
+      <a href="/best-stocks-for/breakouts">/best-stocks-for/breakouts</a>
+      (1-day move + composite 70+), and
+      <a href="/best-stocks-for/growth-stocks">/best-stocks-for/growth-stocks</a>
+      (1-month move + composite 65+). Same universe, different timeframes.
+      Pick the one that matches your holding period.</p>
+
+      <h2>The bottom line</h2>
+      <p>Finding momentum stocks is easy. Finding the momentum stocks
+      that <em>continue</em> is hard — and is mostly about filtering out
+      the head-fakes. Confluence is the answer: above 200DMA, volume
+      confirming, beating sector + SPY, supportive fundamentals. Any one
+      of those is necessary but not sufficient. All four together is the
+      pattern.</p>
+    `,
+  },
+  {
+    slug: "best-time-to-buy-stocks",
+    title: "What's the best time to buy stocks? The data answer (it's not what you'd think).",
+    excerpt:
+      "Retail trading folklore says 'buy at the open', 'wait until the last hour', or 'never on Mondays'. We pulled the data on intraday + day-of-week + month-of-year patterns. Here's what actually holds up — and what's just superstition.",
+    publishedAt: "2026-05-20",
+    author: "Tapeline",
+    body: `
+      <p>Every retail trader has heard them: "Mondays are bearish." "Buy at
+      the open, sell at the close." "Avoid trading the first 30 minutes."
+      "Tax-loss season hits the market in November." A lot of this is
+      folklore that survived because it sounds plausible. Some of it is
+      real, with explanations rooted in market structure.</p>
+
+      <p>Here's what actually holds up under data scrutiny — for the
+      retail trader making decisions about <em>when</em> to enter a
+      position, not just which one.</p>
+
+      <h2>Day-of-week effects</h2>
+
+      <h3>The Monday Effect (mostly gone)</h3>
+      <p>Decades of academic studies documented a "Monday effect" —
+      historical underperformance of Mondays vs Tuesday–Friday. The
+      explanation was bad news being held until weekends + Sunday-night
+      hand-wringing pricing in by Monday open. Most studies after 2010
+      find the effect has faded substantially — possibly because
+      24/7 financial news + extended-hours trading prices weekend news
+      in faster. Mondays still skew slightly negative on average but the
+      edge is too small to trade on its own.</p>
+
+      <h3>The Friday-into-Monday rollover</h3>
+      <p>One pattern that <em>has</em> held up: Friday afternoons see
+      reduced institutional positioning ahead of the weekend, which can
+      produce thin liquidity and outsized moves on relatively normal
+      news. If you're entering a position late Friday, expect more noise
+      than usual. If you're holding through weekend, expect a Monday gap
+      either direction.</p>
+
+      <h2>Intraday timing</h2>
+
+      <h3>The first 30 minutes</h3>
+      <p>The market open (9:30–10:00 ET) is the most volatile window of
+      the trading day. Spreads are wider, prices gap on overnight news,
+      retail order flow is concentrated. For most retail traders, the
+      first 30 minutes is the worst time to enter — you're trading
+      against algos optimised for that exact window. Wait until 10:00 ET
+      and the picture stabilises substantially.</p>
+
+      <h3>The midday lull</h3>
+      <p>11:30 ET to roughly 14:00 ET is the lowest-volume window of the
+      US session — institutional desks are at lunch, news flow slows.
+      Prices drift, ranges compress. For swing traders, this is a fine
+      window to enter at a confirmed setup. For day traders, this is
+      often a time to do nothing.</p>
+
+      <h3>The close</h3>
+      <p>The last 30 minutes (15:30–16:00 ET) sees a return of volume
+      and volatility as end-of-day flows hit: closing auctions, MOC
+      orders, index rebalancing. The closing print sets the official
+      record for the day's price. If you're entering on a confirmed
+      breakout, the last hour is often a stronger entry than the
+      midday range because volume confirms the move.</p>
+
+      <h2>Month and quarter effects</h2>
+
+      <h3>The January Effect</h3>
+      <p>Small-caps have historically outperformed in January, possibly
+      because of December tax-loss selling reversing + new-year fund
+      allocations. The effect has weakened over the last 20 years but
+      isn't dead. Small-cap-heavy strategies have a mild structural
+      tailwind in early January.</p>
+
+      <h3>Sell in May and go away</h3>
+      <p>This one is half-real. The May–October window has, on average,
+      lower returns than the November–April window over the last century.
+      But "lower" doesn't mean "negative" — May–October has been
+      positive on average. The trade isn't "sell in May" so much as "be
+      a bit more selective about new positions in the summer months."</p>
+
+      <h3>Earnings seasons</h3>
+      <p>Mid-January, mid-April, mid-July, mid-October — earnings
+      announcements concentrate. Implied volatility rises across the
+      board. Individual stocks gap on earnings beats and misses. If
+      you're trading individual names, knowing which weeks are dense
+      with reports for your holdings matters more than any seasonal
+      calendar effect. Tapeline's earnings calendar at
+      <a href="/app/earnings">/app/earnings</a> filters to the names
+      you actually care about.</p>
+
+      <h2>The honest answer</h2>
+      <p>The best time to buy a stock is when the setup is right, not
+      when the calendar says so. Day-of-week effects are weak and
+      mostly arbitraged away. Intraday timing matters more — avoid
+      the first 30 minutes, use the close window for confirmed
+      breakouts, treat the midday lull as a research window. Month
+      effects are real but small.</p>
+
+      <p>The bigger question — "is this stock setting up?" — matters
+      far more than "what time of day is it?" The Tapeline composite
+      is built to answer the first question. The second question
+      mostly takes care of itself once the first one is settled.</p>
+
+      <p><a href="/signup">Try the 14-day Premium trial</a> — no card,
+      cancel in one click. Read every score the same way our public
+      scorecard does.</p>
+    `,
+  },
 ];
 
 export function findPost(slug: string): BlogPost | null {
