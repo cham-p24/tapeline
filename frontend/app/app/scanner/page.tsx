@@ -126,7 +126,7 @@ export default function ScannerPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search ticker (AAPL, NVDA, TSLA...)"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+            className="flex-1 bg-transparent text-base outline-none placeholder:text-muted"
             autoComplete="off"
             spellCheck={false}
             maxLength={20}
@@ -151,7 +151,7 @@ export default function ScannerPage() {
             max={100}
             value={minScore}
             onChange={(e) => setMinScore(Number(e.target.value))}
-            className="w-20 bg-transparent text-sm nums"
+            className="w-20 bg-transparent text-base nums"
           />
         </div>
         <div className="card px-3 py-2">
@@ -171,7 +171,7 @@ export default function ScannerPage() {
           <select
             value={sector}
             onChange={(e) => setSector(e.target.value)}
-            className="bg-transparent text-sm"
+            className="bg-transparent text-base"
           >
             <option value="">All sectors</option>
             {[
@@ -197,7 +197,7 @@ export default function ScannerPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="bg-transparent text-sm"
+            className="bg-transparent text-base"
           >
             <option value="score">Score</option>
             <option value="change_pct_1d">1D change</option>
