@@ -44,16 +44,24 @@ export default function PricingPage() {
       <TrackPageView event="pricing_page_viewed" properties={{ surface: "marketing" }} />
       <MarketingNav />
 
-      {/* Hero — single tight intro, no orphaned scroll links */}
+      {/* Hero — sharper value-led headline. Was 'Pick your tier' which sold
+          nothing; now reframes pricing as a choice of commitment, not a
+          choice of product. Same data, same formula, same public record
+          across all three tiers — the price is just about how much of the
+          surface you want. */}
       <section className="section py-16 sm:py-20">
         <div className="mx-auto max-w-3xl text-center">
           <p className="eyebrow">Pricing</p>
-          <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
-            Pick your tier.
+          <h1 className="mt-3 text-4xl sm:text-6xl font-bold tracking-tight">
+            Same tape.{" "}
+            <span className="bg-gradient-to-r from-accent to-accent2 bg-clip-text text-transparent">
+              Three commitment levels.
+            </span>
           </h1>
-          <p className="mt-4 text-base sm:text-lg text-muted">
-            Every signup starts with a 14-day Premium trial. No credit card.
-            Cancel in one click, anytime.
+          <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
+            Every signup starts with a 14-day Premium trial &mdash; no credit
+            card, cancel in one click. Annual subscribers lock today&rsquo;s
+            price for as long as the subscription stays active.
           </p>
         </div>
 
