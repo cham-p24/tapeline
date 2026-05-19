@@ -44,16 +44,24 @@ export default function PricingPage() {
       <TrackPageView event="pricing_page_viewed" properties={{ surface: "marketing" }} />
       <MarketingNav />
 
-      {/* Hero — single tight intro, no orphaned scroll links */}
+      {/* Hero — sharper value-led headline. Was 'Pick your tier' which sold
+          nothing; now reframes pricing as a choice of commitment, not a
+          choice of product. Same data, same formula, same public record
+          across all three tiers — the price is just about how much of the
+          surface you want. */}
       <section className="section py-16 sm:py-20">
         <div className="mx-auto max-w-3xl text-center">
           <p className="eyebrow">Pricing</p>
-          <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
-            Pick your tier.
+          <h1 className="mt-3 text-4xl sm:text-6xl font-bold tracking-tight">
+            Same tape.{" "}
+            <span className="bg-gradient-to-r from-accent to-accent2 bg-clip-text text-transparent">
+              Three commitment levels.
+            </span>
           </h1>
-          <p className="mt-4 text-base sm:text-lg text-muted">
-            Every signup starts with a 14-day Premium trial. No credit card.
-            Cancel in one click, anytime.
+          <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
+            Every signup starts with a 14-day Premium trial &mdash; no credit
+            card, cancel in one click. Annual subscribers lock today&rsquo;s
+            price for as long as the subscription stays active.
           </p>
         </div>
 
@@ -63,7 +71,7 @@ export default function PricingPage() {
       </section>
 
       {/* Comparison — soft section break, tighter heading */}
-      <section className="border-t border-border/60 bg-panel/20">
+      <section className="bg-panel/20">
         <div className="section py-14 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Every feature, every limit.</h2>
@@ -81,7 +89,7 @@ export default function PricingPage() {
         <div className="mx-auto max-w-2xl">
           <h2 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Common questions</h2>
 
-          <div className="mt-8 divide-y divide-border border-y border-border">
+          <div className="mt-8 divide-y divide-border/60">
             <Faq
               q="What happens when my trial ends?"
               a="Your account drops to Free — top 20 tickers, 24-hour delayed. Watchlists and settings stay intact. Add a card any time to keep Premium."
@@ -102,7 +110,7 @@ export default function PricingPage() {
 
           <div className="mt-10 text-center">
             <Link href="/signup" className="btn-accent inline-flex h-11 px-6 text-base">
-              Start 14-day trial &rarr;
+              Try Premium free for 14 days &rarr;
             </Link>
             <p className="mt-3 text-xs text-subtle">
               No credit card required ·{" "}

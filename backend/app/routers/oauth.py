@@ -29,8 +29,10 @@ from __future__ import annotations
 
 import logging
 import secrets
+import string
 import time
 import uuid
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
@@ -48,6 +50,16 @@ from app.services.session import issue_session_token, session_cookie_kwargs
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+
+
+def _generate_referral_code() -> str:
+    """Short, human-readable referral code. Mirrors auth.py's generator —
+    inlined here so OAuth-created users get one without taking a circular
+    import dependency on the routers package."""
+    alphabet = string.ascii_uppercase + string.digits
+    for ch in "0O1IL":
+        alphabet = alphabet.replace(ch, "")
+    return "".join(secrets.choice(alphabet) for _ in range(8))
 
 
 PROVIDERS = {
@@ -281,24 +293,57 @@ async def oauth_callback(
     # Find or create user
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
+    is_new = user is None
     if user is None:
+        # Mirror the native-signup trial grant — OAuth signups land on Premium
+        # for 14 days with no card, then get dropped to Free by
+        # `_downgrade_expired_trials` if they never add a Stripe customer.
+        # Without this, Google/Microsoft/Apple signups land directly on Free
+        # and never see the product the marketing copy promised.
+        trial_ends = datetime.now(UTC) + timedelta(days=14)
+        ref_code = _generate_referral_code()
+        for _ in range(5):  # retry on the (unlikely) referral-code collision
+            conflict = await session.execute(
+                select(User).where(User.referral_code == ref_code)
+            )
+            if conflict.scalar_one_or_none() is None:
+                break
+            ref_code = _generate_referral_code()
         user = User(
             id=f"u_{uuid.uuid4().hex}",
             email=email,
             name=name,
-            tier="free",
+            tier="premium",
             password_hash=None,  # OAuth-only account
+            trial_ends_at=trial_ends,
+            referral_code=ref_code,
+            # OAuth providers proved ownership of this address — auto-stamp
+            # email_verified_at so the user doesn't see a redundant
+            # "verify your email" banner.
+            email_verified_at=datetime.now(UTC),
         )
         session.add(user)
         await session.commit()
         await session.refresh(user)
-        logger.info("oauth.user_created provider=%s email=%s", provider, email)
+        logger.info("oauth.user_created provider=%s email=%s trial_ends=%s",
+                    provider, email, trial_ends.isoformat())
     else:
+        # Returning OAuth user. If they were never verified (signed up
+        # natively first, then later via OAuth), stamp it now — the
+        # provider just re-proved ownership.
+        if user.email_verified_at is None:
+            user.email_verified_at = datetime.now(UTC)
+            await session.commit()
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
-    # Issue session cookie + redirect to app
+    # Issue session cookie + redirect to app. New OAuth signups pass through
+    # /app/onboarding first (same flow as native signup). Existing users skip
+    # straight to the scanner.
     token = issue_session_token(user.id)
-    redirect_url = f"{settings.app_url}/app/scanner"
+    if is_new:
+        redirect_url = f"{settings.app_url}/app/onboarding?next=/app/scanner"
+    else:
+        redirect_url = f"{settings.app_url}/app/scanner"
     resp = RedirectResponse(redirect_url)
     resp.set_cookie(value=token, **session_cookie_kwargs())
     resp.delete_cookie(f"oauth_state_{provider}", path="/")

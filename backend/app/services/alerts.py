@@ -34,13 +34,18 @@ from app.models import (
     SqueezeSetup,
     Ticker,
     User,
+    WatchlistItem,
 )
-from app.services.email import render_alert_email, send_email
+from app.services.email import render_alert_email, render_watchlist_alert_email, send_email
 
 logger = logging.getLogger(__name__)
 
 # Debounce: don't fire the same rule more than once every 15 minutes
 MIN_FIRE_INTERVAL = timedelta(minutes=15)
+
+# Watchlist smart-alerts re-fire at most once per 24h per item — the EOD
+# digest carries the steady-state drumbeat for a ticker that stays elevated.
+WATCHLIST_ALERT_DEBOUNCE = timedelta(hours=24)
 
 # Look-back window for "new" congress trades — only fire on trades disclosed
 # in the last hour (prevents re-firing on the entire backlog every tick)
@@ -60,6 +65,102 @@ async def evaluate_all_rules(session: AsyncSession) -> int:
     fired += await evaluate_regime_rules(session)
     fired += await evaluate_congress_rules(session)
     fired += await evaluate_news_rules(session)
+    fired += await evaluate_watchlist_alerts(session)
+    return fired
+
+
+async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
+    """Fire a per-ticker email when a watchlisted item's score moves past
+    its alert_threshold_delta relative to the baseline.
+
+    Differs from the AlertRule-driven evaluators above in that the trigger
+    lives on the WatchlistItem row itself — no user-authored rule needed.
+    Every Pro+ user with a watchlist gets this for free; Free users have
+    watchlists capped at 5 with no alerts (tier.py:FEATURES["alerts.email"]
+    requires pro).
+
+    Debounced via `WatchlistItem.last_alert_at` — once fired, we won't
+    re-alert the same item for 24h even if it stays past the threshold.
+    The EOD digest carries the steady-state cadence.
+
+    Per-user email-prefs ALERT_EMAILS gate is respected — opting out of
+    rule-driven alert emails also silences these.
+    """
+    from app.services.email_prefs import EmailPref, wants
+    from app.services.tier import Tier, has_feature
+
+    now = datetime.now(UTC)
+
+    # Pull every (item, user, ticker) where ticker has a current score.
+    # Inner-join on Ticker so we never evaluate orphan symbols. Outer-join
+    # users (always exists; the FK guarantees that).
+    rows_r = await session.execute(
+        select(WatchlistItem, User, Ticker)
+        .join(User, User.id == WatchlistItem.user_id)
+        .join(Ticker, Ticker.symbol == WatchlistItem.symbol)
+        .where(Ticker.score.isnot(None))
+        .where(WatchlistItem.baseline_score.isnot(None))
+    )
+    rows = list(rows_r.all())
+    if not rows:
+        return 0
+
+    fired = 0
+    for item, user, ticker in rows:
+        # Tier gate — free users get the data but not the email.
+        if not has_feature(Tier(user.tier), "alerts.email"):
+            continue
+        # Per-user email-prefs — alerts are opt-out-able.
+        if not wants(user, EmailPref.ALERT_EMAILS):
+            continue
+        # Time-based debounce. SQLite drops tzinfo on roundtrip even with
+        # timezone=True on the column, so coerce-to-aware before subtracting
+        # to match Postgres behaviour.
+        last = item.last_alert_at
+        if last is not None:
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=UTC)
+            if (now - last) < WATCHLIST_ALERT_DEBOUNCE:
+                continue
+        # Threshold check.
+        if ticker.score is None or item.baseline_score is None:
+            continue
+        delta = ticker.score - item.baseline_score
+        threshold = item.alert_threshold_delta or 10.0
+        if abs(delta) < threshold:
+            continue
+
+        try:
+            html = render_watchlist_alert_email(
+                user_name=user.name or "trader",
+                symbol=item.symbol,
+                current_score=ticker.score,
+                baseline_score=item.baseline_score,
+                signal=ticker.signal,
+                reason=ticker.reason,
+            )
+            sign = "+" if delta >= 0 else ""
+            subject = (
+                f"[Tapeline] {item.symbol} watchlist alert · "
+                f"score {ticker.score:.0f} ({sign}{delta:.1f})"
+            )
+            res = await send_email(
+                user.email, subject, html, persona="alerts",
+            )
+            delivered = not res.get("skipped", False)
+            item.last_alert_at = now
+            fired += 1
+            logger.info(
+                "alert.watchlist user=%s symbol=%s score=%.1f delta=%+.1f delivered=%s",
+                user.id, item.symbol, ticker.score, delta, delivered,
+            )
+        except Exception:
+            logger.exception(
+                "alert.watchlist_failed user=%s symbol=%s", user.id, item.symbol,
+            )
+
+    if fired:
+        await session.commit()
     return fired
 
 

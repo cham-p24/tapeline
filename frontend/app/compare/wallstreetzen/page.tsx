@@ -87,7 +87,7 @@ const WINS = [
   },
   {
     label: "Macro regime + sector heatmap in same tool",
-    tapeline: "✓ Live VIX / DXY / 10Y from FRED, breadth + sector rotation",
+    tapeline: "✓ Live VIX / DXY / 10Y macro indicators, breadth + sector rotation",
     competitor: "—",
   },
 ];
@@ -175,7 +175,7 @@ export default function VsWallStreetZenPage() {
         </div>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+            <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">Feature</th>
                 <th className="px-4 py-3 text-left text-accent">Tapeline</th>
@@ -221,7 +221,7 @@ export default function VsWallStreetZenPage() {
           Free tier is hard-capped on purpose (20 tickers, 24h delayed). Start the trial to see the live product properly. No card.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup" className="btn-primary">Start free trial →</Link>
+          <Link href="/signup" className="btn-primary">Try Premium free →</Link>
           <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">
@@ -232,7 +232,7 @@ export default function VsWallStreetZenPage() {
       {/* Visible FAQ — mirrors COMPARE_FAQ JSON-LD. */}
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <h2 className="text-2xl font-semibold tracking-tight">Tapeline vs WallStreetZen — questions</h2>
-        <div className="mt-6 divide-y divide-border border-y border-border">
+        <div className="mt-6 divide-y divide-border/60">
           {COMPARE_FAQ.map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">

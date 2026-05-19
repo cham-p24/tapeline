@@ -20,9 +20,16 @@ def test_payment_failed_renders_with_user_name_and_tier() -> None:
     assert 'href="https://tapeline.io/app/billing"' in html
     # First-attempt copy is the soft variant ("Stripe will retry automatically")
     assert "Stripe will retry automatically" in html
-    # No jinja or f-string syntax leaks
-    assert "{" not in html.replace("{margin", "").replace("{display", "").replace("{font", "")  # CSS uses {} legitimately
-    assert "}}" not in html
+    # No jinja or f-string template placeholders leaked through. The shell
+    # has a legitimate <style> block with CSS curly braces, so we look for
+    # the unmistakable signature of an unresolved placeholder: a `{word}`
+    # or `{word_word}` token surrounded by HTML text (NOT inside `<style>`).
+    import re
+    # Strip the <style>...</style> block so we don't false-positive on CSS.
+    html_no_style = re.sub(r"<style[\s\S]*?</style>", "", html, flags=re.IGNORECASE)
+    # Any remaining `{identifier}` is a leaked placeholder.
+    leaked = re.findall(r"\{[a-z_][a-z0-9_]*\}", html_no_style)
+    assert not leaked, f"unresolved template placeholders: {leaked[:5]}"
 
 
 def test_payment_failed_third_attempt_uses_urgent_copy() -> None:

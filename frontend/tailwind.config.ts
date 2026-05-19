@@ -51,13 +51,31 @@ const config: Config = {
         muted:      tokenRgb("muted"),
         subtle:     tokenRgb("subtle"),
         accent:     tokenRgb("accent"),
+        // `accent2` — gradient pair for accent. iOS systemIndigo. Used in
+        // `from-accent to-accent2` button + badge gradients across the
+        // marketing surfaces. Was missing before; gradients silently fell
+        // back to flat accent.
+        accent2:    tokenRgb("accent2"),
         up:         tokenRgb("up"),
         down:       tokenRgb("down"),
+        // iOS systemYellow / amber. Used for CAUTION-tier signal pills,
+        // warning banners, trial-ending callouts. Adapts per theme:
+        // darker amber on light bg (for readable contrast against white),
+        // brighter amber on dark bg (matches iOS dark-mode systemYellow).
+        warn:       tokenRgb("warn"),
         // Tokens that ship with built-in alpha — surface tints + the
         // hairline divider. Alpha modifiers won't compose on these; use a
         // different utility (`bg-fg/10` etc.) if you need a custom alpha.
-        panel:  tokenWithAlpha("panel"),
-        border: tokenWithAlpha("border"),
+        panel:   tokenWithAlpha("panel"),
+        // `panel2` — one shade deeper than panel. For nested surfaces
+        // (input fields inside cards, the "Everything in Pro" strip inside
+        // the pricing card, etc.). Previously undefined.
+        panel2:  tokenWithAlpha("panel2"),
+        border:  tokenWithAlpha("border"),
+        // `border2` — emphasised border, more visible than the hairline.
+        // For interactive elements that need a tactile edge (pricing card
+        // CTA buttons, etc.). Previously undefined.
+        border2: tokenWithAlpha("border2"),
       },
       boxShadow: {
         // iOS-style elevation. Soft, low-spread, biased toward dark on

@@ -11,16 +11,54 @@ import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ScannerLegend } from "@/components/ScannerLegend";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
+import { PresetMenu } from "@/components/PresetMenu";
+import { useUser } from "@/components/UserContext";
 
 type SortKey = "score" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
 
+// Shape of the filter blob saved into ScannerPreset.filters_json. Adding
+// new filter dimensions later is backwards-compatible — old presets just
+// lack the new keys; we treat missing keys as "no filter / default".
+type ScannerFilters = {
+  minScore: number;
+  sort: SortKey;
+  order: "asc" | "desc";
+  sector: string;
+  search: string;
+};
+
+// Mirror of `saved_scans` caps from backend/app/services/tier.py. The
+// server-side cap is the authoritative gate; this just disables the UI
+// button for Free users (cap=0) so they don't waste a click before the
+// 403 lands.
+const SAVED_SCANS_CAP_BY_TIER: Record<string, number> = {
+  free: 0,
+  pro: 10,
+  premium: 100,
+};
+
 export default function ScannerPage() {
+  const { user } = useUser();
   const [rows, setRows] = useState<ScannerRow[]>([]);
   const [minScore, setMinScore] = useState(0);
   const [sort, setSort] = useState<SortKey>("score");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [sector, setSector] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  // Restore filter state from a saved preset blob. JSON-parsed by
+  // PresetMenu before we get here; missing keys fall through to current
+  // state, so a preset saved before some new filter dimension was added
+  // still applies cleanly.
+  const applyPreset = useCallback((f: ScannerFilters) => {
+    if (typeof f.minScore === "number") setMinScore(f.minScore);
+    if (f.sort) setSort(f.sort);
+    if (f.order === "asc" || f.order === "desc") setOrder(f.order);
+    if (typeof f.sector === "string") setSector(f.sector);
+    if (typeof f.search === "string") setSearch(f.search);
+  }, []);
+
+  const savedScansCap = SAVED_SCANS_CAP_BY_TIER[user?.tier ?? "free"] ?? 0;
   // Symbol search — debounced 250ms so typing "NVDA" fires one request not 4.
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -88,7 +126,7 @@ export default function ScannerPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search ticker (AAPL, NVDA, TSLA...)"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+            className="flex-1 bg-transparent text-base outline-none placeholder:text-muted"
             autoComplete="off"
             spellCheck={false}
             maxLength={20}
@@ -113,7 +151,7 @@ export default function ScannerPage() {
             max={100}
             value={minScore}
             onChange={(e) => setMinScore(Number(e.target.value))}
-            className="w-20 bg-transparent text-sm nums"
+            className="w-20 bg-transparent text-base nums"
           />
         </div>
         <div className="card px-3 py-2">
@@ -133,7 +171,7 @@ export default function ScannerPage() {
           <select
             value={sector}
             onChange={(e) => setSector(e.target.value)}
-            className="bg-transparent text-sm"
+            className="bg-transparent text-base"
           >
             <option value="">All sectors</option>
             {[
@@ -159,7 +197,7 @@ export default function ScannerPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="bg-transparent text-sm"
+            className="bg-transparent text-base"
           >
             <option value="score">Score</option>
             <option value="change_pct_1d">1D change</option>
@@ -175,6 +213,14 @@ export default function ScannerPage() {
         >
           {order === "desc" ? "↓ high first" : "↑ low first"}
         </button>
+        {/* Phase A: scanner-preset save + load. Free tier (cap=0) sees
+            the load dropdown but the Save button is disabled with an
+            upgrade tooltip. */}
+        <PresetMenu<ScannerFilters>
+          cap={savedScansCap}
+          currentFilters={{ minScore, sort, order, sector, search }}
+          onApply={applyPreset}
+        />
         <span className="ml-auto self-center text-xs text-muted">
           Showing <strong className="text-fg">{rows.length}</strong> · refresh every 10s
         </span>
@@ -223,7 +269,7 @@ export default function ScannerPage() {
                 )}
               </td></tr>
             ) : rows.map((r) => (
-              <tr key={r.symbol} className="border-b border-border/20 hover:bg-black/20">
+              <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
                 </td>
@@ -273,7 +319,7 @@ function SignalPill({ v }: { v: string }) {
     : v === "STRONG SETUP" ? "bg-up/10 text-up"
     : v === "CONSTRUCTIVE" ? "bg-accent/10 text-accent"
     : v === "NEUTRAL" ? "bg-muted/20 text-muted"
-    : v === "CAUTION" ? "bg-yellow-500/10 text-yellow-400"
+    : v === "CAUTION" ? "bg-warn/10 text-warn"
     : "bg-down/10 text-down";
   return <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${tone}`}>{v}</span>;
 }
@@ -292,7 +338,7 @@ function confidenceColor(c: number | null | undefined) {
   if (c == null) return "text-muted";
   if (c >= 80) return "text-up";
   if (c >= 60) return "text-fg";
-  if (c >= 40) return "text-yellow-400";
+  if (c >= 40) return "text-warn";
   return "text-down";
 }
 function confidenceLabel(c: number | null | undefined) {

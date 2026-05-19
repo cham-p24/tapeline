@@ -7,6 +7,8 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { TrialBanner } from "@/components/TrialBanner";
+import { TrialEndedModal } from "@/components/TrialEndedModal";
+import { TrialEarlyCapture } from "@/components/TrialEarlyCapture";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
@@ -49,7 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="min-h-screen">
-        <nav className="sticky top-0 z-40 border-b border-white/5 bg-background/90 backdrop-blur">
+        <nav className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
             <Link href="/" className="flex items-center gap-2">
               <div className="h-2 w-6 rounded-full bg-accent" />
@@ -82,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {mobileOpen && (
-            <div className="border-t border-border md:hidden">
+            <div className="md:hidden">
               <div className="mx-auto flex max-w-7xl flex-col gap-1 px-6 py-3">
                 {tabs.map((t) => (
                   <Link
@@ -110,7 +112,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
 
-        <footer className="mt-16 border-t border-border">
+        {/* Card-capture moments. Both are self-gating on user/tier state:
+            - TrialEndedModal fires once when an expired-trial user lands on /app.
+            - TrialEarlyCapture fires once mid-trial (days 5-9 remaining).
+            They render nothing when their conditions aren't met, so they're
+            safe to mount globally. */}
+        <TrialEndedModal />
+        <TrialEarlyCapture />
+
+        <footer className="mt-16">
           <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted">
             Not investment advice. For informational purposes only.&nbsp;
             <Link href="/legal/risk" className="hover:text-fg">Risk disclosure</Link>
@@ -130,7 +140,7 @@ function SearchButton() {
       title="Search any ticker — keyboard shortcut shown next to the label"
     >
       Search&nbsp;
-      <kbd className="rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-mono" aria-label="Keyboard shortcut">
+      <kbd className="rounded bg-panel px-1.5 py-0.5 text-[10px] font-mono" aria-label="Keyboard shortcut">
         {label}
       </kbd>
     </button>
@@ -161,7 +171,7 @@ function UserChip() {
       <button
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        className="flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-sm hover:bg-black/30"
+        className="flex items-center gap-2 rounded-md border border-border bg-panel px-3 py-1.5 text-sm hover:bg-panel-hover"
         aria-label={`Account menu for ${displayName}`}
       >
         <span className="font-medium">{displayName}</span>
@@ -178,16 +188,16 @@ function UserChip() {
             <div className="text-sm font-medium">{displayName}</div>
             <div className="truncate text-xs text-muted">{user.email}</div>
           </div>
-          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Account &amp; settings
           </Link>
-          <Link href="/app/watchlist" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/watchlist" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             My watchlist
           </Link>
-          <Link href="/app/alerts" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/alerts" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Alert rules
           </Link>
-          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Email preferences
           </Link>
           <div className="border-t border-border" />
@@ -196,17 +206,17 @@ function UserChip() {
               scheduled at sunset on their Mac gets it automatically. */}
           <ThemeSwitcher />
           <div className="border-t border-border" />
-          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-black/30">
+          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Billing &amp; plan
           </Link>
           {user.tier === "free" && (
-            <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-black/30">
+            <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-panel-hover">
               Upgrade to Pro →
             </Link>
           )}
           <button
             onClick={async () => { await signout(); window.location.href = "/"; }}
-            className="block w-full border-t border-border px-4 py-2 text-left text-sm text-muted hover:text-down"
+            className="block w-full px-4 py-2 text-left text-sm text-muted hover:text-down"
           >
             Sign out
           </button>
@@ -265,7 +275,7 @@ function MobileUserChip() {
   }
   return (
     <>
-      <div className="mt-2 border-t border-border pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
+      <div className="mt-2 pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
       <Link href="/app/billing" className="px-3 py-2 text-sm text-muted">Billing &amp; plan</Link>
       <button onClick={async () => { await signout(); window.location.href = "/"; }} className="px-3 py-2 text-left text-sm text-down">
         Sign out

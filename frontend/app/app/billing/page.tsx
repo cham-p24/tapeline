@@ -186,7 +186,7 @@ export default function BillingPage() {
         <div className={`rounded-lg border p-4 text-sm ${
           msg.kind === "err"
             ? "border-down/40 bg-down/5 text-down"
-            : "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
+            : "border-warn/30 bg-warn/5 text-warn"
         }`}>
           {msg.text}
         </div>
@@ -237,7 +237,7 @@ export default function BillingPage() {
           {tier === "free" && (
             <div className="mt-6">
               <Link href="/signup" className="btn-accent text-sm">
-                Start 14-day Premium trial →
+                Try Premium free for 14 days →
               </Link>
             </div>
           )}
@@ -280,7 +280,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted">
                 {billingPeriod === "annual"
-                  ? `Effective $${meta.annualMonthly}/mo · 30-day money-back, no questions.`
+                  ? `Effective $${meta.annualMonthly}/mo · 7-day money back, cancel in one click.`
                   : "Switch to annual to save ~14-19% and lock the price forever."}
               </p>
             </>
@@ -323,7 +323,7 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                30-day money-back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
+                7-day money back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
@@ -405,7 +405,7 @@ export default function BillingPage() {
                 </div>
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
-              <div className="border-t border-border/60 p-5 pt-2">
+              <div className="p-5 pt-2">
                 <ComparisonTable />
               </div>
             </details>
@@ -420,7 +420,7 @@ export default function BillingPage() {
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
               title="Bloomberg-grade data"
-              body="Same market feed (Massive, formerly Polygon), Fed data (FRED), fundamentals (Finnhub) used by quant funds. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
+              body="Same shape of inputs quant funds use — live market data, macro indicators, fundamentals, SEC filings. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
             />
             <Selling
               title="Public scorecard, day 1"
@@ -455,7 +455,7 @@ export default function BillingPage() {
       </section>
 
       {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border/60 pt-6 text-xs text-muted">
+      <footer className="pt-6 text-xs text-muted">
         Questions about a charge or want to cancel?
         Email <a href="mailto:support@tapeline.io" className="text-accent hover:underline">support@tapeline.io</a>
         — usually replied to within a business day.
@@ -815,7 +815,7 @@ function Plan({
       {/* "Everything in Pro" anchor strip — makes the upgrade reason
           obviously the additions, not a duplicated bullet list. */}
       {proPlus && (
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-border bg-black/30 px-2.5 py-1.5 text-[11px] text-muted">
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-border bg-panel px-2.5 py-1.5 text-[11px] text-muted">
           <span className="text-up">✓</span>
           <span>Everything in Pro</span>
           <span className="ml-auto text-accent font-medium">+ all of:</span>

@@ -49,40 +49,59 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io";
   const now = new Date();
 
+  // Per-URL stable lastModified dates. Previously every entry used `now`,
+  // which Google heuristics treat as "the whole site changed" — a signal
+  // they're known to downweight (and a likely contributor to the 496
+  // "Discovered / crawled but not indexed" pages in GSC, since the
+  // sitemap was telling Google to recrawl static content multiple times
+  // a day with no real changes). Use the last known revision date per
+  // page; the daily-changing surfaces (scanner-derived: scorecard,
+  // signals, sector, signal, strategy, ticker) keep changeFrequency=daily
+  // so Google still revisits them.
+  const STATIC_LAST_MODIFIED = new Date("2026-05-18");
+  const LEGAL_LAST_MODIFIED = new Date("2026-05-17");   // privacy rewrite in PR #35
+  const HOWITWORKS_LAST_MODIFIED = new Date("2026-05-17");
+
   const staticEntries: MetadataRoute.Sitemap = [
-    { url: `${base}/`,                          lastModified: now, priority: 1.0 },
-    { url: `${base}/pricing`,                   lastModified: now, priority: 0.9 },
-    { url: `${base}/how-it-works`,              lastModified: now, priority: 0.9 },
-    { url: `${base}/data-sources`,              lastModified: now, priority: 0.85 },
-    { url: `${base}/scorecard`,                 lastModified: now, priority: 0.9 },
-    { url: `${base}/signals`,                   lastModified: now, priority: 0.9 },
-    { url: `${base}/about`,                     lastModified: now, priority: 0.8 },
-    { url: `${base}/press`,                     lastModified: now, priority: 0.7 },
-    { url: `${base}/blog`,                      lastModified: now, priority: 0.7 },
-    { url: `${base}/changelog`,                 lastModified: now, priority: 0.6 },
-    { url: `${base}/roadmap`,                   lastModified: now, priority: 0.6 },
-    { url: `${base}/status`,                    lastModified: now, priority: 0.4 },
+    { url: `${base}/`,                          lastModified: STATIC_LAST_MODIFIED, priority: 1.0 },
+    { url: `${base}/pricing`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.9 },
+    { url: `${base}/how-it-works`,              lastModified: HOWITWORKS_LAST_MODIFIED, priority: 0.9 },
+    { url: `${base}/data-sources`,              lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    // Scorecard is daily-refreshing (new top-10 picks every market close).
+    { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: `${base}/signals`,                   lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
+    { url: `${base}/blog`,                      lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
+    { url: `${base}/changelog`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
+    { url: `${base}/roadmap`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
+    { url: `${base}/status`,                    lastModified: now, changeFrequency: "hourly", priority: 0.4 },
     // Comparison pages — high commercial-investigation intent.
-    { url: `${base}/compare/finviz`,            lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/zacks`,             lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/wallstreetzen`,     lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/tradingview`,       lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/trade-ideas`,       lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/koyfin`,            lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/tipranks`,          lastModified: now, priority: 0.8 },
-    { url: `${base}/compare/simply-wall-st`,    lastModified: now, priority: 0.8 },
+    { url: `${base}/compare/finviz`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/zacks`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/wallstreetzen`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/tradingview`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/trade-ideas`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/koyfin`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/tipranks`,          lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/simply-wall-st`,    lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/seeking-alpha`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/stock-rover`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/benzinga-pro`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/stockcharts`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
-    { url: `${base}/best-finviz-alternatives`,  lastModified: now, priority: 0.8 },
-    { url: `${base}/best-stock-scanners`,       lastModified: now, priority: 0.8 },
-    { url: `${base}/signin`,                    lastModified: now, priority: 0.4 },
-    { url: `${base}/signup`,                    lastModified: now, priority: 0.6 },
-    { url: `${base}/contact`,                   lastModified: now, priority: 0.4 },
-    { url: `${base}/legal/risk`,                lastModified: now, priority: 0.3 },
-    { url: `${base}/legal/terms`,               lastModified: now, priority: 0.3 },
-    { url: `${base}/legal/privacy`,             lastModified: now, priority: 0.3 },
-    { url: `${base}/legal/refund`,              lastModified: now, priority: 0.3 },
-    { url: `${base}/security`,                  lastModified: now, priority: 0.4 },
-    { url: `${base}/support`,                   lastModified: now, priority: 0.4 },
+    { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/signup`,                    lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
+    { url: `${base}/contact`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
+    // /signin removed from sitemap — auth pages shouldn't be in search
+    // indices. Same posture as the noindex on /app/*.
+    { url: `${base}/legal/risk`,                lastModified: LEGAL_LAST_MODIFIED, priority: 0.3 },
+    { url: `${base}/legal/terms`,               lastModified: LEGAL_LAST_MODIFIED, priority: 0.3 },
+    { url: `${base}/legal/privacy`,             lastModified: LEGAL_LAST_MODIFIED, priority: 0.3 },
+    { url: `${base}/legal/refund`,              lastModified: LEGAL_LAST_MODIFIED, priority: 0.3 },
+    { url: `${base}/security`,                  lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
+    { url: `${base}/support`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
   ];
 
   // Programmatic surface: one URL per sector and per signal level. Each

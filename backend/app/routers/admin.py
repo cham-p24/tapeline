@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -259,3 +261,258 @@ async def platform_stats(
         "paying_premium": paying_premium,
         "mrr_usd": mrr_usd,
     }
+
+
+# ── Email preview ──────────────────────────────────────────────────────────
+#
+# Renders any of the 15 email templates with representative sample data so the
+# admin can iterate on copy + layout without sending themselves a real email.
+# Admin-only. The companion frontend page at /app/admin/email-preview embeds
+# /api/admin/email-preview/{name} in an iframe with light/dark/mobile toggles.
+
+def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
+    """Lazy factory so the email module isn't imported on every admin request.
+
+    Maps preview-name → (human description, renderer callable). The
+    callable returns the rendered HTML when invoked. New emails added to
+    `app.services.email` should get a row here too.
+    """
+    from app.services.email import (
+        render_alert_email,
+        render_email_verification_email,
+        render_eod_watchlist_digest,
+        render_payment_failed_email,
+        render_re_engagement_email,
+        render_referral_referee_email,
+        render_referral_referrer_email,
+        render_subscription_started_email,
+        render_trial_day3_email,
+        render_trial_day7_email,
+        render_trial_day11_email,
+        render_trial_day13_email,
+        render_trial_ended_email,
+        render_trial_expired_email,
+        render_trial_post_expiry_email,
+        render_watchlist_alert_email,
+        render_weekly_market_digest,
+        render_welcome_email,
+    )
+
+    sample_picks = [
+        {"symbol": "AAPL", "score": 82, "signal": "STRONG SETUP",
+         "reason": "Trend strong, fundamentals 78, RS +4%"},
+        {"symbol": "MSFT", "score": 71, "signal": "STRONG SETUP",
+         "reason": "Earnings beat plus broad sector momentum"},
+        {"symbol": "NVDA", "score": 88, "signal": "HIGH CONVICTION",
+         "reason": "Squeeze setup confirmed, smart money 90"},
+    ]
+    sample_summary = {
+        "watchlist_count": 8, "watchlist_top_signals": 3,
+        "watchlist_best": {"symbol": "AMD", "score": 84,
+                           "signal": "STRONG SETUP", "delta": 12.4},
+        "scorecard_picks_during_trial": 12,
+        "scorecard_hit_rate": 67.0, "scorecard_alpha_avg": 0.82,
+        "scorecard_best": {"symbol": "PLTR", "as_of": "2026-05-10", "alpha": 3.4},
+    }
+    sample_digest = [
+        {"symbol": "AAPL", "score": 82, "signal": "STRONG SETUP",
+         "change_pct_1d": 1.4, "score_delta": 3.2,
+         "reason": "Trend strong, fundamentals 78"},
+        {"symbol": "MSFT", "score": 71, "signal": "CONSTRUCTIVE",
+         "change_pct_1d": -0.6, "score_delta": -1.1,
+         "reason": "Sector weak today"},
+        {"symbol": "NVDA", "score": 88, "signal": "HIGH CONVICTION",
+         "change_pct_1d": 3.1, "score_delta": 5.0,
+         "reason": "Squeeze breakout confirmed on heavy volume"},
+    ]
+    return {
+        # Day 0 transactional
+        "welcome_with_picks": (
+            "Welcome (with 3 live picks)",
+            lambda: render_welcome_email("Alex", picks=sample_picks),
+        ),
+        "welcome_fallback": (
+            "Welcome (no picks — first-tick fallback)",
+            lambda: render_welcome_email("Alex", picks=None),
+        ),
+        "referral_referee": (
+            "Referral: welcome to the referee",
+            lambda: render_referral_referee_email("Alex", "Sam"),
+        ),
+        "referral_referrer": (
+            "Referral: someone joined your link",
+            lambda: render_referral_referrer_email(
+                "Alex", "ne***@example.com",
+            ),
+        ),
+        # Trial drip
+        "day3": ("Trial drip · day 3 (feature tour)",
+                 lambda: render_trial_day3_email("Alex")),
+        "day7_no_summary": ("Trial drip · day 7 · no per-user data",
+                            lambda: render_trial_day7_email("Alex", None)),
+        "day7_with_summary": ("Trial drip · day 7 · personalised",
+                              lambda: render_trial_day7_email("Alex", sample_summary)),
+        "day11": ("Trial drip · day 11 (T-3)",
+                  lambda: render_trial_day11_email("Alex", sample_summary)),
+        "day13": ("Trial drip · day 13 (T-1, amber urgent)",
+                  lambda: render_trial_day13_email("Alex", sample_summary)),
+        "trial_expired": ("Trial drip · T+0 expired",
+                          lambda: render_trial_expired_email("Alex", sample_summary)),
+        "trial_post_expiry": ("Trial drip · T+3 final note",
+                              lambda: render_trial_post_expiry_email("Alex")),
+        "trial_ended": ("Trial ended (legacy downgrade path)",
+                        lambda: render_trial_ended_email("Alex")),
+        # Stripe
+        "payment_failed_first": (
+            "Payment failed · 1st attempt (soft)",
+            lambda: render_payment_failed_email("Alex", "pro", 1),
+        ),
+        "payment_failed_third": (
+            "Payment failed · 3rd attempt (urgent)",
+            lambda: render_payment_failed_email("Alex", "premium", 3),
+        ),
+        # Alerts + digest
+        "alert_rule": (
+            "Per-rule alert (score / squeeze / regime / congress / news)",
+            lambda: render_alert_email(
+                "Alex", "AAPL crossed 80", "AAPL", 81.5,
+                "Score crossed your threshold of 80",
+            ),
+        ),
+        "watchlist_alert": (
+            "Watchlist score-move alert",
+            lambda: render_watchlist_alert_email(
+                "Alex", "AMD", 78.0, 65.0, "STRONG SETUP",
+                "Trend and momentum both turned up sharply, "
+                "with fundamentals holding above 70 and smart-money "
+                "score climbing six points.",
+            ),
+        ),
+        "digest_with_items": (
+            "EOD watchlist digest (3 tickers)",
+            lambda: render_eod_watchlist_digest("Alex", sample_digest),
+        ),
+        "digest_empty": (
+            "EOD watchlist digest (empty state)",
+            lambda: render_eod_watchlist_digest("Alex", []),
+        ),
+        "re_engagement": (
+            "14-day dormant re-engagement",
+            lambda: render_re_engagement_email("Alex"),
+        ),
+        "email_verification": (
+            "Email verification (signup security)",
+            lambda: render_email_verification_email(
+                "Alex",
+                verify_url="https://tapeline.io/verify-email?token=demo123",
+                cancel_url="https://tapeline.io/verify-email?token=demo123&action=cancel",
+            ),
+        ),
+        "subscription_started_pro_monthly": (
+            "Subscription started · Pro monthly",
+            lambda: render_subscription_started_email(
+                "Alex", tier="pro", billing_period="monthly",
+                amount_cents=2999, currency="usd",
+                next_charge_iso="2026-06-19T00:00:00+00:00",
+            ),
+        ),
+        "subscription_started_premium_annual": (
+            "Subscription started · Premium annual",
+            lambda: render_subscription_started_email(
+                "Alex", tier="premium", billing_period="annual",
+                amount_cents=47999, currency="usd",
+                next_charge_iso="2027-05-19T00:00:00+00:00",
+            ),
+        ),
+        "weekly_newsletter": (
+            "Weekly market digest (Monday newsletter)",
+            lambda: render_weekly_market_digest(
+                "Alex",
+                week_label="May 19, 2026",
+                regime={
+                    "regime": "BULL", "vix": 14.32, "yield_10y": 4.21,
+                    "breadth_pct": 68.0,
+                    "sector_leaders": "Tech, Healthcare, Industrials",
+                },
+                movers=[
+                    *sample_picks,
+                    {"symbol": "AMD", "score": 84, "signal": "STRONG SETUP",
+                     "reason": "Momentum and RS both inflecting up"},
+                    {"symbol": "PLTR", "score": 77, "signal": "STRONG SETUP",
+                     "reason": "Earnings beat, contract pipeline expanding"},
+                ],
+                scorecard={
+                    "picks": 50,
+                    "hit_rate_pct": 62.0,
+                    "avg_alpha_pct": 0.41,
+                    "best": {"symbol": "NVDA", "alpha": 4.8},
+                },
+                headlines=[
+                    {"title": "Fed holds rates, signals patience on inflation",
+                     "publisher": "Reuters", "url": "https://tapeline.io"},
+                    {"title": "Nvidia earnings crush estimates, guidance lifted",
+                     "publisher": "Bloomberg", "url": "https://tapeline.io"},
+                    {"title": "Oil rallies 3% on inventory draw",
+                     "publisher": "WSJ", "url": "https://tapeline.io"},
+                ],
+            ),
+        ),
+    }
+
+
+@router.get("/email-preview")
+async def list_email_previews(_: None = Depends(require_admin)) -> dict:
+    """Index for the email-preview admin page.
+
+    Frontend uses this to render the sidebar of available emails. Order
+    matches the dict insertion order in `_email_samples` so related
+    variants stay next to each other.
+    """
+    samples = _email_samples()
+    return {
+        "count": len(samples),
+        "items": [
+            {"name": name, "description": desc}
+            for name, (desc, _) in samples.items()
+        ],
+    }
+
+
+@router.get("/email-preview/{name}", response_class=HTMLResponse)
+async def render_email_preview(
+    name: str,
+    theme: str = Query("auto", pattern=r"^(auto|light|dark)$"),
+    _: None = Depends(require_admin),
+) -> HTMLResponse:
+    """Render one email by name. Theme can be forced via query param.
+
+    `theme=auto` (default) returns the email exactly as a real recipient
+    would see it — `prefers-color-scheme` decides. `theme=light` neutralises
+    the dark-mode media query so the rules never apply; `theme=dark` flips
+    it to always-match so dark rules always apply. Doing this via string
+    replacement keeps the prod renderer code untouched.
+    """
+    samples = _email_samples()
+    if name not in samples:
+        raise HTTPException(404, f"Unknown email: {name}")
+    _desc, renderer = samples[name]
+    try:
+        html = renderer()
+    except Exception as exc:
+        logger.exception("email_preview.render_failed name=%s", name)
+        raise HTTPException(500, f"Renderer failed: {exc}") from exc
+
+    if theme == "light":
+        # Make the dark-mode media query never match.
+        html = html.replace(
+            "@media (prefers-color-scheme: dark)",
+            "@media (max-width: 0px)",
+        )
+    elif theme == "dark":
+        # Make the dark-mode media query always match.
+        html = html.replace(
+            "@media (prefers-color-scheme: dark)",
+            "@media all",
+        )
+
+    return HTMLResponse(content=html)

@@ -7,7 +7,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 type Providers = { google: boolean; microsoft: boolean; apple: boolean };
 const NONE: Providers = { google: false, microsoft: false, apple: false };
 
-export function OAuthButtons() {
+type Position = "top" | "bottom";
+
+export function OAuthButtons({
+  position = "bottom",
+  dividerLabel,
+}: { position?: Position; dividerLabel?: string } = {}) {
   const [providers, setProviders] = useState<Providers | null>(null);
 
   useEffect(() => {
@@ -20,39 +25,56 @@ export function OAuthButtons() {
   if (!providers) return null;
   if (!providers.google && !providers.microsoft && !providers.apple) return null;
 
-  return (
+  // When rendered above the email form ("top"), the divider sits below the
+  // OAuth buttons and reads "or sign up with email" by default. When rendered
+  // below ("bottom" — the signin flow), the divider sits above and reads
+  // "or continue with".
+  const divider = (
+    <div className="my-6 flex items-center gap-3 text-xs text-muted">
+      <div className="h-px flex-1 bg-border" />
+      <span>{dividerLabel ?? (position === "top" ? "or sign up with email" : "or continue with")}</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+
+  const buttons = (
+    <div className="grid gap-2">
+      {providers.google && (
+        <a
+          href={`${API_BASE}/api/auth/oauth/google/start`}
+          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
+        >
+          <GoogleGlyph /> Continue with Google
+        </a>
+      )}
+      {providers.microsoft && (
+        <a
+          href={`${API_BASE}/api/auth/oauth/microsoft/start`}
+          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
+        >
+          <MicrosoftGlyph /> Continue with Microsoft
+        </a>
+      )}
+      {providers.apple && (
+        <a
+          href={`${API_BASE}/api/auth/oauth/apple/start`}
+          className="flex items-center justify-center gap-3 rounded-md border border-border bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/80"
+        >
+          <AppleGlyph /> Continue with Apple
+        </a>
+      )}
+    </div>
+  );
+
+  return position === "top" ? (
     <>
-      <div className="my-6 flex items-center gap-3 text-xs text-muted">
-        <div className="h-px flex-1 bg-border" />
-        <span>or continue with</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-      <div className="grid gap-2">
-        {providers.google && (
-          <a
-            href={`${API_BASE}/api/auth/oauth/google/start`}
-            className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-black/30"
-          >
-            <GoogleGlyph /> Continue with Google
-          </a>
-        )}
-        {providers.microsoft && (
-          <a
-            href={`${API_BASE}/api/auth/oauth/microsoft/start`}
-            className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-black/30"
-          >
-            <MicrosoftGlyph /> Continue with Microsoft
-          </a>
-        )}
-        {providers.apple && (
-          <a
-            href={`${API_BASE}/api/auth/oauth/apple/start`}
-            className="flex items-center justify-center gap-3 rounded-md border border-border bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/80"
-          >
-            <AppleGlyph /> Continue with Apple
-          </a>
-        )}
-      </div>
+      {buttons}
+      {divider}
+    </>
+  ) : (
+    <>
+      {divider}
+      {buttons}
     </>
   );
 }

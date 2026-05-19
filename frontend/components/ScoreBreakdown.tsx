@@ -48,7 +48,7 @@ export function ScoreBreakdown({
                 <span className="text-muted">{r.label} <span className="opacity-50">({r.weight}%)</span></span>
                 <span className="nums font-medium">{v.toFixed(0)}</span>
               </div>
-              <div className="mt-1 h-1.5 w-full rounded-full bg-black/40">
+              <div className="mt-1 h-1.5 w-full rounded-full bg-panel">
                 <div
                   className={`h-full rounded-full ${color}`}
                   style={{ width: `${Math.max(2, v)}%` }}

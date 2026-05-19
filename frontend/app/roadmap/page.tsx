@@ -14,7 +14,7 @@ export const metadata = pageMeta({
 const ITEMS: RoadmapItem[] = [
   // SHIPPED
   { slug: "live-data",              title: "Live market data",          detail: "Real-time prices, volumes, and intraday updates across the universe.",                  status: "shipped" },
-  { slug: "live-macro",             title: "Live macro indicators",     detail: "DXY, 10-year yield, VIX pulled live from the Federal Reserve's FRED feed.",             status: "shipped" },
+  { slug: "live-macro",             title: "Live macro indicators",     detail: "DXY, 10-year yield, VIX pulled live; classified into RISING / FALLING / SIDEWAYS for the regime factor.",             status: "shipped" },
   { slug: "recent-insider-buys",    title: "Recent insider buys",       detail: "SEC Form 4 transactions (officers, directors, 10%+ owners) across the top ~2,500 most-liquid US tickers. Refreshed daily.", status: "shipped" },
   { slug: "telegram-alerts",        title: "Telegram alerts",           detail: "Per-rule alerts plus the hourly market-regime + watchlist digest. Premium-only.",        status: "shipped" },
   { slug: "browser-push",           title: "Browser push notifications", detail: "Lock-screen alerts on desktop and Android. Free, one click to enable.",                 status: "shipped" },
@@ -49,7 +49,7 @@ export default function RoadmapPage() {
 
       <section className="mx-auto max-w-4xl px-6 py-12">
         <p className="eyebrow">Roadmap</p>
-        <h1 className="mt-3 text-5xl font-bold tracking-tight">What&rsquo;s shipping next.</h1>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What&rsquo;s shipping next.</h1>
         <p className="mt-4 text-lg text-muted">
           The things on our shortlist, ordered by what we&rsquo;re working on now.
           Premium subscribers can vote on order — counts update live.

@@ -28,15 +28,20 @@
   --background:  255 255 255;        /* page bg                        */
   --surface:     250 250 252;        /* subtle elevation tier 1        */
   --panel:       0 0 0 / 0.04;       /* inset panel (rgba on bg)       */
+  --panel2:      0 0 0 / 0.07;       /* nested panel (one shade deeper)*/
   --panel-hover: 0 0 0 / 0.07;       /* panel on hover                 */
   --fg:          10 10 10;           /* primary text                   */
   --muted:       113 113 122;        /* secondary text                 */
   --subtle:      161 161 170;        /* tertiary text                  */
   --border:      0 0 0 / 0.08;       /* hairline divider (rgba)        */
+  --border2:     0 0 0 / 0.14;       /* emphasised divider (rgba)      */
   --accent:      0 122 255;          /* iOS systemBlue                 */
+  --accent2:     88 86 214;          /* iOS systemIndigo — gradient end*/
   --accent-hover: 0 100 220;
   --up:          52 199 89;          /* iOS systemGreen                */
   --down:        255 59 48;          /* iOS systemRed                  */
+  /* iOS systemYellow at darker shade for legible contrast on white. */
+  --warn:        180 83 9;           /* amber-700                      */
   --shadow:      0 0 0 / 0.06;
 }
 
@@ -44,15 +49,19 @@
   --background:  10 10 10;
   --surface:     18 18 20;
   --panel:       255 255 255 / 0.04;
+  --panel2:      255 255 255 / 0.07;
   --panel-hover: 255 255 255 / 0.07;
   --fg:          244 244 245;
   --muted:       156 163 175;
   --subtle:      113 113 122;
   --border:      255 255 255 / 0.06;
+  --border2:     255 255 255 / 0.14;
   --accent:      10 132 255;          /* iOS systemBlue (dark mode tint) */
+  --accent2:     94 92 230;           /* iOS systemIndigo (dark mode tint) */
   --accent-hover: 64 156 255;
   --up:          48 209 88;
   --down:        255 69 58;
+  --warn:        250 204 21;          /* amber-400, legible on near-black */
   --shadow:      0 0 0 / 0.45;
 }
 
@@ -67,15 +76,19 @@
     --background:  10 10 10;
     --surface:     18 18 20;
     --panel:       255 255 255 / 0.04;
+    --panel2:      255 255 255 / 0.07;
     --panel-hover: 255 255 255 / 0.07;
     --fg:          244 244 245;
     --muted:       156 163 175;
     --subtle:      113 113 122;
     --border:      255 255 255 / 0.06;
+    --border2:     255 255 255 / 0.14;
     --accent:      10 132 255;
+    --accent2:     94 92 230;
     --accent-hover: 64 156 255;
     --up:          48 209 88;
     --down:        255 69 58;
+    --warn:        250 204 21;
     --shadow:      0 0 0 / 0.45;
   }
 }
@@ -99,6 +112,36 @@
     /* iOS-style font smoothing on macOS / Webkit. */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Make body the positioning parent for the ::before atmospheric layer. */
+    position: relative;
+    min-height: 100vh;
+  }
+
+  /*
+   * Page-wide blue atmospheric layer. Fixed-position pseudo-element so it
+   * stays on every page, regardless of which route or how long the page
+   * is, without us having to add the gradient to each page's <main> tag.
+   *
+   * Values mirror what was on the homepage <main> in PR #138 — 14% / 8% /
+   * 12% iOS systemBlue. Subtle on white in light mode, faint navy wash
+   * on near-black in dark mode (per founder feedback "blue tinge must
+   * be on all the pages").
+   *
+   * pointer-events:none so the overlay never blocks clicks; z-index:-1
+   * keeps it behind every page element including <main>.
+   */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgb(var(--accent) / 0.14),
+      rgb(var(--accent) / 0.08),
+      rgb(var(--accent) / 0.12)
+    );
   }
   .nums {
     font-variant-numeric: tabular-nums;
@@ -118,6 +161,18 @@
 }
 
 @layer components {
+  /* `.section` — centred page section with the standard max-width and
+     horizontal gutter. Used by /pricing and /how-it-works. Previously
+     undefined (only the `py-*` padding utilities actually applied),
+     which is why those pages were edge-bleeding on wide screens. */
+  .section {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 72rem;       /* matches `max-w-6xl` used elsewhere */
+    padding-left: 1.5rem;   /* matches `px-6` */
+    padding-right: 1.5rem;
+  }
+
   /*
    * `.card` was previously a hard-edged border box. Now: soft translucent
    * inset that blends into the page bg, with a hint of backdrop blur for
@@ -146,6 +201,16 @@
   .btn-primary:hover {
     background-color: rgb(var(--accent-hover));
   }
+  /*
+   * `.btn-accent` was being used on 7 marketing pages (CTA on
+   * /how-it-works, /pricing, /not-found, /t/[symbol], /blog/[slug],
+   * /blog/ticker/[symbol], /app/watchlist, /app/billing) without ever
+   * being defined — rendered as unstyled text. Alias to btn-primary
+   * so every CTA gets the proper iOS-blue pill button.
+   */
+  .btn-accent {
+    @apply btn-primary;
+  }
   .btn-ghost {
     @apply btn;
     color: rgb(var(--muted));
@@ -153,6 +218,31 @@
   .btn-ghost:hover {
     color: rgb(var(--fg));
     background-color: rgb(var(--panel));
+  }
+
+  /* `.eyebrow` — small, all-caps, tracked-out label that sits above a
+     section heading. Used across marketing + app pages but previously
+     undefined (no-op). Now a real visual signal. */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--subtle));
+  }
+
+  /* `.link` — accent-coloured inline link with subtle hover underline.
+     Used in body copy where a default Tailwind link would be too quiet. */
+  .link {
+    color: rgb(var(--accent));
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+  }
+  .link:hover {
+    color: rgb(var(--accent-hover));
+    text-decoration-color: currentColor;
   }
 }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -50,6 +51,107 @@ async def me(user: User | None = Depends(current_user_optional)) -> dict:
             "email_alerts_per_day": effective_limit(user, "email_alerts_per_day"),
             "api_requests_per_day": effective_limit(user, "api_requests_per_day"),
         },
+        # Onboarding state — frontend uses onboarding_completed_at to decide
+        # whether to redirect a newly-signed-in user through /app/onboarding.
+        "onboarding_completed_at": (
+            user.onboarding_completed_at.isoformat()
+            if user.onboarding_completed_at else None
+        ),
+        "profile": {
+            "experience_level": user.experience_level,
+            "trading_style": user.trading_style,
+            "portfolio_band": user.portfolio_band,
+            "referral_source": user.referral_source,
+            "marketing_opt_in": user.marketing_opt_in,
+            "sectors_of_interest": (
+                [s for s in (user.sectors_of_interest or "").split(",") if s]
+            ),
+        },
+    }
+
+
+# ---- Onboarding (post-signup profile capture) -------------------------------
+#
+# Submitted by the /app/onboarding page either with a filled body (real
+# answers) or an empty body (user clicked Skip). Either path stamps
+# `onboarding_completed_at` so the user is only prompted once.
+
+ExperienceLevel = Literal["beginner", "intermediate", "advanced"]
+TradingStyle = Literal["day", "swing", "longterm", "mixed"]
+PortfolioBand = Literal[
+    "under_10k", "10_50k", "50_250k", "250k_plus", "prefer_not_to_say",
+]
+ReferralSource = Literal[
+    "twitter_x", "reddit", "youtube", "podcast", "friend", "search",
+    "hacker_news", "other",
+]
+
+# Sector slugs the frontend offers — anything outside this set is dropped
+# server-side so a malformed client can't smuggle arbitrary text into the
+# column. Keep in sync with frontend/app/app/onboarding/page.tsx.
+_ALLOWED_SECTORS = {
+    "technology", "healthcare", "financials", "energy", "communications",
+    "consumer_discretionary", "consumer_staples", "industrials", "materials",
+    "real_estate", "utilities", "commodities", "etfs",
+}
+
+
+class OnboardingBody(BaseModel):
+    experience_level: ExperienceLevel | None = None
+    trading_style: TradingStyle | None = None
+    portfolio_band: PortfolioBand | None = None
+    referral_source: ReferralSource | None = None
+    marketing_opt_in: bool = False
+    sectors_of_interest: list[str] = Field(default_factory=list, max_length=20)
+    # Optional explicit skip flag. Not strictly needed (an empty body has the
+    # same effect) but lets the client signal intent for analytics.
+    skipped: bool = False
+
+
+@router.post("/onboarding")
+async def submit_onboarding(
+    body: OnboardingBody,
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Capture the post-signup investor-profile answers (or mark skipped).
+
+    Idempotent: re-submitting overwrites previous answers and bumps the
+    completed_at timestamp. Frontend should disable the link once
+    `onboarding_completed_at` is non-null, but the endpoint stays open in
+    case the user wants to edit later from /app/settings.
+    """
+    sectors = [s.strip().lower() for s in body.sectors_of_interest if s]
+    sectors = [s for s in sectors if s in _ALLOWED_SECTORS]
+
+    user.experience_level = body.experience_level
+    user.trading_style = body.trading_style
+    user.portfolio_band = body.portfolio_band
+    user.referral_source = body.referral_source
+    user.marketing_opt_in = bool(body.marketing_opt_in)
+    user.sectors_of_interest = ",".join(sectors) if sectors else None
+    user.onboarding_completed_at = datetime.now(UTC)
+    # Keep the weekly-newsletter bit in sync with the marketing-opt-in
+    # checkbox: opting in turns it on, opting out turns it off. The bit
+    # alone never delivers — the orchestrator double-gates on
+    # marketing_opt_in too — but keeping them aligned at the consent
+    # moment means /app/settings/email shows the toggle in the state
+    # the user just chose.
+    from app.services.email_prefs import EmailPref
+    bit = int(EmailPref.WEEKLY_NEWSLETTER)
+    current = int(user.email_prefs or 0)
+    if user.marketing_opt_in:
+        user.email_prefs = current | bit
+    else:
+        user.email_prefs = current & ~bit
+    await session.commit()
+    logger.info(
+        "me.onboarding_submitted user=%s skipped=%s sectors=%d marketing_opt_in=%s",
+        user.id, body.skipped, len(sectors), user.marketing_opt_in,
+    )
+    return {
+        "ok": True,
+        "onboarding_completed_at": user.onboarding_completed_at.isoformat(),
     }
 
 
@@ -251,6 +353,7 @@ class EmailPrefsBody(BaseModel):
     re_engagement: bool | None = None
     daily_digest: bool | None = None
     alert_emails: bool | None = None
+    weekly_newsletter: bool | None = None
 
 
 @router.get("/email-prefs")
@@ -294,6 +397,14 @@ async def set_email_prefs(
                 current &= ~cat.bit
 
     user.email_prefs = current
+    # Toggling the weekly-newsletter ON here is itself an act of consent —
+    # mirror it onto the marketing_opt_in column so the orchestrator's
+    # double-gate clears. Toggling OFF leaves marketing_opt_in alone:
+    # email_prefs is "do I want this category"; marketing_opt_in is "do I
+    # have consent on file". A user can pause delivery without revoking
+    # consent, but a user can't START delivery without granting it.
+    if incoming.get("weekly_newsletter") is True:
+        user.marketing_opt_in = True
     await session.commit()
     logger.info("me.email_prefs_updated user=%s prefs=%d", user.id, current)
     return {"prefs": prefs_to_dict(current)}

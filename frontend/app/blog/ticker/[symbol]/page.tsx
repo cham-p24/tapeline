@@ -68,6 +68,162 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   }
 }
 
+// Per-ticker scorecard track record. Pulled at render time so each
+// /blog/ticker/{X} page can show its OWN historical hit rate + best/
+// worst alpha day — substantially distinct content from /t/{X} (which
+// only shows live data, no historical aggregates).
+type ScorecardForSymbol = {
+  symbol: string;
+  in_universe: boolean;
+  appearances: number;
+  appearances_scored: number;
+  entries_excluded_outliers: number;
+  median_1d_return: number | null;
+  median_alpha_vs_spy: number | null;
+  hit_rate_beat_spy: number | null;
+  best_alpha: number | null;
+  worst_alpha: number | null;
+};
+
+async function fetchSymbolScorecard(symbol: string): Promise<ScorecardForSymbol | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/scorecard/symbol/${symbol}`, {
+      next: { revalidate: 3600 }, // hourly is plenty — scorecard rolls daily
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { summary: ScorecardForSymbol };
+    return body.summary;
+  } catch {
+    return null;
+  }
+}
+
+// Signal-specific narrative paragraphs. Each signal label maps to a
+// 2-3 sentence explanation of what the score implies for action. The
+// final string interpolates {SYMBOL} so each /blog/ticker/{X} page
+// gets prose tied to its current label — substantially-unique content
+// across the 50-ticker set.
+function signalNarrative(symbol: string, signal: string | null, composite: number | null): string {
+  if (!signal || composite === null) {
+    return (
+      `${symbol}'s composite is currently pending — the worker may be ` +
+      `mid-tick, or vendor data may be transiently incomplete. The page ` +
+      `refreshes every 30 minutes; if this persists more than an hour the ` +
+      `/status page will report the source-feed gap.`
+    );
+  }
+  switch (signal) {
+    case "HIGH CONVICTION":
+      return (
+        `A HIGH CONVICTION reading on ${symbol} (composite ${composite.toFixed(1)}) ` +
+        `means all six factor sub-scores are aligned in the same direction with ` +
+        `material weight — no single factor is carrying the call. Historically, ` +
+        `this label triggers when Trend, Relative Strength, and at least two of ` +
+        `Fundamentals/Smart Money/Macro all clear their respective thresholds ` +
+        `for confluence. It's the most-restricted label in the Tapeline taxonomy; ` +
+        `roughly the top 1-2% of names on any given session earn it.`
+      );
+    case "STRONG SETUP":
+      return (
+        `STRONG SETUP on ${symbol} (composite ${composite.toFixed(1)}) means ` +
+        `four or more factor sub-scores point the same direction with material ` +
+        `weight, but one or two are dragging — usually Macro in a hostile regime ` +
+        `or Fundamentals on a name that's growth-y but unprofitable. The setup ` +
+        `is structurally bullish but lacks the full-confluence backing of a ` +
+        `HIGH CONVICTION read. Treat it as a "primary trend in place" signal.`
+      );
+    case "CONSTRUCTIVE":
+      return (
+        `CONSTRUCTIVE on ${symbol} (composite ${composite.toFixed(1)}) means the ` +
+        `weighted factor balance leans positive but the confluence is mixed — ` +
+        `typically three factors agreeing, two neutral, one against. It's the ` +
+        `middle-ground label: enough signal to be on a watchlist, not enough ` +
+        `for high-conviction sizing. Pair it with the factor breakdown below to ` +
+        `see which sub-scores are doing the lifting.`
+      );
+    case "NEUTRAL":
+      return (
+        `NEUTRAL on ${symbol} (composite ${composite.toFixed(1)}) means the six ` +
+        `factor sub-scores are split — some bullish, some bearish, no clear ` +
+        `aggregate read. This is the most-common label in the universe at any ` +
+        `given time (roughly 40-50% of scored tickers). It doesn't mean "do ` +
+        `nothing"; it means the model can't tell you what to do, which is honest.`
+      );
+    case "CAUTION":
+      return (
+        `CAUTION on ${symbol} (composite ${composite.toFixed(1)}) means the ` +
+        `weighted factor balance leans negative — typically Trend or Relative ` +
+        `Strength have rolled over while Macro has weakened. It's the inverse ` +
+        `of CONSTRUCTIVE: enough signal to flag, not enough to put a clear short ` +
+        `framing on. Check the factor breakdown for which sub-scores are dragging.`
+      );
+    case "WEAK":
+      return (
+        `WEAK on ${symbol} (composite ${composite.toFixed(1)}) means four or ` +
+        `more factor sub-scores point bearishly with material weight. It's the ` +
+        `inverse of STRONG SETUP — structurally bearish, but not the full-six ` +
+        `confluence that would push it deeper. For long-only investors, this is ` +
+        `the "actively avoid" label, not just the "ignore" label.`
+      );
+    default:
+      return (
+        `${symbol}'s current signal label is ${signal} (composite ${composite.toFixed(1)}). ` +
+        `See the factor breakdown below to inspect what's driving the call.`
+      );
+  }
+}
+
+// Confidence pct interpretation, derived from the value itself. High
+// confidence (>= 85) implies full data coverage across all six factor
+// inputs — typical for mega-caps. Low confidence (<= 55) implies sparse
+// Fundamentals or Smart Money coverage — typical for micro-caps,
+// recent IPOs, or sector-specific data gaps (biotech clinical-stage,
+// ETFs, foreign ADRs).
+function confidenceContext(symbol: string, conf: number | null): string {
+  if (conf === null) {
+    return (
+      `Confidence isn't computed for ${symbol} on this read — the upstream ` +
+      `data-coverage signal is pending. The page refreshes hourly.`
+    );
+  }
+  if (conf >= 85) {
+    return (
+      `${symbol}'s ${Math.round(conf)}% confidence reflects near-full data ` +
+      `coverage across the six factor inputs — Trend + RS pull from real ` +
+      `historical bars, Fundamentals from a third-party data feed quarterly statements, Smart ` +
+      `Money from SEC Form 4 + Congressional disclosures, Macro from a public macro feed, ` +
+      `Momentum from primary OHLCV. The composite is as well-informed as the ` +
+      `data plumbing allows for a US-listed equity at this scale.`
+    );
+  }
+  if (conf >= 70) {
+    return (
+      `${symbol}'s ${Math.round(conf)}% confidence reflects strong-but-not-` +
+      `complete coverage. Typical gap: Smart Money data may be lighter (fewer ` +
+      `recent Form 4 filings or no Congressional disclosures), or Fundamentals ` +
+      `may lag the latest quarter. The composite is reliable but tilted slightly ` +
+      `toward the always-present Trend/RS/Momentum factors.`
+    );
+  }
+  if (conf >= 55) {
+    return (
+      `${symbol}'s ${Math.round(conf)}% confidence reflects partial coverage. ` +
+      `This is typical for mid- and small-caps: Fundamentals data may be ` +
+      `quarter-old, Smart Money has thinner signal density, and 90-day insider ` +
+      `flow may be zero. The composite is computed from the available inputs ` +
+      `but weighted more heavily toward price-action factors than for a mega-cap.`
+    );
+  }
+  return (
+    `${symbol}'s ${Math.round(conf)}% confidence reflects sparse coverage — ` +
+    `typically a micro-cap, recent IPO, ETF (no traditional Fundamentals), or ` +
+    `sector-specific data gap (biotech clinical-stage names, foreign ADRs). The ` +
+    `composite still ranks ${symbol} but the underlying signal is weighted ` +
+    `toward Trend / RS / Momentum, the three factors that don't require ` +
+    `quarterly statements or insider filings to compute.`
+  );
+}
+
 // Build every URL at build time so Google can find them on a normal crawl
 // rather than needing a deep-link discovery pass.
 export function generateStaticParams() {
@@ -102,7 +258,7 @@ const SIGNAL_COLOR: Record<string, string> = {
   "STRONG SETUP": "text-up",
   "CONSTRUCTIVE": "text-fg",
   "NEUTRAL": "text-muted",
-  "CAUTION": "text-yellow-400",
+  "CAUTION": "text-warn",
   "WEAK": "text-down",
 };
 
@@ -118,7 +274,7 @@ function FactorRow({ label, factor, why }: { label: string; factor: FactorEntry 
   const v = factor?.value;
   const weight = factor?.weight ?? 0;
   return (
-    <div className="border-t border-border py-4">
+    <div className="py-4">
       <div className="flex items-baseline justify-between gap-4">
         <div className="text-base font-medium">{label} <span className="text-xs text-muted">· {weight}% weight</span></div>
         <div className="font-mono text-xl font-bold nums">{fmtFactor(v)}</div>
@@ -133,13 +289,26 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
   const t = findTicker(symbol);
   if (!t) notFound();
 
-  const data = await fetchTicker(t.symbol);
+  // Parallel-fetch live data + per-ticker scorecard track record so
+  // the page renders the symbol's actual historical hit rate (unique
+  // per ticker, not just a generic "we have a scorecard" link).
+  const [data, scorecard] = await Promise.all([
+    fetchTicker(t.symbol),
+    fetchSymbolScorecard(t.symbol),
+  ]);
 
   const composite = data?.score ?? null;
   const signal = data?.signal ?? null;
   const reason = data?.reason ?? null;
   const confidence = data?.confidence_pct ?? null;
   const signalClass = signal ? (SIGNAL_COLOR[signal] ?? "text-fg") : "text-muted";
+
+  // Cached strings used by the new content sections — each is unique per
+  // {symbol, signal, composite, confidence} combination, which is the
+  // distinguishing payload Google needs to see vs the /t/{symbol}
+  // interactive page (same data, different prose framing).
+  const narrative = signalNarrative(t.symbol, signal, composite);
+  const confidenceText = confidenceContext(t.symbol, confidence);
 
   const articleUrl = `https://tapeline.io/blog/ticker/${t.symbol}`;
   const article = articleJsonLd({
@@ -175,7 +344,26 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     {
       q: `Where can I see Tapeline's track record on ${t.symbol}?`,
       a:
-        `Every market day, Tapeline freezes the top 10 composite scores and logs each name's next-day return versus SPY. The full history — including misses — lives on the public scorecard at tapeline.io/scorecard with no survivor-bias filtering.`,
+        scorecard && scorecard.appearances > 0
+          ? `${t.symbol} has been in Tapeline's top-10 cohort ${scorecard.appearances} time${scorecard.appearances === 1 ? "" : "s"} since the public scorecard started forward-testing${scorecard.median_alpha_vs_spy !== null ? `, with a median 1-day alpha of ${scorecard.median_alpha_vs_spy >= 0 ? "+" : ""}${scorecard.median_alpha_vs_spy.toFixed(2)}% vs SPY` : ""}. Full per-day history at tapeline.io/scorecard/${t.symbol}.`
+          : `Every market day, Tapeline freezes the top 10 composite scores and logs each name's next-day return versus SPY. ${t.symbol} hasn't been in a top-10 cohort yet; the universe-wide history lives at tapeline.io/scorecard.`,
+    },
+    {
+      q: `What does ${t.symbol}'s confidence percentage mean?`,
+      a:
+        confidence !== null
+          ? `${t.symbol} has a ${Math.round(confidence)}% confidence reading, which reflects how complete the data coverage is across the six factor inputs (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum). High confidence (>=85%) means full coverage typical of mega-caps; lower confidence (<55%) means sparse coverage typical of micro-caps, ETFs, or recent IPOs.`
+          : `Confidence reflects how complete the data coverage is across the six factor inputs. ${t.symbol}'s reading is pending — the upstream signal updates hourly on this page.`,
+    },
+    {
+      q: `Does Tapeline factor ${t.sector ?? "sector"} dynamics into the ${t.symbol} score?`,
+      a:
+        `Yes — the Relative Strength factor (20% weight) explicitly compares ${t.symbol}'s performance against both SPY and its sector peers (Mansfield RS calculation). The Macro factor (15%) adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.`,
+    },
+    {
+      q: `How often does the ${t.symbol} Tapeline score update?`,
+      a:
+        `The composite score recomputes every minute during US market hours (9:30 AM to 4:00 PM ET) on the live data feeds. This page caches each fetch for 30 minutes to keep crawler load light; the interactive product page at tapeline.io/t/${t.symbol} updates in real time. Outside market hours, the score holds at the previous close's value.`,
     },
   ]);
 
@@ -281,10 +469,70 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
         </section>
 
         <section className="mt-12">
-          <h2 className="text-2xl font-semibold tracking-tight">The Public Scorecard: Does {t.symbol}'s Read Hold Up?</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">What "{signal ?? "Pending"}" Means for {t.symbol} Right Now</h2>
+          <p className="mt-3 text-base text-fg leading-relaxed">{narrative}</p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            Every market day, Tapeline freezes the top 10 composite scores at the close. The next day, each pick's actual return is logged against SPY. Wins are recorded, misses are recorded, nothing gets quietly removed. The full track record is at <Link href="/scorecard" className="text-accent hover:underline">/scorecard</Link>, with a per-ticker history if {t.symbol} has ever surfaced in a top-10 cohort.
+            The label is descriptive, not prescriptive — Tapeline doesn't say "buy" or "sell" on {t.symbol}. It says <em>here's what six independent signals add up to</em>, and leaves the position-sizing, time-horizon, and tax-situation parts of the decision to you. The labels above are calibrated against the public scorecard's forward-test results, not against an opinion of where the market should be.
           </p>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="text-2xl font-semibold tracking-tight">Confidence — Why {t.symbol} Scores {confidence !== null ? `${Math.round(confidence)}%` : "—"}</h2>
+          <p className="mt-3 text-base text-fg leading-relaxed">{confidenceText}</p>
+          <p className="mt-3 text-base text-fg leading-relaxed">
+            Confidence is the column most retail traders skip. It shouldn't be. Two tickers with the same 78 composite carry very different conviction if one is at 92% confidence (full data coverage) and the other is at 51% (sparse). For sizing purposes, confidence is closer to "how much should this read weigh in the portfolio" than the composite alone.
+          </p>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="text-2xl font-semibold tracking-tight">The Public Scorecard — {t.symbol}'s Track Record</h2>
+          {scorecard && scorecard.appearances > 0 ? (
+            <>
+              <p className="mt-3 text-base text-fg leading-relaxed">
+                {t.symbol} has been in Tapeline's top-10 cohort{" "}
+                <strong className="text-fg">{scorecard.appearances} time{scorecard.appearances === 1 ? "" : "s"}</strong> since the public scorecard started forward-testing.
+                {scorecard.appearances_scored > 0 && (
+                  <>
+                    {" "}Of those, {scorecard.appearances_scored} have a recorded next-day return vs SPY
+                    {scorecard.entries_excluded_outliers > 0 && (
+                      <> ({scorecard.entries_excluded_outliers} excluded as vendor-data outliers; methodology on the page)</>
+                    )}
+                    .
+                    {scorecard.median_alpha_vs_spy !== null && (
+                      <>
+                        {" "}Median 1-day alpha:{" "}
+                        <strong className={scorecard.median_alpha_vs_spy > 0 ? "text-up" : "text-down"}>
+                          {scorecard.median_alpha_vs_spy >= 0 ? "+" : ""}
+                          {scorecard.median_alpha_vs_spy.toFixed(2)}%
+                        </strong>
+                        {scorecard.hit_rate_beat_spy !== null && (
+                          <>. Beat-SPY rate: <strong className="text-fg">{Math.round(scorecard.hit_rate_beat_spy)}%</strong></>
+                        )}
+                        .
+                      </>
+                    )}
+                  </>
+                )}
+                {scorecard.best_alpha !== null && scorecard.worst_alpha !== null && (
+                  <>
+                    {" "}Best single-day alpha:{" "}
+                    <span className="text-up">{scorecard.best_alpha >= 0 ? "+" : ""}{scorecard.best_alpha.toFixed(2)}%</span>;
+                    worst:{" "}
+                    <span className="text-down">{scorecard.worst_alpha >= 0 ? "+" : ""}{scorecard.worst_alpha.toFixed(2)}%</span>.
+                  </>
+                )}
+              </p>
+              <p className="mt-3 text-base text-fg leading-relaxed">
+                Full per-day history (including every miss) at{" "}
+                <Link href={`/scorecard/${t.symbol}`} className="text-accent hover:underline">/scorecard/{t.symbol}</Link>. Sample sizes under 20-30 entries are statistically noisy — treat the median as directional, not as a predicted return.
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-base text-fg leading-relaxed">
+              {t.symbol} hasn't been in a Tapeline top-10 cohort yet, so there's no per-ticker back-check history on the public scorecard. That's not a negative read — only the top-scoring 10 names per session are frozen for back-checking, so the bar for inclusion is high. Today's composite ({fmtScore(composite)}) shows where {t.symbol} currently ranks. The full universe-wide scorecard, including every other ticker that has been frozen, lives at{" "}
+              <Link href="/scorecard" className="text-accent hover:underline">/scorecard</Link>.
+            </p>
+          )}
           <p className="mt-3 text-base text-fg leading-relaxed">
             The scorecard isn't proof the formula will keep working — it's evidence the publisher isn't hiding the misses. That's the part most prosumer scanner tools refuse to do. If you can't see the misses, you can't tell whether a score is signal or marketing.
           </p>
@@ -298,6 +546,51 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
           <p className="mt-3 text-base text-fg leading-relaxed">
             The factor breakdown is the part to read carefully. The composite is a summary; the six factors show whether the read is concentrated in one factor (single-source signal, easier to be wrong) or distributed across leading and lagging factors (confluence, higher conviction). Tapeline labels are descriptive — "HIGH CONVICTION", "STRONG SETUP", "CONSTRUCTIVE" — not "BUY" prescriptions. That distinction matters legally and practically.
           </p>
+        </section>
+
+        <section className="mt-12">
+          <h2 className="text-2xl font-semibold tracking-tight">Questions about the {t.symbol} score</h2>
+          <p className="mt-3 text-sm text-muted">
+            FAQ — the same answers are encoded as structured data on this page so search engines can surface them as rich results.
+          </p>
+          <div className="mt-4 divide-y divide-border/60">
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-baseline justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">Does Tapeline factor {t.sector ?? "sector"} dynamics into the {t.symbol} score?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
+                Yes — the Relative Strength factor (20% weight) explicitly compares {t.symbol}'s performance against both SPY and its sector peers (Mansfield RS calculation). The Macro factor (15%) adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-baseline justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">How often does the {t.symbol} score update?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
+                The composite recomputes every minute during US market hours on the live feeds. This page caches each fetch for 30 minutes to keep crawler load light; <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> updates in real time. Outside market hours, the score holds at the previous close's value.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-baseline justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">Is the {t.symbol} Tapeline score a buy recommendation?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
+                No. The label is descriptive (HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK), not prescriptive. It summarizes six independent signals into one 0-100 number. Acting on it depends on portfolio, risk tolerance, time horizon, and tax situation Tapeline doesn't know about. See <Link href="/legal/risk" className="text-accent hover:underline">/legal/risk</Link> for the full general-information posture.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-baseline justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">What does {t.symbol}'s confidence percentage mean?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
+                {confidenceText}
+              </p>
+            </details>
+          </div>
         </section>
 
         <section className="mt-12">
@@ -320,7 +613,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
               Open the live {t.symbol} page &rarr;
             </Link>
             <Link href="/signup" className="btn-ghost">
-              Start 14-day trial
+              Try Premium free
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard
@@ -328,7 +621,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
           </div>
         </div>
 
-        <nav className="mt-14 border-t border-border pt-8">
+        <nav className="mt-14 pt-8">
           <div className="text-xs uppercase tracking-wider text-subtle">Other ticker analyses</div>
           <ul className="mt-3 flex flex-wrap gap-2 text-sm">
             {TICKERS.filter((x: TickerPost) => x.symbol !== t.symbol).slice(0, 8).map((x) => (

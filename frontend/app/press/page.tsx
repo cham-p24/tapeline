@@ -31,7 +31,7 @@ const FACT_SHEET = [
   { label: "Free trial",      value: "14-day Premium, no credit card required" },
   { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume) · 5,757 tracked" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
-  { label: "Data partners",   value: "Massive (formerly Polygon.io), Finnhub, Quiver, FRED, Benzinga" },
+  { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
   { label: "Press contact",   value: "press@tapeline.io" },
 ];
 

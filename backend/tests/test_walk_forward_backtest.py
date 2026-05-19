@@ -17,7 +17,7 @@ keeps the suite fast and avoids any shell/quoting weirdness on Windows CI.
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx
@@ -290,7 +290,7 @@ def _make_massive_response(symbol: str, n_bars: int = 5) -> dict:
     endpoint returns (the production adapter at polygon_feed.fetch_aggregates
     parses identical fields). Five bars is enough to exercise the parser
     without bloating the test."""
-    base_ts = int(datetime(2024, 1, 2, tzinfo=timezone.utc).timestamp() * 1000)
+    base_ts = int(datetime(2024, 1, 2, tzinfo=UTC).timestamp() * 1000)
     one_day_ms = 86400 * 1000
     return {
         "ticker": symbol,

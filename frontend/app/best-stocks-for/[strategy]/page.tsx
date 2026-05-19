@@ -15,7 +15,7 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
 
 const API_BASE =
@@ -88,10 +88,29 @@ export default async function BestStocksForStrategyPage({
     { name: s.display, url },
   ]);
 
+  // ItemList JSON-LD with the actual ranked tickers from the live scanner.
+  // Critical for the "discovered/crawled not indexed" 496-page backlog —
+  // Google's quality filter rejects templated pages without unique structured
+  // data per slug; emitting different ItemList content per strategy proves
+  // the pages are distinct ranked lists, not duplicate boilerplate.
+  const itemList = rows.length > 0
+    ? tickerItemListJsonLd({
+        pageUrl: url,
+        name: s.h1,
+        description: s.metaDescription,
+        items: rows.map((r) => ({
+          symbol: r.symbol,
+          name: r.name,
+          score: r.score,
+        })),
+      })
+    : null;
+
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(s.faq))} />
+      {itemList ? <script {...jsonLdScript(itemList)} /> : null}
       <MarketingNav />
 
       <article className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
@@ -116,7 +135,7 @@ export default async function BestStocksForStrategyPage({
           ) : (
             <div className="card overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+                <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
                   <tr>
                     <th className="px-3 py-3 text-left">#</th>
                     <th className="px-3 py-3 text-left">Ticker</th>
@@ -194,7 +213,7 @@ export default async function BestStocksForStrategyPage({
           <h2 className="text-2xl font-semibold tracking-tight">
             Questions about {s.display.toLowerCase()} on Tapeline
           </h2>
-          <div className="mt-6 divide-y divide-border border-y border-border">
+          <div className="mt-6 divide-y divide-border/60">
             {s.faq.map((item) => (
               <details key={item.q} className="group py-4">
                 <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
@@ -239,7 +258,7 @@ export default async function BestStocksForStrategyPage({
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Start 14-day trial →
+              Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

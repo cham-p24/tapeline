@@ -45,7 +45,12 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       await api.watchlistAdd(symbol);
       setAddMsg(`${symbol} added to watchlist`);
     } catch (e: any) {
-      setAddMsg(e.message?.includes("409") ? "Already in watchlist" : `Failed: ${e.message}`);
+      const m = String(e.message || e);
+      if (m.includes("401")) {
+        window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
+        return;
+      }
+      setAddMsg(m.includes("409") ? "Already in watchlist" : `Failed: ${m}`);
     }
     setAdding(false);
   }
@@ -66,7 +71,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
     } catch (e: any) {
       const m = String(e.message || e);
-      // Friendly messages for the obvious cases:
+      if (m.includes("401")) {
+        window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
+        return;
+      }
       if (m.includes("403")) setNewsAlertMsg("Pro plan required for email alerts");
       else if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
       else setNewsAlertMsg(`Failed: ${m}`);
@@ -82,7 +90,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     : data.signal === "STRONG SETUP" ? "text-up bg-up/10"
     : data.signal === "CONSTRUCTIVE" ? "text-accent bg-accent/10"
     : data.signal === "NEUTRAL" ? "text-muted bg-muted/20"
-    : data.signal === "CAUTION" ? "text-yellow-400 bg-yellow-500/10"
+    : data.signal === "CAUTION" ? "text-warn bg-warn/10"
     : "text-down bg-down/10";
 
   return (
@@ -218,7 +226,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
               <Kv k="Pattern" v={data.squeeze.breakout_type} />
               <Kv k="Window" v={data.squeeze.suggested_window} />
             </dl>
-            <p className="border-t border-border p-4 text-xs text-muted italic">{data.squeeze.reason}</p>
+            <p className="p-4 text-xs text-muted italic">{data.squeeze.reason}</p>
           </div>
         ) : (
           <div className="card p-5">
@@ -357,7 +365,7 @@ function compact(n: number) {
 function confColor(c: number) {
   if (c >= 80) return "text-up";
   if (c >= 60) return "text-fg";
-  if (c >= 40) return "text-yellow-400";
+  if (c >= 40) return "text-warn";
   return "text-down";
 }
 function confLabel(c: number) {

@@ -19,7 +19,7 @@ const SECTIONS: Section[] = [
     rows: [
       { label: "Ticker universe", free: "Top 20", pro: "~2,500 US equities, ETFs & commodity ETFs", premium: "~2,500 US equities, ETFs & commodity ETFs" },
       { label: "Data freshness", free: "24-hour delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
-      { label: "News feed", free: "Headlines only", pro: "Real-time Massive + sentiment", premium: "Real-time Massive + sentiment" },
+      { label: "News feed", free: "Headlines only", pro: "Real-time news + sentiment", premium: "Real-time news + sentiment" },
     ],
   },
   {
@@ -87,7 +87,7 @@ export function ComparisonTable() {
           <col style={{ width: "20%" }} />
           <col style={{ width: "20%" }} />
         </colgroup>
-        <thead className="border-b border-border bg-black/40">
+        <thead className="border-b border-border bg-panel">
           <tr>
             <th className="px-4 py-3 text-left text-xs uppercase text-muted align-bottom">Feature</th>
             <th className="px-4 py-3 text-center text-xs uppercase text-muted align-bottom">Free</th>

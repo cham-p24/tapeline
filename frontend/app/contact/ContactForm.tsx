@@ -87,7 +87,7 @@ export function ContactForm() {
           minLength={8}
           maxLength={5000}
           rows={6}
-          className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
+          className="w-full rounded-md border border-border bg-bg px-3 py-2.5 text-base focus:border-accent focus:outline-none"
           placeholder="What's up? Bug report, feature idea, billing question — anything."
         />
       </div>
@@ -141,7 +141,7 @@ function Field({
         required={required}
         autoComplete={autoComplete}
         maxLength={type === "email" ? 200 : 200}
-        className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
+        className="w-full rounded-md border border-border bg-bg px-3 py-2.5 text-base focus:border-accent focus:outline-none"
       />
     </div>
   );

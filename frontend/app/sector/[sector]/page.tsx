@@ -141,7 +141,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
           ) : (
             <div className="card overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+                <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
                   <tr>
                     <th className="px-3 py-3 text-left">#</th>
                     <th className="px-3 py-3 text-left">Ticker</th>
@@ -219,7 +219,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
           <h2 className="text-2xl font-semibold tracking-tight">
             Frequently asked about {sector.display} stocks
           </h2>
-          <div className="mt-6 divide-y divide-border border-y border-border">
+          <div className="mt-6 divide-y divide-border/60">
             {faq.map((item) => (
               <details key={item.q} className="group py-4">
                 <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">

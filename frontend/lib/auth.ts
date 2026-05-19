@@ -8,7 +8,7 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
-  tier: "free" | "starter" | "pro" | "premium";
+  tier: "free" | "pro" | "premium";
   is_admin?: boolean;
   is_lifetime?: boolean;
   trial_ends_at?: string | null;
@@ -17,6 +17,14 @@ export type SessionUser = {
   phone_number?: string | null;
   discord_webhook_url?: string | null;
   created_at: string | null;
+  // Null until the user has submitted (or skipped) /app/onboarding. The
+  // frontend post-signup redirect uses this to decide whether to bounce
+  // through onboarding before /app/scanner.
+  onboarding_completed_at?: string | null;
+  // Null until the user clicks the link in their verification email.
+  // OAuth signups are auto-verified at the moment of account creation.
+  // The /app/* layout uses this to render a "verify your email" banner.
+  email_verified_at?: string | null;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -58,7 +66,7 @@ export const authApi = {
 };
 
 // Feature-gating helpers mirroring backend tier.py
-const TIER_ORDER: Record<SessionUser["tier"], number> = { free: 0, starter: 1, pro: 2, premium: 3 };
+const TIER_ORDER: Record<SessionUser["tier"], number> = { free: 0, pro: 1, premium: 2 };
 
 export function hasMinTier(user: SessionUser | null, minTier: SessionUser["tier"]): boolean {
   if (!user) return minTier === "free";

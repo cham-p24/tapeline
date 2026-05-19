@@ -5,121 +5,127 @@ import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline Data Sources — What Powers Every Score, Honestly",
+  title: "Tapeline Data Categories — What Powers Every Score",
   description:
-    "Every data feed Tapeline reads from, what it's used for, and the license posture. Polygon/Massive for prices, Finnhub for fundamentals, SEC EDGAR for filings, FRED for macro, Benzinga for news. No hidden vendors, no embellishment.",
+    "The data categories Tapeline uses to compute every score: live market data, fundamentals, macro indicators, SEC filings, Congressional disclosures, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
   path: "/data-sources",
 });
 
-type Source = {
+type Category = {
   name: string;
-  url: string;
   usedFor: string[];
-  surfaceArea: string;          // where in the product this shows up
+  surfaceArea: string;
   refreshCadence: string;
-  publicDomain: boolean;        // FRED + SEC = true; rest = no
-  note?: string;                // optional flavour / caveat
+  publicRecord: boolean;
 };
 
-const SOURCES: Source[] = [
+// Vendor-agnostic data category list. We deliberately do not name specific
+// providers on the public marketing surface — license terms vary by tier and
+// vendor and the named-attribution version of this page (live until 2026-05-19)
+// risked over-disclosing how we source data. Where a downstream display surface
+// (e.g. an Analyst Ratings widget) needs vendor attribution for legal reasons,
+// it's attributed at the point of display, not aggregated here.
+const CATEGORIES: Category[] = [
   {
-    name: "Massive (formerly Polygon.io)",
-    url: "https://massive.com",
+    name: "Live market data",
     usedFor: [
-      "Live equity + ETF prices",
-      "OHLC bars for trend / RS / momentum calculations",
-      "Volume + dollar-volume for the heatmap tile sizing",
+      "Equity + ETF prices, OHLC bars, volumes",
+      "Trend and relative-strength calculations",
+      "Heatmap tile sizing (dollar-volume weighted)",
       "Auto-discovery of the active US ticker universe",
     ],
-    surfaceArea: "Every ticker price you see, every chart, every percentage change, the heatmap tiles, the scanner table",
-    refreshCadence: "Sub-60 seconds for live prices; weekly for the ticker universe walk",
-    publicDomain: false,
-    note: "Stocks Starter tier ($29/mo). Data is delayed ~15 minutes on this tier — the 'live' badge reflects scanner-tick freshness, not exchange real-time.",
+    surfaceArea:
+      "Every ticker price, every chart, every percentage change, the heatmap tiles, the scanner table.",
+    refreshCadence: "Sub-60 seconds during US market hours.",
+    publicRecord: false,
   },
   {
-    name: "Finnhub",
-    url: "https://finnhub.io",
+    name: "Fundamentals",
     usedFor: [
-      "Per-ticker fundamentals (P/E, ROE, margins, growth rates)",
-      "SEC Form 4 insider transactions",
-      "Upcoming earnings + IPO calendar",
-      "Company profile / sector classification (backfill)",
+      "Per-ticker financial ratios (P/E, ROE, margins)",
+      "Revenue and EPS growth",
+      "Debt / equity, balance sheet health",
+      "Company classification (sector backfill)",
     ],
-    surfaceArea: "The Financials tab on every ticker page, the Insider activity tab, the recent insider buys feed at /app/holdings, /app/earnings, /app/ipos, the sector label on the heatmap",
-    refreshCadence: "Fundamentals refresh weekly. Form 4 transactions refresh daily for the top ~2,500 most-liquid tickers. Calendars refresh twice daily.",
-    publicDomain: false,
-    note: "Free tier (60 calls/min). Falls back to empty cards if the upstream key is unset.",
+    surfaceArea:
+      "The Financials tab on every ticker page and the Fundamentals sub-factor in the score breakdown.",
+    refreshCadence: "Refreshed on company filing cadence.",
+    publicRecord: false,
   },
   {
-    name: "SEC EDGAR (direct)",
-    url: "https://www.sec.gov/cgi-bin/browse-edgar",
+    name: "Macro indicators",
     usedFor: [
-      "Real-time 8-K material event filings",
-      "CIK → ticker symbol mapping (for cross-referencing)",
+      "10-year Treasury yield, DXY US Dollar Index, VIX",
+      "Rate-direction classification (RISING / FALLING / SIDEWAYS)",
+      "Inputs to the Macro sub-factor",
     ],
-    surfaceArea: "The breaking-news bar on every dashboard page tagged 'SEC EDGAR'. Material event filings (M&A announcements, earnings restatements, executive changes) appear here ~5-30 minutes before they're re-reported by the news wires.",
-    refreshCadence: "Every 5 minutes alongside the news refresh",
-    publicDomain: true,
-    note: "US government public record. Free, no key, no licensing.",
+    surfaceArea:
+      "The Regime tile on every dashboard page. The Macro sub-factor on every ticker. The Fear & Greed composite on /app/regime.",
+    refreshCadence: "Hourly cache, refreshed on next worker tick.",
+    publicRecord: true,
   },
   {
-    name: "FRED (Federal Reserve Economic Data)",
-    url: "https://fred.stlouisfed.org",
+    name: "SEC filings",
     usedFor: [
-      "10-year Treasury yield",
-      "DXY US Dollar Index",
-      "VIX volatility index",
-      "Rate-direction inference (RISING / FALLING / SIDEWAYS)",
+      "Form 4 insider transactions (buys, sales, vesting)",
+      "8-K material event filings (M&A, restatements, executive changes)",
+      "CIK-to-ticker mapping",
     ],
-    surfaceArea: "The Regime tile on every dashboard page. The Macro sub-factor on every ticker score. The 'Fear & Greed' composite on /app/regime.",
-    refreshCadence: "Cached 1 hour, refreshed on the next worker tick",
-    publicDomain: true,
-    note: "US Federal Reserve public data. Free, no licensing restrictions.",
+    surfaceArea:
+      "Recent insider buys feed at /app/holdings. Breaking-news bar 8-K alerts on dashboards.",
+    refreshCadence:
+      "Form 4 daily for the top-liquidity universe. 8-Ks every 5 minutes.",
+    publicRecord: true,
   },
   {
-    name: "Benzinga",
-    url: "https://www.benzinga.com",
+    name: "Congressional disclosures",
     usedFor: [
-      "Live news wire with cashtag tagging",
-      "Analyst consensus ratings (Buy/Hold/Sell tally, avg price target)",
+      "House + Senate financial disclosure filings",
+      "Inputs to the Smart Money sub-factor",
     ],
-    surfaceArea: "The breaking-news bar headlines tagged 'Benzinga'. The Analyst Ratings widget on Premium ticker pages.",
-    refreshCadence: "News every 5 minutes. Analyst ratings cached 6 hours per ticker.",
-    publicDomain: false,
-    note: "Tapeline prefers Benzinga over Massive for news quality. Falls back to Massive cleanly if Benzinga is unreachable.",
+    surfaceArea:
+      "Congressional trades feed at /app/congress (Premium tier).",
+    refreshCadence: "Daily.",
+    publicRecord: true,
   },
   {
-    name: "Signal-system (the founder's research workbook)",
-    url: "",
+    name: "News wire",
     usedFor: [
-      "Composite ticker scoring (6-factor blend)",
-      "Smart Money sub-score (Congressional + insider activity)",
-      "Market regime label (BULL / NEUTRAL / CAUTIOUS / BEAR)",
-      "ETF benchmark classifications",
+      "Live cashtag-tagged headlines per ticker",
+      "Sentiment-tagged headlines for the breaking-news bar",
     ],
-    surfaceArea: "The composite 0-100 score on every ticker page, scanner row, and watchlist item. The signal label (HIGH CONVICTION / STRONG SETUP / etc.). The Regime tile.",
-    refreshCadence: "Tapeline pulls the signal-system's published Google Sheet via CSV every 5 minutes",
-    publicDomain: false,
-    note: "Tapeline reads the founder's personal research workbook. The signal-system project is separate from Tapeline (lives at C:\\signal-system\\ on the founder's machine, not part of this repo).",
+    surfaceArea:
+      "News bar on every dashboard page. Per-ticker news section on the ticker detail page.",
+    refreshCadence: "Every ~5 minutes.",
+    publicRecord: false,
+  },
+  {
+    name: "Analyst ratings",
+    usedFor: [
+      "Consensus tally (Buy / Hold / Sell)",
+      "Average price target + recent rating events",
+    ],
+    surfaceArea:
+      "Analyst Ratings widget on Premium ticker pages. Not folded into the score — displayed as descriptive context only.",
+    refreshCadence: "Cached 6 hours per ticker.",
+    publicRecord: false,
   },
 ];
 
 const TRANSPARENCY_NOTE = `
-Tapeline is built and run by one person. The product reads data from several
-public and licensed feeds, transforms it through a 6-factor scoring formula,
-and surfaces the result. The page above lists every feed honestly — what it's
-used for, where it shows up, how often it refreshes. No hidden vendors, no
-"proprietary data" hand-waving.
+Tapeline reads from several categories of market and reference data, transforms
+it through a 6-factor scoring formula, and surfaces the result. The categories
+above describe what each input is used for and where it appears in the product.
 
-Where Tapeline displays a number that came directly from a vendor (a price, a
-P/E ratio, an analyst rating), the vendor is named in the surface area
-column above. Where Tapeline displays its own derived metric (the composite
-score, the sub-scores, the signal label, the plain-English "why" sentence),
-that's Tapeline's own analytical output computed via the published 6-factor
-formula at /how-it-works.
+Where Tapeline displays a number that came directly from an upstream feed (a
+price, a P/E ratio, an analyst rating), the displayed value is the upstream
+value at the time of the most recent refresh. Where Tapeline displays its own
+derived metric (the composite score, the sub-scores, the signal label, the
+plain-English "why" sentence), that's Tapeline's own analytical output computed
+via the published 6-factor formula at /how-it-works.
 
-If you're a vendor and you'd like Tapeline to credit you differently, drop a
-line to support@tapeline.io. Page is editable on every release.
+Tapeline is not a registered investment adviser. Everything on the platform is
+descriptive analytics — see /legal/risk for the full disclosure.
 `.trim();
 
 export default function DataSourcesPage() {
@@ -128,55 +134,47 @@ export default function DataSourcesPage() {
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-6 py-12">
-        <p className="eyebrow">Data sources</p>
+        <p className="eyebrow">Data categories</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           What powers Tapeline.
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Every data feed Tapeline reads from, the surface area where it appears,
-          and the refresh cadence. No black boxes, no &ldquo;proprietary data&rdquo; vague-speak.
+          The data categories Tapeline reads from, the surface area where each
+          one appears, and the refresh cadence. No black boxes, no
+          &ldquo;proprietary data&rdquo; vague-speak.
         </p>
         <p className="mt-3 text-sm text-subtle">
-          The Tapeline composite score and the per-factor sub-scores are computed via the
-          published 6-factor formula at{" "}
-          <Link href="/how-it-works" className="link">/how-it-works</Link>. Those numbers are
-          Tapeline&rsquo;s analytical output — derived through transformation, not redistributed
-          from any single vendor. The list below covers the underlying inputs.
+          The Tapeline composite score and the per-factor sub-scores are
+          computed via the published 6-factor formula at{" "}
+          <Link href="/how-it-works" className="link">/how-it-works</Link>. Those
+          numbers are Tapeline&rsquo;s analytical output — derived through
+          transformation, not redistributed from any single source. The list
+          below covers the underlying input categories.
         </p>
       </section>
 
       <section className="mx-auto max-w-4xl px-6 pb-16">
         <ol className="space-y-8">
-          {SOURCES.map((s) => (
-            <li key={s.name} className="card p-6">
+          {CATEGORIES.map((c) => (
+            <li key={c.name} className="card p-6">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="text-xl font-semibold">{s.name}</h2>
-                {s.publicDomain ? (
+                <h2 className="text-xl font-semibold">{c.name}</h2>
+                {c.publicRecord ? (
                   <span className="rounded-full border border-up/30 bg-up/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-up">
-                    Public domain
+                    Public record
                   </span>
                 ) : (
                   <span className="rounded-full border border-muted/30 bg-muted/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted">
-                    Licensed
+                    Market data
                   </span>
                 )}
               </div>
-              {s.url && (
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-block text-xs text-accent hover:underline"
-                >
-                  {s.url.replace(/^https?:\/\//, "")} ↗
-                </a>
-              )}
 
               <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
                 <div>
-                  <h3 className="text-[10px] uppercase tracking-wider text-subtle">What it's used for</h3>
+                  <h3 className="text-[10px] uppercase tracking-wider text-subtle">What it&rsquo;s used for</h3>
                   <ul className="mt-1 space-y-1 text-muted">
-                    {s.usedFor.map((u) => (
+                    {c.usedFor.map((u) => (
                       <li key={u} className="flex gap-2">
                         <span className="text-accent select-none">·</span>
                         <span>{u}</span>
@@ -186,22 +184,16 @@ export default function DataSourcesPage() {
                 </div>
                 <div>
                   <h3 className="text-[10px] uppercase tracking-wider text-subtle">Where it appears</h3>
-                  <p className="mt-1 text-muted leading-relaxed">{s.surfaceArea}</p>
+                  <p className="mt-1 text-muted leading-relaxed">{c.surfaceArea}</p>
                   <h3 className="mt-3 text-[10px] uppercase tracking-wider text-subtle">Refresh cadence</h3>
-                  <p className="mt-1 text-muted">{s.refreshCadence}</p>
+                  <p className="mt-1 text-muted">{c.refreshCadence}</p>
                 </div>
               </div>
-
-              {s.note && (
-                <p className="mt-4 rounded-md bg-white/[0.025] p-3 text-xs text-muted leading-relaxed">
-                  {s.note}
-                </p>
-              )}
             </li>
           ))}
         </ol>
 
-        <div className="mt-12 rounded-xl bg-white/[0.025] p-6">
+        <div className="mt-12 rounded-xl bg-panel/60 p-6">
           <h2 className="text-lg font-semibold">Transparency note</h2>
           <p className="mt-3 text-sm text-muted whitespace-pre-line leading-relaxed">
             {TRANSPARENCY_NOTE}

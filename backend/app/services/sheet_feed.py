@@ -882,3 +882,28 @@ async def refresh_smart_money_from_workbook(session: AsyncSession) -> dict[str, 
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
     logger.info("sheet_feed.smart_money_refreshed rows=%d", counts["total"])
     return counts
+
+
+async def refresh_all_tabs(session: AsyncSession) -> dict[str, dict[str, int]]:
+    """Refresh every workbook tab serially. Used by the Apps Script
+    webhook (/api/internal/sheet-changed) and intended to replace the
+    per-tab worker calls in `signal_publisher` once the live-push path
+    is proven out.
+
+    Serial (not parallel) on purpose: each refresh writes to the same DB
+    session, and parallel writes against SQLite hit `database is locked`
+    errors. Even on Postgres prod, the per-row upserts contend on the
+    same unique indexes — parallelism would buy maybe 2x latency at the
+    cost of debugging surface.
+
+    Returns a per-tab breakdown so callers can log what changed. Errors
+    in one tab don't block the others — each refresh swallows its own
+    exception and returns an `error: 1` count.
+    """
+    return {
+        "all_signals": await refresh_from_workbook(session),
+        "spikes":      await refresh_spikes_from_workbook(session),
+        "etfs":        await refresh_etfs_from_workbook(session),
+        "market":      await refresh_market_from_workbook(session),
+        "smart_money": await refresh_smart_money_from_workbook(session),
+    }

@@ -1,5 +1,12 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+// Only attach the dev-bypass bearer when the API base is local. In production
+// the backend ignores it (auth.py only accepts it when app_env=development),
+// so sending it cross-origin is harmless but pointless — and it's the kind
+// of token-shaped string that's confusing to see in prod request logs.
+const IS_DEV_API = /localhost|127\.0\.0\.1/.test(API_BASE);
+const DEV_TOKEN = IS_DEV_API ? "dev-bypass" : "";
+
 /**
  * Every fetch in this file passes `credentials: "include"` so the
  * `tapeline_session` cookie travels with the request.
@@ -12,12 +19,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
  * every authenticated POST/DELETE/GET-with-auth returned 401 in production
  * even though the user was clearly signed in. Live bug observed
  * 2026-05-17 on "Add to watchlist" and "Notify me on news" buttons.
- *
- * The Bearer-dev-bypass header below is still sent for local dev (where
- * the backend honours it). In production the backend ignores it
- * (auth.py:142 only accepts it when `app_env=development`), so the cookie
- * is the only auth signal that actually applies. Cookie + dev-bypass
- * together is harmless in prod and works in dev.
  */
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -89,6 +90,11 @@ export type TickerDetail = {
 export type WatchlistItem = {
   id: number;
   symbol: string;
+  // Phase A: which named list this item belongs to. Null only for
+  // items that pre-date migration 0022's backfill (no such rows in
+  // production after the deploy ran); allowed null in the type for
+  // safety.
+  watchlist_id: number | null;
   note: string | null;
   baseline_score: number | null;
   alert_threshold_delta: number;
@@ -100,6 +106,27 @@ export type WatchlistItem = {
   reason: string | null;
   score_delta: number | null;
   alert_triggered: boolean;
+};
+
+// Phase A — one row returned by /api/watchlists (the LIST CRUD, not the
+// per-item watchlist). `item_count` is the number of WatchlistItems
+// currently attached to this list (computed server-side).
+export type WatchlistRow = {
+  id: number;
+  name: string;
+  sort_order: number;
+  item_count: number;
+  created_at: string | null;
+};
+
+// Phase A — one row returned by /api/presets. `filters_json` is an opaque
+// blob the scanner page serialises via JSON.stringify on save and parses
+// back on apply.
+export type ScannerPresetRow = {
+  id: number;
+  name: string;
+  filters_json: string;
+  created_at: string | null;
 };
 
 export type ScorecardEntry = {
@@ -258,6 +285,28 @@ export type TrackedFund = {
   slug: string;
 };
 
+export type AlertRule = {
+  id: number;
+  name: string;
+  rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
+  symbol: string | null;
+  threshold: number | null;
+  channel: "email" | "telegram" | "web_push";
+  enabled: boolean;
+  last_fired_at: string | null;
+  created_at: string;
+};
+
+export type AlertEvent = {
+  id: number;
+  rule_id: number;
+  symbol: string | null;
+  message: string;
+  channel: string;
+  delivered: boolean;
+  created_at: string;
+};
+
 async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -282,19 +331,29 @@ async function del<T>(path: string, token?: string): Promise<T> {
   return res.json();
 }
 
-async function getAuth<T>(path: string, token: string): Promise<T> {
+async function patch<T>(path: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    cache: "no-store",
+    method: "PATCH",
     credentials: "include",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
 
-// For dev: all authenticated calls use "dev-bypass" to hit the premium dev user.
-// Production swaps this for the Clerk session token.
-const DEV_TOKEN = "dev-bypass";
+async function getAuth<T>(path: string, token: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
 
 export const api = {
   scanner: (params: Record<string, string | number> = {}) => {
@@ -315,7 +374,7 @@ export const api = {
   emailPrefsGet: () =>
     get<EmailPrefsResponse>(`/api/me/email-prefs`),
   emailPrefsPatch: async (partial: Partial<Record<EmailPrefKey, boolean>>) => {
-    const res = await fetch(`/api/me/email-prefs`, {
+    const res = await fetch(`${API_BASE}/api/me/email-prefs`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -333,7 +392,7 @@ export const api = {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return get<{ sectors: HeatmapSector[]; available_sectors: string[]; query: string | null }>(`/api/heatmap${suffix}`);
   },
-  scorecard: (days = 30) => get<{ summary: { days_tracked: number; entries_scored: number; avg_1d_return: number | null; avg_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null }; days: Record<string, ScorecardEntry[]> }>(`/api/scorecard?days=${days}`),
+  scorecard: (days = 30) => get<{ summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number }; days: Record<string, ScorecardEntry[]> }>(`/api/scorecard?days=${days}`),
   popularTickers: (n = 8) => get<{ items: Array<{ symbol: string; name: string | null; sector: string | null; score: number | null }>; cached: boolean }>(`/api/scanner/popular?n=${n}`),
   scorecardSymbol: (symbol: string) => get<{
     summary: {
@@ -345,11 +404,16 @@ export const api = {
       current_signal: string | null;
       appearances: number;
       appearances_scored: number;
+      entries_excluded_outliers: number;
       avg_1d_return: number | null;
+      median_1d_return: number | null;
       avg_alpha_vs_spy: number | null;
+      median_alpha_vs_spy: number | null;
       hit_rate_beat_spy: number | null;
       best_alpha: number | null;
       worst_alpha: number | null;
+      is_delayed: boolean;
+      delay_days: number;
     };
     rows: Array<{
       as_of: string;
@@ -362,10 +426,48 @@ export const api = {
       alpha_vs_spy: number | null;
     }>;
   }>(`/api/scorecard/symbol/${encodeURIComponent(symbol.toUpperCase())}`),
-  watchlist: () => getAuth<{ count: number; items: WatchlistItem[] }>("/api/watchlist", DEV_TOKEN),
-  watchlistAdd: (symbol: string, alert_threshold_delta = 10) =>
-    post<{ id: number; symbol: string; baseline_score: number | null }>("/api/watchlist", { symbol, alert_threshold_delta }, DEV_TOKEN),
+  // `list_id` (Phase A): when set, narrows the result to one named list.
+  // Omitted → all of the caller's items (matches pre-Phase-A behaviour).
+  watchlist: (list_id?: number | null) => {
+    const qs = list_id != null ? `?list_id=${list_id}` : "";
+    return getAuth<{ count: number; items: WatchlistItem[] }>(`/api/watchlist${qs}`, DEV_TOKEN);
+  },
+  // Phase A: optional list_id. When provided, the new item lands in
+  // that list; when omitted, the backend resolves to the user's default
+  // list (auto-creates "My Watchlist" on first add for new users).
+  watchlistAdd: (symbol: string, alert_threshold_delta = 10, list_id?: number | null) =>
+    post<{ id: number; symbol: string; watchlist_id: number | null; baseline_score: number | null }>(
+      "/api/watchlist",
+      { symbol, alert_threshold_delta, ...(list_id != null ? { list_id } : {}) },
+      DEV_TOKEN,
+    ),
+  // Move an existing item to a different named list.
+  watchlistMove: (id: number, watchlist_id: number) =>
+    patch<{ id: number; symbol: string; watchlist_id: number }>(
+      `/api/watchlist/${id}`,
+      { watchlist_id },
+      DEV_TOKEN,
+    ),
   watchlistRemove: (id: number) => del<{ ok: boolean }>(`/api/watchlist/${id}`, DEV_TOKEN),
+
+  // --- Phase A: multi-watchlists (lists CRUD) + scanner presets ----------
+  // Pluralised /api/watchlists is the LIST CRUD; the singular /api/watchlist
+  // above remains the ITEM CRUD. Two routers, one tier (`watchlists` cap
+  // Free=1 / Pro=5 / Premium=20 enforced server-side; the matching frontend
+  // cap is read off /api/me's `tier` field).
+  watchlists: () => getAuth<{ count: number; items: WatchlistRow[] }>("/api/watchlists", DEV_TOKEN),
+  watchlistCreate: (name: string) =>
+    post<WatchlistRow>("/api/watchlists", { name }, DEV_TOKEN),
+  watchlistRename: (id: number, name: string) =>
+    patch<{ id: number; name: string }>(`/api/watchlists/${id}`, { name }, DEV_TOKEN),
+  watchlistDelete: (id: number) =>
+    del<{ ok: boolean }>(`/api/watchlists/${id}`, DEV_TOKEN),
+
+  presets: () => getAuth<{ count: number; items: ScannerPresetRow[] }>("/api/presets", DEV_TOKEN),
+  presetCreate: (name: string, filters_json: string) =>
+    post<ScannerPresetRow>("/api/presets", { name, filters_json }, DEV_TOKEN),
+  presetDelete: (id: number) =>
+    del<{ ok: boolean }>(`/api/presets/${id}`, DEV_TOKEN),
   /**
    * Recent Insider Buys feed. Backed by SEC Form 4 filings via Finnhub.
    * Replaces the legacy 13F holdings call; URL `/api/holdings` is unchanged
@@ -388,11 +490,17 @@ export const api = {
   },
   alertRuleCreate: (body: {
     name: string;
-    rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
+    rule_type: AlertRule["rule_type"];
     symbol?: string | null;
     threshold?: number | null;
-    channel?: "email" | "telegram" | "web_push";
-  }) => post<{ id: number; rule_type: string; symbol: string | null }>(
-    "/api/alerts/rules", body, DEV_TOKEN,
+    channel?: AlertRule["channel"];
+  }) => post<AlertRule>("/api/alerts/rules", body, DEV_TOKEN),
+  alertRules: () => getAuth<{ count: number; items: AlertRule[] }>(
+    "/api/alerts/rules", DEV_TOKEN,
+  ),
+  alertRuleDelete: (id: number) =>
+    del<{ ok: boolean }>(`/api/alerts/rules/${id}`, DEV_TOKEN),
+  alertEvents: (limit = 50) => getAuth<{ count: number; items: AlertEvent[] }>(
+    `/api/alerts/events?limit=${limit}`, DEV_TOKEN,
   ),
 };

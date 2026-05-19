@@ -60,7 +60,7 @@ export default function StatusPage() {
     : data?.status === "ok"
     ? { label: "All systems operational", tone: "bg-up/10 border-up/40 text-up" }
     : data?.status === "degraded"
-    ? { label: "Degraded — some checks failing", tone: "bg-yellow-500/10 border-yellow-500/40 text-yellow-400" }
+    ? { label: "Degraded — some checks failing", tone: "bg-warn/10 border-warn/40 text-warn" }
     : { label: "Checking…", tone: "bg-muted/10 border-border text-muted" };
 
   return (
@@ -200,7 +200,7 @@ function Row({
           status === "ok"
             ? "text-up"
             : status === "warn"
-            ? "text-yellow-400"
+            ? "text-warn"
             : status === "down"
             ? "text-down"
             : "text-muted"

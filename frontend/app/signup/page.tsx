@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/gtag";
+import { api } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
@@ -63,6 +65,39 @@ function SignUpForm() {
   const [busy, setBusy] = useState(false);
   const turnstileRef = useRef<HTMLDivElement | null>(null);
 
+  // Live scorecard proof block — fetched once on mount. The summary stats
+  // (days_tracked, hit_rate_beat_spy, median_alpha_vs_spy) are tier-invariant
+  // so we get them even though the visitor is anonymous. If the fetch fails
+  // or returns nulls (e.g. no back-checked entries yet), the block silently
+  // renders nothing — the page should never show "—%" placeholders that look
+  // broken. This is the highest-leverage copy lever on /signup: turning the
+  // bullet promises above into measurable receipts.
+  const [proof, setProof] = useState<{
+    days: number;
+    hit_rate: number;
+    median_alpha: number;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.scorecard(30).then((d) => {
+      if (cancelled) return;
+      const s = d.summary;
+      if (
+        typeof s.days_tracked === "number" &&
+        s.days_tracked > 0 &&
+        typeof s.hit_rate_beat_spy === "number" &&
+        typeof s.median_alpha_vs_spy === "number"
+      ) {
+        setProof({
+          days: s.days_tracked,
+          hit_rate: s.hit_rate_beat_spy,
+          median_alpha: s.median_alpha_vs_spy,
+        });
+      }
+    }).catch(() => { /* silent — no proof block is better than a broken one */ });
+    return () => { cancelled = true; };
+  }, []);
+
   // Subscribe React state into the module-scope Turnstile callback. The
   // window.onTapelineTurnstile handler was already registered at module load
   // (see top of file) — here we just point it at our setter and drain any
@@ -77,9 +112,11 @@ function SignUpForm() {
   }, []);
 
   // Funnel event: fired once on mount when a real human sees the signup form.
-  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics.
+  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics
+  // + GA4 (typed event names — see lib/gtag.ts).
   useEffect(() => {
     track("signup_started", { next });
+    trackEvent("sign_up_started", { next });
   }, [next]);
 
   async function submit(e: React.FormEvent) {
@@ -116,9 +153,17 @@ function SignUpForm() {
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
       // trial event on the same beat. Property `oauth: false` lets us segment
       // form-vs-OAuth conversion later when OAuth tracking lands.
+      // Mirror to GA4 so Search Console can attribute the query → signup
+      // chain via Acquisition reports.
       track("signup_completed", { method: "email", next });
       track("trial_started", { tier: "premium", days: 14, method: "email" });
-      router.push(next);
+      trackEvent("sign_up", { method: "email" });
+      trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
+      // Route through /app/onboarding first — captures investor profile +
+      // attribution + marketing-opt-in before they hit the product. The
+      // onboarding page redirects to `next` after submit or skip. Existing
+      // users (signin) never pass through here.
+      router.push(`/app/onboarding?next=${encodeURIComponent(next)}`);
       router.refresh();
     } catch (e: any) {
       setErr(e.message || "Sign up failed");
@@ -138,8 +183,58 @@ function SignUpForm() {
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
           </Link>
 
-          <h1 className="mt-10 text-3xl font-bold tracking-tight">Start 14-day Pro trial</h1>
+          <h1 className="mt-10 text-3xl font-bold tracking-tight">Try Premium free for 14 days</h1>
           <p className="mt-2 text-sm text-muted">No credit card. Cancel anytime.</p>
+
+          {/* Live scorecard proof — the only block on this page where the
+              numbers update with real data. Bullets below promise features;
+              this block surfaces actual track record. Renders nothing when
+              the back-check hasn't accumulated enough entries yet, so the
+              page never shows a "broken" empty state.
+              Tap-target — full row links to /scorecard so the curious
+              visitor can audit the receipts before signing up. */}
+          {proof && (
+            <Link
+              href="/scorecard"
+              className="mt-6 block rounded-md border border-up/20 bg-up/5 p-3 transition-colors hover:border-up/40 hover:bg-up/10"
+            >
+              <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-wider text-muted">
+                <span>Public scorecard</span>
+                <span className="text-subtle">audit →</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 nums">
+                <span className="text-fg">
+                  <span className="text-base font-semibold">{proof.days}</span>
+                  <span className="ml-1 text-xs text-muted">days tracked</span>
+                </span>
+                <span className="text-up">
+                  <span className="text-base font-semibold">{proof.hit_rate.toFixed(0)}%</span>
+                  <span className="ml-1 text-xs text-muted">beat SPY</span>
+                </span>
+                <span className={proof.median_alpha >= 0 ? "text-up" : "text-down"}>
+                  <span className="text-base font-semibold">
+                    {proof.median_alpha >= 0 ? "+" : ""}{proof.median_alpha.toFixed(2)}%
+                  </span>
+                  <span className="ml-1 text-xs text-muted">median alpha</span>
+                </span>
+              </div>
+            </Link>
+          )}
+
+          <ul className="mt-6 space-y-2 text-sm text-muted">
+            <li className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span><span className="text-fg">Full universe, live scores</span> — not the 20-ticker, 24-hour-delayed free view</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span><span className="text-fg">Smart-money signals</span> — Congressional trades + recent insider buys (SEC Form 4)</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push, Telegram</span>
+            </li>
+          </ul>
 
           {refCode && (
             <div className="mt-6 rounded-md border border-up/30 bg-up/5 p-3 text-sm text-up">
@@ -147,7 +242,15 @@ function SignUpForm() {
             </div>
           )}
 
-          <form onSubmit={submit} className="mt-8 space-y-4">
+          {/* OAuth above the email form. One-click signup is the highest-leverage
+              conversion lever on this page; we used to bury it below. The
+              OAuthButtons component renders nothing if no provider is configured
+              so the layout collapses cleanly in environments without OAuth. */}
+          <div className="mt-8">
+            <OAuthButtons position="top" />
+          </div>
+
+          <form onSubmit={submit} className="space-y-4">
             {/* Honeypot field — offscreen, hidden from real users (and screen readers).
                 Bots that auto-fill every input will populate it; if non-empty, the
                 backend silently rejects the signup. */}
@@ -200,9 +303,26 @@ function SignUpForm() {
             </p>
           </form>
 
-          <OAuthButtons />
+          {/* After-trial transparency footer. The single most common pre-signup
+              objection is "what happens at day 14 — will I get auto-charged?"
+              Spelling out the off-ramp here defuses that anxiety. Wording is
+              kept tight: free fallback first (loss-aversion-light), upgrade
+              path second, explicit no-charge guarantee third. */}
+          <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
+            <div className="font-medium text-fg">After your 14 days</div>
+            <p className="mt-1.5">
+              Stay on Free (top 20 tickers, 24-hour delayed) — or upgrade to{" "}
+              <span className="text-fg">Pro from $24.99/mo</span> for the full
+              live universe. No card on file means no surprise charge.
+            </p>
+            <p className="mt-2 text-[11px] text-subtle">
+              <span className="text-muted">7-day money back</span> if you change your mind ·
+              Cancel in one click ·{" "}
+              <Link href="/legal/refund" className="link">Full refund policy</Link>
+            </p>
+          </div>
 
-          <p className="mt-8 text-center text-sm text-muted">
+          <p className="mt-6 text-center text-sm text-muted">
             Already have an account?{" "}
             <Link href={`/signin?next=${encodeURIComponent(next)}`} className="link">Sign in</Link>
           </p>
@@ -228,7 +348,7 @@ function Field({
         minLength={minLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block h-10 w-full rounded-md border border-border bg-panel px-3 text-sm transition-colors focus:border-accent focus:outline-none"
+        className="mt-1.5 block h-11 w-full rounded-md border border-border bg-panel px-3 text-base transition-colors focus:border-accent focus:outline-none"
       />
       {hint && <span className="mt-1 block text-xs text-subtle">{hint}</span>}
     </label>

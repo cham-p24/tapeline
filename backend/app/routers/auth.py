@@ -63,6 +63,17 @@ def _user_out(u: User) -> dict:
         "trial_ends_at": u.trial_ends_at.isoformat() if u.trial_ends_at else None,
         "referral_code": u.referral_code,
         "created_at": u.created_at.isoformat() if u.created_at else None,
+        # Drives the post-signup redirect — frontend sends users with a NULL
+        # onboarding_completed_at through /app/onboarding before /app/scanner.
+        "onboarding_completed_at": (
+            u.onboarding_completed_at.isoformat() if u.onboarding_completed_at else None
+        ),
+        # Null until the user clicks the link in their verification email
+        # (or OAuth provider verified at signup). Frontend uses this to
+        # render the "Verify your email" banner in /app/*.
+        "email_verified_at": (
+            u.email_verified_at.isoformat() if u.email_verified_at else None
+        ),
     }
 
 
@@ -247,7 +258,146 @@ async def signup(
         except Exception:
             logger.exception("auth.welcome_email_failed user=%s", user.id)
 
+    # Verification email — fire-and-forget, alongside the welcome. Native
+    # signup ONLY: OAuth users get auto-verified in routers/oauth.py because
+    # the provider already proved ownership.
+    try:
+        from app.services.email import mint_and_send_verification
+        await mint_and_send_verification(session, user)
+    except Exception:
+        logger.exception("auth.verification_send_failed user=%s", user.id)
+
     return {"user": _user_out(user)}
+
+
+# ── Email verification ────────────────────────────────────────────────────
+
+class VerifyEmailBody(BaseModel):
+    """POST body for the verify-email endpoint. We accept POST + GET so the
+    frontend can call this from a click handler without juggling redirects;
+    GET keeps the simple-link case working for email clients that don't
+    handle anchor → fetch chains."""
+
+    token: str = Field(..., min_length=8, max_length=200)
+    action: str = Field("verify", pattern=r"^(verify|cancel)$")
+
+
+async def _consume_verification(
+    session: AsyncSession, token: str, action: str,
+) -> dict:
+    """Shared implementation for GET and POST verification endpoints.
+
+    Returns a dict the caller can shape into JSON. Never raises 5xx —
+    every branch is a user-readable outcome:
+      - {"status": "verified"}             token good, email stamped
+      - {"status": "cancelled"}            user said "this wasn't me" — account deleted
+      - {"status": "already_verified"}     token already consumed earlier
+      - {"status": "expired"}              token past 24h
+      - {"status": "invalid"}              token doesn't exist / bad shape
+    """
+    from app.models import EmailVerificationToken
+
+    r = await session.execute(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.token == token,
+        )
+    )
+    row = r.scalar_one_or_none()
+    if row is None:
+        return {"status": "invalid"}
+
+    now = datetime.now(UTC)
+    expires_at = row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+
+    if row.used_at is not None:
+        # Idempotent: a second click on the same link reports the prior
+        # outcome rather than scaring the user with "invalid token".
+        return {"status": "already_verified"}
+
+    if expires_at < now:
+        return {"status": "expired"}
+
+    # Load user
+    u = await session.execute(select(User).where(User.id == row.user_id))
+    user = u.scalar_one_or_none()
+    if user is None:
+        # Shouldn't happen (FK cascade), but defensively treat as invalid.
+        return {"status": "invalid"}
+
+    if action == "cancel":
+        # "This wasn't me" — delete the account before any further damage.
+        # Token row cascades via the FK; we delete the user explicitly.
+        await session.delete(user)
+        await session.commit()
+        logger.info(
+            "auth.verification_cancelled user=%s email=%s", user.id, user.email,
+        )
+        return {"status": "cancelled"}
+
+    # action == "verify"
+    user.email_verified_at = now
+    row.used_at = now
+    await session.commit()
+    logger.info("auth.verification_verified user=%s", user.id)
+    return {"status": "verified"}
+
+
+@router.get("/verify-email")
+async def verify_email_get(
+    token: str,
+    action: str = "verify",
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """GET variant — what the email link points at. Mirror of POST below.
+
+    Validation is identical to the Pydantic body in POST; we re-do the
+    pattern check here so a malformed query string returns 400 rather
+    than passing junk into _consume_verification.
+    """
+    if action not in ("verify", "cancel"):
+        raise HTTPException(400, "action must be 'verify' or 'cancel'")
+    if not (8 <= len(token) <= 200):
+        raise HTTPException(400, "token has an invalid length")
+    return await _consume_verification(session, token, action)
+
+
+@router.post("/verify-email")
+async def verify_email_post(
+    body: VerifyEmailBody,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    return await _consume_verification(session, body.token, body.action)
+
+
+@router.post("/resend-verification", dependencies=[Depends(limit_auth)])
+async def resend_verification(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Mint a fresh 24h verification token + send the email.
+
+    Requires an authenticated session (you can only ask to resend YOUR
+    OWN verification email — there's no email-to-userid path here so
+    we don't accidentally enable account-enumeration via this endpoint).
+    No-op + 200 if the user is already verified.
+    """
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(401, "Not signed in")
+    user_id = verify_session_token(token)
+    if not user_id:
+        raise HTTPException(401, "Invalid session")
+    r = await session.execute(select(User).where(User.id == user_id))
+    user = r.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(401, "Invalid session")
+    if user.email_verified_at is not None:
+        return {"status": "already_verified"}
+    from app.services.email import mint_and_send_verification
+    ok = await mint_and_send_verification(session, user)
+    return {"status": "sent" if ok else "send_skipped"}
 
 
 @router.post("/signin", dependencies=[Depends(limit_auth)])

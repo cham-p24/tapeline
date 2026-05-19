@@ -25,7 +25,14 @@ export default function EmailSettingsPage() {
     api
       .emailPrefsGet()
       .then(setState)
-      .catch((e: unknown) => setError(String((e as Error)?.message || e)));
+      .catch((e: unknown) => {
+        const m = String((e as Error)?.message || e);
+        if (m.includes("401")) {
+          window.location.href = `/signin?next=${encodeURIComponent("/app/settings/email")}`;
+          return;
+        }
+        setError(m);
+      });
   }, []);
 
   async function toggle(key: EmailPrefKey, next: boolean) {
@@ -41,9 +48,14 @@ export default function EmailSettingsPage() {
       setState({ ...state, prefs: res.prefs });
       setSavedAt(Date.now());
     } catch (e: unknown) {
+      const m = String((e as Error)?.message || e);
+      if (m.includes("401")) {
+        window.location.href = `/signin?next=${encodeURIComponent("/app/settings/email")}`;
+        return;
+      }
       // Roll back
       setState({ ...state, prefs: prev });
-      setError(String((e as Error)?.message || e));
+      setError(m);
     } finally {
       setPending(null);
     }

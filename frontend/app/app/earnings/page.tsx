@@ -74,7 +74,7 @@ export default function EarningsPage() {
               </thead>
               <tbody>
                 {byDate[d].map((r) => (
-                  <tr key={r.id} className="border-b border-border/20 hover:bg-black/20">
+                  <tr key={r.id} className="border-b border-border/20 hover:bg-panel/60">
                     <td className="px-4 py-2 font-medium">
                       <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
                     </td>

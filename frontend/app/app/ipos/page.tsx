@@ -73,7 +73,7 @@ export default function IPOPage() {
             {filtered.length === 0 ? (
               <tr><td colSpan={9} className="px-4 py-8 text-center text-muted">No upcoming IPOs in window.</td></tr>
             ) : filtered.map((i) => (
-              <tr key={i.id} className="border-b border-border/20 hover:bg-black/20">
+              <tr key={i.id} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2">{new Date(i.expected_date).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
                 <td className="px-4 py-2 font-mono font-medium">{i.symbol}</td>
                 <td className="px-4 py-2">{i.company_name}</td>

@@ -45,13 +45,13 @@ export default function BlogIndex() {
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
         <p className="eyebrow">Blog</p>
-        <h1 className="mt-3 text-5xl font-bold tracking-tight">Notes from building.</h1>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">Notes from building.</h1>
         <p className="mt-4 text-lg text-muted">
           Methodology, market commentary, and occasional rants about scanner pricing.
           Posts are short. Newest first. <a href="/blog/rss.xml" className="text-accent hover:underline">RSS</a>.
         </p>
 
-        <div className="mt-12 divide-y divide-border border-y border-border">
+        <div className="mt-12 divide-y divide-border/60">
           {sorted.map((p) => (
             <article key={p.slug} className="py-6">
               <Link href={`/blog/${p.slug}`} className="group block">

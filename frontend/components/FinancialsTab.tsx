@@ -42,8 +42,8 @@ export function FinancialsTab({ symbol }: { symbol: string }) {
     return (
       <p className="text-sm text-muted">
         No fundamentals coverage for {symbol}. This is normal for ETFs, closed-end
-        funds, and many ADRs — Finnhub only publishes balance-sheet metrics for
-        companies that file directly with the SEC.
+        funds, and many ADRs — our data feed only publishes balance-sheet metrics
+        for companies that file directly with the SEC.
       </p>
     );
 

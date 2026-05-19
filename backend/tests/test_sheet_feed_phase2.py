@@ -12,7 +12,6 @@ from sqlalchemy import select
 from app.db import session_scope
 from app.models import RegimeState, Ticker
 
-
 # ============================================================================
 # ETF BENCHMARKS — parser + upsert
 # ============================================================================
@@ -201,7 +200,7 @@ def test_parse_smart_money_counts_appearances():
 
 def test_parse_smart_money_caps_score_at_100():
     """Five signals → 60 + 4*10 = 100. Six signals also = 100 (capped)."""
-    csv = "Ticker,Category\n" + "\n".join([f"AAPL,Elite hedge fund investor"] * 7)
+    csv = "Ticker,Category\n" + "\n".join(["AAPL,Elite hedge fund investor"] * 7)
     csv = "Watcher / Buyer,Category,Ticker,Recent Buy / Holding Signal,Filing / Period,Filed,Current Model Sign,Model Score,Model Action,Hold Window,Why It Matters\n" + "\n".join([
         ",Elite hedge fund investor,AAPL,Buy,,,BUY NOW,100,Strong Buy,6-12,test"
     ] * 7)

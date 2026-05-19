@@ -2,24 +2,43 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type WatchlistItem } from "@/lib/api";
+import { api, type WatchlistItem, type WatchlistRow } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
+import { WatchlistTabs } from "@/components/WatchlistTabs";
+import { useUser } from "@/components/UserContext";
 
 // Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
 // start before the worker has populated any scored tickers). Same shape
 // as the API response so the seed-button code path is identical.
 const STARTER_FALLBACK = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY"];
 
+// Mirror of `watchlists` caps from backend/app/services/tier.py.
+// Kept in sync manually — the canonical source is the server-side
+// TIER_LIMITS dict (server enforces the cap with a 403 regardless).
+const WATCHLISTS_CAP_BY_TIER: Record<string, number> = {
+  free: 1,
+  pro: 5,
+  premium: 20,
+};
+
 export default function WatchlistPage() {
+  const { user } = useUser();
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [symbol, setSymbol] = useState("");
   const [threshold, setThreshold] = useState(10);
   const [seeding, setSeeding] = useState(false);
   const [starter, setStarter] = useState<string[]>(STARTER_FALLBACK);
+  // Phase A: multi-list state. `lists` is the user's named watchlists;
+  // `activeId` is the currently-selected tab (null = "All items" view).
+  // Items table is not yet filtered by activeId — the legacy /api/watchlist
+  // endpoint returns ALL items today. Filtering ships in a follow-up PR
+  // that extends GET /api/watchlist with `?list_id=X`.
+  const [lists, setLists] = useState<WatchlistRow[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
 
   // Refresh the starter pack from the API on mount. Falls back to the
   // hardcoded mega-cap list if the call fails for any reason.
@@ -34,28 +53,72 @@ export default function WatchlistPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api.watchlist();
+      // Phase A: pass activeId so the items table narrows to the active
+      // tab. activeId=null → no filter → all items across all lists
+      // (matches the legacy single-list behaviour exactly).
+      const r = await api.watchlist(activeId);
       setItems(r.items);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
+  }, [activeId]);
+
+  // Refresh the user's lists. Called on mount + after creating a new list.
+  const loadLists = useCallback(async () => {
+    try {
+      const r = await api.watchlists();
+      setLists(r.items);
+    } catch {
+      // Silent — multi-list UI is additive; if it fails the legacy single-
+      // list view continues to work unchanged.
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadLists(); }, [loadLists]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  const watchlistsCap = WATCHLISTS_CAP_BY_TIER[user?.tier ?? "free"] ?? 1;
 
   async function add() {
     if (!symbol.trim()) return;
     try {
-      await api.watchlistAdd(symbol.trim().toUpperCase(), threshold);
+      // Phase A: items land in the currently-active tab's list. When
+      // viewing "all items" (activeId=null), the backend resolves to
+      // the user's default list ("My Watchlist") — auto-creates on
+      // first add for new users.
+      await api.watchlistAdd(symbol.trim().toUpperCase(), threshold, activeId);
       setSymbol("");
       load();
+      loadLists();  // refresh list counts shown in the tab strip
     } catch (e: any) {
-      alert(e.message?.includes("409") ? "Already in watchlist" : `Failed: ${e.message}`);
+      const m = String(e.message || e);
+      if (m.includes("401")) {
+        // Session probably expired. Send them through signin and come back here.
+        window.location.href = `/signin?next=${encodeURIComponent("/app/watchlist")}`;
+        return;
+      }
+      alert(m.includes("409") ? "Already in watchlist" : `Failed: ${m}`);
     }
   }
   async function remove(id: number) {
     await api.watchlistRemove(id);
     load();
+    loadLists();
+  }
+
+  // Phase A: move an item between lists. Called by the Move dropdown
+  // on each row. Server validates that both the item and the
+  // destination list belong to the caller; we re-fetch the items + list
+  // counts after the move lands so the UI converges without a hard
+  // reload.
+  async function moveTo(itemId: number, newListId: number) {
+    try {
+      await api.watchlistMove(itemId, newListId);
+      load();
+      loadLists();
+    } catch (e) {
+      console.error("watchlistMove failed", e);
+    }
   }
 
   async function seedStarter() {
@@ -91,6 +154,17 @@ export default function WatchlistPage() {
         <RecentTickers />
       </div>
 
+      {/* Phase A: list tabs. Hidden for Free tier (cap=1) and for any
+          Pro+ user who hasn't created a second list yet — see
+          WatchlistTabs's internal showTabs check. */}
+      <WatchlistTabs
+        lists={lists}
+        activeId={activeId}
+        cap={watchlistsCap}
+        onChange={setActiveId}
+        onCreated={loadLists}
+      />
+
       {/* Add ticker */}
       <div className="card mt-6 flex flex-wrap items-end gap-3 p-4">
         <div>
@@ -100,7 +174,7 @@ export default function WatchlistPage() {
             onChange={(e) => setSymbol(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="AAPL"
-            className="mt-1 w-32 rounded-md bg-black/40 px-3 py-2 text-sm nums font-mono"
+            className="mt-1 w-32 rounded-md bg-panel px-3 py-2 text-sm nums font-mono"
           />
         </div>
         <div>
@@ -111,7 +185,7 @@ export default function WatchlistPage() {
             max={50}
             value={threshold}
             onChange={(e) => setThreshold(Number(e.target.value))}
-            className="mt-1 w-20 rounded-md bg-black/40 px-3 py-2 text-sm nums"
+            className="mt-1 w-20 rounded-md bg-panel px-3 py-2 text-sm nums"
           />
         </div>
         <button onClick={add} className="btn-primary text-sm">Add</button>
@@ -176,10 +250,10 @@ export default function WatchlistPage() {
               <tr><td colSpan={9}><TableSkeleton cols={9} rows={5} /></td></tr>
             )}
             {items.map((w) => (
-              <tr key={w.id} className={`border-b border-border/20 hover:bg-black/20 ${w.alert_triggered ? "bg-yellow-500/5" : ""}`}>
+              <tr key={w.id} className={`border-b border-border/20 hover:bg-panel/60 ${w.alert_triggered ? "bg-warn/5" : ""}`}>
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${w.symbol}`} className="hover:text-accent">{w.symbol}</Link>
-                  {w.alert_triggered && <span className="ml-2 text-xs text-yellow-400">⚠ alert</span>}
+                  {w.alert_triggered && <span className="ml-2 text-xs text-warn">⚠ alert</span>}
                 </td>
                 <td className="px-4 py-2 text-right">{w.price != null ? `$${w.price.toFixed(2)}` : "—"}</td>
                 <td className={`px-4 py-2 text-right ${(w.change_pct_1d ?? 0) > 0 ? "text-up" : (w.change_pct_1d ?? 0) < 0 ? "text-down" : ""}`}>
@@ -193,7 +267,32 @@ export default function WatchlistPage() {
                 <td className="px-4 py-2"><span className="text-xs">{w.signal ?? "—"}</span></td>
                 <td className="px-4 py-2 text-xs text-muted">{w.reason}</td>
                 <td className="px-4 py-2 text-right">
-                  <button onClick={() => remove(w.id)} className="text-xs text-muted hover:text-down">remove</button>
+                  <div className="inline-flex items-center gap-2">
+                    {/* Phase A: Move-to-list dropdown. Hidden when the
+                        user has < 2 lists (no destination to move to).
+                        The current list is rendered as the selected
+                        option but disabled so onChange always fires
+                        with a real destination. */}
+                    {lists.length >= 2 ? (
+                      <select
+                        value={w.watchlist_id ?? ""}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isNaN(v) && v !== w.watchlist_id) moveTo(w.id, v);
+                        }}
+                        className="rounded-md border border-border bg-panel px-1.5 py-1 text-[10px] text-muted hover:text-fg"
+                        aria-label={`Move ${w.symbol} to a different list`}
+                        title="Move to a different list"
+                      >
+                        {lists.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.id === w.watchlist_id ? `↳ ${l.name}` : `→ ${l.name}`}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    <button onClick={() => remove(w.id)} className="text-xs text-muted hover:text-down">remove</button>
+                  </div>
                 </td>
               </tr>
             ))}

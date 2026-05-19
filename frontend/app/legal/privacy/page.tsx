@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
         </p>
 
-        <div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-400">
+        <div className="mt-6 rounded-lg border border-warn/30 bg-warn/5 p-4 text-sm text-warn">
           ⚠ This policy is accurate to the system as of the date above but has not yet been reviewed by qualified counsel. A pre-launch legal review is in progress — material changes will be reflected here with an updated date.
         </div>
 
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
             <li><strong>Sentry</strong> — error tracking. May capture stack traces with limited non-PII context when something breaks.</li>
             <li><strong>Telegram</strong> — only if you connect your Telegram for alerts. Sees the chat ID you provided and the alert content.</li>
             <li><strong>Twilio</strong> — only if you enable SMS alerts on Premium. Sees your phone number and the alert content.</li>
-            <li><strong>Massive (formerly Polygon.io)</strong>, <strong>Finnhub</strong>, <strong>FRED</strong>, <strong>Benzinga</strong> — market-data feeds. <em>No user data is sent to any of them.</em> They power the scanner; they never see you.</li>
+            <li><strong>Third-party market-data feeds</strong> — power the scanner with prices, fundamentals, macro indicators, SEC filings, and news. <em>No user data is sent to any of them.</em> They power the scanner; they never see you.</li>
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Cookies</h2>

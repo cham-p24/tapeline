@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
+import { PostHogProvider } from "@/components/PostHogProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
@@ -14,17 +15,31 @@ const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "";
 const PLAUSIBLE_SCRIPT =
   process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT || "https://plausible.io/js/script.js";
 
+// Google Analytics 4 measurement ID. Defaults to the production property
+// (G-YRK73W9NS9) so prod tracks without env config; override via
+// NEXT_PUBLIC_GA4_ID for staging/preview deploys, or set to empty string
+// to disable on a specific environment. GA4 powers the GSC ↔ signup
+// attribution loop — Search Console shows what query brought a visitor,
+// GA4 shows what they did after (event "sign_up" on the success page).
+const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
+
 // Title template is "%s" so each page owns its full <title>. Putting the
 // brand suffix in the template double-applies it on pages that already
 // include " — Tapeline" in their own title (most of them do, for SEO).
 // Default title is used only when a page omits its own.
 export const metadata: Metadata = {
   title: {
-    default: "Tapeline — Read the tape · Live quantitative stock scanner",
+    // Brand-first title keeps the "Read the tape" tagline (recognisable to
+    // existing audience on X/LinkedIn) while adding the explicit category +
+    // public-formula differentiator that addresses the GSC brand-search audit
+    // (the old "Live quantitative stock scanner" suffix wasn't winning brand
+    // CTR — 11 imp / 0 clicks on "tapeline" over 3mo per GSC). Reads cleanly
+    // in the 60-char SERP truncation window.
+    default: "Tapeline — Read the tape · Stock scanner with public formula",
     template: "%s",
   },
   description:
-    "Live quantitative stock scanner. Every US ticker gets one 0-100 score and a plain-English sentence from a public 6-factor formula. Pro from $24.99/mo, Premium from $39.99/mo (USD, annual). 14-day free trial, no credit card.",
+    "Tapeline.io is a transparent quantitative stock scanner: every US ticker gets one 0-100 score from a public 6-factor formula, and every top-10 pick is logged at /scorecard with the next-day return. Pro from $24.99/mo. 14-day Premium trial, no card.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -42,6 +57,8 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
+    // OG card is share-context — keep the punchy "Read the tape" line
+    // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
       "Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro $24.99/mo, Premium $39.99/mo. 14-day Premium trial, no card.",
@@ -63,10 +80,10 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
   },
   icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
+    // favicon.ico isn't shipped (we use SVG only). Referencing a non-existent
+    // .ico made Google log a 404 against /favicon.ico in Search Console; SVG
+    // alone is supported in every modern browser + Googlebot.
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
     apple: "/favicon.svg",
   },
@@ -112,8 +129,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               "@context": "https://schema.org",
               "@type": "Organization",
               name: "Tapeline",
+              // Entity disambiguation for brand-name SERP. Per Search Console
+              // (2026-05-19 audit) the bare query "tapeline" returns us at
+              // position 15.1 with 13 imp / 0 clicks over 90 days — the
+              // measuring-tool brands and a UK insurance broker outrank us
+              // for our own name. The fix is heavier entity signal: legalName,
+              // explicit description, slogan, knowsAbout, and country so
+              // Google's Knowledge Graph learns "Tapeline = US stock scanner
+              // SaaS" rather than "Tapeline = generic word."
+              legalName: "Tapeline",
+              alternateName: "Tapeline.io",
+              slogan: "Read the tape",
+              description:
+                "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from a publicly-documented six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
               url: "https://tapeline.io",
               logo: "https://tapeline.io/favicon.svg",
+              foundingDate: "2026",
+              // Country-only address — full street suppressed per founder
+              // privacy. Country signal alone is enough to help Google
+              // localise the brand entity vs the UK/AU "tapeline" measuring-
+              // tool sellers.
+              address: {
+                "@type": "PostalAddress",
+                addressCountry: "AU",
+              },
+              // knowsAbout teaches the Knowledge Graph what topics this
+              // entity is about — strongest available signal for brand-query
+              // disambiguation. Each entry is a topic Google has its own
+              // entity page for.
+              knowsAbout: [
+                "Stock scanner",
+                "Quantitative trading",
+                "US equities",
+                "Exchange-traded fund",
+                "Technical analysis",
+                "Fundamental analysis",
+                "Market data",
+                "Financial technology",
+              ],
               // sameAs is the canonical "this is the same entity" graph that
               // feeds Google's Knowledge Panel and Knowledge Graph. Each URL
               // here should be the actual public profile page on an
@@ -175,11 +228,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               url: "https://tapeline.io",
               potentialAction: {
                 "@type": "SearchAction",
-                // Search box currently routes to ticker page; once a real
-                // /search exists, swap target to /search?q={search_term_string}
+                // SearchAction must point at a URL Googlebot can actually
+                // crawl with a substituted query. /t/{search_term_string} was
+                // logging a literal-placeholder 404 in Search Console because
+                // Google was test-fetching the template URL itself. /search
+                // accepts ?q=, validates as a ticker, and redirects to /t/.
                 target: {
                   "@type": "EntryPoint",
-                  urlTemplate: "https://tapeline.io/t/{search_term_string}",
+                  urlTemplate: "https://tapeline.io/search?q={search_term_string}",
                 },
                 "query-input": "required name=search_term_string",
               },
@@ -262,7 +318,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <ThemeProvider>
-          <UserProvider>{children}</UserProvider>
+          <UserProvider>
+            <PostHogProvider>{children}</PostHogProvider>
+          </UserProvider>
         </ThemeProvider>
         {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
             config needed — auto-detects when deployed on Vercel and is a
@@ -272,6 +330,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             view; Vercel adds per-route + Web Vitals). */}
         <Analytics />
         <SpeedInsights />
+        {/* Google Analytics 4 — loaded after-interactive so it never blocks
+            first paint or interactivity. Two scripts per Google docs: (1)
+            the gtag loader; (2) the inline config. Once mounted, fire events
+            with `gtag('event','sign_up')` from any client component (see
+            lib/gtag.ts for the typed helper). Cross-references with Search
+            Console under GSC → Settings → Associations so query data flows
+            into GA4's Acquisition reports. */}
+        {GA4_ID && (
+          <>
+            <Script
+              id="ga4-loader"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script
+              id="ga4-config"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${GA4_ID}');
+                `,
+              }}
+            />
+          </>
+        )}
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)
             via <div className="cf-turnstile">. The script self-discovers them. */}

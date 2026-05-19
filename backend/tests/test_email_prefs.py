@@ -29,21 +29,29 @@ def client():
 # ----- bitmask helpers --------------------------------------------------------
 
 def test_default_prefs_is_all_bits_set():
-    """A fresh user signs up with every bit on — all four toggles default
-    to 'send me everything'. They can opt out later. Default = 15."""
-    assert DEFAULT_PREFS == 15
-    assert DEFAULT_PREFS == (
+    """A fresh user signs up with every bit on — all five toggles default
+    to 'send me everything' (the weekly-newsletter bit landed in migration
+    0023). They can opt out later. Default = 31.
+
+    NB: the weekly-newsletter bit being SET on a new user doesn't mean
+    they automatically receive newsletters — the orchestrator double-gates
+    on `User.marketing_opt_in` which is False by default and only set when
+    the user explicitly opts in at onboarding.
+    """
+    assert DEFAULT_PREFS == 31
+    assert (
         int(EmailPref.TRIAL_DRIP)
         | int(EmailPref.RE_ENGAGEMENT)
         | int(EmailPref.DAILY_DIGEST)
         | int(EmailPref.ALERT_EMAILS)
-    )
+        | int(EmailPref.WEEKLY_NEWSLETTER)
+    ) == DEFAULT_PREFS
 
 
 def test_prefs_to_dict_round_trip():
-    """Round-trip: int -> dict -> int yields the same int across all 16
-    possible combinations of the 4 bits."""
-    for i in range(16):
+    """Round-trip: int -> dict -> int yields the same int across all 32
+    possible combinations of the 5 bits."""
+    for i in range(32):
         d = prefs_to_dict(i)
         assert dict_to_prefs(d) == i
 
@@ -78,7 +86,8 @@ def test_categories_for_ui_covers_every_pref_bit():
     the user can't toggle it. This is the contract that keeps the
     frontend / backend / model in sync."""
     pref_bits = {int(EmailPref.TRIAL_DRIP), int(EmailPref.RE_ENGAGEMENT),
-                 int(EmailPref.DAILY_DIGEST), int(EmailPref.ALERT_EMAILS)}
+                 int(EmailPref.DAILY_DIGEST), int(EmailPref.ALERT_EMAILS),
+                 int(EmailPref.WEEKLY_NEWSLETTER)}
     category_bits = {c.bit for c in categories_for_ui()}
     assert pref_bits == category_bits
 
@@ -104,9 +113,10 @@ async def test_get_email_prefs_returns_default(client):
         assert "categories" in body
         assert set(body["prefs"].keys()) == {
             "trial_drip", "re_engagement", "daily_digest", "alert_emails",
+            "weekly_newsletter",
         }
-        # All four categories must come back as toggles to render
-        assert len(body["categories"]) == 4
+        # All five categories must come back as toggles to render
+        assert len(body["categories"]) == 5
         for cat in body["categories"]:
             assert {"key", "label", "description"}.issubset(cat.keys())
 

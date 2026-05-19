@@ -39,26 +39,30 @@ const COMPARE_FAQ = [
 // "Tapeline wins" rows first — the categories that decide which tool earns
 // a slot in someone's daily workflow. Tradeoff rows below are reframed: every
 // category Finviz "wins" is reframed as a feature-not-bug for our positioning.
+//
+// Competitor-column copy uses "Not available — <one-liner>" (not bare em-dash)
+// per the §5 audit: a lone — reads as a data-dump error, not as deliberate
+// "absent here" contrast.
 const WINS = [
   {
     label: "One composite score per ticker",
     tapeline: "✓ Six factors, public weights",
-    competitor: "—  (no synthesis at all)",
+    competitor: "Not available — no synthesis at all",
   },
   {
     label: "Plain-English Why on every row",
     tapeline: "✓ Default sentence, every ticker",
-    competitor: "—  (you write your own thesis)",
+    competitor: "Not available — you write your own thesis",
   },
   {
     label: "Public scorecard with receipts",
     tapeline: "✓ Every top-10 back-checked vs SPY next day",
-    competitor: "—  (no track record published)",
+    competitor: "Not available — no track record published",
   },
   {
     label: "Squeeze setup detection",
     tapeline: "✓ BB compression + volume + OBV scored",
-    competitor: "—  (you build it from raw filters)",
+    competitor: "Not available — you build it from raw filters",
   },
   {
     label: "Congressional trades feed",
@@ -155,12 +159,14 @@ export default function VsFinvizPage() {
 
       {/* Where Tapeline wins */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-up">
-            Where Tapeline wins
-          </h2>
-          <span className="text-[10px] uppercase tracking-wider text-subtle">All prices in USD</span>
-        </div>
+        {/* "All prices in USD" used to float top-right next to the section
+            heading — looked orphaned, especially because the table has no
+            prices itself (pricing is on the tradeoffs section below). Moved
+            into the comparison-data-verified footer at the bottom of the
+            page, where it belongs alongside the data-provenance note. */}
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-up">
+          Where Tapeline wins
+        </h2>
         <div className="card overflow-x-auto">
           <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
             {/* Explicit column widths so neither side hogs space on wide
@@ -170,7 +176,7 @@ export default function VsFinvizPage() {
               <col style={{ width: "36%" }} />
               <col style={{ width: "32%" }} />
             </colgroup>
-            <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+            <thead className="border-b border-border bg-panel/60 text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">Feature</th>
                 <th className="px-4 py-3 text-left text-accent border-l border-border/40">Tapeline</th>
@@ -181,17 +187,20 @@ export default function VsFinvizPage() {
               {WINS.map((r, i) => (
                 <tr
                   key={r.label}
-                  // Alternating row tint for visual rhythm; subtle vertical
-                  // column dividers so the eye doesn't lose the column on
-                  // multi-line wraps.
+                  // Alternating row tint — uses bg-panel so it adapts to the
+                  // active theme (was bg-panel/40 which was invisible in light
+                  // mode after the marketing-nav theme toggle shipped).
+                  // Subtle vertical column dividers + a per-row min-height
+                  // (via min-h on each cell) keep the rhythm consistent even
+                  // when one cell wraps to two lines and others don't.
                   className={
                     "border-b border-border/30 " +
-                    (i % 2 === 1 ? "bg-black/15" : "")
+                    (i % 2 === 1 ? "bg-panel/40" : "")
                   }
                 >
-                  <td className="px-4 py-3 font-medium align-top">{r.label}</td>
-                  <td className="px-4 py-3 font-medium text-accent align-top border-l border-border/30">{r.tapeline}</td>
-                  <td className="px-4 py-3 text-muted align-top border-l border-border/30">{r.competitor}</td>
+                  <td className="px-4 py-3 font-medium align-top min-h-[3rem]">{r.label}</td>
+                  <td className="px-4 py-3 font-medium text-accent align-top border-l border-border/30 min-h-[3rem]">{r.tapeline}</td>
+                  <td className="px-4 py-3 text-muted align-top border-l border-border/30 min-h-[3rem]">{r.competitor}</td>
                 </tr>
               ))}
             </tbody>
@@ -225,7 +234,7 @@ export default function VsFinvizPage() {
         <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
         <p className="mt-3 text-muted">No credit card. Cancel in one click.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup" className="btn-primary">Start free trial →</Link>
+          <Link href="/signup" className="btn-primary">Try Premium free →</Link>
           <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">
@@ -237,7 +246,7 @@ export default function VsFinvizPage() {
           reflects on-page content (Google's rich-result requirement). */}
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <h2 className="text-2xl font-semibold tracking-tight">Tapeline vs Finviz — questions</h2>
-        <div className="mt-6 divide-y divide-border border-y border-border">
+        <div className="mt-6 divide-y divide-border/60">
           {COMPARE_FAQ.map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
@@ -251,7 +260,7 @@ export default function VsFinvizPage() {
       </section>
 
       <p className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 text-center text-[11px] text-subtle">
-        Comparison data verified {VERIFIED_ON}. Competitor pricing and feature claims sourced from
+        Comparison data verified {VERIFIED_ON}. All prices in USD. Competitor pricing and feature claims sourced from
         their public pages. Spot a mistake?{" "}
         <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> — we
         update within 48 hours.

@@ -11,6 +11,20 @@ const nextConfig = {
     ];
   },
 
+  // Permanent redirects for two specific Search Console 404s:
+  //
+  // - /favicon.ico → /favicon.svg
+  //   Browsers + Googlebot fetch /favicon.ico at the document root regardless
+  //   of <link rel="icon"> hints. We only ship SVG, so the .ico fetch 404'd
+  //   and surfaced in GSC. 308 redirect resolves to a 200 SVG that every
+  //   modern browser + Googlebot accepts. Permanent so search engines learn
+  //   the canonical and stop re-fetching the .ico.
+  async redirects() {
+    return [
+      { source: "/favicon.ico", destination: "/favicon.svg", permanent: true },
+    ];
+  },
+
   // Production-grade security headers — same set Vercel + Linear ship.
   // CSP is intentionally NOT set yet because TradingView's embed + Cloudflare
   // Turnstile + the API rewrite all need an audit before we can pin hashes.

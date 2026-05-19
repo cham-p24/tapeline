@@ -51,6 +51,14 @@ function localeForCountry(country: string | undefined): string {
 }
 
 export function middleware(request: NextRequest) {
+  // Ticker route handling — two responsibilities (see handleTickerRoute):
+  //   - Case-normalize lowercase backlinks like /t/aapl → 308 → /t/AAPL
+  //   - Redirect non-ticker /t/* URLs (template placeholders, garbage)
+  //     to /search?q=<raw> instead of letting them 404
+  // Either of these returns early so auth+locale don't run on the redirect.
+  const tickerHandled = handleTickerRoute(request);
+  if (tickerHandled) return tickerHandled;
+
   const response = handleAuth(request);
 
   // Set/refresh the locale cookie on every response. Vercel injects
@@ -75,6 +83,62 @@ export function middleware(request: NextRequest) {
     }
   }
   return response;
+}
+
+/**
+ * Routes whose final path segment is a ticker symbol. Two jobs:
+ *
+ * 1. Case-normalize lowercase variants. /t/aapl → 308 → /t/AAPL.
+ *    Next's dynamic segments are case-sensitive and our generated params +
+ *    render path use uppercase; without this, every lowercase backlink
+ *    404s and burns link equity.
+ *
+ * 2. Catch non-ticker garbage. /t/{search_term_string} (literal template
+ *    placeholder from the Sitelinks SearchAction graph), /t/foo-bar,
+ *    /t/$$$, etc. — these used to 404. Now they 308 to /search?q=<raw>
+ *    so the searcher gets a sensible page AND GSC's "Not found (404)"
+ *    report stops accumulating template-leak entries.
+ *
+ * Patterns covered (matched case-insensitively):
+ *   /t/{SYMBOL}
+ *   /scorecard/{SYMBOL}
+ *   /blog/ticker/{SYMBOL}
+ *
+ * Valid ticker shape: 1-6 alpha + optional dot-suffix (BRK.B). Symbols
+ * containing dots route via Next's static dispatch (matcher excludes
+ * paths with dots), so this regex only sees no-dot paths in practice.
+ */
+const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/(.+)$/;
+const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
+
+function handleTickerRoute(request: NextRequest): NextResponse | null {
+  const pathname = request.nextUrl.pathname;
+  const m = TICKER_PREFIX_RE.exec(pathname);
+  if (!m) return null;
+  const [, prefix, raw] = m;
+
+  const upper = raw.toUpperCase();
+
+  // Non-ticker symbol (template placeholder, garbage, or just gibberish).
+  // Send to /search?q=<raw> so the visitor lands somewhere useful and
+  // Google can crawl a 200 instead of a 404.
+  if (!VALID_TICKER_RE.test(upper)) {
+    const target = new URL("/search", request.url);
+    // Don't URL-encode the placeholder twice — pass through whatever the
+    // crawler had. If raw is literally "{search_term_string}", that's what
+    // /search shows back as the "didn't look like a ticker" hint.
+    target.searchParams.set("q", raw);
+    return NextResponse.redirect(target, 308);
+  }
+
+  // Valid ticker but wrong case → canonicalise.
+  const canonical = `/${prefix}/${upper}`;
+  if (canonical === pathname) return null;
+  const target = new URL(canonical, request.url);
+  // Preserve query + hash so links like /t/aapl?ref=hn keep their UTM.
+  target.search = request.nextUrl.search;
+  target.hash = request.nextUrl.hash;
+  return NextResponse.redirect(target, 308);
 }
 
 function handleAuth(request: NextRequest) {

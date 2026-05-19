@@ -179,7 +179,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
 
   // Score-tier colours mirror /how-it-works.
   const scoreColor =
-    score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-yellow-400" : "text-down";
+    score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-warn" : "text-down";
 
   const b = data.breakdown ?? {};
   const factors: { label: string; value: number | null | undefined; weight: number }[] = [
@@ -348,7 +348,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href={`/signup?next=${encodeURIComponent(`/app/ticker/${sym}`)}`} className="btn-accent">
-              Start 14-day Premium trial →
+              Try Premium free for 14 days →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard
@@ -380,7 +380,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
             Frequently asked about {data.symbol}
           </h2>
-          <div className="mt-6 divide-y divide-border border-y border-border">
+          <div className="mt-6 divide-y divide-border/60">
             {faqItems.map((item) => (
               <details key={item.q} className="group py-4">
                 <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">

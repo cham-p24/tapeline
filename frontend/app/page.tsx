@@ -2,174 +2,364 @@ import Link from "next/link";
 import { ScannerPreview } from "@/components/ScannerPreview";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
-import { TickerSearch } from "@/components/TickerSearch";
 import { LiveCounters } from "@/components/LiveCounters";
 import { FadeIn } from "@/components/FadeIn";
+import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen">
+    // The page-wide blue atmospheric gradient now lives on `body::before`
+    // in globals.css (PR #141) so EVERY route gets it consistently
+    // without per-page wiring. <main> here just needs the structural
+    // container styles. `overflow-x-hidden` clips any wide blob halos
+    // from the hero section so they can't create a horizontal scrollbar.
+    <main className="relative min-h-screen overflow-x-hidden">
       <MarketingNav />
 
-      {/* Hero + product preview in one fold.
-          Soft accent-coloured radial glow behind the section gives depth
-          without colour — Linear/Vercel-style. Pointer-events disabled so
-          it never traps clicks. */}
-      <section className="relative overflow-hidden px-6 pt-16 pb-12">
+      {/* HERO — single-purpose fold.
+          Left: one sentence value prop + one primary CTA + one ghost CTA.
+          Right: live mock table (ScannerPreview). Nothing else competes.
+          The TickerSearch previously sat under the preview, doing the same
+          job twice; removed so the eye lands on one demo, not two. */}
+      <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
+        {/* Decorative gradient blobs — positioned relative to the full viewport
+            (no max-w-6xl wrapper) so they bleed full-bleed rather than creating
+            a visible "boxed-in" rectangle on wide screens. Two soft, oversized
+            blobs read as ambient atmosphere, the way Linear / Stripe / Vercel
+            heroes do — page first, container second. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 -top-40 -z-10 mx-auto h-[640px] max-w-6xl"
+          className="pointer-events-none absolute inset-0 -z-10"
         >
-          <div className="absolute left-1/2 top-0 h-[480px] w-[920px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
-          <div className="absolute left-[12%] top-32 h-[280px] w-[420px] rounded-full bg-up/5 blur-3xl" />
+          <div className="absolute left-1/2 top-[-15%] h-[680px] w-[1400px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
+          <div className="absolute left-[-8%] top-[20%] h-[420px] w-[640px] rounded-full bg-up/[0.04] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl grid gap-10 lg:grid-cols-5 lg:gap-8">
-          {/* Left: copy */}
-          <div className="lg:col-span-2">
+        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
+          <div className="lg:col-span-2 lg:pt-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
               Live market scanning
             </div>
-            <h1 className="mt-6 text-5xl font-bold tracking-tight sm:text-6xl">
+            <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">
               A scanner that
               <br />
               <span className="text-accent">shows its work.</span>
             </h1>
-            <p className="mt-6 text-lg text-muted">
-              The <span className="text-fg font-medium">Tapeline Score</span> blends six factors at published weights into one
-              read on every ticker. Every call goes on a permanent public record — same day.
+            <p className="mt-6 text-lg text-muted leading-relaxed">
+              The <span className="font-medium text-fg">Tapeline Score</span>{" "}
+              blends six factors at published weights into one read on every
+              ticker. Every call goes on a permanent public record &mdash; same
+              day, no edits.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/signup" className="btn-primary text-base">Start 14-day trial &rarr;</Link>
-              <Link href="/scorecard" className="btn-ghost text-base">See the record</Link>
+              <Link href="/signup" className="btn-primary text-base">
+                Try Premium free for 14 days &rarr;
+              </Link>
+              <Link href="/scorecard" className="btn-ghost text-base">
+                See the record
+              </Link>
             </div>
-            <p className="mt-3 text-xs text-muted">14-day Premium trial · no credit card · cancel in one click</p>
-            {/* Compare strip — visitors actively comparing scanners click here
-                rather than bouncing. Lands on the existing /compare/* pages. */}
-            <p className="mt-5 text-xs text-muted">
-              Compare with{" "}
-              <Link href="/compare/zacks" className="text-accent hover:underline">Zacks</Link>
-              {" · "}
-              <Link href="/compare/finviz" className="text-accent hover:underline">Finviz</Link>
-              {" · "}
-              <Link href="/compare/wallstreetzen" className="text-accent hover:underline">WallStreetZen</Link>
+            <p className="mt-3 text-xs text-muted">
+              14-day Premium trial &middot; no credit card &middot; cancel in
+              one click
             </p>
           </div>
 
-          {/* Right: product preview + try-it search.
-              Search lives next to the scanner preview so the visitor sees the
-              live mock, then immediately gets to type their own ticker — the
-              "see what you'd get" loop happens before any signup ask. */}
           <div className="lg:col-span-3">
             <ScannerPreview />
             <p className="mt-3 text-center text-xs text-muted">
-              Every ticker scored on 6 factors · hover any score in the app for the full breakdown
+              Live mock &middot; hover any score in the app for the full
+              6-factor breakdown
             </p>
-            <div className="mt-6 rounded-2xl border border-border bg-panel/40 p-5">
-              <TickerSearch />
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Live counters strip — concrete numbers fetched from /api/status,
-          refreshed every 60s. Replaces vague "live" with specifics: how
-          many tickers, how many news items, current regime, last tick. */}
-      <section className="border-t border-border bg-panel/20">
+      {/* LIVE COUNTERS — concrete numbers from /api/status, refreshed every 60s.
+          Replaces vague "live" with specifics: how many tickers, how many
+          news items, current regime, last tick. */}
+      <section className="bg-panel/20">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <LiveCounters />
         </div>
       </section>
 
-      {/* Headline trust pillars — the moat in three lines.
-          Lands between the hero and the data/legal microcopy strip below.
-          Reads as a confident factual claim, not a marketing line, because
-          each pillar links to the artefact that proves it. */}
+      {/* WHY THIS IS DIFFERENT — three bold contrastive claims, NOT cards.
+          The trust pillars used to be a 3-card grid, identical in shape to
+          the "How it works" cards below — same rhythm twice. Now: typography-
+          led statements with thin dividers, then cards for the process. Two
+          different visual treatments for two different jobs.
+          Section is `relative overflow-hidden` so we can drop in a soft
+          right-side accent blob that picks up the atmosphere from the hero. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+        <p className="eyebrow text-accent">Why Tapeline</p>
+        <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+          Three things every other scanner won&rsquo;t do.
+        </h2>
+
+        <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-12">
+          <FadeIn delayMs={0}>
+            <Differentiator
+              num="01"
+              label="Published weights"
+              body={
+                <>
+                  Trend 25% &middot; RS 20% &middot; Fund 15% &middot; SM 15%
+                  &middot; Macro 15% &middot; Mom 10%. No black box. No hidden
+                  multipliers. Every weight change is{" "}
+                  <Link href="/changelog" className="link">
+                    announced before it ships
+                  </Link>
+                  .
+                </>
+              }
+            />
+          </FadeIn>
+          <FadeIn delayMs={80}>
+            <Differentiator
+              num="02"
+              label="Back-checked vs SPY"
+              body={
+                <>
+                  Top-10 picks logged at close. Next-day return + alpha vs SPY
+                  recorded automatically. The losers stay on the page.{" "}
+                  <Link href="/scorecard" className="link">
+                    Audit any day
+                  </Link>
+                  .
+                </>
+              }
+            />
+          </FadeIn>
+          <FadeIn delayMs={160}>
+            <Differentiator
+              num="03"
+              label="Descriptive, not prescriptive"
+              body={
+                <>
+                  Tapeline never tells you to buy, sell, or hold. Scores describe
+                  what the tape is doing &mdash; the decision is yours.{" "}
+                  <Link href="/how-it-works" className="link">
+                    Read the formula
+                  </Link>
+                  .
+                </>
+              }
+            />
+          </FadeIn>
+        </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS — three-step process. Cards are appropriate here
+          because each step is sequential and self-contained. */}
+      <section className="bg-panel/10">
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+          <p className="eyebrow text-accent">How it works</p>
+          <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+            From data to decision in one glance.
+          </h2>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            <FadeIn delayMs={0}>
+              <Step n="1" title="Six factors, exact weights">
+                Trend 25% &middot; relative strength 20% &middot; fundamentals
+                15% &middot; smart money 15% &middot; macro 15% &middot;
+                momentum 10%. Same weights every tick.
+              </Step>
+            </FadeIn>
+            <FadeIn delayMs={80}>
+              <Step n="2" title="One sentence per ticker">
+                Plain-English &ldquo;Why&rdquo; on every row &mdash; no chat
+                session required, no premium gate. Hover the score for the
+                factor breakdown.
+              </Step>
+            </FadeIn>
+            <FadeIn delayMs={160}>
+              <Step n="3" title="Every call on the record">
+                Top-10 picks logged daily with the original reasoning
+                preserved. Performance vs SPY recorded next session. No
+                cherry-picking, no hindsight edits.
+              </Step>
+            </FadeIn>
+          </div>
+        </div>
+      </section>
+
+      {/* FROM THE BLOG — surfaces every methodology + transparency post
+          from the homepage. Two jobs:
+          (1) Visitor: deeper reads for the curious before they sign up.
+          (2) Google crawler: internal-link path from the highest-PageRank
+              page on the site (homepage) to every blog post. Without this
+              widget the blog posts were stranded in "Discovered - currently
+              not indexed" because no high-authority page linked to them
+              and Google's crawl budget for a new domain never reached
+              /blog → individual post. Posts are sorted newest-first; show
+              the most recent 6 inline + "see all" link to /blog. */}
+      <section className="relative overflow-hidden bg-panel/10">
+        {/* Mid-page atmospheric accent — opposite side from the "Why" section
+            blob so the eye traces a soft accent zigzag down the page rather
+            than seeing a single column of colour. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+          <p className="eyebrow text-accent">From the blog</p>
+          <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+            How the score works, on the record.
+          </h2>
+          <p className="mt-4 max-w-2xl text-muted">
+            Methodology notes, design choices, and accountability writeups.
+            Every post is anchored to public data — no opinion-only takes.
+          </p>
+          {/* Mobile: cap at 3 cards (≈600px) instead of 6 cards stacked
+              vertically (≈1200px) so the page scroll doesn't bloat. Posts
+              4-6 reappear at sm+ where they fit in a 2-col grid without
+              adding scroll length. The "see all posts" link below still
+              gives mobile users a path to the full blog index. */}
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:block">
+            {POSTS.slice(0, 6).map((p) => (
+              <FadeIn key={p.slug} delayMs={0}>
+                <Link
+                  href={`/blog/${p.slug}`}
+                  className="block h-full rounded-2xl border border-border bg-panel/40 p-6 transition hover:border-accent/40 hover:bg-panel/60"
+                >
+                  <p className="text-xs font-mono text-subtle">
+                    {new Date(p.publishedAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <h3 className="mt-3 text-lg font-semibold tracking-tight leading-snug">
+                    {p.title}
+                  </h3>
+                  <p className="mt-3 text-sm text-muted leading-relaxed line-clamp-4">
+                    {p.excerpt}
+                  </p>
+                </Link>
+              </FadeIn>
+            ))}
+          </div>
+          <div className="mt-10">
+            <Link href="/blog" className="link text-sm">
+              See all {POSTS.length} posts &rarr;
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* OBJECTION HANDLING / FAQ — five short answers to the questions every
+          first-time visitor asks before they sign up. Conversion best
+          practice: anticipate the doubt that's actually killing the signup
+          and answer it before they need to ask.
+          Wrapped in a relative-positioned container so we can drop a soft
+          accent blob behind the FAQ for visual continuity with the rest of
+          the page. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
+        </div>
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-20">
+        <p className="eyebrow text-accent">Common questions</p>
+        <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
+          Things people ask before signing up.
+        </h2>
+        <div className="mt-10 divide-y divide-border/60">
+          <Faq q="Is this financial advice?">
+            No. Tapeline publishes a quantitative score derived from public
+            market data. Scores describe what the data is doing &mdash; they
+            never tell you to buy, sell, or hold. See the{" "}
+            <Link href="/legal/risk" className="link">
+              risk disclosure
+            </Link>
+            .
+          </Faq>
+          <Faq q="How is this different from Finviz / Zacks / TradingView?">
+            Other scanners give you 500 filters and a blank stare. Tapeline
+            gives you one number, one sentence, and a public track record.
+            Side-by-side comparisons:{" "}
+            <Link href="/compare/finviz" className="link">
+              vs Finviz
+            </Link>
+            ,{" "}
+            <Link href="/compare/tradingview" className="link">
+              vs TradingView
+            </Link>
+            ,{" "}
+            <Link href="/compare/zacks" className="link">
+              vs Zacks
+            </Link>
+            .
+          </Faq>
+          <Faq q="Is the scorecard really real?">
+            Yes. Top-10 picks log automatically at market close every day; the
+            next session records the actual price move + alpha vs SPY. We
+            don&rsquo;t edit losers. The whole record is on{" "}
+            <Link href="/scorecard" className="link">
+              /scorecard
+            </Link>{" "}
+            for everyone &mdash; you don&rsquo;t even need an account.
+          </Faq>
+          <Faq q="What if I cancel?">
+            Cancel anytime, one click in billing settings. Monthly plans get a
+            7-day full refund &mdash; if it doesn&rsquo;t click, you owe us
+            nothing.
+          </Faq>
+          <Faq q="What data do you use?">
+            US equities and commodity ETFs from live market data feeds, plus
+            macro indicators, fundamentals, SEC Form 4 insider filings, and a
+            real-time news wire. Categories and refresh cadences listed on{" "}
+            <Link href="/data-sources" className="link">
+              data sources
+            </Link>
+            .
+          </Faq>
+        </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA — mirrors the hero promise rather than a generic
+          "Stop scrolling" line. Restated specifically: one score, one
+          sentence, one public record.
+          No section bg — body::before gradient (globals.css) is the
+          continuous canvas now; the old `from-panel/20 to-transparent`
+          here created a visible seam against the FAQ above. */}
       <section>
-        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-10 sm:grid-cols-3">
-          <FadeIn delayMs={0}>
-            <Pillar
-              label="Six published weights"
-              body={<>
-                Trend 25% · RS 20% · Fund 15% · SM 15% · Macro 15% · Mom 10%.
-                No black box, no hidden multipliers.
-              </>}
-              href="/how-it-works"
-              cta="See the formula"
-            />
-          </FadeIn>
-          <FadeIn delayMs={100}>
-            <Pillar
-              label="Every call back-checked vs SPY"
-              body="Top-10 picks logged at close. Next-day return + alpha vs SPY recorded automatically."
-              href="/scorecard"
-              cta="See the scorecard"
-            />
-          </FadeIn>
-          <FadeIn delayMs={200}>
-            <Pillar
-              label="100% on the public record"
-              body="No cherry-picking. No hindsight edits. Original reasoning preserved with every entry."
-              href="/scorecard"
-              cta="Audit any day"
-            />
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* Data + legal microcopy — quieter strip beneath the moat pillars. */}
-      <section className="border-y border-border bg-panel/50">
-        <div className="mx-auto grid max-w-6xl gap-3 px-6 py-4 text-center text-xs text-muted sm:grid-cols-3">
-          <div>🔬 Powered by Massive (formerly Polygon.io) licensed data</div>
-          <div>📈 Every pick on the <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link></div>
-          <div>⚠️ Informational only — <Link href="/legal/risk" className="text-accent hover:underline">not investment advice</Link></div>
-        </div>
-      </section>
-
-      {/* How it works — 3 steps */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-3xl font-bold tracking-tight">How it works</h2>
-        <p className="mt-2 text-muted">From data to decision in one glance.</p>
-
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          <FadeIn delayMs={0}>
-            <Step n="1" title="Six factors, exact weights">
-              Trend 25% · relative strength 20% · fundamentals 15% · smart money 15% · macro 15% · momentum 10%.
-              Weights are public. Every change is announced before it ships.
-            </Step>
-          </FadeIn>
-          <FadeIn delayMs={100}>
-            <Step n="2" title="One sentence per ticker">
-              Default plain-English Why on every row — no chat session required, no premium gate.
-              Hover the score for the factor breakdown.
-            </Step>
-          </FadeIn>
-          <FadeIn delayMs={200}>
-            <Step n="3" title="Every call on the public record">
-              Top-10 picks logged daily to the <Link href="/scorecard" className="text-accent">public scorecard</Link>{" "}
-              with the original reasoning preserved. Performance vs SPY recorded next session. No cherry-picking, no hindsight edits.
-            </Step>
-          </FadeIn>
-        </div>
-
-        <div className="mt-8 text-center">
-          <Link href="/how-it-works" className="text-sm text-accent hover:underline">
-            See the exact weights and methodology →
-          </Link>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="mx-auto max-w-4xl px-6 pt-10 pb-20 text-center">
-        <h2 className="text-4xl font-bold tracking-tight">Stop scrolling. Start scanning.</h2>
-        <p className="mt-4 text-muted">14 days free · No credit card · Cancel in one click</p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link href="/signup" className="btn-primary text-base">
-            Open the live scanner &rarr;
-          </Link>
-          <Link href="/pricing" className="btn-ghost text-base">
-            See pricing
-          </Link>
+        <div className="mx-auto max-w-3xl px-6 py-10 sm:py-14 text-center">
+          <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            One score. One sentence. <br />
+            <span className="text-accent">One public record.</span>
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-muted">
+            See your watchlist scored the same way we score the public
+            scorecard. Free for 14 days, no card.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link href="/signup" className="btn-primary text-base">
+              Try Premium free &rarr;
+            </Link>
+            <Link href="/pricing" className="btn-ghost text-base">
+              See pricing
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-muted">
+            No credit card &middot; Cancel in one click &middot; 7-day refund
+            on monthly
+          </p>
         </div>
       </section>
 
@@ -178,41 +368,58 @@ export default function LandingPage() {
   );
 }
 
-function Step({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+/* ----- Section helpers ----- */
+
+function Step({
+  n,
+  title,
+  children,
+}: {
+  n: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="card p-6">
-      <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 font-mono text-sm font-bold text-accent">
+    <div className="card p-7">
+      <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 font-mono text-sm font-semibold text-accent">
         {n}
       </div>
-      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-      <p className="mt-2 text-sm text-muted leading-relaxed">{children}</p>
+      <h3 className="mt-5 text-lg font-semibold tracking-tight">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-muted">{children}</p>
     </div>
   );
 }
 
-function Pillar({
-  label, body, href, cta,
+function Differentiator({
+  num,
+  label,
+  body,
 }: {
+  num: string;
   label: string;
   body: React.ReactNode;
-  href: string;
-  cta: string;
 }) {
   return (
     <div>
-      <div className="flex items-center gap-2.5">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-up/15 text-up">
-          <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <h3 className="text-sm font-semibold tracking-tight">{label}</h3>
-      </div>
-      <p className="mt-2 text-sm text-muted leading-relaxed">{body}</p>
-      <Link href={href} className="mt-2 inline-block text-xs text-accent hover:underline">
-        {cta} →
-      </Link>
+      <div className="font-mono text-xs text-subtle">{num}</div>
+      <h3 className="mt-2 text-xl font-semibold tracking-tight">{label}</h3>
+      <p className="mt-3 text-sm leading-relaxed text-muted">{body}</p>
     </div>
   );
 }
 
+function Faq({ q, children }: { q: string; children: React.ReactNode }) {
+  return (
+    <details className="group py-5">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-base font-medium text-fg">
+        <span>{q}</span>
+        <span className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted transition group-open:rotate-45 group-open:border-accent group-open:text-accent">
+          +
+        </span>
+      </summary>
+      <div className="mt-3 pr-9 text-sm leading-relaxed text-muted">
+        {children}
+      </div>
+    </details>
+  );
+}

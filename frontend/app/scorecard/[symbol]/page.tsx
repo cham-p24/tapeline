@@ -86,25 +86,52 @@ export default function TickerScorecardPage() {
               </div>
             )}
 
+            {/* Same tier-gate banner as /scorecard. Summary stats above the row
+                list stay live regardless of viewer tier; only the per-row data
+                below is delayed for non-payers. Backend (`routers/scorecard.py`)
+                resolves the gate from the session cookie. */}
+            {data.summary.is_delayed && data.summary.appearances > 0 && (
+              <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <strong className="text-fg">Rows shown are delayed {data.summary.delay_days} days.</strong>{" "}
+                    <span className="text-muted">
+                      Live rows are a Pro / Premium feature. Summary stats above are real-time.
+                    </span>
+                  </div>
+                  <Link href="/pricing" className="btn-primary whitespace-nowrap text-sm">
+                    See live rows &rarr;
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {data.summary.appearances > 0 && (
               <>
                 <div className="mt-8 grid gap-4 sm:grid-cols-4">
                   <Stat label="Top-10 appearances" value={String(data.summary.appearances)} />
                   <Stat
-                    label="Avg 1D return"
-                    value={data.summary.avg_1d_return != null ? `${data.summary.avg_1d_return.toFixed(2)}%` : "pending"}
-                    tone={data.summary.avg_1d_return != null ? (data.summary.avg_1d_return > 0 ? "up" : "down") : undefined}
+                    label="Median 1D return"
+                    value={data.summary.median_1d_return != null ? `${data.summary.median_1d_return.toFixed(2)}%` : "pending"}
+                    tone={data.summary.median_1d_return != null ? (data.summary.median_1d_return > 0 ? "up" : "down") : undefined}
                   />
                   <Stat
-                    label="Avg alpha vs SPY"
-                    value={data.summary.avg_alpha_vs_spy != null ? `${data.summary.avg_alpha_vs_spy.toFixed(2)}%` : "pending"}
-                    tone={data.summary.avg_alpha_vs_spy != null ? (data.summary.avg_alpha_vs_spy > 0 ? "up" : "down") : undefined}
+                    label="Median alpha vs SPY"
+                    value={data.summary.median_alpha_vs_spy != null ? `${data.summary.median_alpha_vs_spy.toFixed(2)}%` : "pending"}
+                    tone={data.summary.median_alpha_vs_spy != null ? (data.summary.median_alpha_vs_spy > 0 ? "up" : "down") : undefined}
                   />
                   <Stat
                     label="Beat SPY rate"
                     value={data.summary.hit_rate_beat_spy != null ? `${data.summary.hit_rate_beat_spy.toFixed(0)}%` : "pending"}
                   />
                 </div>
+                {/* Methodology + exclusions disclosure (same posture as
+                    the universe-wide /scorecard page). */}
+                {data.summary.appearances_scored > 0 && data.summary.entries_excluded_outliers > 0 && (
+                  <p className="mt-3 text-xs text-subtle">
+                    <span className="text-muted">{data.summary.entries_excluded_outliers} row{data.summary.entries_excluded_outliers === 1 ? "" : "s"} excluded from medians as data outliers (&gt;50% 1-day move). Mean 1D return {data.summary.avg_1d_return != null ? `${data.summary.avg_1d_return.toFixed(2)}%` : "—"}, mean alpha {data.summary.avg_alpha_vs_spy != null ? `${data.summary.avg_alpha_vs_spy.toFixed(2)}%` : "—"}.</span>
+                  </p>
+                )}
 
                 {(data.summary.best_alpha != null || data.summary.worst_alpha != null) && (
                   <p className="mt-3 text-xs text-subtle">
@@ -163,6 +190,21 @@ export default function TickerScorecardPage() {
             </div>
           </>
         )}
+        {/* Regulatory disclaimer — same wording as /scorecard, intentionally
+            inlined rather than componentised so lawyer review can compare the
+            on-page text directly against the source. */}
+        <div className="mt-12 rounded-lg border border-border bg-panel/40 p-5 text-xs text-subtle">
+          <p className="font-semibold uppercase tracking-wider text-muted">Important — general information only</p>
+          <p className="mt-2 leading-relaxed">
+            The scorecard is a transparent record of historical model output. It is <strong className="text-muted">not personal financial advice, not a recommendation to buy or sell any security, and not a forecast of future returns.</strong> Past performance does not predict future results. Any return figures shown reflect the realised next-day price moves of the top-10 ranked tickers vs. SPY on the dates listed — they are not the return of any investable portfolio or strategy.
+          </p>
+          <p className="mt-2 leading-relaxed">
+            Composite scores are derived from a published 6-factor formula (see <Link href="/how-it-works" className="text-muted underline hover:text-fg">/how-it-works</Link>). Vendor data occasionally contains errors (unadjusted-for-split closes, halt-reopen reference prices); aggregate statistics exclude entries where the 1-day move exceeds 50% as a defensible heuristic for data-quality outliers. Raw rows remain visible in the table above.
+          </p>
+          <p className="mt-2 leading-relaxed">
+            Tapeline operates from Melbourne, Australia under the publisher exemption from AFSL requirements. We do not hold an Australian Financial Services Licence. You should consider your own circumstances, read any relevant product disclosure documents, and obtain advice from a licensed adviser before making investment decisions.
+          </p>
+        </div>
       </div>
       <TransparencyStrip current="/scorecard" />
       <MarketingFooter />

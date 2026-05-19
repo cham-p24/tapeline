@@ -27,10 +27,10 @@ export const STRATEGIES: StrategyConfig[] = [
   {
     slug: "day-traders",
     display: "Day Traders",
-    h1: "Best Stocks for Day Trading — Ranked by Today's Momentum + Score Confluence",
-    metaTitle: "Best Stocks for Day Trading 2026 — Live Top Movers Scored by Tapeline",
+    h1: "Best Stocks to Day Trade — Today's Top 30 by Move + Composite Score",
+    metaTitle: "Best Stocks to Day Trade Today — Live Top 30 Movers with Score Confluence | Tapeline",
     metaDescription:
-      "Live ranking of US stocks for day traders — highest score-and-momentum confluence today. Six-factor composite, sub-60s refresh, public scorecard. Free tier 24h-delayed; full live universe on Tapeline Pro from $24.99/mo annual.",
+      "30 US stocks with the biggest moves today that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend and relative strength. Sub-60s refresh. Public scorecard, no edits.",
     lede:
       "Day trading lives or dies on confluence: setups where the score, the trend, the relative strength, and the day's price action all point the same direction. The list below ranks today's US tickers sorted by today's 1-day move, filtered to names with a Tapeline composite at or above 60. The tape is fresh — the underlying scores re-tick sub-60 seconds during market hours.",
     apiParams: { sort: "change_pct_1d", order: "desc", min_score: "60", limit: "30" },
@@ -57,10 +57,20 @@ export const STRATEGIES: StrategyConfig[] = [
   {
     slug: "swing-traders",
     display: "Swing Traders",
-    h1: "Best Stocks for Swing Trading — Highest Composite Score with Multi-Day Setup",
-    metaTitle: "Best Stocks for Swing Trading 2026 — Top Tapeline Scores Across the Universe",
+    h1: "Best Stocks to Swing Trade — Live Top 30 by Composite Score",
+    // metaTitle / metaDescription rewritten 2026-05-19 against GSC data:
+    // page sat at position 12.4 with 304 impressions over 90 days (biggest
+    // single-page impression bucket on the site), but the previous 87-char
+    // title was truncating in the SERP and burying the keyword. New title is
+    // 60 chars, front-loads "Best Stocks to Swing Trade 2026" verbatim
+    // (matches "best swing trading stocks 2026", "best us stocks for swing
+    // trading 2026", "top swing trade stocks 2026" — all queries we already
+    // rank for), keeps the specific number "Top 30" + brand. New description
+    // is 142 chars (well under desktop truncation), leads with "today" for
+    // freshness and ends with the public-scorecard credibility hook.
+    metaTitle: "Best Stocks to Swing Trade 2026 — Top 30 by Score | Tapeline",
     metaDescription:
-      "Live ranking of US stocks for swing traders — highest six-factor composite scores across ~2,500 actively scored tickers. Trend + relative strength + fundamentals + macro confluence. 14-day Tapeline trial, no credit card.",
+      "Today's 30 best US stocks to swing trade, ranked by Tapeline's public 6-factor composite. Live scores, daily refresh, public scorecard vs SPY.",
     lede:
       "Swing trading rewards the names where multiple factors line up over multiple sessions. The list below ranks US tickers by Tapeline composite score — the six factors weighted at exact published percentages — filtered to a minimum score of 65 (top third of the distribution). Sorted by composite descending. The composite is the best summary number for a multi-day setup.",
     apiParams: { sort: "score", order: "desc", min_score: "65", limit: "30" },
@@ -87,10 +97,20 @@ export const STRATEGIES: StrategyConfig[] = [
   {
     slug: "momentum",
     display: "Momentum Trading",
-    h1: "Best Momentum Stocks Right Now — Ranked by 5-Day Move with Score Confirmation",
-    metaTitle: "Best Momentum Stocks 2026 — 5-Day Movers Score-Confirmed by Tapeline",
+    h1: "Top Momentum Stocks — Live Top 30 by 5-Day Move with Score Confluence",
+    // metaTitle / metaDescription rewritten 2026-05-19 against GSC data:
+    // page sat at position 11.3 with 160 impressions over 90 days — right
+    // at the page-1/page-2 border, where a sharper title is the highest-
+    // leverage move. The previous 84-char title was truncating; new title
+    // is 63 chars and leads with the exact query string the cluster uses:
+    // "Top Momentum Stocks 2026" (4 imp), "top 5 momentum stocks may 2026"
+    // (12 imp), "top momentum stocks for swing trading may 2026" (4 imp),
+    // "momentum stocks 2026" (1 imp pos 6.0). Description trimmed to
+    // 138 chars, leads with the "biggest 5-day movers WITH score 60+"
+    // differentiator and ends with the public-scorecard credibility hook.
+    metaTitle: "Top Momentum Stocks 2026 — Top 30 5-Day Movers + Score | Tapeline",
     metaDescription:
-      "Live ranking of US momentum stocks — biggest 5-day moves with composite score 60+. Six-factor scoring confirms the momentum is structural, not a head-fake. Free tier 24h-delayed; Pro at $24.99/mo annual for live.",
+      "30 biggest 5-day US movers also scoring 60+ on Tapeline's public 6-factor composite. Live, daily refresh, public scorecard tracks each pick.",
     lede:
       "Momentum without score confirmation is a coin flip. Pure 'biggest 5-day movers' lists are dominated by news pops, short squeezes, and reversals that fail in the next session. The list below filters to composite 60+ before sorting by 5-day change — the move PLUS the underlying factor confluence. Trend, relative strength, smart money: if those agree with the recent momentum, you've got a structural runner. If they don't, you've got a name to fade.",
     apiParams: { sort: "change_pct_5d", order: "desc", min_score: "60", limit: "30" },
@@ -162,7 +182,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the Fundamentals factor specifically?",
-        a: "Fundamentals (15% weight) blends earnings quality, margin trend, balance-sheet health, revenue growth, ROE, and free-cash-flow stability. Sourced from Finnhub's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
+        a: "Fundamentals (15% weight) blends earnings quality, margin trend, balance-sheet health, revenue growth, ROE, and free-cash-flow stability. Sourced from a third-party data feed's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
       },
       {
         q: "How is this different from Simply Wall St's value screen?",

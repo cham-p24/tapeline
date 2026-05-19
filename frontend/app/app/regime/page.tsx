@@ -18,7 +18,7 @@ export default function RegimePage() {
   const toneBg =
     r?.regime === "BULL" ? "bg-up/20 text-up"
     : r?.regime === "NEUTRAL" ? "bg-accent/20 text-accent"
-    : r?.regime === "CAUTIOUS" ? "bg-yellow-500/20 text-yellow-400"
+    : r?.regime === "CAUTIOUS" ? "bg-warn/20 text-warn"
     : "bg-down/20 text-down";
 
   return (
@@ -36,7 +36,7 @@ export default function RegimePage() {
         <div className="mt-3 grid gap-3 text-muted sm:grid-cols-2">
           <div><strong className="text-up">BULL</strong> &mdash; VIX low, breadth above 60%, most stocks above 200DMA. Risk-on trades tend to work. Long bias favoured.</div>
           <div><strong className="text-accent">NEUTRAL</strong> &mdash; VIX mid-range, mixed breadth. Stock selection dominates. Individual setups matter more than beta.</div>
-          <div><strong className="text-yellow-400">CAUTIOUS</strong> &mdash; VIX elevated, breadth eroding. Time to lighten size, tighten stops, avoid marginal setups.</div>
+          <div><strong className="text-warn">CAUTIOUS</strong> &mdash; VIX elevated, breadth eroding. Time to lighten size, tighten stops, avoid marginal setups.</div>
           <div><strong className="text-down">BEAR</strong> &mdash; VIX high, most stocks below 200DMA. Capital preservation mode. Cash is a position.</div>
         </div>
       </details>
@@ -81,7 +81,11 @@ export default function RegimePage() {
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Kpi label="VIX" value={r.vix.toFixed(2)} />
-            <Kpi label="Dollar Index (DXY)" value={r.dxy.toFixed(2)} />
+            {/* FRED series DTWEXBGS — broad trade-weighted USD index, not
+                ICE DXY. Reads ~115-125 right now; ICE DXY (the futures
+                contract most traders watch) is ~100-110. Label kept honest
+                to the source. */}
+            <Kpi label="USD Broad Index" value={r.dxy.toFixed(2)} />
             <Kpi label="10Y Yield" value={r.yield_10y.toFixed(3) + "%"} />
             <Kpi label="Rate direction" value={r.rate_direction} />
             <Kpi label="Breadth (above 200DMA)" value={r.breadth_pct.toFixed(1) + "%"} />

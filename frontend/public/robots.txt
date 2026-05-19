@@ -1,6 +1,21 @@
+# Tapeline robots.txt
+# Public marketing surfaces are crawl-friendly. Authenticated app shell
+# (/app/*) and API rewrites (/api/* — proxied to api.tapeline.io) are
+# intentionally excluded; both are non-indexable by design.
+#
+# IndexNow key file lives at /<KEY>.txt and is served by Vercel as a
+# static asset; nothing in this file blocks it.
+
 User-agent: *
 Allow: /
 Disallow: /app/
 Disallow: /api/
+
+# Explicit allows for surfaces that occasionally get false-positive
+# blocked by overly-aggressive heuristics in some crawlers.
+Allow: /sitemap.xml
+Allow: /opengraph-image
+Allow: /icon
+Allow: /favicon.ico
 
 Sitemap: https://tapeline.io/sitemap.xml

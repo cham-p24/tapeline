@@ -15,7 +15,7 @@ export type RoadmapItem = {
 const STATUS_META: Record<Status, { label: string; color: string; ring: string }> = {
   shipped:     { label: "Shipped",     color: "text-up",         ring: "border-up/30 bg-up/5" },
   in_progress: { label: "In progress", color: "text-accent",     ring: "border-accent/30 bg-accent/5" },
-  next:        { label: "Next",        color: "text-yellow-400", ring: "border-yellow-500/30 bg-yellow-500/5" },
+  next:        { label: "Next",        color: "text-warn", ring: "border-warn/30 bg-warn/5" },
   later:       { label: "Later",       color: "text-muted",      ring: "border-border bg-panel" },
 };
 
@@ -83,7 +83,7 @@ export function RoadmapItems({ items }: { items: RoadmapItem[] }) {
   return (
     <div className="space-y-10">
       {err && (
-        <div className="rounded-md border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm text-yellow-400">
+        <div className="rounded-md border border-warn/30 bg-warn/5 p-3 text-sm text-warn">
           {err}
         </div>
       )}

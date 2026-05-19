@@ -55,7 +55,7 @@ export default function SupportPage() {
 
         {/* Quick links to the things people email about most */}
         <h2 className="mt-14 text-2xl font-semibold tracking-tight">Before you email — quick answers</h2>
-        <div className="mt-6 divide-y divide-border border-y border-border">
+        <div className="mt-6 divide-y divide-border/60">
           <Faq
             q="Is Tapeline live and healthy right now?"
             a={
@@ -82,7 +82,7 @@ export default function SupportPage() {
             a={
               <>
                 The STOCK Act gives politicians up to 45 days to disclose a trade. The data IS up to
-                date — we sync from Quiver multiple times per day. The "trade date" can be weeks before
+                date — we sync multiple times per day. The "trade date" can be weeks before
                 the "disclosed date" because of the legal disclosure delay, not a sync lag.
               </>
             }

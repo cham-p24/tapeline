@@ -38,10 +38,13 @@ function polar(angleDeg: number, radius = R) {
   return { x: CX + radius * Math.cos(rad), y: CY - radius * Math.sin(rad) };
 }
 
-// Score-to-angle: 0 = leftmost (180°), 100 = rightmost (0°).
+// Score-to-angle. polar() below treats 0° as leftmost (the EXTREME FEAR end
+// of the arc) and 180° as rightmost (EXTREME GREED). Score 0 → 0° → left;
+// score 100 → 180° → right. The previous `180 - …` had this inverted, so a
+// greed reading of 71 pointed at the fear side. Caught 2026-05-17.
 function angleFor(score: number) {
   const s = Math.max(0, Math.min(100, score));
-  return 180 - (s / 100) * 180;
+  return (s / 100) * 180;
 }
 
 export function FearGreedDial({ score, label, color }: Props) {

@@ -172,12 +172,12 @@ const ITEM_LIST_JSON_LD = {
 
 function transparencyChip(s: Tool["scoring"]) {
   if (s === "Public formula") return "text-up";
-  if (s === "Proprietary score") return "text-yellow-400";
+  if (s === "Proprietary score") return "text-warn";
   return "text-subtle";
 }
 function scorecardChip(s: Tool["scorecard"]) {
   if (s === "Per-pick public") return "text-up";
-  if (s === "Aggregate") return "text-yellow-400";
+  if (s === "Aggregate") return "text-warn";
   return "text-subtle";
 }
 
@@ -204,7 +204,7 @@ export default function BestStockScannersPage() {
           <h2 className="text-xl font-semibold">At a glance</h2>
           <div className="mt-4 card overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-black/40 text-xs uppercase text-muted">
+              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
                 <tr>
                   <th className="px-3 py-3 text-left">#</th>
                   <th className="px-3 py-3 text-left">Tool</th>
@@ -283,7 +283,7 @@ export default function BestStockScannersPage() {
 
         <section className="mt-12">
           <h2 className="text-2xl font-semibold tracking-tight">Frequently asked</h2>
-          <div className="mt-6 divide-y divide-border border-y border-border">
+          <div className="mt-6 divide-y divide-border/60">
             {FAQ.map((item) => (
               <details key={item.q} className="group py-4">
                 <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
@@ -303,7 +303,7 @@ export default function BestStockScannersPage() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Start free trial →
+              Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

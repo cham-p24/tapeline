@@ -32,7 +32,7 @@ const PLANS = [
       "Email alerts (10/day) · daily briefing",
       "TradingView charts · CSV export",
     ],
-    cta: "Start 14-day trial",
+    cta: "Try Premium free",
     ctaHref: "/signup?plan=pro",
     highlight: false,
   },
@@ -52,7 +52,7 @@ const PLANS = [
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
       "Priority support · same-day reply",
     ],
-    cta: "Start 14-day trial",
+    cta: "Try Premium free",
     ctaHref: "/signup?plan=premium",
     highlight: true,
     badge: "Most popular",
@@ -106,7 +106,7 @@ export function PricingTable() {
           return (
             <div
               key={p.name}
-              className={`relative rounded-2xl border p-8 transition-all ${
+              className={`relative rounded-2xl border p-6 sm:p-8 transition-all ${
                 p.highlight
                   ? "border-accent/60 bg-gradient-to-b from-accent/10 via-panel to-panel shadow-lg shadow-accent/20"
                   : "border-border bg-panel"
@@ -183,7 +183,7 @@ export function PricingTable() {
       <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
         <span>14-day Premium trial · no card</span>
         <span className="text-subtle">·</span>
-        <span>30-day money back</span>
+        <span>7-day money back</span>
         <span className="text-subtle">·</span>
         <span>Annual price locked forever</span>
         <span className="text-subtle">·</span>

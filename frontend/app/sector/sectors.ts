@@ -6,7 +6,7 @@
  * list of metadata-related fields. Re-exporting domain constants from a
  * page file breaks the App Router type guarantees at build time.
  *
- * Yahoo/Polygon sector taxonomy. The DB stores sector strings exactly as
+ * Yahoo/a third-party market-data feed sector taxonomy. The DB stores sector strings exactly as
  * they appear in the `api` field below (the data feed uses Yahoo Finance
  * sector names). Slugs are kebab-case for clean URLs.
  */

@@ -51,7 +51,7 @@ const SIGNALS = [
   { label: "STRONG SETUP",    range: "70–84",  tone: "text-up/80",         desc: "Most factors favourable." },
   { label: "CONSTRUCTIVE",    range: "55–69",  tone: "text-accent",        desc: "Net positive, not decisive." },
   { label: "NEUTRAL",         range: "40–54",  tone: "text-muted",         desc: "Factors cancel out." },
-  { label: "CAUTION",         range: "25–39",  tone: "text-yellow-400",    desc: "More factors negative." },
+  { label: "CAUTION",         range: "25–39",  tone: "text-warn",    desc: "More factors negative." },
   { label: "WEAK",            range: "0–24",   tone: "text-down",          desc: "Broadly negative." },
 ];
 
@@ -63,11 +63,11 @@ export default function HowItWorksPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="relative section py-20">
+      <section className="relative section py-14 sm:py-20">
         <div className="pointer-events-none absolute inset-0 bg-hero opacity-60" />
         <div className="relative mx-auto max-w-3xl text-center">
           <p className="eyebrow">Methodology</p>
-          <h1 className="mt-3 text-5xl font-bold sm:text-6xl">Six factors. Exact weights. Public record.</h1>
+          <h1 className="mt-3 text-4xl font-bold sm:text-6xl">Six factors. Exact weights. Public record.</h1>
           <p className="mt-6 text-lg text-muted">
             Every score is a transparent weighted blend of six published factors —
             no black box, no mystery AI, no chat assistant required. You see each contribution on every ticker.
@@ -76,7 +76,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Factors */}
-      <section className="section py-20">
+      <section className="section py-14 sm:py-20">
         <div className="mx-auto max-w-4xl">
           <p className="eyebrow">The six factors</p>
           <h2 className="mt-3 text-3xl font-semibold">Composite = weighted sum of 6 sub-scores</h2>
@@ -120,20 +120,20 @@ export default function HowItWorksPage() {
               stock has recent insider filings, not every name has analyst coverage.
             </p>
             <div className="mt-4 grid gap-2 text-sm">
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="text-up font-medium">95%+</span>
                 <span className="text-muted">Full data on every signal feature — strongest evidence</span>
               </div>
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="text-up font-medium">80–95%</span>
                 <span className="text-muted">Most features present, missing 1–3 minor data points</span>
               </div>
-              <div className="flex justify-between border-b border-border py-2">
+              <div className="flex justify-between border-b border-border/30 py-2">
                 <span className="font-medium">60–80%</span>
                 <span className="text-muted">Core scoring data + most fundamentals — typical liquid stock</span>
               </div>
-              <div className="flex justify-between border-b border-border py-2">
-                <span className="text-yellow-400 font-medium">40–60%</span>
+              <div className="flex justify-between border-b border-border/30 py-2">
+                <span className="text-warn font-medium">40–60%</span>
                 <span className="text-muted">Only basic price/trend data — caution</span>
               </div>
               <div className="flex justify-between py-2">
@@ -146,8 +146,8 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Signals */}
-      <section className="border-t border-border/60 bg-panel/20">
-        <div className="section py-20">
+      <section className="bg-panel/20">
+        <div className="section py-14 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Signal labels</p>
             <h2 className="mt-3 text-3xl font-semibold">Descriptive, not prescriptive.</h2>
@@ -160,7 +160,7 @@ export default function HowItWorksPage() {
               {SIGNALS.map((s) => (
                 <div
                   key={s.label}
-                  className="grid grid-cols-[minmax(8.5rem,auto)_1fr_auto] items-center gap-x-4 gap-y-1 border-b border-border py-4 last:border-b-0"
+                  className="grid grid-cols-[minmax(8.5rem,auto)_1fr_auto] items-center gap-x-4 gap-y-1 py-4"
                 >
                   <span className={`font-mono text-sm font-medium ${s.tone}`}>{s.label}</span>
                   <span className="text-sm text-muted">{s.desc}</span>
@@ -173,12 +173,12 @@ export default function HowItWorksPage() {
       </section>
 
       {/* FAQ — visible content that mirrors HOW_FAQ JSON-LD above. */}
-      <section className="border-t border-border/60 bg-panel/20">
+      <section className="bg-panel/20">
         <div className="section py-16">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Common questions</p>
             <h2 className="mt-3 text-3xl font-semibold">Methodology FAQ</h2>
-            <div className="mt-8 divide-y divide-border border-y border-border">
+            <div className="mt-8 divide-y divide-border/60">
               {HOW_FAQ.map((item) => (
                 <details key={item.q} className="group py-4">
                   <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
@@ -194,11 +194,11 @@ export default function HowItWorksPage() {
       </section>
 
       {/* CTA */}
-      <section className="section py-24 text-center">
+      <section className="section py-10 sm:py-14 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
         <p className="mt-3 text-muted">14-day Premium trial. No credit card.</p>
-        <Link href="/signup" className="btn-accent mt-8 inline-flex h-11 px-6 text-base">
-          Start free trial &rarr;
+        <Link href="/signup" className="btn-primary mt-6 inline-flex h-11 px-6 text-base">
+          Try Premium free &rarr;
         </Link>
       </section>
 

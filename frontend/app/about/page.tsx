@@ -178,8 +178,8 @@ export default function AboutPage() {
               <h3 className="mt-1 font-semibold">Engine running in production for personal use</h3>
               <p className="mt-1 text-sm text-muted">
                 The scoring engine that powers Tapeline ran for ~12 months as a personal
-                trading bot, including paper-trading via Alpaca and live-data feeds from
-                Massive (formerly Polygon.io), Finnhub, Quiver, and FRED.
+                trading bot, paper-trading against live market data, fundamentals,
+                macro indicators, and SEC filings.
               </p>
             </li>
           </ol>
@@ -219,7 +219,7 @@ export default function AboutPage() {
         {/* FAQ — visible content mirrors the FAQPage JSON-LD. */}
         <section className="mt-12">
           <h2 className="text-2xl font-bold tracking-tight">Frequently asked</h2>
-          <div className="mt-6 divide-y divide-border border-y border-border">
+          <div className="mt-6 divide-y divide-border/60">
             {ABOUT_FAQ.map((item) => (
               <details key={item.q} className="group py-4">
                 <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
@@ -240,7 +240,7 @@ export default function AboutPage() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Start 14-day trial →
+              Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the scorecard

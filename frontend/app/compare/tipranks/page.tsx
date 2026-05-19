@@ -65,9 +65,9 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Analyst consensus data",
-    tapeline: "Benzinga analyst ratings widget on every ticker page; not folded into the score",
+    tapeline: "Analyst ratings widget on every ticker page; not folded into the score",
     competitor: "Analyst consensus is a primary input to Smart Score; tracks individual analyst track records",
-    note: "Tipranks built its name on aggregating analyst calls and ranking the analysts themselves — that database is unique and useful. Tapeline displays analyst ratings via the Benzinga widget but treats them as descriptive context, not a score input. The reason: analyst calls have a delayed, sticky bias that distorts short-horizon scoring.",
+    note: "Tipranks built its name on aggregating analyst calls and ranking the analysts themselves — that database is unique and useful. Tapeline displays an analyst-ratings summary but treats it as descriptive context, not a score input. The reason: analyst calls have a delayed, sticky bias that distorts short-horizon scoring.",
   },
   {
     label: "Brand authority",
