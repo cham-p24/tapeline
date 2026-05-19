@@ -89,6 +89,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/compare/stock-rover`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/benzinga-pro`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/stockcharts`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // New competitor pages — 2026-05-20 expansion to cover the remaining
+    // high-intent comparison clusters (free incumbent, broker-built scanners,
+    // institutional pedigree, enterprise pricing anchor).
+    { url: `${base}/compare/yahoo-finance`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/webull`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/robinhood`,         lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/marketsmith`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/bloomberg-terminal`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
