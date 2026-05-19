@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
+import { api } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
@@ -63,6 +64,39 @@ function SignUpForm() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const turnstileRef = useRef<HTMLDivElement | null>(null);
+
+  // Live scorecard proof block — fetched once on mount. The summary stats
+  // (days_tracked, hit_rate_beat_spy, median_alpha_vs_spy) are tier-invariant
+  // so we get them even though the visitor is anonymous. If the fetch fails
+  // or returns nulls (e.g. no back-checked entries yet), the block silently
+  // renders nothing — the page should never show "—%" placeholders that look
+  // broken. This is the highest-leverage copy lever on /signup: turning the
+  // bullet promises above into measurable receipts.
+  const [proof, setProof] = useState<{
+    days: number;
+    hit_rate: number;
+    median_alpha: number;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.scorecard(30).then((d) => {
+      if (cancelled) return;
+      const s = d.summary;
+      if (
+        typeof s.days_tracked === "number" &&
+        s.days_tracked > 0 &&
+        typeof s.hit_rate_beat_spy === "number" &&
+        typeof s.median_alpha_vs_spy === "number"
+      ) {
+        setProof({
+          days: s.days_tracked,
+          hit_rate: s.hit_rate_beat_spy,
+          median_alpha: s.median_alpha_vs_spy,
+        });
+      }
+    }).catch(() => { /* silent — no proof block is better than a broken one */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Subscribe React state into the module-scope Turnstile callback. The
   // window.onTapelineTurnstile handler was already registered at module load
@@ -151,6 +185,41 @@ function SignUpForm() {
 
           <h1 className="mt-10 text-3xl font-bold tracking-tight">Try Premium free for 14 days</h1>
           <p className="mt-2 text-sm text-muted">No credit card. Cancel anytime.</p>
+
+          {/* Live scorecard proof — the only block on this page where the
+              numbers update with real data. Bullets below promise features;
+              this block surfaces actual track record. Renders nothing when
+              the back-check hasn't accumulated enough entries yet, so the
+              page never shows a "broken" empty state.
+              Tap-target — full row links to /scorecard so the curious
+              visitor can audit the receipts before signing up. */}
+          {proof && (
+            <Link
+              href="/scorecard"
+              className="mt-6 block rounded-md border border-up/20 bg-up/5 p-3 transition-colors hover:border-up/40 hover:bg-up/10"
+            >
+              <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-wider text-muted">
+                <span>Public scorecard</span>
+                <span className="text-subtle">audit →</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 nums">
+                <span className="text-fg">
+                  <span className="text-base font-semibold">{proof.days}</span>
+                  <span className="ml-1 text-xs text-muted">days tracked</span>
+                </span>
+                <span className="text-up">
+                  <span className="text-base font-semibold">{proof.hit_rate.toFixed(0)}%</span>
+                  <span className="ml-1 text-xs text-muted">beat SPY</span>
+                </span>
+                <span className={proof.median_alpha >= 0 ? "text-up" : "text-down"}>
+                  <span className="text-base font-semibold">
+                    {proof.median_alpha >= 0 ? "+" : ""}{proof.median_alpha.toFixed(2)}%
+                  </span>
+                  <span className="ml-1 text-xs text-muted">median alpha</span>
+                </span>
+              </div>
+            </Link>
+          )}
 
           <ul className="mt-6 space-y-2 text-sm text-muted">
             <li className="flex items-start gap-2">
