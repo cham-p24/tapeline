@@ -96,6 +96,18 @@ class User(Base):
         DateTime(timezone=True), nullable=True,
     )
 
+    # Marketing-attribution UTM triplet captured at signup time. Distinct
+    # from `referral_source` above (self-reported during onboarding, often
+    # blank or "other"). The frontend's lib/utm.ts captures `?utm_*` on
+    # landing, stores in localStorage 30 days, and forwards on signup POST.
+    # Written once at signup, never updated. Indexed groupings live in the
+    # analytics dashboard, not SQL — so these aren't indexed at the DB level.
+    signup_utm_source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    signup_utm_medium: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    signup_utm_campaign: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    signup_utm_term: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    signup_utm_content: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

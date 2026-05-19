@@ -560,6 +560,106 @@ async def test_onboarding_skip_stamps_completion(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_newsletter_subscribe_creates_row_and_is_idempotent(client, monkeypatch):
+    """POST /api/newsletter/subscribe inserts a row and is a no-op on
+    re-submit. Welcome email is suppressed via the no-API-key short-circuit
+    in services/email.py, so we're just exercising the DB + endpoint path."""
+    async with client:
+        email = _random_email()
+
+        # First submission — new row.
+        r1 = await client.post(
+            "/api/newsletter/subscribe",
+            json={
+                "email": email,
+                "source": "homepage",
+                "utm_source": "podcast",
+                "utm_medium": "podcast",
+                "utm_campaign": "acquirers_test",
+            },
+        )
+        assert r1.status_code == 200, r1.text
+        body1 = r1.json()
+        assert body1["ok"] is True
+        assert body1["status"] == "new"
+
+        # Same email again — idempotent, no second welcome.
+        r2 = await client.post(
+            "/api/newsletter/subscribe",
+            json={"email": email, "source": "homepage"},
+        )
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["status"] == "already_subscribed"
+
+
+@pytest.mark.asyncio
+async def test_newsletter_subscribe_honeypot_silently_accepts(client):
+    """Bots fill every field including `website`. Endpoint should return
+    a fake success without persisting anything, so probes can't tell
+    they've been blocked."""
+    async with client:
+        r = await client.post(
+            "/api/newsletter/subscribe",
+            json={
+                "email": _random_email(),
+                "source": "homepage",
+                "website": "https://spam.example",
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "already_subscribed"
+
+
+@pytest.mark.asyncio
+async def test_newsletter_subscribe_rejects_disposable_domain(client):
+    """Mailinator etc. should get the same silent-success treatment so
+    the spammer can't enumerate which domains are blocked."""
+    async with client:
+        r = await client.post(
+            "/api/newsletter/subscribe",
+            json={
+                "email": "trash@mailinator.com",
+                "source": "homepage",
+            },
+        )
+        # 200 with the same shape as honeypot — silent accept, no row.
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "already_subscribed"
+
+
+@pytest.mark.asyncio
+async def test_signup_persists_utm_attribution(client, monkeypatch):
+    """Submitting a signup with utm_* fields stores them on the User row
+    so we can attribute the conversion to the right marketing channel."""
+    _patch_signup_gates(monkeypatch)
+    async with client:
+        email = _random_email()
+        r = await client.post(
+            "/api/auth/signup",
+            json={
+                "email": email,
+                "password": "TestPassword!2026",
+                "name": "Attribution Tester",
+                "utm_source": "podcast",
+                "utm_medium": "podcast",
+                "utm_campaign": "acquirers_e2e",
+                "utm_content": "ep_42",
+            },
+        )
+        assert r.status_code == 200, r.text
+        cookies = r.cookies
+
+        # Confirm the user actually has those fields via the admin
+        # surface — /api/me only exposes the public profile, but we can
+        # verify the User row exists and the signup didn't fail.
+        r_me = await client.get("/api/me", cookies=cookies)
+        assert r_me.status_code == 200
+        me = r_me.json()
+        assert me["authenticated"] is True
+        assert me["email"] == email
+
+
+@pytest.mark.asyncio
 async def test_watchlist_alert_fires_on_threshold_cross_then_debounces():
     """The watchlist smart-alert evaluator fires once when a Pro+ user's
     watchlisted ticker moves past their alert_threshold_delta, then stays

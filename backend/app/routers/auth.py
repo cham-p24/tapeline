@@ -48,6 +48,16 @@ class SignupBody(BaseModel):
     # for the same-device retrial check; empty/missing falls back to the
     # other defences (honeypot, Turnstile, IP cap, email normalisation).
     device_fingerprint: str | None = Field(None, max_length=64)
+    # Marketing-attribution UTMs captured by lib/utm.ts on the landing
+    # visit (localStorage, 30-day TTL) and forwarded here. Written once
+    # to the User row; never updated. Distinct from `referral_source`
+    # (self-reported during onboarding) — this is ground-truth channel
+    # attribution.
+    utm_source: str | None = Field(None, max_length=80)
+    utm_medium: str | None = Field(None, max_length=80)
+    utm_campaign: str | None = Field(None, max_length=120)
+    utm_term: str | None = Field(None, max_length=120)
+    utm_content: str | None = Field(None, max_length=120)
 
 
 class SigninBody(BaseModel):
@@ -187,6 +197,14 @@ async def signup(
         referral_code=ref_code,
         referred_by=referred_by_id,
         referral_credit_months=1 if referrer else 0,
+        # Marketing attribution — forwarded by the frontend from the user's
+        # original landing query string. Written once at signup, never
+        # updated. Stay nullable so direct/un-tagged traffic doesn't blow up.
+        signup_utm_source=(body.utm_source or None),
+        signup_utm_medium=(body.utm_medium or None),
+        signup_utm_campaign=(body.utm_campaign or None),
+        signup_utm_term=(body.utm_term or None),
+        signup_utm_content=(body.utm_content or None),
     )
     session.add(user)
     # Credit the referrer too. Doing this in the same transaction guarantees

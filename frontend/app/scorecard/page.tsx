@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { userLocale } from "@/lib/datetime";
@@ -308,6 +309,24 @@ export default function ScorecardPage() {
         <p className="mt-2 leading-relaxed">
           Tapeline operates from Melbourne, Australia under the publisher exemption from AFSL requirements. We do not hold an Australian Financial Services Licence. You should consider your own circumstances, read any relevant product disclosure documents, and obtain advice from a licensed adviser before making investment decisions.
         </p>
+      </div>
+      {/* Lead-magnet email capture — scorecard visitors are inherently
+          high-intent (they've come to verify the back-checked record).
+          Lower the friction to staying in touch by offering the daily
+          digest before they leave. */}
+      <div className="mt-8 rounded-lg border border-border bg-panel/40 p-6">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold text-fg">
+            Get tomorrow&rsquo;s Top 10 in your inbox
+          </h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted leading-relaxed">
+            One email each US market morning — the 10 highest-scoring tickers
+            from this same composite. No card, unsubscribe in one click.
+          </p>
+        </div>
+        <div className="mx-auto max-w-md">
+          <NewsletterCapture source="scorecard" heading="" sub="" />
+        </div>
       </div>
       </div>
       <MarketingFooter />

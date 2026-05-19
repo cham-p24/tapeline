@@ -5,6 +5,7 @@ from app.models.email_verification_token import EmailVerificationToken
 from app.models.holdings import InstitutionalHolding
 from app.models.insider_transaction import InsiderTransaction
 from app.models.news import NewsItem
+from app.models.newsletter import NewsletterSubscriber
 from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
 from app.models.scanner_preset import ScannerPreset
@@ -28,6 +29,7 @@ __all__ = [
     "InsiderTransaction",
     "InstitutionalHolding",
     "NewsItem",
+    "NewsletterSubscriber",
     "RegimeState",
     "RoadmapVote",
     "ScannerPreset",
