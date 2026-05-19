@@ -92,6 +92,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // Feature landing pages — public surfaces for the gated /app/* tools.
+    // High-intent keyword clusters: short squeeze, congress trades, insider
+    // buying, market heatmap, market regime. Each ranks for the cluster +
+    // converts to the matching tier via a tier-aware CTA.
+    { url: `${base}/short-squeeze-scanner`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/congressional-trades`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/insider-buying`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/stock-market-heatmap`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/market-regime`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/signup`,                    lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/contact`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
     // /signin removed from sitemap — auth pages shouldn't be in search
