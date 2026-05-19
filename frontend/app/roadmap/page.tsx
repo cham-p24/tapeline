@@ -49,7 +49,7 @@ export default function RoadmapPage() {
 
       <section className="mx-auto max-w-4xl px-6 py-12">
         <p className="eyebrow">Roadmap</p>
-        <h1 className="mt-3 text-5xl font-bold tracking-tight">What&rsquo;s shipping next.</h1>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What&rsquo;s shipping next.</h1>
         <p className="mt-4 text-lg text-muted">
           The things on our shortlist, ordered by what we&rsquo;re working on now.
           Premium subscribers can vote on order — counts update live.

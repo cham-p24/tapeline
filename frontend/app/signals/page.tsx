@@ -163,7 +163,7 @@ export default async function SignalsPage() {
 
       <section className="mx-auto max-w-6xl px-6 py-12">
         <p className="eyebrow">Public universe</p>
-        <h1 className="mt-3 text-5xl font-bold tracking-tight">
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Every ticker we score.
         </h1>
         <p className="mt-4 max-w-3xl text-lg text-muted">
