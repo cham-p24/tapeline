@@ -8,7 +8,15 @@ import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen">
+    // Page-wide atmospheric layer — very faint vertical accent gradient
+    // (~3-4% opacity) so the bluish tinge from the hero doesn't stop dead
+    // at the LiveCounters section. Combined with the section-anchored
+    // accent blobs further down (Why Tapeline + From the blog + FAQ), the
+    // whole page reads as one continuous canvas the way Stripe / Linear
+    // marketing reads. `relative` + `overflow-x-hidden` clip any wide
+    // blob halos that would otherwise create a horizontal scrollbar on
+    // narrow viewports.
+    <main className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-accent/[0.04] via-transparent to-accent/[0.03]">
       <MarketingNav />
 
       {/* HERO — single-purpose fold.
