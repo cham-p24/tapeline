@@ -408,7 +408,8 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                     "breadth_pct": 68.0,
                     "sector_leaders": "Tech, Healthcare, Industrials",
                 },
-                movers=sample_picks + [
+                movers=[
+                    *sample_picks,
                     {"symbol": "AMD", "score": 84, "signal": "STRONG SETUP",
                      "reason": "Momentum and RS both inflecting up"},
                     {"symbol": "PLTR", "score": 77, "signal": "STRONG SETUP",
