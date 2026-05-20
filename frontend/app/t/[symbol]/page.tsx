@@ -16,6 +16,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 import {
@@ -431,6 +432,25 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           Score updated live (sub-60s). Public formula. Public scorecard.
           Not investment advice — see <Link href="/legal/risk" className="text-accent hover:underline">risk disclosure</Link>.
         </p>
+
+        {/* Lead-magnet email capture — ticker pages are the heaviest SEO
+            entry point (search for "AAPL stock score" / "NVDA buy or
+            sell" lands here). Curious visitor with no account: capture
+            the email so the daily digest does the conversion work. */}
+        <div className="mt-12 rounded-lg border border-border bg-panel/30 p-6">
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-semibold text-fg">
+              See this ticker scored each market morning
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted leading-relaxed">
+              Get the Tapeline daily Top 10 in your inbox. One email, no card,
+              unsubscribe in one click.
+            </p>
+          </div>
+          <div className="mx-auto max-w-md">
+            <NewsletterCapture source="blog" heading="" sub="" />
+          </div>
+        </div>
       </section>
 
       <MarketingFooter />
