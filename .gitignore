@@ -75,3 +75,13 @@ test-results/
 # Worker caches
 backend/.cache/
 frontend/tsconfig.tsbuildinfo
+
+# Claude Code worktrees — local agent-managed branches, never tracked
+.claude/worktrees/
+
+# One-shot local deploy helpers — fly/gh CLI orchestration scripts the
+# founder uses interactively. Specific to a single deploy event; commit
+# them as docs only if they generalise.
+.deploy-*.bat
+.deploy-*.ps1
+.deploy-*.sh
