@@ -79,7 +79,7 @@ export default function LandingPage() {
       {/* LIVE COUNTERS — concrete numbers from /api/status, refreshed every 60s.
           Replaces vague "live" with specifics: how many tickers, how many
           news items, current regime, last tick. */}
-      <section className="bg-panel/20">
+      <section className="border-y border-border/60">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <LiveCounters />
         </div>

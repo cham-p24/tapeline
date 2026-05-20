@@ -93,7 +93,7 @@ export default function HowItWorksPage() {
             ))}
           </div>
 
-          <div className="mt-8 rounded-xl border border-border bg-background p-6">
+          <div className="mt-8 rounded-xl border border-border bg-panel p-6">
             <p className="text-xs uppercase tracking-wider text-subtle">The formula</p>
             <pre className="mt-3 overflow-x-auto text-sm text-muted nums leading-relaxed">
 {`score = 0.25 × trend
@@ -111,7 +111,7 @@ export default function HowItWorksPage() {
           </div>
 
           {/* Confidence band — explains the per-ticker confidence column */}
-          <div className="mt-6 rounded-xl border border-border bg-background p-6">
+          <div className="mt-6 rounded-xl border border-border bg-panel p-6">
             <p className="text-xs uppercase tracking-wider text-subtle">Per-ticker confidence</p>
             <h3 className="mt-2 text-lg font-semibold">Not every signal has the same evidence behind it.</h3>
             <p className="mt-3 text-sm text-muted leading-relaxed">
@@ -146,7 +146,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Signals */}
-      <section className="bg-panel/20">
+      <section className="border-t border-border/60">
         <div className="section py-14 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Signal labels</p>
@@ -173,7 +173,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* FAQ — visible content that mirrors HOW_FAQ JSON-LD above. */}
-      <section className="bg-panel/20">
+      <section className="border-t border-border/60">
         <div className="section py-16">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Common questions</p>
