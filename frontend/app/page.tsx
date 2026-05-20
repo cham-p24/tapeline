@@ -99,7 +99,7 @@ export default function LandingPage() {
         >
           <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
         <p className="eyebrow text-accent">Why Tapeline</p>
         <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           Three things every other scanner won&rsquo;t do.
@@ -162,7 +162,7 @@ export default function LandingPage() {
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
           because each step is sequential and self-contained. */}
       <section className="bg-panel/10">
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
           <p className="eyebrow text-accent">How it works</p>
           <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
             From data to decision in one glance.
@@ -214,7 +214,7 @@ export default function LandingPage() {
         >
           <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
             How the score works, on the record.
@@ -274,7 +274,7 @@ export default function LandingPage() {
         >
           <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
         </div>
-        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-20">
+        <div className="mx-auto max-w-3xl px-6 py-8 sm:py-12">
         <p className="eyebrow text-accent">Common questions</p>
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
           Things people ask before signing up.
@@ -340,7 +340,7 @@ export default function LandingPage() {
           continuous canvas now; the old `from-panel/20 to-transparent`
           here created a visible seam against the FAQ above. */}
       <section>
-        <div className="mx-auto max-w-3xl px-6 py-10 sm:py-14 text-center">
+        <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />
             <span className="text-accent">One public record.</span>
@@ -371,7 +371,7 @@ export default function LandingPage() {
           Placed before the footer so it's the last thing the eye sees on
           the way out, not competing with the primary trial CTA above. */}
       <section className="border-t border-border bg-panel/30">
-        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-14">
+        <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
           <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
               Free · no card

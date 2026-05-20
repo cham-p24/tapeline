@@ -64,7 +64,7 @@ export default function StatusPage() {
     : { label: "Checking…", tone: "bg-muted/10 border-border text-muted" };
 
   return (
-    <main className="min-h-screen px-6 py-16">
+    <main className="min-h-screen px-6 py-10">
       <div className="mx-auto max-w-3xl">
         <div className="text-xs uppercase tracking-wider text-subtle">Tapeline</div>
         <h1 className="mt-2 text-4xl font-bold tracking-tight">System status</h1>
