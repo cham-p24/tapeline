@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { authApi } from "@/lib/auth";
 import { OAuthButtons } from "@/components/OAuthButtons";
+import { useUser } from "@/components/UserContext";
 
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
 export default function SignInPage() {
@@ -20,6 +21,23 @@ function SignInForm() {
   const qp = useSearchParams();
   const next = qp.get("next") || "/app/scanner";
 
+  const { user, loading: userLoading, refresh } = useUser();
+
+  // 2026-05-20 — Back-button sign-out bug fix (part 2 of 2; the
+  // UserContext side is the other half).
+  //
+  // If the user is already signed in (cookie still valid) and they land
+  // on /signin — e.g. by hitting Back after signing in — bounce them to
+  // `next` so they don't see the signin form acting as if they're
+  // signed out. Without this redirect, the user could re-submit the
+  // form and either get "already signed in" 4xx (bad UX) or end up with
+  // stale session state.
+  useEffect(() => {
+    if (!userLoading && user) {
+      router.replace(next);
+    }
+  }, [user, userLoading, next, router]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -31,6 +49,12 @@ function SignInForm() {
     setBusy(true);
     try {
       await authApi.signin(email, password);
+      // Push the new session into UserContext BEFORE navigating, so
+      // when the destination page mounts (and any back-navigation later)
+      // the user state is already correct. Without this, the destination
+      // briefly renders signed-out, then flips when the context's own
+      // refresh resolves.
+      await refresh();
       router.push(next);
       router.refresh();
     } catch (e: any) {
