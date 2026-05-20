@@ -70,25 +70,25 @@ export default function RegimePage() {
                   />
                 </div>
                 <p className="mt-4 text-[11px] text-subtle text-center leading-relaxed">
-                  Composite of VIX ({r.fear_greed.components.vix.score.toFixed(0)}),
-                  breadth ({r.fear_greed.components.breadth.score.toFixed(0)}),
-                  regime ({r.fear_greed.components.regime.score.toFixed(0)}),
-                  and 5-day SPY momentum ({r.fear_greed.components.spy_5d.score.toFixed(0)}).
+                  Composite of VIX ({fmtScore(r.fear_greed.components.vix.score)}),
+                  breadth ({fmtScore(r.fear_greed.components.breadth.score)}),
+                  regime ({fmtScore(r.fear_greed.components.regime.score)}),
+                  and 5-day SPY momentum ({fmtScore(r.fear_greed.components.spy_5d.score)}).
                 </p>
               </div>
             )}
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Kpi label="VIX" value={r.vix.toFixed(2)} />
+            <Kpi label="VIX" value={fmtKpi(r.vix, 2)} />
             {/* FRED series DTWEXBGS — broad trade-weighted USD index, not
                 ICE DXY. Reads ~115-125 right now; ICE DXY (the futures
                 contract most traders watch) is ~100-110. Label kept honest
                 to the source. */}
-            <Kpi label="USD Broad Index" value={r.dxy.toFixed(2)} />
-            <Kpi label="10Y Yield" value={r.yield_10y.toFixed(3) + "%"} />
+            <Kpi label="USD Broad Index" value={fmtKpi(r.dxy, 2)} />
+            <Kpi label="10Y Yield" value={fmtKpi(r.yield_10y, 3, "%")} />
             <Kpi label="Rate direction" value={r.rate_direction} />
-            <Kpi label="Breadth (above 200DMA)" value={r.breadth_pct.toFixed(1) + "%"} />
+            <Kpi label="Breadth (above 200DMA)" value={fmtKpi(r.breadth_pct, 1, "%")} />
             <Kpi label="Sector leaders" value={r.sector_leaders} small />
           </div>
         </>
@@ -104,4 +104,18 @@ function Kpi({ label, value, small }: { label: string; value: string; small?: bo
       <div className={`mt-1 font-semibold nums ${small ? "text-base" : "text-2xl"}`}>{value}</div>
     </div>
   );
+}
+
+// Defensive number formatters — the regime API types these as `number` but
+// FRED / vendor feeds occasionally hand back null between refreshes (the
+// 2026-05-20 Sentry crash TAPELINE-BACKEND-6 was exactly this — null.toFixed
+// in production). Treat null as the em-dash placeholder rather than letting
+// the whole page error-boundary out.
+function fmtKpi(v: number | null | undefined, digits: number, suffix = ""): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toFixed(digits) + suffix;
+}
+function fmtScore(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toFixed(0);
 }

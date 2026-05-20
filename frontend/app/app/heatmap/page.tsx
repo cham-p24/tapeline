@@ -116,16 +116,23 @@ export default function HeatmapPage() {
             </div>
             <div className="flex flex-wrap gap-1">
               {s.tickers.map((t) => {
+                // Backend occasionally returns null change_pct_1d for an illiquid
+                // ticker between price ticks (TS type is non-nullable but the
+                // wire shape lies — Sentry TAPELINE-BACKEND-6 surfaced this as
+                // "Cannot read properties of null (reading 'toFixed')" on
+                // 2026-05-20). Treat null as 0% for layout/colour purposes and
+                // render an em-dash in the label.
+                const change = t.change_pct_1d ?? 0;
                 const size =
                   (t.volume || 0) > 30_000_000 ? "min-w-[110px] py-4"
                   : (t.volume || 0) > 10_000_000 ? "min-w-[95px] py-3"
                   : (t.volume || 0) > 3_000_000 ? "min-w-[82px] py-2.5"
                   : "min-w-[70px] py-2";
                 const bg =
-                  t.change_pct_1d > 2 ? "bg-up/40"
-                  : t.change_pct_1d > 0.5 ? "bg-up/20"
-                  : t.change_pct_1d > -0.5 ? "bg-panel"
-                  : t.change_pct_1d > -2 ? "bg-down/20"
+                  change > 2 ? "bg-up/40"
+                  : change > 0.5 ? "bg-up/20"
+                  : change > -0.5 ? "bg-panel"
+                  : change > -2 ? "bg-down/20"
                   : "bg-down/40";
                 return (
                   <Link
@@ -134,8 +141,8 @@ export default function HeatmapPage() {
                     className={`${size} ${bg} flex flex-col items-center rounded-md px-2 text-center transition hover:ring-1 hover:ring-accent`}
                   >
                     <span className="font-mono text-sm font-bold">{t.symbol}</span>
-                    <span className={`nums text-xs ${t.change_pct_1d > 0 ? "text-up" : t.change_pct_1d < 0 ? "text-down" : "text-muted"}`}>
-                      {t.change_pct_1d >= 0 ? "+" : ""}{t.change_pct_1d.toFixed(2)}%
+                    <span className={`nums text-xs ${change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted"}`}>
+                      {t.change_pct_1d == null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`}
                     </span>
                   </Link>
                 );
