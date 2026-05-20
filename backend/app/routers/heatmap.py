@@ -42,7 +42,20 @@ async def get_heatmap(
 ) -> dict:
     if not has_feature(Tier(user.tier), "heatmap"):
         raise HTTPException(403, "Heatmap is a Pro feature")
-    result = await session.execute(select(Ticker).where(Ticker.score.isnot(None)))
+    # 2026-05-20 data-quality filter — only include tickers that have
+    # *both* a 1-day change AND a volume number from the live feed.
+    # The previous query included anything with a non-null score, which
+    # surfaced obscure tickers (WLY, VRE, ZGN, etc.) whose price feed
+    # hasn't refreshed; those tiles rendered "—" instead of a percentage
+    # and made the heatmap feel broken. Filtering at the DB level is
+    # cheaper than letting the frontend skip them.
+    result = await session.execute(
+        select(Ticker).where(
+            Ticker.score.isnot(None),
+            Ticker.change_pct_1d.isnot(None),
+            Ticker.volume.isnot(None),
+        )
+    )
     tickers = result.scalars().all()
 
     # Server-side symbol filter — cheaper than shipping all 1,700 tiles to the

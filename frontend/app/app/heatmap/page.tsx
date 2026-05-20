@@ -81,6 +81,20 @@ export default function HeatmapPage() {
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
+      {/* Inline colour-scale legend — mirrors the CMC / Finviz heatmap
+          conventions so a first-time visitor can read the tiles without
+          guessing what the shade means. */}
+      <div className="mt-3 flex items-center gap-1.5 text-[10px] text-muted">
+        <span className="mr-1 uppercase tracking-wider">Move</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--down) / 0.55)" }}>&lt;-3%</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--down) / 0.32)" }}>-3 to -1</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--down) / 0.15)" }}>-1 to 0</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--panel))" }}>flat</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--up) / 0.15)" }}>0 to 1</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--up) / 0.32)" }}>1 to 3</span>
+        <span className="rounded px-1.5 py-0.5 font-mono" style={{ backgroundColor: "rgb(var(--up) / 0.55)" }}>&gt;+3%</span>
+      </div>
+
       <Paywall feature="heatmap" title="Market Heatmap">
       {/* Filter bar — sticky so it stays visible as the user scrolls the heatmap */}
       <div className="sticky top-0 z-10 mt-4 -mx-4 border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
@@ -154,35 +168,65 @@ export default function HeatmapPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{s.sector}</h2>
               <span className="text-xs text-muted">{s.tickers.length} {s.tickers.length === 1 ? "ticker" : "tickers"}</span>
             </div>
-            <div className="flex flex-wrap gap-1">
+            {/* CMC-style tile grid (founder feedback 2026-05-20: "I like the
+                heat map on CMC market"). Three changes from the prior tile:
+                  1. Tighter spacing (gap-0.5 instead of gap-1) so tiles
+                     read as a unified treemap, not scattered cards.
+                  2. Five-step colour gradient (strong red / red / neutral /
+                     green / strong green) instead of two-step up/down,
+                     so the colour itself communicates magnitude — like
+                     finviz/CMC.
+                  3. Both ticker symbol AND % on the same line for small
+                     tiles (saves vertical space, matches treemap density).
+                Backend filters tickers with null change_pct_1d / volume
+                (heatmap.py 2026-05-20), so every visible tile is guaranteed
+                to have real values — no more em-dash placeholders. */}
+            <div className="flex flex-wrap gap-0.5">
               {s.tickers.map((t) => {
-                // Backend occasionally returns null change_pct_1d for an illiquid
-                // ticker between price ticks (TS type is non-nullable but the
-                // wire shape lies — Sentry TAPELINE-BACKEND-6 surfaced this as
-                // "Cannot read properties of null (reading 'toFixed')" on
-                // 2026-05-20). Treat null as 0% for layout/colour purposes and
-                // render an em-dash in the label.
                 const change = t.change_pct_1d ?? 0;
+                const vol = t.volume || 0;
                 const size =
-                  (t.volume || 0) > 30_000_000 ? "min-w-[110px] py-4"
-                  : (t.volume || 0) > 10_000_000 ? "min-w-[95px] py-3"
-                  : (t.volume || 0) > 3_000_000 ? "min-w-[82px] py-2.5"
-                  : "min-w-[70px] py-2";
-                const bg =
-                  change > 2 ? "bg-up/40"
-                  : change > 0.5 ? "bg-up/20"
-                  : change > -0.5 ? "bg-panel"
-                  : change > -2 ? "bg-down/20"
-                  : "bg-down/40";
+                  vol > 30_000_000 ? "min-w-[120px] py-4"
+                  : vol > 10_000_000 ? "min-w-[100px] py-3"
+                  : vol > 3_000_000 ? "min-w-[84px] py-2.5"
+                  : "min-w-[72px] py-2";
+                // Five-step colour ladder. Inline RGB values (rather than
+                // bg-up/40 tokens) so the gradient reads continuously from
+                // strong red through neutral grey to strong green.
+                let bgStyle: React.CSSProperties = {};
+                if (change > 3) {
+                  bgStyle = { backgroundColor: "rgb(var(--up) / 0.55)" };
+                } else if (change > 1) {
+                  bgStyle = { backgroundColor: "rgb(var(--up) / 0.32)" };
+                } else if (change > 0.1) {
+                  bgStyle = { backgroundColor: "rgb(var(--up) / 0.15)" };
+                } else if (change > -0.1) {
+                  bgStyle = { backgroundColor: "rgb(var(--panel))" };
+                } else if (change > -1) {
+                  bgStyle = { backgroundColor: "rgb(var(--down) / 0.15)" };
+                } else if (change > -3) {
+                  bgStyle = { backgroundColor: "rgb(var(--down) / 0.32)" };
+                } else {
+                  bgStyle = { backgroundColor: "rgb(var(--down) / 0.55)" };
+                }
+                // High-contrast text on strong-tinted tiles, muted on
+                // neutral-tinted. Keeps the symbol legible regardless of
+                // whether the background went deep red or pale green.
+                const strong = Math.abs(change) > 1;
+                const textCls = strong
+                  ? change > 0 ? "text-up" : "text-down"
+                  : "text-fg";
                 return (
                   <Link
                     key={t.symbol}
                     href={`/app/ticker/${t.symbol}`}
-                    className={`${size} ${bg} flex flex-col items-center rounded-md px-2 text-center transition hover:ring-1 hover:ring-accent`}
+                    style={bgStyle}
+                    title={`${t.symbol} · ${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${vol.toLocaleString()} vol`}
+                    className={`${size} flex flex-col items-center justify-center rounded-md px-2 text-center transition hover:ring-2 hover:ring-accent hover:ring-offset-1 hover:ring-offset-background`}
                   >
-                    <span className="font-mono text-sm font-bold">{t.symbol}</span>
-                    <span className={`nums text-xs ${change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted"}`}>
-                      {t.change_pct_1d == null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`}
+                    <span className="font-mono text-sm font-bold leading-tight">{t.symbol}</span>
+                    <span className={`nums text-[11px] font-semibold leading-tight ${textCls}`}>
+                      {change >= 0 ? "+" : ""}{change.toFixed(2)}%
                     </span>
                   </Link>
                 );
