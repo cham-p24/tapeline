@@ -86,10 +86,10 @@ const SECTIONS: Section[] = [
 export function ComparisonTable() {
   return (
     // Constrain to max-w-5xl + center so the table doesn't stretch the
-    // full viewport on wide monitors. Outer card gets a stronger border +
-    // shadow than the prior translucent-only card so the table reads as
-    // a distinct element on the page.
-    <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_3px_rgb(var(--shadow))]">
+    // full viewport on wide monitors. Outer surface uses `bg-panel` so
+    // the atmospheric layer underneath shows through — `bg-surface` was
+    // rendering as a stark white island against the blue tint.
+    <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-border bg-panel shadow-[0_1px_3px_rgb(var(--shadow))]">
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
           {/* Explicit column widths so the FEATURE column doesn't greedily
