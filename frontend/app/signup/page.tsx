@@ -7,6 +7,7 @@ import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
 import { api } from "@/lib/api";
 import { authApi } from "@/lib/auth";
+import { getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -143,11 +144,17 @@ function SignUpForm() {
     try {
       const { deviceFingerprint } = await import("@/lib/fingerprint");
       const device_fp = await deviceFingerprint();
+      // First-touch UTM attribution. lib/utm.ts persisted these on the
+      // landing visit with a 30-day TTL; we forward whatever's stored so
+      // the User row carries the channel that originally brought them in
+      // (not whatever URL they happened to be on at submit time).
+      const utm = getStoredUtm();
       await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: token || undefined,
         device_fingerprint: device_fp || undefined,
         ref: refCode || undefined,
+        ...utm,
       });
       // Funnel events: signup landed cleanly. Trial auto-starts on signup
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the

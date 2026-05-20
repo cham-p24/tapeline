@@ -25,6 +25,7 @@ from app.routers import (
     internal,
     me,
     news,
+    newsletter,
     oauth,
     regime,
     roadmap,
@@ -429,6 +430,7 @@ app.include_router(ticker.router, prefix="/api/ticker", tags=["ticker"])
 app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
 app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"])
 app.include_router(news.router, prefix="/api/news", tags=["news"])
+app.include_router(newsletter.router, prefix="/api/newsletter", tags=["newsletter"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
 app.include_router(contact.router, prefix="/api/contact", tags=["contact"])

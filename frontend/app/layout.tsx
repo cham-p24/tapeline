@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
+import { UtmCapture } from "@/components/UtmCapture";
 import { PostHogProvider } from "@/components/PostHogProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -322,6 +323,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PostHogProvider>{children}</PostHogProvider>
           </UserProvider>
         </ThemeProvider>
+        {/* First-touch UTM capture — runs once per page-load and writes
+            ?utm_* query params to localStorage with a 30-day TTL. The
+            signup page + newsletter capture component both read this
+            back on submit so we attribute revenue to the original
+            paid-channel landing, not the eventual direct-return signup. */}
+        <UtmCapture />
         {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
             config needed — auto-detects when deployed on Vercel and is a
             no-op in local dev. Page-view + custom-event tracking +

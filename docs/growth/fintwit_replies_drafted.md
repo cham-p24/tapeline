@@ -151,3 +151,32 @@ the tweets fall off the algorithm.
 - `@TSOH_Investing` — verified-active (daily posts, weekly roundup cadence)
 - `@JohnHuber72` — verified-active (multiple posts within last week)
 - `@alluvialcapital` — **verified-inactive** since Nov 2023 (update CSV)
+
+## UTM tagging — if/when a reply includes a tapeline.io link
+
+Round-1 replies are intentionally text-only (no link, no promo). If a
+follow-up reply naturally includes a link to e.g. a specific ticker
+page or the scorecard, tag it with:
+
+```
+https://tapeline.io/scorecard?utm_source=x&utm_medium=reply&utm_campaign=<handle>_<date>
+https://tapeline.io/t/<SYMBOL>?utm_source=x&utm_medium=reply&utm_campaign=<handle>_<date>
+```
+
+Examples for this batch:
+
+- @JohnHuber72 follow-up linking to a semi:
+  `tapeline.io/t/NVDA?utm_source=x&utm_medium=reply&utm_campaign=johnhuber72_20260517`
+- @TSOH_Investing follow-up linking to ABNB or BKNG:
+  `tapeline.io/t/ABNB?utm_source=x&utm_medium=reply&utm_campaign=tsoh_20260517`
+- @HaydenCapital follow-up linking to $APP:
+  `tapeline.io/t/APP?utm_source=x&utm_medium=reply&utm_campaign=haydencapital_20260517`
+
+The frontend's `UtmCapture` component persists this to localStorage so
+if the curious viewer signs up days later (after coming back direct),
+the User row still attributes to the right fintwit reply.
+
+Why text-only is the default: a link in the reply triggers Twitter's
+spam-detection signals (and looks promotional). Replies without links
+get higher organic reach; the UTM only matters when the value of
+sending traffic to a specific URL outweighs the reach hit.

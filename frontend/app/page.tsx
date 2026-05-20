@@ -4,6 +4,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { LiveCounters } from "@/components/LiveCounters";
 import { FadeIn } from "@/components/FadeIn";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
@@ -360,6 +361,32 @@ export default function LandingPage() {
             No credit card &middot; Cancel in one click &middot; 7-day refund
             on monthly
           </p>
+        </div>
+      </section>
+
+      {/* Newsletter lead-magnet — second-chance email capture for visitors
+          who scrolled past the trial CTAs. Lower commitment than /signup
+          (no card, no account). Once they're in the list, the daily Top 10
+          send + the in-email Premium CTA do the eventual conversion lift.
+          Placed before the footer so it's the last thing the eye sees on
+          the way out, not competing with the primary trial CTA above. */}
+      <section className="border-t border-border bg-panel/30">
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-14">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
+              Free · no card
+            </div>
+            <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
+              Not ready for a trial?
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-muted text-sm sm:text-base leading-relaxed">
+              Get the daily Top 10 picks in your inbox each market morning.
+              One email, one minute, no card. Unsubscribe in one click.
+            </p>
+          </div>
+          <div className="mx-auto max-w-md">
+            <NewsletterCapture source="homepage" heading="" sub="" />
+          </div>
         </div>
       </section>
 

@@ -7,6 +7,7 @@ from app.routers import (
     heatmap,
     me,
     news,
+    newsletter,
     regime,
     scanner,
     scorecard,
@@ -19,6 +20,6 @@ from app.routers import (
 
 __all__ = [
     "alerts", "billing", "briefing", "congress", "heatmap", "me", "news",
-    "regime", "scanner", "scorecard", "squeeze", "stream", "ticker",
-    "watchlist", "webhooks",
+    "newsletter", "regime", "scanner", "scorecard", "squeeze", "stream",
+    "ticker", "watchlist", "webhooks",
 ]
