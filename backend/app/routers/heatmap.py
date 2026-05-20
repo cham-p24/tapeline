@@ -42,18 +42,32 @@ async def get_heatmap(
 ) -> dict:
     if not has_feature(Tier(user.tier), "heatmap"):
         raise HTTPException(403, "Heatmap is a Pro feature")
-    # 2026-05-20 data-quality filter — only include tickers that have
-    # *both* a 1-day change AND a volume number from the live feed.
-    # The previous query included anything with a non-null score, which
-    # surfaced obscure tickers (WLY, VRE, ZGN, etc.) whose price feed
-    # hasn't refreshed; those tiles rendered "—" instead of a percentage
-    # and made the heatmap feel broken. Filtering at the DB level is
-    # cheaper than letting the frontend skip them.
+    # 2026-05-21 universe scoping — match competitor heatmap posture.
+    #
+    # Finviz Map ships ~500 (S&P 500), TradingView Heatmap ships per-market
+    # (~500 each), CoinMarketCap ships top 100. None of them try to render
+    # all 3,000+ instruments — because at that scale, the long-tail
+    # micro-caps don't get refreshed often enough by any consumer-grade
+    # price feed (we use Massive/Polygon Starter), so most tiles render
+    # "+0.00%" and make the heatmap feel broken.
+    #
+    # The Tapeline universe is sourced from the signal-system Google Sheet
+    # at ~3,000 rows — that's the right scoring universe but the wrong
+    # display universe for a heatmap. Filter to three thresholds:
+    #   1. score IS NOT NULL — the ticker has been scored at all
+    #   2. change_pct_1d IS NOT NULL — the price feed has it
+    #   3. volume IS NOT NULL AND > 100,000 — actually-liquid
+    # 100K shares/day is the floor below which a tile would mislead a
+    # retail user into thinking they can trade size at the displayed
+    # change. (Real institutions use higher thresholds — 1M+ — but we're
+    # serving retail.)
+    LIQUIDITY_FLOOR = 100_000
     result = await session.execute(
         select(Ticker).where(
             Ticker.score.isnot(None),
             Ticker.change_pct_1d.isnot(None),
             Ticker.volume.isnot(None),
+            Ticker.volume > LIQUIDITY_FLOOR,
         )
     )
     tickers = result.scalars().all()
