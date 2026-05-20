@@ -224,3 +224,246 @@ async def _send_welcome(*, email: str, token: str) -> None:
         text=text,
         persona="sales",
     )
+
+
+# ---------------------------------------------------------------------------
+# Daily Top 10 digest send
+# ---------------------------------------------------------------------------
+#
+# Triggered by the worker once per US market day. Pulls the current top-10
+# tickers by composite score and sends each confirmed newsletter
+# subscriber a single email containing the picks, a one-sentence read on
+# each, and an upgrade-to-Pro CTA tagged with today's date so we can
+# attribute conversions back to a specific edition.
+#
+# Dedupe: process-token guards against worker restarts firing the digest
+# twice within a UTC day, and per-row `last_sent_at` is the DB-of-record
+# (set after send succeeds) so the digest is idempotent across deploys.
+
+
+async def run_daily_digest(
+    session: AsyncSession,
+    *,
+    now: datetime | None = None,
+) -> int:
+    """Send the Daily Top 10 to every confirmed subscriber.
+
+    Returns the number of emails actually sent (skipped re-sends and
+    Resend-skipped no-op responses are not counted).
+
+    A subscriber receives at most one digest per UTC date — enforced by
+    comparing `last_sent_at::date` to today. Worker restarts mid-day
+    therefore replay safely. If `send_email` returns `{"skipped": True}`
+    (no API key configured), we do NOT bump `last_sent_at` so the next
+    real run will retry the same subscriber.
+    """
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    from sqlalchemy import or_, select
+
+    now = now or _dt.now(UTC)
+    today = now.date()
+
+    # Pull the top 10 from the Ticker table. Excluding ETFs etc. is left
+    # to the marketing-clear rendering layer below; the SELECT keeps it
+    # simple so we never accidentally exclude something legitimate.
+    from sqlalchemy import desc
+
+    from app.models import Ticker
+
+    top_q = await session.execute(
+        select(
+            Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal,
+            Ticker.reason, Ticker.price, Ticker.change_pct_1d,
+        )
+        .where(Ticker.score.is_not(None))
+        .order_by(desc(Ticker.score))
+        .limit(10)
+    )
+    picks = [
+        {
+            "symbol": symbol,
+            "name": name or symbol,
+            "score": score,
+            "signal": signal,
+            "reason": reason,
+            "price": price,
+            "change_pct_1d": change_pct_1d,
+        }
+        for (symbol, name, score, signal, reason, price, change_pct_1d) in top_q.all()
+    ]
+
+    if not picks:
+        logger.warning("newsletter.digest_skipped reason=no_picks")
+        return 0
+
+    # Subscribers who are confirmed AND have either never been sent today
+    # or last sent before today. last_sent_at is a UTC timestamp; today's
+    # boundary is the UTC midnight before `now`.
+    midnight_utc = datetime.combine(today, datetime.min.time(), tzinfo=UTC)
+    sub_q = await session.execute(
+        select(NewsletterSubscriber).where(
+            NewsletterSubscriber.status == "confirmed",
+            or_(
+                NewsletterSubscriber.last_sent_at.is_(None),
+                NewsletterSubscriber.last_sent_at < midnight_utc,
+            ),
+        )
+    )
+    subscribers = sub_q.scalars().all()
+
+    if not subscribers:
+        logger.info("newsletter.digest_no_eligible_subscribers")
+        return 0
+
+    date_label = today.strftime("%b %d, %Y")
+    campaign_tag = f"daily_{today.strftime('%Y%m%d')}"
+    sent = 0
+    any_commits = False
+
+    for sub in subscribers:
+        try:
+            html, text = _render_daily_digest(
+                picks=picks,
+                date_label=date_label,
+                campaign_tag=campaign_tag,
+                unsubscribe_token=sub.unsubscribe_token,
+            )
+            res = await send_email(
+                to=sub.email,
+                subject=f"Tapeline Top 10 · {date_label}",
+                html=html,
+                text=text,
+                persona="sales",
+            )
+            if not res.get("skipped", False):
+                sub.last_sent_at = now
+                sent += 1
+                any_commits = True
+        except Exception:
+            logger.exception("newsletter.digest_send_failed email=%s", sub.email)
+
+    if any_commits:
+        await session.commit()
+
+    logger.info(
+        "newsletter.digest_sent count=%d eligible=%d picks=%d date=%s",
+        sent, len(subscribers), len(picks), date_label,
+    )
+    return sent
+
+
+def _render_daily_digest(
+    *,
+    picks: list[dict],
+    date_label: str,
+    campaign_tag: str,
+    unsubscribe_token: str,
+) -> tuple[str, str]:
+    """Build the (html, text) pair for the daily Top 10 email.
+
+    Each link is tagged with the per-edition `campaign_tag` so GA4 can
+    attribute conversions to a specific day's send. The Pro upgrade CTA
+    is the primary monetisation lever — every reader hits it whether or
+    not they click any individual ticker.
+    """
+    base = settings.app_url or "https://tapeline.io"
+    unsub_url = f"{base}/api/newsletter/unsubscribe?token={unsubscribe_token}"
+
+    def utm(path: str) -> str:
+        return (
+            f"{base}{path}"
+            f"?utm_source=newsletter&utm_medium=email&utm_campaign={campaign_tag}"
+        )
+
+    scorecard_url = utm("/scorecard")
+    pricing_url = utm("/pricing")
+
+    # HTML table rows for the picks
+    rows_html: list[str] = []
+    for i, p in enumerate(picks, start=1):
+        ticker_url = utm(f"/t/{p['symbol']}")
+        score_str = f"{int(p['score'])}" if p["score"] is not None else "—"
+        signal = (p["signal"] or "").upper()
+        reason = (p["reason"] or "").strip()
+        # Hard-cap the reason so a single row doesn't blow the email height
+        if len(reason) > 140:
+            reason = reason[:137].rstrip() + "…"
+        rows_html.append(f"""
+          <tr>
+            <td style="padding:14px 8px 14px 0;border-bottom:1px solid #1f1f23;width:32px;color:#6b7280;font-size:12px;vertical-align:top;">#{i}</td>
+            <td style="padding:14px 8px;border-bottom:1px solid #1f1f23;vertical-align:top;">
+              <a href="{ticker_url}" style="color:#fb923c;text-decoration:none;font-weight:600;font-size:15px;">${p['symbol']}</a>
+              <div style="color:#9ca3af;font-size:12px;margin-top:2px;">{(p['name'] or p['symbol'])[:40]}</div>
+            </td>
+            <td style="padding:14px 8px;border-bottom:1px solid #1f1f23;text-align:right;vertical-align:top;">
+              <div style="color:#f4f4f5;font-weight:600;font-size:18px;font-family:'JetBrains Mono',monospace;">{score_str}</div>
+              <div style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">{signal}</div>
+            </td>
+            <td style="padding:14px 0 14px 8px;border-bottom:1px solid #1f1f23;vertical-align:top;color:#d4d4d8;font-size:13px;line-height:1.45;">{reason or '—'}</td>
+          </tr>""")
+
+    html = f"""<!doctype html><html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;margin:0;">
+  <div style="max-width:640px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Tapeline · Daily Top 10</div>
+        <h1 style="margin:6px 0 0;font-size:22px;font-weight:600;">{date_label}</h1>
+      </div>
+      <a href="{scorecard_url}" style="color:#fb923c;font-size:13px;text-decoration:none;">Full scorecard →</a>
+    </div>
+    <p style="margin:0 0 20px;color:#9ca3af;font-size:13px;line-height:1.55;">
+      The 10 highest-scoring US tickers from the public 6-factor composite,
+      pre-open. Score is 0–100, blended from trend / RS / fundamentals /
+      smart-money / macro / momentum at <a href="{utm('/how-it-works')}" style="color:#fb923c;">published weights</a>.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="padding:8px 0;text-align:left;color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">#</th>
+          <th style="padding:8px 0;text-align:left;color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Ticker</th>
+          <th style="padding:8px 0;text-align:right;color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Score</th>
+          <th style="padding:8px 0 8px 8px;text-align:left;color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:500;">Read</th>
+        </tr>
+      </thead>
+      <tbody>{''.join(rows_html)}</tbody>
+    </table>
+
+    <div style="margin:28px 0;padding:20px;background:#0a0a0a;border:1px solid #27272a;border-radius:8px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#fb923c;margin-bottom:8px;">Live, sub-60s scoring on every US ticker</div>
+      <div style="font-size:15px;font-weight:600;color:#f4f4f5;line-height:1.45;">
+        See your watchlist scored the same way. Set alerts when one of these
+        composites crosses your threshold.
+      </div>
+      <a href="{pricing_url}" style="display:inline-block;background:#fb923c;color:#0a0a0a;padding:11px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:14px;font-size:14px;">Start 14-day Premium trial — no card →</a>
+      <div style="color:#6b7280;font-size:11px;margin-top:8px;">Free for 14 days · Cancel in one click · 7-day refund</div>
+    </div>
+
+    <p style="margin:28px 0 0;padding-top:16px;border-top:1px solid #1f1f23;color:#6b7280;font-size:11px;line-height:1.55;">
+      Tapeline scores every US-listed ticker from a publicly documented 6-factor formula.
+      Composite labels (HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK)
+      are descriptive readings of the score, not buy/sell recommendations.
+      Tapeline operates under the publisher exemption from AFSL requirements; we do not hold
+      an Australian Financial Services Licence. Not investment advice. Past performance does
+      not guarantee future results.
+      <br><br>
+      You received this because you subscribed to the Tapeline daily Top 10 on tapeline.io.
+      <a href="{unsub_url}" style="color:#6b7280;">Unsubscribe</a>.
+    </p>
+  </div></body></html>"""
+
+    # Plain-text fallback for clients that block HTML
+    text_rows = "\n".join(
+        f"  #{i:2d}  ${p['symbol']:<6} {int(p['score']) if p['score'] else 0:>3}  "
+        f"{(p['signal'] or '').upper():<16}  {(p['reason'] or '')[:80]}"
+        for i, p in enumerate(picks, start=1)
+    )
+    text = (
+        f"Tapeline Daily Top 10 — {date_label}\n\n"
+        f"{text_rows}\n\n"
+        f"Full scorecard: {scorecard_url}\n"
+        f"Start your 14-day Premium trial (no card): {pricing_url}\n\n"
+        "Not investment advice. Unsubscribe: " + unsub_url + "\n"
+    )
+    return html, text
