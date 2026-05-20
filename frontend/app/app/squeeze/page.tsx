@@ -69,11 +69,11 @@ export default function SqueezePage() {
             {rows.map((r) => (
               <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">{r.symbol}</td>
-                <td className={`px-4 py-2 text-right ${r.spike_score >= 75 ? "text-up font-semibold" : ""}`}>
-                  {r.spike_score.toFixed(1)}
+                <td className={`px-4 py-2 text-right ${(r.spike_score ?? 0) >= 75 ? "text-up font-semibold" : ""}`}>
+                  {r.spike_score != null ? r.spike_score.toFixed(1) : "—"}
                 </td>
                 <td className="px-4 py-2 text-right">{r.squeeze_days}d</td>
-                <td className="px-4 py-2 text-right">{r.volume_multiple.toFixed(2)}x</td>
+                <td className="px-4 py-2 text-right">{r.volume_multiple != null ? `${r.volume_multiple.toFixed(2)}x` : "—"}</td>
                 <td className="px-4 py-2 text-muted">{r.obv_trend}</td>
                 <td className="px-4 py-2 text-muted">{r.breakout_type}</td>
                 <td className="px-4 py-2">{r.suggested_window}</td>
