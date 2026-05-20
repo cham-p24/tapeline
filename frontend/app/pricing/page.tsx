@@ -70,8 +70,10 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Comparison — soft section break, tighter heading */}
-      <section className="bg-panel/20">
+      {/* Comparison — soft section break, no bg band (was striping
+          unevenly with the atmospheric tint on body::before; the new
+          comparison card carries its own surface treatment now). */}
+      <section className="border-t border-border/60">
         <div className="section py-14 sm:py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Every feature, every limit.</h2>

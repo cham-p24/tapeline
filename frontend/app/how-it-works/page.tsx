@@ -146,7 +146,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Signals */}
-      <section className="bg-panel/20">
+      <section className="border-t border-border/60">
         <div className="section py-14 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Signal labels</p>
@@ -173,7 +173,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* FAQ — visible content that mirrors HOW_FAQ JSON-LD above. */}
-      <section className="bg-panel/20">
+      <section className="border-t border-border/60">
         <div className="section py-16">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Common questions</p>

@@ -8,6 +8,20 @@
  * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
  * Pro intelligence, Account & support) so the table reads like a spec sheet,
  * not a wall of bullets.
+ *
+ * **2026-05-20 redesign** — founder feedback: prior version "looks a bit
+ * ugly". Changes:
+ *  - Plan column headers turned into stacked badges (name + price block,
+ *    cleaner hierarchy than 3 cramped lines of text)
+ *  - "—" replaced with a styled muted dot so missing features read as
+ *    "deliberately not included" instead of "we forgot a value"
+ *  - "✓" checks use the up-green accent so present features pop without
+ *    over-colouring every Premium cell in blue
+ *  - Premium column gets a subtle column-wide tint (bg-accent/[0.04])
+ *    instead of per-cell text-accent — same emphasis, less noisy
+ *  - Section headers use bg-panel2 + larger padding for stronger
+ *    visual separation
+ *  - "Most popular" pill on Pro since that's the conversion target
  */
 
 type Row = { label: string; free: string; pro: string; premium: string };
@@ -72,43 +86,57 @@ const SECTIONS: Section[] = [
 export function ComparisonTable() {
   return (
     // Constrain to max-w-5xl + center so the table doesn't stretch the
-    // full viewport on wide monitors (was creating an ugly empty band
-    // between the FEATURE column and the plan columns). Keep
-    // overflow-x-auto so the table scrolls horizontally on phones.
-    <div className="card mt-8 mx-auto max-w-5xl overflow-x-auto">
-      <div className="px-4 pt-3 text-right text-[10px] uppercase tracking-wider text-subtle">All prices in USD</div>
-      <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
-        {/* Explicit column widths so the FEATURE column doesn't greedily
-            absorb all the leftover space on wide screens. ~40% feature,
-            ~20% per plan column. */}
-        <colgroup>
-          <col style={{ width: "40%" }} />
-          <col style={{ width: "20%" }} />
-          <col style={{ width: "20%" }} />
-          <col style={{ width: "20%" }} />
-        </colgroup>
-        <thead className="border-b border-border bg-panel">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs uppercase text-muted align-bottom">Feature</th>
-            <th className="px-4 py-3 text-center text-xs uppercase text-muted align-bottom">Free</th>
-            <th className="px-4 py-3 text-center align-bottom">
-              <span className="text-fg block text-xs uppercase">Pro</span>
-              <span className="text-[11px] text-muted block mt-1.5 nums">$29.99/mo</span>
-              <span className="text-[10px] text-subtle block nums">or $24.99/mo annual</span>
-            </th>
-            <th className="px-4 py-3 text-center align-bottom">
-              <span className="text-accent block text-xs uppercase">Premium</span>
-              <span className="text-[11px] text-muted block mt-1.5 nums">$49.99/mo</span>
-              <span className="text-[10px] text-subtle block nums">or $39.99/mo annual</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {SECTIONS.map((sec) => (
-            <SectionGroup key={sec.name} section={sec} />
-          ))}
-        </tbody>
-      </table>
+    // full viewport on wide monitors. Outer card gets a stronger border +
+    // shadow than the prior translucent-only card so the table reads as
+    // a distinct element on the page.
+    <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_1px_3px_rgb(var(--shadow))]">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+          {/* Explicit column widths so the FEATURE column doesn't greedily
+              absorb all the leftover space on wide screens. ~36% feature,
+              ~21% per plan column (slightly wider Premium for the
+              "Unlimited · hourly digest" string). */}
+          <colgroup>
+            <col style={{ width: "36%" }} />
+            <col style={{ width: "21%" }} />
+            <col style={{ width: "21%" }} />
+            <col style={{ width: "22%" }} />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-border2 bg-panel">
+              <th className="px-5 py-5 text-left align-bottom">
+                <span className="block text-[10px] uppercase tracking-[0.12em] text-subtle">Feature</span>
+              </th>
+              <th className="px-3 py-5 text-center align-bottom">
+                <span className="block text-xs font-semibold uppercase tracking-wider text-muted">Free</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">$0</span>
+                <span className="block text-[10px] text-subtle">/forever</span>
+              </th>
+              <th className="relative px-3 py-5 text-center align-bottom">
+                <span className="absolute left-1/2 top-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fg px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.08em] text-background">
+                  Most popular
+                </span>
+                <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-fg">Pro</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">$24.99</span>
+                <span className="block text-[10px] text-subtle">/mo · annual · save $60</span>
+              </th>
+              <th className="bg-accent/[0.04] px-3 py-5 text-center align-bottom">
+                <span className="block text-xs font-semibold uppercase tracking-wider text-accent">Premium</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">$39.99</span>
+                <span className="block text-[10px] text-subtle">/mo · annual · save $120</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {SECTIONS.map((sec) => (
+              <SectionGroup key={sec.name} section={sec} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
+        All prices in USD · Monthly billing $4 / $10 higher
+      </div>
     </div>
   );
 }
@@ -116,19 +144,58 @@ export function ComparisonTable() {
 function SectionGroup({ section }: { section: Section }) {
   return (
     <>
-      <tr className="bg-panel/50 border-y border-border/60">
-        <td colSpan={4} className="px-4 py-2.5 text-[11px] uppercase tracking-wider text-accent font-semibold">
+      <tr>
+        <td
+          colSpan={4}
+          className="border-y border-border/60 bg-panel2 px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent"
+        >
           {section.name}
         </td>
       </tr>
       {section.rows.map((r) => (
-        <tr key={r.label} className="border-b border-border/30">
-          <td className="px-4 py-3 text-fg">{r.label}</td>
-          <td className="px-4 py-3 text-center nums text-xs text-muted">{r.free}</td>
-          <td className="px-4 py-3 text-center nums text-xs">{r.pro}</td>
-          <td className="px-4 py-3 text-center nums text-xs font-medium text-accent">{r.premium}</td>
+        <tr key={r.label} className="border-b border-border/40">
+          <td className="px-5 py-3.5 text-fg">{r.label}</td>
+          <Cell value={r.free} tone="muted" />
+          <Cell value={r.pro} tone="default" />
+          <Cell value={r.premium} tone="premium" />
         </tr>
       ))}
     </>
+  );
+}
+
+/**
+ * One body cell — renders three visual treatments depending on value:
+ *  - "—" (missing)       → small muted dot, signals "deliberately not in this tier"
+ *  - "✓" (present)       → up-green check, reads as positive without over-colouring
+ *  - anything else (str) → plain text, tone-coloured
+ *
+ * `tone="premium"` applies the Premium column tint band — kept as a column
+ * background, NOT per-cell text colour, so the Premium column reads as a
+ * highlighted unit instead of every value shouting in accent blue.
+ */
+function Cell({ value, tone }: { value: string; tone: "muted" | "default" | "premium" }) {
+  const bg = tone === "premium" ? "bg-accent/[0.04]" : "";
+  const text =
+    tone === "muted" ? "text-muted"
+    : tone === "premium" ? "text-fg font-medium"
+    : "text-fg";
+
+  if (value === "—") {
+    return (
+      <td className={`px-3 py-3.5 text-center ${bg}`}>
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-border2" aria-label="not included" />
+      </td>
+    );
+  }
+  if (value === "✓") {
+    return (
+      <td className={`px-3 py-3.5 text-center ${bg}`}>
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-up/15 text-[11px] font-bold text-up">✓</span>
+      </td>
+    );
+  }
+  return (
+    <td className={`px-3 py-3.5 text-center text-xs nums ${text} ${bg}`}>{value}</td>
   );
 }
