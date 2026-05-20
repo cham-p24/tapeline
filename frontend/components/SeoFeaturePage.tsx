@@ -93,7 +93,7 @@ export function SeoFeaturePage({
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
+      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
         {/* Hero */}
         <p className="eyebrow">{eyebrow}</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">

@@ -15,7 +15,7 @@ export default function SupportPage() {
     <main className="min-h-screen">
       <MarketingNav />
 
-      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <p className="eyebrow">Support</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           We read every email.

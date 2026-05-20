@@ -95,7 +95,7 @@ export default function AboutPage() {
       ) : null}
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <p className="eyebrow">About</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           The public-formula stock scanner.

@@ -147,7 +147,7 @@ export default function VsWallStreetZenPage() {
       ))}
       <MarketingNav />
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
         <p className="eyebrow">Comparison</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Tapeline vs WallStreetZen — why active traders switch.
@@ -215,7 +215,7 @@ export default function VsWallStreetZenPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-12 text-center">
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
         <p className="mt-3 text-muted">
           Free tier is hard-capped on purpose (20 tickers, 24h delayed). Start the trial to see the live product properly. No card.

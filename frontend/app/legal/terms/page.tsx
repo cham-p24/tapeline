@@ -14,7 +14,7 @@ export default function TermsPage() {
   return (
     <main className="min-h-screen">
       <MarketingNav />
-      <div className="mx-auto max-w-3xl px-6 py-16">
+      <div className="mx-auto max-w-3xl px-6 py-10">
       <h1 className="text-4xl font-bold tracking-tight">Terms of Service</h1>
       <p className="mt-3 text-sm text-muted">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
 

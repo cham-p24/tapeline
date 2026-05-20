@@ -95,7 +95,7 @@ export default function PressPage() {
       ))}
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <p className="eyebrow">Press kit</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Press kit & media resources.

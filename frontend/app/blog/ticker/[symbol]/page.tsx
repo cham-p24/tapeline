@@ -375,7 +375,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
       <script {...jsonLdScript(faq)} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <Link href="/blog" className="text-sm text-muted hover:text-fg">
           &larr; All posts
         </Link>

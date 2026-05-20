@@ -161,7 +161,7 @@ export default async function SignalsPage() {
       <MarketingNav />
       <script {...jsonLdScript(breadcrumb)} />
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section className="mx-auto max-w-6xl px-6 py-8">
         <p className="eyebrow">Public universe</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Every ticker we score.

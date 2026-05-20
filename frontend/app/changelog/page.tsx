@@ -183,7 +183,7 @@ export default function ChangelogPage() {
     <main className="min-h-screen">
       <MarketingNav />
 
-      <section className="mx-auto max-w-3xl px-6 py-12">
+      <section className="mx-auto max-w-3xl px-6 py-8">
         <p className="eyebrow">Changelog</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What we shipped, when.</h1>
         <p className="mt-4 text-lg text-muted">
