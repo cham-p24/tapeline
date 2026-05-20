@@ -156,9 +156,12 @@ export default function HeatmapPage() {
             </div>
             <div className="flex flex-wrap gap-1">
               {s.tickers.map((t) => {
-                // Null-safe — backend can return null change_pct_1d when the
-                // price feed hasn't yet posted today's bar. Treat as 0 for
-                // sizing/colour so the tile still renders.
+                // Backend occasionally returns null change_pct_1d for an illiquid
+                // ticker between price ticks (TS type is non-nullable but the
+                // wire shape lies — Sentry TAPELINE-BACKEND-6 surfaced this as
+                // "Cannot read properties of null (reading 'toFixed')" on
+                // 2026-05-20). Treat null as 0% for layout/colour purposes and
+                // render an em-dash in the label.
                 const change = t.change_pct_1d ?? 0;
                 const size =
                   (t.volume || 0) > 30_000_000 ? "min-w-[110px] py-4"

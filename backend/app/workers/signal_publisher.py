@@ -56,6 +56,7 @@ _last_sheet_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
+_last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
@@ -437,6 +438,26 @@ async def tick() -> None:
         except Exception:
             logger.exception("weekly_newsletter.run_failed")
         _last_weekly_newsletter_token = weekly_token
+
+    # Daily Top 10 digest to newsletter_subscribers. Fires once per UTC day
+    # at/after 13:00 UTC — ~9am ET pre-market open. Process-level token +
+    # DB-side `last_sent_at` give us two layers of dedupe so a worker
+    # restart can't double-send. Only US weekdays — Sat/Sun there's no
+    # fresh tape to send, so we skip cleanly.
+    global _last_daily_newsletter_date
+    if (
+        started.hour >= 13                                # 13:00 UTC onward
+        and started.weekday() < 5                         # Mon-Fri
+        and _last_daily_newsletter_date != today_str
+    ):
+        try:
+            from app.services.newsletter import run_daily_digest
+            async with session_scope() as ndl_session:
+                count = await run_daily_digest(ndl_session, now=started)
+            logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
+        except Exception:
+            logger.exception("newsletter_daily.run_failed")
+        _last_daily_newsletter_date = today_str
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(

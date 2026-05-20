@@ -219,9 +219,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
               <h2 className="font-semibold">🔥 Squeeze detected</h2>
             </div>
             <dl className="space-y-2 p-4 text-sm">
-              <Kv k="Spike score" v={data.squeeze.spike_score.toFixed(1)} />
+              <Kv k="Spike score" v={data.squeeze.spike_score != null ? data.squeeze.spike_score.toFixed(1) : "—"} />
               <Kv k="Squeeze days" v={`${data.squeeze.squeeze_days}d`} />
-              <Kv k="Volume x avg" v={`${data.squeeze.volume_multiple.toFixed(2)}x`} />
+              <Kv k="Volume x avg" v={data.squeeze.volume_multiple != null ? `${data.squeeze.volume_multiple.toFixed(2)}x` : "—"} />
               <Kv k="OBV" v={data.squeeze.obv_trend} />
               <Kv k="Pattern" v={data.squeeze.breakout_type} />
               <Kv k="Window" v={data.squeeze.suggested_window} />

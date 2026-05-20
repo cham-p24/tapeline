@@ -23,6 +23,19 @@ import { FearGreedDial } from "@/components/FearGreedDial";
  *      consistent with the rest of the site's transparency posture
  */
 
+// FRED / vendor feeds occasionally hand back null between refreshes (the
+// 2026-05-20 Sentry crash TAPELINE-BACKEND-6 was exactly this — null.toFixed
+// in production). Treat null as the em-dash placeholder rather than letting
+// the whole page error-boundary out.
+function fmtKpi(v: number | null | undefined, digits: number, suffix = ""): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toFixed(digits) + suffix;
+}
+function fmtScore(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toFixed(0);
+}
+
 // Per-KPI metadata (description + threshold notes) so the page can
 // teach as it surfaces numbers. Kept inline rather than imported so
 // each KPI is self-documenting in source.
@@ -216,10 +229,10 @@ export default function RegimePage() {
                   />
                 </div>
                 <p className="mt-4 text-center text-[11px] leading-relaxed text-subtle">
-                  Composite of VIX ({r.fear_greed.components.vix.score.toFixed(0)}),
-                  breadth ({r.fear_greed.components.breadth.score.toFixed(0)}),
-                  regime ({r.fear_greed.components.regime.score.toFixed(0)}),
-                  and 5-day SPY momentum ({r.fear_greed.components.spy_5d.score.toFixed(0)}).
+                  Composite of VIX ({fmtScore(r.fear_greed.components.vix.score)}),
+                  breadth ({fmtScore(r.fear_greed.components.breadth.score)}),
+                  regime ({fmtScore(r.fear_greed.components.regime.score)}),
+                  and 5-day SPY momentum ({fmtScore(r.fear_greed.components.spy_5d.score)}).
                 </p>
               </div>
             )}
@@ -233,15 +246,15 @@ export default function RegimePage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Kpi label="VIX" value={r.vix.toFixed(2)} copy={VIX_COPY} numericValue={r.vix} />
+            <Kpi label="VIX" value={fmtKpi(r.vix, 2)} copy={VIX_COPY} numericValue={r.vix} />
             {/* FRED series DTWEXBGS — broad trade-weighted USD index, not
                 ICE DXY. Reads ~115-125 right now; ICE DXY (the futures
                 contract most traders watch) is ~100-110. Label kept
                 honest to the source. */}
-            <Kpi label="USD Broad Index" value={r.dxy.toFixed(2)} copy={DXY_COPY} numericValue={r.dxy} />
-            <Kpi label="10Y Yield" value={r.yield_10y.toFixed(3) + "%"} copy={TY_COPY} numericValue={r.yield_10y} />
+            <Kpi label="USD Broad Index" value={fmtKpi(r.dxy, 2)} copy={DXY_COPY} numericValue={r.dxy} />
+            <Kpi label="10Y Yield" value={fmtKpi(r.yield_10y, 3, "%")} copy={TY_COPY} numericValue={r.yield_10y} />
             <Kpi label="Rate direction" value={r.rate_direction} copy={RD_COPY} />
-            <Kpi label="Breadth (above 200DMA)" value={r.breadth_pct.toFixed(1) + "%"} copy={BR_COPY} numericValue={r.breadth_pct} />
+            <Kpi label="Breadth (above 200DMA)" value={fmtKpi(r.breadth_pct, 1, "%")} copy={BR_COPY} numericValue={r.breadth_pct} />
             <Kpi label="Sector leaders" value={r.sector_leaders} copy={SL_COPY} small />
           </div>
 

@@ -19,6 +19,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { TICKERS, findTicker, type TickerPost } from "../tickers";
@@ -636,6 +637,25 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             ))}
           </ul>
         </nav>
+
+        {/* Lead-magnet email capture — long-form ticker blog pages
+            convert better than the bare /t/[symbol] page because the
+            reader has already invested attention. Same daily-Top-10
+            offer, lower friction than the trial CTA. */}
+        <aside className="mt-12 rounded-lg border border-border bg-panel/30 p-6">
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-semibold text-fg">
+              Get the daily Top 10 in your inbox
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted leading-relaxed">
+              The 10 highest-scoring US tickers each market morning, same
+              composite this article uses. No card, unsubscribe in one click.
+            </p>
+          </div>
+          <div className="mx-auto max-w-md">
+            <NewsletterCapture source="blog" heading="" sub="" />
+          </div>
+        </aside>
       </article>
 
       <MarketingFooter />

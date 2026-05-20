@@ -48,6 +48,15 @@ type SignupExtras = {
   company?: string;             // honeypot — must be empty for humans
   turnstile_token?: string;     // Cloudflare Turnstile token (if configured)
   device_fingerprint?: string;  // 16-char hex hash from lib/fingerprint.ts
+  // Marketing-attribution UTMs — read from localStorage on submit via
+  // lib/utm.ts:getStoredUtm(). Backend writes them once to the User
+  // row's signup_utm_* columns; never updated. Optional everywhere
+  // since direct/un-tagged traffic is a legitimate signup path.
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
 };
 
 export const authApi = {
