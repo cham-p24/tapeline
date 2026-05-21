@@ -112,6 +112,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/insider-buying`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/stock-market-heatmap`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/market-regime`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    // Free-tool / embed docs — backlink-acquisition asset. Every site that
+    // pastes the iframe = one evergreen backlink to /t/{TICKER}. Indexed
+    // intentionally (the embed views themselves are noindex; this docs
+    // page IS the marketing landing page for the widget).
+    { url: `${base}/embed`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/signup`,                    lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/contact`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
     // /signin removed from sitemap — auth pages shouldn't be in search
