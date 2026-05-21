@@ -23,6 +23,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { handle401 } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const DISMISS_KEY = "tapeline_verify_banner_dismissed";
@@ -56,7 +57,10 @@ export function EmailVerificationBanner() {
         method: "POST",
         credentials: "include",
       });
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      if (!r.ok) {
+        handle401(r.status);
+        throw new Error(`${r.status} ${r.statusText}`);
+      }
       const body = await r.json();
       if (body.status === "already_verified") {
         setState("already_verified");

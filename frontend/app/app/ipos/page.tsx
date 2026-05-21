@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { userLocale } from "@/lib/datetime";
+import { handle401 } from "@/lib/api";
 
 type IPO = {
   id: number; symbol: string; company_name: string; sector: string | null;
@@ -22,6 +23,7 @@ export default function IPOPage() {
   const load = useCallback(async () => {
     const r = await fetch(`${API_BASE}/api/ipos?days=180`, { credentials: "include", cache: "no-store" });
     if (r.ok) setIpos((await r.json()).items);
+    else handle401(r.status);
   }, []);
 
   useEffect(() => { load(); }, [load]);

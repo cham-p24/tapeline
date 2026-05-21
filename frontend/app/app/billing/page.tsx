@@ -13,6 +13,7 @@ import {
   unsubscribeFromWebPush,
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
+import { handle401 } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -141,6 +142,8 @@ export default function BillingPage() {
       const body = await res.json();
       if (res.ok && body.url) {
         window.location.href = body.url;
+      } else if (res.status === 401) {
+        handle401(res.status);
       } else if (res.status === 502 || res.status === 503 || body.detail?.includes("not configured")) {
         setMsg({ kind: "info", text: "Checkout isn't live yet — Stripe activation pending. Email support@tapeline.io if you want to upgrade in the meantime." });
       } else {
@@ -161,6 +164,7 @@ export default function BillingPage() {
       });
       const body = await res.json();
       if (res.ok && body.url) window.location.href = body.url;
+      else if (res.status === 401) handle401(res.status);
       else setMsg({ kind: "err", text: body.detail || "Portal not available — Stripe activation pending." });
     } catch (e: any) {
       setMsg({ kind: "err", text: e.message });
