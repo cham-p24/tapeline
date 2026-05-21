@@ -69,6 +69,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/data-sources`,              lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // Daily-picks newsletter lead-magnet landing — preview of what
+    // newsletter subscribers get. Refreshes every 30 min via ISR.
+    { url: `${base}/daily-picks`,               lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/signals`,                   lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
