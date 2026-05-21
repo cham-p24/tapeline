@@ -223,6 +223,50 @@ export function jsonLdScript(data: unknown) {
 }
 
 /**
+ * HowTo schema for instructional blog posts.
+ *
+ * Unlocks Google's step-by-step rich-result variant — the SERP card with
+ * numbered steps surfaced above the fold under the post URL. Massive CTR
+ * lift on educational queries when it triggers ("how to find momentum
+ * stocks", "what is RSI", "best time to buy stocks").
+ *
+ * Apply with restraint: Google's quality classifier rejects HowTo schema
+ * on pages where the body doesn't literally walk through ordered steps.
+ * Only the genuinely instructional posts in posts.ts should pass
+ * `howToSteps` — see the type comment on BlogPost.howToSteps for the
+ * eligibility heuristic.
+ *
+ * `totalTime` is ISO 8601 duration (PT7M = 7 minutes). Conservative
+ * defaults of 5-10 min suit the long-form educational posts we ship.
+ */
+export type HowToArgs = {
+  name: string;
+  description: string;
+  url: string;
+  imageUrl?: string;
+  totalTime?: string; // ISO 8601 duration
+  steps: { name: string; text: string }[];
+};
+
+export function howToJsonLd(a: HowToArgs) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: a.name,
+    description: a.description,
+    ...(a.imageUrl ? { image: a.imageUrl } : {}),
+    ...(a.totalTime ? { totalTime: a.totalTime } : {}),
+    step: a.steps.map((s, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      name: s.name,
+      text: s.text,
+      url: `${a.url}#step-${i + 1}`,
+    })),
+  };
+}
+
+/**
  * Schema.org Dataset for /scorecard.
  *
  * The public scorecard is Tapeline's flagship proprietary asset — a permanent,
