@@ -112,6 +112,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             src={PLAUSIBLE_SCRIPT}
           />
         )}
+        {/* RSS feed discovery — browsers + aggregators (Feedly, Inoreader,
+            NewsBlur, etc.) look for this link tag to auto-detect the
+            site's feed. Pointing at /feed.xml (RSS 2.0 of the daily
+            Top 10) gets the scorecard into aggregator pipelines without
+            anyone needing to know the URL. */}
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title="Tapeline — Daily Top 10"
+          href="/feed.xml"
+        />
       </head>
       <body>
         {/* SEO structured data — Google + LinkedIn parse this for rich
