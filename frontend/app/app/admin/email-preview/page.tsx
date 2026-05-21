@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { handle401 } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -36,13 +37,22 @@ export default function EmailPreviewPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user || !user.is_admin) {
+    if (!user) {
       router.push("/signin?next=/app/admin/email-preview");
+      return;
+    }
+    // Signed-in non-admins: bounce to a safe page (NOT /signin — that
+    // would loop because the backend returns 401 for non-admins).
+    if (!user.is_admin) {
+      router.push("/app/scanner");
       return;
     }
     fetch(`${API_BASE}/api/admin/email-preview`, { credentials: "include" })
       .then((r) => {
-        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        if (!r.ok) {
+          handle401(r.status);
+          throw new Error(`${r.status} ${r.statusText}`);
+        }
         return r.json();
       })
       .then((data: { items: PreviewItem[] }) => {
@@ -149,6 +159,7 @@ export default function EmailPreviewPage() {
                       { method: "POST", credentials: "include" },
                     );
                     if (!r.ok) {
+                      handle401(r.status);
                       const txt = await r.text();
                       setSendState("error");
                       setSendMsg(txt || `${r.status} ${r.statusText}`);
