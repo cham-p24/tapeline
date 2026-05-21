@@ -20,6 +20,7 @@ tiles underneath. The frontend uses this for the heatmap search box.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -30,6 +31,15 @@ from app.models import Ticker, User
 from app.services.auth import current_user_required
 from app.services.sector import CANONICAL_ORDER, canonical_sector
 from app.services.tier import Tier, has_feature
+
+# Hard freshness floor: a ticker that hasn't been re-snapshotted in this
+# many minutes is excluded from the heatmap, even if it passes every
+# other filter. Founder feedback (2026-05-21): "people trade based on the
+# information being live". 15 min is generous (real-time feeds tick by
+# the second; we're on 60s worker cycles plus rate-limit batching) but
+# guards against the worst case where Massive's rate-limit queue stretches
+# a long tail of tickers out to >2hrs stale.
+HEATMAP_MAX_STALE_MIN = 15
 
 router = APIRouter()
 
@@ -62,12 +72,14 @@ async def get_heatmap(
     # change. (Real institutions use higher thresholds — 1M+ — but we're
     # serving retail.)
     LIQUIDITY_FLOOR = 100_000
+    fresh_cutoff = datetime.now(timezone.utc) - timedelta(minutes=HEATMAP_MAX_STALE_MIN)
     result = await session.execute(
         select(Ticker).where(
             Ticker.score.isnot(None),
             Ticker.change_pct_1d.isnot(None),
             Ticker.volume.isnot(None),
             Ticker.volume > LIQUIDITY_FLOOR,
+            Ticker.updated_at >= fresh_cutoff,
         )
     )
     tickers = result.scalars().all()
@@ -105,6 +117,11 @@ async def get_heatmap(
         key=lambda kv: order_index.get(kv[0], len(CANONICAL_ORDER)),
     )
 
+    # Freshness summary so the frontend can surface "Updated 12s ago"
+    # next to the LiveBadge without needing to compute it client-side.
+    newest_update = max((t.updated_at for t in tickers if t.updated_at), default=None)
+    oldest_update = min((t.updated_at for t in tickers if t.updated_at), default=None)
+
     return {
         "sectors": [
             {"sector": name, "tickers": items}
@@ -113,4 +130,10 @@ async def get_heatmap(
         ],
         "available_sectors": CANONICAL_ORDER,  # for the frontend filter dropdown
         "query": needle or None,
+        "freshness": {
+            "newest_updated_at": newest_update.isoformat() if newest_update else None,
+            "oldest_updated_at": oldest_update.isoformat() if oldest_update else None,
+            "max_stale_minutes": HEATMAP_MAX_STALE_MIN,
+            "ticker_count": len(tickers),
+        },
     }

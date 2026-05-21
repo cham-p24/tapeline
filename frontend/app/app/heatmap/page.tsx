@@ -25,6 +25,7 @@ export default function HeatmapPage() {
   const [sectors, setSectors] = useState<HeatmapSector[]>([]);
   const [availableSectors, setAvailableSectors] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [freshness, setFreshness] = useState<{ newest: string | null; oldest: string | null; count: number } | null>(null);
   // Search state for the symbol input. We debounce the API call (250ms) so a
   // user typing "TSLA" doesn't fire 4 requests — but the input updates
   // instantly for responsive feel.
@@ -43,6 +44,13 @@ export default function HeatmapPage() {
       setSectors(r.sectors || []);
       if (r.available_sectors && r.available_sectors.length) {
         setAvailableSectors(r.available_sectors);
+      }
+      if (r.freshness) {
+        setFreshness({
+          newest: r.freshness.newest_updated_at,
+          oldest: r.freshness.oldest_updated_at,
+          count: r.freshness.ticker_count,
+        });
       }
       setLoadError(null);
     } catch (e) {
@@ -80,6 +88,35 @@ export default function HeatmapPage() {
         </div>
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
+
+      {/* Live-freshness banner — surfaces backend's newest/oldest
+          updated_at so the user can see "data is X seconds old" at a
+          glance. Founder feedback 2026-05-21: "people trade based on
+          the information being live — is the information live?" */}
+      {freshness && freshness.newest && (() => {
+        const newestMs = Date.now() - new Date(freshness.newest).getTime();
+        const oldestMs = freshness.oldest ? Date.now() - new Date(freshness.oldest).getTime() : 0;
+        const newestSec = Math.max(0, Math.round(newestMs / 1000));
+        const oldestMin = Math.max(0, Math.round(oldestMs / 60000));
+        const fresh = newestSec < 90;
+        return (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 ${fresh ? "bg-up/15 text-up" : "bg-warn/15 text-warn"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${fresh ? "bg-up" : "bg-warn"} ${fresh ? "animate-pulse" : ""}`} />
+              {fresh ? "LIVE" : "DELAYED"}
+            </span>
+            <span className="text-muted">
+              Newest tile: <span className="font-semibold text-fg nums">{newestSec}s</span> ago
+            </span>
+            <span className="text-subtle">·</span>
+            <span className="text-muted">
+              Oldest tile: <span className="font-semibold text-fg nums">{oldestMin}m</span> ago
+            </span>
+            <span className="text-subtle">·</span>
+            <span className="text-muted nums">{freshness.count} tickers shown</span>
+          </div>
+        );
+      })()}
 
       {/* Inline colour-scale legend — mirrors the CMC / Finviz heatmap
           conventions so a first-time visitor can read the tiles without
