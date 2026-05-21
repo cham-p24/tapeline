@@ -6,6 +6,20 @@
  * posts, swap to MDX or fetch from a CMS without changing the route
  * shape (slug-based).
  */
+/**
+ * Optional HowTo-style step list for posts that are genuinely instructional.
+ * When present, the /blog/[slug] route emits HowTo JSON-LD alongside the
+ * Article schema — this unlocks Google's step-by-step rich-result variant
+ * (numbered cards with the post URL above the fold). Only set this for
+ * posts where the title pattern is "how to X" / "what is X" / "best X" and
+ * the body literally walks through ordered steps; misapplied HowTo schema
+ * gets rejected as spam by Google's quality classifier.
+ */
+export type HowToStep = {
+  name: string;       // ≤ 60 chars; shown as the step header in SERP
+  text: string;       // ≤ 280 chars; the body of the step
+};
+
 export type BlogPost = {
   slug: string;
   title: string;
@@ -13,6 +27,10 @@ export type BlogPost = {
   publishedAt: string; // ISO 8601 date
   author: string;
   body: string; // Trusted HTML — keep this internal-only.
+  /** Optional HowTo schema — only on instructional posts. */
+  howToSteps?: HowToStep[];
+  /** Total time (ISO 8601 duration) needed to complete the steps. */
+  howToTime?: string;
 };
 
 export const POSTS: BlogPost[] = [
@@ -774,6 +792,29 @@ RSI = 100 - (100 / (1 + RS))</pre>
       factors. <a href="/signup">Try the 14-day Premium trial</a> — no
       credit card.</p>
     `,
+    howToTime: "PT8M",
+    howToSteps: [
+      {
+        name: "Understand what RSI measures",
+        text: "RSI compares the magnitude of recent gains to recent losses on a 0–100 scale over a 14-day window. Above 70 = 'overbought'. Below 30 = 'oversold'. 30–70 is neutral.",
+      },
+      {
+        name: "Avoid trading the 70/30 cross mechanically",
+        text: "Strong uptrends ride RSI in the 70–90 range for weeks. Selling every 70 cross means selling every rally early. Use 70/30 as warnings, not triggers.",
+      },
+      {
+        name: "Pick your timeframe deliberately",
+        text: "RSI on 1-minute charts is noise. RSI on daily charts is signal. Pick the timeframe that matches your holding period — they tell completely different stories.",
+      },
+      {
+        name: "Combine RSI with trend and relative strength",
+        text: "Pure-RSI trading bets on mean reversion in a market that mostly trends. Use RSI in confluence with trend, relative strength, volume, and fundamentals.",
+      },
+      {
+        name: "Look for confluence at pullback entries and divergences",
+        text: "In a confirmed uptrend, RSI dipping to 35–45 is a high-probability pullback entry. Watch for RSI/price divergence — rare but high-signal.",
+      },
+    ],
   },
   {
     slug: "how-to-find-momentum-stocks",
@@ -886,6 +927,29 @@ RSI = 100 - (100 / (1 + RS))</pre>
       of those is necessary but not sufficient. All four together is the
       pattern.</p>
     `,
+    howToTime: "PT10M",
+    howToSteps: [
+      {
+        name: "Filter to stocks above their 200-day moving average",
+        text: "Real momentum almost always happens in established uptrends. Stocks below their 200DMA are dead-cat bounces more often than breakouts. This single filter cuts 60–70% of false signals.",
+      },
+      {
+        name: "Confirm with above-average volume",
+        text: "Calculate volume multiple (today's volume / 20-day average). Below 1.2× is weak; above 1.5× is structural demand. Pure price spikes on light volume are head-fakes.",
+      },
+      {
+        name: "Check relative strength vs sector AND SPY",
+        text: "Real momentum stocks outperform their sector AND the broader market. If the stock is up 10% but the sector ETF is also up 8%, what you have is sector beta, not stock leadership.",
+      },
+      {
+        name: "Identify the setup the day before the spike",
+        text: "Most momentum trades fail because traders chase the gap. The structural setup — rising RS, accumulating volume, still-tight range — is visible BEFORE the breakout day. Find it then.",
+      },
+      {
+        name: "Match the scan timeframe to your holding period",
+        text: "Day-trading momentum lives in the 1-day list. Swing-trading momentum lives in 5-day to 1-month. Position momentum lives in 3–12 month. Mismatching scan to holding period guarantees losses.",
+      },
+    ],
   },
   {
     slug: "best-time-to-buy-stocks",
@@ -993,6 +1057,33 @@ RSI = 100 - (100 / (1 + RS))</pre>
       cancel in one click. Read every score the same way our public
       scorecard does.</p>
     `,
+    howToTime: "PT7M",
+    howToSteps: [
+      {
+        name: "Avoid the first 30 minutes of the session",
+        text: "The 9:30–10:00 ET window is the most volatile of the day. Spreads are wide, gaps are common, retail order flow runs into algos. Wait until 10:00 ET for stable prices.",
+      },
+      {
+        name: "Use the midday lull as research time, not entry time",
+        text: "11:30–14:00 ET is the lowest-volume window. Day traders should do nothing; swing traders can use confirmed setups but expect tight ranges.",
+      },
+      {
+        name: "Treat the close window (15:30–16:00 ET) as a stronger entry for confirmed breakouts",
+        text: "End-of-day flows confirm the move with real volume. If the setup held all day and is closing on its highs, the last 30 minutes is often a higher-quality entry than midday.",
+      },
+      {
+        name: "Be selective about Friday afternoon and Monday gap entries",
+        text: "Friday afternoons see thin institutional liquidity ahead of the weekend. Monday gaps can move either way on weekend news. Expect more noise than usual at both ends.",
+      },
+      {
+        name: "Use the calendar effects as tiebreakers, not triggers",
+        text: "Small-caps have a mild January tailwind. May–October is slightly weaker than November–April. These edges are real but small — let the setup decide, not the date.",
+      },
+      {
+        name: "Track earnings weeks for your specific watchlist",
+        text: "Mid-January, April, July, October. Implied volatility rises across the board. Knowing which weeks your holdings report matters more than any seasonal calendar effect.",
+      },
+    ],
   },
   {
     slug: "best-stock-scanner-under-30",
