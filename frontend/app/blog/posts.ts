@@ -994,6 +994,538 @@ RSI = 100 - (100 / (1 + RS))</pre>
       scorecard does.</p>
     `,
   },
+  {
+    slug: "best-stock-scanner-under-30",
+    title: "Best stock scanner under $30/month in 2026 (honest cost-quality breakdown).",
+    excerpt:
+      "We benchmarked the four sub-$30/mo stock scanners retail traders actually consider in 2026 — Finviz Elite, Stock Rover Essentials, Zacks Premium, and Tapeline Pro — across feature depth, data freshness, and (the part nobody else publishes) whether the picks beat SPY. Here's the honest matrix.",
+    publishedAt: "2026-05-20",
+    author: "Tapeline",
+    body: `
+      <p>Most "best stock scanner under $30" articles you find online
+      are affiliate-fee farms. The author gets paid per signup, every
+      product gets a 9/10 review, and the conclusion is always "they're
+      all great, pick what suits you." If you've read more than two of
+      them, you know the type.</p>
+
+      <p>This isn't that. Tapeline is one of the four scanners in this
+      matrix and we're not going to pretend otherwise — but the
+      comparison is structured so you can rule us out cleanly if we
+      don't fit. The criteria are public, the rankings are explicit,
+      and the rows where we lose are highlighted, not hidden.</p>
+
+      <h2>The four scanners under $30/mo retail traders actually buy</h2>
+
+      <p>"Under $30/mo" rules out the institutional tier — Bloomberg
+      Terminal ($24K/yr), Koyfin Plus ($59/mo), Trade Ideas Premium
+      ($188/mo), Benzinga Pro ($177/mo). Those are tools built for
+      sell-side and prop-desk users; if you're a retail trader running
+      one or two accounts, they're not realistic. The actual sub-$30/mo
+      shortlist in 2026:</p>
+
+      <ul>
+        <li><strong>Finviz Elite</strong> — $24.96/mo annual ($29.96/mo
+        monthly). The veteran. Maps + heatmaps + 70+ screener filters.
+        Free tier is the entry point most retail traders started with.</li>
+        <li><strong>Stock Rover Essentials</strong> — $7.99/mo annual
+        ($9.99/mo monthly). Long-only fundamentals focus. Strong
+        portfolio analytics, weaker on intraday data.</li>
+        <li><strong>Zacks Premium</strong> — $20.83/mo annual ($24.95/mo
+        monthly). Earnings + analyst-rating focus. The Zacks Rank is the
+        core differentiator; everything else is supporting.</li>
+        <li><strong>Tapeline Pro</strong> — $24.99/mo annual ($29.99/mo
+        monthly). One 0-100 composite per ticker from a
+        <a href="/how-it-works">public 6-factor formula</a>, with a
+        public daily back-checked scorecard.</li>
+      </ul>
+
+      <h2>The matrix (data current as of 2026-05-21)</h2>
+
+      <p>I've split the comparison into four axes that actually matter
+      to the retail trader spending $25/mo on a scanner: feature depth,
+      data freshness, transparency of the methodology, and — the one
+      nobody else publishes — whether the daily picks actually beat
+      SPY.</p>
+
+      <h3>1. Feature depth</h3>
+
+      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+
+      screening criteria, real-time data, advanced charting, custom
+      groups. If you're the type who wants to express a thesis as a
+      seven-condition AND-filter, it's hard to beat.</p>
+
+      <p><strong>Stock Rover</strong> wins on fundamentals depth —
+      150+ fundamental metrics, multi-year history, portfolio tracking
+      with allocation drift alerts. Built for the long-only quality
+      investor.</p>
+
+      <p><strong>Zacks</strong> wins on earnings + analyst ratings —
+      the Zacks Rank is the original "stock signal" and still the
+      reference for that style of scoring. Earnings ESP, broker rating
+      changes, and surprise history are deeper than competitors.</p>
+
+      <p><strong>Tapeline Pro</strong> ranks lower on raw filter
+      breadth (we don't try to expose 70 filters), higher on signal
+      density — the composite score does the synthesis work that
+      filter-by-filter screening makes the user do manually. Different
+      product philosophy, not necessarily a better one for everyone.</p>
+
+      <h3>2. Data freshness</h3>
+
+      <p>This one's measurable. We checked the actual delay on each
+      product's free tier:</p>
+
+      <ul>
+        <li>Finviz free: 15-minute delay. Elite: real-time.</li>
+        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>
+        <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
+        <li>Tapeline free: 24-hour delay (intentional gating; full
+        universe ~60-second freshness on Pro+).</li>
+      </ul>
+
+      <p>Tapeline's free tier delay is the harshest of the four, which
+      is a deliberate trade-off — we want Pro to be obviously
+      differentiated. If you're testing the product, the
+      <a href="/scorecard">public scorecard</a> shows the real
+      composite quality at full freshness.</p>
+
+      <h3>3. Methodology transparency</h3>
+
+      <p>This is the criterion most retail-trader comparisons skip
+      entirely. "How is the score calculated?" is a question every
+      product answers with marketing copy ("proprietary algorithm",
+      "decades of research"). The actual formula is rarely published.</p>
+
+      <ul>
+        <li><strong>Finviz</strong>: no composite score. Filters only.
+        N/A.</li>
+        <li><strong>Stock Rover</strong>: "Score" and "Growth Score"
+        published as relative-to-universe percentile rankings; weights
+        not disclosed.</li>
+        <li><strong>Zacks</strong>: The Zacks Rank methodology is
+        published at high level (earnings ESP + earnings surprise +
+        broker rating changes) but the exact weights are proprietary.</li>
+        <li><strong>Tapeline</strong>: Full formula at
+        <a href="/how-it-works">/how-it-works</a> with exact weights
+        (Trend 25% / RS 20% / Fundamentals 15% / Smart Money 15% /
+        Macro 15% / Momentum 10%). Weight changes are announced in the
+        changelog before they ship.</li>
+      </ul>
+
+      <h3>4. Does it beat SPY?</h3>
+
+      <p>This is the question that should drive the buy decision and
+      the one nobody answers honestly. The reason: most product owners
+      don't actually track it. The "back-tested results" in marketing
+      materials are usually one-time historical simulations, not live
+      forward-tracked records.</p>
+
+      <p>Of the four, Tapeline is the only one that publishes a
+      permanent, append-only daily log of every top-10 pick with
+      next-day return vs SPY at
+      <a href="/scorecard">tapeline.io/scorecard</a>. The losers stay
+      on the page. The hit rate, median alpha, and best/worst days
+      update automatically.</p>
+
+      <p>Stock Rover and Zacks both publish historical performance for
+      their internal ranks (Stock Rover's Premier list, Zacks #1
+      Strong Buy), but those use proprietary universe-construction
+      rules that aren't easy to verify externally. Finviz doesn't
+      claim a stock-picking record at all — it's a tool, not a
+      signal.</p>
+
+      <h2>When to pick which</h2>
+
+      <ul>
+        <li><strong>Pick Finviz Elite</strong> if you have a specific
+        thesis to express as a filter and want raw breadth (the most
+        screens, the most filters).</li>
+        <li><strong>Pick Stock Rover Essentials</strong> if you're a
+        long-only quality investor with portfolio analytics needs and
+        don't trade intraday.</li>
+        <li><strong>Pick Zacks Premium</strong> if you trade earnings
+        events and want the deepest analyst-rating + earnings-surprise
+        data set.</li>
+        <li><strong>Pick Tapeline Pro</strong> if you want one
+        synthesised read on every US ticker, a transparent formula
+        you can argue with, and a live track record you can audit
+        before you trust it.</li>
+      </ul>
+
+      <h2>The honest pitch for Tapeline</h2>
+
+      <p>I'm not going to tell you Tapeline replaces Finviz's filter
+      breadth, because it doesn't. I'm not going to tell you it has
+      Stock Rover's portfolio analytics, because it doesn't. What it
+      does have is one read per ticker from a formula you can argue
+      with line-by-line, and a public daily record of whether that
+      formula's top-10 picks actually beat SPY.</p>
+
+      <p>If that's the criterion that should drive the buy decision —
+      and we'd argue it should — then the
+      <a href="/scorecard">scorecard</a> is the test. Read it. If the
+      numbers don't hold up, we're not the right product for you. If
+      they do, the
+      <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=best_scanner_under_30">14-day
+      Premium trial</a> is the no-card way to see it from the inside.</p>
+    `,
+  },
+  {
+    slug: "how-to-read-sec-form-4",
+    title: "How to read SEC Form 4 insider buying (and what's actually a signal).",
+    excerpt:
+      "SEC Form 4 — the filing every corporate insider must submit within 2 business days of a trade — is the rawest 'smart money' signal retail traders can access. But 90% of Form 4 activity is noise. Here's how to filter for the 10% that matters, and how Tapeline's Smart Money sub-score does it automatically.",
+    publishedAt: "2026-05-20",
+    author: "Tapeline",
+    body: `
+      <p>If you've ever read a finance Twitter thread that ends with
+      "the insider just bought 50,000 shares" and felt vaguely
+      compelled to investigate further, you've encountered SEC Form 4.
+      It's the filing every corporate insider — directors, officers,
+      anyone with 10%+ ownership — must submit to the SEC within 2
+      business days of any trade in the company's stock. It's been
+      mandatory since 1934. The signal is real. The noise around it is
+      what kills retail traders.</p>
+
+      <p>This post is the field guide: what Form 4 actually contains,
+      which 90% of filings to ignore, and what the remaining 10%
+      reliably predicts. Tapeline's Smart Money sub-score (15% of the
+      composite — <a href="/how-it-works">see the formula</a>) does
+      this filtering automatically, but the underlying logic is worth
+      understanding regardless of what tool you use.</p>
+
+      <h2>What Form 4 actually is</h2>
+
+      <p>A Form 4 filing has six things you care about:</p>
+
+      <ol>
+        <li><strong>The insider's name and role</strong> — CEO, CFO,
+        director, 10%+ owner. Role matters; we'll get to why.</li>
+        <li><strong>Transaction code</strong> — a one-letter code from
+        a fixed table. The ones that matter for "is this a signal":
+        <code>P</code> (open-market purchase), <code>S</code>
+        (open-market sale), <code>A</code> (grant — almost never
+        meaningful), <code>F</code> (tax-withholding sale — almost
+        never meaningful).</li>
+        <li><strong>Number of shares</strong> — raw count, not dollar
+        amount. You compute the $ from price.</li>
+        <li><strong>Price per share</strong> — the executed price.</li>
+        <li><strong>Date of trade</strong> — not the filing date. The
+        filing window is 2 business days, so the trade is up to 48
+        hours older than the filing.</li>
+        <li><strong>Shares held after transaction</strong> — total
+        post-trade. This is the field most retail traders ignore and
+        the one that determines whether the trade is a signal or
+        noise.</li>
+      </ol>
+
+      <h2>The 90% that's noise — what to ignore</h2>
+
+      <h3>1. Anything that isn't transaction code P or S</h3>
+
+      <p>Form 4 has 30+ transaction codes. Most of them — grants,
+      vestings, exercises, gifts, withholdings — are not voluntary
+      market activity. An insider getting shares via an automatic
+      restricted-stock vesting tells you nothing about their view of
+      the company's valuation. They didn't choose to acquire the
+      shares; the comp plan did. Filter to code P (open-market buy)
+      and code S (open-market sale) only. Everything else is HR
+      paperwork dressed as a filing.</p>
+
+      <h3>2. 10b5-1 sales</h3>
+
+      <p>10b5-1 plans are pre-arranged trading schedules executives
+      use to sell stock systematically without being accused of
+      insider trading. A CFO who set up a 10b5-1 plan in March 2025
+      that triggers a sale of 10,000 shares every quarter is selling
+      mechanically — it's not their reaction to current information.
+      These show up as code S sales but are explicitly marked
+      "pursuant to 10b5-1 plan" in footnotes. Filter them out;
+      they're noise.</p>
+
+      <h3>3. Tiny purchases relative to ownership</h3>
+
+      <p>A board member who already owns 500,000 shares buying 100
+      more is not a signal. They're rounding error in their own
+      portfolio. The relevant ratio is <em>shares purchased ÷ shares
+      held after</em>. Anything under 1-2% is meaningless.</p>
+
+      <h3>4. Director purchases at companies with mandatory
+      share-ownership requirements</h3>
+
+      <p>Many large companies require directors to own at least N×
+      their annual cash retainer in stock. When a newly-appointed
+      director makes a small open-market purchase, they're often just
+      complying with the requirement — not expressing a view on
+      valuation. The clue: it's their first purchase, it's small, and
+      it happens within 90 days of board appointment.</p>
+
+      <h2>The 10% that matters — what's actually a signal</h2>
+
+      <h3>1. Cluster buying</h3>
+
+      <p>The single highest-information Form 4 pattern. Multiple
+      different insiders — usually CEO + CFO + at least one director
+      — all making open-market purchases (code P) within a tight
+      time window (say 30 days), at meaningful sizes (1%+ of their
+      existing holdings each). This is hard to fake and hard to
+      explain via comp-plan mechanics. When you see it, the people
+      closest to the company's actual numbers have collectively
+      decided the stock is mispriced low.</p>
+
+      <h3>2. CEO purchases at a meaningful percentage of net worth</h3>
+
+      <p>If the CEO buys $1M of stock and their compensation suggests
+      a net worth in the $50M range, that's 2% of their net worth in
+      one position. That's a real bet. Cross-check via the proxy
+      statement (DEF 14A) for total compensation history.</p>
+
+      <h3>3. CFO buying when others are selling</h3>
+
+      <p>The CFO has the cleanest, earliest view of the company's
+      actual financials — quarterly closing, working-capital trends,
+      cash-flow forecast. When a CFO buys against a sector tape that
+      has other peers selling, it's an unusually strong dissenting
+      signal.</p>
+
+      <h3>4. First-time purchases at companies that haven't seen
+      insider buying for 12+ months</h3>
+
+      <p>Companies in steady-state mode often see zero insider
+      open-market activity for stretches. When that dry spell breaks
+      with a meaningful purchase, something has changed in management's
+      view. Pull the most-recent 4-5 Form 4s and check the gap.</p>
+
+      <h2>How Tapeline scores this automatically</h2>
+
+      <p>Tapeline's Smart Money sub-score — 15% of the
+      <a href="/how-it-works">composite formula</a> — looks at the
+      90-day rolling net Form 4 transaction count and dollar volume,
+      filtered to:</p>
+
+      <ul>
+        <li>Transaction codes P and S only (excludes grants,
+        vestings, withholdings).</li>
+        <li>Excludes 10b5-1 marked sales.</li>
+        <li>Weights by insider role (CEO and CFO buys count more than
+        director buys).</li>
+        <li>Weights by transaction size relative to insider's existing
+        position.</li>
+        <li>Bonuses for cluster signals (3+ different insiders, same
+        direction, 30-day window).</li>
+      </ul>
+
+      <p>The result is a 0-100 sub-score that lands in the composite.
+      Recent insider buys are also displayed on Tapeline Premium at
+      <a href="/app/holdings">/app/holdings</a> — raw filtered Form 4
+      data per ticker, sorted by date, with the same noise filters
+      applied. Read alongside the composite score, not in place of it.</p>
+
+      <h2>Where the signal breaks down</h2>
+
+      <p>Three honest caveats:</p>
+
+      <ul>
+        <li><strong>2-day filing lag</strong>. By the time you see the
+        Form 4, the insider's trade is up to 48 hours old. The market
+        often already moved.</li>
+        <li><strong>Selling is less informative than buying</strong>.
+        Insiders sell for personal reasons (diversification, house
+        purchase, divorce) that aren't tied to their view of the
+        company. Buying is almost always a directional view; selling
+        is mixed.</li>
+        <li><strong>Small-cap signal-to-noise is worse than
+        large-cap</strong>. Microcap insiders trade more frequently
+        for personal-liquidity reasons. The cluster filter helps but
+        doesn't eliminate the noise.</li>
+      </ul>
+
+      <h2>The pitch</h2>
+
+      <p>Form 4 is one of the few real edges retail traders have
+      access to — the raw data is public, the filing is mandatory,
+      and most retail traders don't read it. The hard part isn't
+      access; it's filtering. Tapeline Premium does the filtering
+      and surfaces it as both (1) a sub-score in the composite and
+      (2) raw filtered transactions at /app/holdings.</p>
+
+      <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">14-day
+      Premium trial — no card</a>. Read 90 days of filtered Form 4
+      activity across the full universe. Cancel in one click.</p>
+    `,
+  },
+  {
+    slug: "how-to-evaluate-a-stock-scanner-track-record",
+    title: "How to evaluate a stock scanner you can actually trust (5 criteria most fail).",
+    excerpt:
+      "Every stock scanner claims to beat the market. Almost none publish a daily, append-only, back-checked track record you can audit. Here are the five tests we'd put any scanner through before paying — and how to read between the lines when the answers get vague.",
+    publishedAt: "2026-05-21",
+    author: "Tapeline",
+    body: `
+      <p>Choosing a stock scanner is mostly an exercise in detecting
+      what isn't said. Every product claims to "beat the market" or
+      "outperform" or "deliver signals." Almost none publish the data
+      that would let you verify those claims. The asymmetry is the
+      whole story: the products with real records publish them
+      prominently; the products without real records hide behind
+      proprietary algorithms and selected case studies.</p>
+
+      <p>This post is the buyer's checklist — five tests we'd put any
+      scanner through, with the questions to ask and what each answer
+      tells you. Tapeline is one of the products you might evaluate
+      with these criteria; we score ourselves at the end so you can
+      compare us against the same yardstick we'd apply to a
+      competitor.</p>
+
+      <h2>Test 1: Can you see every pick, including the losers?</h2>
+
+      <p>This is the single most important test and the one most
+      products fail. "Picks of the day" or "today's recommendations"
+      are easy to publish; what's hard is publishing every pick that
+      was wrong, with the same prominence, on the same page, with the
+      original score and signal still attached.</p>
+
+      <p>The right answer looks like: <em>"Yes, every top-10 daily
+      pick we've ever published is logged at this URL, sorted by
+      date, with the next-day return and the original score visible.
+      The page is append-only — we can't go back and edit it. You can
+      see every win and every miss."</em></p>
+
+      <p>The wrong answer looks like: <em>"Our algorithm has a 67%
+      win rate based on internal testing"</em> with no link to the
+      raw record. That's a marketing claim, not a verifiable
+      statement.</p>
+
+      <p>Test it: ask for the URL of the daily picks log. If they
+      hesitate, you have your answer.</p>
+
+      <h2>Test 2: Is the benchmark named?</h2>
+
+      <p>"Outperforms the market" is a meaningless claim without a
+      named benchmark. Outperforms which market? The S&amp;P 500?
+      Russell 2000? Equal-weighted universe? Sector ETF? The choice
+      of benchmark changes the answer by 5-10 percentage points
+      annually.</p>
+
+      <p>Real answer: <em>"Picks are back-checked against SPY (S&amp;P
+      500 ETF) on a same-day, next-trading-day basis. Alpha is the
+      pick's 1-day return minus SPY's same-day return."</em></p>
+
+      <p>Vague answer: <em>"Outperforms the broader market"</em> with
+      no specific index named.</p>
+
+      <p>Tapeline's choice: SPY same-day-pick to next-trading-day-close
+      vs SPY same window. Documented at
+      <a href="/scorecard">/scorecard</a>.</p>
+
+      <h2>Test 3: Is the scoring methodology published?</h2>
+
+      <p>This is the test most products fail through omission rather
+      than misdirection. They simply don't disclose the formula at
+      all. "Proprietary algorithm developed over X years" is the
+      standard formulation.</p>
+
+      <p>The right answer publishes the inputs, the weights, and any
+      transformations explicitly. Tapeline's example:
+      Trend 25% / Relative Strength 20% / Fundamentals 15% / Smart
+      Money 15% / Macro 15% / Momentum 10%, summed to a 0-100
+      composite. Each sub-score's input data sources and computation
+      steps are documented at <a href="/how-it-works">/how-it-works</a>.</p>
+
+      <p>What this enables: if the product underperforms in a
+      particular regime, you can look at the score breakdown and see
+      <em>which factor is dragging</em>. You can disagree with the
+      weights and reason about that disagreement. With a black box,
+      you can't do any of that — you can only stop using it.</p>
+
+      <h2>Test 4: How fresh is the data?</h2>
+
+      <p>"Real-time" means different things at different price tiers.
+      On a free tier, "real-time" often means 15-minute delayed,
+      because that's the IEX exchange delay limit on free
+      consolidated feeds. On a paid tier, "real-time" usually means
+      direct exchange data with sub-second latency.</p>
+
+      <p>Test it by checking the timestamp on a single quote. If
+      it's behind the broker quote you'd see at your trading
+      platform, you have your answer.</p>
+
+      <p>For composite scanners (like Tapeline), the question is
+      slightly different: how often does the SCORE refresh, not just
+      the underlying price? Tapeline's worker ticks every 60 seconds
+      during market hours, recomputing the composite from fresh
+      snapshot data. Free tier is 24-hour-delayed (intentional
+      gating); Pro is 60-second freshness.</p>
+
+      <h2>Test 5: What's the unsubscribe / cancel friction?</h2>
+
+      <p>This is the dirtiest test, but the most diagnostic. Products
+      that are confident in their value make it trivial to leave.
+      Products that depend on dark-pattern retention make it hard.</p>
+
+      <p>Check before you sign up:</p>
+
+      <ul>
+        <li>Can you cancel from a settings page in one click, or do
+        you need to email support and wait?</li>
+        <li>Is the trial auto-converting? Do you have to add a credit
+        card?</li>
+        <li>What's the refund window?</li>
+      </ul>
+
+      <p>Tapeline's policy: trial doesn't require a card, cancel from
+      /app/billing in one click, 7-day refund window on monthly
+      subscriptions. We'd rather lose subscribers cleanly than retain
+      them via friction.</p>
+
+      <h2>How Tapeline scores against the checklist</h2>
+
+      <table>
+        <thead>
+          <tr><th>Test</th><th>Tapeline</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Public daily picks log with losers visible</td>
+              <td>Yes — <a href="/scorecard">/scorecard</a></td></tr>
+          <tr><td>Named benchmark</td><td>SPY, same-day-pick to next-trading-day-close</td></tr>
+          <tr><td>Public scoring formula with weights</td>
+              <td>Yes — <a href="/how-it-works">/how-it-works</a> with exact weights</td></tr>
+          <tr><td>Data freshness</td>
+              <td>60s composite refresh on Pro+; 24h delayed on Free (intentional)</td></tr>
+          <tr><td>Cancel friction</td>
+              <td>One-click cancel, 7-day refund, no card required for trial</td></tr>
+        </tbody>
+      </table>
+
+      <h2>What this checklist does NOT test</h2>
+
+      <p>To be honest: none of these criteria tell you whether the
+      product will work for YOUR specific trading style. You might
+      need filter breadth Tapeline doesn't have. You might need
+      international coverage we don't offer (US-only for now). You
+      might prefer the analyst-rating focus Zacks does better than
+      anyone. The checklist tells you whether the product is
+      <em>honest about what it does</em>, not whether what it does
+      matches your needs.</p>
+
+      <p>The two questions you need to answer separately:</p>
+
+      <ol>
+        <li>Does this product publish enough evidence for me to
+        verify their claims? (Checklist above.)</li>
+        <li>Does the thing they're publishing evidence FOR match what
+        I actually want to do? (Read the product page + try the free
+        tier + read the scorecard.)</li>
+      </ol>
+
+      <p>Tapeline's pitch: we'd rather lose your business to a
+      product that fits you better than win it via misleading
+      claims. If the scorecard convinces you, the
+      <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">14-day
+      Premium trial</a> is the no-card way to see the rest. If it
+      doesn't, that's useful information too.</p>
+    `,
+  },
 ];
 
 export function findPost(slug: string): BlogPost | null {
