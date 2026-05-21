@@ -4,6 +4,7 @@ import { ComparisonTable } from "@/components/ComparisonTable";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TrackPageView } from "@/components/TrackPageView";
+import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -125,6 +126,13 @@ export default function PricingPage() {
       </section>
 
       <MarketingFooter />
+
+      {/* Exit-intent capture — fires once per session when the cursor
+          leaves the viewport via the top edge. Visitors who reached
+          /pricing have commercial intent; if they bounce without
+          converting, capturing them into the newsletter is the
+          second-best outcome. Skips touch devices automatically. */}
+      <ExitIntentModal source="pricing" />
     </main>
   );
 }

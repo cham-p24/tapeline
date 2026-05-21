@@ -387,6 +387,12 @@ export default function LandingPage() {
           <div className="mx-auto max-w-md">
             <NewsletterCapture source="homepage" heading="" sub="" />
           </div>
+          <p className="mx-auto mt-4 max-w-md text-center text-xs text-muted">
+            Want to see today&rsquo;s picks first?{" "}
+            <Link href="/daily-picks" className="text-accent hover:underline">
+              Preview today&rsquo;s Top 10 →
+            </Link>
+          </p>
         </div>
       </section>
 
