@@ -516,3 +516,82 @@ async def render_email_preview(
         )
 
     return HTMLResponse(content=html)
+
+
+@router.post("/email-preview/{name}/send")
+async def send_email_preview_to_admin(
+    name: str,
+    admin: User | None = Depends(require_admin),
+) -> dict:
+    """Send the rendered preview to the calling admin's email address.
+
+    Closes the "I want to see how this actually looks in Gmail / Apple Mail"
+    loop — the iframe in the preview UI shows what the rendered HTML LOOKS
+    like, but real clients massage it (Gmail's preview pane, Outlook's
+    desktop renderer, etc.). This button delivers a real copy via Resend
+    so you can preview in any inbox.
+
+    Admin-gated and sender-locked: the email always goes to the admin's
+    own address. We do NOT accept an arbitrary `to` parameter — that
+    would turn the admin endpoint into an open relay.
+
+    Returns:
+      - {"status": "sent", "to": "..."} on success
+      - {"status": "skipped", "reason": "no_api_key"} when Resend isn't
+        configured (local dev). Same shape send_email itself uses.
+      - 503 when the legacy admin-API-key path was used (no real user
+        attached, so no `to` address to send to).
+    """
+    if admin is None:
+        # Caller authenticated via the legacy X-Admin-Key header — no user
+        # row, so we have no email address to send to. Tell them, don't
+        # 500.
+        raise HTTPException(
+            503,
+            "send-to-me requires a user-session admin login (cookie-based). "
+            "The X-Admin-Key header doesn't carry a destination address.",
+        )
+    if not admin.email:
+        raise HTTPException(503, "Admin user has no email address on file")
+
+    samples = _email_samples()
+    if name not in samples:
+        raise HTTPException(404, f"Unknown email: {name}")
+    desc, renderer = samples[name]
+    try:
+        html = renderer()
+    except Exception as exc:
+        logger.exception("email_preview.send_render_failed name=%s", name)
+        raise HTTPException(500, f"Renderer failed: {exc}") from exc
+
+    # Pick the right persona based on what category the email is. We can't
+    # introspect renderer intent so the heuristic is name-based: anything
+    # starting with `subscription_` / `payment_` goes via billing@, alert
+    # + digest + newsletter go via alerts@, sales drips via christian@.
+    # Everything else (welcome, verification, referrals) is default/hello@.
+    if name.startswith(("subscription_", "payment_")):
+        persona = "billing"
+    elif name.startswith(("alert", "watchlist_alert", "digest", "weekly_newsletter")):
+        persona = "alerts"
+    elif name.startswith(("day7", "day11", "day13", "trial_expired", "trial_post", "re_engagement")):
+        persona = "sales"
+    else:
+        persona = "default"
+
+    from app.services.email import send_email
+
+    try:
+        res = await send_email(
+            admin.email,
+            f"[Preview] {desc}",
+            html,
+            persona=persona,  # type: ignore[arg-type]
+        )
+    except Exception as exc:
+        logger.exception("email_preview.send_failed name=%s admin=%s", name, admin.id)
+        raise HTTPException(502, f"Send failed: {exc}") from exc
+
+    if res.get("skipped"):
+        return {"status": "skipped", "reason": "no_api_key"}
+    logger.info("email_preview.sent name=%s to=%s persona=%s", name, admin.email, persona)
+    return {"status": "sent", "to": admin.email, "persona": persona}

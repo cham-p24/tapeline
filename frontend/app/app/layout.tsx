@@ -12,6 +12,7 @@ import { TrialEarlyCapture } from "@/components/TrialEarlyCapture";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 
 /**
  * Platform-aware shortcut key for the Search button.
@@ -106,6 +107,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="mx-auto max-w-7xl px-6 py-6">
           <StaleDataBanner />
+          <EmailVerificationBanner />
           <TrialBanner />
           <BreakingNewsBar />
           <OnboardingTip />
