@@ -38,7 +38,13 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
     <main className="min-h-screen">
       {/* Article schema — gives Google an explicit headline, datePublished
           and author for rich-result eligibility. BreadcrumbList helps Google
-          render the site-hierarchy path under the SERP result. */}
+          render the site-hierarchy path under the SERP result.
+          imageUrl points at the Next.js-generated dynamic OG image for this
+          slug (frontend/app/blog/[slug]/opengraph-image.tsx). Google's
+          Article rich-result eligibility requires an absolute image URL at
+          1200×630+ which the OG handler emits. Without this, the SERP card
+          renders text-only; with it, the post can win the image-thumbnail
+          variant that materially lifts CTR. */}
       <script
         {...jsonLdScript(
           articleJsonLd({
@@ -47,6 +53,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
             url: `https://tapeline.io/blog/${post.slug}`,
             publishedAt: post.publishedAt,
             author: post.author,
+            imageUrl: `https://tapeline.io/blog/${post.slug}/opengraph-image`,
           }),
         )}
       />
