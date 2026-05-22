@@ -20,7 +20,7 @@ tiles underneath. The frontend uses this for the heatmap search box.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -72,7 +72,7 @@ async def get_heatmap(
     # change. (Real institutions use higher thresholds — 1M+ — but we're
     # serving retail.)
     LIQUIDITY_FLOOR = 100_000
-    fresh_cutoff = datetime.now(timezone.utc) - timedelta(minutes=HEATMAP_MAX_STALE_MIN)
+    fresh_cutoff = datetime.now(UTC) - timedelta(minutes=HEATMAP_MAX_STALE_MIN)
     result = await session.execute(
         select(Ticker).where(
             Ticker.score.isnot(None),
