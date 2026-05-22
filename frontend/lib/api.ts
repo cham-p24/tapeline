@@ -440,7 +440,17 @@ export const api = {
   heatmap: (q?: string) => {
     const qs = new URLSearchParams(q ? { q } : {});
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return get<{ sectors: HeatmapSector[]; available_sectors: string[]; query: string | null }>(`/api/heatmap${suffix}`);
+    return get<{
+      sectors: HeatmapSector[];
+      available_sectors: string[];
+      query: string | null;
+      freshness?: {
+        newest_updated_at: string | null;
+        oldest_updated_at: string | null;
+        max_stale_minutes: number;
+        ticker_count: number;
+      };
+    }>(`/api/heatmap${suffix}`);
   },
   scorecard: (days = 30) => get<{ summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number }; days: Record<string, ScorecardEntry[]> }>(`/api/scorecard?days=${days}`),
   popularTickers: (n = 8) => get<{ items: Array<{ symbol: string; name: string | null; sector: string | null; score: number | null }>; cached: boolean }>(`/api/scanner/popular?n=${n}`),
