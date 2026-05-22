@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { CompareIndex } from "@/components/CompareIndex";
 import {
   breadcrumbJsonLd,
   compareJsonLd,
@@ -199,6 +200,15 @@ export function CompareLayout({
         <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> —
         we update within 48 hours.
       </p>
+
+      {/* Internal-linking cluster — graphs every /compare/* page to all
+          the others. Per the 2026-05-21 GSC audit, the comparison cluster
+          had ~14 pages stuck at "Discovered — currently not indexed"
+          because each page was a templated island. Cross-linking
+          concentrates crawl budget on the topic-cluster rather than
+          treating each page as standalone duplicate content. Also gives
+          a human visitor an obvious next step. */}
+      <CompareIndex currentSlug={slug} />
 
       <MarketingFooter />
     </main>

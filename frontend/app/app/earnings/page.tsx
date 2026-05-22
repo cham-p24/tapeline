@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { userLocale } from "@/lib/datetime";
+import { handle401 } from "@/lib/api";
 
 type Earnings = {
   id: number; symbol: string; report_date: string; report_time: string;
@@ -20,6 +21,7 @@ export default function EarningsPage() {
   const load = useCallback(async () => {
     const r = await fetch(`${API_BASE}/api/earnings?days=14`, { credentials: "include", cache: "no-store" });
     if (r.ok) setRows((await r.json()).items);
+    else handle401(r.status);
   }, []);
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);

@@ -19,13 +19,48 @@ const DEV_TOKEN = IS_DEV_API ? "dev-bypass" : "";
  * every authenticated POST/DELETE/GET-with-auth returned 401 in production
  * even though the user was clearly signed in. Live bug observed
  * 2026-05-17 on "Add to watchlist" and "Notify me on news" buttons.
+ *
+ * 401 handling: centralised in `handle401()` below — every helper in this
+ * file routes through it. When an authed call returns 401 (cookie expired,
+ * tampered, or the user was signed out elsewhere), the user is bounced to
+ * /signin?next=<current path> automatically. Previously only 5 pages
+ * detected 401 string-matched on the thrown error; ~15 others let the
+ * raw 'Failed: 401 Unauthorized' fall through to the UI. This handler
+ * fixes that everywhere at once.
  */
+
+// Routes where 401 should NOT redirect — public marketing surfaces calling
+// optional auth-aware endpoints (e.g. /api/auth/session returning null
+// when signed out, which is the expected response, not an error). Without
+// this allowlist a signed-out homepage visit would loop /signin → / → /signin.
+const NO_REDIRECT_PATHS = ["/signin", "/signup", "/verify-email"];
+
+export function handle401(status: number) {
+  if (status !== 401) return;
+  if (typeof window === "undefined") return; // SSR: just throw, no redirect
+  const path = window.location.pathname;
+  // Don't redirect from public surfaces (homepage, marketing, /signin
+  // itself). Only redirect from authed app surfaces — these are the ones
+  // where 401 means 'your session is gone' not 'this is a public read'.
+  const isAppSurface = path.startsWith("/app");
+  const isSignAuthPage = NO_REDIRECT_PATHS.some((p) => path.startsWith(p));
+  if (!isAppSurface || isSignAuthPage) return;
+  // Already redirecting (e.g. multiple concurrent 401s on the same page)?
+  // Skip — first one wins.
+  if (window.location.pathname === "/signin") return;
+  const next = encodeURIComponent(path + window.location.search);
+  window.location.href = `/signin?next=${next}`;
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    handle401(res.status);
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -317,7 +352,10 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    handle401(res.status);
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -327,7 +365,10 @@ async function del<T>(path: string, token?: string): Promise<T> {
     credentials: "include",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    handle401(res.status);
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -341,7 +382,10 @@ async function patch<T>(path: string, body: unknown, token?: string): Promise<T>
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    handle401(res.status);
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -351,7 +395,10 @@ async function getAuth<T>(path: string, token: string): Promise<T> {
     credentials: "include",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    handle401(res.status);
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -380,7 +427,10 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(partial),
     });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) {
+      handle401(res.status);
+      throw new Error(`${res.status} ${await res.text()}`);
+    }
     return res.json() as Promise<{ prefs: Record<EmailPrefKey, boolean> }>;
   },
   news: (symbol?: string, limit = 20) => {

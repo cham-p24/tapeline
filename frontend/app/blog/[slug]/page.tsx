@@ -4,7 +4,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { findPost, POSTS } from "../posts";
 import { pageMeta } from "@/lib/seo";
-import { articleJsonLd, breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { articleJsonLd, breadcrumbJsonLd, howToJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export async function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -38,7 +38,13 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
     <main className="min-h-screen">
       {/* Article schema — gives Google an explicit headline, datePublished
           and author for rich-result eligibility. BreadcrumbList helps Google
-          render the site-hierarchy path under the SERP result. */}
+          render the site-hierarchy path under the SERP result.
+          imageUrl points at the Next.js-generated dynamic OG image for this
+          slug (frontend/app/blog/[slug]/opengraph-image.tsx). Google's
+          Article rich-result eligibility requires an absolute image URL at
+          1200×630+ which the OG handler emits. Without this, the SERP card
+          renders text-only; with it, the post can win the image-thumbnail
+          variant that materially lifts CTR. */}
       <script
         {...jsonLdScript(
           articleJsonLd({
@@ -47,6 +53,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
             url: `https://tapeline.io/blog/${post.slug}`,
             publishedAt: post.publishedAt,
             author: post.author,
+            imageUrl: `https://tapeline.io/blog/${post.slug}/opengraph-image`,
           }),
         )}
       />
@@ -59,6 +66,25 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           ]),
         )}
       />
+      {/* HowTo schema — only emitted for posts that opted in via howToSteps
+          in the manifest (currently the 3 long-form educational posts:
+          what-is-rsi, how-to-find-momentum-stocks, best-time-to-buy-stocks).
+          Unlocks Google's step-by-step rich result which sits high on the
+          SERP and lifts CTR significantly on instructional queries. */}
+      {post.howToSteps && post.howToSteps.length > 0 && (
+        <script
+          {...jsonLdScript(
+            howToJsonLd({
+              name: post.title,
+              description: post.excerpt,
+              url: `https://tapeline.io/blog/${post.slug}`,
+              imageUrl: `https://tapeline.io/blog/${post.slug}/opengraph-image`,
+              totalTime: post.howToTime,
+              steps: post.howToSteps,
+            }),
+          )}
+        />
+      )}
       <MarketingNav />
 
       <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">

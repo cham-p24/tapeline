@@ -318,6 +318,9 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     url: articleUrl,
     publishedAt: "2026-05-14T00:00:00Z",
     author: "Tapeline",
+    // Dynamic per-ticker OG card unlocks Article rich-result image variant.
+    // Same source the page's og:image header already points at.
+    imageUrl: `https://tapeline.io/blog/ticker/${t.symbol}/opengraph-image`,
   });
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },

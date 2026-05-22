@@ -154,3 +154,89 @@ async def test_email_preview_rejects_invalid_theme(client, monkeypatch):
             cookies=cookies,
         )
         assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_send_to_me_requires_admin(client):
+    """POST /api/admin/email-preview/{name}/send is admin-only — same gate
+    as the GET endpoints."""
+    async with client:
+        r = await client.post("/api/admin/email-preview/welcome_fallback/send")
+        assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_send_to_me_skips_when_no_api_key(client, monkeypatch):
+    """In test/dev with no RESEND_API_KEY, send_email returns skipped.
+    The endpoint surfaces that as status='skipped' (not an error) so the
+    UI can show a clear 'Resend not configured' message instead of failing."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        r = await client.post(
+            "/api/admin/email-preview/welcome_fallback/send",
+            cookies=cookies,
+        )
+        assert r.status_code == 200
+        body = r.json()
+        # In a fresh test env Resend isn't configured so we expect skipped.
+        # If a developer has RESEND_API_KEY exported in their shell while
+        # running tests locally, we'd see status="sent" instead — accept
+        # either since both prove the endpoint wired up.
+        assert body["status"] in ("sent", "skipped")
+        if body["status"] == "skipped":
+            assert body["reason"] == "no_api_key"
+
+
+@pytest.mark.asyncio
+async def test_send_to_me_unknown_name_404(client, monkeypatch):
+    """Same 404 path as the GET render — name must be a known variant."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        r = await client.post(
+            "/api/admin/email-preview/this_does_not_exist/send",
+            cookies=cookies,
+        )
+        assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_send_to_me_picks_persona_by_name(client, monkeypatch):
+    """The endpoint's persona heuristic dispatches by name prefix so the
+    From: header matches the kind of email being previewed. We can verify
+    this by mocking send_email and asserting on the persona arg.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    cases = [
+        ("welcome_fallback",                  "default"),
+        ("email_verification",                "default"),
+        ("subscription_started_pro_monthly",  "billing"),
+        ("payment_failed_first",              "billing"),
+        ("alert_rule",                        "alerts"),
+        ("watchlist_alert",                   "alerts"),
+        ("digest_with_items",                 "alerts"),
+        ("weekly_newsletter",                 "alerts"),
+        ("day13",                             "sales"),
+        ("re_engagement",                     "sales"),
+    ]
+
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        for preview_name, expected_persona in cases:
+            mock_send = AsyncMock(return_value={"id": "stub"})  # not skipped
+            # admin.py does `from app.services.email import send_email`
+            # at call time — so the live reference lives on
+            # app.services.email, not on the admin module.
+            with patch("app.services.email.send_email", new=mock_send):
+                r = await client.post(
+                    f"/api/admin/email-preview/{preview_name}/send",
+                    cookies=cookies,
+                )
+            assert r.status_code == 200, (preview_name, r.text)
+            body = r.json()
+            assert body.get("status") == "sent", (preview_name, body)
+            assert body["persona"] == expected_persona, (preview_name, body)
+            # Mock should have been invoked exactly once per preview
+            assert mock_send.await_count == 1, preview_name
+            persona_kw = mock_send.call_args.kwargs.get("persona")
+            assert persona_kw == expected_persona, (preview_name, persona_kw)

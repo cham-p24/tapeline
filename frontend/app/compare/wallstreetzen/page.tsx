@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { CompareIndex } from "@/components/CompareIndex";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -253,6 +254,7 @@ export default function VsWallStreetZenPage() {
         update within 48 hours.
       </p>
 
+      <CompareIndex currentSlug="wallstreetzen" />
       <MarketingFooter />
     </main>
   );

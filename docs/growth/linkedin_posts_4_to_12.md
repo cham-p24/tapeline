@@ -1,4 +1,7 @@
-# LinkedIn posts #4-12 — drafts ready to schedule
+# LinkedIn posts #4-15 — drafts ready to schedule
+
+> Filename still says `_4_to_12` for git-blame continuity — file now
+> covers posts #4–15 (latest three added 2026-05-22 in PR #166).
 
 Drafts continue from posts #1-3 (already LIVE on
 linkedin.com/in/christian-piyatilaka-16192a40a). Each post follows the
@@ -221,3 +224,174 @@ between your own posts.
 
 After post #12, re-audit: are there topics from reader comments / Show
 HN feedback / podcast interviews that are worth a #13-#20 batch?
+
+---
+
+## Posts #13-15 — amplify the 2026-05-20 blog cluster
+
+Three new long-form posts shipped 2026-05-20/21 in PR #165 targeting
+commercial-investigation SERP queries:
+
+  /blog/best-stock-scanner-under-30
+  /blog/how-to-read-sec-form-4
+  /blog/how-to-evaluate-a-stock-scanner-track-record
+
+Each gets a paired LinkedIn post in the same factual / methodology-first
+voice. URL in the FIRST COMMENT (LinkedIn down-ranks links in body).
+
+---
+
+### Post #13 — Honest scanner-comparison framing
+
+```
+I wrote a "best stock scanner under $30/month" comparison this week.
+
+I'm running one of the four products in the comparison (Tapeline). The
+post is 1,200 words of honest cost-quality matrix vs Finviz Elite,
+Stock Rover Essentials, Zacks Premium — and it explicitly calls out
+the rows where Tapeline loses to each of them.
+
+We lose on:
+- Raw filter breadth (Finviz has 70+ filters; we don't try to)
+- Portfolio analytics (Stock Rover does this better)
+- Earnings + analyst-rating depth (Zacks is the reference)
+- Free-tier data freshness (ours is 24-hour delayed — deliberately)
+
+We win on:
+- Public formula with exact weights (not "proprietary algorithm")
+- Daily back-checked picks vs SPY, append-only, every loser still on
+  the page
+- One-click cancel, no-card trial
+
+The reason most "best scanner" articles are useless is that they're
+affiliate-fee farms. Every product gets 9/10, the criteria are
+gamed, the conclusion is always "they're all great." If you've
+read more than two, you know the pattern.
+
+This isn't that. I tried to write the post I wish I'd read before
+buying my first scanner — the one that tells you to rule us out
+cleanly if we don't fit.
+```
+
+Char count: ~1,140. First comment: `tapeline.io/blog/best-stock-scanner-under-30`
+
+Why this works: signals confidence (calling out own weaknesses), keys
+into "affiliate farm" frustration B2B operators recognise, ends with
+soft pitch tied to discomfort with industry-standard fluff.
+
+---
+
+### Post #14 — Form 4 field guide
+
+```
+Most retail traders see a Form 4 filing — the SEC paperwork every
+corporate insider files within 2 business days of trading their
+company's stock — and assume any large purchase is bullish.
+
+90% of Form 4 activity is noise. Here's what I filter out before
+the data hits Tapeline's Smart Money sub-score:
+
+1. Anything that isn't transaction code P (open-market buy) or S
+   (open-market sale). Grants, vestings, withholdings, exercises
+   — those are HR paperwork, not directional trades.
+
+2. 10b5-1 plan sales. These are pre-arranged schedules executives
+   use to sell systematically. A CFO who set up a 10b5-1 in March
+   selling 10k shares every quarter isn't reacting to current
+   information.
+
+3. Tiny purchases relative to existing holdings. A director who
+   owns 500k shares buying 100 more is rounding error in their own
+   portfolio.
+
+4. Director purchases at companies with mandatory ownership rules.
+   New board appointees are often just complying with the policy,
+   not expressing a view.
+
+What's left after that filter is the 10% that actually predicts
+something. Cluster buying (CEO + CFO + ≥1 director, same direction,
+30-day window) is the cleanest signal in the data. The 2-day filing
+lag is the catch — by the time you see it, the trade is up to 48
+hours old.
+
+Smart Money is 15% of the Tapeline composite. The 90% filter runs
+automatically; the result is one number, scored against the
+universe.
+```
+
+Char count: ~1,310. First comment: `tapeline.io/blog/how-to-read-sec-form-4`
+
+Why this works: technical credibility (mentions specific filing codes,
+real 2-day lag), useful even if reader never visits Tapeline, ends on
+"we do this filtering for you" pitch that's earned not begged.
+
+---
+
+### Post #15 — The 5-test scanner checklist
+
+```
+Choosing a stock scanner is mostly an exercise in detecting what
+isn't said.
+
+The five tests I'd run before paying for any of them — and what
+the vague answer to each one tells you:
+
+1. Can you see every pick, including the losers?
+   Right answer: a URL to the daily picks log, append-only, losers
+   visible. Vague answer: "67% win rate based on internal testing"
+   with no link.
+
+2. Is the benchmark named?
+   Right answer: "vs SPY, same-day-pick to next-trading-day-close."
+   Vague answer: "outperforms the market" with no index named.
+
+3. Is the scoring methodology published?
+   Right answer: exact factor weights, public, change-log
+   announced. Vague answer: "proprietary algorithm developed
+   over X years."
+
+4. How fresh is the data?
+   Test it by checking the timestamp on a single quote against
+   your broker feed.
+
+5. What's the cancel friction?
+   The dirtiest test but the most diagnostic. Products confident
+   in their value make it trivial to leave. Products that depend
+   on retention friction make it hard.
+
+I scored Tapeline against this checklist in the post (linked in
+first comment). We pass all five — but the checklist is
+deliberately product-agnostic. Use it on any scanner before paying.
+
+The one thing the checklist DOESN'T test: whether the product
+matches your style. That's a separate question. Pass the
+checklist first, then check the style fit.
+```
+
+Char count: ~1,260. First comment: `tapeline.io/blog/how-to-evaluate-a-stock-scanner-track-record`
+
+Why this works: positioned as buyer's framework, not seller's pitch.
+Useful even if reader never tries Tapeline. Last paragraph admits the
+checklist's limit — that admission is the credibility move.
+
+---
+
+### Updated posting schedule
+
+Posts #4–6 are past their scheduled dates — facts haven't changed,
+so just post them at the next available Tue/Thu/Sat in sequence
+rather than shifting the whole calendar.
+
+| Date | Post |
+|---|---|
+| Catch-up (post in order, one per Tue/Thu/Sat) | #4 → #5 → #6 |
+| Tue 2026-05-26 | #7 (7 days of forward-testing) — refresh the number at post time |
+| Thu 2026-05-28 | #8 (why publish the formula) |
+| Sat 2026-05-30 | #9 (a scanner that publishes misses) |
+| Tue 2026-06-02 | #10 (building solo from Melbourne) |
+| Thu 2026-06-04 | #11 (free tier philosophy) |
+| Sat 2026-06-06 | #12 (roadmap) |
+| **Tue 2026-06-09** | **#13 (honest scanner comparison)** |
+| **Thu 2026-06-11** | **#14 (Form 4 field guide)** |
+| **Sat 2026-06-13** | **#15 (5-test scanner checklist)** |
+

@@ -7,6 +7,8 @@
  * non-installed iOS Safari — caller should catch and surface the install hint.
  */
 
+import { handle401 } from "@/lib/api";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -54,6 +56,7 @@ export async function subscribeToWebPush(): Promise<{ ok: true } | { ok: false; 
 
   // Step 3: get the VAPID public key from the backend
   const vapidRes = await fetch(`${API_BASE}/api/me/vapid`, { credentials: "include", cache: "no-store" });
+  if (!vapidRes.ok) handle401(vapidRes.status);
   const vapidBody = await vapidRes.json();
   const publicKey: string = vapidBody.public_key || "";
   if (!publicKey) {
@@ -86,6 +89,7 @@ export async function subscribeToWebPush(): Promise<{ ok: true } | { ok: false; 
     }),
   });
   if (!post.ok) {
+    handle401(post.status);
     const body = await post.json().catch(() => ({} as any));
     return { ok: false, reason: body.detail || `Server rejected subscription (${post.status})` };
   }
@@ -110,6 +114,7 @@ export async function unsubscribeFromWebPush(): Promise<{ ok: true } | { ok: fal
 
 export async function testWebPush(): Promise<{ ok: true; delivered: number; total: number } | { ok: false; reason: string }> {
   const r = await fetch(`${API_BASE}/api/me/push/test`, { method: "POST", credentials: "include" });
+  if (!r.ok) handle401(r.status);
   const body = await r.json();
   if (!r.ok) return { ok: false, reason: body.detail || `${r.status}` };
   return { ok: true, delivered: body.delivered, total: body.total };
