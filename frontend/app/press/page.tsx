@@ -23,7 +23,12 @@ export const metadata = pageMeta({
   path: "/press",
 });
 
+const LAST_UPDATED = "2026-05-22";
+const LAST_UPDATED_DISPLAY = "May 22, 2026";
+
 const FACT_SHEET = [
+  { label: "Company",         value: "Tapeline (tapeline.io)" },
+  { label: "Founder",         value: "Christian Piyatilaka (solo founder)" },
   { label: "Founded",         value: "2025 (engine), 2026 (public launch)" },
   { label: "Headquarters",    value: "Melbourne, Victoria, Australia" },
   { label: "Funding",         value: "Bootstrapped — no external investment" },
@@ -33,6 +38,7 @@ const FACT_SHEET = [
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
   { label: "Press contact",   value: "press@tapeline.io" },
+  { label: "Last updated",    value: LAST_UPDATED_DISPLAY },
 ];
 
 const ONE_LINER =
@@ -81,6 +87,38 @@ const SCREENSHOTS = [
   },
 ];
 
+// Founder Person schema — teaches the Knowledge Graph that the human
+// "Christian Piyatilaka" is the founder of the organisation "Tapeline".
+// Helps two SERP problems at once:
+//   1. The brand-query problem (positions Tapeline as a company with a
+//      named founder, not a generic word).
+//   2. The founder-discovery problem (if a journalist or investor
+//      searches "Christian Piyatilaka", the result links them to
+//      Tapeline rather than to unrelated namesakes).
+const FOUNDER_PERSON_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: "Christian Piyatilaka",
+  jobTitle: "Founder",
+  worksFor: {
+    "@type": "Organization",
+    name: "Tapeline",
+    url: "https://tapeline.io",
+  },
+  knowsAbout: [
+    "Quantitative trading",
+    "Stock scanners",
+    "US equities",
+    "Software engineering",
+    "Financial technology",
+    "Retail trading",
+  ],
+  sameAs: [
+    "https://x.com/tapeline_io",
+    "https://github.com/cham-p24",
+  ],
+};
+
 export default function PressPage() {
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },
@@ -90,6 +128,7 @@ export default function PressPage() {
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
+      <script {...jsonLdScript(FOUNDER_PERSON_JSON_LD)} />
       {pressContactPageJsonLd().map((g, i) => (
         <script key={`pressld-${i}`} {...jsonLdScript(g)} />
       ))}
@@ -234,24 +273,106 @@ export default function PressPage() {
           </div>
         </section>
 
-        {/* Founder bio — Person schema-eligible. Update with real bio + headshot. */}
+        {/* Founder bio — Person schema-eligible and named so the Knowledge
+            Graph picks up the founder ↔ company link. */}
         <section className="mt-12 rounded-2xl border border-border bg-panel/40 p-6 sm:p-8">
           <h2 className="text-xl font-bold tracking-tight">Founder bio</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Tapeline is built by a solo founder with a decade of software
-            engineering and active retail trading experience. The same scoring
-            engine that powers Tapeline runs as a personal trading bot in
-            production, including paper-trading via Alpaca on the same signals
-            shown publicly. The founder is available for podcast and
-            interview requests via{" "}
+            <strong className="text-fg">Christian Piyatilaka</strong> is the
+            solo founder of Tapeline. Based in Melbourne, Australia. Software
+            engineer + active retail trader; built the underlying scoring
+            engine in 2025 as a personal trading bot before opening it up as
+            a public SaaS in 2026.
+          </p>
+          <p className="mt-3 text-sm text-muted leading-relaxed">
+            The same 6-factor scoring engine that powers tapeline.io continues
+            to run as a personal trading system in production — including
+            paper-trading via Alpaca against the same signals shown publicly
+            on the scorecard. Tapeline is the public version of that work,
+            rebuilt for traders who want one number and one sentence per
+            ticker rather than 60 raw filter fields and a blank stare.
+          </p>
+          <p className="mt-3 text-sm text-muted leading-relaxed">
+            Available for podcast and interview requests via{" "}
             <a href="mailto:press@tapeline.io" className="text-accent hover:underline">
               press@tapeline.io
             </a>
+            {" "}— usually returns within one business day. Topics most
+            comfortable speaking to: transparent quantitative scoring,
+            public-track-record accountability, building SaaS solo, retail
+            trader workflows, and why the 'AI stock picker' category is
+            mostly opaque ML black boxes.
+          </p>
+          <p className="mt-4 text-xs text-subtle">
+            Headshot and detailed prior-background CV available on request.
+            Public profiles:{" "}
+            <a href="https://x.com/tapeline_io" target="_blank" rel="noopener" className="text-accent hover:underline">X / tapeline_io</a>
+            {" · "}
+            <a href="https://github.com/cham-p24" target="_blank" rel="noopener" className="text-accent hover:underline">GitHub / cham-p24</a>
             .
           </p>
-          <p className="mt-3 text-xs text-subtle">
-            Detailed bio with photo and prior background available on request.
+        </section>
+
+        {/* What Tapeline is NOT — common journalist due-diligence questions
+            answered up-front so the legal/regulatory posture is clear and
+            doesn't surprise anyone post-publication. */}
+        <section className="mt-12">
+          <h2 className="text-2xl font-bold tracking-tight">What Tapeline is NOT</h2>
+          <p className="mt-3 text-sm text-muted">
+            For journalist due-diligence and to head off common
+            misinterpretations:
           </p>
+          <ul className="mt-5 space-y-3 text-sm text-muted leading-relaxed">
+            <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
+              <strong className="text-fg">Not a registered investment adviser.</strong>{" "}
+              Tapeline is a research tool that publishes descriptive analytics
+              ("CONSTRUCTIVE", "STRONG SETUP") — not prescriptive recommendations
+              ("BUY NOW"). This is the publisher&rsquo;s exemption posture from
+              investment-adviser registration in the US, AU, and EU.
+            </li>
+            <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
+              <strong className="text-fg">Not a broker, custodian, or wallet.</strong>{" "}
+              Tapeline does not hold client funds, execute trades, or accept
+              custody of securities. Scores are displayed; users trade
+              elsewhere.
+            </li>
+            <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
+              <strong className="text-fg">Not an AI black box.</strong> The
+              composite score uses a published 6-factor formula with exact
+              weights at <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
+              Weights are versioned in the public changelog and never edited
+              retroactively. No proprietary ML rerank step is applied
+              between the formula and the displayed number.
+            </li>
+            <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
+              <strong className="text-fg">Not crypto, not options, not futures.</strong>{" "}
+              US equities and ETFs only (~2,500 actively scored). The
+              underlying data feed supports broader asset classes but
+              Tapeline&rsquo;s scoring model is calibrated for cash equities.
+            </li>
+          </ul>
+        </section>
+
+        {/* Recent press — empty state structure ready for the first
+            coverage. When the first piece publishes, replace the empty
+            state with a Press[] array and a Link list. */}
+        <section className="mt-12">
+          <h2 className="text-2xl font-bold tracking-tight">Recent press</h2>
+          <p className="mt-3 text-sm text-muted">
+            Coverage, interviews, and mentions. Tapeline launched publicly
+            in 2026 — be the first to cover it.
+          </p>
+          <div className="mt-5 rounded-lg border border-dashed border-border/60 bg-panel/20 p-6 text-center">
+            <p className="text-sm text-muted">
+              First publication slot reserved. Email{" "}
+              <a href="mailto:press@tapeline.io" className="text-accent hover:underline">
+                press@tapeline.io
+              </a>{" "}
+              with your outlet, deadline, and angle — we&rsquo;ll send a
+              founder quote, custom data pull, or full embargo set
+              depending on what your piece needs.
+            </p>
+          </div>
         </section>
 
         {/* CTA */}
