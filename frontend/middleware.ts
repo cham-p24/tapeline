@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SECTOR_LEGACY_REDIRECTS } from "./app/sector/sectors";
 
 /**
  * Tapeline edge middleware — two responsibilities:
@@ -58,6 +59,13 @@ export function middleware(request: NextRequest) {
   // Either of these returns early so auth+locale don't run on the redirect.
   const tickerHandled = handleTickerRoute(request);
   if (tickerHandled) return tickerHandled;
+
+  // Sector slug redirect — old Yahoo Finance slugs (technology,
+  // healthcare, financial-services, consumer-cyclical, etc.) 308 to the
+  // new GICS slugs. Returns early so locale/auth don't fire on the
+  // redirect hop.
+  const sectorHandled = handleSectorRedirect(request);
+  if (sectorHandled) return sectorHandled;
 
   const response = handleAuth(request);
 
@@ -136,6 +144,27 @@ function handleTickerRoute(request: NextRequest): NextResponse | null {
   if (canonical === pathname) return null;
   const target = new URL(canonical, request.url);
   // Preserve query + hash so links like /t/aapl?ref=hn keep their UTM.
+  target.search = request.nextUrl.search;
+  target.hash = request.nextUrl.hash;
+  return NextResponse.redirect(target, 308);
+}
+
+/**
+ * Yahoo → GICS sector-slug 308 redirect. The frontend SECTORS list was
+ * migrated to GICS on 2026-05-22 to match the backend's
+ * canonical_sector() output. Old URLs (technology, healthcare, etc.)
+ * already exist in Google's index and in external backlinks — 308 to
+ * preserve link equity and stop those landings from 404'ing.
+ */
+function handleSectorRedirect(request: NextRequest): NextResponse | null {
+  const pathname = request.nextUrl.pathname;
+  // Match /sector/<slug> exactly (one segment after /sector/, no trailing path).
+  const m = /^\/sector\/([^/]+)\/?$/.exec(pathname);
+  if (!m) return null;
+  const oldSlug = m[1].toLowerCase();
+  const newSlug = SECTOR_LEGACY_REDIRECTS[oldSlug];
+  if (!newSlug || newSlug === oldSlug) return null;
+  const target = new URL(`/sector/${newSlug}`, request.url);
   target.search = request.nextUrl.search;
   target.hash = request.nextUrl.hash;
   return NextResponse.redirect(target, 308);
