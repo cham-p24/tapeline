@@ -74,6 +74,76 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   }
 }
 
+type RelatedRow = {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  score: number | null;
+  signal: string | null;
+};
+
+/**
+ * Fetch 6 tickers in the same sector with comparable scores, excluding
+ * the current symbol. Two passes: server-side request scoped by sector
+ * + min-score floor, then in-memory selection of the 6 closest by
+ * score delta.
+ *
+ * Why this exists: GSC reported ~400 per-ticker pages stuck "Discovered,
+ * currently not indexed" — Google's quality classifier rejecting them
+ * as templated/low-uniqueness. Surfacing 6 deterministically-different
+ * related tickers per page solves both halves of that diagnosis:
+ *   (a) each page's HTML body becomes provably unique (no two tickers
+ *       have the same sector + score-cohort 6),
+ *   (b) creates dense internal linking — every indexed ticker page
+ *       passes 6 internal links to other ticker pages, accelerating
+ *       crawl + sibling discovery.
+ *
+ * Caches 5 min server-side; falls back to empty array on any error so
+ * the page renders even if /api/scanner is down. Empty array hides the
+ * section entirely (no awkward "couldn't load" UI).
+ */
+async function fetchRelatedTickers(
+  symbol: string,
+  sector: string | null,
+  currentScore: number | null,
+): Promise<RelatedRow[]> {
+  if (!sector) return [];
+  try {
+    const params = new URLSearchParams({
+      sort: "score",
+      order: "desc",
+      min_score: "40",
+      limit: "60",
+    });
+    const res = await fetch(`${API_BASE}/api/scanner?${params.toString()}`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { items?: RelatedRow[] };
+    const items = body.items ?? [];
+    const sym = symbol.toUpperCase();
+    // Filter to same sector, exclude self, score must exist.
+    const candidates = items.filter(
+      (r) =>
+        r.sector === sector &&
+        r.symbol.toUpperCase() !== sym &&
+        r.score != null,
+    );
+    if (currentScore == null) return candidates.slice(0, 6);
+    // Sort by absolute score-delta vs current ticker so the related set
+    // is "names with similar conviction in your sector" — most useful for
+    // a trader and most defensibly unique for Google's quality classifier.
+    candidates.sort(
+      (a, b) =>
+        Math.abs((a.score ?? 0) - currentScore) -
+        Math.abs((b.score ?? 0) - currentScore),
+    );
+    return candidates.slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
 // Per-page metadata so each ticker page has its own title + description and
 // its own social-share text. The sibling opengraph-image.tsx auto-wires
 // og:image. The root layout's title.template is "%s" so the brand suffix
@@ -184,6 +254,11 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
   const data = await fetchTicker(sym);
 
   if (!data) notFound();
+
+  // Related tickers fetched in parallel with the main page render. Empty
+  // array gracefully hides the section so a slow / failing /api/scanner
+  // doesn't degrade the rest of the page.
+  const related = await fetchRelatedTickers(sym, data.sector, data.score);
 
   const score = data.score ?? 0;
   const signal = data.signal ?? "—";
@@ -385,6 +460,69 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             </a>
           </div>
         </div>
+
+        {/* Related tickers — same sector, comparable composite. This is
+            the per-ticker indexing rescue: GSC flagged ~400 of these
+            pages as "Discovered, currently not indexed" (templated /
+            low-uniqueness verdict from Google's quality classifier).
+            Surfacing a deterministic, sector-scoped, score-sorted set
+            of 6 siblings makes the body provably unique per ticker AND
+            creates 6 fresh internal links per page → dense crawl graph
+            across the cluster. */}
+        {related.length > 0 && (
+          <section className="mt-12 sm:mt-16">
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
+              Similar setups in {data.sector ?? "this sector"} right now
+            </h2>
+            <p className="mt-2 text-sm text-muted max-w-2xl">
+              Six {data.sector ? `${data.sector.toLowerCase()} ` : ""}tickers with
+              composite scores closest to {data.symbol}&rsquo;s {data.score?.toFixed(0) ?? "—"} —
+              same factor environment, sortable on the live scanner.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((r) => {
+                const rScore = r.score ?? 0;
+                const rScoreColor =
+                  rScore >= 85 ? "text-up" :
+                  rScore >= 70 ? "text-up" :
+                  rScore >= 55 ? "text-accent" :
+                  rScore >= 40 ? "text-muted" :
+                  "text-down";
+                return (
+                  <Link
+                    key={r.symbol}
+                    href={`/t/${r.symbol}`}
+                    className="group block rounded-lg border border-border bg-panel/40 p-4 transition hover:border-accent/40 hover:bg-panel"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-mono font-bold text-base tracking-tight group-hover:text-accent">
+                        {r.symbol}
+                      </span>
+                      <span className={`text-xl font-bold nums ${rScoreColor}`}>
+                        {r.score != null ? r.score.toFixed(0) : "—"}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted truncate" title={r.name}>
+                      {r.name}
+                    </div>
+                    {r.signal && (
+                      <div className="mt-2 text-[10px] uppercase tracking-wider text-subtle">
+                        {r.signal}
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="mt-4 text-xs text-subtle">
+              Sorted by closeness to {data.symbol}&rsquo;s composite score within{" "}
+              {data.sector ?? "sector"}. Refreshed every 5 minutes.{" "}
+              <Link href="/app/scanner" className="text-accent hover:underline">
+                Run the full scanner →
+              </Link>
+            </p>
+          </section>
+        )}
 
         {/* FAQ — visible content that mirrors the FAQPage JSON-LD above.
             Hits the long-tail "{TICKER} stock score", "is {TICKER} a buy",
