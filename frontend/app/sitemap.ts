@@ -153,7 +153,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  const tickers = await fetchTopTickers(500);
+  // Per-ticker pages — capped at the top 250 by daily $-volume.
+  //
+  // 2026-05-24: cut from 500 → 250 after GSC reported 474 /t/{TICKER}
+  // pages stuck in "Crawled - currently not indexed" (quality classifier
+  // FAIL). The diagnosis: too many templated programmatic pages for the
+  // long-tail tickers no one searches for. Concentrating crawl budget
+  // on 250 names where the per-ticker content has a chance of ranking
+  // is materially better SEO than submitting 500+ thin pages and
+  // watching Google reject 474 of them.
+  //
+  // The matching client-side gate lives in /t/[symbol]/page.tsx —
+  // isLowSignalTicker() emits `robots: noindex, follow` for any
+  // ticker that DID reach the page (e.g. via direct link) but doesn't
+  // pass the score/confidence/volume floor. Sitemap + page noindex
+  // combine: Google only ever sees the 250 here AND those 250 only
+  // get indexed if they pass the runtime quality bar.
+  const tickers = await fetchTopTickers(250);
   const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
     url: `${base}/t/${sym}`,
     lastModified: now,
