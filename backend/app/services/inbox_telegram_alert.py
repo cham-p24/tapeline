@@ -52,8 +52,11 @@ def _channel_label(channel: str) -> str:
 
 
 async def alert_founder(message: InboundMessage) -> bool:
-    """Send a Tier 1 alert card to the founder's Telegram. Returns
-    True on successful send, False on any skip/failure."""
+    """Send a Tier 1 alert card to the founder's Telegram with inline
+    Approve/Reject buttons. Returns True on successful send.
+
+    Buttons send `callback_data="inbox:<action>:<id>"` payloads that the
+    webhook handler in `routers/inbox.telegram_update` processes."""
     chat_id = settings.inbox_founder_telegram_chat_id
     if not chat_id:
         logger.info(
@@ -68,7 +71,7 @@ async def alert_founder(message: InboundMessage) -> bool:
 
     # Build the alert body. Telegram supports basic HTML — emoji + bold.
     # Keeps the structure scan-able on a phone screen: header / from /
-    # reason / preview / suggested reply / actions.
+    # reason / preview / suggested reply / inline buttons below.
     parts: list[str] = [
         "🟢 <b>Tier 1 inbound — needs your eyes</b>",
         "",
@@ -88,17 +91,30 @@ async def alert_founder(message: InboundMessage) -> bool:
         parts.append("<b>Suggested reply:</b>")
         parts.append(_truncate(message.suggested_reply, PREVIEW_CHAR_LIMIT))
 
-    parts.append("")
-    parts.append(
-        f"Reply via /app/inbox or use /approve_{message.id} "
-        f"/edit_{message.id} /reject_{message.id} "
-        "(commands wired in Phase D)."
-    )
-
     text = "\n".join(parts)
 
+    # Inline keyboard — one row of Approve / Reject / Edit. "Edit"
+    # routes to /app/inbox in the browser because Telegram doesn't
+    # have a clean inline-edit primitive; founder can edit then resend
+    # via the web UI. The Approve and Reject paths complete entirely
+    # inside Telegram with one tap.
+    public_url = "https://tapeline.io/app/inbox"
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Approve & send", "callback_data": f"inbox:approve:{message.id}"},
+                {"text": "❌ Reject", "callback_data": f"inbox:reject:{message.id}"},
+            ],
+            [
+                {"text": "✏️ Edit in browser", "url": public_url},
+            ],
+        ],
+    }
+
     try:
-        ok = await telegram.send_message(chat_id, text)
+        ok = await telegram.send_message(
+            chat_id, text, parse_mode="HTML", reply_markup=reply_markup,
+        )
         if ok:
             logger.info(
                 "inbox_telegram_alert.sent msg_id=%d chat_id=%s", message.id, chat_id,
