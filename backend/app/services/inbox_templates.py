@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Callable
+from collections.abc import Callable
 
 import httpx
 
@@ -77,7 +77,7 @@ async def render_ticker_score(body: str) -> str | None:
     # decimals on individual factors at this granularity.
     def sub(key: str) -> str:
         v = (breakdown.get(key) or {}).get("value")
-        return "—" if v is None else f"{int(round(v))}"
+        return "—" if v is None else f"{round(v)}"
 
     return (
         f"${symbol} currently scores {score:.1f}/100 ({signal}). "
@@ -129,7 +129,7 @@ async def render_thanks(_body: str) -> str:
 # templates that need live API calls (ticker_score). All renderers
 # return either the reply text or None (None means "fall through to
 # LLM" — the dispatcher will not auto-send).
-TEMPLATES: dict[str, Callable[[str], "object"]] = {
+TEMPLATES: dict[str, Callable[[str], object]] = {
     "ticker_score": render_ticker_score,
     "pricing":      render_pricing,
     "trial":        render_trial,
