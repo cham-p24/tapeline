@@ -57,6 +57,7 @@ _last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
+_last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
@@ -458,6 +459,34 @@ async def tick() -> None:
         except Exception:
             logger.exception("newsletter_daily.run_failed")
         _last_daily_newsletter_date = today_str
+
+    # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
+    # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.
+    # Generates copy-paste-ready X / LinkedIn / fintwit drafts + a
+    # conversion-funnel snapshot, emails the package to the founder.
+    # No-op when GROWTH_BOT_ENABLED is false (default — opt-in).
+    # Weekdays only — no growth tick on Sat/Sun so the founder's inbox
+    # doesn't ping at 8am on the weekend.
+    global _last_growth_tick_date
+    if (
+        settings.growth_bot_enabled
+        and started.hour >= 22                            # 22:00 UTC onward
+        and started.weekday() < 5                         # Mon-Fri
+        and _last_growth_tick_date != today_str
+    ):
+        try:
+            from app.services.growth_bot import run_daily_growth_tick
+            async with session_scope() as gb_session:
+                result = await run_daily_growth_tick(gb_session)
+            logger.info(
+                "growth_bot.tick_complete picks=%d fintwit=%d skipped=%s",
+                result.get("picks_count", 0),
+                result.get("fintwit_candidates_count", 0),
+                result.get("skipped", False),
+            )
+        except Exception:
+            logger.exception("growth_bot.tick_failed")
+        _last_growth_tick_date = today_str
 
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(

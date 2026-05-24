@@ -628,6 +628,80 @@ async def test_newsletter_subscribe_rejects_disposable_domain(client):
 
 
 @pytest.mark.asyncio
+async def test_growth_bot_preview_returns_full_payload(client, monkeypatch):
+    """GET /api/admin/growth-tick/preview returns the structured drafts.
+
+    Doesn't need GROWTH_BOT_ENABLED — preview is read-only and never sends.
+    """
+
+    # Force-promote an admin user so require_admin passes via cookie path.
+    async with client:
+        signup_email = _random_email()
+        r_signup = await client.post(
+            "/api/auth/signup",
+            json={"email": signup_email, "password": "TestPassword!2026"},
+        )
+        cookies = r_signup.cookies
+
+        # Promote to admin via DB (no public endpoint does this — by design).
+        from sqlalchemy import select
+
+        from app.db import session_scope
+        from app.models import User
+
+        async with session_scope() as s:
+            user = (await s.execute(select(User).where(User.email == signup_email))).scalar_one()
+            user.is_admin = True
+            await s.commit()
+
+        r = await client.get("/api/admin/growth-tick/preview", cookies=cookies)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert "metrics" in body
+        assert "daily_tweet" in body
+        assert "linkedin" in body
+        assert "fintwit_candidates" in body
+        assert isinstance(body["picks"], list)
+
+
+@pytest.mark.asyncio
+async def test_growth_bot_run_respects_kill_switch(client, monkeypatch):
+    """When GROWTH_BOT_ENABLED=false (default), POST .../run returns skipped."""
+    from app.db import session_scope
+    from app.services.growth_bot import run_daily_growth_tick
+
+    async with session_scope() as s:
+        result = await run_daily_growth_tick(s)
+        # Default is disabled — must short-circuit
+        assert result.get("skipped") is True
+        assert result.get("reason") == "disabled"
+
+
+@pytest.mark.asyncio
+async def test_growth_bot_draft_daily_tweet_fits_280():
+    """The daily-tweet drafter must always produce text ≤ 280 chars."""
+    from app.services.growth_bot import TopPick, draft_daily_tweet
+
+    # No picks → fallback brand-only tweet
+    assert len(draft_daily_tweet([])) <= 280
+    # 5 picks
+    picks = [
+        TopPick(symbol=f"AB{i}", name=f"Co {i}", score=80.0 + i, signal="STRONG SETUP",
+                reason="reason")
+        for i in range(5)
+    ]
+    assert len(draft_daily_tweet(picks)) <= 280
+    # Long symbol stress test
+    long_picks = [
+        TopPick(symbol="LONGSYMBL", name="Very long company name " * 4,
+                score=95.0, signal="HIGH CONVICTION",
+                reason="extremely long reason " * 5)
+        for _ in range(5)
+    ]
+    assert len(draft_daily_tweet(long_picks)) <= 280
+
+
+@pytest.mark.asyncio
 async def test_daily_digest_sends_once_per_utc_day_and_dedupes(client, monkeypatch):
     """run_daily_digest must:
        - send to every confirmed subscriber when last_sent_at is null
