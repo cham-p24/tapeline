@@ -33,7 +33,7 @@ from app.models import InboundMessage, User
 from app.services import email as email_service
 from app.services import telegram as telegram_service
 from app.services.auth import current_user_required
-from app.services.inbox_router import handle_inbound, mark_sent
+from app.services.inbox_router import handle_inbound, mark_sent, send_tier_1_5_ack
 from app.services.inbox_telegram_alert import alert_founder
 
 logger = logging.getLogger(__name__)
@@ -180,6 +180,10 @@ async def email_inbound(
     # here because no reply has gone out yet.
     if result.tier == 1:
         await session.commit()  # commit before sending so the row is queryable
+        # Fire the Tier 1.5 auto-ack first ("I'll get back within 24h") so the
+        # sender isn't ghosted while the Melbourne founder is asleep, then the
+        # founder alert. Both best-effort — neither blocks the row save.
+        await send_tier_1_5_ack(result.message)
         await alert_founder(result.message)
         return {
             "ok": True,
@@ -187,6 +191,7 @@ async def email_inbound(
             "status": result.message.status,
             "message_id": result.message.id,
             "founder_alerted": True,
+            "tier_1_5_ack_attempted": True,
         }
 
     # Tier 3 → ignored.

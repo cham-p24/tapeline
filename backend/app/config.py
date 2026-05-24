@@ -216,6 +216,66 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.0  # 0=off, 0.05=5% perf traces
     sentry_environment: str = ""  # defaults to app_env when blank
 
+    # ---- Inbox auto-handler bot ----
+    # Triages inbound messages from Reddit / email / Telegram into Tier 1 /
+    # 2 / 3. Tier 2 auto-replies via deterministic templates; Tier 1 is
+    # drafted by Claude and routed to the founder's Telegram for one-tap
+    # approval; Tier 3 is ignored. See services/inbox_classifier.py and
+    # services/inbox_router.py for the orchestration; this block holds the
+    # toggles + secrets that gate the whole thing.
+    #
+    # Global kill switch. When false, the worker still polls but never
+    # classifies or sends — useful for an instant "pause everything"
+    # without a redeploy.
+    inbox_bot_enabled: bool = True
+    # Dry-run mode. Classify + decide normally, but channel adapters
+    # short-circuit before the actual upstream send. Logs the "would
+    # have sent" payload so you can shadow-audit a week of behaviour
+    # before going live. Independent of inbox_bot_enabled.
+    inbox_dry_run: bool = False
+    # Per-channel toggles. Let the operator yank one channel without
+    # taking the others down (e.g. Reddit account shadow-banned).
+    inbox_reddit_enabled: bool = True
+    inbox_email_enabled: bool = True
+    inbox_telegram_enabled: bool = True
+    # Daily Claude classification spend ceiling. Once today's
+    # `inbox_classification_log.cost_usd` sum exceeds the cap, the
+    # classifier downgrades every ambiguous message to Tier 1 manual
+    # review until UTC midnight. $5/day ≈ 7.5K Haiku calls — plenty of
+    # headroom but a hard stop against a runaway feedback loop.
+    inbox_claude_daily_cap_usd: float = 5.0
+    # Anthropic SDK key. When unset, the LLM path is short-circuited
+    # and every ambiguous message defaults to Tier 1 manual review
+    # (safe default — never auto-replies without explicit approval).
+    anthropic_api_key: str = ""
+    # Default Claude model. Haiku 4.5 is cheapest-capable for fixed-
+    # schema JSON triage; override to claude-sonnet-4-5 if Haiku
+    # misclassifies on your fixture set.
+    inbox_claude_model: str = "claude-haiku-4-5"
+    # Tier 1.5 auto-acknowledgement toggle. When true (default), the
+    # bot fires an immediate "I'll get back within 24h" reply on every
+    # Tier 1 inbound so US-business-hours senders aren't ghosted while
+    # the Melbourne founder is asleep. Founder's actual reply still
+    # waits on Telegram approval.
+    inbox_tier1_auto_ack: bool = True
+    # Reddit OAuth (script-tier app at https://www.reddit.com/prefs/apps).
+    # All four required for the Reddit channel; missing any makes
+    # services/reddit_inbox.py a no-op.
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
+    reddit_username: str = ""
+    reddit_password: str = ""
+    reddit_user_agent: str = "tapeline-inbox-bot/0.1"
+    # Subreddits to scan for "tapeline" mentions (alongside DMs +
+    # comment-replies on bot's own posts). Comma-separated. Default
+    # covers the high-signal finance subs.
+    reddit_mention_subreddits: str = "wallstreetbets,stocks,investing,SecurityAnalysis,ValueInvesting"
+    # New-account guard. When the configured Reddit account is younger
+    # than N days, throttle auto-replies to ≤3/day. Avoids the
+    # new-account anti-spam triggers in r/wallstreetbets-style subs.
+    # Set to 0 to disable.
+    reddit_new_account_throttle_days: int = 30
+
     # ---- Growth bot (autonomous content + metrics digest) ----
     # The growth bot runs from the worker tick at 22:00 UTC weekdays
     # (~8am Melbourne). It pulls live metrics from Postgres, drafts a
