@@ -48,10 +48,16 @@ class Settings(BaseSettings):
     # select ALL SIGNALS tab + CSV format → copy URL, set:
     #   fly secrets set SIGNAL_SHEET_CSV_URL="https://docs.google.com/..." -a tapeline-backend
     signal_sheet_csv_url: str = ""
-    # Throttle: only pull from the sheet at most every N seconds. Default 300s
-    # (5 min) — well under Google's public-CSV quota, fresh enough for a sheet
-    # that updates from the signal-system every few hours.
-    signal_sheet_refresh_seconds: int = 300
+    # Throttle: only pull from the sheet at most every N seconds.
+    #
+    # 2026-05-24: cut from 300s → 30s. With sheet_feed's SHA-256 hash-dedup
+    # in place (services/sheet_feed._CSV_HASH_CACHE), an unchanged sheet
+    # costs one HTTP GET + 32-byte hash compare per tab per tick — no
+    # parse, no DB writes. A 30s cadence at 5 tabs = 600 published-CSV
+    # GETs/hour = trivial vs Google's no-published-quota stance. When the
+    # sheet IS edited, the next tick (within 30s) picks it up — gives us
+    # near-live refresh without the Apps Script trigger fragility.
+    signal_sheet_refresh_seconds: int = 30
     # Phase 2 sheet tabs — each is its own published-CSV URL. The signal-system
     # workbook has one tab per intelligence layer; Tapeline reads them
     # separately so each tab can be cached + parsed + upserted on its own
