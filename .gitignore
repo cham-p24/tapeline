@@ -85,3 +85,8 @@ frontend/tsconfig.tsbuildinfo
 .deploy-*.bat
 .deploy-*.ps1
 .deploy-*.sh
+
+# Local-only workspace (PII, API keys, drafts)
+sales/
+seo-tools/
+scripts/debug-*.ps1
