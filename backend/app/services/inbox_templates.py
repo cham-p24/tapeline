@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 import httpx
 
@@ -129,7 +129,7 @@ async def render_thanks(_body: str) -> str:
 # templates that need live API calls (ticker_score). All renderers
 # return either the reply text or None (None means "fall through to
 # LLM" — the dispatcher will not auto-send).
-TEMPLATES: dict[str, Callable[[str], object]] = {
+TEMPLATES: dict[str, Callable[[str], Awaitable[str | None]]] = {
     "ticker_score": render_ticker_score,
     "pricing":      render_pricing,
     "trial":        render_trial,
