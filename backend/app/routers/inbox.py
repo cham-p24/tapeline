@@ -23,11 +23,15 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
+from app.models import InboundMessage, User
 from app.services import email as email_service
+from app.services.auth import current_user_required
 from app.services.inbox_router import handle_inbound, mark_sent
 from app.services.inbox_telegram_alert import alert_founder
 
@@ -192,6 +196,157 @@ async def email_inbound(
         "status": result.message.status,
         "message_id": result.message.id,
     }
+
+
+# --- Admin endpoints (Phase E) ---------------------------------------------
+
+def _require_admin(user: User) -> None:
+    """The /app/inbox surface is founder-only — every inbound message is
+    sensitive (real DMs, real emails). Non-admins get 403 even if they
+    somehow auth into the page."""
+    if not getattr(user, "is_admin", False):
+        raise HTTPException(403, "Inbox is admin-only")
+
+
+class InboxListItem(BaseModel):
+    id: int
+    channel: str
+    author: str
+    subject: str | None
+    body_preview: str
+    received_at: str
+    tier: int | None
+    tier_reason: str | None
+    suggested_reply: str | None
+    status: str
+    handled_at: str | None
+
+
+class ReplyBody(BaseModel):
+    reply_text: str = Field(min_length=1, max_length=4000)
+
+
+@router.get("")
+async def list_inbox(
+    status_filter: str | None = None,
+    channel: str | None = None,
+    tier: int | None = None,
+    limit: int = 100,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
+) -> dict[str, Any]:
+    """List recent inbound messages, newest first. Founder-only.
+
+    Filters are AND-combined. `status_filter` is a comma-separated list
+    so the UI can show "active queue" (new + classified) vs "history".
+    """
+    _require_admin(user)
+    stmt = select(InboundMessage).order_by(desc(InboundMessage.received_at))
+    if status_filter:
+        allowed = [s.strip() for s in status_filter.split(",") if s.strip()]
+        stmt = stmt.where(InboundMessage.status.in_(allowed))
+    if channel:
+        stmt = stmt.where(InboundMessage.channel == channel)
+    if tier is not None:
+        stmt = stmt.where(InboundMessage.tier == tier)
+    stmt = stmt.limit(min(max(limit, 1), 500))
+    rows = (await session.execute(stmt)).scalars().all()
+
+    items = [
+        InboxListItem(
+            id=m.id,
+            channel=m.channel,
+            author=m.author,
+            subject=m.subject,
+            body_preview=(m.body[:400] + "…") if m.body and len(m.body) > 400 else (m.body or ""),
+            received_at=m.received_at.isoformat() if m.received_at else "",
+            tier=m.tier,
+            tier_reason=m.tier_reason,
+            suggested_reply=m.suggested_reply,
+            status=m.status,
+            handled_at=m.handled_at.isoformat() if m.handled_at else None,
+        ).model_dump()
+        for m in rows
+    ]
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/{message_id}/approve")
+async def approve_message(
+    message_id: int,
+    body: ReplyBody | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
+) -> dict[str, Any]:
+    """Approve + send a Tier 1 reply. If `body.reply_text` is provided
+    it overrides the LLM-drafted suggested_reply (the 'edit' flow).
+    Sends via the channel-appropriate adapter."""
+    _require_admin(user)
+    row = (await session.execute(
+        select(InboundMessage).where(InboundMessage.id == message_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Message not found")
+    if row.status == "sent":
+        return {"ok": True, "already_sent": True, "id": row.id}
+
+    reply_text = (body.reply_text if body else None) or row.suggested_reply
+    if not reply_text:
+        raise HTTPException(400, "No reply_text provided and no suggested_reply on record")
+
+    # Persist the (possibly edited) text before sending so a send failure
+    # leaves the right reply on the row for retry.
+    row.suggested_reply = reply_text
+    row.status = "approved"
+
+    # Dispatch via channel adapter
+    if row.channel == "email":
+        await email_service.send_email(
+            to=row.author,
+            subject=f"Re: {row.subject or 'your message'}",
+            html=_text_to_html(reply_text),
+            text=reply_text,
+            persona="default",
+        )
+    else:
+        # Reddit / Telegram adapters come in Phases C and D. For now,
+        # mark approved but defer actual send to the channel-specific
+        # poller's next tick. Founder still sees the action took effect
+        # in the UI.
+        await session.commit()
+        return {
+            "ok": True,
+            "id": row.id,
+            "status": row.status,
+            "deferred_send": True,
+            "reason": f"Channel '{row.channel}' adapter not yet wired",
+        }
+
+    await mark_sent(session, row.id, when=datetime.now(UTC))
+    await session.commit()
+    return {"ok": True, "id": row.id, "status": "sent"}
+
+
+@router.post("/{message_id}/reject")
+async def reject_message(
+    message_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
+) -> dict[str, Any]:
+    """Mark a Tier 1 message as rejected — founder decided not to reply.
+    No external send happens. Status is terminal."""
+    _require_admin(user)
+    row = (await session.execute(
+        select(InboundMessage).where(InboundMessage.id == message_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Message not found")
+    if row.status in ("sent", "ignored"):
+        return {"ok": True, "already_final": True, "id": row.id}
+    row.status = "ignored"
+    row.handled_at = datetime.now(UTC)
+    await session.commit()
+    return {"ok": True, "id": row.id, "status": "ignored"}
 
 
 # --- helpers ----------------------------------------------------------------
