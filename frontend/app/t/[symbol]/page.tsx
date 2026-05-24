@@ -74,6 +74,37 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   }
 }
 
+/**
+ * Decide if a ticker page is "thin enough" that Google should skip it.
+ *
+ * GSC audit 2026-05-24: 474 /t/{TICKER} pages stuck in "Crawled -
+ * currently not indexed" (validation FAILED). The crawler reads the
+ * page, sees a templated shell with sparse data per ticker, and the
+ * quality classifier rejects it. The fix is to stop SUBMITTING these
+ * pages for indexing in the first place — concentrate Googlebot's
+ * crawl budget on the ~200-300 tickers that have a real chance of
+ * ranking, and quietly noindex the long tail.
+ *
+ * Criteria (any failure ⇒ noindex):
+ *   1. No composite score at all — no signal to rank on
+ *   2. Data-confidence below 50% — feed coverage too sparse, the
+ *      score itself is unreliable
+ *   3. Daily $-volume below ~$1M (10K shares × $100 nominal floor) —
+ *      not enough demand to surface in any search anyway
+ *
+ * Pages return `robots: noindex, follow` when low-signal. They STILL
+ * render for direct visits (users who type the URL or follow a
+ * private link), and STILL pass link equity to /t/{related} and other
+ * internal links. They just stop competing for index slots that
+ * mega-caps actually deserve.
+ */
+function isLowSignalTicker(d: TickerData): boolean {
+  if (d.score == null) return true;
+  if (d.confidence_pct == null || d.confidence_pct < 50) return true;
+  if (d.volume == null || d.volume < 1_000_000) return true;
+  return false;
+}
+
 type RelatedRow = {
   symbol: string;
   name: string;
@@ -233,11 +264,17 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
     "Finviz alternative",
   ];
   const url = `https://tapeline.io/t/${sym}`;
+  // Noindex gate: low-signal tickers shouldn't compete for index slots
+  // that mega-caps deserve. See isLowSignalTicker docs above.
+  const lowSignal = isLowSignalTicker(data);
   return {
     title,
     description,
     keywords,
     alternates: { canonical: url },
+    robots: lowSignal
+      ? { index: false, follow: true, googleBot: { index: false, follow: true } }
+      : { index: true, follow: true, googleBot: { index: true, follow: true } },
     openGraph: {
       title: `${sym} · ${score}/100 · ${signal}`,
       description: why,
