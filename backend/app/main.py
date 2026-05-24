@@ -22,6 +22,7 @@ from app.routers import (
     contact,
     heatmap,
     holdings,
+    inbox,
     internal,
     me,
     news,
@@ -432,6 +433,7 @@ app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"]
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(newsletter.router, prefix="/api/newsletter", tags=["newsletter"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
+app.include_router(inbox.router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
 app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
