@@ -47,7 +47,7 @@ const FAQ = [
   },
   {
     q: "Does the badge work in GitHub README files?",
-    a: "Iframes don't render in GitHub markdown (security policy), but an SVG-based badge is on the roadmap specifically for READMEs. Subscribe to /changelog or follow @tapeline_io on X to be notified when it ships.",
+    a: "Iframes don't render in GitHub markdown — but the SVG variant does. Drop this into any README: ![Tapeline Score](https://tapeline.io/badge/NVDA). Swap NVDA for any ticker; add ?theme=dark for the dark variant. The badge is a flat Shields.io-style SVG showing the ticker, current score, and short signal label. Cached 60s server-side. Free, no auth, link-back welcome.",
   },
   {
     q: "What's the licence?",
