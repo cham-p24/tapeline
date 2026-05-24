@@ -84,7 +84,30 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   }
 
   if (error) return <div className="card p-8 text-down">Error: {error}</div>;
-  if (!data) return <div className="card p-8 text-muted">Loading {symbol}…</div>;
+  if (!data)
+    return (
+      <div className="space-y-4">
+        {/* Skeleton matches the post-load ticker page header + first-row
+            cards, so the layout doesn't shift when data lands. Plain
+            "Loading…" text was jarring on a page this dense. */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-3 w-32 animate-pulse rounded bg-panel" />
+            <div className="h-10 w-28 animate-pulse rounded bg-panel" />
+            <div className="h-4 w-48 animate-pulse rounded bg-panel" />
+          </div>
+          <div className="space-y-2 text-right">
+            <div className="ml-auto h-10 w-28 animate-pulse rounded bg-panel" />
+            <div className="ml-auto h-4 w-20 animate-pulse rounded bg-panel" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="card h-40 animate-pulse" />
+          <div className="card h-40 animate-pulse" />
+          <div className="card h-40 animate-pulse" />
+        </div>
+      </div>
+    );
 
   const toneSig =
     data.signal === "HIGH CONVICTION" ? "text-up bg-up/20"

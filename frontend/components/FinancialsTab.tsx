@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type TickerFinancials } from "@/lib/api";
+import { Skeleton } from "@/components/Skeleton";
 
 /**
  * Financials tab for the authenticated ticker page.
@@ -37,7 +38,17 @@ export function FinancialsTab({ symbol }: { symbol: string }) {
 
   if (error)
     return <p className="text-sm text-down">Couldn&rsquo;t load financials: {error}</p>;
-  if (!data) return <p className="text-sm text-muted">Loading…</p>;
+  if (!data)
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        ))}
+      </div>
+    );
   if (!data.available)
     return (
       <p className="text-sm text-muted">

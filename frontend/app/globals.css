@@ -177,6 +177,54 @@
     border-radius: 14px;
     backdrop-filter: blur(20px) saturate(140%);
     -webkit-backdrop-filter: blur(20px) saturate(140%);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  }
+
+  /*
+   * `.card-link` — opt-in interaction layer for cards that wrap a Link
+   * (sister-feature nav, blog cards, related rankings). Subtle lift +
+   * softer shadow on hover, ~iOS-style. Not applied to .card itself
+   * because most cards are containers, not clickable surfaces; adding
+   * this differentiates "this is interactive" from "this is a panel".
+   */
+  .card-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgb(var(--shadow));
+  }
+  /* Same idea but for non-`.card` linked panels — the bordered rounded
+     divs the blog index + sister-feature lists use. Reuses the same
+     transition window. */
+  .lift {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgb(var(--shadow));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-link:hover,
+    .lift:hover {
+      transform: none;
+    }
+  }
+
+  /*
+   * `.fade-in` — 150ms opacity ramp + small upward translate. Applied
+   * to top-level page <main> wrappers via the route layout so route
+   * navigations feel produced rather than hard-cut. Reduced-motion
+   * users get the final state immediately, no animation.
+   */
+  .fade-in {
+    animation: page-fade-in 0.18s ease-out both;
+  }
+  @keyframes page-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in {
+      animation: none;
+    }
   }
   /* iOS-style pill button — fully rounded, generous horizontal padding,
      subtle scale + opacity on press. */
