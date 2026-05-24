@@ -27,7 +27,7 @@ from typing import Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0027_password_reset_undeliverable"
+revision: str = "0027_password_reset_bounce"
 down_revision: Union[str, None] = "0026_inbox_auto_handler"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
