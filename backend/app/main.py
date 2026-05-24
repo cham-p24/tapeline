@@ -22,6 +22,7 @@ from app.routers import (
     contact,
     heatmap,
     holdings,
+    inbox,
     internal,
     me,
     news,
@@ -437,6 +438,7 @@ app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(internal.router, prefix="/api/internal", tags=["internal"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(inbox.router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
 app.include_router(calendar_routes.ipo_router, prefix="/api/ipos", tags=["calendar"])
