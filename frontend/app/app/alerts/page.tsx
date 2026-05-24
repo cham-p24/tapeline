@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, type AlertEvent, type AlertRule, TierGateError } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
+import { TableSkeleton } from "@/components/Skeleton";
 
 type RuleType = AlertRule["rule_type"];
 type Channel = AlertRule["channel"];
@@ -191,7 +192,7 @@ export default function AlertsPage() {
       </h2>
 
       {loading ? (
-        <div className="card p-6 text-sm text-muted">Loading…</div>
+        <div className="card overflow-hidden"><TableSkeleton cols={6} rows={4} /></div>
       ) : rules.length === 0 ? (
         <div className="card p-6 text-sm text-muted">
           No alert rules yet. Create one above, or visit the{" "}
