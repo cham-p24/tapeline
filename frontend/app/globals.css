@@ -43,14 +43,10 @@
   /* iOS systemYellow at darker shade for legible contrast on white. */
   --warn:        180 83 9;           /* amber-700                      */
   --shadow:      0 0 0 / 0.06;
-  /* Atmospheric tint opacity (used by body::before). Founder feedback
-     2026-05-20: "the rest of the page doesn't have the blue tinge in
-     the background". Bumped from 0.05 → 0.08 in light mode so the
-     iOS blue wash is actually perceptible against pure-white cards —
-     0.05 was visible only on huge unbroken background expanses, on
-     content-dense pages the cards drowned it out. 0.08 still leaves
-     enough contrast that card text stays legible. */
-  --atmosphere-opacity: 0.08;
+  /* --atmosphere-opacity removed 2026-05-22 — see globals.css body::before
+     section below for the rationale. Token kept defined as 0 for any
+     stray reference to render as a no-op rather than a parse error. */
+  --atmosphere-opacity: 0;
 }
 
 [data-theme="dark"] {
@@ -71,9 +67,7 @@
   --down:        255 69 58;
   --warn:        250 204 21;          /* amber-400, legible on near-black */
   --shadow:      0 0 0 / 0.45;
-  /* Dark mode keeps a visible navy wash — same overall feeling as the
-     pre-refactor 14% top stop, just uniform now (no banding). */
-  --atmosphere-opacity: 0.10;
+  --atmosphere-opacity: 0;
 }
 
 /*
@@ -101,7 +95,7 @@
     --down:        255 69 58;
     --warn:        250 204 21;
     --shadow:      0 0 0 / 0.45;
-    --atmosphere-opacity: 0.10;
+    --atmosphere-opacity: 0;
   }
 }
 
@@ -130,32 +124,19 @@
   }
 
   /*
-   * Page-wide blue atmospheric layer. Fixed-position pseudo-element so it
-   * stays on every page, regardless of which route or how long the page
-   * is, without us having to add the gradient to each page's <main> tag.
+   * Page-wide blue atmospheric layer — REMOVED 2026-05-22.
    *
-   * **2026-05-20 update** — replaced the 14% / 8% / 12% gradient with a
-   * single flat opacity per theme. The gradient produced visible banding
-   * as you scrolled long pages (top heavier blue, middle lighter, bottom
-   * heavier blue again) — founder feedback "bluish tinge is not [uniform]
-   * across the entire page". A single value reads as a consistent
-   * atmospheric tint instead of a streak.
+   * Was a fixed full-viewport iOS-blue tint at 5% (light) / 10% (dark) on
+   * `body::before`. Combined with the per-section gradient blobs on the
+   * landing page, the cumulative overlay was reading as "everything is
+   * faintly blue" rather than "ambient atmosphere" — founder feedback
+   * "there's a lot of overlays on the tapeline page, remove them".
    *
-   * Light mode uses 5% (barely-there iOS blue wash) so the warm card
-   * surfaces stay legible against it. Dark mode keeps the visible 10%
-   * navy wash that the founder already liked.
-   *
-   * pointer-events:none so the overlay never blocks clicks; z-index:-1
-   * keeps it behind every page element including <main>.
+   * Background now resolves to the theme's --background token directly,
+   * with section-level `bg-panel/10` tints carrying any depth signal.
+   * If we want atmosphere back in future, do it per-section + opt-in,
+   * not as a site-wide fixed overlay.
    */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-color: rgb(var(--accent) / var(--atmosphere-opacity, 0.05));
-  }
   .nums {
     font-variant-numeric: tabular-nums;
   }
