@@ -4,6 +4,7 @@ from app.models.congress import CongressTrade
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.holdings import InstitutionalHolding
 from app.models.inbox import InboundMessage
+from app.models.inbox_classification_log import InboxClassificationLog
 from app.models.insider_transaction import InsiderTransaction
 from app.models.news import NewsItem
 from app.models.newsletter import NewsletterSubscriber
@@ -28,6 +29,7 @@ __all__ = [
     "EmailVerificationToken",
     "IPOEvent",
     "InboundMessage",
+    "InboxClassificationLog",
     "InsiderTransaction",
     "InstitutionalHolding",
     "NewsItem",

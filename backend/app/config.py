@@ -195,6 +195,73 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.0  # 0=off, 0.05=5% perf traces
     sentry_environment: str = ""  # defaults to app_env when blank
 
+    # ---- Inbox auto-handler bot ----
+    # Triages inbound messages from Reddit / email / Telegram into Tier 1 /
+    # 2 / 3. Tier 2 auto-replies via deterministic templates; Tier 1 is
+    # drafted by Claude and routed to the founder's Telegram for one-tap
+    # approval; Tier 3 is ignored. See services/inbox_classifier.py +
+    # docs/launch/TAPELINE_BOT_PROMPT.md for the full design.
+    #
+    # Global kill switch (default ON in dev so tests can exercise paths;
+    # production prudence: leave OFF in fly secrets until first shadow
+    # week, then flip to true). When false, the worker still classifies
+    # and logs but never sends an actual reply.
+    inbox_bot_enabled: bool = True
+    # Dry-run mode: classify + route as usual, but every channel adapter
+    # short-circuits before the real send. Logs the "would have replied"
+    # with full payload so you can audit a week of behaviour before going
+    # live. Independent from inbox_bot_enabled — dry_run wins when both
+    # are set.
+    inbox_dry_run: bool = False
+    # Per-channel kill switches — let the operator yank one channel
+    # without taking the others down (e.g. Reddit account shadow-banned).
+    inbox_reddit_enabled: bool = True
+    inbox_email_enabled: bool = True
+    inbox_telegram_enabled: bool = True
+    # Daily spend ceiling on the Claude classification API. Sum of
+    # `classification_log.cost_usd` for today's UTC date. Once exceeded,
+    # every message that would normally hit the LLM is downgraded to
+    # Tier 1 (founder reviews manually) so we never silently burn the
+    # cap. Defaults to $5/day (roughly 1.5K Sonnet classifications, or
+    # 7.5K Haiku — plenty of headroom for normal volume; a hard stop
+    # against a feedback loop).
+    inbox_claude_daily_cap_usd: float = 5.0
+    # Anthropic SDK key. When unset, the LLM path is short-circuited and
+    # every ambiguous message goes straight to Tier 1 manual review (safe
+    # default — never auto-replies without explicit approval).
+    anthropic_api_key: str = ""
+    # Default classification model. Haiku 4.5 is the cheapest capable
+    # model for fixed-schema JSON triage; Sonnet 4.5 is the fallback if
+    # Haiku misclassifies on the fixture set. Override via env to swap
+    # without code change.
+    inbox_claude_model: str = "claude-haiku-4-5"
+    # Founder's Telegram chat_id (the destination for Tier 1 approval
+    # cards + the admin commands /approve_&lt;id&gt; / /reject_&lt;id&gt; /
+    # /edit_&lt;id&gt;). DM @userinfobot on Telegram to find it.
+    inbox_founder_telegram_chat_id: str = ""
+    # Resend inbound webhook signing secret. Configured per-webhook in
+    # the Resend dashboard, sent as the `svix-signature` header on every
+    # POST to /api/inbox/email. When unset, the email channel rejects
+    # all webhooks (fail-safe — better than processing unsigned payloads).
+    resend_inbound_secret: str = ""
+    # Reddit OAuth (script-tier app at https://www.reddit.com/prefs/apps).
+    # All four are required for the Reddit channel to work; missing any
+    # makes services/reddit_inbox.py a no-op.
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
+    reddit_username: str = ""
+    reddit_password: str = ""
+    reddit_user_agent: str = "tapeline-inbox-bot/0.1"
+    # Subreddits to scan for "tapeline" / "tapeline.io" mentions (in
+    # addition to comments on the bot's own posts + inbox DMs). Comma-
+    # separated. Default covers the high-signal finance subs.
+    reddit_mention_subreddits: str = "wallstreetbets,stocks,investing,SecurityAnalysis,ValueInvesting"
+    # New-account guard. If the configured Reddit account is under N days
+    # old, throttle auto-replies to ≤3/day to avoid the new-account
+    # shadow-ban auto-triggers in r/wallstreetbets et al. Bot accounts
+    # over N days fall back to no throttle. Set to 0 to disable.
+    reddit_new_account_throttle_days: int = 30
+
 
 @lru_cache
 def get_settings() -> Settings:
