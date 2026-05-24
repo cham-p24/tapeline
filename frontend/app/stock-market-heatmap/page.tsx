@@ -4,6 +4,11 @@ import { pageMeta } from "@/lib/seo";
 
 export const revalidate = 300;
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "https://api.tapeline.io";
+
 export const metadata = pageMeta({
   title: "Stock Market Heatmap — Live Sector + Ticker Performance, 1D / 1W / 1M | Tapeline",
   description:
@@ -11,36 +16,55 @@ export const metadata = pageMeta({
   path: "/stock-market-heatmap",
 });
 
-// Showcase sector tiles — representative of a normal trading day. Real
-// heatmap dynamically computes from the live ticker universe.
-const SHOWCASE_SECTORS = [
-  { name: "Information Technology",  change: +1.42, tone: "up-strong" },
-  { name: "Communication Services",  change: +0.89, tone: "up" },
-  { name: "Health Care",             change: +0.54, tone: "up" },
-  { name: "Consumer Discretionary",  change: +0.31, tone: "up-faint" },
-  { name: "Financials",              change: +0.18, tone: "up-faint" },
-  { name: "Industrials",             change: -0.04, tone: "neutral" },
-  { name: "Materials",               change: -0.27, tone: "down-faint" },
-  { name: "Consumer Staples",        change: -0.41, tone: "down-faint" },
-  { name: "Real Estate",             change: -0.62, tone: "down" },
-  { name: "Utilities",               change: -0.78, tone: "down" },
-  { name: "Energy",                  change: -1.15, tone: "down-strong" },
+type SectorTile = { sector: string; change_pct_1d: number; ticker_count?: number };
+
+// Fallback when /api/public/heatmap is unreachable. Realistic sector
+// performance pattern for credibility; the live preview replaces this
+// on every successful refresh.
+const SHOWCASE_SECTORS: SectorTile[] = [
+  { sector: "Information Technology", change_pct_1d: +1.42 },
+  { sector: "Communication Services", change_pct_1d: +0.89 },
+  { sector: "Health Care",            change_pct_1d: +0.54 },
+  { sector: "Consumer Discretionary", change_pct_1d: +0.31 },
+  { sector: "Financials",             change_pct_1d: +0.18 },
+  { sector: "Industrials",            change_pct_1d: -0.04 },
+  { sector: "Materials",              change_pct_1d: -0.27 },
+  { sector: "Consumer Staples",       change_pct_1d: -0.41 },
+  { sector: "Real Estate",            change_pct_1d: -0.62 },
+  { sector: "Utilities",              change_pct_1d: -0.78 },
+  { sector: "Energy",                 change_pct_1d: -1.15 },
 ];
 
-function toneClass(tone: string): string {
-  switch (tone) {
-    case "up-strong":   return "bg-up/40 text-up";
-    case "up":          return "bg-up/25 text-up";
-    case "up-faint":    return "bg-up/10 text-up/90";
-    case "neutral":     return "bg-panel text-muted";
-    case "down-faint":  return "bg-down/10 text-down/90";
-    case "down":        return "bg-down/25 text-down";
-    case "down-strong": return "bg-down/40 text-down";
-    default:            return "bg-panel text-muted";
+async function fetchHeatmap(): Promise<{ sectors: SectorTile[]; live: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/public/heatmap`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return { sectors: SHOWCASE_SECTORS, live: false };
+    const body = (await res.json()) as { sectors?: SectorTile[] };
+    const sectors = body.sectors ?? [];
+    return sectors.length > 0
+      ? { sectors, live: true }
+      : { sectors: SHOWCASE_SECTORS, live: false };
+  } catch {
+    return { sectors: SHOWCASE_SECTORS, live: false };
   }
 }
 
-export default function StockMarketHeatmapPage() {
+// Map a 1D % change into a 5-band tone — same logic the in-app heatmap
+// uses so the visual reads consistently across the SEO + in-app surfaces.
+function toneFor(change: number): string {
+  if (change >= 1.0)  return "bg-up/40 text-up";
+  if (change >= 0.4)  return "bg-up/25 text-up";
+  if (change >= 0.1)  return "bg-up/10 text-up/90";
+  if (change > -0.1)  return "bg-panel text-muted";
+  if (change > -0.4)  return "bg-down/10 text-down/90";
+  if (change > -1.0)  return "bg-down/25 text-down";
+  return "bg-down/40 text-down";
+}
+
+export default async function StockMarketHeatmapPage() {
+  const { sectors, live } = await fetchHeatmap();
   return (
     <SeoFeaturePage
       slug="stock-market-heatmap"
@@ -116,30 +140,36 @@ export default function StockMarketHeatmapPage() {
     >
       <div className="rounded-2xl border border-border bg-panel/40 p-5">
         <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-xs uppercase tracking-wider text-muted">
+          <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted">
             Sector snapshot · 1D %
+            {live && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-up">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
+                Live
+              </span>
+            )}
           </p>
-          <p className="text-[10px] uppercase tracking-wider text-subtle">
-            Live tile size by $ volume · /app/heatmap
-          </p>
+          <Link href="/app/heatmap" className="text-[10px] uppercase tracking-wider text-accent hover:underline">
+            Full heatmap →
+          </Link>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-          {SHOWCASE_SECTORS.map((s) => (
+          {sectors.map((s) => (
             <div
-              key={s.name}
-              className={`rounded-lg border border-border/50 p-3 ${toneClass(s.tone)}`}
+              key={s.sector}
+              className={`rounded-lg border border-border/50 p-3 ${toneFor(s.change_pct_1d)}`}
             >
-              <div className="text-xs font-medium leading-tight">{s.name}</div>
+              <div className="text-xs font-medium leading-tight">{s.sector}</div>
               <div className="mt-1.5 text-lg font-bold nums">
-                {s.change > 0 ? "+" : ""}
-                {s.change.toFixed(2)}%
+                {s.change_pct_1d > 0 ? "+" : ""}
+                {s.change_pct_1d.toFixed(2)}%
               </div>
             </div>
           ))}
         </div>
       </div>
       <p className="mt-3 text-xs text-subtle">
-        Snapshot example. The{" "}
+        {live ? "Live sector aggregate — refreshed every 5 minutes." : "Snapshot example."} The{" "}
         <Link href="/app/heatmap" className="text-accent hover:underline">
           live heatmap
         </Link>{" "}
