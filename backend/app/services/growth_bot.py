@@ -272,13 +272,16 @@ def draft_linkedin_post(weekday: int) -> dict[str, str]:
 
     Weekends fall back to Monday's topic but are flagged for the caller
     so they can decide whether to send the digest at all on Sat/Sun.
+
+    `weekday_index` is stringified so the return shape stays dict[str,str]
+    — JSON-serialised it's all strings on the wire anyway.
     """
     idx = weekday if 0 <= weekday < len(_LINKEDIN_TOPIC_ROTATION) else 0
     headline, body = _LINKEDIN_TOPIC_ROTATION[idx]
     return {
         "headline": headline,
         "body": body,
-        "weekday_index": idx,
+        "weekday_index": str(idx),
     }
 
 
