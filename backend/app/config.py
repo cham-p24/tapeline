@@ -111,11 +111,21 @@ class Settings(BaseSettings):
     # never bounce — even if a per-persona alias hasn't been wired into
     # the Cloudflare routing rules yet.
     resend_api_key: str = ""
-    # Optional — set in Resend dashboard under Webhooks. When configured,
-    # /api/webhooks/resend verifies the Svix signature and processes
-    # email.bounced + email.complained events. Without it the endpoint
-    # 503s, which is fine — Resend retries.
+    # Outbound bounce/complaint webhook (Resend dashboard → Webhooks).
+    # When configured, /api/webhooks/resend verifies the Svix signature
+    # and processes email.bounced + email.complained events. Without it
+    # the endpoint 503s — fine because Resend retries.
     resend_webhook_secret: str = ""
+    # Inbound webhook signing secret (Resend dashboard → Webhooks).
+    # Without this, POST /api/inbox/email accepts unsigned requests in
+    # dev — set it in prod or any attacker who guesses the URL can
+    # inject fake emails into the inbox auto-handler.
+    resend_inbound_secret: str = ""
+    # Founder's Telegram chat_id — destination for Tier 1 inbox
+    # alerts requiring approval. Without this, Tier 1 messages get
+    # stored but no notification fires (founder will see them next
+    # time they open /app/inbox).
+    inbox_founder_telegram_chat_id: str = ""
     email_from: str = "hello@tapeline.io"                  # default / transactional
     email_from_sales: str = "christian@tapeline.io"        # conversion-y trial drip + re-engagement
     email_from_billing: str = "billing@tapeline.io"        # Stripe events
