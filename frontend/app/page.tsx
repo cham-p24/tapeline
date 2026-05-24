@@ -211,7 +211,7 @@ export default function LandingPage() {
               <FadeIn key={p.slug} delayMs={0}>
                 <Link
                   href={`/blog/${p.slug}`}
-                  className="block h-full rounded-2xl border border-border bg-panel/40 p-6 transition hover:border-accent/40 hover:bg-panel/60"
+                  className="lift block h-full rounded-2xl border border-border bg-panel/40 p-6 hover:border-accent/40 hover:bg-panel/60"
                 >
                   <p className="text-xs font-mono text-subtle">
                     {new Date(p.publishedAt).toLocaleDateString("en-GB", {
