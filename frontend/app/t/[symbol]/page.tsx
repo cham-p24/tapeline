@@ -623,7 +623,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                   <Link
                     key={r.symbol}
                     href={`/t/${r.symbol}`}
-                    className="group block rounded-lg border border-border bg-panel/40 p-4 transition hover:border-accent/40 hover:bg-panel"
+                    className="lift group block rounded-lg border border-border bg-panel/40 p-4 hover:border-accent/40 hover:bg-panel"
                   >
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="font-mono font-bold text-base tracking-tight group-hover:text-accent">
