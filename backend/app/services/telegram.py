@@ -17,21 +17,78 @@ settings = get_settings()
 TG_API = "https://api.telegram.org"
 
 
-async def send_message(chat_id: str, text: str) -> bool:
-    """Send a single Telegram message. Returns True on success."""
+async def send_message(
+    chat_id: str,
+    text: str,
+    *,
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> bool:
+    """Send a single Telegram message. Returns True on success.
+
+    Pass `reply_markup` to attach inline-keyboard buttons (used by the
+    inbox alert flow so the founder can Approve/Reject from their
+    phone with one tap rather than typing a command).
+    """
     if not settings.telegram_bot_token:
         logger.warning("telegram.skipped no_bot_token")
         return False
+    payload: dict = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": True,
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     async with httpx.AsyncClient(timeout=10) as c:
         r = await c.post(
             f"{TG_API}/bot{settings.telegram_bot_token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown",
-                  "disable_web_page_preview": True},
+            json=payload,
         )
         if r.status_code != 200:
             logger.warning("telegram.send_failed chat=%s body=%s", chat_id, r.text[:200])
             return False
     return True
+
+
+async def answer_callback_query(callback_query_id: str, text: str = "") -> bool:
+    """Acknowledge a callback_query (button tap). Required by Telegram —
+    without it the user sees a loading spinner on the button forever."""
+    if not settings.telegram_bot_token:
+        return False
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.post(
+            f"{TG_API}/bot{settings.telegram_bot_token}/answerCallbackQuery",
+            json={"callback_query_id": callback_query_id, "text": text},
+        )
+        return r.status_code == 200
+
+
+async def edit_message_text(
+    chat_id: str,
+    message_id: int,
+    text: str,
+    *,
+    parse_mode: str = "HTML",
+) -> bool:
+    """Edit an existing message in place. Used to update the inbox
+    alert card after the founder taps Approve/Reject so they see
+    "Sent ✓" or "Rejected ✗" rather than the original buttons."""
+    if not settings.telegram_bot_token:
+        return False
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.post(
+            f"{TG_API}/bot{settings.telegram_bot_token}/editMessageText",
+            json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            },
+        )
+        return r.status_code == 200
 
 
 async def render_watchlist_digest(session: AsyncSession, user: User) -> str:
