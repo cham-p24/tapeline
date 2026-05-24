@@ -153,23 +153,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // Per-ticker pages — capped at the top 250 by daily $-volume.
+  // Per-ticker pages — top 1,000 by daily $-volume.
   //
-  // 2026-05-24: cut from 500 → 250 after GSC reported 474 /t/{TICKER}
-  // pages stuck in "Crawled - currently not indexed" (quality classifier
-  // FAIL). The diagnosis: too many templated programmatic pages for the
-  // long-tail tickers no one searches for. Concentrating crawl budget
-  // on 250 names where the per-ticker content has a chance of ranking
-  // is materially better SEO than submitting 500+ thin pages and
-  // watching Google reject 474 of them.
+  // 2026-05-24 (later same day): reversed the 250 cap after founder
+  // pushback ("i want to be indexed for everything"). New approach:
+  // submit a much larger universe AND make every page substantial
+  // enough that Google's quality classifier accepts it. The content
+  // depth work happens in /t/[symbol]/page.tsx via
+  // buildEditorialCommentary() which auto-generates a 200-400 word
+  // ticker-specific editorial paragraph from the live factor
+  // sub-scores. Combined with the existing Related Tickers,
+  // news-headlines feed, and FAQ, each page now reads as genuinely
+  // ticker-specific content rather than a templated shell.
   //
-  // The matching client-side gate lives in /t/[symbol]/page.tsx —
-  // isLowSignalTicker() emits `robots: noindex, follow` for any
-  // ticker that DID reach the page (e.g. via direct link) but doesn't
-  // pass the score/confidence/volume floor. Sitemap + page noindex
-  // combine: Google only ever sees the 250 here AND those 250 only
-  // get indexed if they pass the runtime quality bar.
-  const tickers = await fetchTopTickers(250);
+  // 1000 (vs 250) is the right balance: covers every actively-traded
+  // US name a search query is realistically about, without flooding
+  // Google with the lowest-volume tickers that have effectively zero
+  // search demand (and where even rich content wouldn't index).
+  const tickers = await fetchTopTickers(1000);
   const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
     url: `${base}/t/${sym}`,
     lastModified: now,
