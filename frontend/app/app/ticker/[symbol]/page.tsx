@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type TickerDetail } from "@/lib/api";
+import { api, type TickerDetail, TierGateError } from "@/lib/api";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
@@ -70,14 +70,15 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       });
       setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
     } catch (e: any) {
-      const m = String(e.message || e);
-      if (m.includes("401")) {
-        window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
-        return;
+      // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
+      if (e instanceof TierGateError) {
+        // Backend's exact message — e.g. "Email alerts require Pro tier"
+        setNewsAlertMsg(`${e.message} — upgrade at /app/billing`);
+      } else {
+        const m = String(e.message || e);
+        if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
+        else setNewsAlertMsg(`Failed: ${m}`);
       }
-      if (m.includes("403")) setNewsAlertMsg("Pro plan required for email alerts");
-      else if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
-      else setNewsAlertMsg(`Failed: ${m}`);
     }
     setNewsAlerting(false);
   }

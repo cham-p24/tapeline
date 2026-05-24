@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { CompareIndex } from "@/components/CompareIndex";
 import {
   breadcrumbJsonLd,
@@ -162,6 +163,15 @@ export function CompareLayout({
               <p className="mt-2 text-sm text-muted leading-relaxed">{r.note}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Newsletter mid-funnel capture — comparison-shoppers who haven't
+          decided yet but will read a daily Top 10 email. Lower commitment
+          than /signup; same conversion bucket via method='newsletter'. */}
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-6">
+        <div className="rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="compare" heading="" sub="" />
         </div>
       </section>
 

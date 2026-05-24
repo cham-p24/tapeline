@@ -19,6 +19,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
@@ -331,6 +332,13 @@ export default async function SignalsPage() {
           </Link>
           .
         </p>
+
+        {/* Newsletter mid-funnel capture — anonymous + free users see this
+            below the signup gate; paid users see it below the scanner CTA.
+            Either way it's a lower-commitment funnel step. */}
+        <section className="mt-8 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="signals" heading="" sub="" />
+        </section>
 
         {isSignedIn && (
           <div className="mt-8 rounded-xl border border-border bg-panel p-6">

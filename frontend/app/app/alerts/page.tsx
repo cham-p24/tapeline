@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type AlertEvent, type AlertRule } from "@/lib/api";
+import { api, type AlertEvent, type AlertRule, TierGateError } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
 
 type RuleType = AlertRule["rule_type"];
@@ -66,13 +66,15 @@ export default function AlertsPage() {
       if (def.needsSymbol) setSymbol("");
       load();
     } catch (e: any) {
-      const m = String(e.message || e);
-      if (m.includes("401")) {
-        window.location.href = `/signin?next=${encodeURIComponent("/app/alerts")}`;
-        return;
+      // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
+      // 403 is typed via TierGateError carrying the backend's actual message
+      // ("Telegram alerts require Premium tier", etc.) — surface it verbatim
+      // instead of inventing copy from the channel name.
+      if (e instanceof TierGateError) {
+        setError(`${e.message} Upgrade at /app/billing.`);
+      } else {
+        setError(String(e.message || e));
       }
-      if (m.includes("403")) setError(`${channel === "telegram" ? "Telegram" : channel === "web_push" ? "Web push" : "Email"} alerts require a higher tier. Upgrade at /app/billing.`);
-      else setError(m);
     } finally {
       setCreating(false);
     }

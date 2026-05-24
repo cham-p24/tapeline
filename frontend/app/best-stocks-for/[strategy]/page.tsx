@@ -14,6 +14,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
@@ -246,6 +247,44 @@ export default async function BestStocksForStrategyPage({
             ))}
           </div>
         </nav>
+
+        {/* Related Tapeline tools — cross-link into the feature landing pages
+            (squeeze, congress, insider, heatmap, regime). Tightens the
+            internal link graph between the strategy cluster and the feature
+            cluster, both of which the GSC audit flagged as under-indexed
+            because they sat as siloed templated content. */}
+        <nav
+          aria-label="Related Tapeline tools"
+          className="mt-6 rounded-xl border border-border bg-panel/40 p-6"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
+            Related Tapeline tools
+          </h2>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <Link href="/short-squeeze-scanner" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Short squeeze scanner
+            </Link>
+            <Link href="/congressional-trades" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Congressional trades
+            </Link>
+            <Link href="/insider-buying" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Insider buying (Form 4)
+            </Link>
+            <Link href="/stock-market-heatmap" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Stock market heatmap
+            </Link>
+            <Link href="/market-regime" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Market regime indicator
+            </Link>
+          </div>
+        </nav>
+
+        {/* Newsletter mid-funnel capture — same logic as the feature
+            pages: visitors not ready to start a trial but willing to
+            give us an email for the daily Top 10 digest. */}
+        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="strategy" heading="" sub="" />
+        </section>
 
         {/* CTA */}
         <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
