@@ -111,6 +111,11 @@ class Settings(BaseSettings):
     # never bounce — even if a per-persona alias hasn't been wired into
     # the Cloudflare routing rules yet.
     resend_api_key: str = ""
+    # Optional — set in Resend dashboard under Webhooks. When configured,
+    # /api/webhooks/resend verifies the Svix signature and processes
+    # email.bounced + email.complained events. Without it the endpoint
+    # 503s, which is fine — Resend retries.
+    resend_webhook_secret: str = ""
     email_from: str = "hello@tapeline.io"                  # default / transactional
     email_from_sales: str = "christian@tapeline.io"        # conversion-y trial drip + re-engagement
     email_from_billing: str = "billing@tapeline.io"        # Stripe events
