@@ -102,6 +102,7 @@ export default function AdminPage() {
 
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
         <a href="/app/admin/email-preview" className="link">Email preview &rarr;</a>
+        <a href="/app/admin/inbox" className="link">Inbox auto-handler &rarr;</a>
       </div>
 
       {stats && (
