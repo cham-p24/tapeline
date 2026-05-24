@@ -486,6 +486,50 @@ export const api = {
     const qs = new URLSearchParams({ limit: String(limit), ...(symbol ? { symbol } : {}) });
     return get<{ count: number; items: Array<{ id: string; title: string; publisher: string; published_at: string; url: string; description: string | null; tickers: string[]; sentiment: number | null }> }>(`/api/news?${qs}`);
   },
+  inboxList: (params: { status?: string; channel?: string; tier?: number; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status_filter", params.status);
+    if (params.channel) qs.set("channel", params.channel);
+    if (params.tier !== undefined) qs.set("tier", String(params.tier));
+    if (params.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return get<{
+      count: number;
+      items: Array<{
+        id: number;
+        channel: string;
+        author: string;
+        subject: string | null;
+        body_preview: string;
+        received_at: string;
+        tier: number | null;
+        tier_reason: string | null;
+        suggested_reply: string | null;
+        status: string;
+        handled_at: string | null;
+      }>;
+    }>(`/api/inbox${suffix}`);
+  },
+  inboxApprove: async (id: number, replyText?: string) => {
+    const res = await fetch(`${API_BASE}/api/inbox/${id}/approve`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: replyText ? JSON.stringify({ reply_text: replyText }) : undefined,
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+  },
+  inboxReject: async (id: number) => {
+    const res = await fetch(`${API_BASE}/api/inbox/${id}/reject`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+  },
   heatmap: (q?: string) => {
     const qs = new URLSearchParams(q ? { q } : {});
     const suffix = qs.toString() ? `?${qs.toString()}` : "";

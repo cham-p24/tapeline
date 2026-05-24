@@ -22,6 +22,7 @@ from app.routers import (
     contact,
     heatmap,
     holdings,
+    inbox,
     internal,
     me,
     news,
@@ -263,6 +264,184 @@ async def public_signals(
     }
 
 
+@app.get("/api/public/regime")
+async def public_regime() -> dict[str, object]:
+    """Public, no-auth regime snapshot — powers the /market-regime SEO page.
+
+    Returns just the regime label, the four macro inputs (VIX, 10Y yield,
+    DXY, breadth) + sector leaders + the Fear & Greed score. Intentionally
+    a thinner payload than /api/regime (the Pro-gated authed endpoint),
+    which includes the per-component F&G breakdown plus a more detailed
+    `updated_at`. The public preview is enough to render a real macro card
+    + dial on the SEO landing page; the deeper breakdown stays Pro.
+    """
+    from sqlalchemy import select
+
+    from app.db import session_scope
+    from app.models import RegimeState, Ticker
+    from app.services.fear_greed import compute_fear_greed
+
+    async with session_scope() as session:
+        row = (await session.execute(select(RegimeState).where(RegimeState.id == 1))).scalar_one_or_none()
+        if row is None:
+            return {"available": False}
+        spy_5d = (await session.execute(
+            select(Ticker.change_pct_5d).where(Ticker.symbol == "SPY")
+        )).scalar_one_or_none()
+    fg = compute_fear_greed(
+        vix=row.vix,
+        breadth_pct=row.breadth_pct,
+        regime=row.regime,
+        spy_change_5d_pct=spy_5d,
+    )
+    return {
+        "available": True,
+        "regime": row.regime,
+        "vix": row.vix,
+        "dxy": row.dxy,
+        "yield_10y": row.yield_10y,
+        "rate_direction": row.rate_direction,
+        "breadth_pct": row.breadth_pct,
+        "sector_leaders": row.sector_leaders,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "fear_greed": {"score": fg["score"], "label": fg["label"]},
+    }
+
+
+@app.get("/api/public/insider-buys")
+async def public_insider_buys(limit: int = 10) -> dict[str, object]:
+    """Public, no-auth feed of recent open-market insider buys (Form 4 code 'P').
+
+    Powers /insider-buying. The underlying data is SEC EDGAR public
+    filings (we fetch via Finnhub) so there's no licensing constraint
+    on exposing a preview. Capped at 20 rows to keep the SEO surface
+    a teaser, not a replacement for /app/holdings (Premium).
+    """
+    from sqlalchemy import desc, select
+
+    from app.db import session_scope
+    from app.models import InsiderTransaction
+
+    capped = max(1, min(limit, 20))
+    async with session_scope() as session:
+        result = await session.execute(
+            select(InsiderTransaction)
+            # SEC Form 4 code 'P' = open-market buy. The high-signal cluster
+            # we surface separately from option-grant / sale rows.
+            .where(InsiderTransaction.code == "P")
+            .where(InsiderTransaction.share_change > 0)
+            .order_by(desc(InsiderTransaction.transaction_date))
+            .limit(capped)
+        )
+        rows = result.scalars().all()
+    return {
+        "count": len(rows),
+        "items": [
+            {
+                "symbol": r.symbol,
+                "insider_name": r.insider_name,
+                "transaction_date": r.transaction_date,
+                "share_change": r.share_change,
+                "transaction_price": r.transaction_price,
+                "transaction_value": r.transaction_value,
+                "code": r.code,
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.get("/api/public/squeeze")
+async def public_squeeze(limit: int = 5) -> dict[str, object]:
+    """Public, no-auth preview of the squeeze-watch surface.
+
+    Powers /short-squeeze-scanner. Capped tightly (5 rows by default,
+    20 hard max) so the live /app/squeeze view (Pro+, no row cap) is
+    still the upgrade reason. Pre-computed spike_score / squeeze_days /
+    OBV trend are exposed — the structural setup is the SEO hook.
+    """
+    from sqlalchemy import desc, select
+
+    from app.db import session_scope
+    from app.models import SqueezeSetup
+
+    capped = max(1, min(limit, 20))
+    async with session_scope() as session:
+        result = await session.execute(
+            select(SqueezeSetup)
+            .order_by(desc(SqueezeSetup.spike_score))
+            .limit(capped)
+        )
+        rows = result.scalars().all()
+    return {
+        "count": len(rows),
+        "items": [
+            {
+                "symbol": r.symbol,
+                "spike_score": r.spike_score,
+                "squeeze_days": r.squeeze_days,
+                "volume_multiple": r.volume_multiple,
+                "obv_trend": r.obv_trend,
+                "breakout_type": r.breakout_type,
+                "reason": r.reason,
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.get("/api/public/heatmap")
+async def public_heatmap() -> dict[str, object]:
+    """Public, no-auth sector-level heatmap for /stock-market-heatmap.
+
+    Returns the 11 GICS sectors + Tapeline buckets with their
+    *aggregate* 1D change (volume-weighted average). Per-ticker
+    drill-down stays on the Pro /app/heatmap surface. The aggregated
+    sector tiles are enough to render a real heatmap on the SEO page
+    without giving away the granular surface.
+    """
+    from collections import defaultdict
+
+    from sqlalchemy import select
+
+    from app.db import session_scope
+    from app.models import Ticker
+    from app.services.sector import canonical_sector
+
+    async with session_scope() as session:
+        result = await session.execute(
+            select(Ticker.sector, Ticker.change_pct_1d, Ticker.price, Ticker.volume)
+            .where(Ticker.score.is_not(None))
+            .where(Ticker.change_pct_1d.is_not(None))
+            .where(Ticker.price.is_not(None))
+            .where(Ticker.volume.is_not(None))
+        )
+        rows = result.all()
+
+    buckets: dict[str, list[tuple[float, float]]] = defaultdict(list)
+    for sector_raw, change_pct, price, volume in rows:
+        sector = canonical_sector(sector_raw or "Unknown")
+        dollar_vol = (price or 0) * (volume or 0)
+        if dollar_vol <= 0:
+            continue
+        buckets[sector].append((change_pct or 0.0, dollar_vol))
+
+    out = []
+    for sector, items in buckets.items():
+        total_vol = sum(v for _, v in items)
+        if total_vol <= 0:
+            continue
+        weighted = sum(c * v for c, v in items) / total_vol
+        out.append({
+            "sector": sector,
+            "change_pct_1d": round(weighted, 3),
+            "ticker_count": len(items),
+        })
+    # Sort by 1D move desc so the rendering side gets it in a usable order.
+    out.sort(key=lambda s: s["change_pct_1d"], reverse=True)
+    return {"count": len(out), "sectors": out}
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     """Bare-bones liveness probe — must stay cheap (no DB, no external calls).
@@ -432,6 +611,7 @@ app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"]
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(newsletter.router, prefix="/api/newsletter", tags=["newsletter"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
+app.include_router(inbox.router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
 app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])

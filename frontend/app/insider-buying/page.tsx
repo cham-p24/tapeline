@@ -4,6 +4,11 @@ import { pageMeta } from "@/lib/seo";
 
 export const revalidate = 600;
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "https://api.tapeline.io";
+
 export const metadata = pageMeta({
   title: "Insider Buying Stocks — Live SEC Form 4 Tracker Across ~2,500 US Tickers | Tapeline",
   description:
@@ -11,16 +16,41 @@ export const metadata = pageMeta({
   path: "/insider-buying",
 });
 
-// Realistic showcase — open-market buys (Form 4 code 'P') with notable
-// transaction values. The actual data spine is Finnhub for live Form 4
-// across the universe; this page shows a representative snapshot.
-const SHOWCASE = [
-  { symbol: "BRK.B", insider: "Director", shares: 50_000, price: 480.12, value: 24_006_000, date: "3 days ago" },
-  { symbol: "ORCL",  insider: "CEO",      shares: 25_000, price: 168.45, value: 4_211_250,  date: "5 days ago" },
-  { symbol: "AMD",   insider: "CFO",      shares: 10_000, price: 142.30, value: 1_423_000,  date: "1 week ago" },
-  { symbol: "INTC",  insider: "Director", shares: 75_000, price:  22.18, value: 1_663_500,  date: "1 week ago" },
-  { symbol: "DIS",   insider: "Officer",  shares: 12_000, price:  96.40, value: 1_156_800,  date: "2 weeks ago" },
+// Static fallback — only used if /api/public/insider-buys fails. Realistic
+// open-market buys (Form 4 code 'P'); the live feed replaces these every
+// 10 minutes via ISR.
+type InsiderRow = {
+  symbol: string;
+  insider_name: string;
+  transaction_date: string;
+  share_change: number;
+  transaction_price: number;
+  transaction_value: number;
+};
+
+const SHOWCASE: InsiderRow[] = [
+  { symbol: "BRK.B", insider_name: "Director", transaction_date: "3 days ago", share_change: 50_000, transaction_price: 480.12, transaction_value: 24_006_000 },
+  { symbol: "ORCL",  insider_name: "CEO",      transaction_date: "5 days ago", share_change: 25_000, transaction_price: 168.45, transaction_value: 4_211_250  },
+  { symbol: "AMD",   insider_name: "CFO",      transaction_date: "1 week ago", share_change: 10_000, transaction_price: 142.30, transaction_value: 1_423_000  },
+  { symbol: "INTC",  insider_name: "Director", transaction_date: "1 week ago", share_change: 75_000, transaction_price:  22.18, transaction_value: 1_663_500  },
+  { symbol: "DIS",   insider_name: "Officer",  transaction_date: "2 weeks ago", share_change: 12_000, transaction_price:  96.40, transaction_value: 1_156_800  },
 ];
+
+async function fetchInsiderBuys(): Promise<{ items: InsiderRow[]; live: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/public/insider-buys?limit=10`, {
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) return { items: SHOWCASE, live: false };
+    const body = (await res.json()) as { items?: InsiderRow[] };
+    const items = body.items ?? [];
+    return items.length > 0
+      ? { items, live: true }
+      : { items: SHOWCASE, live: false };
+  } catch {
+    return { items: SHOWCASE, live: false };
+  }
+}
 
 function fmtMoney(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
@@ -28,7 +58,18 @@ function fmtMoney(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
-export default function InsiderBuyingPage() {
+function fmtDate(d: string): string {
+  // Backend returns ISO YYYY-MM-DD; fallback string ("3 days ago") passes
+  // through unchanged. ISO-shape → "Mar 14" using the user's locale.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const dt = new Date(d + "T00:00:00Z");
+    return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  }
+  return d;
+}
+
+export default async function InsiderBuyingPage() {
+  const { items: rows, live } = await fetchInsiderBuys();
   return (
     <SeoFeaturePage
       slug="insider-buying"
@@ -98,10 +139,22 @@ export default function InsiderBuyingPage() {
       tier="premium"
     >
       <div className="card overflow-x-auto">
-        <div className="px-4 pt-3 text-right text-[10px] uppercase tracking-wider text-subtle">
-          Recent example · live feed at /app/holdings
+        <div className="flex items-center justify-between px-4 pt-3">
+          {live ? (
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-up">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
+              Live preview · most recent open-market buys
+            </span>
+          ) : (
+            <span className="text-[10px] uppercase tracking-wider text-subtle">
+              Recent example · live feed at /app/holdings
+            </span>
+          )}
+          <Link href="/app/holdings" className="text-[10px] uppercase tracking-wider text-accent hover:underline">
+            Full feed →
+          </Link>
         </div>
-        <table className="w-full text-sm">
+        <table className="mt-2 w-full text-sm">
           <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
             <tr>
               <th className="px-3 py-3 text-left">Ticker</th>
@@ -113,28 +166,27 @@ export default function InsiderBuyingPage() {
             </tr>
           </thead>
           <tbody>
-            {SHOWCASE.map((r, i) => (
+            {rows.map((r, i) => (
               <tr key={`${r.symbol}-${i}`} className="border-b border-border/30 hover:bg-panel/40">
                 <td className="px-3 py-3 font-mono font-medium">
                   <Link href={`/t/${r.symbol}`} className="hover:text-accent">
                     {r.symbol}
                   </Link>
                 </td>
-                <td className="px-3 py-3 text-xs text-muted">{r.insider}</td>
-                <td className="px-3 py-3 text-right font-mono nums">{r.shares.toLocaleString()}</td>
-                <td className="px-3 py-3 text-right font-mono nums">${r.price.toFixed(2)}</td>
+                <td className="px-3 py-3 text-xs text-muted">{r.insider_name}</td>
+                <td className="px-3 py-3 text-right font-mono nums">{r.share_change.toLocaleString()}</td>
+                <td className="px-3 py-3 text-right font-mono nums">${r.transaction_price.toFixed(2)}</td>
                 <td className="px-3 py-3 text-right font-mono nums font-semibold text-up">
-                  {fmtMoney(r.value)}
+                  {fmtMoney(r.transaction_value)}
                 </td>
-                <td className="px-3 py-3 text-xs text-subtle">{r.date}</td>
+                <td className="px-3 py-3 text-xs text-subtle">{fmtDate(r.transaction_date)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <p className="mt-3 text-xs text-subtle">
-        Snapshot example showing the kind of open-market buys (Form 4 code
-        &lsquo;P&rsquo;) the live feed surfaces. The{" "}
+        {live ? "Live snapshot of recent open-market buys (Form 4 code 'P'), refreshed every 10 minutes." : "Snapshot example of open-market buys (Form 4 code 'P')."} The{" "}
         <Link href="/app/holdings" className="text-accent hover:underline">
           full live feed
         </Link>{" "}

@@ -4,6 +4,11 @@ import { pageMeta } from "@/lib/seo";
 
 export const revalidate = 600;
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "https://api.tapeline.io";
+
 export const metadata = pageMeta({
   title: "Market Regime Indicator — Live VIX + Breadth + Rate Direction | Tapeline",
   description:
@@ -11,19 +16,62 @@ export const metadata = pageMeta({
   path: "/market-regime",
 });
 
-const SHOWCASE = {
-  regime: "NEUTRAL",
-  vix: 17.26,
-  breadth: 57.4,
-  rate_direction: "RISING",
-  yield_10y: 4.47,
-  spy_5d: 0.32,
-  fear_greed: 71,
-  fear_greed_label: "Greed",
-  sector_leaders: ["Information Technology", "Communication Services", "Health Care"],
+type RegimePreview = {
+  regime: string;
+  vix: number;
+  breadth_pct: number;
+  rate_direction: string;
+  yield_10y: number;
+  fear_greed: { score: number; label: string };
+  sector_leaders: string;
 };
 
-export default function MarketRegimePage() {
+const SHOWCASE: RegimePreview = {
+  regime: "NEUTRAL",
+  vix: 17.26,
+  breadth_pct: 57.4,
+  rate_direction: "RISING",
+  yield_10y: 4.47,
+  fear_greed: { score: 71, label: "Greed" },
+  sector_leaders: "Information Technology · Communication Services · Health Care",
+};
+
+async function fetchRegime(): Promise<{ data: RegimePreview; live: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/public/regime`, {
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) return { data: SHOWCASE, live: false };
+    const body = (await res.json()) as Partial<RegimePreview> & { available?: boolean };
+    if (!body.available || !body.regime) return { data: SHOWCASE, live: false };
+    return {
+      data: {
+        regime: body.regime,
+        vix: body.vix ?? SHOWCASE.vix,
+        breadth_pct: body.breadth_pct ?? SHOWCASE.breadth_pct,
+        rate_direction: body.rate_direction ?? SHOWCASE.rate_direction,
+        yield_10y: body.yield_10y ?? SHOWCASE.yield_10y,
+        fear_greed: body.fear_greed ?? SHOWCASE.fear_greed,
+        sector_leaders: body.sector_leaders ?? SHOWCASE.sector_leaders,
+      },
+      live: true,
+    };
+  } catch {
+    return { data: SHOWCASE, live: false };
+  }
+}
+
+export default async function MarketRegimePage() {
+  const { data, live } = await fetchRegime();
+  // Tone the F&G number by its score band so the colour matches what the
+  // dial would show: red below 25, amber to 44, muted to 54, accent to 74,
+  // green at 75+.
+  const fgTone =
+    data.fear_greed.score < 25 ? "text-down"
+    : data.fear_greed.score < 45 ? "text-warn"
+    : data.fear_greed.score < 55 ? "text-muted"
+    : data.fear_greed.score < 75 ? "text-accent"
+    : "text-up";
   return (
     <SeoFeaturePage
       slug="market-regime"
@@ -99,8 +147,16 @@ export default function MarketRegimePage() {
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Regime card */}
         <div className="rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-panel to-panel p-6">
-          <p className="text-xs uppercase tracking-wider text-muted">Current regime</p>
-          <p className="mt-2 text-5xl font-bold tracking-tight text-accent">{SHOWCASE.regime}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs uppercase tracking-wider text-muted">Current regime</p>
+            {live && (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-up">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
+                Live
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-5xl font-bold tracking-tight text-accent">{data.regime}</p>
           <p className="mt-3 text-xs text-muted leading-relaxed">
             Synthesized from VIX, breadth, rate direction, and short-window SPY
             momentum. Updated each worker tick (~60s).
@@ -108,18 +164,18 @@ export default function MarketRegimePage() {
           <p className="mt-4 text-[11px] uppercase tracking-wider text-subtle">
             Sector leaders
           </p>
-          <p className="text-xs">{SHOWCASE.sector_leaders.join(" · ")}</p>
+          <p className="text-xs">{data.sector_leaders}</p>
         </div>
 
         {/* Fear & Greed card */}
         <div className="rounded-2xl border border-border bg-panel/40 p-6">
           <p className="text-xs uppercase tracking-wider text-muted">Fear &amp; Greed</p>
           <div className="mt-2 flex items-baseline gap-3">
-            <span className="text-5xl font-bold tracking-tight text-up">
-              {SHOWCASE.fear_greed}
+            <span className={`text-5xl font-bold tracking-tight ${fgTone}`}>
+              {data.fear_greed.score}
             </span>
-            <span className="text-base font-semibold uppercase tracking-wider text-up">
-              {SHOWCASE.fear_greed_label}
+            <span className={`text-base font-semibold uppercase tracking-wider ${fgTone}`}>
+              {data.fear_greed.label}
             </span>
           </div>
           <p className="mt-3 text-xs text-muted leading-relaxed">
@@ -131,14 +187,14 @@ export default function MarketRegimePage() {
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="VIX" value={SHOWCASE.vix.toFixed(2)} />
-        <Kpi label="10Y Yield" value={`${SHOWCASE.yield_10y.toFixed(2)}%`} />
-        <Kpi label="Rate direction" value={SHOWCASE.rate_direction} />
-        <Kpi label="Breadth above 200DMA" value={`${SHOWCASE.breadth.toFixed(1)}%`} />
+        <Kpi label="VIX" value={data.vix.toFixed(2)} />
+        <Kpi label="10Y Yield" value={`${data.yield_10y.toFixed(2)}%`} />
+        <Kpi label="Rate direction" value={data.rate_direction} />
+        <Kpi label="Breadth above 200DMA" value={`${data.breadth_pct.toFixed(1)}%`} />
       </div>
 
       <p className="mt-3 text-xs text-subtle">
-        Snapshot example. The{" "}
+        {live ? "Live snapshot — regenerates every 10 minutes." : "Snapshot example."} The{" "}
         <Link href="/app/regime" className="text-accent hover:underline">
           live regime panel
         </Link>{" "}

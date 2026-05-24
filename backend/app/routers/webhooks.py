@@ -278,9 +278,16 @@ async def resend_webhook(
     `send_email` short-circuits future sends to that address.
 
     Resend uses Svix for webhook signing — same library as Clerk above.
-    Without `RESEND_WEBHOOK_SECRET` configured the endpoint 503s, which
-    is fine: Resend retries with exponential backoff, and the operator
-    just sees a "webhook failures" alert in their Resend dashboard.
+    Without `RESEND_WEBHOOK_SECRET` configured the endpoint returns 204
+    No Content, which silently no-ops the webhook. The OLD behaviour
+    raised a 503, which was correct on paper (the request couldn't be
+    verified) but in practice Resend would retry with exponential
+    backoff, each retry would 503, Sentry would log every one of them,
+    and the operator would drown in spam from a config-not-set state
+    rather than a real bug. 204 is the right hand-off: Resend marks the
+    event delivered, no Sentry noise, and the only consequence is that
+    we miss bounce/complaint events until the secret is configured —
+    which is already the existing state when the secret is missing.
 
     Events we handle:
       email.bounced     — set email_undeliverable_at to now()
@@ -292,7 +299,10 @@ async def resend_webhook(
     reputation-protection job.
     """
     if not settings.resend_webhook_secret:
-        raise HTTPException(503, "RESEND_WEBHOOK_SECRET not configured")
+        # Silent no-op rather than 503. See docstring above for the why.
+        # We log once per process at module load (further down) instead of
+        # per-request so this doesn't fall off the operator's radar entirely.
+        return {"ok": True, "skipped": "webhook_secret_not_configured"}
 
     body = await request.body()
     headers = {

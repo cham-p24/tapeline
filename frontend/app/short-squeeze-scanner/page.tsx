@@ -2,7 +2,14 @@ import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
 
+// 5-minute server-cache. Fresh enough to feel live, cheap enough that
+// crawler hits + thundering-herd organic traffic doesn't hammer the API.
 export const revalidate = 300;
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "https://api.tapeline.io";
 
 export const metadata = pageMeta({
   title: "Short Squeeze Scanner — Live Squeeze Setups Across ~2,500 US Stocks | Tapeline",
@@ -11,18 +18,46 @@ export const metadata = pageMeta({
   path: "/short-squeeze-scanner",
 });
 
-// Showcase data — a recent snapshot of the squeeze-watch surface. Realistic
-// patterns (compressed range + rising OBV + volume above 20-day average) for
-// SEO/credibility. The actual live feed sits behind the /app/squeeze gate.
+// Static fallback — used only if the public-preview API call fails (cold
+// DB, backend hiccup, build-time fetch with API_URL unset). Realistic
+// patterns for SEO credibility; the live feed below replaces these on
+// every successful refresh.
 const SHOWCASE_ROWS = [
-  { symbol: "AMD",  spike: 92, days: 14, vol_mult: 2.1, obv: "RISING",  type: "Bull squeeze",   note: "21-day BB squeeze, OBV trending up" },
-  { symbol: "PLTR", spike: 88, days: 11, vol_mult: 1.8, obv: "RISING",  type: "Bull squeeze",   note: "Tight range, accumulation pattern" },
-  { symbol: "NVDA", spike: 84, days: 18, vol_mult: 2.4, obv: "RISING",  type: "Bull squeeze",   note: "Above 200DMA, volume confirming" },
-  { symbol: "META", spike: 79, days: 9,  vol_mult: 1.5, obv: "FLAT",    type: "Neutral",        note: "Compressed range, direction unclear" },
-  { symbol: "INTC", spike: 73, days: 22, vol_mult: 1.9, obv: "FALLING", type: "Bear squeeze",   note: "Distribution pattern, watch for breakdown" },
+  { symbol: "AMD",  spike_score: 92, squeeze_days: 14, volume_multiple: 2.1, obv_trend: "RISING",  breakout_type: "Bull squeeze",   reason: "21-day BB squeeze, OBV trending up" },
+  { symbol: "PLTR", spike_score: 88, squeeze_days: 11, volume_multiple: 1.8, obv_trend: "RISING",  breakout_type: "Bull squeeze",   reason: "Tight range, accumulation pattern" },
+  { symbol: "NVDA", spike_score: 84, squeeze_days: 18, volume_multiple: 2.4, obv_trend: "RISING",  breakout_type: "Bull squeeze",   reason: "Above 200DMA, volume confirming" },
+  { symbol: "META", spike_score: 79, squeeze_days: 9,  volume_multiple: 1.5, obv_trend: "FLAT",    breakout_type: "Neutral",        reason: "Compressed range, direction unclear" },
+  { symbol: "INTC", spike_score: 73, squeeze_days: 22, volume_multiple: 1.9, obv_trend: "FALLING", breakout_type: "Bear squeeze",   reason: "Distribution pattern, watch for breakdown" },
 ];
 
-export default function ShortSqueezeScannerPage() {
+type SqueezeRow = {
+  symbol: string;
+  spike_score: number;
+  squeeze_days: number;
+  volume_multiple: number;
+  obv_trend: string;
+  breakout_type: string;
+  reason: string;
+};
+
+async function fetchSqueeze(): Promise<{ items: SqueezeRow[]; live: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/public/squeeze?limit=5`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return { items: SHOWCASE_ROWS, live: false };
+    const body = (await res.json()) as { items?: SqueezeRow[] };
+    const items = body.items ?? [];
+    return items.length > 0
+      ? { items, live: true }
+      : { items: SHOWCASE_ROWS, live: false };
+  } catch {
+    return { items: SHOWCASE_ROWS, live: false };
+  }
+}
+
+export default async function ShortSqueezeScannerPage() {
+  const { items: rows, live } = await fetchSqueeze();
   return (
     <SeoFeaturePage
       slug="short-squeeze-scanner"
@@ -96,10 +131,22 @@ export default function ShortSqueezeScannerPage() {
       tier="pro"
     >
       <div className="card overflow-x-auto">
-        <div className="px-4 pt-3 text-right text-[10px] uppercase tracking-wider text-subtle">
-          Recent example · live feed at /app/squeeze
+        <div className="flex items-center justify-between px-4 pt-3">
+          {live ? (
+            <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-up">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
+              Live preview · top 5
+            </span>
+          ) : (
+            <span className="text-[10px] uppercase tracking-wider text-subtle">
+              Recent example · live feed at /app/squeeze
+            </span>
+          )}
+          <Link href="/app/squeeze" className="text-[10px] uppercase tracking-wider text-accent hover:underline">
+            Full scanner →
+          </Link>
         </div>
-        <table className="w-full text-sm">
+        <table className="mt-2 w-full text-sm">
           <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
             <tr>
               <th className="px-3 py-3 text-left">#</th>
@@ -112,7 +159,7 @@ export default function ShortSqueezeScannerPage() {
             </tr>
           </thead>
           <tbody>
-            {SHOWCASE_ROWS.map((r, i) => (
+            {rows.map((r, i) => (
               <tr key={r.symbol} className="border-b border-border/30 hover:bg-panel/40">
                 <td className="px-3 py-3 font-mono text-subtle">{i + 1}</td>
                 <td className="px-3 py-3 font-mono font-medium">
@@ -120,24 +167,24 @@ export default function ShortSqueezeScannerPage() {
                     {r.symbol}
                   </Link>
                 </td>
-                <td className="px-3 py-3 text-right font-mono nums font-semibold">{r.spike}</td>
-                <td className="px-3 py-3 text-right font-mono nums">{r.days}</td>
-                <td className="px-3 py-3 text-right font-mono nums">{r.vol_mult.toFixed(1)}x</td>
+                <td className="px-3 py-3 text-right font-mono nums font-semibold">{r.spike_score.toFixed(0)}</td>
+                <td className="px-3 py-3 text-right font-mono nums">{r.squeeze_days}</td>
+                <td className="px-3 py-3 text-right font-mono nums">{r.volume_multiple.toFixed(1)}x</td>
                 <td
                   className={`px-3 py-3 text-xs font-medium ${
-                    r.obv === "RISING" ? "text-up" : r.obv === "FALLING" ? "text-down" : "text-muted"
+                    r.obv_trend === "RISING" ? "text-up" : r.obv_trend === "FALLING" ? "text-down" : "text-muted"
                   }`}
                 >
-                  {r.obv}
+                  {r.obv_trend}
                 </td>
-                <td className="px-3 py-3 text-xs text-muted">{r.note}</td>
+                <td className="px-3 py-3 text-xs text-muted">{r.reason}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <p className="mt-3 text-xs text-subtle">
-        Snapshot example. The{" "}
+        {live ? "Live snapshot, refreshed every 5 minutes." : "Example snapshot."} The{" "}
         <Link href="/app/squeeze" className="text-accent hover:underline">
           live scanner
         </Link>{" "}

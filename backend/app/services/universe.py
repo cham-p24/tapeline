@@ -59,20 +59,30 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
         from app.models import Ticker
 
         async with session_scope() as session:
-            # ORDER BY volume * price DESC NULLS LAST — gives us the most
-            # liquid actively-tradeable names first. NULLs (newly-discovered
-            # tickers without a snapshot yet) sort to the bottom.
-            # Without NULLS LAST, Postgres puts NULL first in DESC ordering,
-            # which would crowd out real high-$-volume mega-caps with
-            # unscored newly-discovered tickers.
+            # 2026-05-24: was `WHERE volume IS NOT NULL AND price IS NOT NULL`.
+            # That created a chicken-and-egg trap: any newly-inserted sheet
+            # ticker without a price snapshot yet was excluded from the
+            # universe → never got a price snapshot → stayed excluded forever.
+            # Founder hit this when the sheet grew to 1969 tickers but the
+            # price feed was only seeing the older ~800.
             #
-            # Filter `volume IS NOT NULL AND price IS NOT NULL` is the
-            # belt-and-suspenders version that works on every dialect (SQLite
-            # doesn't natively support NULLS LAST in older versions).
+            # Fix: include EVERY ticker that has a score (the sheet/scorer
+            # decided it's worth tracking) regardless of price-coverage
+            # status. Sort by (volume * price) DESC NULLS LAST so liquid
+            # mega-caps still come first in the snapshot batches, and the
+            # newly-discovered NULL-volume tickers ride along at the tail —
+            # they pick up their first snapshot in the next tick and on
+            # subsequent calls sort into their natural position.
+            #
+            # `coalesce(volume * price, -1)` is the cross-dialect way to
+            # express NULLS LAST in DESC order: NULL → -1 → sorts last.
+            from sqlalchemy import func
+
+            sort_key = func.coalesce(Ticker.volume * Ticker.price, -1)
             r = await session.execute(
                 select(Ticker.symbol, Ticker.name, Ticker.sector)
-                .where(Ticker.volume.is_not(None), Ticker.price.is_not(None))
-                .order_by(desc(Ticker.volume * Ticker.price))
+                .where(Ticker.score.is_not(None))
+                .order_by(desc(sort_key))
                 .limit(size)
             )
             rows: list[tuple[str, str, str]] = [
