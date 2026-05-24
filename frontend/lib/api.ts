@@ -52,6 +52,55 @@ export function handle401(status: number) {
   window.location.href = `/signin?next=${next}`;
 }
 
+/**
+ * Typed 403 — tier-gate. Thrown by every helper in this file when the
+ * backend returns 403 (Pro / Premium feature attempted from a lower
+ * tier). Carries the backend's human message + an inferred `requiredTier`
+ * so callers can render a Paywall directly without string-matching the
+ * 'Failed: 403 Forbidden' format.
+ *
+ * Detection: `if (e instanceof TierGateError) { ... }`. The backend's
+ * 403 messages are stable phrases like "Squeeze scanner is a Pro feature"
+ * — we parse `Pro` / `Premium` out for the tier label. Falls back to
+ * 'pro' if the phrase shape changes.
+ */
+export class TierGateError extends Error {
+  readonly status = 403;
+  readonly requiredTier: "pro" | "premium";
+  constructor(message: string) {
+    super(message);
+    this.name = "TierGateError";
+    this.requiredTier = /premium/i.test(message) ? "premium" : "pro";
+  }
+}
+
+/**
+ * Parse the FastAPI error envelope. Backend returns `{ detail: "<msg>" }`
+ * on HTTPException — extract that. Falls back to status text when the
+ * response isn't JSON.
+ */
+async function extractDetail(res: Response): Promise<string> {
+  try {
+    const body = await res.clone().json();
+    if (typeof body?.detail === "string") return body.detail;
+  } catch {
+    // not JSON
+  }
+  return `${res.status} ${res.statusText}`;
+}
+
+/**
+ * Centralised non-2xx handling — call from every helper after handle401()
+ * but before throwing. Throws TierGateError on 403 (with the backend's
+ * actual feature-required message); throws plain Error otherwise.
+ */
+async function throwForStatus(res: Response): Promise<never> {
+  if (res.status === 403) {
+    throw new TierGateError(await extractDetail(res));
+  }
+  throw new Error(await extractDetail(res));
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
@@ -59,7 +108,7 @@ async function get<T>(path: string): Promise<T> {
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -354,7 +403,7 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -367,7 +416,7 @@ async function del<T>(path: string, token?: string): Promise<T> {
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -384,7 +433,7 @@ async function patch<T>(path: string, body: unknown, token?: string): Promise<T>
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -397,7 +446,7 @@ async function getAuth<T>(path: string, token: string): Promise<T> {
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -429,7 +478,7 @@ export const api = {
     });
     if (!res.ok) {
       handle401(res.status);
-      throw new Error(`${res.status} ${await res.text()}`);
+      await throwForStatus(res);
     }
     return res.json() as Promise<{ prefs: Record<EmailPrefKey, boolean> }>;
   },
