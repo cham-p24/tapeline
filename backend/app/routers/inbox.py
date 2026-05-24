@@ -222,7 +222,8 @@ async def resend_inbound_webhook(
     # already saved so we don't lose it). Worker will re-pick this up
     # on the next tick if classification fails now.
     try:
-        await _classify_and_route(msg, session)
+        from app.services.inbox_pipeline import classify_and_route
+        await classify_and_route(msg, session)
     except Exception:
         logger.exception(
             "inbox.resend.classify_route_failed id=%d (will retry next worker tick)",
@@ -230,138 +231,6 @@ async def resend_inbound_webhook(
         )
 
     return {"ok": True, "id": msg.id}
-
-
-# ── Classify + route helper ────────────────────────────────────────────────
-#
-# Shared between the webhook handler (immediate processing on receipt)
-# and the worker poll (sweep for any messages still status='new' that
-# the webhook handler couldn't process). Idempotent at the dispatch
-# layer.
-
-async def _classify_and_route(
-    message: InboundMessage, session: AsyncSession,
-) -> None:
-    """Classify the message + take the appropriate action.
-
-    - Tier 2 → send_tier_2_auto_reply (template + dispatch)
-    - Tier 1 → fire Tier-1.5 auto-ack + send Telegram approval card to
-      INBOX_FOUNDER_TELEGRAM_CHAT_ID
-    - Tier 3 → mark status='ignored', no further action
-    """
-    from app.services import inbox_kill_switch
-    from app.services.inbox_classifier import classify_async
-    from app.services.inbox_reply import maybe_send_tier_1_5_ack, send_tier_2_auto_reply
-
-    if not inbox_kill_switch.bot_enabled():
-        logger.info("inbox.classify.bot_disabled id=%d", message.id)
-        return
-
-    result = await classify_async(
-        message.body,
-        session=session,
-        author=message.author,
-        channel=message.channel,
-        inbound_message_id=message.id,
-    )
-
-    message.tier = result.tier
-    message.tier_reason = result.reason
-    if result.suggested_reply:
-        message.suggested_reply = result.suggested_reply
-
-    if result.tier == 2 and result.template_key:
-        message.status = "classified"
-        await session.commit()
-        await send_tier_2_auto_reply(message, result.template_key, session)
-    elif result.tier == 1:
-        message.status = "classified"
-        await session.commit()
-        # Fire the immediate auto-ack + send Telegram approval card to
-        # the founder for the real draft.
-        await maybe_send_tier_1_5_ack(message, session)
-        await _send_tier_1_telegram_card(message, session)
-    elif result.tier == 3:
-        message.status = "ignored"
-        message.handled_at = datetime.now(UTC)
-        await session.commit()
-    else:
-        # Defensive — every classification returns a known tier. If a
-        # future tier value sneaks in, leave status=new so a human can
-        # triage.
-        logger.warning("inbox.classify.unknown_tier id=%d tier=%s", message.id, result.tier)
-
-
-async def _send_tier_1_telegram_card(
-    message: InboundMessage, session: AsyncSession,
-) -> None:
-    """Send the founder a formatted Tier 1 approval card on Telegram.
-
-    Card layout:
-
-        🟢 Tier 1 inbound — needs your eyes
-
-        From: <author> (<channel>)
-        Reason: <tier_reason>
-
-        Their message:
-        > <first 400 chars of body>
-
-        Draft reply:
-        <suggested_reply or "[no draft — please write one]">
-
-        /approve_<id>   /edit_<id>   /reject_<id>
-
-    Captures Telegram's returned message_id and stores it on
-    `message.telegram_alert_message_id` so the bot can edit the card in
-    place when the founder taps a command.
-
-    Fail mode: if Telegram fails, log + leave status=classified. The
-    next worker tick will retry.
-    """
-    s = get_settings()
-    chat_id = s.inbox_founder_telegram_chat_id
-    if not chat_id:
-        logger.warning(
-            "inbox.tier1.no_chat_id id=%d — INBOX_FOUNDER_TELEGRAM_CHAT_ID unset",
-            message.id,
-        )
-        return
-
-    from app.services.telegram import send_message
-
-    body_preview = (message.body or "")[:400]
-    if len(message.body or "") > 400:
-        body_preview += "…"
-
-    draft = message.suggested_reply or "_[no draft — please write one]_"
-
-    card = (
-        f"🟢 *Tier 1 inbound — needs your eyes*\n\n"
-        f"*From:* `{message.author}` ({message.channel})\n"
-        f"*Reason:* {message.tier_reason or '(no reason)'}\n\n"
-        f"*Their message:*\n"
-        f"```\n{body_preview}\n```\n\n"
-        f"*Draft reply:*\n{draft}\n\n"
-        f"/approve\\_{message.id}   /edit\\_{message.id}   /reject\\_{message.id}"
-    )
-    try:
-        ok = await send_message(chat_id, card)
-        if not ok:
-            logger.warning(
-                "inbox.tier1.telegram_card_failed id=%d", message.id,
-            )
-            return
-    except Exception:
-        logger.exception(
-            "inbox.tier1.telegram_card_exception id=%d", message.id,
-        )
-        return
-    # NB: services/telegram.send_message doesn't currently return the
-    # message_id. Phase D adds a `send_message_with_id` variant; until
-    # then we can't edit the card in place. The approval flow still
-    # works — the founder just gets a confirmation message instead of
-    # an in-place edit.
 
 
 # ── Admin list + actions (Phase E surface; basic GET stub here) ────────────
