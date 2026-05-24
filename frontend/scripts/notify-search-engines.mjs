@@ -29,7 +29,12 @@
  */
 
 const SITE_URL = (process.env.SITE_URL || "https://tapeline.io").replace(/\/$/, "");
-const INDEXNOW_KEY = process.env.INDEXNOW_KEY || "";
+// Static IndexNow key — file lives at frontend/public/<key>.txt and is
+// served by Vercel. Override via INDEXNOW_KEY env var only if rotating.
+// Keeping a literal default means this script works out of the box in
+// CI / on a fresh clone without any GitHub-secret configuration.
+const STATIC_INDEXNOW_KEY = "7b3f8c5d2a9e4f1b6c8d0a3e5f7b9c2d";
+const INDEXNOW_KEY = process.env.INDEXNOW_KEY || STATIC_INDEXNOW_KEY;
 const SITEMAP_URL = `${SITE_URL}/sitemap.xml`;
 
 const explicitUrls = process.argv.slice(2).filter((a) => a.startsWith("http"));
