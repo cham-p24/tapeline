@@ -7,6 +7,7 @@ from app.models.inbox import InboundMessage
 from app.models.insider_transaction import InsiderTransaction
 from app.models.news import NewsItem
 from app.models.newsletter import NewsletterSubscriber
+from app.models.password_reset_token import PasswordResetToken
 from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
 from app.models.scanner_preset import ScannerPreset
@@ -32,6 +33,7 @@ __all__ = [
     "InstitutionalHolding",
     "NewsItem",
     "NewsletterSubscriber",
+    "PasswordResetToken",
     "RegimeState",
     "RoadmapVote",
     "ScannerPreset",

@@ -82,6 +82,12 @@ function SignInForm() {
             <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
             <Field label="Password" type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
 
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-xs text-muted underline-offset-4 hover:text-fg hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
             {err && (
               <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
                 {err}

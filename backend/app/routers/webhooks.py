@@ -258,3 +258,97 @@ async def stripe_webhook(
             await session.rollback()
 
     return {"ok": True}
+
+
+# ── Resend (deliverability feedback) ──────────────────────────────────────
+
+@router.post("/resend")
+async def resend_webhook(
+    request: Request,
+    svix_id: str | None = Header(None, alias="svix-id"),
+    svix_timestamp: str | None = Header(None, alias="svix-timestamp"),
+    svix_signature: str | None = Header(None, alias="svix-signature"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Handle email.bounced + email.complained from Resend.
+
+    A hard bounce or spam complaint means the recipient address can't
+    or won't receive our mail. Continuing to send eats the domain's
+    sender reputation fast. We stamp `User.email_undeliverable_at` and
+    `send_email` short-circuits future sends to that address.
+
+    Resend uses Svix for webhook signing — same library as Clerk above.
+    Without `RESEND_WEBHOOK_SECRET` configured the endpoint 503s, which
+    is fine: Resend retries with exponential backoff, and the operator
+    just sees a "webhook failures" alert in their Resend dashboard.
+
+    Events we handle:
+      email.bounced     — set email_undeliverable_at to now()
+      email.complained  — set email_undeliverable_at + clear all email_prefs
+                          + clear marketing_opt_in (spam-flag IS opt-out)
+
+    Other events (delivered, opened, clicked, sent, delivery_delayed)
+    are ignored — they're useful for analytics later but not for this
+    reputation-protection job.
+    """
+    if not settings.resend_webhook_secret:
+        raise HTTPException(503, "RESEND_WEBHOOK_SECRET not configured")
+
+    body = await request.body()
+    headers = {
+        "svix-id": svix_id or "",
+        "svix-timestamp": svix_timestamp or "",
+        "svix-signature": svix_signature or "",
+    }
+    try:
+        payload = Webhook(settings.resend_webhook_secret).verify(body, headers)
+    except WebhookVerificationError as exc:
+        raise HTTPException(400, f"Invalid signature: {exc}") from exc
+
+    evt_type = payload.get("type", "")
+    data = payload.get("data", {}) or {}
+    # Resend payloads put recipient emails on data.to as a list.
+    recipients = data.get("to") or []
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    recipients = [str(r).lower().strip() for r in recipients if r]
+
+    if not recipients:
+        return {"ok": True, "noop": True}
+
+    from datetime import UTC, datetime
+    now = datetime.now(UTC)
+
+    affected = 0
+    for addr in recipients:
+        r = await session.execute(select(User).where(User.email == addr))
+        user = r.scalar_one_or_none()
+        if user is None:
+            continue
+        if evt_type == "email.bounced":
+            # Hard bounce. Address won't accept our mail again — mark
+            # undeliverable so send_email short-circuits.
+            if user.email_undeliverable_at is None:
+                user.email_undeliverable_at = now
+                affected += 1
+                logger.info("resend.bounce_marked user=%s addr=%s", user.id, addr)
+        elif evt_type == "email.complained":
+            # User clicked "Mark as spam" in their inbox. Treat as a
+            # full opt-out: kill every email_prefs bit and clear the
+            # marketing-consent flag. Also stamp undeliverable so the
+            # rare transactional we'd otherwise send (e.g. payment_failed)
+            # also short-circuits — better to lose a transactional than
+            # earn another spam complaint.
+            if user.email_undeliverable_at is None:
+                user.email_undeliverable_at = now
+            user.email_prefs = 0
+            user.marketing_opt_in = False
+            affected += 1
+            logger.warning(
+                "resend.spam_complaint user=%s addr=%s — all prefs cleared",
+                user.id, addr,
+            )
+
+    if affected:
+        await session.commit()
+    return {"ok": True, "type": evt_type, "affected": affected}

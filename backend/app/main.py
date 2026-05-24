@@ -449,6 +449,13 @@ from app.routers import usage
 app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
 app.include_router(roadmap.router, prefix="/api/roadmap", tags=["roadmap"])
 
+# RFC 8058 one-click unsubscribe — public, HMAC-token-gated. Mounted at
+# /api/unsubscribe (no auth) so List-Unsubscribe headers in marketing
+# emails resolve quickly when Gmail / Outlook POSTs the one-click form.
+from app.routers import unsubscribe as unsubscribe_router
+
+app.include_router(unsubscribe_router.router, prefix="/api/unsubscribe", tags=["unsubscribe"])
+
 # Phase A — multi-watchlists + scanner presets (PR Phase A1, 2026-05-18).
 # Mounted alongside the legacy `/api/watchlist` (singular, item-level)
 # router. `/api/watchlists` (plural) manages the list objects themselves;

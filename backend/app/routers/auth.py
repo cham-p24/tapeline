@@ -418,6 +418,99 @@ async def resend_verification(
     return {"status": "sent" if ok else "send_skipped"}
 
 
+# ── Password reset ────────────────────────────────────────────────────────
+
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordBody(BaseModel):
+    token: str = Field(..., min_length=8, max_length=200)
+    password: str = Field(..., min_length=8, max_length=200)
+
+
+@router.post("/forgot-password", dependencies=[Depends(limit_auth)])
+async def forgot_password(
+    body: ForgotPasswordBody,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Initiate a password reset.
+
+    Returns 200 with {"status": "sent"} regardless of whether the email
+    matches a real account. This is deliberate: a different response for
+    unknown emails would let attackers enumerate which addresses have
+    accounts. Slightly worse UX for typos, much better security posture.
+    Rate-limited by limit_auth.
+    """
+    email = body.email.lower().strip()
+    r = await session.execute(select(User).where(User.email == email))
+    user = r.scalar_one_or_none()
+    if user is not None and user.password_hash:
+        # OAuth-only users (password_hash IS NULL) can't reset what they
+        # never had — silently no-op for them too, same response as
+        # unknown-email case, so we don't leak "this email signed up with
+        # Google" either.
+        try:
+            from app.services.email import mint_and_send_password_reset
+            await mint_and_send_password_reset(session, user)
+        except Exception:
+            logger.exception("auth.password_reset_send_failed user=%s", user.id)
+    else:
+        logger.info("auth.forgot_password_noop email=%s", email)
+    return {"status": "sent"}
+
+
+@router.post("/reset-password", dependencies=[Depends(limit_auth)])
+async def reset_password(
+    body: ResetPasswordBody,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Consume a password-reset token and update the user's password.
+
+    Returns one of:
+      {"status": "reset"}             token good, password updated
+      {"status": "expired"}           token past 60min
+      {"status": "already_used"}      token already consumed
+      {"status": "invalid"}           token doesn't exist / bad shape
+      {"status": "weak_password"}     new password failed hash_password validation
+    """
+    from app.models import PasswordResetToken
+
+    r = await session.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token == body.token,
+        )
+    )
+    row = r.scalar_one_or_none()
+    if row is None:
+        return {"status": "invalid"}
+
+    if row.used_at is not None:
+        return {"status": "already_used"}
+
+    expires_at = row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at < datetime.now(UTC):
+        return {"status": "expired"}
+
+    u = await session.execute(select(User).where(User.id == row.user_id))
+    user = u.scalar_one_or_none()
+    if user is None:
+        return {"status": "invalid"}
+
+    try:
+        pw = hash_password(body.password)
+    except ValueError:
+        return {"status": "weak_password"}
+
+    user.password_hash = pw
+    row.used_at = datetime.now(UTC)
+    await session.commit()
+    logger.info("auth.password_reset_completed user=%s", user.id)
+    return {"status": "reset"}
+
+
 @router.post("/signin", dependencies=[Depends(limit_auth)])
 async def signin(
     body: SigninBody,

@@ -281,6 +281,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_alert_email,
         render_email_verification_email,
         render_eod_watchlist_digest,
+        render_password_reset_email,
         render_payment_failed_email,
         render_re_engagement_email,
         render_referral_referee_email,
@@ -406,6 +407,13 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                 "Alex",
                 verify_url="https://tapeline.io/verify-email?token=demo123",
                 cancel_url="https://tapeline.io/verify-email?token=demo123&action=cancel",
+            ),
+        ),
+        "password_reset": (
+            "Password reset (forgot password flow)",
+            lambda: render_password_reset_email(
+                "Alex",
+                reset_url="https://tapeline.io/reset-password?token=demo123",
             ),
         ),
         "subscription_started_pro_monthly": (

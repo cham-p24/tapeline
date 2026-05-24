@@ -30,6 +30,14 @@ class User(Base):
         DateTime(timezone=True), nullable=True,
     )
 
+    # Stamped when Resend reports a hard bounce or a spam complaint for this
+    # user's address. send_email short-circuits on this column to stop
+    # burning sender reputation on dead addresses. Cleared when the user
+    # changes their email (POST /api/me/email — not yet wired).
+    email_undeliverable_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     # Owner/operator flag. Set via seed script or DB update, never via signup.
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
 
