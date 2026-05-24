@@ -62,6 +62,7 @@ _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
 _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
+_last_inbox_tick: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -459,11 +460,66 @@ async def tick() -> None:
             logger.exception("newsletter_daily.run_failed")
         _last_daily_newsletter_date = today_str
 
+    # Inbox auto-handler tick: poll Reddit + sweep pending classifications.
+    # Email + Telegram are webhook-driven (no poll needed) — the sweep
+    # catches anything the webhook handler crashed on. Cadence: 5 min
+    # during US market hours (more chatter), 15 min off-hours. Bypasses
+    # cleanly when the bot is disabled / no creds set.
+    global _last_inbox_tick
+    is_market_hours_now = (
+        started.weekday() < 5 and 13 <= started.hour < 21  # 9am-5pm ET ≈ 13-21 UTC
+    )
+    inbox_interval = 300 if is_market_hours_now else 900
+    if _last_inbox_tick is None or (started - _last_inbox_tick).total_seconds() >= inbox_interval:
+        _last_inbox_tick = started
+        try:
+            await _run_inbox_tick()
+        except Exception:
+            logger.exception("inbox.tick_failed")
+
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
         "tick.done snapshots=%d squeezes=%d regime=%s trades_added=%d elapsed=%.2fs",
         len(snapshots), len(squeezes), regime["regime"], len(new_trades), elapsed,
     )
+
+
+async def _run_inbox_tick() -> None:
+    """One inbox-poll cycle.
+
+    Order matters:
+      1. Reddit poll (the only channel that requires polling — email is
+         webhook-driven by Resend; Telegram is webhook-driven by the
+         existing /api/telegram/webhook).
+      2. Pending sweep — picks up any InboundMessage rows still
+         status='new' that the webhook handler crashed on. Safety net.
+
+    Honours the per-channel + global kill switches via the called
+    services; no need to re-check here.
+    """
+    try:
+        from app.services.reddit_inbox import poll_reddit_inbox
+        async with session_scope() as session:
+            counts = await poll_reddit_inbox(session)
+        if counts.get("total"):
+            logger.info(
+                "inbox.reddit_poll dms=%d comments=%d mentions=%d",
+                counts["dms"], counts["comments"], counts["mentions"],
+            )
+    except Exception:
+        logger.exception("inbox.reddit_poll_failed")
+
+    try:
+        from app.services.inbox_pipeline import process_pending
+        async with session_scope() as session:
+            counts = await process_pending(session, limit=50)
+        if counts.get("classified") or counts.get("error"):
+            logger.info(
+                "inbox.pending_sweep seen=%d classified=%d error=%d",
+                counts["seen"], counts["classified"], counts["error"],
+            )
+    except Exception:
+        logger.exception("inbox.pending_sweep_failed")
 
 
 async def _ensure_daily_scorecard(today: date) -> None:

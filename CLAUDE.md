@@ -137,6 +137,41 @@ Three live delivery channels for alerts (`backend/app/services/alerts.py:_fire`)
 
 End-of-day watchlist email digest fires daily ~21:00 UTC for every Pro+ user with watchlist items (`services/email.py:run_eod_watchlist_digest`).
 
+## Inbox auto-handler bot
+Server-side bot that triages inbound messages across Reddit, email, and Telegram into Tier 1 / 2 / 3. Tier 2 auto-replies via deterministic templates (ticker_score / pricing / trial / thanks). Tier 1 is drafted by Claude API and routed to the founder's Telegram for one-tap approval (`/approve_<id>` / `/edit_<id>` / `/reject_<id>`). Tier 3 is ignored. NEVER auto-sends a Tier 1.
+
+**Architecture:**
+- **Classifier** (`services/inbox_classifier.py`) — rule-based fast path catches ~70% of obvious cases (cashtag → ticker_score, pricing keywords → pricing template, spam patterns → Tier 3). Ambiguous fall through to Anthropic Claude (default `claude-haiku-4-5`, override via `INBOX_CLAUDE_MODEL`). Prompt-cached system block. Every LLM call logs to `inbox_classification_log` table (cost + latency + tier audit).
+- **Pipeline** (`services/inbox_pipeline.py`) — `upsert_inbound_message()` (idempotent on channel+msg_id) + `classify_and_route()` (status-guarded, dispatches per tier) + `process_pending()` (worker sweep for crashed-webhook recovery).
+- **Reply templates + dispatcher** (`services/inbox_reply.py`) — voice-rule-locked templates (descriptive only, no "buy"/"sell"/"you should"; first-person; unsigned). Dispatcher honours kill switches before calling channel adapters. Tier 1.5 auto-ack ("I'll get back to you within 24h") fires immediately on Tier 1 so US-business-hours senders aren't ghosted overnight.
+- **Channel adapters:**
+  * `services/email_inbox.py` — `send_email_reply()` via Resend (persona=default, threaded "Re:" subject).
+  * `services/reddit_inbox.py` — full poller (DMs + comment-replies on own posts + finance-sub mentions) + `send_reddit_reply()`. Reply-loop guards (`_is_self_authored`, `_is_parent_self_authored`) prevent infinite ping-pong. New-account throttle caps replies at 3/day for accounts < `REDDIT_NEW_ACCOUNT_THROTTLE_DAYS` days old.
+  * `services/telegram_inbox.py` — webhook-driven (no poll). `handle_telegram_update()` dispatches founder commands vs stranger DMs. Edit-state machine (10-min in-process TTL) for `/edit_<id>` follow-up text.
+- **Inbound entry points:**
+  * `POST /api/inbox/email` — Resend inbound webhook, Svix-signed against `RESEND_INBOUND_SECRET`. Fail-closed on missing secret.
+  * `POST /api/telegram/webhook/{secret}` — existing endpoint; extended to hand off to `telegram_inbox.handle_telegram_update()` for non-/start text.
+  * Reddit — polled from `signal_publisher.tick()` every 5 min market hours / 15 min off-hours via `_run_inbox_tick()`.
+- **Worker integration** — `_run_inbox_tick()` polls Reddit + sweeps `status='new'` via `process_pending()`. Single function in signal_publisher; idempotent so a worker restart mid-cycle is safe.
+- **Admin UI** — `/app/admin/inbox` lists every inbound with tier/channel/status filters, modal for review with editable draft + Approve/Reject.
+
+**Kill switches** (all `INBOX_*` env vars, default on):
+- `INBOX_BOT_ENABLED=false` — master pause; classify + send both skip
+- `INBOX_DRY_RUN=true` — full pipeline runs but adapter calls log instead of sending
+- `INBOX_<CHANNEL>_ENABLED=false` — per-channel kill (reddit/email/telegram)
+- `INBOX_CLAUDE_DAILY_CAP_USD=5.0` — daily LLM spend cap (default $5/day = ~7.5K Haiku classifications); once tripped, ambiguous messages default to Tier 1 manual review (no auto-reply). Resets at UTC midnight.
+- `INBOX_TIER1_AUTO_ACK=false` — disable the immediate Tier 1.5 "I'll get back to you" auto-ack
+
+**Required secrets to actually run** (none currently set on Fly):
+- `ANTHROPIC_API_KEY` — without it, every ambiguous message defaults to Tier 1
+- `INBOX_FOUNDER_TELEGRAM_CHAT_ID` — founder's chat_id for approval cards (DM `@userinfobot` to find)
+- `RESEND_INBOUND_SECRET` — Resend dashboard, plus MX records for `inbound@tapeline.io` → Resend
+- `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` — script-tier app at https://www.reddit.com/prefs/apps
+
+**Voice rules (legal-critical):** descriptive language only ("constructive setup", "high conviction", "weak") — never "buy" / "sell" / "you should" / "recommend". The Australian publisher exemption from AFSL depends on this. Tests in `tests/test_inbox_reply.py:TestVoiceRules` are the regression guard.
+
+**Coverage:** ~95 inbox-specific tests across `test_inbox_*.py` (classifier rule-based + LLM, kill switch, reply templates + dispatcher, webhook, pipeline, Reddit poller, Telegram approval flow).
+
 ## Per-ticker confidence
 Each Ticker row carries a `confidence_pct` (0-100) that varies with which underlying data feeds returned data for that symbol. Mega-caps with full Quiver/Finnhub/FINRA coverage land 88-96, ETFs without traditional fundamentals land 45-70, the typical liquid stock lands 60-85. Surfaced as a column on the scanner table + as an inline pill on the ticker page. Documented on `/how-it-works`. Pattern ported from the personal signal-system. Mock value via `mock_feed._compute_mock_confidence(symbol)` (deterministic per symbol). Real polygon_feed should compute from actual data-feed presence.
 
@@ -189,6 +224,17 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `docs/ARCHITECTURE.md` — system overview, deployment plan
 - `docs/LEGAL_CHECKLIST.md` — pre-launch legal must-dos
 - `docs/DATA_SOURCES.md` — what's licensed vs not
+- `backend/app/routers/inbox.py` — Resend inbound webhook + admin list/approve/reject
+- `backend/app/services/inbox_classifier.py` — rule-based + Claude LLM tier classification (Tier 1/2/3)
+- `backend/app/services/inbox_pipeline.py` — upsert + classify-and-route + pending sweep
+- `backend/app/services/inbox_reply.py` — Tier 2 templates + dispatcher + Tier 1.5 auto-ack
+- `backend/app/services/inbox_kill_switch.py` — bot_enabled / dry_run / channel_enabled / cap_exceeded gates
+- `backend/app/services/email_inbox.py` — outbound email reply adapter (uses Resend send_email)
+- `backend/app/services/reddit_inbox.py` — PRAW poller (DMs + comments + mentions) + reply adapter
+- `backend/app/services/telegram_inbox.py` — founder approval commands (/approve_/edit_/reject_) + DM classification
+- `backend/app/models/inbox.py` — `InboundMessage` (one row per inbound, idempotent on channel+msg_id)
+- `backend/app/models/inbox_classification_log.py` — per-LLM-call audit row backing the daily cost cap
+- `frontend/app/app/admin/inbox/page.tsx` — admin inbox review UI
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
 Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Benzinga, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Vercel frontend.
@@ -197,6 +243,12 @@ Short list of what's actually left:
 
 1. **Microsoft OAuth** client ID + secret (Google is done; Microsoft setup steps in `docs/launch/LAUNCH_PLAYBOOK.md` §6)
 2. **Lawyer consult** — Holley Nethercote Melbourne ($400-800). Now higher-priority than before: `docs/LICENSE_AUDIT.md` (2026-05-17) flagged that Polygon/Massive Starter + Finnhub Free are also "personal/non-business only" — Quiver was just the most visibly-marketed exposure.
+3. **Inbox auto-handler bot — 4 secrets + 1 MX setup** before it goes live (shipped 2026-05-24, dormant until secrets set):
+   - `ANTHROPIC_API_KEY` (Anthropic console)
+   - `INBOX_FOUNDER_TELEGRAM_CHAT_ID` (DM `@userinfobot` on Telegram → copy id)
+   - `RESEND_INBOUND_SECRET` + MX records for `inbound@tapeline.io` → Resend
+   - `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` (script-tier app at https://www.reddit.com/prefs/apps; uses an aged Reddit handle to avoid new-account anti-spam triggers)
+   - Recommended first deploy: `INBOX_DRY_RUN=true` for the first week so the bot classifies + logs but doesn't actually send. Shadow-mode audit via `/app/admin/inbox`, then flip to live.
 
 **No longer a launch blocker:** Quiver QuantData key. Premium dropped "Elite 13F holdings" from marketing in PR #74 (Quiver Trader-tier TOS says "No Commercial Use Rights"). The `_refresh_elite_13f` worker task still runs with mock-fallback so the `InstitutionalHolding` table stays populated, but nothing surfaces it. Only revisit if Premium ever re-adds elite 13F under a commercial Quiver license or alternative vendor.
 
