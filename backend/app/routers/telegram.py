@@ -51,9 +51,25 @@ async def telegram_webhook(secret: str, request: Request) -> dict:
     if not chat_id or not text:
         return {"ok": True}
 
-    # Only /start <token> matters here
+    # Inbox bot integration (Phase D): if the text isn't `/start`, hand
+    # off to the inbox handler. It dispatches between:
+    #   - founder commands (/approve_<id>, /reject_<id>, /edit_<id>)
+    #   - inbound DMs from non-founders → classify + route
+    # When the inbox handler doesn't claim the message, fall through to
+    # the legacy "use the website" reply.
     if not text.startswith("/start"):
-        # Optional: respond once so users know to use the website
+        try:
+            from app.db import session_scope as _scope
+            from app.services.telegram_inbox import handle_telegram_update
+            async with _scope() as inbox_session:
+                outcome = await handle_telegram_update(update, inbox_session)
+            if outcome.get("handled"):
+                return {"ok": True, "inbox": outcome}
+        except Exception:
+            logger.exception("telegram.inbox_handler_failed chat=%s", chat_id)
+
+        # Inbox declined — keep the legacy bot-introduction reply for any
+        # plain-text DM (e.g. someone sending "hello" with no link token)
         await send_message(
             chat_id,
             "Hi! To connect Telegram alerts, click *Connect Telegram* on "
