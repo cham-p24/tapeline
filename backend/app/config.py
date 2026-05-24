@@ -200,6 +200,24 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.0  # 0=off, 0.05=5% perf traces
     sentry_environment: str = ""  # defaults to app_env when blank
 
+    # ---- Growth bot (autonomous content + metrics digest) ----
+    # The growth bot runs from the worker tick at 22:00 UTC weekdays
+    # (~8am Melbourne). It pulls live metrics from Postgres, drafts a
+    # daily X tweet, LinkedIn post, and 3 fintwit reply candidates from
+    # the priority-1 account list, and emails the package to
+    # GROWTH_DIGEST_TO. Defaults to off so a fresh deploy doesn't surprise
+    # the founder with daily email — flip to true once they want it.
+    growth_bot_enabled: bool = False
+    # Recipient for the daily growth digest email. Defaults to the brand
+    # inbox if blank.
+    growth_digest_to: str = "tapeline.inbox@gmail.com"
+    # X handle the bot targets when scanning for fresh fintwit tweets.
+    # Comma-separated list; defaults to the priority-1 cohort.
+    growth_fintwit_handles: str = (
+        "JohnHuber72,TSOH_Investing,HaydenCapital,TidefallCapital,"
+        "SuperMugatu,Citrini7,iancassel,FoolAllTheTime"
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
