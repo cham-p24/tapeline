@@ -380,6 +380,25 @@ async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
         "sheet_feed.refreshed rows=%d ins=%d upd=%d",
         counts["total"], counts["inserted"], counts["updated"],
     )
+
+    # If the sheet added new tickers (insert count > 0), invalidate the
+    # active-universe cache so the next price-feed snapshot batch picks
+    # them up immediately instead of waiting up to an hour for the next
+    # scheduled universe refresh. Without this, founder-sheet additions
+    # take effect at the human's edit cadence but DB writes (price,
+    # volume, change_pct_1d) lag by up to an hour — confusing as hell
+    # when you're staring at the live data spreadsheet.
+    if counts.get("inserted", 0) > 0:
+        try:
+            from app.services.universe import refresh_active_universe
+            new_size = await refresh_active_universe()
+            logger.info(
+                "sheet_feed.universe_invalidated inserts=%d new_universe_size=%d",
+                counts["inserted"], new_size,
+            )
+        except Exception:
+            logger.exception("sheet_feed.universe_refresh_failed_after_insert")
+
     return counts
 
 
