@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { authApi } from "@/lib/auth";
+import { errorMessage } from "@/lib/api";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { useUser } from "@/components/UserContext";
 
@@ -57,8 +58,8 @@ function SignInForm() {
       await refresh();
       router.push(next);
       router.refresh();
-    } catch (e: any) {
-      setErr(e.message || "Sign in failed");
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Sign in failed");
     } finally {
       setBusy(false);
     }

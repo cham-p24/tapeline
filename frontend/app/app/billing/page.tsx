@@ -13,7 +13,7 @@ import {
   unsubscribeFromWebPush,
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
-import { handle401 } from "@/lib/api";
+import { handle401, errorMessage } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -149,8 +149,8 @@ export default function BillingPage() {
       } else {
         setMsg({ kind: "err", text: body.detail || `Checkout failed (${res.status})` });
       }
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message || "Checkout failed" });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) || "Checkout failed" });
     } finally {
       setBusy(null);
     }
@@ -166,8 +166,8 @@ export default function BillingPage() {
       if (res.ok && body.url) window.location.href = body.url;
       else if (res.status === 401) handle401(res.status);
       else setMsg({ kind: "err", text: body.detail || "Portal not available — Stripe activation pending." });
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     }
   }
 
@@ -554,8 +554,8 @@ function NotificationsCard() {
       window.open(body.deep_link, "_blank", "noopener,noreferrer");
       setMsg({ kind: "ok", text: "Tap Start in Telegram. We'll auto-detect the connection." });
       setPolling(true);
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 
@@ -572,8 +572,8 @@ function NotificationsCard() {
       if (!r.ok) throw new Error(body.detail || `Save failed (${r.status})`);
       setMsg({ kind: "ok", text: "Saved. Hit Test to verify the wiring." });
       await refresh();
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 
@@ -586,8 +586,8 @@ function NotificationsCard() {
       const body = await r.json();
       if (!r.ok) throw new Error(body.detail || `Test failed (${r.status})`);
       setMsg({ kind: "ok", text: "Sent. Check your Telegram." });
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 
@@ -601,8 +601,8 @@ function NotificationsCard() {
       setChatId("");
       setMsg({ kind: "ok", text: "Disconnected. Hourly digest stopped." });
       await refresh();
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 

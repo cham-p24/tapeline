@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { CardSkeleton } from "@/components/Skeleton";
 import { userLocale } from "@/lib/datetime";
-import { handle401 } from "@/lib/api";
+import { handle401, errorMessage } from "@/lib/api";
 
 type Stats = {
   users_total: number; users_pro: number; users_premium: number;
@@ -81,7 +81,7 @@ export default function AdminPage() {
     try {
       await adminPatch(`/api/admin/users/${userId}/tier`, { tier });
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, tier } : u));
-    } catch (e: any) { alert(e.message); }
+    } catch (e: unknown) { alert(errorMessage(e)); }
   }
 
   if (loading) return <CardSkeleton rows={6} />;

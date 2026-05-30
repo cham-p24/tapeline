@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type TickerDetail, TierGateError } from "@/lib/api";
+import { api, type TickerDetail, TierGateError, errorMessage } from "@/lib/api";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
@@ -31,7 +31,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
 
   const load = useCallback(async () => {
     try { setData(await api.ticker(symbol)); setError(null); }
-    catch (e: any) { setError(String(e.message || e)); }
+    catch (e: unknown) { setError(errorMessage(e)); }
   }, [symbol]);
 
   useEffect(() => { load(); }, [load]);
@@ -45,8 +45,8 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     try {
       await api.watchlistAdd(symbol);
       setAddMsg(`${symbol} added to watchlist`);
-    } catch (e: any) {
-      const m = String(e.message || e);
+    } catch (e: unknown) {
+      const m = errorMessage(e);
       if (m.includes("401")) {
         window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
         return;
@@ -70,13 +70,13 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         channel: "email",
       });
       setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
       if (e instanceof TierGateError) {
         // Backend's exact message — e.g. "Email alerts require Pro tier"
         setNewsAlertMsg(`${e.message} — upgrade at /app/billing`);
       } else {
-        const m = String(e.message || e);
+        const m = errorMessage(e);
         if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
         else setNewsAlertMsg(`Failed: ${m}`);
       }

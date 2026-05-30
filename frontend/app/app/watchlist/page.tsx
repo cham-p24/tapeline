@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type WatchlistItem, type WatchlistRow } from "@/lib/api";
+import { api, type WatchlistItem, type WatchlistRow, errorMessage } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -90,8 +90,8 @@ export default function WatchlistPage() {
       setSymbol("");
       load();
       loadLists();  // refresh list counts shown in the tab strip
-    } catch (e: any) {
-      const m = String(e.message || e);
+    } catch (e: unknown) {
+      const m = errorMessage(e);
       if (m.includes("401")) {
         // Session probably expired. Send them through signin and come back here.
         window.location.href = `/signin?next=${encodeURIComponent("/app/watchlist")}`;
