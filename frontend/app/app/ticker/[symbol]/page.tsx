@@ -13,6 +13,7 @@ import { InsiderTab } from "@/components/InsiderTab";
 import { Paywall } from "@/components/Paywall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 
 type DetailTab = "financials" | "insider";
@@ -117,6 +118,18 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     : data.signal === "CAUTION" ? "text-warn bg-warn/10"
     : "text-down bg-down/10";
 
+  // Animate the score number on first paint (and only first paint —
+  // useCountUp snaps on subsequent updates so the 60s live-stream
+  // refresh doesn't re-animate). Pass the integer floor; the .toFixed(1)
+  // tail is rendered separately so we only animate the meaningful part.
+  // Multiply by 10 to preserve the one-decimal precision while
+  // animating an integer.
+  const animatedScoreX10 = useCountUp(
+    data.score != null ? Math.round(data.score * 10) : null,
+  );
+  const displayScore =
+    animatedScoreX10 != null ? (animatedScoreX10 / 10).toFixed(1) : "—";
+
   return (
     <div>
       {/* Header */}
@@ -186,7 +199,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
                 </span>
               )}
             </div>
-            <div className="mt-1 text-4xl font-bold">{data.score?.toFixed(1)}</div>
+            <div className="mt-1 text-4xl font-bold nums">{displayScore}</div>
             <div className={`mt-2 inline-block rounded px-2 py-0.5 text-xs ${toneSig}`}>
               {data.signal}
             </div>
