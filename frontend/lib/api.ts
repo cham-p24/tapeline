@@ -668,4 +668,13 @@ export const api = {
   alertEvents: (limit = 50) => getAuth<{ count: number; items: AlertEvent[] }>(
     `/api/alerts/events?limit=${limit}`, DEV_TOKEN,
   ),
+
+  // --- Two-factor auth (TOTP) — all tiers, /app/settings/security ----------
+  twoFAStatus: () => get<{ enabled: boolean }>("/api/me/2fa"),
+  twoFASetup: () =>
+    post<{ secret: string; otpauth_uri: string; qr_svg: string }>("/api/me/2fa/setup", {}, DEV_TOKEN),
+  twoFAEnable: (code: string) =>
+    post<{ ok: boolean; recovery_codes: string[] }>("/api/me/2fa/enable", { code }, DEV_TOKEN),
+  twoFADisable: (password: string) =>
+    post<{ ok: boolean }>("/api/me/2fa/disable", { password }, DEV_TOKEN),
 };

@@ -32,6 +32,8 @@ dependencies = [
     "cryptography>=43.0.0",          # JWT signature verification
     "bcrypt>=4.2.0",                 # password hashing
     "pyjwt>=2.10.0",                 # session JWT signing
+    "pyotp>=2.9.0",                  # TOTP 2FA (authenticator-app codes)
+    "segno>=1.6.0",                  # QR code → inline SVG for 2FA enrolment (pure-Python)
     "sentry-sdk[fastapi]>=2.18.0",   # error monitoring (inert until SENTRY_DSN is set)
     "pywebpush>=2.0.1",              # web push delivery via VAPID — services/web_push.py imports it conditionally
 ]

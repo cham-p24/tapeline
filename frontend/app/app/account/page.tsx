@@ -70,6 +70,11 @@ export default function AccountPage() {
       description: "Choose which alert digests and product emails you receive.",
     },
     {
+      title: "Security",
+      href: "/app/settings/security",
+      description: "Two-factor authentication and sign-in protection.",
+    },
+    {
       title: "Watchlist",
       href: "/app/watchlist",
       description: "Tickers you're tracking + their per-ticker alert rules.",
