@@ -8,6 +8,8 @@
  */
 "use client";
 
+import { useCountUp } from "@/lib/useCountUp";
+
 type Props = {
   score: number;         // 0-100
   label: string;         // "Extreme Fear" | "Fear" | "Neutral" | "Greed" | "Extreme Greed"
@@ -49,7 +51,13 @@ function angleFor(score: number) {
 
 export function FearGreedDial({ score, label, color }: Props) {
   const accentHex = HEX[color] ?? HEX.muted;
-  const needleAngle = angleFor(score);
+  // Sweep the score up from 0 on first paint — the needle tracks the same
+  // animated value so dial + number settle together. useCountUp snaps on
+  // later updates, so a live 60s poll won't re-run the sweep. SSR and the
+  // client's first render both read null → 0, so no hydration mismatch.
+  const animated = useCountUp(score);
+  const shown = animated ?? 0;
+  const needleAngle = angleFor(shown);
   const needleEnd = polar(needleAngle, R - 8);
 
   // Outer arc from left (180°) to right (0°)
@@ -125,7 +133,7 @@ export function FearGreedDial({ score, label, color }: Props) {
 
       <div className="mt-3 flex items-baseline gap-3">
         <span className="text-5xl font-bold nums tracking-tight" style={{ color: accentHex }}>
-          {score}
+          {shown}
         </span>
         <span className="text-base font-semibold uppercase tracking-wider" style={{ color: accentHex }}>
           {label}
