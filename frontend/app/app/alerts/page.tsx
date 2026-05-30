@@ -114,8 +114,11 @@ export default function AlertsPage() {
         </div>
       </div>
 
-      {/* Create form */}
-      <div className="card mt-6 p-5">
+      {/* Create form — p-4 to match the watchlist "add ticker" form's
+          compactness. Both are top-of-page input blocks of the same
+          shape; before this they were drifting at p-5 vs p-4 which
+          read as two slightly different design languages. */}
+      <div className="card mt-6 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">New rule</h2>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
