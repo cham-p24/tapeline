@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
-import { api } from "@/lib/api";
+import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
@@ -172,8 +172,8 @@ function SignUpForm() {
       // users (signin) never pass through here.
       router.push(`/app/onboarding?next=${encodeURIComponent(next)}`);
       router.refresh();
-    } catch (e: any) {
-      setErr(e.message || "Sign up failed");
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Sign up failed");
     } finally {
       setBusy(false);
     }

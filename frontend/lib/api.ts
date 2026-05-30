@@ -53,6 +53,18 @@ export function handle401(status: number) {
 }
 
 /**
+ * Normalise a caught `unknown` to a display string. Lets call sites use
+ * `catch (e: unknown)` — strict, no implicit `any` — while keeping the terse
+ * `setError(errorMessage(e))` shape. `Error` (incl. TierGateError) → its
+ * `.message`; anything else → `String()`. Type-safe replacement for the old
+ * `String(e.message || e)` idiom that was repeated across ~10 catch blocks.
+ */
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
+
+/**
  * Typed 403 — tier-gate. Thrown by every helper in this file when the
  * backend returns 403 (Pro / Premium feature attempted from a lower
  * tier). Carries the backend's human message + an inferred `requiredTier`

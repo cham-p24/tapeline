@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { errorMessage } from "@/lib/api";
 
 type StatusResponse = {
   status: "ok" | "degraded";
@@ -43,8 +44,8 @@ export default function StatusPage() {
       setData(body);
       setError(null);
       setFetchedAt(new Date());
-    } catch (e: any) {
-      setError(e.message || "Status endpoint unreachable");
+    } catch (e: unknown) {
+      setError(errorMessage(e) || "Status endpoint unreachable");
       setFetchedAt(new Date());
     }
   }

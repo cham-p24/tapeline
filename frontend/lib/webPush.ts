@@ -7,7 +7,7 @@
  * non-installed iOS Safari — caller should catch and surface the install hint.
  */
 
-import { handle401 } from "@/lib/api";
+import { handle401, errorMessage } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -44,8 +44,8 @@ export async function subscribeToWebPush(): Promise<{ ok: true } | { ok: false; 
   try {
     registration = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
-  } catch (e: any) {
-    return { ok: false, reason: `Service worker failed to register: ${e.message}` };
+  } catch (e: unknown) {
+    return { ok: false, reason: `Service worker failed to register: ${errorMessage(e)}` };
   }
 
   // Step 2: request notification permission
@@ -72,8 +72,8 @@ export async function subscribeToWebPush(): Promise<{ ok: true } | { ok: false; 
       // away from the expected BufferSource union here
       applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
     });
-  } catch (e: any) {
-    return { ok: false, reason: `Push subscribe failed: ${e.message}` };
+  } catch (e: unknown) {
+    return { ok: false, reason: `Push subscribe failed: ${errorMessage(e)}` };
   }
 
   // Step 5: POST the subscription to the backend
