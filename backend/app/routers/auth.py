@@ -524,9 +524,67 @@ async def signin(
         # Identical error message for both branches = no account enumeration
         raise HTTPException(401, "Invalid email or password")
 
+    # 2FA gate — if TOTP is enabled, don't mint a session yet. Return a
+    # short-lived challenge token the client exchanges at POST /api/auth/2fa
+    # together with a live authenticator code (or a recovery code).
+    if user.mfa_enabled and user.totp_secret:
+        from app.services.mfa import issue_mfa_token
+        logger.info("auth.signin_mfa_challenge user=%s", user.id)
+        return {"mfa_required": True, "mfa_token": issue_mfa_token(user.id)}
+
     token = issue_session_token(user.id)
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signin user=%s", user.id)
+    return {"user": _user_out(user)}
+
+
+class TwoFASigninBody(BaseModel):
+    mfa_token: str = Field(..., min_length=8, max_length=2048)
+    code: str = Field(..., min_length=6, max_length=20)
+
+
+@router.post("/2fa", dependencies=[Depends(limit_auth)])
+async def signin_2fa(
+    body: TwoFASigninBody,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Second step of a 2FA signin: verify the code, then mint the session.
+
+    Accepts either a current 6-digit TOTP code OR one of the user's
+    single-use recovery codes. The challenge token (from /signin) proves the
+    password step already passed and expires after 5 minutes.
+    """
+    from app.services.mfa import hash_recovery_code, verify_mfa_token, verify_totp
+
+    user_id = verify_mfa_token(body.mfa_token)
+    if not user_id:
+        raise HTTPException(401, "Your verification window expired. Please sign in again.")
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None or not user.mfa_enabled or not user.totp_secret:
+        raise HTTPException(401, "Two-factor auth is not active on this account.")
+
+    code = body.code.strip()
+    if not verify_totp(user.totp_secret, code):
+        # Not a valid TOTP — try a single-use recovery code.
+        from app.models import MfaRecoveryCode
+        r = await session.execute(
+            select(MfaRecoveryCode).where(
+                MfaRecoveryCode.user_id == user.id,
+                MfaRecoveryCode.code_hash == hash_recovery_code(code),
+                MfaRecoveryCode.used_at.is_(None),
+            )
+        )
+        rc = r.scalar_one_or_none()
+        if rc is None:
+            raise HTTPException(401, "Invalid code.")
+        rc.used_at = datetime.now(UTC)  # consume it
+
+    token = issue_session_token(user.id)
+    response.set_cookie(value=token, **session_cookie_kwargs())
+    await session.commit()
+    logger.info("auth.signin_2fa user=%s", user.id)
     return {"user": _user_out(user)}
 
 

@@ -924,6 +924,128 @@ async def test_watchlist_alert_skips_free_tier_and_below_threshold():
     assert n == 0
 
 
+def test_mfa_service_helpers():
+    """Pure-function checks for services/mfa: TOTP verify, recovery-code
+    hashing/normalisation, and the challenge-token purpose isolation that
+    keeps a 2FA token from ever standing in for a full session (or vice
+    versa)."""
+    import pyotp
+
+    from app.services.mfa import (
+        generate_recovery_codes,
+        generate_totp_secret,
+        hash_recovery_code,
+        issue_mfa_token,
+        verify_mfa_token,
+        verify_totp,
+    )
+    from app.services.session import issue_session_token, verify_session_token
+
+    secret = generate_totp_secret()
+    assert verify_totp(secret, pyotp.TOTP(secret).now()) is True
+    assert verify_totp(secret, "abc") is False  # non-digit
+    assert verify_totp("", "123456") is False   # no secret
+
+    # Recovery codes: 10 unique, hashing is dash/case-insensitive.
+    codes = generate_recovery_codes()
+    assert len(codes) == 10
+    assert len(set(codes)) == 10
+    c = codes[0]
+    assert hash_recovery_code(c) == hash_recovery_code(c.replace("-", "").upper())
+
+    # Challenge token round-trips, but is namespaced by purpose="mfa".
+    tok = issue_mfa_token("u_mfa_test")
+    assert verify_mfa_token(tok) == "u_mfa_test"
+    sess = issue_session_token("u_mfa_test")
+    assert verify_mfa_token(sess) is None        # a session cookie isn't an mfa token
+    assert verify_session_token(tok) is None      # an mfa token isn't a session
+
+
+@pytest.mark.asyncio
+async def test_2fa_enable_and_two_step_signin(client, monkeypatch):
+    """End-to-end TOTP 2FA: enable on a fresh account, then prove the signin
+    path challenges for a code and accepts both a live TOTP and a single-use
+    recovery code. Reusing a spent recovery code must fail."""
+    _patch_signup_gates(monkeypatch)
+    import pyotp
+
+    email = _random_email()
+    password = "TestPassword!2026"
+
+    async with client:
+        r = await client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": password, "name": "MFA"},
+        )
+        assert r.status_code == 200, r.text
+        cookies = r.cookies
+
+        # Starts off.
+        r0 = await client.get("/api/me/2fa", cookies=cookies)
+        assert r0.status_code == 200 and r0.json()["enabled"] is False
+
+        # Setup mints a secret + an inline-SVG QR.
+        r1 = await client.post("/api/me/2fa/setup", cookies=cookies)
+        assert r1.status_code == 200, r1.text
+        secret = r1.json()["secret"]
+        assert r1.json()["qr_svg"].lstrip().startswith("<svg")
+
+        # A wrong code is rejected; a live code enables + returns 10 recovery codes.
+        r_bad = await client.post("/api/me/2fa/enable", json={"code": "000000"}, cookies=cookies)
+        assert r_bad.status_code in (400, 401)
+        r2 = await client.post(
+            "/api/me/2fa/enable",
+            json={"code": pyotp.TOTP(secret).now()},
+            cookies=cookies,
+        )
+        assert r2.status_code == 200, r2.text
+        recovery = r2.json()["recovery_codes"]
+        assert len(recovery) == 10
+
+        r3 = await client.get("/api/me/2fa", cookies=cookies)
+        assert r3.json()["enabled"] is True
+
+        # Signin now returns a challenge (no session cookie, no user).
+        r4 = await client.post(
+            "/api/auth/signin", json={"email": email, "password": password},
+        )
+        assert r4.status_code == 200, r4.text
+        body4 = r4.json()
+        assert body4.get("mfa_required") is True
+        assert "user" not in body4
+        assert not any(
+            "tapeline_session" in c for c in r4.headers.get_list("set-cookie")
+        ), "challenge response must not set a session cookie"
+
+        # Exchange the challenge + a live code → real session.
+        r5 = await client.post(
+            "/api/auth/2fa",
+            json={"mfa_token": body4["mfa_token"], "code": pyotp.TOTP(secret).now()},
+        )
+        assert r5.status_code == 200, r5.text
+        assert r5.json()["user"]["email"] == email
+
+        # A recovery code also satisfies the challenge…
+        r6 = await client.post(
+            "/api/auth/signin", json={"email": email, "password": password},
+        )
+        r7 = await client.post(
+            "/api/auth/2fa",
+            json={"mfa_token": r6.json()["mfa_token"], "code": recovery[0]},
+        )
+        assert r7.status_code == 200, r7.text
+
+        # …but only once — the spent code is now rejected.
+        r8 = await client.post(
+            "/api/auth/signin", json={"email": email, "password": password},
+        )
+        r9 = await client.post(
+            "/api/auth/2fa",
+            json={"mfa_token": r8.json()["mfa_token"], "code": recovery[0]},
+        )
+        assert r9.status_code == 401
+
+
 # NOTE: keep this test LAST. The rate-limiter is process-global and stays
 # triggered for ~60s after this test fires; subsequent tests would all 429.
 @pytest.mark.asyncio

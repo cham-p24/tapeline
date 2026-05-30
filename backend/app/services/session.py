@@ -66,6 +66,11 @@ def verify_session_token(token: str) -> str | None:
         payload = jwt.decode(token, _session_secret(), algorithms=["HS256"])
     except Exception:
         return None
+    # The 5-minute 2FA challenge token (services/mfa.issue_mfa_token) is signed
+    # with this same secret but carries purpose="mfa". It must never be accepted
+    # as a full session — defence-in-depth even though it's never set as a cookie.
+    if payload.get("purpose") == "mfa":
+        return None
     sub = payload.get("sub")
     return sub if isinstance(sub, str) else None
 

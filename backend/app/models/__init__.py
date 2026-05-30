@@ -15,7 +15,7 @@ from app.models.scorecard import DailyScorecardEntry
 from app.models.squeeze import SqueezeSetup
 from app.models.telegram_token import TelegramLinkToken
 from app.models.ticker import Ticker
-from app.models.user import AlertEvent, AlertRule, Subscription, User
+from app.models.user import AlertEvent, AlertRule, MfaRecoveryCode, Subscription, User
 from app.models.watchlist import Watchlist, WatchlistItem
 from app.models.web_push import WebPushSubscription
 from app.models.webhook_event import StripeWebhookEvent
@@ -31,6 +31,7 @@ __all__ = [
     "InboundMessage",
     "InsiderTransaction",
     "InstitutionalHolding",
+    "MfaRecoveryCode",
     "NewsItem",
     "NewsletterSubscriber",
     "PasswordResetToken",
