@@ -44,14 +44,13 @@
   --warn:        180 83 9;           /* amber-700                      */
   --shadow:      0 0 0 / 0.06;
   /* Atmospheric tint opacity (used by body::before, restored below).
-     History: 0.05 (orig) → 0.08 (2026-05-20) → removed entirely 2026-05-22
-     because the landing page's per-section gradient blobs + this wash
-     read as "too many overlays" → restored 2026-05-30 at 0.08 because
-     "the blue tinge is not there across all the pages" — the per-section
-     blobs were doing the heavy lifting on landing but every OTHER page
-     was flat. Restoring the global wash gives consistent atmosphere
-     without re-introducing the gradient stack on landing. */
-  --atmosphere-opacity: 0.08;
+     History: 0.05 → 0.08 → removed 2026-05-22 → restored 0.08 (am 2026-05-30)
+     → 0.16 (pm 2026-05-30, still not visible enough). The 0.08 wash in
+     light mode worked out to about rgb(245, 248, 255) over white — barely
+     distinguishable from #fff on most monitors. 0.16 lands closer to
+     rgb(235, 243, 255), a clearly perceptible iOS-blue wash in negative
+     space without darkening card surfaces or hurting text contrast. */
+  --atmosphere-opacity: 0.16;
 }
 
 [data-theme="dark"] {
@@ -71,8 +70,12 @@
   --up:          48 209 88;
   --down:        255 69 58;
   --warn:        250 204 21;          /* amber-400, legible on near-black */
+  /* Dark mode navy wash. 0.12 was painting a subtle but easy-to-miss tint
+     on monitors with cool colour profiles. 0.22 puts the wash at roughly
+     rgb(10, 37, 64) — unmistakable navy atmosphere, still well within the
+     "ambient" range (not a hero gradient). */
   --shadow:      0 0 0 / 0.45;
-  --atmosphere-opacity: 0.12;
+  --atmosphere-opacity: 0.22;
 }
 
 /*
@@ -100,7 +103,7 @@
     --down:        255 69 58;
     --warn:        250 204 21;
     --shadow:      0 0 0 / 0.45;
-    --atmosphere-opacity: 0.12;
+    --atmosphere-opacity: 0.22;
   }
 }
 
