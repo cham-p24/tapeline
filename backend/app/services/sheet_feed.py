@@ -44,6 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models import Ticker
+from app.services.score import compute_tapeline_composite
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +263,6 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # Stage 2: compute Tapeline's published composite from those inputs.
         # `compute_tapeline_composite` lazy-imports the Finnhub caches so
         # missing data degrades to NEUTRAL (50) per factor, never None.
-        from app.services.score import compute_tapeline_composite  # local import - keeps sheet_feed parse-time light
         composite, subs = compute_tapeline_composite(row_for_composite)
 
         rows.append({
