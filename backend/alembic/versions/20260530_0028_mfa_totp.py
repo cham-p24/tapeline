@@ -15,7 +15,7 @@ server_default=false on mfa_enabled backfills the column for existing rows
 without a separate UPDATE.
 
 Revision ID: 0028_mfa_totp
-Revises: 0027_password_reset_bounce
+Revises: 0028_inbox_classification_log
 Create Date: 2026-05-30 09:00:00
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0028_mfa_totp"
-down_revision: Union[str, None] = "0027_password_reset_bounce"
+down_revision: Union[str, None] = "0028_inbox_classification_log"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
