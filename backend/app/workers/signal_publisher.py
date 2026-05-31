@@ -445,6 +445,23 @@ async def tick() -> None:
     )
 
 
+_MAX_PER_SECTOR = 3
+"""Concentration cap on the daily top-10. Without it the freeze frequently
+holds 5+ semiconductors or 5+ regional banks because the sheet ranks them
+all high in sympathy moves. They co-move next day, so a single hostile
+session for the cluster blows up the whole top-10's back-check. Capping
+at 3 per sector forces some diversification on the public record without
+hand-curating picks. Set to 0 to disable."""
+
+_MIN_MACRO_FOR_INCLUSION = 30.0
+"""Picks whose Tapeline sub_macro falls in the FALLING band (mapped to 25
+in services/score) are skipped from the top-10 freeze. We still keep the
+Ticker row in the DB and surface it on /scanner — this filter only
+governs which picks make the public scorecard, where a hostile-macro
+pick almost certainly fights the next-day tape regardless of how strong
+its other factors look."""
+
+
 async def _ensure_daily_scorecard(today: date) -> None:
     """Record today's top-10 picks once per day, for the public scorecard page.
 
@@ -455,6 +472,13 @@ async def _ensure_daily_scorecard(today: date) -> None:
 
     Also skips tickers with a missing/zero price (bad upstream data) — a $0
     flag price would cause divide-by-zero when computing return.
+
+    Concentration controls (2026-06-01, fix 3 of SCORING_AUDIT_2026-06-01.md):
+    - At most _MAX_PER_SECTOR picks from any single sector
+    - Skip picks where sub_macro indicates FALLING regime (< _MIN_MACRO_FOR_INCLUSION)
+    These reduce next-day correlation in the top-10 and improve the
+    back-check's resilience to sector or regime shocks. Both are tunable
+    constants at the top of this module.
     """
     from app.services.scorecard_backcheck import is_trading_day
 
@@ -469,17 +493,49 @@ async def _ensure_daily_scorecard(today: date) -> None:
         )
         if existing.scalar_one_or_none() is not None:
             return
-        top = await session.execute(
-            select(Ticker).where(Ticker.score.isnot(None)).order_by(desc(Ticker.score)).limit(10)
+
+        # Pull a wider candidate pool (50) so the concentration filter has
+        # room to skip clustered picks without running out before reaching 10.
+        candidates = await session.execute(
+            select(Ticker).where(Ticker.score.isnot(None)).order_by(desc(Ticker.score)).limit(50)
         )
+
+        sector_counts: dict[str, int] = {}
+        skipped_zero_price = 0
+        skipped_macro_hostile = 0
+        skipped_sector_cap = 0
         rank = 0
-        for t in top.scalars().all():
+
+        for t in candidates.scalars().all():
+            if rank >= 10:
+                break
+
             if not t.price or t.price <= 0:
                 # Don't poison the public record with $0-price entries — these
                 # come from tier-restricted snapshot fields or partial fetches.
-                # Skipping reduces the day's count below 10; that's fine, the
-                # scorecard page renders whatever's there.
+                skipped_zero_price += 1
                 continue
+
+            # Macro gate: skip picks in a clearly hostile regime. sub_macro
+            # of None means "no signal" (don't filter); a value below the
+            # threshold means the Tapeline composite read the regime as
+            # FALLING / BEAR. Same pick is still on /scanner — it just
+            # doesn't get put on the public scorecard where it would drag
+            # the median alpha down on day 1.
+            if t.sub_macro is not None and t.sub_macro < _MIN_MACRO_FOR_INCLUSION:
+                skipped_macro_hostile += 1
+                continue
+
+            # Sector concentration cap. Use the canonical sector field;
+            # tickers with NULL/unknown sectors fall into the "Unknown"
+            # bucket which gets its own cap (so we don't dump all unknowns
+            # into the top-10 either).
+            sector_key = (t.sector or "Unknown").strip()
+            if _MAX_PER_SECTOR > 0 and sector_counts.get(sector_key, 0) >= _MAX_PER_SECTOR:
+                skipped_sector_cap += 1
+                continue
+            sector_counts[sector_key] = sector_counts.get(sector_key, 0) + 1
+
             rank += 1
             session.add(DailyScorecardEntry(
                 as_of=today,
@@ -488,7 +544,14 @@ async def _ensure_daily_scorecard(today: date) -> None:
                 score_at_flag=t.score or 0,
                 price_at_flag=float(t.price),
             ))
-        logger.info("scorecard.snapshot saved for %s rows=%d", today, rank)
+
+        logger.info(
+            "scorecard.snapshot saved for %s rows=%d "
+            "skipped_zero_price=%d skipped_macro_hostile=%d skipped_sector_cap=%d "
+            "sector_mix=%s",
+            today, rank, skipped_zero_price, skipped_macro_hostile,
+            skipped_sector_cap, sector_counts,
+        )
 
 
 _news_cache_wiped: bool = False
