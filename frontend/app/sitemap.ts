@@ -27,6 +27,17 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
+// Bound the upstream call. /api/public/top-tickers does an unindexed
+// ORDER BY score DESC and can briefly stall (Neon scale-to-zero cold start
+// or a heavy worker tick — observed >30s before recovering). Without a
+// timeout the sitemap ISR regeneration inherits that stall, which can 5xx
+// the /sitemap.xml route. That's a double miss: Google sees no sitemap, and
+// the daily stale-link audit reads "sitemap_unavailable" so IndexNow submits
+// nothing. An 8s cap lets a slow-but-fine call through while turning a true
+// hang into a clean fallback. AbortSignal.timeout is not part of Next's
+// fetch cache key, so the 1h ISR cache is preserved.
+const TOP_TICKERS_TIMEOUT_MS = 8000;
+
 async function fetchTopTickers(limit = 500): Promise<string[]> {
   try {
     // /api/public/top-tickers is the no-auth, no-tier-gating endpoint built
@@ -35,12 +46,15 @@ async function fetchTopTickers(limit = 500): Promise<string[]> {
     // expansion entirely.
     const res = await fetch(`${API_BASE}/api/public/top-tickers?limit=${limit}`, {
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(TOP_TICKERS_TIMEOUT_MS),
     });
     if (!res.ok) return FALLBACK_TICKERS;
     const body = (await res.json()) as { symbols?: string[] };
     const syms = body.symbols ?? [];
     return syms.length > 0 ? syms : FALLBACK_TICKERS;
   } catch {
+    // Timeout / network error → fall back to the mega-cap list so the
+    // sitemap still emits a valid (if smaller) document.
     return FALLBACK_TICKERS;
   }
 }
@@ -69,7 +83,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/data-sources`,              lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // Daily-picks newsletter lead-magnet landing — preview of what
+    // newsletter subscribers get. Refreshes every 30 min via ISR.
+    { url: `${base}/daily-picks`,               lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/signals`,                   lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // Sector hub-of-hubs — shallow crawl entry point into the 11 /sector/{slug}
+    // ranking pages (and onward to per-ticker pages). Aggregates change as
+    // scores re-tick, so daily.
+    { url: `${base}/sectors`,                   lastModified: now, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
     { url: `${base}/blog`,                      lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
@@ -89,9 +110,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/compare/stock-rover`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/benzinga-pro`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/stockcharts`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // New competitor pages — 2026-05-20 expansion to cover the remaining
+    // high-intent comparison clusters (free incumbent, broker-built scanners,
+    // institutional pedigree, enterprise pricing anchor).
+    { url: `${base}/compare/yahoo-finance`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/webull`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/robinhood`,         lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/marketsmith`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/compare/bloomberg-terminal`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // Feature landing pages — public surfaces for the gated /app/* tools.
+    // High-intent keyword clusters: short squeeze, congress trades, insider
+    // buying, market heatmap, market regime. Each ranks for the cluster +
+    // converts to the matching tier via a tier-aware CTA.
+    { url: `${base}/short-squeeze-scanner`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/congressional-trades`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/insider-buying`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/stock-market-heatmap`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    { url: `${base}/market-regime`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    // Free-tool / embed docs — backlink-acquisition asset. Every site that
+    // pastes the iframe = one evergreen backlink to /t/{TICKER}. Indexed
+    // intentionally (the embed views themselves are noindex; this docs
+    // page IS the marketing landing page for the widget).
+    { url: `${base}/embed`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/signup`,                    lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/contact`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
     // /signin removed from sitemap — auth pages shouldn't be in search
@@ -128,7 +171,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  const tickers = await fetchTopTickers(500);
+  // Per-ticker pages — top 1,000 by daily $-volume.
+  //
+  // 2026-05-24 (later same day): reversed the 250 cap after founder
+  // pushback ("i want to be indexed for everything"). New approach:
+  // submit a much larger universe AND make every page substantial
+  // enough that Google's quality classifier accepts it. The content
+  // depth work happens in /t/[symbol]/page.tsx via
+  // buildEditorialCommentary() which auto-generates a 200-400 word
+  // ticker-specific editorial paragraph from the live factor
+  // sub-scores. Combined with the existing Related Tickers,
+  // news-headlines feed, and FAQ, each page now reads as genuinely
+  // ticker-specific content rather than a templated shell.
+  //
+  // 1000 (vs 250) is the right balance: covers every actively-traded
+  // US name a search query is realistically about, without flooding
+  // Google with the lowest-volume tickers that have effectively zero
+  // search demand (and where even rich content wouldn't index).
+  const tickers = await fetchTopTickers(1000);
   const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
     url: `${base}/t/${sym}`,
     lastModified: now,

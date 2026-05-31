@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type TickerInsiderResponse, type TickerInsiderRow } from "@/lib/api";
+import { TableSkeleton } from "@/components/Skeleton";
 
 /**
  * Insider transactions tab — Premium-only (gating at the Paywall wrapper
@@ -35,7 +36,7 @@ export function InsiderTab({ symbol }: { symbol: string }) {
 
   if (error)
     return <p className="text-sm text-down">Couldn&rsquo;t load insider activity: {error}</p>;
-  if (!data) return <p className="text-sm text-muted">Loading…</p>;
+  if (!data) return <TableSkeleton cols={5} rows={4} />;
   if (data.transactions.length === 0)
     return (
       <p className="text-sm text-muted">

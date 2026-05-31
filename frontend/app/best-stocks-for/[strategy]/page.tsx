@@ -14,9 +14,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
+
+// Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
+// `revalidate: 300` below and the file's "5-minute snapshot" contract, and
+// keeps this route off the build-time critical path (see generateStaticParams).
+export const revalidate = 300;
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -40,7 +46,14 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
     ).toString();
     const url = `${API_BASE}/api/scanner?${qs}`;
     // 5-minute cache so search-engine crawls don't hammer the API.
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await fetch(url, {
+      next: { revalidate: 300 },
+      // Bound the fetch so a degraded backend can't hang the on-demand render
+      // (this page is ISR, not build-time — see generateStaticParams). On
+      // timeout we fall through to the [] fallback and render fast; ISR refills
+      // the data within `revalidate` once the backend recovers.
+      signal: AbortSignal.timeout(7000),
+    });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: ScannerRow[] };
     return body.items ?? [];
@@ -49,8 +62,16 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
   }
 }
 
-export function generateStaticParams() {
-  return STRATEGIES.map((s) => ({ strategy: s.slug }));
+// Deliberately NOT pre-rendered at build time. Pre-rendering coupled deploy
+// success to backend health: each strategy page fetched /api/scanner at build,
+// so a degraded api.tapeline.io could blow the per-page build budget — and the
+// build-time fan-out itself piled load onto an already-struggling backend.
+// These pages now render on-demand (dynamicParams defaults to true) and cache
+// via `revalidate` (ISR). Discovery is unaffected: every /best-stocks-for/{slug}
+// URL is emitted in app/sitemap.ts, so crawlers find them, render the first hit
+// on-demand, then serve the ISR cache. Mirrors /blog/ticker/[symbol] + /t/[symbol].
+export function generateStaticParams(): { strategy: string }[] {
+  return [];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ strategy: string }> }) {
@@ -113,7 +134,7 @@ export default async function BestStocksForStrategyPage({
       {itemList ? <script {...jsonLdScript(itemList)} /> : null}
       <MarketingNav />
 
-      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
+      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
         <p className="eyebrow">Best stocks · {s.display}</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           {s.h1}
@@ -246,6 +267,44 @@ export default async function BestStocksForStrategyPage({
             ))}
           </div>
         </nav>
+
+        {/* Related Tapeline tools — cross-link into the feature landing pages
+            (squeeze, congress, insider, heatmap, regime). Tightens the
+            internal link graph between the strategy cluster and the feature
+            cluster, both of which the GSC audit flagged as under-indexed
+            because they sat as siloed templated content. */}
+        <nav
+          aria-label="Related Tapeline tools"
+          className="mt-6 rounded-xl border border-border bg-panel/40 p-6"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
+            Related Tapeline tools
+          </h2>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <Link href="/short-squeeze-scanner" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Short squeeze scanner
+            </Link>
+            <Link href="/congressional-trades" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Congressional trades
+            </Link>
+            <Link href="/insider-buying" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Insider buying (Form 4)
+            </Link>
+            <Link href="/stock-market-heatmap" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Stock market heatmap
+            </Link>
+            <Link href="/market-regime" className="text-muted hover:text-accent underline-offset-4 hover:underline">
+              Market regime indicator
+            </Link>
+          </div>
+        </nav>
+
+        {/* Newsletter mid-funnel capture — same logic as the feature
+            pages: visitors not ready to start a trial but willing to
+            give us an email for the daily Top 10 digest. */}
+        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="strategy" heading="" sub="" />
+        </section>
 
         {/* CTA */}
         <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">

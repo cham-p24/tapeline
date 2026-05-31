@@ -37,7 +37,7 @@ export function TransparencyStrip({ current }: { current?: string }) {
             <Link
               key={i.slug}
               href={i.slug}
-              className="group rounded-xl border border-border bg-panel/40 p-4 transition-colors hover:border-accent/40"
+              className="lift group rounded-xl border border-border bg-panel/40 p-4 hover:border-accent/40"
             >
               <div className="text-base">{i.emoji}</div>
               <div className="mt-2 text-sm font-semibold group-hover:text-accent transition-colors">{i.title}</div>

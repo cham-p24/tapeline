@@ -70,6 +70,11 @@ export default function AccountPage() {
       description: "Choose which alert digests and product emails you receive.",
     },
     {
+      title: "Security",
+      href: "/app/settings/security",
+      description: "Two-factor authentication and sign-in protection.",
+    },
+    {
       title: "Watchlist",
       href: "/app/watchlist",
       description: "Tickers you're tracking + their per-ticker alert rules.",
@@ -105,7 +110,7 @@ export default function AccountPage() {
           <Link
             key={c.href}
             href={c.href}
-            className="card p-4 transition hover:border-accent/30 hover:bg-panel-hover"
+            className="card card-link p-4 hover:border-accent/30 hover:bg-panel-hover"
           >
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">{c.title}</h3>

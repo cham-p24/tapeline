@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCountUp } from "@/lib/useCountUp";
 
 /**
  * High-fidelity scanner preview for the landing hero — matches the layout
@@ -131,9 +132,7 @@ export function ScannerPreview() {
               >
                 <td className="px-3 py-2 font-mono font-medium">{r.sym}</td>
                 <td className="hidden px-3 py-2 text-xs text-muted md:table-cell">{r.sector}</td>
-                <td className={`px-3 py-2 text-right font-semibold ${r.score >= 80 ? "text-up" : r.score >= 60 ? "text-up/80" : "text-fg"}`}>
-                  {r.score.toFixed(1)}
-                </td>
+                <ScoreCell score={r.score} />
                 <td className="hidden px-3 py-2 text-right text-xs text-muted sm:table-cell">{r.conf}%</td>
                 <td className="px-3 py-2">
                   <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${
@@ -164,6 +163,26 @@ export function ScannerPreview() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Score cell — counts up from 0 to its starting score on first paint so the
+ * table "boots up" in sync with the hero, then snaps on every 4s drift tick
+ * (useCountUp animates once, snaps thereafter) so the per-tick nudge stays
+ * instant rather than re-sweeping. Scaled ×10 to keep the one-decimal scores
+ * through the integer-rounding hook. Colour reads from the live score, not the
+ * animated value, so it never flickers mid-sweep. SSR and the first client
+ * render both show 0.0 (hook returns null), so hydration matches.
+ */
+function ScoreCell({ score }: { score: number }) {
+  const animated = useCountUp(Math.round(score * 10));
+  const shown = (animated ?? 0) / 10;
+  const colour = score >= 80 ? "text-up" : score >= 60 ? "text-up/80" : "text-fg";
+  return (
+    <td className={`px-3 py-2 text-right font-semibold ${colour}`}>
+      {shown.toFixed(1)}
+    </td>
   );
 }
 

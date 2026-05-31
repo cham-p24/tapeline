@@ -6,6 +6,7 @@ import { track } from "@vercel/analytics";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
 import { ComparisonTable } from "@/components/ComparisonTable";
+import { CancelInterceptModal } from "@/components/CancelInterceptModal";
 import {
   getWebPushStatus,
   subscribeToWebPush,
@@ -13,6 +14,7 @@ import {
   unsubscribeFromWebPush,
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
+import { handle401, errorMessage } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -46,11 +48,13 @@ const TIER_META = {
 type TierKey = keyof typeof TIER_META;
 
 export default function BillingPage() {
-  const { user } = useUser();
+  const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "info" | "err"; text: string } | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
   const [showPlans, setShowPlans] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [winbackOffer, setWinbackOffer] = useState(false);
 
   const tier = (user?.tier || "free") as TierKey;
   const meta = TIER_META[tier] ?? TIER_META.free;
@@ -91,6 +95,16 @@ export default function BillingPage() {
         tier: qp.get("tier") || tier,
         billing_period: qp.get("billing_period") || "annual",
       });
+    }
+    // Win-back landing — the day-90 cancellation email links here with
+    // ?winback=1. Surface the returning-customer banner + open the plan
+    // picker. The 40%-off coupon itself is minted server-side at checkout,
+    // gated on "actually churned" (tier=free + canceled_at set) — the param
+    // is just the UX hint, never the source of the discount.
+    if (qp.get("winback") === "1") {
+      setWinbackOffer(true);
+      setShowPlans(true);
+      track("winback_landing", {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,13 +155,15 @@ export default function BillingPage() {
       const body = await res.json();
       if (res.ok && body.url) {
         window.location.href = body.url;
+      } else if (res.status === 401) {
+        handle401(res.status);
       } else if (res.status === 502 || res.status === 503 || body.detail?.includes("not configured")) {
         setMsg({ kind: "info", text: "Checkout isn't live yet — Stripe activation pending. Email support@tapeline.io if you want to upgrade in the meantime." });
       } else {
         setMsg({ kind: "err", text: body.detail || `Checkout failed (${res.status})` });
       }
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message || "Checkout failed" });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) || "Checkout failed" });
     } finally {
       setBusy(null);
     }
@@ -161,9 +177,10 @@ export default function BillingPage() {
       });
       const body = await res.json();
       if (res.ok && body.url) window.location.href = body.url;
+      else if (res.status === 401) handle401(res.status);
       else setMsg({ kind: "err", text: body.detail || "Portal not available — Stripe activation pending." });
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     }
   }
 
@@ -189,6 +206,19 @@ export default function BillingPage() {
             : "border-warn/30 bg-warn/5 text-warn"
         }`}>
           {msg.text}
+        </div>
+      )}
+
+      {/* Win-back landing banner (?winback=1 from the day-90 email). The 40%
+          discount is applied server-side at checkout for genuinely churned
+          accounts — this is purely the welcome-back framing. */}
+      {winbackOffer && tier === "free" && (
+        <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm">
+          <div className="font-semibold text-fg">Welcome back — your first 3 months are 40% off.</div>
+          <p className="mt-1 text-muted">
+            Pick a plan below and the returning-customer discount applies automatically at checkout.
+            Your saved watchlist, scans and alerts come back with you.
+          </p>
         </div>
       )}
 
@@ -231,6 +261,12 @@ export default function BillingPage() {
                 className="btn-ghost text-xs"
               >
                 {showPlans ? "Hide plans" : "Change plan"}
+              </button>
+              <button
+                onClick={() => setShowCancel(true)}
+                className="btn-ghost text-xs text-muted hover:text-down"
+              >
+                Cancel subscription
               </button>
             </div>
           )}
@@ -460,6 +496,13 @@ export default function BillingPage() {
         Email <a href="mailto:support@tapeline.io" className="text-accent hover:underline">support@tapeline.io</a>
         — usually replied to within a business day.
       </footer>
+
+      <CancelInterceptModal
+        open={showCancel}
+        onClose={() => setShowCancel(false)}
+        onChanged={refresh}
+        tier={tier}
+      />
     </div>
   );
 }
@@ -550,8 +593,8 @@ function NotificationsCard() {
       window.open(body.deep_link, "_blank", "noopener,noreferrer");
       setMsg({ kind: "ok", text: "Tap Start in Telegram. We'll auto-detect the connection." });
       setPolling(true);
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 
@@ -568,8 +611,8 @@ function NotificationsCard() {
       if (!r.ok) throw new Error(body.detail || `Save failed (${r.status})`);
       setMsg({ kind: "ok", text: "Saved. Hit Test to verify the wiring." });
       await refresh();
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 
@@ -582,8 +625,8 @@ function NotificationsCard() {
       const body = await r.json();
       if (!r.ok) throw new Error(body.detail || `Test failed (${r.status})`);
       setMsg({ kind: "ok", text: "Sent. Check your Telegram." });
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 
@@ -597,8 +640,8 @@ function NotificationsCard() {
       setChatId("");
       setMsg({ kind: "ok", text: "Disconnected. Hourly digest stopped." });
       await refresh();
-    } catch (e: any) {
-      setMsg({ kind: "err", text: e.message });
+    } catch (e: unknown) {
+      setMsg({ kind: "err", text: errorMessage(e) });
     } finally { setBusy(null); }
   }
 

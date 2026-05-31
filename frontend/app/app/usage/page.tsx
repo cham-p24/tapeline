@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { CardSkeleton } from "@/components/Skeleton";
+import { handle401 } from "@/lib/api";
 
 type UsageData = {
   tier: string;
@@ -24,7 +25,13 @@ export default function UsagePage() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/usage`, { credentials: "include", cache: "no-store" })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => {
+        if (!r.ok) {
+          handle401(r.status);
+          return null;
+        }
+        return r.json();
+      })
       .then(setData)
       .catch(() => {});
   }, []);

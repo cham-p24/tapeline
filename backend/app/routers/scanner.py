@@ -77,6 +77,11 @@ async def list_scanner(
     user: User | None = Depends(current_user_optional),
     min_score: float = Query(0, ge=0, le=100),
     max_score: float = Query(100, ge=0, le=100),
+    # Price filter — added 2026-05-20 to support the price-anchored strategy
+    # listicle pages (/best-stocks-for/penny-stocks, /under-10, /under-5).
+    # Optional; when both None the filter is a no-op.
+    min_price: float | None = Query(None, ge=0, description="Lower price bound, inclusive"),
+    max_price: float | None = Query(None, ge=0, description="Upper price bound, inclusive"),
     signal: str | None = None,
     sector: str | None = None,
     q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
@@ -95,6 +100,10 @@ async def list_scanner(
         Ticker.score >= min_score,
         Ticker.score <= max_score,
     )
+    if min_price is not None:
+        stmt = stmt.where(Ticker.price >= min_price)
+    if max_price is not None:
+        stmt = stmt.where(Ticker.price <= max_price)
     if signal:
         stmt = stmt.where(Ticker.signal == signal)
     if sector:

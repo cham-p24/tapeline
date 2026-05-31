@@ -347,6 +347,117 @@ The marketing claim was removed in PR #11 because no API existed. To actually bu
 
 ---
 
+## 9. Conversion & analytics — what's live, what to verify
+
+Wired across the stack as of PR #98 (2026-05-20). Brief rundown so you
+can sanity-check it's all flowing and know where to read the numbers.
+
+### Analytics layers (in order of read priority)
+
+| Layer | What it captures | Where to read |
+| --- | --- | --- |
+| **Google Analytics 4** | Acquisition, behaviour, conversions (sign_up, start_trial, subscribe, view_*) | analytics.google.com → Tapeline property |
+| **Vercel Analytics** | Per-route pageviews + custom events fired via `track()` | vercel.com/cham-p24/tapeline → Analytics |
+| **Speed Insights** | Core Web Vitals + custom perf metrics | Same Vercel dashboard |
+| **PostHog** | Session recordings + event funnel | posthog.com |
+| **Plausible** | Privacy-first aggregate view (no cookies) | **disabled in prod** — set `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=tapeline.io` in Vercel to enable |
+
+### GA4 setup verification
+
+GA4 measurement ID is hardcoded as `G-YRK73W9NS9` (default in
+`frontend/app/layout.tsx`). Override with `NEXT_PUBLIC_GA4_ID` env var
+in Vercel if the property rotates.
+
+After deploy, smoke-test it's actually firing:
+
+1. Open analytics.google.com → Admin → DebugView (left panel)
+2. In a separate tab, open https://tapeline.io with `?_gl=1*debug*1` (forces debug mode)
+3. Click around — pageviews should arrive in DebugView within ~30s
+4. Submit the newsletter form on the homepage → `sign_up` event with `method=newsletter` arrives
+5. Submit a signup → `sign_up` event with `method=email` arrives + `start_trial`
+
+If nothing arrives, in GA4 → Admin → Account → Account access management,
+confirm the property has at least one data stream pointing at `tapeline.io`.
+
+### UTM attribution — how it works end-to-end
+
+Captured first-touch with 30-day TTL:
+
+1. Visitor lands at e.g.
+   `tapeline.io?utm_source=podcast&utm_campaign=acquirers&utm_medium=podcast`
+2. `frontend/components/UtmCapture.tsx` (mounted in root layout) writes
+   the UTM triplet to `localStorage` under `tapeline_utm_v1`
+3. If the user signs up (any time within 30 days, even from a different page):
+   - `frontend/app/signup/page.tsx` reads `getStoredUtm()` and POSTs the
+     UTMs to `/api/auth/signup`
+   - Backend stores them on `users.signup_utm_*` (migration 0021)
+4. If the user joins the newsletter:
+   - `frontend/components/NewsletterCapture.tsx` does the same forward
+   - Backend stores on `newsletter_subscribers.utm_*` (same migration)
+
+### Outbound UTM conventions
+
+Tag every outbound link to tapeline.io with the standard triplet:
+
+```
+?utm_source=<channel>&utm_medium=<format>&utm_campaign=<specific>
+```
+
+| Channel | utm_source | utm_medium | utm_campaign example |
+| --- | --- | --- | --- |
+| X bio link | `x` | `social` | `bio` |
+| X tweet | `x` | `social` | `tweet_<date>` |
+| Fintwit reply | `x` | `reply` | `<handle_short>_<date>` |
+| Reddit post | `reddit` | `community` | `r_stocks_launch` |
+| Podcast show notes | `podcast` | `podcast` | `<show_short>` |
+| Cold email | `email` | `outreach` | `<segment>_<batch>` |
+| Newsletter (own) | `newsletter` | `email` | `daily_<YYYYMMDD>` |
+| Show HN | `hn` | `community` | `show_hn` |
+| Press / TechCrunch | `press` | `referral` | `<publication>_<date>` |
+
+Rule of thumb: keep `utm_source` short and singular (`x`, not `twitter,
+also-x`). The composite columns `signup_utm_source/medium/campaign` are
+all stringly-typed; nothing parses them — they're for SQL grouping in
+post-launch attribution reports.
+
+### Newsletter lead-magnet (added PR #98)
+
+`/api/newsletter/subscribe` — public POST, IP rate-limited, honeypot +
+disposable-domain filtered. Fires a Resend welcome email from
+`christian@tapeline.io` and stores the row in `newsletter_subscribers`.
+
+Surfaces with the capture form rendered today:
+- Homepage footer band ("Not ready for a trial?")
+- Scorecard footer ("Get tomorrow's Top 10 in your inbox")
+
+Daily-digest worker is NOT yet wired — that's a follow-up PR. Until
+then, subscribers get the welcome and nothing else; document that
+clearly in the UI copy (we do — "first daily digest hits the next US
+market morning") and ship the worker quickly.
+
+### Conversion events fired today (audit map)
+
+| Event | Where | What it means |
+| --- | --- | --- |
+| `signup_started` | /signup mount | Visitor opened the form |
+| `signup_completed` / `sign_up` | /signup submit | Account created |
+| `trial_started` / `start_trial` | /signup submit | 14-day Premium trial begins |
+| `newsletter_subscribed` / `sign_up{method=newsletter}` | NewsletterCapture submit | Email captured |
+| `pricing_page_viewed` | /app/billing render | In-app upgrade view |
+| `trial_converted` | /app/billing on trial → paid | Conversion to paid Premium |
+| `trial_downgraded` | /app/billing on trial → free | Lost trial |
+| `checkout_started` | /app/billing checkout-click | Stripe redirect initiated |
+| `onboarding_submitted` | /app/onboarding submit | Profile captured |
+| `scanner_first_use` | /app/scanner first mount | Activation |
+| `trial_early_capture_*` | TrialEarlyCapture | Mid-trial upgrade nudge |
+| `trial_ended_modal_*` | TrialEndedModal | Post-trial recovery |
+
+To flag any of these as a "conversion" in GA4 (so they appear in
+Acquisition reports / show up in attribution): GA4 Admin → Events →
+toggle "Mark as conversion" on the row.
+
+---
+
 ## Punch list snapshot — what's done tonight vs what's outstanding
 
 ### Done this session

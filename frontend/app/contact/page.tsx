@@ -9,6 +9,7 @@
  */
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import Link from "next/link";
 import { pageMeta } from "@/lib/seo";
 import { ContactForm } from "./ContactForm";
 
@@ -32,7 +33,7 @@ export default function ContactPage() {
     <div className="bg-bg text-fg min-h-screen">
       <MarketingNav />
 
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <main className="mx-auto max-w-3xl px-6 py-10">
         <header className="mb-10">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Contact</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Talk to a human.</h1>
@@ -77,8 +78,8 @@ export default function ContactPage() {
             <strong className="text-fg">Not a place for investment advice.</strong>{" "}
             We can&apos;t answer &quot;should I buy X?&quot; or interpret the Tapeline Score for a specific
             position — the score is descriptive, not prescriptive. For methodology questions, see{" "}
-            <a href="/how-it-works" className="text-accent hover:underline">/how-it-works</a> and the public{" "}
-            <a href="/scorecard" className="text-accent hover:underline">scorecard</a>.
+            <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link> and the public{" "}
+            <Link href="/scorecard" className="text-accent hover:underline">scorecard</Link>.
           </p>
         </section>
       </main>

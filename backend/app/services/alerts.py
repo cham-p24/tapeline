@@ -146,6 +146,8 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
             )
             res = await send_email(
                 user.email, subject, html, persona="alerts",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="alert_emails",
             )
             delivered = not res.get("skipped", False)
             item.last_alert_at = now
@@ -436,6 +438,8 @@ async def _fire(
                 res = await send_email(
                     user.email, f"[Tapeline] {rule.name}: {symbol}", html,
                     persona="alerts",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="alert_emails",
                 )
                 # send_email returns {"skipped": True} if Resend isn't configured
                 event.delivered = not res.get("skipped", False)

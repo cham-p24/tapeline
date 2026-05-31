@@ -19,6 +19,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { TICKERS, findTicker, type TickerPost } from "../tickers";
@@ -56,16 +57,38 @@ type TickerData = {
   };
 };
 
+// Every render (build-time or on-demand) fetches live data. A degraded
+// backend must NOT be able to hang the render: each attempt is time-bounded
+// so it fails fast instead of blowing the platform's per-page build budget —
+// an un-bounded fetch against a wedged api.tapeline.io is exactly what turned
+// a backend blip into a failed Vercel deploy. Two attempts with a short
+// backoff clears the overwhelming majority of transient blips. On total
+// failure we return null and the page renders its "pending" state (NEVER a
+// 404), so a transient backend issue can't drop a valid URL from the index.
+const FETCH_ATTEMPTS = 2;
+const FETCH_TIMEOUT_MS = 7000;
+
 async function fetchTicker(symbol: string): Promise<TickerData | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/ticker/${symbol}`, {
-      next: { revalidate: 1800 },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as TickerData;
-  } catch {
-    return null;
+  const url = `${API_BASE}/api/ticker/${symbol}`;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        // AbortSignal is not part of Next's fetch cache key, so the 30-min
+        // ISR cache below is preserved.
+        next: { revalidate: 1800 },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (res.ok) return (await res.json()) as TickerData;
+      if (res.status === 404) return null; // definitive: no live data for this symbol
+      // other non-ok (5xx) → transient; fall through to retry.
+    } catch {
+      // timeout / network error → transient; fall through to retry.
+    }
+    if (attempt < FETCH_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
   }
+  return null;
 }
 
 // Per-ticker scorecard track record. Pulled at render time so each
@@ -86,16 +109,27 @@ type ScorecardForSymbol = {
 };
 
 async function fetchSymbolScorecard(symbol: string): Promise<ScorecardForSymbol | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/scorecard/symbol/${symbol}`, {
-      next: { revalidate: 3600 }, // hourly is plenty — scorecard rolls daily
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { summary: ScorecardForSymbol };
-    return body.summary;
-  } catch {
-    return null;
+  const url = `${API_BASE}/api/scorecard/symbol/${symbol}`;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        next: { revalidate: 3600 }, // hourly is plenty — scorecard rolls daily
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { summary: ScorecardForSymbol };
+        return body.summary;
+      }
+      if (res.status === 404) return null; // definitive: symbol has no scorecard row
+      // other non-ok (5xx) → transient; fall through to retry.
+    } catch {
+      // timeout / network error → transient; fall through to retry.
+    }
+    if (attempt < FETCH_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
   }
+  return null;
 }
 
 // Signal-specific narrative paragraphs. Each signal label maps to a
@@ -224,10 +258,19 @@ function confidenceContext(symbol: string, conf: number | null): string {
   );
 }
 
-// Build every URL at build time so Google can find them on a normal crawl
-// rather than needing a deep-link discovery pass.
-export function generateStaticParams() {
-  return TICKERS.map((t) => ({ symbol: t.symbol }));
+// We deliberately do NOT pre-render the ticker universe at build time.
+// Pre-rendering coupled deploy success to backend health: each build fetched
+// live data for all 50 tickers, so a degraded api.tapeline.io could (and did)
+// blow the per-page build budget and fail the whole Vercel deploy — and the
+// build-time fan-out itself piled load onto an already-struggling backend.
+//
+// Instead these pages are generated on-demand (dynamicParams defaults to true)
+// and cached via `revalidate` (ISR). Discovery is unaffected: every
+// /blog/ticker/{symbol} URL is emitted in app/sitemap.ts, so Googlebot finds
+// them on a normal sitemap crawl, renders the first hit on-demand, then serves
+// the ISR cache thereafter. Same approach the /t/[symbol] route already uses.
+export function generateStaticParams(): { symbol: string }[] {
+  return [];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }) {
@@ -317,6 +360,9 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     url: articleUrl,
     publishedAt: "2026-05-14T00:00:00Z",
     author: "Tapeline",
+    // Dynamic per-ticker OG card unlocks Article rich-result image variant.
+    // Same source the page's og:image header already points at.
+    imageUrl: `https://tapeline.io/blog/ticker/${t.symbol}/opengraph-image`,
   });
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },
@@ -374,7 +420,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
       <script {...jsonLdScript(faq)} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <Link href="/blog" className="text-sm text-muted hover:text-fg">
           &larr; All posts
         </Link>
@@ -636,6 +682,25 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             ))}
           </ul>
         </nav>
+
+        {/* Lead-magnet email capture — long-form ticker blog pages
+            convert better than the bare /t/[symbol] page because the
+            reader has already invested attention. Same daily-Top-10
+            offer, lower friction than the trial CTA. */}
+        <aside className="mt-12 rounded-lg border border-border bg-panel/30 p-6">
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-semibold text-fg">
+              Get the daily Top 10 in your inbox
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted leading-relaxed">
+              The 10 highest-scoring US tickers each market morning, same
+              composite this article uses. No card, unsubscribe in one click.
+            </p>
+          </div>
+          <div className="mx-auto max-w-md">
+            <NewsletterCapture source="blog" heading="" sub="" />
+          </div>
+        </aside>
       </article>
 
       <MarketingFooter />

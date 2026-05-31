@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { errorMessage } from "@/lib/api";
 
 export type Status = "shipped" | "in_progress" | "next" | "later";
 
@@ -71,8 +72,8 @@ export function RoadmapItems({ items }: { items: RoadmapItem[] }) {
         return next;
       });
       setCounts((prev) => ({ ...prev, [slug]: (prev[slug] || 0) + (wasVoted ? -1 : 1) }));
-    } catch (e: any) {
-      setErr(e.message || "Vote failed");
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Vote failed");
     } finally {
       setBusy(null);
     }

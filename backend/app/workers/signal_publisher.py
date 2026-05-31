@@ -39,7 +39,7 @@ from app.services.mock_feed import (
 from app.services.news_feed import fetch_latest_news
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
-from app.services.scorecard_backcheck import backcheck_yesterday
+from app.services.scorecard_backcheck import backcheck_all_pending
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -56,11 +56,17 @@ _last_sheet_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
+_last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
+_last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
+_last_stale_audit_date: str | None = None  # "YYYY-MM-DD" of last stale-link audit + alert
+_last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
+_last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
 _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
+_last_inbox_tick: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -201,8 +207,16 @@ async def tick() -> None:
             logger.exception("edgar.8k_tick_failed")
         _last_news_refresh = started
 
-    # Scorecard back-check: run once per day, within ~10 minutes of boot
-    if _last_backcheck is None:
+    # Scorecard back-check: drain the pending backlog on a real daily cadence.
+    # BUG FIX (2026-06-01): this was `if _last_backcheck is None`, which fired
+    # ONLY on the first tick after a worker reboot. On a stable deploy the
+    # worker doesn't reboot daily, so the back-check silently stopped and the
+    # public scorecard froze — 91 of 140 rows (every day after ~May 20) sat
+    # with no next-day price, so the headline stayed stuck on a stale 49-pick
+    # sample. Mirror the calendar-seed cadence below: re-run every 6h. The job
+    # itself now drains ALL pending dates (see _run_backcheck), so a day the
+    # worker happened to miss is retried on the next run instead of stranded.
+    if _last_backcheck is None or (started - _last_backcheck).total_seconds() >= 6 * 3600:
         await _run_backcheck()
         _last_backcheck = started
 
@@ -245,19 +259,37 @@ async def tick() -> None:
         _last_holdings_refresh = started
 
     # Daily trial-drip emails (day 3 / 7 / 13) + 14-day re-engagement for
-    # dormant non-trial users. Worker-restart-safe — User.drip_state tracks
-    # per-user per-stage delivery so no email fires twice.
+    # dormant non-trial users + 30/60/90-day post-cancellation win-back +
+    # early-lifecycle activation nudges (first watchlist / first alert) +
+    # post-conversion monthly→annual upgrade nudge. Worker-restart-safe —
+    # User.drip_state / winback_state track per-user per-stage delivery so no
+    # email fires twice.
     global _last_drip_check
     if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
         try:
-            from app.services.email import run_daily_drip, run_re_engagement_drip
+            from app.services.email import (
+                run_activation_drip,
+                run_annual_nudge_drip,
+                run_daily_drip,
+                run_re_engagement_drip,
+                run_winback_drip,
+            )
             async with session_scope() as drip_session:
                 counts = await run_daily_drip(drip_session)
                 re_counts = await run_re_engagement_drip(drip_session)
+                wb_counts = await run_winback_drip(drip_session)
+                act_counts = await run_activation_drip(drip_session)
+                annual_counts = await run_annual_nudge_drip(drip_session)
             if any(counts.values()):
                 logger.info("drip.sent day3=%d day7=%d day13=%d", counts["day3"], counts["day7"], counts["day13"])
             if re_counts["re14"]:
                 logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
+            if any(wb_counts.values()):
+                logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
+            if any(act_counts.values()):
+                logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
+            if annual_counts["annual_p"]:
+                logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
         except Exception:
             logger.exception("drip.run_failed")
         _last_drip_check = started
@@ -438,11 +470,193 @@ async def tick() -> None:
             logger.exception("weekly_newsletter.run_failed")
         _last_weekly_newsletter_token = weekly_token
 
+    # Daily Top 10 digest to newsletter_subscribers. Fires once per UTC day
+    # at/after 13:00 UTC — ~9am ET pre-market open. Process-level token +
+    # DB-side `last_sent_at` give us two layers of dedupe so a worker
+    # restart can't double-send. Only US weekdays — Sat/Sun there's no
+    # fresh tape to send, so we skip cleanly.
+    global _last_daily_newsletter_date
+    if (
+        started.hour >= 13                                # 13:00 UTC onward
+        and started.weekday() < 5                         # Mon-Fri
+        and _last_daily_newsletter_date != today_str
+    ):
+        try:
+            from app.services.newsletter import run_daily_digest
+            async with session_scope() as ndl_session:
+                count = await run_daily_digest(ndl_session, now=started)
+            logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
+        except Exception:
+            logger.exception("newsletter_daily.run_failed")
+        _last_daily_newsletter_date = today_str
+
+    # IndexNow batch submit — daily, fires once per UTC day at/after
+    # 06:00 UTC (Sydney evening, so any new pages shipped today are
+    # already deployed by Vercel). Pushes every URL in the sitemap to
+    # Bing + Yandex + DuckDuckGo + Seznam in one batch — they pick up
+    # new content within hours instead of waiting on Googlebot's crawl
+    # schedule. Free, no auth, gracefully no-ops if endpoint is down.
+    global _last_indexnow_date
+    if started.hour >= 6 and _last_indexnow_date != today_str:
+        # Latch BEFORE spawning so this fires at most once per UTC day even if
+        # the batch runs long, then run it detached — a slow sitemap fetch or
+        # submit must never eat the 60s tick-watchdog budget.
+        _last_indexnow_date = today_str
+        asyncio.create_task(_run_daily_indexnow())
+
+    # Daily stale-link audit — fires once per UTC day at/after 08:00
+    # UTC. Crawls every URL in the sitemap; alerts the founder via
+    # Telegram ONLY if broken URLs are present (no broken = no noise).
+    # Catches 404s introduced by route renames, 5xx outages, and
+    # accidental disconnects between sitemap entries and live pages
+    # within ~24 hours instead of relying on the next user/Google to
+    # surface them.
+    global _last_stale_audit_date
+    if started.hour >= 8 and _last_stale_audit_date != today_str:
+        # Latch BEFORE spawning, then run detached. The audit crawls the full
+        # sitemap (~1k URLs, minutes) — far longer than the 60s tick watchdog.
+        # Awaiting it inline previously WEDGED the worker: wait_for killed
+        # tick() mid-audit before the latch was set, so the audit re-ran every
+        # cycle — a self-inflicted crawl storm that hammered /api/ticker
+        # (cold-news 15s with a DB connection held) and spammed the
+        # tick.timeout_streak CRITICAL. Detached + latched, it runs once/day
+        # and tick() returns in ~6s.
+        _last_stale_audit_date = today_str
+        asyncio.create_task(_run_daily_stale_audit())
+
+    # Weekly SEO digest — Monday at/after 09:00 UTC (~7pm Sydney
+    # post-Monday-close, ~5am ET pre-market). Sends a Markdown summary
+    # to the founder's Telegram: sitemap size, broken-URL count,
+    # ticker-universe stats, and suggested next steps. Process-level
+    # token + Telegram-side dedupe make double-fires harmless.
+    global _last_seo_digest_token
+    seo_digest_token = f"seo_{iso_year}W{iso_week:02d}"
+    if (
+        iso_dow == 1                                    # Monday
+        and started.hour >= 9                           # 09:00 UTC onward
+        and _last_seo_digest_token != seo_digest_token
+    ):
+        try:
+            from app.services.seo_health import run_weekly_digest
+            async with session_scope() as seo_session:
+                sent = await run_weekly_digest(seo_session)
+            logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
+        except Exception:
+            logger.exception("seo_digest.weekly.failed")
+        _last_seo_digest_token = seo_digest_token
+
+    # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
+    # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.
+    # Generates copy-paste-ready X / LinkedIn / fintwit drafts + a
+    # conversion-funnel snapshot, emails the package to the founder.
+    # No-op when GROWTH_BOT_ENABLED is false (default — opt-in).
+    # Weekdays only — no growth tick on Sat/Sun so the founder's inbox
+    # doesn't ping at 8am on the weekend.
+    global _last_growth_tick_date
+    if (
+        settings.growth_bot_enabled
+        and started.hour >= 22                            # 22:00 UTC onward
+        and started.weekday() < 5                         # Mon-Fri
+        and _last_growth_tick_date != today_str
+    ):
+        try:
+            from app.services.growth_bot import run_daily_growth_tick
+            async with session_scope() as gb_session:
+                result = await run_daily_growth_tick(gb_session)
+            logger.info(
+                "growth_bot.tick_complete picks=%d fintwit=%d skipped=%s",
+                result.get("picks_count", 0),
+                result.get("fintwit_candidates_count", 0),
+                result.get("skipped", False),
+            )
+        except Exception:
+            logger.exception("growth_bot.tick_failed")
+        _last_growth_tick_date = today_str
+
+    # Inbox auto-handler tick: poll Reddit (the only channel that needs
+    # polling — email is webhook-driven via /api/inbox/email; Telegram
+    # alerts are dispatched at classification time). Cadence: 5 min
+    # during US market hours (more chatter), 15 min off-hours. No-ops
+    # cleanly when REDDIT_* credentials are unset.
+    global _last_inbox_tick
+    is_inbox_market_hours = (
+        started.weekday() < 5 and 13 <= started.hour < 21  # 9am-5pm ET ≈ 13-21 UTC
+    )
+    inbox_interval = 300 if is_inbox_market_hours else 900
+    if _last_inbox_tick is None or (started - _last_inbox_tick).total_seconds() >= inbox_interval:
+        _last_inbox_tick = started
+        try:
+            await _run_inbox_tick()
+        except Exception:
+            logger.exception("inbox.tick_failed")
+
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
         "tick.done snapshots=%d squeezes=%d regime=%s trades_added=%d elapsed=%.2fs",
         len(snapshots), len(squeezes), regime["regime"], len(new_trades), elapsed,
     )
+
+
+async def _run_daily_indexnow() -> None:
+    """Detached daily IndexNow batch (spawned, never awaited, from tick()).
+
+    Pushes every sitemap URL to Bing/Yandex/DuckDuckGo/Seznam. Self-contained
+    so a slow sitemap fetch/submit can't stall the 60s tick watchdog; swallows
+    its own exceptions so the fire-and-forget task never raises unretrieved."""
+    try:
+        from app.services.index_now import submit_urls
+        from app.services.seo_health import fetch_sitemap_urls
+        urls = await fetch_sitemap_urls()
+        if urls:
+            result = await submit_urls(urls)
+            logger.info(
+                "indexnow.daily_batch submitted=%d accepted=%d queued=%d failed=%d",
+                result["submitted"], result["accepted"],
+                result["queued"], result["failed"],
+            )
+        else:
+            logger.warning("indexnow.daily_batch.empty no_sitemap_urls")
+    except Exception:
+        logger.exception("indexnow.daily_batch.failed")
+
+
+async def _run_daily_stale_audit() -> None:
+    """Detached daily stale-link audit (spawned, never awaited, from tick()).
+
+    Crawls the full sitemap (~1k URLs, minutes) and alerts the founder via
+    Telegram only if broken URLs are present. Opens its own session and
+    swallows its own exceptions so the fire-and-forget task is self-contained
+    and can't stall or wedge the 60s tick watchdog."""
+    try:
+        from app.services.seo_health import run_stale_audit_alert
+        async with session_scope() as audit_session:
+            alerted = await run_stale_audit_alert(audit_session)
+        logger.info("stale_audit.daily.ran alerted=%s", alerted)
+    except Exception:
+        logger.exception("stale_audit.daily.failed")
+
+
+async def _run_inbox_tick() -> None:
+    """One inbox-poll cycle.
+
+    Currently only polls Reddit — email + Telegram inbound are both
+    webhook-driven so don't need a poller. The Reddit poller is the
+    safety net for the only inbound channel that doesn't get a push.
+
+    Honours the per-channel + global kill switches via the called
+    services; no need to re-check here.
+    """
+    try:
+        from app.services.reddit_inbox import poll_reddit_inbox
+        async with session_scope() as session:
+            counts = await poll_reddit_inbox(session)
+        if counts.get("total"):
+            logger.info(
+                "inbox.reddit_poll dms=%d comments=%d mentions=%d",
+                counts["dms"], counts["comments"], counts["mentions"],
+            )
+    except Exception:
+        logger.exception("inbox.reddit_poll_failed")
 
 
 async def _ensure_daily_scorecard(today: date) -> None:
@@ -621,10 +835,20 @@ async def _refresh_watchlisted_news() -> None:
 
 
 async def _run_backcheck() -> None:
-    """Populate next-day performance on yesterday's scorecard entries."""
+    """Drain the scorecard back-check backlog.
+
+    Scores EVERY prior date that still has entries without a next-day price,
+    not just yesterday. This is what makes the job self-healing: if the worker
+    missed a day (reboot gap, transient feed outage, SPY window not yet
+    complete), those dates stay pending and get retried on the next run instead
+    of being stranded forever — which is exactly the failure that froze the
+    public scorecard on a stale 49-pick sample for ~10 days.
+    """
     async with session_scope() as session:
         try:
-            await backcheck_yesterday(session)
+            scored = await backcheck_all_pending(session)
+            if scored:
+                logger.info("scorecard.backcheck_scored total=%d", scored)
         except Exception:
             logger.exception("scorecard.backcheck_failed")
 

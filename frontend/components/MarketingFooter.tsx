@@ -38,6 +38,7 @@ export function MarketingFooter() {
             <FooterLink href="/pricing">Pricing</FooterLink>
             <FooterLink href="/scorecard">Public scorecard</FooterLink>
             <FooterLink href="/signals">All signals</FooterLink>
+            <FooterLink href="/sectors">Sectors</FooterLink>
             <FooterLink href="/blog">Blog</FooterLink>
             <FooterLink href="/changelog">Changelog</FooterLink>
           </FooterCol>

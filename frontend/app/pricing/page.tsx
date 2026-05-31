@@ -49,7 +49,7 @@ export default function PricingPage() {
           choice of product. Same data, same formula, same public record
           across all three tiers — the price is just about how much of the
           surface you want. */}
-      <section className="section py-16 sm:py-20">
+      <section className="section py-8 sm:py-10">
         <div className="mx-auto max-w-3xl text-center">
           <p className="eyebrow">Pricing</p>
           <h1 className="mt-3 text-4xl sm:text-6xl font-bold tracking-tight">
@@ -70,9 +70,11 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Comparison — soft section break, tighter heading */}
-      <section className="bg-panel/20">
-        <div className="section py-14 sm:py-16">
+      {/* Comparison — soft section break, no bg band (was striping
+          unevenly with the atmospheric tint on body::before; the new
+          comparison card carries its own surface treatment now). */}
+      <section className="border-t border-border/60">
+        <div className="section py-10 sm:py-12">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Every feature, every limit.</h2>
             <p className="mt-2 text-sm text-muted">No asterisks.</p>
@@ -85,7 +87,7 @@ export default function PricingPage() {
 
       {/* FAQ — trimmed to the 4 questions actually asked at sign-up time.
           Detailed support FAQ lives at /support. */}
-      <section className="section py-14 sm:py-16">
+      <section className="section py-10 sm:py-12">
         <div className="mx-auto max-w-2xl">
           <h2 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Common questions</h2>
 

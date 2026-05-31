@@ -6,6 +6,7 @@ import { useUser } from "@/components/UserContext";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton } from "@/components/Skeleton";
 import { userLocale } from "@/lib/datetime";
+import { handle401 } from "@/lib/api";
 
 type ReferralStats = {
   referral_code: string | null;
@@ -30,7 +31,13 @@ export default function ReferralsPage() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/referrals/me`, { credentials: "include", cache: "no-store" })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => {
+        if (!r.ok) {
+          handle401(r.status);
+          return null;
+        }
+        return r.json();
+      })
       .then(setStats)
       .catch(() => {});
   }, []);

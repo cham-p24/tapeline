@@ -123,17 +123,78 @@ def configured() -> bool:
     return bool(get_settings().signal_sheet_csv_url)
 
 
-async def fetch_csv(url: str) -> str:
+# Per-URL content hash cache. Lets us short-circuit the parse + DB-upsert
+# work when the sheet hasn't actually changed since the last fetch — turns
+# every "no-op" tick into a single 15-50ms HTTP GET + 32-byte hash compare.
+#
+# Why this matters: cutting the poll interval from 300s → 30s would 10x the
+# DB-write load if every tick reran upserts on identical data. With this
+# cache, the only cost of the faster cadence is one HTTP round-trip per
+# tab per 30s — Google's published-CSV endpoint serves these from cache
+# and they're <10KB each, so the bandwidth is trivial.
+#
+# Keyed by URL not tab-name because each tab is a separate published URL.
+# In-memory only — survives the lifetime of the worker process. A worker
+# restart re-fetches once per tab (cheap) and re-caches.
+_CSV_HASH_CACHE: dict[str, str] = {}
+
+
+def _hash_csv(text: str) -> str:
+    """SHA-256 of the CSV body. 64-char hex. We only compare equality so
+    any collision-resistant digest works; SHA-256 is stdlib + fast."""
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def fetch_csv(url: str, *, dedup: bool = True) -> str | None:
     """Pull the published-CSV content. Raises httpx.HTTPError on non-200.
 
     A 15s timeout covers a few-thousand-row sheet over reasonable
     bandwidth. The worker's tick runs in a try/except so a transient
     network blip drops one refresh cycle without taking down scoring.
+
+    When `dedup=True` (the default), returns None if the content hash
+    matches what we cached on the previous call for this URL — the
+    caller should short-circuit instead of re-parsing identical data.
+    The first call per URL always returns the body (cache is empty);
+    subsequent calls only return when the sheet actually changed.
+
+    Pass `dedup=False` to force a parse — useful for manual triggers
+    via /api/internal/sheet-changed where the caller knows the sheet
+    was just edited even if Google's CDN hasn't bumped the byte
+    representation yet.
     """
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
         r = await c.get(url)
         r.raise_for_status()
-        return r.text
+        body = r.text
+
+    if dedup:
+        new_hash = _hash_csv(body)
+        cached = _CSV_HASH_CACHE.get(url)
+        if cached == new_hash:
+            logger.debug(
+                "sheet_feed.fetch_csv.unchanged url=%s hash=%s",
+                url[:60], new_hash[:8],
+            )
+            return None
+        _CSV_HASH_CACHE[url] = new_hash
+        logger.info(
+            "sheet_feed.fetch_csv.changed url=%s old=%s new=%s bytes=%d",
+            url[:60],
+            (cached or "—")[:8],
+            new_hash[:8],
+            len(body),
+        )
+
+    return body
+
+
+def reset_csv_hash_cache() -> None:
+    """Drop the cache so the next fetch runs a full upsert regardless of
+    content. Useful for tests + the /api/internal/sheet-changed webhook
+    when the caller knows the sheet was just edited."""
+    _CSV_HASH_CACHE.clear()
 
 
 def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
@@ -170,6 +231,13 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # `score`. Before this change the marketed 6-factor formula on
         # /how-it-works was a copy claim, not running code — fix 2 in
         # docs/SCORING_AUDIT_2026-06-01.md.
+        #
+        # We still clamp the sheet's column-F to [0, 100] for the
+        # `sheet_score` field — the signal-system has been seen publishing
+        # 131-133 for very-high-conviction tickers, and displaying
+        # "sheet_score: 131" on a debug surface would confuse the support
+        # team about whether something's broken. The 0-100 clamp is the
+        # documented contract on /how-it-works.
         sheet_score_raw = _parse_float(raw.get("Score"))
         sheet_score_clamped = (
             None if sheet_score_raw is None
@@ -354,6 +422,11 @@ async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.fetch_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    if text is None:
+        # Content hash matched the prior fetch — nothing to upsert.
+        # Saves a parse + DB round-trip on every steady-state 30s tick.
+        logger.debug("sheet_feed.unchanged_skip")
+        return {"inserted": 0, "updated": 0, "total": 0, "unchanged": 1}
     try:
         rows = parse_all_signals_csv(text)
     except Exception:
@@ -368,6 +441,25 @@ async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
         "sheet_feed.refreshed rows=%d ins=%d upd=%d",
         counts["total"], counts["inserted"], counts["updated"],
     )
+
+    # If the sheet added new tickers (insert count > 0), invalidate the
+    # active-universe cache so the next price-feed snapshot batch picks
+    # them up immediately instead of waiting up to an hour for the next
+    # scheduled universe refresh. Without this, founder-sheet additions
+    # take effect at the human's edit cadence but DB writes (price,
+    # volume, change_pct_1d) lag by up to an hour — confusing as hell
+    # when you're staring at the live data spreadsheet.
+    if counts.get("inserted", 0) > 0:
+        try:
+            from app.services.universe import refresh_active_universe
+            new_size = await refresh_active_universe()
+            logger.info(
+                "sheet_feed.universe_invalidated inserts=%d new_universe_size=%d",
+                counts["inserted"], new_size,
+            )
+        except Exception:
+            logger.exception("sheet_feed.universe_refresh_failed_after_insert")
+
     return counts
 
 
@@ -533,6 +625,11 @@ async def refresh_spikes_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.spike_fetch_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    if text is None:
+        # Content hash matched the prior fetch — nothing to upsert.
+        # Saves a parse + DB round-trip on every steady-state 30s tick.
+        logger.debug("sheet_feed.spike_unchanged_skip")
+        return {"inserted": 0, "updated": 0, "total": 0, "unchanged": 1}
     try:
         rows = parse_spike_intelligence_csv(text)
     except Exception:
@@ -665,6 +762,11 @@ async def refresh_etfs_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.etf_fetch_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    if text is None:
+        # Content hash matched the prior fetch — nothing to upsert.
+        # Saves a parse + DB round-trip on every steady-state 30s tick.
+        logger.debug("sheet_feed.etf_unchanged_skip")
+        return {"inserted": 0, "updated": 0, "total": 0, "unchanged": 1}
     try:
         rows = parse_etf_benchmarks_csv(text)
     except Exception:
@@ -833,6 +935,11 @@ async def refresh_market_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.market_fetch_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    if text is None:
+        # Content hash matched the prior fetch — nothing to upsert.
+        # Saves a parse + DB round-trip on every steady-state 30s tick.
+        logger.debug("sheet_feed.market_unchanged_skip")
+        return {"inserted": 0, "updated": 0, "total": 0, "unchanged": 1}
     try:
         parsed = parse_market_intelligence_csv(text)
     except Exception:
@@ -930,6 +1037,11 @@ async def refresh_smart_money_from_workbook(session: AsyncSession) -> dict[str, 
     except Exception:
         logger.exception("sheet_feed.smart_money_fetch_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    if text is None:
+        # Content hash matched the prior fetch — nothing to upsert.
+        # Saves a parse + DB round-trip on every steady-state 30s tick.
+        logger.debug("sheet_feed.smart_money_unchanged_skip")
+        return {"inserted": 0, "updated": 0, "total": 0, "unchanged": 1}
     try:
         rows = parse_smart_money_csv(text)
     except Exception:

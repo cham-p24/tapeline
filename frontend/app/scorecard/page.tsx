@@ -11,9 +11,11 @@ import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { userLocale } from "@/lib/datetime";
+import { useCountUp } from "@/lib/useCountUp";
 import {
   breadcrumbJsonLd,
   jsonLdScript,
@@ -171,10 +173,10 @@ export default function ScorecardPage() {
                here is therefore robust within a clean subset.
           The exclusion count is disclosed inline so the filter is auditable. */}
       <div className="mt-8 grid gap-4 sm:grid-cols-4">
-        <Stat label="Days tracked" value={String(data.summary.days_tracked)} />
-        <Stat label="Median 1D return" value={data.summary.median_1d_return != null ? `${data.summary.median_1d_return.toFixed(2)}%` : "pending"} tone={data.summary.median_1d_return != null ? (data.summary.median_1d_return > 0 ? "up" : "down") : undefined} />
-        <Stat label="Median alpha vs SPY" value={data.summary.median_alpha_vs_spy != null ? `${data.summary.median_alpha_vs_spy.toFixed(2)}%` : "pending"} tone={data.summary.median_alpha_vs_spy != null ? (data.summary.median_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
-        <Stat label="Beat SPY rate" value={data.summary.hit_rate_beat_spy != null ? `${data.summary.hit_rate_beat_spy.toFixed(0)}%` : "pending"} />
+        <Stat label="Days tracked" value={data.summary.days_tracked} />
+        <Stat label="Median 1D return" value={data.summary.median_1d_return} decimals={2} suffix="%" tone={data.summary.median_1d_return != null ? (data.summary.median_1d_return > 0 ? "up" : "down") : undefined} />
+        <Stat label="Median alpha vs SPY" value={data.summary.median_alpha_vs_spy} decimals={2} suffix="%" tone={data.summary.median_alpha_vs_spy != null ? (data.summary.median_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
+        <Stat label="Beat SPY rate" value={data.summary.hit_rate_beat_spy} suffix="%" />
       </div>
       {/* Methodology + exclusions disclosure. Lives directly under the
           summary cards so visitors can audit the filter without scrolling. */}
@@ -309,17 +311,63 @@ export default function ScorecardPage() {
           Tapeline operates from Melbourne, Australia under the publisher exemption from AFSL requirements. We do not hold an Australian Financial Services Licence. You should consider your own circumstances, read any relevant product disclosure documents, and obtain advice from a licensed adviser before making investment decisions.
         </p>
       </div>
+      {/* Lead-magnet email capture — scorecard visitors are inherently
+          high-intent (they've come to verify the back-checked record).
+          Lower the friction to staying in touch by offering the daily
+          digest before they leave. */}
+      <div className="mt-8 rounded-lg border border-border bg-panel/40 p-6">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold text-fg">
+            Get tomorrow&rsquo;s Top 10 in your inbox
+          </h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted leading-relaxed">
+            One email each US market morning — the 10 highest-scoring tickers
+            from this same composite. No card, unsubscribe in one click.
+          </p>
+        </div>
+        <div className="mx-auto max-w-md">
+          <NewsletterCapture source="scorecard" heading="" sub="" />
+        </div>
+      </div>
       </div>
       <MarketingFooter />
     </main>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
+/**
+ * Summary stat card. Pass a raw `value` (number) and it counts up from 0 on
+ * first paint via useCountUp; `null` renders the literal pending label instead
+ * (back-check hasn't run yet). useCountUp rounds to an integer, so we scale by
+ * 10^decimals to preserve the displayed precision, then divide back. These
+ * cards only ever render client-side (the page returns a skeleton until the
+ * data fetch resolves), so there's no SSR value to mismatch against.
+ */
+function Stat({
+  label,
+  value,
+  decimals = 0,
+  suffix = "",
+  tone,
+  pendingLabel = "pending",
+}: {
+  label: string;
+  value: number | null;
+  decimals?: number;
+  suffix?: string;
+  tone?: "up" | "down";
+  pendingLabel?: string;
+}) {
+  const scale = 10 ** decimals;
+  const animated = useCountUp(value != null ? Math.round(value * scale) : null);
+  const display =
+    value == null
+      ? pendingLabel
+      : `${((animated ?? 0) / scale).toFixed(decimals)}${suffix}`;
   return (
     <div className="card p-5">
       <div className="text-xs uppercase text-muted">{label}</div>
-      <div className={`mt-1 text-2xl font-bold nums ${tone === "up" ? "text-up" : tone === "down" ? "text-down" : ""}`}>{value}</div>
+      <div className={`mt-1 text-2xl font-bold nums ${tone === "up" ? "text-up" : tone === "down" ? "text-down" : ""}`}>{display}</div>
     </div>
   );
 }
