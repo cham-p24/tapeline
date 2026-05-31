@@ -505,11 +505,19 @@ async def status() -> dict[str, object]:
             regime_row = (await session.execute(select(RegimeState).where(RegimeState.id == 1))).scalar_one_or_none()
             checks["database"] = {"status": "ok", "tickers": int(n_tickers or 0), "news_items": int(n_news or 0)}
             if regime_row is not None and regime_row.updated_at is not None:
-                age = (datetime.now(UTC) - regime_row.updated_at).total_seconds()
+                # SQLite drops tzinfo on roundtrip (same guard as alerts.py /
+                # auth.py / tier.py), so normalise naive->UTC before subtracting
+                # from an aware now(). Without it the whole probe raised
+                # "can't subtract offset-naive and offset-aware datetimes" and
+                # the endpoint 503'd, blanking the homepage stat band.
+                regime_updated = regime_row.updated_at
+                if regime_updated.tzinfo is None:
+                    regime_updated = regime_updated.replace(tzinfo=UTC)
+                age = (datetime.now(UTC) - regime_updated).total_seconds()
                 checks["worker_last_tick"] = {
                     "status": "ok" if age < 300 else "stale",
                     "regime": regime_row.regime,
-                    "updated_at": regime_row.updated_at.isoformat(),
+                    "updated_at": regime_updated.isoformat(),
                     "age_seconds": int(age),
                 }
             else:
@@ -538,6 +546,9 @@ async def status() -> dict[str, object]:
             ).scalar_one()
 
             if latest_news is not None:
+                # Same SQLite naive->UTC normalisation as the regime probe above.
+                if latest_news.tzinfo is None:
+                    latest_news = latest_news.replace(tzinfo=UTC)
                 news_age = (datetime.now(UTC) - latest_news).total_seconds()
                 # Market-hours-aware thresholds (matches the freshness
                 # regression cron). Benzinga's wire goes very quiet on
