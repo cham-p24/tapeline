@@ -100,7 +100,7 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[]) {
   };
 }
 
-export type FinancialProductArgs = {
+export type TickerDatasetArgs = {
   symbol: string;
   name: string;
   url: string;
@@ -113,42 +113,49 @@ export type FinancialProductArgs = {
 };
 
 /**
- * Schema.org FinancialProduct for a per-ticker page.
- * Tapeline isn't selling the security itself — we publish a *rating* of it —
- * so we model the page as a Review of a FinancialProduct, with the score
- * inside reviewRating. This is the same pattern Morningstar and Zacks pages
- * use and what Google's docs recommend for analyst-rating pages.
+ * Schema.org Dataset for a per-ticker page.
+ *
+ * Deliberately NOT a Review/Rating of the security. A reviewRating on a stock
+ * is wrong on two counts:
+ *   1. Invalid structured data — Google does not accept FinancialProduct as an
+ *      `itemReviewed` type, so the page is ineligible for rich results and GSC
+ *      flags it ("Invalid object type for field itemReviewed").
+ *   2. Prescriptive framing — a Review + reviewRating authored by Tapeline reads
+ *      as "Tapeline rates this security N/100", which collides with the
+ *      descriptive-not-prescriptive posture that protects the Australian
+ *      publisher's exemption.
+ * So we model the page honestly: a dataset of quantitative factor readings.
+ * No rating semantics, no recommendation. The visible score stays on the page;
+ * it just isn't dressed up as a star rating in JSON-LD.
  */
-export function tickerReviewJsonLd(a: FinancialProductArgs) {
-  const product = {
-    "@type": "FinancialProduct",
-    name: `${a.name} (${a.symbol})`,
-    category: "Stock",
-    url: a.url,
-  };
-  if (a.score == null) {
-    return {
-      "@context": "https://schema.org",
-      ...product,
-    };
-  }
+export function tickerDatasetJsonLd(a: TickerDatasetArgs) {
+  const lead = a.why ? `${a.why.trim().replace(/\.$/, "")}. ` : "";
+  const description =
+    `${lead}Tapeline's six-factor quantitative readings for ${a.name} (${a.symbol}) — ` +
+    `trend, relative strength, fundamentals, smart money, macro, and momentum, blended into a ` +
+    `single 0-100 composite score. Descriptive market analytics, not financial advice.`;
   return {
     "@context": "https://schema.org",
-    "@type": "Review",
-    itemReviewed: product,
-    name: `Tapeline Score for ${a.symbol}`,
-    reviewBody: a.why ?? `Tapeline 6-factor quantitative score for ${a.symbol}.`,
-    reviewRating: {
-      "@type": "Rating",
-      ratingValue: a.score,
-      bestRating: 100,
-      worstRating: 0,
-    },
-    author: {
+    "@type": "Dataset",
+    name: `Tapeline quantitative scan — ${a.name} (${a.symbol})`,
+    description,
+    url: a.url,
+    isAccessibleForFree: true,
+    creator: {
       "@type": "Organization",
       name: "Tapeline",
       url: "https://tapeline.io",
     },
+    variableMeasured: [
+      "Trend",
+      "Relative strength",
+      "Fundamentals",
+      "Smart money",
+      "Macro",
+      "Momentum",
+      "Composite score (0-100)",
+    ],
+    keywords: [a.symbol, a.name, "stock scanner", "quantitative score"],
   };
 }
 
