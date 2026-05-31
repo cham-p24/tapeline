@@ -164,7 +164,18 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         if len(symbol) > 12:    # tickers are short; longer = junk
             continue
 
-        score = _parse_float(raw.get("Score"))
+        # Clamp score to the published 0-100 range. The signal-system sheet
+        # occasionally produces values above 100 for very high-conviction
+        # tickers (we have seen 131-133 in live data). The /how-it-works
+        # page tells visitors the score is on a 0-100 scale - displaying
+        # "131/100" reads as broken and undermines the transparency pitch.
+        # Clamping here keeps the brand promise true without touching the
+        # signal-system's own internal scoring.
+        raw_score = _parse_float(raw.get("Score"))
+        score = (
+            None if raw_score is None
+            else max(0.0, min(100.0, raw_score))
+        )
         conviction = (raw.get("Conviction") or "").strip().upper()
 
         rows.append({
@@ -532,7 +543,13 @@ def parse_etf_benchmarks_csv(text: str) -> list[dict[str, Any]]:
         if signal_raw == "NOT IN SCAN" or not signal_raw:
             continue
 
-        score = _parse_float(raw.get("Score"))
+        # Same 0-100 clamp as parse_all_signals_csv - matches the published
+        # scoring scale on /how-it-works.
+        raw_score = _parse_float(raw.get("Score"))
+        score = (
+            None if raw_score is None
+            else max(0.0, min(100.0, raw_score))
+        )
         rows.append({
             "symbol":         symbol,
             "name":           (raw.get("Name") or "").strip() or symbol,
