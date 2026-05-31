@@ -31,6 +31,28 @@ type InboxItem = {
   handled_at: string | null;
 };
 
+type InboxStats = {
+  today_spend_usd: number;
+  today_classifications: number;
+  cap_usd: number;
+  cap_tripped: boolean;
+  tier_counts_today: { "1": number; "2": number; "3": number; unclassified: number };
+  tier_counts_last_7d: { "1": number; "2": number; "3": number; unclassified: number };
+  channel_counts_today: Record<string, number>;
+  status_counts_today: Record<string, number>;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  cache_hit_ratio: number;
+  pending_count: number;
+  bot_enabled: boolean;
+  dry_run: boolean;
+};
+
+// Refresh cadence for the stats strip — fast enough that a cap trip is
+// noticed within a tick, slow enough that the founder leaving the page
+// open doesn't hammer the API.
+const STATS_REFRESH_MS = 30_000;
+
 const STATUS_FILTERS = [
   { key: "all",       label: "All",       value: "" },
   { key: "queue",     label: "Needs review", value: "classified" },
@@ -55,6 +77,7 @@ const CHANNEL_LABEL: Record<string, string> = {
 export default function InboxPage() {
   const { user, loading: userLoading } = useUser();
   const [items, setItems] = useState<InboxItem[]>([]);
+  const [stats, setStats] = useState<InboxStats | null>(null);
   const [statusKey, setStatusKey] = useState("queue");
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +99,27 @@ export default function InboxPage() {
     }
   }, [statusKey]);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await api.inboxStats();
+      setStats(s);
+    } catch {
+      // Stats failure shouldn't block the page — the strip just hides
+      // when stats is null. Don't surface a banner; the list error
+      // banner is the loud channel.
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+
+  // Stats live independently of the list filter — load once on mount
+  // and poll every 30s so the spend chip + cap warning are fresh.
+  useEffect(() => {
+    if (!user || !user.is_admin) return;
+    loadStats();
+    const id = setInterval(loadStats, STATS_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [user, loadStats]);
 
   async function onApprove(id: number, editedText?: string) {
     setBusy(id);
@@ -130,6 +173,11 @@ export default function InboxPage() {
           </p>
         </div>
       </div>
+
+      {/* Stats strip — observability for spend / queue / latency / mode.
+          Hidden until the stats fetch lands. Cap-tripped + bot-disabled
+          + dry-run get loud chips up front. */}
+      {stats && <StatsStrip stats={stats} />}
 
       {/* Status filter pills */}
       <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
@@ -303,6 +351,124 @@ export default function InboxPage() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * Stats strip — observability chips at the top of the inbox page.
+ *
+ * Prioritised by what the founder MUST see at a glance:
+ *   1. Loud red banner if cap_tripped (Claude calls have stopped)
+ *   2. Loud amber banner if dry_run (no real sends going out)
+ *   3. Loud red banner if bot_enabled=false (master kill switch is on)
+ *   4. Chip row: today's spend / pending queue / classifications today /
+ *      tier mix / p95 latency / cache hit rate
+ *
+ * Cache-hit rate is informational — should sit near 0.95 on a warm
+ * prompt cache. A drop near 0.0 means the cache_control header isn't
+ * landing, which would balloon spend silently.
+ */
+function StatsStrip({ stats }: { stats: InboxStats }) {
+  const banners: { tone: "warn" | "down"; label: string; detail: string }[] = [];
+  if (!stats.bot_enabled) {
+    banners.push({
+      tone: "down",
+      label: "Bot disabled",
+      detail: "INBOX_BOT_ENABLED=false — no classification or sending happens.",
+    });
+  }
+  if (stats.cap_tripped) {
+    banners.push({
+      tone: "down",
+      label: "Daily cap tripped",
+      detail: `Today's Claude spend ≥ $${stats.cap_usd.toFixed(2)}. Ambiguous messages default to Tier 1 manual review until UTC midnight.`,
+    });
+  }
+  if (stats.dry_run) {
+    banners.push({
+      tone: "warn",
+      label: "Dry-run mode",
+      detail: "INBOX_DRY_RUN=true — classifier + pipeline run, but adapters log instead of sending. No real replies going out.",
+    });
+  }
+
+  const spendPct = stats.cap_usd > 0
+    ? Math.min(100, Math.round((stats.today_spend_usd / stats.cap_usd) * 100))
+    : 0;
+  const spendTone = stats.cap_tripped ? "text-down" : spendPct > 80 ? "text-warn" : "text-fg";
+
+  const tier1 = stats.tier_counts_today["1"] || 0;
+  const tier2 = stats.tier_counts_today["2"] || 0;
+  const tier3 = stats.tier_counts_today["3"] || 0;
+  const totalToday = tier1 + tier2 + tier3 + (stats.tier_counts_today.unclassified || 0);
+
+  return (
+    <div className="mt-4 space-y-2">
+      {banners.map((b) => (
+        <div
+          key={b.label}
+          className={`rounded-md border px-3 py-2 text-xs ${
+            b.tone === "down"
+              ? "border-down/40 bg-down/10 text-down"
+              : "border-warn/40 bg-warn/10 text-warn"
+          }`}
+        >
+          <span className="font-semibold">{b.label}.</span> <span className="text-muted">{b.detail}</span>
+        </div>
+      ))}
+
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Chip label="Today's spend">
+          <span className={`font-semibold nums ${spendTone}`}>
+            ${stats.today_spend_usd.toFixed(2)}
+          </span>
+          <span className="text-subtle"> / ${stats.cap_usd.toFixed(2)} cap</span>
+        </Chip>
+        <Chip label="Pending">
+          <span className={`font-semibold nums ${stats.pending_count > 0 ? "text-warn" : "text-fg"}`}>
+            {stats.pending_count}
+          </span>
+        </Chip>
+        <Chip label="Classifications">
+          <span className="font-semibold nums">{stats.today_classifications}</span>
+          <span className="text-subtle"> today</span>
+        </Chip>
+        <Chip label="Tier mix">
+          <span className="nums text-warn">T1 {tier1}</span>
+          <span className="text-subtle"> · </span>
+          <span className="nums text-up">T2 {tier2}</span>
+          <span className="text-subtle"> · </span>
+          <span className="nums text-down">T3 {tier3}</span>
+          {totalToday > 0 && (
+            <span className="text-subtle"> ({totalToday})</span>
+          )}
+        </Chip>
+        {stats.latency_p95_ms !== null && (
+          <Chip label="p95 latency">
+            <span className={`font-semibold nums ${stats.latency_p95_ms > 4000 ? "text-warn" : "text-fg"}`}>
+              {stats.latency_p95_ms}ms
+            </span>
+          </Chip>
+        )}
+        {stats.today_classifications > 0 && (
+          <Chip label="Cache hit">
+            <span className={`font-semibold nums ${stats.cache_hit_ratio < 0.5 ? "text-warn" : "text-up"}`}>
+              {Math.round(stats.cache_hit_ratio * 100)}%
+            </span>
+          </Chip>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Chip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-1.5 rounded-md bg-panel px-2.5 py-1">
+      <span className="text-[10px] uppercase tracking-wider text-subtle">{label}</span>
+      <span className="text-sm">{children}</span>
     </div>
   );
 }
