@@ -73,6 +73,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // newsletter subscribers get. Refreshes every 30 min via ISR.
     { url: `${base}/daily-picks`,               lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/signals`,                   lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // Sector hub-of-hubs — shallow crawl entry point into the 11 /sector/{slug}
+    // ranking pages (and onward to per-ticker pages). Aggregates change as
+    // scores re-tick, so daily.
+    { url: `${base}/sectors`,                   lastModified: now, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
     { url: `${base}/blog`,                      lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
