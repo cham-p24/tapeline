@@ -463,6 +463,17 @@ async def _approve_core(
 
     await mark_sent(session, row.id, when=datetime.now(UTC))
     await session.commit()
+
+    # Edit the Telegram alert card in place to show "✅ Approved · sent"
+    # so the founder doesn't have to remember which Tier 1s they've
+    # handled. Best-effort: failure leaves the card unchanged but the
+    # approve itself stays committed.
+    try:
+        from app.services.inbox_telegram_alert import edit_card_to_done
+        await edit_card_to_done(row, action="approved", sent_reply=final_reply)
+    except Exception:
+        logger.exception("inbox.approve.card_edit_failed id=%d", row.id)
+
     return {"ok": True, "id": row.id, "status": "sent"}
 
 
@@ -481,6 +492,16 @@ async def _reject_core(
     row.status = "ignored"
     row.handled_at = datetime.now(UTC)
     await session.commit()
+
+    # Edit the alert card in place to show "🗑️ Rejected" — same UX
+    # affordance as approve. Best-effort; the rejection itself stays
+    # committed regardless.
+    try:
+        from app.services.inbox_telegram_alert import edit_card_to_done
+        await edit_card_to_done(row, action="rejected")
+    except Exception:
+        logger.exception("inbox.reject.card_edit_failed id=%d", row.id)
+
     return {"ok": True, "id": row.id, "status": "ignored"}
 
 

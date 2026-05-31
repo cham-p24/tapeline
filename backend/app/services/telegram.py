@@ -65,6 +65,48 @@ async def answer_callback_query(callback_query_id: str, text: str = "") -> bool:
         return r.status_code == 200
 
 
+async def send_message_with_id(
+    chat_id: str,
+    text: str,
+    *,
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> int | None:
+    """Like `send_message` but returns Telegram's new message_id on
+    success (None otherwise).
+
+    Used by the inbox alert flow so we can store the alert card's id
+    on InboundMessage.telegram_alert_message_id and then editMessageText
+    it in place after Approve/Reject (instead of stacking confirmation
+    messages on the founder).
+    """
+    if not settings.telegram_bot_token:
+        logger.warning("telegram.skipped no_bot_token")
+        return None
+    payload: dict = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": True,
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.post(
+            f"{TG_API}/bot{settings.telegram_bot_token}/sendMessage",
+            json=payload,
+        )
+        if r.status_code != 200:
+            logger.warning("telegram.send_with_id_failed chat=%s body=%s", chat_id, r.text[:200])
+            return None
+        try:
+            data = r.json()
+            return int(data.get("result", {}).get("message_id"))
+        except Exception:
+            logger.exception("telegram.send_with_id_parse_failed chat=%s", chat_id)
+            return None
+
+
 async def edit_message_text(
     chat_id: str,
     message_id: int,
