@@ -27,6 +27,17 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
+// Bound the upstream call. /api/public/top-tickers does an unindexed
+// ORDER BY score DESC and can briefly stall (Neon scale-to-zero cold start
+// or a heavy worker tick — observed >30s before recovering). Without a
+// timeout the sitemap ISR regeneration inherits that stall, which can 5xx
+// the /sitemap.xml route. That's a double miss: Google sees no sitemap, and
+// the daily stale-link audit reads "sitemap_unavailable" so IndexNow submits
+// nothing. An 8s cap lets a slow-but-fine call through while turning a true
+// hang into a clean fallback. AbortSignal.timeout is not part of Next's
+// fetch cache key, so the 1h ISR cache is preserved.
+const TOP_TICKERS_TIMEOUT_MS = 8000;
+
 async function fetchTopTickers(limit = 500): Promise<string[]> {
   try {
     // /api/public/top-tickers is the no-auth, no-tier-gating endpoint built
@@ -35,12 +46,15 @@ async function fetchTopTickers(limit = 500): Promise<string[]> {
     // expansion entirely.
     const res = await fetch(`${API_BASE}/api/public/top-tickers?limit=${limit}`, {
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(TOP_TICKERS_TIMEOUT_MS),
     });
     if (!res.ok) return FALLBACK_TICKERS;
     const body = (await res.json()) as { symbols?: string[] };
     const syms = body.symbols ?? [];
     return syms.length > 0 ? syms : FALLBACK_TICKERS;
   } catch {
+    // Timeout / network error → fall back to the mega-cap list so the
+    // sitemap still emits a valid (if smaller) document.
     return FALLBACK_TICKERS;
   }
 }
