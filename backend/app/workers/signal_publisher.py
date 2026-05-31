@@ -251,13 +251,17 @@ async def tick() -> None:
         _last_holdings_refresh = started
 
     # Daily trial-drip emails (day 3 / 7 / 13) + 14-day re-engagement for
-    # dormant non-trial users + 30/60/90-day post-cancellation win-back.
-    # Worker-restart-safe — User.drip_state / winback_state track per-user
-    # per-stage delivery so no email fires twice.
+    # dormant non-trial users + 30/60/90-day post-cancellation win-back +
+    # early-lifecycle activation nudges (first watchlist / first alert) +
+    # post-conversion monthly→annual upgrade nudge. Worker-restart-safe —
+    # User.drip_state / winback_state track per-user per-stage delivery so no
+    # email fires twice.
     global _last_drip_check
     if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
         try:
             from app.services.email import (
+                run_activation_drip,
+                run_annual_nudge_drip,
                 run_daily_drip,
                 run_re_engagement_drip,
                 run_winback_drip,
@@ -266,12 +270,18 @@ async def tick() -> None:
                 counts = await run_daily_drip(drip_session)
                 re_counts = await run_re_engagement_drip(drip_session)
                 wb_counts = await run_winback_drip(drip_session)
+                act_counts = await run_activation_drip(drip_session)
+                annual_counts = await run_annual_nudge_drip(drip_session)
             if any(counts.values()):
                 logger.info("drip.sent day3=%d day7=%d day13=%d", counts["day3"], counts["day7"], counts["day13"])
             if re_counts["re14"]:
                 logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
             if any(wb_counts.values()):
                 logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
+            if any(act_counts.values()):
+                logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
+            if annual_counts["annual_p"]:
+                logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
         except Exception:
             logger.exception("drip.run_failed")
         _last_drip_check = started
