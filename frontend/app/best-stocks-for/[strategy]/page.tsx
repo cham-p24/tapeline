@@ -41,7 +41,14 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
     ).toString();
     const url = `${API_BASE}/api/scanner?${qs}`;
     // 5-minute cache so search-engine crawls don't hammer the API.
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await fetch(url, {
+      next: { revalidate: 300 },
+      // Bound the build-time fetch so a degraded backend can't hang the
+      // per-page build budget and fail the whole deploy. On timeout we fall
+      // through to the [] fallback and the page renders fast; ISR refills the
+      // data within `revalidate` once the backend recovers.
+      signal: AbortSignal.timeout(7000),
+    });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: ScannerRow[] };
     return body.items ?? [];
