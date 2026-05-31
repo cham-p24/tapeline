@@ -278,7 +278,10 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
     `app.services.email` should get a row here too.
     """
     from app.services.email import (
+        render_activation_alert_email,
+        render_activation_watchlist_email,
         render_alert_email,
+        render_annual_upgrade_email,
         render_email_verification_email,
         render_eod_watchlist_digest,
         render_password_reset_email,
@@ -411,6 +414,24 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "re_engagement": (
             "14-day dormant re-engagement",
             lambda: render_re_engagement_email("Alex"),
+        ),
+        # Activation nudges (early lifecycle)
+        "activation_watchlist": (
+            "Activation · no watchlist by hour 24",
+            lambda: render_activation_watchlist_email("Alex"),
+        ),
+        "activation_alert": (
+            "Activation · no alert rule by day 3",
+            lambda: render_activation_alert_email("Alex"),
+        ),
+        # Annual upgrade nudge (~30 days post monthly conversion)
+        "annual_nudge_pro": (
+            "Annual nudge · Pro monthly → annual",
+            lambda: render_annual_upgrade_email("Alex", tier="pro"),
+        ),
+        "annual_nudge_premium": (
+            "Annual nudge · Premium monthly → annual",
+            lambda: render_annual_upgrade_email("Alex", tier="premium"),
         ),
         "email_verification": (
             "Email verification (signup security)",

@@ -552,9 +552,11 @@ def render_trial_day11_email(user_name: str, summary: dict | None = None) -> str
         )
         + _trial_summary_block(summary)
         + muted_paragraph(
-            "If you decide to keep Premium, add a card before Friday — at the "
-            "standard Premium price ($49.99/mo, or $39.99/mo billed annually). "
-            "If you don't, the account drops to Free at expiry."
+            "If you decide to keep Premium, add a card before Friday at the "
+            "standard price — $49.99/mo, or $39.99/mo billed annually. "
+            "Picking annual at checkout locks in the lower rate and saves you "
+            "$120 over the year. If you don't add a card, the account drops to "
+            "Free at expiry."
         )
         + button("Keep Premium", "https://tapeline.io/app/billing")
         + footnote("7-day money back. One-click cancel. No phone calls."),
@@ -1197,6 +1199,123 @@ def render_winback_email(
         )
         + footnote("This is the last email in this series. — Christian, founder."),
         preheader="Last win-back note — 40% off your first 3 months back.",
+    )
+
+
+# ── Activation nudges (lever #3: first-watchlist, first-alert) ──────────────
+#
+# Early-lifecycle prompts that fire when a user signed up but skipped the
+# core habit-forming step. Both gate on EmailPref.TRIAL_DRIP (the
+# early-lifecycle suppressable bucket) and send under the "default"
+# transactional-onboarding persona. Dedup'd via User.drip_state tokens
+# "act_wl" / "act_alert" in run_activation_drip below.
+
+def render_activation_watchlist_email(user_name: str) -> str:
+    """Activation nudge — signed up but hasn't added a single watchlist ticker
+    within ~24h. The watchlist is the core habit loop: it powers smart alerts
+    and the end-of-day digest, so the first ticker added is activation
+    milestone #1. Calm, helpful voice; persona "default"."""
+    return shell(
+        h1(f"Add one ticker, {user_name}.")
+        + lead(
+            "You're all set up — but your watchlist is still empty. That's the "
+            "one step that turns Tapeline from a scanner into your scanner."
+        )
+        + paragraph(
+            "Pick three or four names you already follow. From then on you get "
+            "their live score, a flag when conviction shifts, and an end-of-day "
+            "digest of what moved — without re-running a single filter."
+        )
+        + button(
+            "Add my first tickers",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=activation_watchlist&utm_medium=transactional",
+        )
+        + footnote("Takes about thirty seconds. — Christian, founder."),
+        preheader="One ticker on your watchlist unlocks alerts + your daily digest.",
+    )
+
+
+def render_activation_alert_email(user_name: str) -> str:
+    """Activation nudge — three days in, on a plan that can set alerts (trial
+    Premium or paid Pro/Premium), but no alert rule yet. Alerts are the
+    retention hook: a user who receives one genuinely useful alert comes back.
+    Persona "default"."""
+    return shell(
+        h1("Let Tapeline watch while you don't.")
+        + lead(
+            f"{user_name}, you've had a few days to look around. The next step "
+            f"is to stop looking — set one alert and let the scanner tap you on "
+            f"the shoulder instead."
+        )
+        + paragraph(
+            "A rule takes one line: name a score threshold, a squeeze trigger, "
+            "or a regime flip, and Tapeline emails you the moment it fires. No "
+            "dashboard-watching, no missed setups."
+        )
+        + button(
+            "Set up an alert",
+            "https://tapeline.io/app/alerts?utm_source=email&utm_campaign=activation_alert&utm_medium=transactional",
+        )
+        + footnote("One rule is enough to feel the difference. — Christian, founder."),
+        preheader="Set one alert and let the scanner watch the tape for you.",
+    )
+
+
+# ── Annual upgrade nudge (lever #2: monthly → annual, ~30 days post-convert) ─
+#
+# Per-tier annual-savings copy. Mirrors PricingTable.tsx / ComparisonTable.tsx
+# — keep these numbers in sync if the published prices ever move.
+_ANNUAL_PITCH: dict[str, dict[str, str]] = {
+    "pro": {
+        "label": "Pro",
+        "monthly": "$29.99",
+        "annual_monthly": "$24.99",
+        "annual_yearly": "$299.99",
+        "savings": "$60",
+    },
+    "premium": {
+        "label": "Premium",
+        "monthly": "$49.99",
+        "annual_monthly": "$39.99",
+        "annual_yearly": "$479.99",
+        "savings": "$120",
+    },
+}
+
+
+def render_annual_upgrade_email(user_name: str, *, tier: str) -> str:
+    """Post-conversion nudge for MONTHLY subscribers (~30 days in) to switch to
+    annual billing. Loss-aversion framing on the savings they're leaving on the
+    table. Gated on EmailPref.RE_ENGAGEMENT (the sales-nurture suppressable
+    bucket), persona "sales", carries a List-Unsubscribe header (it's a
+    marketing upsell, not account state). Unknown tier falls back to the Pro
+    pitch so the email never renders blank."""
+    pitch = _ANNUAL_PITCH.get(tier, _ANNUAL_PITCH["pro"])
+    return shell(
+        h1(f"You're leaving {pitch['savings']} on the table, {user_name}.")
+        + lead(
+            f"You've been on Tapeline {pitch['label']} for about a month — long "
+            f"enough to know it earns its keep. On monthly you're paying "
+            f"{pitch['monthly']}/mo. Annual works out to {pitch['annual_monthly']}/mo."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Switch to annual</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+            f'{pitch["label"]} annual is <strong>{pitch["annual_yearly"]}/yr</strong> '
+            f'({pitch["annual_monthly"]}/mo) — you keep every tool you have now and '
+            f'<strong>save {pitch["savings"]} a year</strong>.</p>'
+            + button(
+                "Switch to annual",
+                "https://tapeline.io/app/billing?utm_source=email&utm_campaign=annual_nudge&utm_medium=transactional",
+            ),
+            accent=True,
+        )
+        + muted_paragraph(
+            "Same plan, same features — just a lower effective rate for paying "
+            "once a year instead of twelve times."
+        )
+        + footnote("Staying monthly is completely fine too — no change needed. — Christian, founder."),
+        preheader=f"Switch to annual and save {pitch['savings']} a year on {pitch['label']}.",
     )
 
 
@@ -1958,6 +2077,197 @@ async def run_winback_drip(session) -> dict[str, int]:
                 any_sent = True
         except Exception:
             logger.exception("winback.send_failed user=%s stage=%s", user.id, stage)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_activation_drip(session) -> dict[str, int]:
+    """Early-lifecycle activation nudges. Returns per-stage counts.
+
+    Two one-shot prompts, both dedup'd via User.drip_state tokens and gated
+    on EmailPref.TRIAL_DRIP (the early-lifecycle suppressable bucket):
+
+      "act_wl"    — signed up 24-72h ago and still has zero watchlist items.
+                    The watchlist is the core habit loop (it powers smart
+                    alerts and the EOD digest), so the first ticker added is
+                    activation milestone #1. Sent to every tier — a Free user
+                    with an empty watchlist is exactly who to nudge.
+
+      "act_alert" — signed up 3-5 days ago, on a plan that can create alert
+                    rules (trial Premium or paid Pro/Premium), but has none.
+                    Free is excluded: alerts are a Pro+ feature, so nudging a
+                    Free user toward one would just point at a paywall.
+
+    Bounded signup windows (not just a lower bound) keep the nudge timely — we
+    don't email someone who signed up two months ago. A daily run catches each
+    user once inside the window; the drip_state token prevents a repeat if
+    they're still empty the next day. Both send under the "default"
+    transactional-onboarding persona. No-op when RESEND_API_KEY is unset
+    (send_email returns skipped:True, so the token is never stamped).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import exists, select
+
+    from app.models import AlertRule, User, WatchlistItem
+    from app.services.email_prefs import EmailPref, wants
+
+    now = datetime.now(UTC)
+    counts = {"act_wl": 0, "act_alert": 0}
+
+    # act_wl — no watchlist item, 24-72h after signup. Correlated EXISTS so
+    # the "has any ticker" test stays a single round-trip.
+    no_watchlist = ~exists().where(WatchlistItem.user_id == User.id)
+    wl_users = (
+        await session.execute(
+            select(User).where(
+                User.created_at >= now - timedelta(hours=72),
+                User.created_at < now - timedelta(hours=24),
+                no_watchlist,
+            )
+        )
+    ).scalars().all()
+
+    # act_alert — no alert rule, 3-5d after signup, on an alert-capable tier.
+    no_alert_rule = ~exists().where(AlertRule.user_id == User.id)
+    al_users = (
+        await session.execute(
+            select(User).where(
+                User.created_at >= now - timedelta(days=5),
+                User.created_at < now - timedelta(days=3),
+                User.tier.in_(["pro", "premium"]),
+                no_alert_rule,
+            )
+        )
+    ).scalars().all()
+
+    stages = [
+        ("act_wl", wl_users, render_activation_watchlist_email,
+         "Your Tapeline watchlist is still empty"),
+        ("act_alert", al_users, render_activation_alert_email,
+         "Set one alert and let Tapeline watch for you"),
+    ]
+
+    any_sent = False
+    for token, users, renderer, subject in stages:
+        for user in users:
+            if not user.email:
+                continue
+            sent_tokens = set((user.drip_state or "").split(",")) - {""}
+            if token in sent_tokens:
+                continue
+            if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
+            try:
+                html = renderer(user.name or "trader")
+                res = await send_email(
+                    user.email, subject, html,
+                    persona="default",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="trial_drip",
+                )
+                if not res.get("skipped", False):
+                    sent_tokens.add(token)
+                    user.drip_state = ",".join(sorted(sent_tokens))
+                    counts[token] += 1
+                    any_sent = True
+            except Exception:
+                logger.exception(
+                    "activation.send_failed user=%s stage=%s", user.id, token,
+                )
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_annual_nudge_drip(session) -> dict[str, int]:
+    """Post-conversion nudge: monthly subscribers ~30 days in → switch to annual.
+
+    Population: paid users (stripe_customer_id set, tier pro/premium) whose
+    still-live subscription was created 28-45 days ago AND looks monthly.
+
+    We don't persist the billing interval locally, so we infer it from the
+    Subscription row: (current_period_end - created_at) < 180 days is monthly,
+    otherwise annual. That inference is reliable *only* for young subscriptions
+    — a long-tenured monthly sub's period end eventually advances past the
+    180-day mark — which is exactly why the targeting window is bounded to the
+    first ~6 weeks. An annual sub inside the window has current_period_end a
+    full year out, so it's filtered out and never mis-nudged to "switch to
+    annual" when it already is.
+
+    Dedup'd via the "annual_p" drip_state token (one nudge ever, even if the
+    user stays monthly). Gated on EmailPref.RE_ENGAGEMENT (the sales-nurture
+    suppressable bucket), sent under the "sales" persona with a
+    List-Unsubscribe header. No-op when RESEND_API_KEY is unset.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import Subscription, User
+    from app.services.email_prefs import EmailPref, wants
+
+    now = datetime.now(UTC)
+    counts = {"annual_p": 0}
+
+    rows = (
+        await session.execute(
+            select(User, Subscription)
+            .join(Subscription, Subscription.user_id == User.id)
+            .where(
+                User.stripe_customer_id.is_not(None),
+                User.tier.in_(["pro", "premium"]),
+                Subscription.status.in_(["active", "trialing"]),
+                Subscription.created_at >= now - timedelta(days=45),
+                Subscription.created_at < now - timedelta(days=28),
+            )
+        )
+    ).all()
+
+    any_sent = False
+    handled: set[str] = set()
+    for user, sub in rows:
+        if not user.email or user.id in handled:
+            continue
+        # Infer monthly vs annual from period length (see docstring). SQLite
+        # hands datetimes back naive — normalise both sides before subtracting.
+        cpe = sub.current_period_end
+        created = sub.created_at
+        if cpe.tzinfo is None:
+            cpe = cpe.replace(tzinfo=UTC)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        if (cpe - created).days >= 180:
+            handled.add(user.id)  # annual — already on the best rate, skip
+            continue
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if "annual_p" in sent_tokens:
+            handled.add(user.id)
+            continue
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
+            handled.add(user.id)
+            continue
+        try:
+            html = render_annual_upgrade_email(user.name or "trader", tier=user.tier)
+            res = await send_email(
+                user.email,
+                f"Switch to annual and save on Tapeline {user.tier.capitalize()}",
+                html,
+                persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add("annual_p")
+                user.drip_state = ",".join(sorted(sent_tokens))
+                counts["annual_p"] += 1
+                any_sent = True
+                handled.add(user.id)
+        except Exception:
+            logger.exception("annual_nudge.send_failed user=%s", user.id)
 
     if any_sent:
         await session.commit()
