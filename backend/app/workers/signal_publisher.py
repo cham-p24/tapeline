@@ -57,6 +57,9 @@ _last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
+_last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
+_last_stale_audit_date: str | None = None  # "YYYY-MM-DD" of last stale-link audit + alert
+_last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
 _last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
@@ -460,6 +463,70 @@ async def tick() -> None:
         except Exception:
             logger.exception("newsletter_daily.run_failed")
         _last_daily_newsletter_date = today_str
+
+    # IndexNow batch submit — daily, fires once per UTC day at/after
+    # 06:00 UTC (Sydney evening, so any new pages shipped today are
+    # already deployed by Vercel). Pushes every URL in the sitemap to
+    # Bing + Yandex + DuckDuckGo + Seznam in one batch — they pick up
+    # new content within hours instead of waiting on Googlebot's crawl
+    # schedule. Free, no auth, gracefully no-ops if endpoint is down.
+    global _last_indexnow_date
+    if started.hour >= 6 and _last_indexnow_date != today_str:
+        try:
+            from app.services.index_now import submit_urls
+            from app.services.seo_health import fetch_sitemap_urls
+            urls = await fetch_sitemap_urls()
+            if urls:
+                result = await submit_urls(urls)
+                logger.info(
+                    "indexnow.daily_batch submitted=%d accepted=%d queued=%d failed=%d",
+                    result["submitted"], result["accepted"],
+                    result["queued"], result["failed"],
+                )
+            else:
+                logger.warning("indexnow.daily_batch.empty no_sitemap_urls")
+        except Exception:
+            logger.exception("indexnow.daily_batch.failed")
+        _last_indexnow_date = today_str
+
+    # Daily stale-link audit — fires once per UTC day at/after 08:00
+    # UTC. Crawls every URL in the sitemap; alerts the founder via
+    # Telegram ONLY if broken URLs are present (no broken = no noise).
+    # Catches 404s introduced by route renames, 5xx outages, and
+    # accidental disconnects between sitemap entries and live pages
+    # within ~24 hours instead of relying on the next user/Google to
+    # surface them.
+    global _last_stale_audit_date
+    if started.hour >= 8 and _last_stale_audit_date != today_str:
+        try:
+            from app.services.seo_health import run_stale_audit_alert
+            async with session_scope() as audit_session:
+                alerted = await run_stale_audit_alert(audit_session)
+            logger.info("stale_audit.daily.ran alerted=%s", alerted)
+        except Exception:
+            logger.exception("stale_audit.daily.failed")
+        _last_stale_audit_date = today_str
+
+    # Weekly SEO digest — Monday at/after 09:00 UTC (~7pm Sydney
+    # post-Monday-close, ~5am ET pre-market). Sends a Markdown summary
+    # to the founder's Telegram: sitemap size, broken-URL count,
+    # ticker-universe stats, and suggested next steps. Process-level
+    # token + Telegram-side dedupe make double-fires harmless.
+    global _last_seo_digest_token
+    seo_digest_token = f"seo_{iso_year}W{iso_week:02d}"
+    if (
+        iso_dow == 1                                    # Monday
+        and started.hour >= 9                           # 09:00 UTC onward
+        and _last_seo_digest_token != seo_digest_token
+    ):
+        try:
+            from app.services.seo_health import run_weekly_digest
+            async with session_scope() as seo_session:
+                sent = await run_weekly_digest(seo_session)
+            logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
+        except Exception:
+            logger.exception("seo_digest.weekly.failed")
+        _last_seo_digest_token = seo_digest_token
 
     # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
     # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.

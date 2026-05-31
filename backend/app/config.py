@@ -138,6 +138,14 @@ class Settings(BaseSettings):
     email_from_alerts: str = "alerts@tapeline.io"          # automated digests + alert rules
     email_reply_to: str = "support@tapeline.io"            # bounce-safe reply hub
 
+    # ---- IndexNow (Bing / Yandex / DuckDuckGo / Seznam) ----
+    # Static fallback matches the key file shipped at
+    # frontend/public/<key>.txt. Override via env var only if rotating.
+    # The aggregator at api.indexnow.org fans out to all participating
+    # search engines, so this single key serves them all. No account /
+    # auth / quota — free.
+    indexnow_api_key: str = "7b3f8c5d2a9e4f1b6c8d0a3e5f7b9c2d"
+
     # ---- Telegram ----
     telegram_bot_token: str = ""
     # Bot username (no @, no t.me/). Used to build the t.me/<username>?start=<token>
