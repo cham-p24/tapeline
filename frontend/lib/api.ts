@@ -542,6 +542,23 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
   },
+  inboxStats: () => get<{
+    today_spend_usd: number;
+    today_classifications: number;
+    cap_usd: number;
+    cap_tripped: boolean;
+    tier_counts_today: { "1": number; "2": number; "3": number; unclassified: number };
+    tier_counts_last_7d: { "1": number; "2": number; "3": number; unclassified: number };
+    channel_counts_today: Record<string, number>;
+    status_counts_today: Record<string, number>;
+    latency_p50_ms: number | null;
+    latency_p95_ms: number | null;
+    cache_hit_ratio: number;
+    pending_count: number;
+    bot_enabled: boolean;
+    dry_run: boolean;
+    now: string;
+  }>(`/api/inbox/stats`),
   heatmap: (q?: string) => {
     const qs = new URLSearchParams(q ? { q } : {});
     const suffix = qs.toString() ? `?${qs.toString()}` : "";

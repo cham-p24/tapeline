@@ -167,7 +167,9 @@ Server-side bot that triages inbound messages across Reddit, email, and Telegram
 
 **Voice rules (legal-critical):** descriptive language only — never "buy"/"sell"/"you should"/"recommend". Australian publisher exemption from AFSL depends on this. `tests/test_inbox_voice_rules.py` is the regression guard.
 
-**Test coverage:** 91 inbox-specific tests across `test_inbox_*.py` (classifier rule-based + LLM, kill switch, voice rules, router, reddit poller, telegram alerts).
+**Observability:** `GET /api/inbox/stats` (admin-only) returns today's classification spend, cap-tripped flag, tier/channel/status counts, p50/p95 latency, cache hit ratio, pending queue depth, and the live bot_enabled / dry_run state. Surfaced as a chip strip + cap-tripped / dry-run banners at the top of `/app/inbox` (polled every 30s).
+
+**Test coverage:** 97 inbox-specific tests across `test_inbox_*.py` (classifier rule-based + LLM, kill switch, voice rules, router, reddit poller, telegram alerts, stats endpoint).
 
 ## Per-ticker confidence
 Each Ticker row carries a `confidence_pct` (0-100) that varies with which underlying data feeds returned data for that symbol. Mega-caps with full Quiver/Finnhub/FINRA coverage land 88-96, ETFs without traditional fundamentals land 45-70, the typical liquid stock lands 60-85. Surfaced as a column on the scanner table + as an inline pill on the ticker page. Documented on `/how-it-works`. Pattern ported from the personal signal-system. Mock value via `mock_feed._compute_mock_confidence(symbol)` (deterministic per symbol). Real polygon_feed should compute from actual data-feed presence.

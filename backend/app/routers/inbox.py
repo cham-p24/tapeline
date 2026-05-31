@@ -24,7 +24,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -230,6 +230,141 @@ class InboxListItem(BaseModel):
 
 class ReplyBody(BaseModel):
     reply_text: str = Field(min_length=1, max_length=4000)
+
+
+@router.get("/stats")
+async def inbox_stats(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
+) -> dict[str, Any]:
+    """Observability for the inbox bot — daily spend, classification
+    volume, tier/channel distribution, latency percentiles, cache hit
+    rate, and queue depth.
+
+    Founder reads this to verify:
+      - LLM spend is under the daily cap (otherwise the bot has
+        silently downgraded to manual review for everything)
+      - Tier mix looks right (Tier 3 dominating = classifier too
+        spam-trigger-happy; Tier 1 dominating = too cautious)
+      - p95 latency hasn't crept past Telegram's 5s webhook timeout
+      - Cache hit rate is high (cached_tokens / input_tokens; should
+        be ~0.95 on a warm prompt cache, ~0.0 if the cache_control
+        header isn't reaching the API for some reason)
+
+    Cheap to call (4-5 cheap aggregates); polls every 30s from the
+    admin UI without straining the DB.
+    """
+    from datetime import timedelta
+
+    from app.config import get_settings
+    from app.models import InboxClassificationLog
+    from app.services import inbox_kill_switch
+
+    _require_admin(user)
+    settings = get_settings()
+    now = datetime.now(UTC)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=6)
+    day_start = now - timedelta(hours=24)
+
+    # Daily spend SUM(cost_usd) + classification count for today.
+    spend_today_row = (await session.execute(
+        select(
+            func.coalesce(func.sum(InboxClassificationLog.cost_usd), 0),
+            func.count(InboxClassificationLog.id),
+        ).where(InboxClassificationLog.created_at >= today_start)
+    )).one()
+    today_spend_usd = float(spend_today_row[0] or 0)
+    today_classifications = int(spend_today_row[1] or 0)
+
+    cap_usd = float(settings.inbox_claude_daily_cap_usd)
+    cap_tripped = await inbox_kill_switch.cap_exceeded(session)
+
+    # Tier counts today + last 7 days (group by tier).
+    async def _tier_counts(since: datetime) -> dict[str, int]:
+        rows = (await session.execute(
+            select(
+                InboundMessage.tier, func.count(InboundMessage.id),
+            )
+            .where(InboundMessage.received_at >= since)
+            .group_by(InboundMessage.tier)
+        )).all()
+        out = {"1": 0, "2": 0, "3": 0, "unclassified": 0}
+        for tier, n in rows:
+            key = str(tier) if tier in (1, 2, 3) else "unclassified"
+            out[key] = int(n or 0)
+        return out
+
+    tier_counts_today = await _tier_counts(today_start)
+    tier_counts_7d = await _tier_counts(week_start)
+
+    # Channel counts today.
+    channel_rows = (await session.execute(
+        select(InboundMessage.channel, func.count(InboundMessage.id))
+        .where(InboundMessage.received_at >= today_start)
+        .group_by(InboundMessage.channel)
+    )).all()
+    channel_counts_today = {str(ch): int(n or 0) for ch, n in channel_rows}
+
+    # Status counts today.
+    status_rows = (await session.execute(
+        select(InboundMessage.status, func.count(InboundMessage.id))
+        .where(InboundMessage.received_at >= today_start)
+        .group_by(InboundMessage.status)
+    )).all()
+    status_counts_today = {str(s): int(n or 0) for s, n in status_rows}
+
+    # Latency percentiles + cache-hit ratio over the last 24h. We pull the
+    # raw values and compute percentiles in Python because SQLite doesn't
+    # ship percentile_cont. The 24h window is small enough that a list
+    # comprehension is fine.
+    latency_rows = (await session.execute(
+        select(
+            InboxClassificationLog.latency_ms,
+            InboxClassificationLog.input_tokens,
+            InboxClassificationLog.cached_tokens,
+        ).where(
+            InboxClassificationLog.created_at >= day_start,
+            InboxClassificationLog.latency_ms.isnot(None),
+        )
+    )).all()
+
+    latencies = sorted(int(r[0]) for r in latency_rows if r[0] is not None)
+    p50_ms: int | None = None
+    p95_ms: int | None = None
+    if latencies:
+        p50_ms = latencies[len(latencies) // 2]
+        # Index for p95 — floor((n-1) * 0.95). Safe for n=1 (returns idx 0).
+        p95_ms = latencies[int((len(latencies) - 1) * 0.95)]
+
+    total_input = sum(int(r[1] or 0) for r in latency_rows)
+    total_cached = sum(int(r[2] or 0) for r in latency_rows)
+    cache_hit_ratio = (total_cached / total_input) if total_input > 0 else 0.0
+
+    # Pending queue depth — messages awaiting founder attention OR awaiting
+    # auto-reply delivery (status='new' or 'classified').
+    pending_count = int((await session.execute(
+        select(func.count(InboundMessage.id))
+        .where(InboundMessage.status.in_(("new", "classified")))
+    )).scalar_one() or 0)
+
+    return {
+        "today_spend_usd": round(today_spend_usd, 4),
+        "today_classifications": today_classifications,
+        "cap_usd": cap_usd,
+        "cap_tripped": bool(cap_tripped),
+        "tier_counts_today": tier_counts_today,
+        "tier_counts_last_7d": tier_counts_7d,
+        "channel_counts_today": channel_counts_today,
+        "status_counts_today": status_counts_today,
+        "latency_p50_ms": p50_ms,
+        "latency_p95_ms": p95_ms,
+        "cache_hit_ratio": round(cache_hit_ratio, 3),
+        "pending_count": pending_count,
+        "bot_enabled": inbox_kill_switch.bot_enabled(),
+        "dry_run": inbox_kill_switch.dry_run(),
+        "now": now.isoformat(),
+    }
 
 
 @router.get("")
