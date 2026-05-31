@@ -80,18 +80,61 @@ type TickerData = {
   };
 };
 
-async function fetchTicker(symbol: string): Promise<TickerData | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/ticker/${symbol.toUpperCase()}`, {
-      // Cache for 60s — matches the worker tick cadence so the page is fresh
-      // without hammering the API on every social-card crawl.
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as TickerData;
-  } catch {
-    return null;
+/**
+ * Result of a ticker fetch, discriminated so callers can tell a genuine
+ * "not in scanner universe" (backend HTTP 404 → render Next's notFound)
+ * apart from a transient upstream failure (timeout / 5xx / network).
+ *
+ * Why this distinction is load-bearing for "index everything": the old code
+ * collapsed EVERY non-200 into `null`, and the page then called notFound().
+ * So a momentary backend hiccup — cold Neon, connection-pool pressure, a
+ * slow news fetch inside /api/ticker — turned a perfectly valid ticker page
+ * into a hard 404. That has two costs:
+ *   1. It trips the daily stale-link audit with false positives (the audit
+ *      HEADs every /t/{TICKER} in the sitemap; a transient 404 pages the
+ *      founder for a page that's actually fine).
+ *   2. Worse — if Googlebot crawls during the blip, Google sees a 404 for a
+ *      valid URL and drops it from the index. A 404 is a strong "this page
+ *      is gone" signal; a 5xx is "try again later" (Google retries and keeps
+ *      the URL). We must never answer a transient failure with a 404.
+ */
+type TickerFetch =
+  | { status: "ok"; data: TickerData }
+  | { status: "missing" }
+  | { status: "error" };
+
+// Two attempts with a short backoff clears the overwhelming majority of
+// transient blips (most resolve within ~1s). Each attempt is time-bounded
+// so a wedged backend can't hang the whole render up to the platform
+// function timeout.
+const TICKER_FETCH_ATTEMPTS = 2;
+const TICKER_FETCH_TIMEOUT_MS = 7000;
+
+async function fetchTicker(symbol: string): Promise<TickerFetch> {
+  const url = `${API_BASE}/api/ticker/${symbol.toUpperCase()}`;
+  for (let attempt = 1; attempt <= TICKER_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        // Cache for 60s — matches the worker tick cadence so the page is fresh
+        // without hammering the API on every social-card crawl.
+        next: { revalidate: 60 },
+        // Bound each attempt; AbortSignal is not part of Next's fetch cache
+        // key, so the 60s ISR cache above is preserved.
+        signal: AbortSignal.timeout(TICKER_FETCH_TIMEOUT_MS),
+      });
+      // The ONLY case that should ever 404: the backend definitively says
+      // this symbol isn't in the scanner universe.
+      if (res.status === 404) return { status: "missing" };
+      if (res.ok) return { status: "ok", data: (await res.json()) as TickerData };
+      // 5xx / other non-ok → transient; fall through to retry.
+    } catch {
+      // Timeout / network error → transient; fall through to retry.
+    }
+    if (attempt < TICKER_FETCH_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
   }
+  return { status: "error" };
 }
 
 /**
@@ -357,8 +400,12 @@ async function fetchRelatedTickers(
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
   const sym = symbol.toUpperCase();
-  const data = await fetchTicker(sym);
-  if (!data) {
+  const result = await fetchTicker(sym);
+  if (result.status !== "ok") {
+    // `missing` → the noindex "not in universe" stub is correct. `error`
+    // (transient) → the page body throws a 500 below, so this metadata is
+    // discarded by Next in favour of the error boundary's; the noindex stub
+    // is a harmless default either way and never gets attached to a 200.
     return {
       title: `${sym} — Not in Scanner Universe · Tapeline`,
       description: `${sym} is not currently in the Tapeline scanner universe. Browse covered tickers or explore the scoring methodology.`,
@@ -366,6 +413,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
       robots: { index: false, follow: true },
     };
   }
+  const data = result.data;
   const score = data.score?.toFixed(0) ?? "—";
   const signal = data.signal ?? "—";
   const why = data.reason ?? "Six-factor synthesis updated live.";
@@ -501,9 +549,18 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
 export default async function PublicTickerPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
   const sym = symbol.toUpperCase();
-  const data = await fetchTicker(sym);
+  const result = await fetchTicker(sym);
 
-  if (!data) notFound();
+  // Only a definitive backend 404 (symbol genuinely absent from the universe)
+  // renders Next's 404. A transient upstream failure must NOT 404 — that
+  // would let a momentary backend blip de-index a valid page. Throw instead:
+  // Next renders the branded error boundary and returns 500, which Google
+  // retries (keeping the URL indexed) rather than dropping like a 404.
+  if (result.status === "missing") notFound();
+  if (result.status === "error") {
+    throw new Error(`ticker_fetch_unavailable:${sym}`);
+  }
+  const data = result.data;
 
   // Related tickers + ticker-specific news fetched in parallel with the
   // main page render. Empty arrays gracefully hide their sections so a
