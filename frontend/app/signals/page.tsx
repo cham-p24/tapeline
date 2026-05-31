@@ -191,13 +191,16 @@ export default async function SignalsPage() {
             a glance and signals to crawlers that this is a data-rich page
             worth indexing. */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <CountTile label="High conviction" count={counts.high} tone="bg-up/15 text-up" />
-          <CountTile label="Strong setup" count={counts.strong} tone="bg-up/10 text-up/90" />
-          <CountTile label="Constructive" count={counts.constructive} tone="bg-accent/15 text-accent" />
-          <CountTile label="Neutral" count={counts.neutral} tone="bg-muted/20 text-muted" />
-          <CountTile label="Caution" count={counts.caution} tone="bg-warn/15 text-warn" />
-          <CountTile label="Weak" count={counts.weak} tone="bg-down/15 text-down" />
+          <CountTile label="High conviction" count={counts.high} tone="bg-up/15 text-up" href="/signal/high-conviction" />
+          <CountTile label="Strong setup" count={counts.strong} tone="bg-up/10 text-up/90" href="/signal/strong-setup" />
+          <CountTile label="Constructive" count={counts.constructive} tone="bg-accent/15 text-accent" href="/signal/constructive" />
+          <CountTile label="Neutral" count={counts.neutral} tone="bg-muted/20 text-muted" href="/signal/neutral" />
+          <CountTile label="Caution" count={counts.caution} tone="bg-warn/15 text-warn" href="/signal/caution" />
+          <CountTile label="Weak" count={counts.weak} tone="bg-down/15 text-down" href="/signal/weak" />
         </div>
+        <p className="mt-3 text-xs text-subtle">
+          Tap any tier to see every stock currently at that signal level, with the methodology behind the band.
+        </p>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-16">
@@ -367,15 +370,24 @@ function CountTile({
   label,
   count,
   tone,
+  href,
 }: {
   label: string;
   count: number;
   tone: string;
+  href: string;
 }) {
+  // Each tile links to its /signal/{slug} ranking page. This is the signal
+  // cluster's hub-link: /signals (in the main nav + footer) now feeds crawl
+  // equity down to all six per-signal-level pages, which were previously
+  // only reachable via the sitemap and sibling cross-links.
   return (
-    <div className={`rounded-md border border-border p-3 ${tone}`}>
+    <Link
+      href={href}
+      className={`block rounded-md border border-border p-3 transition-colors hover:border-accent/60 ${tone}`}
+    >
       <div className="text-xs uppercase tracking-wide opacity-80">{label}</div>
       <div className="mt-1 text-2xl font-bold nums">{count}</div>
-    </div>
+    </Link>
   );
 }
