@@ -48,10 +48,14 @@ settings = get_settings()
 PUBLIC_BASE = "https://tapeline.io"
 SITEMAP_URL = f"{PUBLIC_BASE}/sitemap.xml"
 
-# Concurrency cap on the audit HTTP fetches. 10 in-flight is a safe
-# default — covers Vercel's edge concurrency without thundering-herd on
-# the same origin.
-AUDIT_CONCURRENCY = 10
+# Concurrency cap on the audit HTTP fetches. Each /t/ HEAD triggers a Next.js
+# SSR render that calls /api/ticker on our own backend, so this number is also
+# the burst we inflict on the API's 30-connection DB pool. Lowered 10→4 after
+# the 2026-05-31 incident: even with /api/ticker no longer holding a connection
+# across its news fetch, a courteous background audit has no business running
+# more than a handful of concurrent origin fetches. Finishes ~1k URLs in a few
+# minutes — fine for a once-daily task.
+AUDIT_CONCURRENCY = 4
 
 # We treat any HTTP status outside this set as a problem. 200-299 = OK.
 # 3xx = redirect (still resolves, fine for SEO). 4xx/5xx = broken.

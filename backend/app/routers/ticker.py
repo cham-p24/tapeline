@@ -7,11 +7,13 @@ ticker page doesn't block on the upstream rating call.
 """
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.db import SessionLocal, get_session
 from app.models import NewsItem, SqueezeSetup, Ticker, User
 from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
@@ -21,40 +23,66 @@ from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
+# Hard cap on the per-request live news fetch. The fetch runs with NO pooled DB
+# connection held (see ticker_detail), so this bounds request/SSR latency only,
+# not pool safety — but it stops a slow upstream from stalling the page.
+NEWS_FETCH_TIMEOUT_S = 6.0
+
 
 @router.get("/{symbol}")
-async def ticker_detail(
-    symbol: str,
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Complete view of a single ticker — score breakdown, squeeze status, news."""
+async def ticker_detail(symbol: str) -> dict:
+    """Complete view of a single ticker — score breakdown, squeeze status, news.
+
+    Connection discipline (incident fix 2026-05-31): we deliberately do NOT
+    hold a pooled DB connection across the live news fetch. The
+    Benzinga→Massive→Finnhub chain can take several seconds, and parking one of
+    the 30 pool connections idle for that whole window is what let a burst of
+    cold-ticker requests — the daily SEO audit crawling ~1k /t/ pages, plus
+    Googlebot sweeping the sitemap — saturate the pool and 500 the entire API
+    (QueuePool checkout TimeoutError → metastable congestion collapse). The
+    request is now three phases:
+        1. short read txn: core ticker + squeeze   (connection released)
+        2. live news fetch with NO connection held  (hard-capped)
+        3. short write/read txn: dedupe-persist new rows, return latest 8
+    `expire_on_commit=False` (see app.db) keeps the ORM objects readable after
+    each `async with` closes, so building the payload outside the txn is safe.
+    """
     symbol = symbol.upper()
 
-    # Core ticker
-    result = await session.execute(select(Ticker).where(Ticker.symbol == symbol))
-    t = result.scalar_one_or_none()
-    if t is None:
-        raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+    # --- Phase 1: quick reads. Connection is checked out only for these two
+    # indexed point-lookups, then returned to the pool on context exit. ---
+    async with SessionLocal() as session:
+        t = (
+            await session.execute(select(Ticker).where(Ticker.symbol == symbol))
+        ).scalar_one_or_none()
+        if t is None:
+            raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+        sq = (
+            await session.execute(
+                select(SqueezeSetup).where(SqueezeSetup.symbol == symbol)
+            )
+        ).scalar_one_or_none()
 
-    # Squeeze setup if present
-    sq_result = await session.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == symbol))
-    sq = sq_result.scalar_one_or_none()
-
-    # News — ALWAYS live-fetch on every visit (Benzinga → Massive → Finnhub
-    # chain), persist any new articles, then return the latest 8 from DB.
-    #
-    # Previous version short-circuited on cache hit ("if not news_rows"),
-    # which meant tickers like BUR (UK ADR with 5 stale 2024 Massive
-    # articles cached) never re-fetched. Visitors saw 2-year-old news
-    # forever. The new flow:
-    #   1. Live fetch through the fallback chain (Benzinga first; falls
-    #      through to Finnhub which has fresh BUR/UK/international coverage).
-    #   2. Insert any unseen articles into NewsItem (id-deduped, per-row
-    #      try/except so one bad insert can't poison the rest).
-    #   3. SELECT the 8 most-recent — fresh articles rank above stale ones
-    #      naturally via ORDER BY published_at DESC.
+    # --- Phase 2: live news fetch with NO DB connection held (the whole point
+    # of the refactor). ALWAYS live-fetch (Benzinga → Massive → Finnhub) so
+    # stale-cached tickers like BUR re-fetch. Hard-capped via wait_for as
+    # defense-in-depth on top of the per-source timeouts; on timeout/failure we
+    # fall through to whatever the DB already has. ---
+    live: list[dict] = []
     try:
-        live = await fetch_news_for_ticker(symbol, limit=8)
+        live = await asyncio.wait_for(
+            fetch_news_for_ticker(symbol, limit=8), timeout=NEWS_FETCH_TIMEOUT_S
+        )
+    except Exception:
+        live = []
+
+    # --- Phase 3: quick write+read. Insert any unseen articles (id-deduped,
+    # per-row try/except so one bad row can't poison the rest), flush so they're
+    # visible to the SELECT, then return the 8 most-recent. No commit — mirrors
+    # the prior get_session (no-commit) semantics exactly; only the
+    # connection-hold window has shrunk from "across the fetch" to "DB ops
+    # only". ---
+    async with SessionLocal() as session:
         for it in live:
             try:
                 existing = await session.execute(
@@ -63,32 +91,35 @@ async def ticker_detail(
                 if existing.scalar_one_or_none() is None:
                     session.add(NewsItem(**it))
             except Exception:
-                # Don't let one bad row kill the request — log + continue.
                 pass
-        await session.flush()
-    except Exception:
-        # Live fetch failure isn't fatal — fall through to cached news.
-        # CRITICAL: roll the session back too. SQLAlchemy marks the
-        # session as dirty after a failed flush, and every subsequent
-        # query on the same session raises PendingRollbackError until we
-        # explicitly clear it. Without this rollback, a single oversized
-        # news URL or an upstream ReadTimeout cascades into a 500 for
-        # the entire ticker page request. (Was the 12-event Sentry
-        # PendingRollbackError storm — fixed defensively at the news
-        # builder layer in news_feed.clip_news_row, and again here so a
-        # future regression at the vendor level can't re-cascade.)
         try:
-            await session.rollback()
+            await session.flush()
         except Exception:
-            pass
-
-    news_result = await session.execute(
-        select(NewsItem)
-        .where(NewsItem.tickers.like(f"%{symbol}%"))
-        .order_by(desc(NewsItem.published_at))
-        .limit(8)
-    )
-    news_rows = news_result.scalars().all()
+            # A bad insert leaves the session in a needs-rollback state;
+            # clear it so the fallback SELECT still runs.
+            try:
+                await session.rollback()
+            except Exception:
+                pass
+        news_rows = (
+            await session.execute(
+                select(NewsItem)
+                .where(NewsItem.tickers.like(f"%{symbol}%"))
+                .order_by(desc(NewsItem.published_at))
+                .limit(8)
+            )
+        ).scalars().all()
+        news_payload = [
+            {
+                "id": n.id,
+                "title": n.title,
+                "publisher": n.publisher,
+                "published_at": n.published_at.isoformat() if hasattr(n.published_at, "isoformat") else str(n.published_at),
+                "url": n.url,
+                "sentiment": getattr(n, "sentiment", None),
+            }
+            for n in news_rows
+        ]
 
     return {
         "symbol": t.symbol,
@@ -121,17 +152,7 @@ async def ticker_detail(
             "suggested_window": sq.suggested_window,
             "reason": sq.reason,
         },
-        "news": [
-            {
-                "id": n.id,
-                "title": n.title,
-                "publisher": n.publisher,
-                "published_at": n.published_at.isoformat() if hasattr(n.published_at, "isoformat") else str(n.published_at),
-                "url": n.url,
-                "sentiment": getattr(n, "sentiment", None),
-            }
-            for n in news_rows
-        ],
+        "news": news_payload,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
     }
 
