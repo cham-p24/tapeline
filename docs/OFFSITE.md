@@ -14,6 +14,8 @@ This doc is the operational checklist for creating each of those off-site profil
 
 **Naming consistency rule:** every profile uses **"Tapeline"** as the display name and **`@tapeline_io`** as the handle where available. If a handle is taken, fall back to **`tapelineio`** (no underscore). Bio: same one-liner everywhere — *"Live quantitative stock scanner. Public 6-factor formula. Public scorecard. tapeline.io"*
 
+> **Paste-ready copy:** this doc says *where* to create each profile. For the exact field-by-field text to paste (taglines, descriptions, char-counted bios for Product Hunt / Crunchbase / G2 / Capterra / AlternativeTo / StockTwits) plus the launch press + backlink pitch (Show HN, Indie Hackers, cold-email template), see **[BRAND_SERP_KIT.md](./BRAND_SERP_KIT.md)**. All strings there are pulled verbatim from [/press](../frontend/app/press/page.tsx) so the entity stays consistent across every platform.
+
 ---
 
 ## Priority 1 — week 1 (foundational, ~3 hours total)
