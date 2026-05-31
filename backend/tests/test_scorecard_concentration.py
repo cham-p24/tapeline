@@ -116,9 +116,20 @@ async def test_sector_cap_enforced():
 
 
 @pytest.mark.asyncio
-async def test_macro_hostile_picks_skipped():
+async def test_macro_hostile_picks_skipped(monkeypatch):
     """Tickers with sub_macro < 30 (FALLING regime) should not appear in
-    the scorecard freeze even if their composite score is the highest."""
+    the scorecard freeze even if their composite score is the highest.
+
+    Force `_macro_gate_active()` → True so the gate fires in tests. In
+    prod the gate ties itself to `signal_sheet_csv_url` being set (so it
+    doesn't activate against polygon_feed's mock sub_macro), but the
+    test fixture sets sub_macro directly on Ticker rows, so we simulate
+    the sheet-configured environment.
+    """
+    monkeypatch.setattr(
+        "app.workers.signal_publisher._macro_gate_active",
+        lambda: True,
+    )
     today = _next_monday(dt.date.today() + dt.timedelta(days=14))  # offset so other test's date doesn't collide
 
     async with session_scope() as s:
