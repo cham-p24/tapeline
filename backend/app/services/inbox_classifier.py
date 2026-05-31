@@ -535,8 +535,8 @@ async def classify_async(
 
 
 __all__ = [
-    "ClassifiedMessage",
     "SYSTEM_PROMPT",
+    "ClassifiedMessage",
     "Tier",
     "classify",
     "classify_async",
