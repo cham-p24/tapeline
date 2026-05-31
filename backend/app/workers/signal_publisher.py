@@ -184,8 +184,19 @@ async def tick() -> None:
         except Exception:
             logger.exception("alerts.eval_failed")
 
-    # Snapshot today's top-10 for the public scorecard (once per day)
-    await _ensure_daily_scorecard(started.date())
+    # NB: _ensure_daily_scorecard(today) used to live here, immediately after
+    # the snapshot upserts. Codex (PR #226 review) flagged that ordering as
+    # racy in sheet-fed prod: fetch_snapshots() writes Ticker.sub_macro from
+    # polygon_feed (documented as mock for the macro factor), and only the
+    # sheet refresh further down rewrites sub_macro with the Tapeline
+    # composite's regime-derived score. Running the macro gate here would
+    # filter on the mock/stale value, so valid high-ranked picks could be
+    # nondeterministically excluded from the back-check.
+    #
+    # Fix: move the freeze AFTER the sheet refresh block so the gate reads
+    # the freshly-written Tapeline sub_macro. Freeze is idempotent (returns
+    # early if today's row already exists) so moving it later doesn't change
+    # the once-per-day semantics.
 
     # Refresh news feed: on first tick after boot + every ~5 minutes thereafter
     global _last_news_refresh, _last_backcheck
@@ -363,6 +374,13 @@ async def tick() -> None:
         except Exception:
             logger.exception("sheet_feed.tick_failed")
         _last_sheet_refresh = started
+
+    # Snapshot today's top-10 for the public scorecard (once per day).
+    # Runs AFTER the sheet refresh so the macro gate + concentration filter
+    # operate on the Tapeline composite's sub_macro / sector values, not
+    # the polygon_feed mock values that fetch_snapshots wrote earlier in
+    # this tick. Idempotent: returns early when today's row already exists.
+    await _ensure_daily_scorecard(started.date())
 
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
@@ -606,6 +624,39 @@ async def tick() -> None:
     )
 
 
+_MAX_PER_SECTOR = 3
+"""Concentration cap on the daily top-10. Without it the freeze frequently
+holds 5+ semiconductors or 5+ regional banks because the sheet ranks them
+all high in sympathy moves. They co-move next day, so a single hostile
+session for the cluster blows up the whole top-10's back-check. Capping
+at 3 per sector forces some diversification on the public record without
+hand-curating picks. Set to 0 to disable."""
+
+_MIN_MACRO_FOR_INCLUSION = 30.0
+"""Picks whose Tapeline sub_macro falls in the FALLING band (mapped to 25
+in services/score) are skipped from the top-10 freeze. We still keep the
+Ticker row in the DB and surface it on /scanner — this filter only
+governs which picks make the public scorecard, where a hostile-macro
+pick almost certainly fights the next-day tape regardless of how strong
+its other factors look."""
+
+
+def _macro_gate_active() -> bool:
+    """The macro gate only applies when Ticker.sub_macro is the Tapeline
+    composite's regime-derived value (set by sheet_feed.refresh_from_workbook).
+
+    Without the sheet, polygon_feed's fetch_snapshots writes a mock/random
+    value to sub_macro on every tick — gating on that would nondeterministically
+    drop valid high-ranked picks from the public scorecard. We tie the gate
+    to `signal_sheet_csv_url` being set: that's the env var that switches
+    sub_macro from mock to Tapeline-composite-derived.
+
+    In dev (no sheet URL), the gate is off and all top-10 candidates pass
+    the macro check. That's the right behaviour: dev runs against mock
+    data; the back-check isn't meaningful there anyway."""
+    return bool(get_settings().signal_sheet_csv_url)
+
+
 async def _run_daily_indexnow() -> None:
     """Detached daily IndexNow batch (spawned, never awaited, from tick()).
 
@@ -678,6 +729,13 @@ async def _ensure_daily_scorecard(today: date) -> None:
 
     Also skips tickers with a missing/zero price (bad upstream data) — a $0
     flag price would cause divide-by-zero when computing return.
+
+    Concentration controls (2026-06-01, fix 3 of SCORING_AUDIT_2026-06-01.md):
+    - At most _MAX_PER_SECTOR picks from any single sector
+    - Skip picks where sub_macro indicates FALLING regime (< _MIN_MACRO_FOR_INCLUSION)
+    These reduce next-day correlation in the top-10 and improve the
+    back-check's resilience to sector or regime shocks. Both are tunable
+    constants at the top of this module.
     """
     from app.services.scorecard_backcheck import is_trading_day
 
@@ -692,17 +750,59 @@ async def _ensure_daily_scorecard(today: date) -> None:
         )
         if existing.scalar_one_or_none() is not None:
             return
-        top = await session.execute(
-            select(Ticker).where(Ticker.score.isnot(None)).order_by(desc(Ticker.score)).limit(10)
+
+        # Pull a wider candidate pool (50) so the concentration filter has
+        # room to skip clustered picks without running out before reaching 10.
+        candidates = await session.execute(
+            select(Ticker).where(Ticker.score.isnot(None)).order_by(desc(Ticker.score)).limit(50)
         )
+
+        sector_counts: dict[str, int] = {}
+        skipped_zero_price = 0
+        skipped_macro_hostile = 0
+        skipped_sector_cap = 0
         rank = 0
-        for t in top.scalars().all():
+
+        for t in candidates.scalars().all():
+            if rank >= 10:
+                break
+
             if not t.price or t.price <= 0:
                 # Don't poison the public record with $0-price entries — these
                 # come from tier-restricted snapshot fields or partial fetches.
-                # Skipping reduces the day's count below 10; that's fine, the
-                # scorecard page renders whatever's there.
+                skipped_zero_price += 1
                 continue
+
+            # Macro gate: skip picks in a clearly hostile regime. sub_macro
+            # of None means "no signal" (don't filter); a value below the
+            # threshold means the Tapeline composite read the regime as
+            # FALLING / BEAR. Same pick is still on /scanner — it just
+            # doesn't get put on the public scorecard where it would drag
+            # the median alpha down on day 1.
+            #
+            # Only enforce the gate when the sheet feed is the source of
+            # truth — otherwise sub_macro is whatever polygon_feed's mock
+            # branch wrote (per the docstring on fetch_snapshots, the macro
+            # factor is still mock data) and gating on it would skip valid
+            # picks based on a random number. Codex flagged this on PR #226.
+            if (
+                _macro_gate_active()
+                and t.sub_macro is not None
+                and t.sub_macro < _MIN_MACRO_FOR_INCLUSION
+            ):
+                skipped_macro_hostile += 1
+                continue
+
+            # Sector concentration cap. Use the canonical sector field;
+            # tickers with NULL/unknown sectors fall into the "Unknown"
+            # bucket which gets its own cap (so we don't dump all unknowns
+            # into the top-10 either).
+            sector_key = (t.sector or "Unknown").strip()
+            if _MAX_PER_SECTOR > 0 and sector_counts.get(sector_key, 0) >= _MAX_PER_SECTOR:
+                skipped_sector_cap += 1
+                continue
+            sector_counts[sector_key] = sector_counts.get(sector_key, 0) + 1
+
             rank += 1
             session.add(DailyScorecardEntry(
                 as_of=today,
@@ -711,7 +811,14 @@ async def _ensure_daily_scorecard(today: date) -> None:
                 score_at_flag=t.score or 0,
                 price_at_flag=float(t.price),
             ))
-        logger.info("scorecard.snapshot saved for %s rows=%d", today, rank)
+
+        logger.info(
+            "scorecard.snapshot saved for %s rows=%d "
+            "skipped_zero_price=%d skipped_macro_hostile=%d skipped_sector_cap=%d "
+            "sector_mix=%s",
+            today, rank, skipped_zero_price, skipped_macro_hostile,
+            skipped_sector_cap, sector_counts,
+        )
 
 
 _news_cache_wiped: bool = False

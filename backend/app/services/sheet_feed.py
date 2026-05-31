@@ -396,7 +396,7 @@ async def upsert_tickers(
         # show 70 alongside a composite computed as if the factor were
         # 50 — the displayed numbers wouldn't add up. Writing None on
         # cache miss clears the stale value so the UI shows "—".
-        # (Codex review on PR #225 caught this; thanks.)
+        # (Codex review on PR #225 + PR #226 caught this; thanks.)
         for key in ("sub_trend", "sub_rs", "sub_fundamentals",
                     "sub_smart_money", "sub_macro", "sub_momentum"):
             setattr(t, key, r.get(key))

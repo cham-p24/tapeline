@@ -141,22 +141,47 @@ def sub_smart_money(symbol: str, get_sm: Any | None = None) -> float | None:
 # values; we normalise + map. Anything we don't recognise falls back to
 # SIDEWAYS (neutral) rather than producing None so we never accidentally
 # drop the macro factor entirely.
-_REGIME_TO_SCORE: dict[str, float] = {
-    "RISING":     75.0,
-    "BULL":       75.0,
-    "BULLISH":    75.0,
-    "FAVORABLE":  70.0,
-    "POSITIVE":   65.0,
-    "SIDEWAYS":   50.0,
-    "NEUTRAL":    50.0,
-    "MIXED":      50.0,
-    "RANGE":      50.0,
-    "FALLING":    25.0,
-    "BEAR":       25.0,
-    "BEARISH":    25.0,
-    "HOSTILE":    25.0,
-    "NEGATIVE":   30.0,
-}
+#
+# Split into NEGATIVE / POSITIVE / NEUTRAL lists (rather than a single dict)
+# because sub_macro does substring-matching for free-text phrases like
+# "BULL TREND" or "BULLISH (with caveat)" and order matters. If we iterated
+# a positive-first list, "UNFAVORABLE" would hit `"FAVORABLE" in "UNFAVORABLE"`
+# → 70.0 (positive) before any negative token had a chance to match. We
+# walk NEGATIVE first so polarity-reversing prefixes ("UN-", "NON-", "ANTI-")
+# resolve to the correct hostile score. Codex caught this on PR #226.
+_NEGATIVE_REGIME_TOKENS: list[tuple[str, float]] = [
+    ("UNFAVORABLE", 25.0),
+    ("FALLING",     25.0),
+    ("BEARISH",     25.0),
+    ("BEAR",        25.0),
+    ("HOSTILE",     25.0),
+    ("NEGATIVE",    30.0),
+]
+_POSITIVE_REGIME_TOKENS: list[tuple[str, float]] = [
+    ("RISING",      75.0),
+    ("BULLISH",     75.0),
+    ("BULL",        75.0),
+    ("FAVORABLE",   70.0),
+    ("POSITIVE",    65.0),
+]
+_NEUTRAL_REGIME_TOKENS: list[tuple[str, float]] = [
+    ("SIDEWAYS",    50.0),
+    ("NEUTRAL",     50.0),
+    ("MIXED",       50.0),
+    ("RANGE",       50.0),
+]
+
+# Direct-match dict used for the fast O(1) lookup when the sheet writes one
+# of the exact bare tokens. Built from the three lists above so adding a
+# token in one place updates both the substring scan AND the direct-match
+# table — keeps the two from drifting.
+_REGIME_TO_SCORE: dict[str, float] = dict(
+    [
+        *_NEGATIVE_REGIME_TOKENS,
+        *_POSITIVE_REGIME_TOKENS,
+        *_NEUTRAL_REGIME_TOKENS,
+    ]
+)
 
 
 def sub_macro(row: dict[str, Any]) -> float | None:
@@ -165,12 +190,19 @@ def sub_macro(row: dict[str, Any]) -> float | None:
     key = str(raw).strip().upper()
     if not key:
         return None
-    # Direct match
+    # Direct match (fast path: bare "RISING" / "BULL" / etc.)
     if key in _REGIME_TO_SCORE:
         return _REGIME_TO_SCORE[key]
     # Substring match — sheet sometimes writes phrases like "BULL TREND" or
-    # "BULLISH (with caveat)"
-    for token, value in _REGIME_TO_SCORE.items():
+    # "BULLISH (with caveat)". Walk NEGATIVE first so an "UN-" / "NON-"
+    # prefixed positive token doesn't outrank a hostile classification.
+    for token, value in _NEGATIVE_REGIME_TOKENS:
+        if token in key:
+            return value
+    for token, value in _POSITIVE_REGIME_TOKENS:
+        if token in key:
+            return value
+    for token, value in _NEUTRAL_REGIME_TOKENS:
         if token in key:
             return value
     return None
