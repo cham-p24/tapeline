@@ -381,11 +381,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)
-            via <div className="cf-turnstile">. The script self-discovers them. */}
+            via <div className="cf-turnstile">. The script self-discovers them.
+
+            strategy="lazyOnload" (not afterInteractive) on purpose: api.js
+            auto-injects an iframe into every SSR'd .cf-turnstile div the moment
+            it runs. Under afterInteractive on a fast connection it fired BEFORE
+            React finished hydrating the signup form's Suspense subtree, so React
+            hit an extra DOM child that wasn't in its vdom -> "Hydration failed,
+            tree regenerated on the client". lazyOnload defers the script to
+            browser idle (strictly after hydration), so the div is hydrated empty
+            -- matching the server -- and only then gets its widget. Same
+            self-discovery mechanism, just no race. */}
         {TURNSTILE_SITE_KEY && (
           <Script
             src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-            strategy="afterInteractive"
+            strategy="lazyOnload"
             async
             defer
           />
