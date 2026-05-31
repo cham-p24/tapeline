@@ -103,7 +103,7 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
 
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },
-    { name: "Signals", url: "https://tapeline.io/how-it-works" },
+    { name: "Signals", url: "https://tapeline.io/signals" },
     { name: signal.display, url },
   ]);
 
@@ -126,7 +126,22 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
       <MarketingNav />
 
       <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
-        <p className="eyebrow">Signal level</p>
+        {/* Visible breadcrumb — mirrors the BreadcrumbList JSON-LD */}
+        <nav aria-label="Breadcrumb" className="text-xs text-subtle">
+          <ol className="flex flex-wrap items-center gap-1.5">
+            <li>
+              <Link href="/" className="hover:text-accent">Tapeline</Link>
+            </li>
+            <li aria-hidden className="text-border">/</li>
+            <li>
+              <Link href="/signals" className="hover:text-accent">Signals</Link>
+            </li>
+            <li aria-hidden className="text-border">/</li>
+            <li className="text-muted">{signal.display}</li>
+          </ol>
+        </nav>
+
+        <p className="eyebrow mt-4">Signal level</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           <span className={`font-mono ${tierColor}`}>{signal.display}</span>{" "}
           <span className="text-muted">— stocks today</span>
