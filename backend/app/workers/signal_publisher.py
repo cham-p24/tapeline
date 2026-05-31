@@ -39,7 +39,7 @@ from app.services.mock_feed import (
 from app.services.news_feed import fetch_latest_news
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
-from app.services.scorecard_backcheck import backcheck_yesterday
+from app.services.scorecard_backcheck import backcheck_all_pending
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -207,8 +207,16 @@ async def tick() -> None:
             logger.exception("edgar.8k_tick_failed")
         _last_news_refresh = started
 
-    # Scorecard back-check: run once per day, within ~10 minutes of boot
-    if _last_backcheck is None:
+    # Scorecard back-check: drain the pending backlog on a real daily cadence.
+    # BUG FIX (2026-06-01): this was `if _last_backcheck is None`, which fired
+    # ONLY on the first tick after a worker reboot. On a stable deploy the
+    # worker doesn't reboot daily, so the back-check silently stopped and the
+    # public scorecard froze — 91 of 140 rows (every day after ~May 20) sat
+    # with no next-day price, so the headline stayed stuck on a stale 49-pick
+    # sample. Mirror the calendar-seed cadence below: re-run every 6h. The job
+    # itself now drains ALL pending dates (see _run_backcheck), so a day the
+    # worker happened to miss is retried on the next run instead of stranded.
+    if _last_backcheck is None or (started - _last_backcheck).total_seconds() >= 6 * 3600:
         await _run_backcheck()
         _last_backcheck = started
 
@@ -827,10 +835,20 @@ async def _refresh_watchlisted_news() -> None:
 
 
 async def _run_backcheck() -> None:
-    """Populate next-day performance on yesterday's scorecard entries."""
+    """Drain the scorecard back-check backlog.
+
+    Scores EVERY prior date that still has entries without a next-day price,
+    not just yesterday. This is what makes the job self-healing: if the worker
+    missed a day (reboot gap, transient feed outage, SPY window not yet
+    complete), those dates stay pending and get retried on the next run instead
+    of being stranded forever — which is exactly the failure that froze the
+    public scorecard on a stale 49-pick sample for ~10 days.
+    """
     async with session_scope() as session:
         try:
-            await backcheck_yesterday(session)
+            scored = await backcheck_all_pending(session)
+            if scored:
+                logger.info("scorecard.backcheck_scored total=%d", scored)
         except Exception:
             logger.exception("scorecard.backcheck_failed")
 

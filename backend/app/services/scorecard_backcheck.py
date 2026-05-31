@@ -217,3 +217,41 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
         target, next_day, scored, skipped_zero_flag, skipped_stale,
     )
     return scored
+
+
+async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> int:
+    """Drain the back-check backlog: score every prior date that still has
+    entries without a next-day price.
+
+    `backcheck_yesterday` only ever scores a single date (today-1 by default).
+    That is fine on a worker that reboots daily, but on a stable deploy any day
+    the single-date job didn't run is stranded forever — its rows keep
+    `price_next_day IS NULL` and nothing ever revisits them. This function
+    finds every distinct `as_of` that still has unscored rows and replays
+    `backcheck_yesterday(as_of_override=...)` for each, oldest first, so the
+    backlog self-heals on the next tick.
+
+    `max_dates` caps the work per run (each date is its own SPY + per-symbol
+    fetch) so a large backlog can't stall the worker loop; remaining dates are
+    picked up on subsequent runs. Dates whose next trading day hasn't happened
+    yet are skipped cheaply inside `backcheck_yesterday` (returns 0).
+    """
+    rows = await session.execute(
+        select(DailyScorecardEntry.as_of)
+        .where(DailyScorecardEntry.price_next_day.is_(None))
+        .group_by(DailyScorecardEntry.as_of)
+        .order_by(DailyScorecardEntry.as_of.asc())
+        .limit(max_dates)
+    )
+    pending_dates = [d for (d,) in rows.all()]
+    if not pending_dates:
+        return 0
+
+    total = 0
+    for d in pending_dates:
+        total += await backcheck_yesterday(session, as_of_override=d)
+    logger.info(
+        "backcheck.drain pending_dates=%d scored=%d",
+        len(pending_dates), total,
+    )
+    return total
