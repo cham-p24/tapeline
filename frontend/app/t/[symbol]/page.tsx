@@ -25,6 +25,26 @@ import {
   jsonLdScript,
   tickerReviewJsonLd,
 } from "@/lib/jsonld";
+import { SECTORS } from "@/app/sector/sectors";
+
+/**
+ * Map a backend sector string (GICS display, e.g. "Information Technology")
+ * to its /sector/[slug] hub URL. Returns null when the ticker's sector has
+ * no hub page — commodity ETFs (sector="Commodities"), "Unknown", or null —
+ * so callers fall back to the generic /signals all-tickers index.
+ *
+ * Why this matters for indexing: linking every /t/{TICKER} page UP to its
+ * sector hub (which in turn lists its constituents) builds the topical
+ * cluster crawl path Google uses to understand and accept deep pages. It's
+ * the structural complement to the editorial/news/related-ticker content
+ * depth — content makes a page worth indexing; cluster links make it
+ * discoverable as part of a coherent site section rather than an orphan.
+ */
+function sectorHubPath(sector: string | null): string | null {
+  if (!sector) return null;
+  const match = SECTORS.find((s) => s.api === sector);
+  return match ? `/sector/${match.slug}` : null;
+}
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -545,9 +565,19 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
     data.sector,
   );
   const url = `https://tapeline.io/t/${data.symbol}`;
+  // Sector-hub uplink. When the ticker's sector has a hub page, the
+  // breadcrumb parent is that hub (a real navigable cluster path:
+  // home → sector → ticker). Otherwise the parent is /signals — the
+  // public all-tickers index — which is a more accurate "all covered
+  // tickers" parent than /scorecard (the track-record page) ever was.
+  const sectorPath = sectorHubPath(data.sector);
+  const parentCrumb =
+    sectorPath && data.sector
+      ? { name: data.sector, url: `https://tapeline.io${sectorPath}` }
+      : { name: "All signals", url: "https://tapeline.io/signals" };
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },
-    { name: "Tickers", url: "https://tapeline.io/scorecard" },
+    parentCrumb,
     { name: `${data.symbol} (${data.name})`, url },
   ]);
   const review = tickerReviewJsonLd({
@@ -567,6 +597,23 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
+        {/* Visible breadcrumb — mirrors the BreadcrumbList JSON-LD (Google
+            requires the schema to reflect on-page content for the breadcrumb
+            rich result) AND gives every ticker page a real link up to its
+            sector hub, the topical-cluster crawl path that gets thin ticker
+            pages discovered + indexed. */}
+        <nav aria-label="Breadcrumb" className="mb-5 flex flex-wrap items-center gap-1.5 text-xs text-subtle">
+          <Link href="/" className="hover:text-fg">Tapeline</Link>
+          <span aria-hidden="true">/</span>
+          {sectorPath && data.sector ? (
+            <Link href={sectorPath} className="hover:text-fg">{data.sector}</Link>
+          ) : (
+            <Link href="/signals" className="hover:text-fg">All signals</Link>
+          )}
+          <span aria-hidden="true">/</span>
+          <span className="text-muted">{data.symbol}</span>
+        </nav>
+
         {/* Header row */}
         <div className="flex flex-wrap items-baseline justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -575,7 +622,14 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               <span className="text-sm sm:text-base text-muted truncate max-w-full">{data.name}</span>
             </div>
             <div className="mt-2 flex items-center gap-3 text-xs sm:text-sm text-muted">
-              {data.sector && <span>{data.sector}</span>}
+              {data.sector &&
+                (sectorPath ? (
+                  <Link href={sectorPath} className="hover:text-fg underline-offset-4 hover:underline">
+                    {data.sector}
+                  </Link>
+                ) : (
+                  <span>{data.sector}</span>
+                ))}
               {data.asset_class && <span className="text-subtle">·</span>}
               {data.asset_class && <span className="capitalize">{data.asset_class}</span>}
             </div>
