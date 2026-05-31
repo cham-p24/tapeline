@@ -9,8 +9,9 @@ Two consumers:
     current UTC day to enforce `INBOX_CLAUDE_DAILY_CAP_USD`. Once tripped,
     the classifier downgrades every ambiguous message to Tier 1 manual
     review (the safe default) until midnight UTC.
-  - Future `/api/admin/inbox/stats` reads this table to surface
-    tier-counts, cache-hit rates, p95 latency, and total spend trends.
+  - **`GET /api/inbox/stats`** (admin-only) reads this table to surface
+    tier-counts, cache-hit rates, p50/p95 latency, and today's spend vs cap.
+    Rendered as the chip strip + cap/dry-run banners atop `/app/inbox`.
 
 `input_hash` is a SHA-256 of the normalised body (lowercased,
 whitespace-collapsed). Lets the operator spot-check "did we give a

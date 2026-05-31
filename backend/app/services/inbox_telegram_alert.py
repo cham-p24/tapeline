@@ -1,15 +1,15 @@
 """Tier 1 inbox alerts via Telegram.
 
-When the classifier lands on Tier 1 (high-value inbound that needs
-founder voice), this module dispatches a notification to the
-founder's Telegram chat_id with the message preview + (Phase B+: a
-suggested reply from the LLM) so they can approve/edit/reject from
-their phone in seconds.
+When the classifier lands on Tier 1 (high-value inbound that needs founder
+voice), this module sends a notification card to the founder's Telegram
+chat_id: the message preview, the LLM's suggested reply, and an inline
+keyboard (✅ Approve & send / ❌ Reject / ✏️ Edit in browser). The founder
+approves, rejects, or edits from their phone in seconds.
 
-Phase B (this file) ships the alert side only — the message is
-delivered to Telegram with a preview but no inline approval buttons.
-Phase D will add the bot's reply-handler that processes
-/approve_<id> / /edit_<id> / /reject_<id> commands.
+Button taps post `callback_data="inbox:<action>:<id>"` to the Telegram
+webhook, which dispatches them via `routers/inbox.process_telegram_update`
+(reached through the unified webhook in routers/telegram.py — Telegram
+allows only one webhook URL per bot, so the inbox callbacks ride in there).
 
 No-op when:
   - INBOX_FOUNDER_TELEGRAM_CHAT_ID env var isn't set (dev / local)
@@ -56,7 +56,7 @@ async def alert_founder(message: InboundMessage) -> bool:
     Approve/Reject buttons. Returns True on successful send.
 
     Buttons send `callback_data="inbox:<action>:<id>"` payloads that the
-    webhook handler in `routers/inbox.telegram_update` processes."""
+    Telegram webhook dispatches via `routers/inbox.process_telegram_update`."""
     chat_id = settings.inbox_founder_telegram_chat_id
     if not chat_id:
         logger.info(

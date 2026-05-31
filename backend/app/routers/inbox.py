@@ -1,18 +1,22 @@
-"""Inbox auto-handler — channel ingress endpoints.
+"""Inbox auto-handler — channel ingress + founder admin endpoints.
 
-Receives inbound messages from external channels and routes them
-through `services/inbox_router.handle_inbound()`. The router
-classifies, persists, and (for Tier 2) renders an auto-reply.
+Receives inbound messages from external channels and routes them through
+`services/inbox_router.handle_inbound()`, which classifies, persists, and
+(for Tier 2) renders an auto-reply.
 
-Phase B endpoints (this file):
-  - POST /api/inbox/email — Resend inbound webhook
+Endpoints:
+  - POST /api/inbox/email           — Resend inbound webhook (Svix-signed)
+  - GET  /api/inbox                 — admin list view (founder-only)
+  - GET  /api/inbox/stats           — observability (spend / queue / latency)
+  - POST /api/inbox/{id}/approve    — founder approval; sends synchronously
+  - POST /api/inbox/{id}/reject     — founder rejection (terminal)
+  - POST /api/inbox/telegram-update — direct Telegram webhook (see the note
+                                      on process_telegram_update — the live
+                                      path is the unified webhook in
+                                      routers/telegram.py)
 
-Phases C/D will add:
-  - POST /api/inbox/reddit  (PRAW poller is internal, but the
-    /admin/inbox surface uses this router for re-trigger)
-  - POST /api/inbox/telegram (webhook from Telegram bot)
-  - GET  /api/inbox          (admin list view)
-  - POST /api/inbox/{id}/approve  (founder approval action)
+Reddit ingress is NOT an HTTP endpoint — it's the internal PRAW poller in
+`services/reddit_inbox.py`, driven by the worker tick.
 """
 from __future__ import annotations
 
@@ -139,40 +143,52 @@ async def email_inbound(
         }
 
     # Tier 2 with rendered template → auto-send the reply email.
+    # handle_inbound already optimistically set status='auto_replied'; we
+    # only flip it to 'sent' once Resend actually accepts the message.
     if result.tier == 2 and result.auto_reply_text:
         try:
-            await email_service.send_email(
+            res = await email_service.send_email(
                 to=sender,
                 subject=f"Re: {subject or 'your message'}",
                 html=_text_to_html(result.auto_reply_text),
                 text=result.auto_reply_text,
                 persona="default",
             )
-            await mark_sent(session, result.message.id, when=datetime.now(UTC))
-            await session.commit()
-            logger.info(
-                "inbox.email.auto_replied to=%s tier=2 template=%s msg_id=%d",
-                sender, "ticker_score/pricing/trial/thanks", result.message.id,
-            )
-            return {
-                "ok": True,
-                "auto_replied": True,
-                "tier": 2,
-                "message_id": result.message.id,
-            }
         except Exception as e:
             logger.exception("inbox.email.send_failed err=%s", e)
-            # Leave the message in 'auto_replied' status; the next
-            # worker tick (Phase F) will retry. Commit the insert so
-            # we don't reclassify on the next webhook retry.
+            # No background retry exists. Leave the row at 'auto_replied'
+            # (drafted but not delivered) and commit the insert so a Resend
+            # webhook redelivery no-ops on idempotency instead of
+            # reclassifying. The founder can resend from /app/inbox.
             await session.commit()
             return {
-                "ok": True,
-                "auto_replied": False,
-                "send_failed": True,
-                "tier": 2,
-                "message_id": result.message.id,
+                "ok": True, "auto_replied": False, "send_failed": True,
+                "tier": 2, "message_id": result.message.id,
             }
+
+        if res.get("skipped"):
+            # No API key / undeliverable address — nothing went out, so don't
+            # record it as sent. Leave at 'auto_replied' for manual follow-up.
+            logger.warning(
+                "inbox.email.auto_reply_skipped reason=%s msg_id=%d",
+                res.get("reason"), result.message.id,
+            )
+            await session.commit()
+            return {
+                "ok": True, "auto_replied": False, "skipped": res.get("reason"),
+                "tier": 2, "message_id": result.message.id,
+            }
+
+        await mark_sent(session, result.message.id, when=datetime.now(UTC))
+        await session.commit()
+        logger.info(
+            "inbox.email.auto_replied to=%s tier=2 msg_id=%d",
+            sender, result.message.id,
+        )
+        return {
+            "ok": True, "auto_replied": True, "tier": 2,
+            "message_id": result.message.id,
+        }
 
     # Tier 1 → route to founder via Telegram. Best-effort: failure
     # leaves the message in 'classified' status; the founder will see
@@ -418,8 +434,13 @@ async def _approve_core(
     reply_text: str | None,
 ) -> dict[str, Any]:
     """Shared approve logic — used by both the web UI endpoint and the
-    Telegram bot callback handler. Returns a dict the caller can
-    forward as JSON / log / format."""
+    Telegram bot callback handler. Sends the reply synchronously on the
+    message's own channel, then marks it 'sent'. Returns a dict the
+    caller can forward as JSON / log / format.
+
+    On a send failure (or a skipped email) the row is left at
+    status='approved', NOT 'sent' — so re-approving from the UI or
+    Telegram simply retries delivery. There is no background drain."""
     row = (await session.execute(
         select(InboundMessage).where(InboundMessage.id == message_id)
     )).scalar_one_or_none()
@@ -435,31 +456,42 @@ async def _approve_core(
     row.suggested_reply = final_reply
     row.status = "approved"
 
-    if row.channel == "email":
-        try:
-            await email_service.send_email(
+    # Deliver synchronously on the inbound channel. Each branch returns a
+    # failure dict (leaving status='approved' for a retry) or falls through
+    # to mark_sent on success. Routing mirrors inbox_router.send_tier_1_5_ack.
+    try:
+        if row.channel == "email":
+            res = await email_service.send_email(
                 to=row.author,
                 subject=f"Re: {row.subject or 'your message'}",
                 html=_text_to_html(final_reply),
                 text=final_reply,
                 persona="default",
             )
-        except Exception as e:
-            logger.exception("inbox.approve.email_send_failed id=%d err=%s", row.id, e)
+            if res.get("skipped"):
+                await session.commit()
+                return {
+                    "ok": False, "error": "send_skipped",
+                    "reason": res.get("reason"), "id": row.id,
+                }
+        elif row.channel in ("reddit_comment", "reddit_dm"):
+            from app.services.reddit_inbox import send_reddit_reply
+            ok = await send_reddit_reply(row, final_reply)
+            if not ok:
+                await session.commit()
+                return {"ok": False, "error": "send_failed", "id": row.id, "channel": row.channel}
+        elif row.channel == "telegram":
+            ok = await telegram_service.send_message(row.author, final_reply)
+            if not ok:
+                await session.commit()
+                return {"ok": False, "error": "send_failed", "id": row.id, "channel": row.channel}
+        else:
             await session.commit()
-            return {"ok": False, "error": "send_failed", "id": row.id}
-    else:
-        # Reddit / Telegram channels — adapters defer to phase-specific
-        # workers. Mark approved and return; the channel's own poller
-        # will pick up 'approved' rows and try to send on next tick.
+            return {"ok": False, "error": "unsupported_channel", "channel": row.channel, "id": row.id}
+    except Exception as e:
+        logger.exception("inbox.approve.send_failed id=%d channel=%s err=%s", row.id, row.channel, e)
         await session.commit()
-        return {
-            "ok": True,
-            "id": row.id,
-            "status": row.status,
-            "deferred_send": True,
-            "reason": f"Channel '{row.channel}' adapter not yet wired",
-        }
+        return {"ok": False, "error": "send_failed", "id": row.id, "channel": row.channel}
 
     await mark_sent(session, row.id, when=datetime.now(UTC))
     await session.commit()
@@ -541,35 +573,30 @@ async def reject_message(
     return result
 
 
-# --- Telegram bot webhook (Phase D-bot) ------------------------------------
+# --- Telegram bot webhook dispatch -----------------------------------------
 
-@router.post("/telegram-update")
-async def telegram_update(
-    request: Request,
-    secret_header: str | None = Header(None, alias="x-telegram-bot-api-secret-token"),
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    """Telegram bot webhook. Set via setWebhook with the same secret
-    string in `TELEGRAM_WEBHOOK_SECRET` env var.
+async def process_telegram_update(
+    payload: dict[str, Any],
+    session: AsyncSession,
+) -> dict[str, Any] | None:
+    """Dispatch a Telegram update to the inbox approve/reject logic.
 
-    Handles two kinds of update:
-      1. `callback_query` — founder tapped an inline-keyboard button
-         on a Tier 1 alert card. Payload like:
-           callback_data = "inbox:approve:42"  or  "inbox:reject:42"
-      2. `message` with text starting `/approve_<id>` / `/reject_<id>`
-         — fallback for command-typing.
+    Returns a result dict when the update WAS an inbox action — an inline
+    button tap (`callback_data="inbox:approve:42"` / `"inbox:reject:42"`)
+    or a founder `/approve_<id>` / `/reject_<id>` command — or None when it
+    wasn't, letting the caller fall through to its own handling (the
+    `/start` account-link flow in routers/telegram.py).
 
-    Only the founder's chat_id (INBOX_FOUNDER_TELEGRAM_CHAT_ID) is
-    permitted to trigger actions. Everyone else gets a polite reply
-    pointing them at tapeline.io.
+    Telegram delivers updates to only ONE webhook URL per bot, so this is
+    invoked from the single registered webhook (routers/telegram.py)
+    rather than being reachable on its own path. The CALLER is responsible
+    for verifying the request actually came from Telegram (path or header
+    secret); this function performs no auth itself.
+
+    Only the founder's chat_id (`INBOX_FOUNDER_TELEGRAM_CHAT_ID`) may
+    trigger actions. Non-founder messages return None (so they still get
+    the link-flow reply); non-founder button taps are acked but no-op'd.
     """
-    # Verify the request came from Telegram (the secret header is set
-    # by Telegram when we register the webhook with `secret_token`).
-    expected_secret = settings.telegram_webhook_secret
-    if expected_secret and secret_header != expected_secret:
-        raise HTTPException(401, "Invalid Telegram webhook secret")
-
-    payload = await request.json()
     founder_chat_id = settings.inbox_founder_telegram_chat_id
 
     # --- Callback query (inline-button tap) ---
@@ -606,12 +633,8 @@ async def telegram_update(
         if action == "approve":
             result = await _approve_core(session, msg_id, reply_text=None)
             if result.get("ok"):
-                if result.get("deferred_send"):
-                    ack = "Approved — channel adapter pending"
-                    edit_text = f"✅ <b>Approved (deferred)</b>\n\nMessage #{msg_id} — channel adapter not yet wired; will send on next worker tick."
-                else:
-                    ack = "Sent ✓"
-                    edit_text = f"✅ <b>Sent</b>\n\nMessage #{msg_id} delivered."
+                ack = "Sent ✓"
+                edit_text = f"✅ <b>Sent</b>\n\nMessage #{msg_id} delivered."
             else:
                 ack = f"Failed: {result.get('error', 'unknown')}"
                 edit_text = f"⚠️ <b>Approve failed</b>\n\nMessage #{msg_id}: {result.get('error')}"
@@ -637,23 +660,21 @@ async def telegram_update(
         return {"ok": True, "action": action, "msg_id": msg_id, "result": result}
 
     # --- Message (text command) ---
+    # Only claim founder /approve_<id> & /reject_<id> commands. Everything
+    # else — including /start <token> account-linking and stray DMs —
+    # returns None so the caller's link-flow handles it.
     message = payload.get("message")
     if message:
         text = (message.get("text") or "").strip()
         from_chat_id = str((message.get("from") or {}).get("id") or "")
         if founder_chat_id and from_chat_id != founder_chat_id:
-            # Don't action anything; non-founders fall through silently
-            # so they don't get a noisy "unauthorised" reply on every
-            # accidental DM to the bot.
-            return {"ok": True, "ignored": "non_founder_message"}
+            return None
 
-        # Match /approve_42 or /reject_42 (Telegram lower-cases the
-        # leading slash but we accept either case for the underscore-
-        # suffixed id form too).
+        # Match /approve_42 or /reject_42.
         import re as _re
         m = _re.match(r"^/(approve|reject)_(\d+)\b", text)
         if not m:
-            return {"ok": True, "ignored": "unmatched_command"}
+            return None
 
         action, msg_id = m.group(1), int(m.group(2))
         if action == "approve":
@@ -667,7 +688,30 @@ async def telegram_update(
         )
         return {"ok": True, "via": "command", "result": result}
 
-    return {"ok": True, "ignored": "no_callback_or_message"}
+    return None
+
+
+@router.post("/telegram-update")
+async def telegram_update(
+    request: Request,
+    secret_header: str | None = Header(None, alias="x-telegram-bot-api-secret-token"),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Direct Telegram webhook endpoint (header-secret gated).
+
+    NOTE: in production Telegram points at the single unified webhook in
+    routers/telegram.py (`/api/telegram/webhook/{secret}`), which calls
+    `process_telegram_update()` for us — Telegram supports only one
+    webhook URL per bot. This endpoint is retained for direct/manual
+    testing and as a fallback if the webhook is ever pointed here.
+    """
+    expected_secret = settings.telegram_webhook_secret
+    if expected_secret and secret_header != expected_secret:
+        raise HTTPException(401, "Invalid Telegram webhook secret")
+
+    payload = await request.json()
+    result = await process_telegram_update(payload, session)
+    return result if result is not None else {"ok": True, "ignored": "no_inbox_action"}
 
 
 # --- helpers ----------------------------------------------------------------

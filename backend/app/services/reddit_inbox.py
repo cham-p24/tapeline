@@ -150,6 +150,32 @@ async def _under_new_account_throttle(session: AsyncSession) -> bool:
 # ── Outbound adapter ────────────────────────────────────────────────────────
 
 
+def _reddit_reply_target(channel: str, channel_msg_id: str | None) -> tuple[str, str]:
+    """Decide how to reply to a Reddit item. Routes by Reddit fullname
+    prefix FIRST (t1_=comment, t3_=submission, t4_=message), falling
+    back to the channel hint only when no recognisable prefix is present.
+
+    Returns ``(kind, bare_id)`` where ``kind`` ∈ {comment, submission, dm}
+    and ``bare_id`` is the id with any ``tN_`` prefix stripped.
+
+    Prefix MUST win over channel: mentions are stored under
+    ``channel='reddit_comment'`` but their fullname is a ``t3_``
+    submission. Routing purely on channel would call ``client.comment()``
+    on a submission id, which fails silently.
+    """
+    raw = channel_msg_id or ""
+    if raw.startswith("t4_"):
+        return "dm", raw[3:]
+    if raw.startswith("t3_"):
+        return "submission", raw[3:]
+    if raw.startswith("t1_"):
+        return "comment", raw[3:]
+    # No recognisable prefix — fall back to the channel hint.
+    if channel == "reddit_dm":
+        return "dm", raw
+    return "comment", raw
+
+
 async def send_reddit_reply(message: InboundMessage, body: str) -> bool:
     """Outbound adapter — post `body` as a reply on Reddit. Honours the
     new-account throttle + channel kill switch + dry-run mode. Routes by
@@ -187,14 +213,11 @@ async def send_reddit_reply(message: InboundMessage, body: str) -> bool:
             )
             return False
 
-    raw_id = message.channel_msg_id
+    kind, bare = _reddit_reply_target(message.channel, message.channel_msg_id)
     try:
-        if message.channel == "reddit_comment":
-            bare = raw_id[3:] if raw_id.startswith("t1_") else raw_id
-
+        if kind == "comment":
             def _post_comment_reply():
-                comment = client.comment(id=bare)
-                reply = comment.reply(body)
+                reply = client.comment(id=bare).reply(body)
                 return f"t1_{reply.id}" if reply else None
 
             upstream_id = await asyncio.to_thread(_post_comment_reply)
@@ -202,25 +225,29 @@ async def send_reddit_reply(message: InboundMessage, body: str) -> bool:
                 "inbox.reddit.comment_reply_sent msg_id=%d upstream=%s",
                 message.id, upstream_id,
             )
-        elif message.channel == "reddit_dm":
-            bare = raw_id[3:] if raw_id.startswith("t4_") else raw_id
+        elif kind == "submission":
+            # Mentions are stored as reddit_comment but carry a t3_
+            # (submission) fullname — reply via the submission accessor,
+            # not client.comment(), or PRAW silently no-ops on a bad id.
+            def _post_submission_reply():
+                reply = client.submission(id=bare).reply(body)
+                return f"t1_{reply.id}" if reply else None
 
+            upstream_id = await asyncio.to_thread(_post_submission_reply)
+            logger.info(
+                "inbox.reddit.submission_reply_sent msg_id=%d upstream=%s",
+                message.id, upstream_id,
+            )
+        else:  # "dm"
             def _post_dm_reply():
-                msg = client.inbox.message(bare)
-                msg.reply(body)
+                client.inbox.message(bare).reply(body)
 
             await asyncio.to_thread(_post_dm_reply)
             logger.info("inbox.reddit.dm_reply_sent msg_id=%d", message.id)
-        else:
-            logger.warning(
-                "inbox.reddit.unsupported_channel msg_id=%d channel=%s",
-                message.id, message.channel,
-            )
-            return False
     except Exception:
         logger.exception(
-            "inbox.reddit.send_failed channel=%s msg_id=%s",
-            message.channel, message.channel_msg_id,
+            "inbox.reddit.send_failed channel=%s msg_id=%s kind=%s",
+            message.channel, message.channel_msg_id, kind,
         )
         return False
 
@@ -297,11 +324,19 @@ async def _dispatch_inbound(
     body: str,
     received_at: datetime,
     subject: str | None = None,
+    allow_auto_reply: bool = True,
 ) -> int | None:
     """Push one Reddit item through the canonical dispatcher + handle
     its tier-appropriate side effect (auto-reply for Tier 2, alert for
     Tier 1). Returns the InboundMessage id on first-insert, None if it
-    was a replay or hit a downstream failure."""
+    was a replay or hit a downstream failure.
+
+    `allow_auto_reply=False` (used for subreddit MENTIONS) suppresses every
+    automated outbound comment — no Tier 2 template, no Tier 1.5 ack — and
+    instead routes the message to the founder for manual approval. We were
+    not addressed in a mention thread, so auto-commenting there is both
+    nonsensical and a fast track to a spam ban on a low-karma account.
+    """
     result = await handle_inbound(
         session,
         channel=channel,  # type: ignore[arg-type]
@@ -317,16 +352,26 @@ async def _dispatch_inbound(
         return None
 
     if result.tier == 2 and result.auto_reply_text:
-        ok = await send_reddit_reply(result.message, result.auto_reply_text)
-        if ok:
-            await mark_sent(session, result.message.id, when=datetime.now(UTC))
+        if allow_auto_reply:
+            ok = await send_reddit_reply(result.message, result.auto_reply_text)
+            if ok:
+                await mark_sent(session, result.message.id, when=datetime.now(UTC))
+                await session.commit()
+        else:
+            # Mention: keep the drafted reply as a suggestion but flip back
+            # to 'classified' so it surfaces in the founder's pending queue,
+            # then alert. The founder approves → it sends as a submission reply.
+            result.message.status = "classified"
             await session.commit()
+            await alert_founder(result.message)
     elif result.tier == 1:
         # Fire the immediate auto-ack FIRST (sender feedback within seconds),
         # then the founder alert. Both are best-effort — failure leaves the
-        # message at status='classified' for /app/inbox manual review.
+        # message at status='classified' for /app/inbox manual review. The
+        # ack is itself an outbound comment, so mentions skip it.
         from app.services.inbox_router import send_tier_1_5_ack
-        await send_tier_1_5_ack(result.message)
+        if allow_auto_reply:
+            await send_tier_1_5_ack(result.message)
         await alert_founder(result.message)
 
     return result.message.id
@@ -491,8 +536,11 @@ async def _poll_mentions(
             body = f"{title}\n\n{selftext}".strip()
 
             # Note: stored as reddit_comment (not a new mention channel)
-            # so the adapter routing + state machine work without
-            # extending the Channel literal in inbox_router.
+            # so the state machine works without extending the Channel
+            # literal. The t3_ fullname routes to a submission reply via
+            # _reddit_reply_target. allow_auto_reply=False means we never
+            # auto-comment into a thread we weren't addressed in — the
+            # founder approves manually from /app/inbox or Telegram.
             inserted = await _dispatch_inbound(
                 session,
                 channel="reddit_comment",
@@ -501,6 +549,7 @@ async def _poll_mentions(
                 subject=title or None,
                 body=body,
                 received_at=received_at,
+                allow_auto_reply=False,
             )
             if inserted is not None:
                 n += 1

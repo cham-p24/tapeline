@@ -260,15 +260,21 @@ For Tier 2 set suggested_reply to null — the bot will fill from a template. Fo
 """
 
 # Token costs ($ per million tokens) per Anthropic model. Used to compute
-# `cost_usd` for the classification log + the daily cap. Conservative
-# fallback (Sonnet pricing) when a model isn't listed — better to over-
-# estimate spend than under-estimate it.
+# `cost_usd` for the classification log + the daily cap. The lookup key is
+# the *configured* model string (settings.inbox_claude_model), not the
+# model the API echoes back, so both the alias and the dated snapshot a
+# founder might pin INBOX_CLAUDE_MODEL to need an entry — otherwise the
+# dated form falls through to the Sonnet fallback and ~3x over-bills the cap.
+# Conservative fallback (Sonnet pricing) for an unlisted model: fine for
+# Haiku/Sonnet-class overrides (over-estimates), but would under-estimate an
+# Opus-class override — add an explicit row before pointing the bot at Opus.
 #
 # Format: model_name -> (input_per_mtok, output_per_mtok, cache_read_per_mtok)
 _MODEL_COSTS_USD_PER_MTOK: dict[str, tuple[float, float, float]] = {
-    "claude-haiku-4-5":   (1.00,  5.00,  0.10),
-    "claude-sonnet-4-5":  (3.00, 15.00,  0.30),
-    "claude-opus-4-5":   (15.00, 75.00,  1.50),
+    "claude-haiku-4-5":            (1.00,  5.00,  0.10),
+    "claude-haiku-4-5-20251001":   (1.00,  5.00,  0.10),  # dated snapshot alias
+    "claude-sonnet-4-5":           (3.00, 15.00,  0.30),
+    "claude-opus-4-5":            (15.00, 75.00,  1.50),
 }
 
 _DEFAULT_COST = _MODEL_COSTS_USD_PER_MTOK["claude-sonnet-4-5"]
