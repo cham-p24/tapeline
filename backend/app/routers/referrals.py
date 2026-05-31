@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -50,4 +50,86 @@ async def my_referral_stats(
             }
             for u in referred[:20]
         ],
+    }
+
+
+def _mask_referrer(u: User | None, *, is_caller: bool) -> str:
+    """Privacy-preserving label for a leaderboard row.
+
+    The caller always sees themselves as "You". Everyone else is masked —
+    "Sam P." when a full name is on file, first name alone when it's a single
+    token, otherwise a masked email local-part (mirrors the /me endpoint's
+    masking). Never exposes a full name or address to another user.
+    """
+    if is_caller:
+        return "You"
+    if u is None:
+        return "A Tapeline user"
+    name = (u.name or "").strip()
+    if name:
+        parts = name.split()
+        if len(parts) >= 2 and parts[-1]:
+            return f"{parts[0]} {parts[-1][0]}."
+        return parts[0]
+    local = u.email.split("@")[0] if u.email else ""
+    return (local[:2] + "***") if local else "A Tapeline user"
+
+
+@router.get("/leaderboard")
+async def referral_leaderboard(
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Top referrers by confirmed signups — privacy-preserving social proof.
+
+    Returns the top 10 (masked) plus the caller's own rank and count even when
+    they're outside the top 10, so the page can always render "you're #N".
+    Open to every logged-in user — referrals aren't tier-gated.
+    """
+    rows = (
+        await session.execute(
+            select(User.referred_by, func.count().label("n"))
+            .where(User.referred_by.is_not(None))
+            .group_by(User.referred_by)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    ranked = [(rid, n) for rid, n in rows if rid]
+    if not ranked:
+        return {
+            "leaderboard": [],
+            "your_rank": None,
+            "your_signups": 0,
+            "total_referrers": 0,
+        }
+
+    top = ranked[:10]
+    needed_ids = {rid for rid, _ in top} | {user.id}
+    resolved = (
+        await session.execute(select(User).where(User.id.in_(list(needed_ids))))
+    ).scalars().all()
+    users_by_id = {u.id: u for u in resolved}
+
+    leaderboard = [
+        {
+            "rank": i,
+            "display": _mask_referrer(users_by_id.get(rid), is_caller=(rid == user.id)),
+            "is_you": rid == user.id,
+            "signups": n,
+        }
+        for i, (rid, n) in enumerate(top, start=1)
+    ]
+
+    your_rank: int | None = None
+    your_signups = 0
+    for i, (rid, n) in enumerate(ranked, start=1):
+        if rid == user.id:
+            your_rank, your_signups = i, n
+            break
+
+    return {
+        "leaderboard": leaderboard,
+        "your_rank": your_rank,
+        "your_signups": your_signups,
+        "total_referrers": len(ranked),
     }

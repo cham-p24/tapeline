@@ -395,6 +395,57 @@ def render_referral_referrer_email(
     )
 
 
+# Referral milestones (lever #5). The per-signup referrer email above reinforces
+# the FIRST referral, so the celebratory milestone series starts at 3 to avoid
+# double-emailing on signup #1. 12 confirmed signups == a free YEAR of Premium
+# (one free month each), which is the recurring headline.
+_REFERRAL_MILESTONES: tuple[int, ...] = (3, 5, 10, 25)
+
+
+def render_referral_milestone_email(
+    user_name: str, *, milestone: int, total_signups: int,
+) -> str:
+    """Celebratory note when a user crosses a referral-count milestone.
+
+    Reports the free months they've banked (one per confirmed signup) and
+    nudges toward the "refer 12, get a free year" headline. Treated like the
+    per-signup referrer email — it reports reward state the user earned by
+    referring — so it's transactional: persona "default", no List-Unsubscribe,
+    not gated by email_prefs.
+    """
+    plural = "friend" if total_signups == 1 else "friends"
+    months = f"{total_signups} month" + ("" if total_signups == 1 else "s")
+    to_free_year = 12 - total_signups
+    if to_free_year > 0:
+        next_line = (
+            f"You're <strong>{to_free_year}</strong> away from a free year of "
+            f"Premium — every signup is another month on the house."
+        )
+    else:
+        next_line = (
+            "You've now banked more than a free year of Premium. Every extra "
+            "signup keeps the credits stacking."
+        )
+    return shell(
+        h1(f"{total_signups} {plural} in — nice work, {user_name}.")
+        + lead(
+            f"Your referral link just crossed <strong>{milestone}</strong> "
+            f"signups. Each one credited you a free month of Premium."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Free months earned</div>'
+            f'<div style="margin-top:6px;font-family:{FONT_MONO};font-size:26px;font-weight:700;color:{SIG_BULL};">{months}</div>'
+            f'<div class="tl-muted" style="margin-top:6px;color:{LIGHT_MUTED};font-size:13px;font-family:{FONT_SANS};">{next_line}</div>',
+            accent=True,
+        )
+        + button("See your referral page", "https://tapeline.io/app/referrals")
+        + muted_paragraph(
+            "Credits auto-redeem at your next checkout — no code to enter."
+        ),
+        preheader=f"{total_signups} referrals and counting — your free months are stacking up.",
+    )
+
+
 # ── Trial drip ──────────────────────────────────────────────────────────────
 
 def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str:
@@ -1316,6 +1367,40 @@ def render_annual_upgrade_email(user_name: str, *, tier: str) -> str:
         )
         + footnote("Staying monthly is completely fine too — no change needed. — Christian, founder."),
         preheader=f"Switch to annual and save {pitch['savings']} a year on {pitch['label']}.",
+    )
+
+
+# ── Founder-touch (lever #4: personal hello to high-value, engaged users) ────
+
+def render_founder_touch_email(user_name: str) -> str:
+    """Personal founder note to a high-value, engaged early user.
+
+    Sent ~5-7 days after signup to someone on a trial-Premium or paid plan who
+    has actually started using Tapeline (≥1 watchlist ticker) — the cohort
+    worth a real 1:1 hello, not a cold blast. Deliberately plain: no stat card,
+    no marketing button, just a short note that invites a reply. Persona
+    "sales" (christian@), gated on EmailPref.RE_ENGAGEMENT, carries a
+    List-Unsubscribe header. One-shot per user via User.founder_touch_sent_at.
+    Voice stays descriptive — no "buy/sell/recommend" — per the publisher
+    exemption."""
+    return shell(
+        h1(f"Hey {user_name} — Christian here.")
+        + lead(
+            "I'm the founder of Tapeline. I build it solo out of Melbourne, so I "
+            "try to say hello to the people who actually start using it — and "
+            "you have, which I genuinely appreciate."
+        )
+        + paragraph(
+            "No pitch in this one. I just want to know how it's landing: what "
+            "made you sign up, and whether the scanner is showing you what you "
+            "hoped it would. If something feels missing or confusing, that's the "
+            "single most useful thing you could tell me."
+        )
+        + paragraph(
+            "Just hit reply — it comes straight to me, and I read every one."
+        )
+        + footnote("Thanks for giving it a shot. — Christian, founder, Tapeline"),
+        preheader="A quick personal hello from Tapeline's founder.",
     )
 
 
@@ -2268,6 +2353,155 @@ async def run_annual_nudge_drip(session) -> dict[str, int]:
                 handled.add(user.id)
         except Exception:
             logger.exception("annual_nudge.send_failed user=%s", user.id)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_founder_touch_drip(session) -> dict[str, int]:
+    """Personal founder hello to high-value, engaged early users (lever #4).
+
+    Population: signed up 5-7 days ago, still inside an active Premium trial OR
+    already paying (stripe_customer_id set), who have actually started using
+    the product (≥1 watchlist item) and haven't yet received the note
+    (founder_touch_sent_at is null). That intersection is the cohort worth a
+    1:1 — engaged and high-intent — not a cold blast to every signup.
+
+    One-shot per user, stamped on User.founder_touch_sent_at (its own column,
+    not a drip_state token — front-loaded in migration 0029 so this ships
+    migration-free). Gated on EmailPref.RE_ENGAGEMENT (the founder-signed
+    nurture bucket, same as re-engagement / win-back / annual-nudge), sent
+    under the "sales" persona (christian@) with a List-Unsubscribe header.
+    No-op when RESEND_API_KEY is unset (send_email returns skipped:True, so
+    founder_touch_sent_at stays null and the next pass retries once the key
+    is live).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import exists, or_, select
+
+    from app.models import User, WatchlistItem
+    from app.services.email_prefs import EmailPref, wants
+
+    now = datetime.now(UTC)
+    counts = {"founder_touch": 0}
+
+    # Correlated EXISTS keeps the "has any ticker" test a single round-trip.
+    has_watchlist = exists().where(WatchlistItem.user_id == User.id)
+    users = (
+        await session.execute(
+            select(User).where(
+                User.created_at >= now - timedelta(days=7),
+                User.created_at < now - timedelta(days=5),
+                User.founder_touch_sent_at.is_(None),
+                has_watchlist,
+                or_(
+                    User.stripe_customer_id.is_not(None),
+                    User.trial_ends_at > now,
+                ),
+            )
+        )
+    ).scalars().all()
+
+    any_sent = False
+    for user in users:
+        if not user.email:
+            continue
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
+            continue
+        try:
+            html = render_founder_touch_email(user.name or "there")
+            res = await send_email(
+                user.email,
+                "A quick hello from Tapeline's founder",
+                html,
+                persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
+            )
+            if not res.get("skipped", False):
+                user.founder_touch_sent_at = now
+                counts["founder_touch"] += 1
+                any_sent = True
+        except Exception:
+            logger.exception("founder_touch.send_failed user=%s", user.id)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_referral_milestone_drip(session) -> dict[str, int]:
+    """Celebrate referral momentum at 3 / 5 / 10 / 25 confirmed signups (#5).
+
+    Counts how many accounts list each user as `referred_by` (the referrer's
+    own id, set in the signup flow), finds the highest milestone that user has
+    crossed which isn't yet stamped in drip_state ("ref_m{n}"), and sends one
+    celebratory note. At most one email per user per run — the highest
+    newly-crossed tier — and dedup'd per-tier, so someone who later crosses the
+    next milestone still gets that one.
+
+    Treated like the per-signup referrer email (it reports reward state the
+    user earned by referring): transactional, persona "default", no
+    List-Unsubscribe, NOT gated by email_prefs. No-op when RESEND_API_KEY is
+    unset (token only stamped on a non-skipped send).
+    """
+    from sqlalchemy import func, select
+
+    from app.models import User
+
+    counts = {f"ref_m{m}": 0 for m in _REFERRAL_MILESTONES}
+
+    # Confirmed signups per referrer, one grouped query.
+    rows = (
+        await session.execute(
+            select(User.referred_by, func.count())
+            .where(User.referred_by.is_not(None))
+            .group_by(User.referred_by)
+        )
+    ).all()
+    smallest = min(_REFERRAL_MILESTONES)
+    signups_by_referrer = {ref_id: n for ref_id, n in rows if ref_id and n >= smallest}
+    if not signups_by_referrer:
+        return counts
+
+    referrers = (
+        await session.execute(
+            select(User).where(User.id.in_(list(signups_by_referrer)))
+        )
+    ).scalars().all()
+
+    any_sent = False
+    for user in referrers:
+        if not user.email:
+            continue
+        n = signups_by_referrer.get(user.id, 0)
+        crossed = [m for m in _REFERRAL_MILESTONES if n >= m]
+        if not crossed:
+            continue
+        target = max(crossed)
+        token = f"ref_m{target}"
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if token in sent_tokens:
+            continue
+        try:
+            html = render_referral_milestone_email(
+                user.name or "trader", milestone=target, total_signups=n,
+            )
+            res = await send_email(
+                user.email,
+                f"You've referred {n} — your free months are stacking up",
+                html,
+                persona="default",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add(token)
+                user.drip_state = ",".join(sorted(sent_tokens))
+                counts[token] += 1
+                any_sent = True
+        except Exception:
+            logger.exception("referral_milestone.send_failed user=%s", user.id)
 
     if any_sent:
         await session.commit()
