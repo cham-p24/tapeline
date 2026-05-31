@@ -330,7 +330,7 @@ export default async function SignalsPage() {
           is per-ticker data confidence — mega-caps with full data coverage land
           80–95; less-followed names sit lower. None of the labels are
           prescriptive — see{" "}
-          <Link href="/legal/disclosure" className="link">
+          <Link href="/legal/risk" className="link">
             disclosure
           </Link>
           .
