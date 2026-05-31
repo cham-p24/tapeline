@@ -150,6 +150,23 @@ def test_sub_macro_handles_regime_variants():
     assert sub_macro({"market_regime": None}) is None
 
 
+def test_sub_macro_negative_prefix_does_not_substring_match_positive():
+    """Codex PR #226: 'UNFAVORABLE' contains 'FAVORABLE' as a substring.
+
+    Before the fix, the substring scan iterated positive tokens first and
+    'UNFAVORABLE' → 70 (positive-leaning). That's a polarity flip that
+    bypasses the scorecard's macro gate. After the fix, NEGATIVE tokens
+    are scanned first so the explicit UNFAVORABLE entry catches it at 25.
+    """
+    assert sub_macro({"market_regime": "UNFAVORABLE"}) == 25
+    # Verify direct positive matches still work
+    assert sub_macro({"market_regime": "FAVORABLE"}) == 70
+    # Phrase variants with the positive root still resolve positive
+    assert sub_macro({"market_regime": "FAVORABLE OUTLOOK"}) == 70
+    # Phrase variants with the negative root resolve negative
+    assert sub_macro({"market_regime": "UNFAVORABLE OUTLOOK"}) == 25
+
+
 def test_sub_momentum_handles_label_and_numeric():
     """Momentum Quality column can be a number or a label."""
     # Numeric

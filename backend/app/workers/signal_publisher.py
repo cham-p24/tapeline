@@ -184,8 +184,19 @@ async def tick() -> None:
         except Exception:
             logger.exception("alerts.eval_failed")
 
-    # Snapshot today's top-10 for the public scorecard (once per day)
-    await _ensure_daily_scorecard(started.date())
+    # NB: _ensure_daily_scorecard(today) used to live here, immediately after
+    # the snapshot upserts. Codex (PR #226 review) flagged that ordering as
+    # racy in sheet-fed prod: fetch_snapshots() writes Ticker.sub_macro from
+    # polygon_feed (documented as mock for the macro factor), and only the
+    # sheet refresh further down rewrites sub_macro with the Tapeline
+    # composite's regime-derived score. Running the macro gate here would
+    # filter on the mock/stale value, so valid high-ranked picks could be
+    # nondeterministically excluded from the back-check.
+    #
+    # Fix: move the freeze AFTER the sheet refresh block so the gate reads
+    # the freshly-written Tapeline sub_macro. Freeze is idempotent (returns
+    # early if today's row already exists) so moving it later doesn't change
+    # the once-per-day semantics.
 
     # Refresh news feed: on first tick after boot + every ~5 minutes thereafter
     global _last_news_refresh, _last_backcheck
@@ -354,6 +365,13 @@ async def tick() -> None:
         except Exception:
             logger.exception("sheet_feed.tick_failed")
         _last_sheet_refresh = started
+
+    # Snapshot today's top-10 for the public scorecard (once per day).
+    # Runs AFTER the sheet refresh so the macro gate + concentration filter
+    # operate on the Tapeline composite's sub_macro / sector values, not
+    # the polygon_feed mock values that fetch_snapshots wrote earlier in
+    # this tick. Idempotent: returns early when today's row already exists.
+    await _ensure_daily_scorecard(started.date())
 
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
@@ -614,6 +632,22 @@ pick almost certainly fights the next-day tape regardless of how strong
 its other factors look."""
 
 
+def _macro_gate_active() -> bool:
+    """The macro gate only applies when Ticker.sub_macro is the Tapeline
+    composite's regime-derived value (set by sheet_feed.refresh_from_workbook).
+
+    Without the sheet, polygon_feed's fetch_snapshots writes a mock/random
+    value to sub_macro on every tick — gating on that would nondeterministically
+    drop valid high-ranked picks from the public scorecard. We tie the gate
+    to `signal_sheet_csv_url` being set: that's the env var that switches
+    sub_macro from mock to Tapeline-composite-derived.
+
+    In dev (no sheet URL), the gate is off and all top-10 candidates pass
+    the macro check. That's the right behaviour: dev runs against mock
+    data; the back-check isn't meaningful there anyway."""
+    return bool(get_settings().signal_sheet_csv_url)
+
+
 async def _run_daily_indexnow() -> None:
     """Detached daily IndexNow batch (spawned, never awaited, from tick()).
 
@@ -736,7 +770,17 @@ async def _ensure_daily_scorecard(today: date) -> None:
             # FALLING / BEAR. Same pick is still on /scanner — it just
             # doesn't get put on the public scorecard where it would drag
             # the median alpha down on day 1.
-            if t.sub_macro is not None and t.sub_macro < _MIN_MACRO_FOR_INCLUSION:
+            #
+            # Only enforce the gate when the sheet feed is the source of
+            # truth — otherwise sub_macro is whatever polygon_feed's mock
+            # branch wrote (per the docstring on fetch_snapshots, the macro
+            # factor is still mock data) and gating on it would skip valid
+            # picks based on a random number. Codex flagged this on PR #226.
+            if (
+                _macro_gate_active()
+                and t.sub_macro is not None
+                and t.sub_macro < _MIN_MACRO_FOR_INCLUSION
+            ):
                 skipped_macro_hostile += 1
                 continue
 
