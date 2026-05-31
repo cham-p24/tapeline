@@ -31,8 +31,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import UTC, datetime, timedelta
-from typing import Optional
+from datetime import UTC, datetime
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -189,7 +188,7 @@ async def run_stale_link_audit(
 # --------------------------------------------------------------------------
 
 
-async def _owner_chat_id(session: AsyncSession) -> Optional[str]:
+async def _owner_chat_id(session: AsyncSession) -> str | None:
     """Return the founder's Telegram chat_id, or None if not configured.
 
     The owner user is seeded by scripts/seed_owner.py with email
@@ -207,7 +206,7 @@ async def _owner_chat_id(session: AsyncSession) -> Optional[str]:
 
 async def render_weekly_digest(
     session: AsyncSession,
-    stale_audit: Optional[dict] = None,
+    stale_audit: dict | None = None,
 ) -> str:
     """Build the weekly SEO digest Markdown string.
 
