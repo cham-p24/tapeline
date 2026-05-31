@@ -124,9 +124,18 @@ export default function InboxPage() {
   async function onApprove(id: number, editedText?: string) {
     setBusy(id);
     try {
-      await api.inboxApprove(id, editedText);
-      setEditingId(null);
-      setEditText("");
+      // The endpoint returns HTTP 200 with {ok:false,...} when the reply
+      // couldn't actually be delivered (Reddit throttle, skipped email,
+      // unsupported channel). Surface that instead of silently "succeeding"
+      // — the row stays at status='approved' so re-approving retries.
+      const res = await api.inboxApprove(id, editedText);
+      if (res && res.ok === false) {
+        const detail = res.reason ? `${res.error} (${res.reason})` : res.error;
+        setError(`Couldn't send #${id}: ${detail ?? "unknown error"}`);
+      } else {
+        setEditingId(null);
+        setEditText("");
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Approve failed");

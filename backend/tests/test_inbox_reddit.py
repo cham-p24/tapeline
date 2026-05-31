@@ -199,3 +199,125 @@ class TestSendRedditReply:
         )
         ok = await reddit_inbox.send_reddit_reply(msg, "thanks")
         assert ok is False
+
+
+# ── Reply-target routing (the t3_-mention-as-reddit_comment bug) ────────────
+
+
+class TestRedditReplyTarget:
+    """Pure routing helper. Must key off the Reddit fullname prefix FIRST:
+    a subreddit *mention* is stored under channel='reddit_comment' but its
+    fullname is a t3_ submission. Routing on channel alone would call
+    client.comment() on a submission id — which PRAW silently no-ops."""
+
+    def test_comment_prefix(self):
+        assert reddit_inbox._reddit_reply_target("reddit_comment", "t1_xyz") == ("comment", "xyz")
+
+    def test_submission_prefix(self):
+        assert reddit_inbox._reddit_reply_target("reddit_comment", "t3_sub") == ("submission", "sub")
+
+    def test_dm_prefix(self):
+        assert reddit_inbox._reddit_reply_target("reddit_dm", "t4_abc") == ("dm", "abc")
+
+    def test_prefix_wins_over_channel(self):
+        # mention: stored as reddit_comment but the fullname is a t3_ submission
+        assert reddit_inbox._reddit_reply_target("reddit_comment", "t3_post") == ("submission", "post")
+        # a t4_ DM mis-tagged as comment still routes to dm
+        assert reddit_inbox._reddit_reply_target("reddit_comment", "t4_dm") == ("dm", "dm")
+
+    def test_no_prefix_falls_back_to_channel(self):
+        assert reddit_inbox._reddit_reply_target("reddit_dm", "rawid") == ("dm", "rawid")
+        assert reddit_inbox._reddit_reply_target("reddit_comment", "rawid") == ("comment", "rawid")
+
+    def test_none_id_is_safe(self):
+        assert reddit_inbox._reddit_reply_target("reddit_comment", None) == ("comment", "")
+
+
+class TestSendRedditReplyRouting:
+    """send_reddit_reply must dispatch to the PRAW accessor that matches the
+    fullname prefix. Client + new-account throttle are mocked so no network
+    or DB introspection happens."""
+
+    @staticmethod
+    def _enable(monkeypatch):
+        for var, val in [
+            ("REDDIT_CLIENT_ID", "id"), ("REDDIT_CLIENT_SECRET", "s"),
+            ("REDDIT_USERNAME", "u"), ("REDDIT_PASSWORD", "p"),
+        ]:
+            monkeypatch.setenv(var, val)
+        monkeypatch.delenv("INBOX_DRY_RUN", raising=False)
+        monkeypatch.delenv("INBOX_REDDIT_ENABLED", raising=False)
+        monkeypatch.setenv("INBOX_BOT_ENABLED", "true")
+        get_settings.cache_clear()
+
+    @pytest.mark.asyncio
+    async def test_mention_t3_routes_to_submission(self, monkeypatch):
+        """The bug that mattered: a mention stored as reddit_comment with a
+        t3_ fullname must reply via client.submission(), NOT client.comment()."""
+        self._enable(monkeypatch)
+        from app.models import InboundMessage
+        msg = InboundMessage(
+            id=1, channel="reddit_comment", channel_msg_id="t3_post",
+            author="u/x", body="hi", status="classified",
+            received_at=datetime.now(UTC),
+        )
+        client = MagicMock()
+        reply_obj = MagicMock()
+        reply_obj.id = "newcomment"
+        client.submission.return_value.reply.return_value = reply_obj
+
+        with patch.object(reddit_inbox, "_praw_client", return_value=client), \
+             patch.object(reddit_inbox, "_under_new_account_throttle",
+                          new=AsyncMock(return_value=False)):
+            ok = await reddit_inbox.send_reddit_reply(msg, "the reply")
+
+        assert ok is True
+        client.submission.assert_called_once_with(id="post")
+        client.submission.return_value.reply.assert_called_once_with("the reply")
+        client.comment.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_comment_t1_routes_to_comment(self, monkeypatch):
+        self._enable(monkeypatch)
+        from app.models import InboundMessage
+        msg = InboundMessage(
+            id=2, channel="reddit_comment", channel_msg_id="t1_c1",
+            author="u/x", body="hi", status="classified",
+            received_at=datetime.now(UTC),
+        )
+        client = MagicMock()
+        reply_obj = MagicMock()
+        reply_obj.id = "r1"
+        client.comment.return_value.reply.return_value = reply_obj
+
+        with patch.object(reddit_inbox, "_praw_client", return_value=client), \
+             patch.object(reddit_inbox, "_under_new_account_throttle",
+                          new=AsyncMock(return_value=False)):
+            ok = await reddit_inbox.send_reddit_reply(msg, "the reply")
+
+        assert ok is True
+        client.comment.assert_called_once_with(id="c1")
+        client.comment.return_value.reply.assert_called_once_with("the reply")
+        client.submission.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dm_t4_routes_to_inbox_message(self, monkeypatch):
+        self._enable(monkeypatch)
+        from app.models import InboundMessage
+        msg = InboundMessage(
+            id=3, channel="reddit_dm", channel_msg_id="t4_d1",
+            author="u/x", body="hi", status="classified",
+            received_at=datetime.now(UTC),
+        )
+        client = MagicMock()
+
+        with patch.object(reddit_inbox, "_praw_client", return_value=client), \
+             patch.object(reddit_inbox, "_under_new_account_throttle",
+                          new=AsyncMock(return_value=False)):
+            ok = await reddit_inbox.send_reddit_reply(msg, "the reply")
+
+        assert ok is True
+        client.inbox.message.assert_called_once_with("d1")
+        client.inbox.message.return_value.reply.assert_called_once_with("the reply")
+        client.comment.assert_not_called()
+        client.submission.assert_not_called()

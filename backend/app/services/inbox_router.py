@@ -4,20 +4,21 @@ Single entry point used by every channel (email webhook, Reddit
 poller, Telegram poller): `handle_inbound(...)`. It owns the full
 lifecycle:
 
-  1. Idempotency check via (channel, channel_msg_id) — returns
+  1. Idempotency check via (channel, channel_msg_id) — returns the
      existing row if already-processed
-  2. Classify the body (rule-based fast path, LLM stub for Phase A)
+  2. Classify the body — rule-based fast path, escalating to the real
+     Anthropic LLM (`classify_async`) for ambiguous messages
   3. Persist the InboundMessage row with classifier output
-  4. For Tier 2: render the matching template, return reply text +
-     a callable the channel adapter uses to actually deliver it
-  5. For Tier 1: stash for Telegram alert (Phase D wires the alert
-     dispatch; this phase just stores)
+  4. For Tier 2: render the matching template and return the reply text
+     in HandleResult.auto_reply_text (status='auto_replied')
+  5. For Tier 1: persist at status='classified'; the caller fires the
+     founder Telegram alert (inbox_telegram_alert.alert_founder)
   6. For Tier 3: mark ignored, return no reply
 
-Channel adapters (Resend webhook in this phase) call this and then
-deliver any returned reply text through their channel-specific API.
-This keeps the dispatcher channel-agnostic — the same router handles
-emails, Reddit comments, and Telegram DMs.
+The dispatcher stays channel-agnostic: it returns a HandleResult and the
+channel adapter delivers any reply text through its own API (Resend /
+PRAW / Telegram). `send_tier_1_5_ack` (below) is the shared immediate-ack
+sender used across all channels.
 """
 from __future__ import annotations
 

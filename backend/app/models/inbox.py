@@ -24,8 +24,10 @@ Status state machine:
   new → (classified, tier set) → [approved | auto_replied | ignored] → sent
 
 The 'sent' status is terminal. If the channel adapter fails (Reddit
-PRAW exception, Resend 5xx, Telegram timeout), status stays at
-'approved' / 'auto_replied' and the next worker tick retries.
+PRAW exception, Resend skip/5xx, Telegram timeout), the row is left at
+'approved' / 'auto_replied' (drafted but NOT delivered) — there is no
+background retry. The founder re-sends from /app/inbox, or re-taps
+Approve in Telegram, either of which retries the send synchronously.
 """
 from __future__ import annotations
 
@@ -102,9 +104,12 @@ class InboundMessage(Base):
         DateTime(timezone=True), nullable=True,
     )
 
-    # Telegram message id of the approval card, so the bot can edit it
-    # in place ("Approved ✓" / "Sent ✓") when the founder taps the
-    # button.
+    # RESERVED — not currently written. The Telegram callback handler edits
+    # the approval card in place using the message_id carried in the callback
+    # payload, so it doesn't need this stored. Kept (nullable) for a future
+    # cross-surface sync: stash the card's id here at alert time so a web-UI
+    # approval can also update the Telegram card. No migration needed to wire
+    # it later — the column already exists.
     telegram_alert_message_id: Mapped[int | None] = mapped_column(
         Integer, nullable=True,
     )
