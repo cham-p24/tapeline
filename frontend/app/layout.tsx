@@ -192,9 +192,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // — Google will learn the wrong Knowledge Graph link.
               //
               // Removed 2026-05-11: Substack, YouTube (HEAD-404).
-              // Removed 2026-05-12: linkedin.com/company/tapeline (it's a
-              //   European agroecology research project — different brand).
-              //   Restore once we claim a unique slug like /company/tapeline-io.
+              // 2026-05-12 → 2026-05-31: linkedin.com/company/tapeline is a
+              //   European agroecology research project (different brand), so we
+              //   claimed the unique slug /company/tapeline-io instead. Verified
+              //   live + admin-owned (company id 118593983) on 2026-05-31 →
+              //   RESTORED to sameAs below.
               // Removed 2026-05-13: producthunt /products/tapeline (HTTP 404),
               //   capterra /p/tapeline (HTTP 404), stocktwits /tapeline
               //   (HTTP 404). Restore each entry as the profile is claimed.
@@ -208,6 +210,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // canonical paste-ready copy when claiming each.
               sameAs: [
                 "https://x.com/tapeline_io",
+                "https://www.linkedin.com/company/tapeline-io",
                 "https://github.com/cham-p24/tapeline",
                 "https://www.reddit.com/user/tapeline_io",
               ],
