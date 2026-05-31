@@ -112,19 +112,24 @@ async def alert_founder(message: InboundMessage) -> bool:
     }
 
     try:
-        ok = await telegram.send_message(
+        # Capture the Telegram message_id so the approval/reject flow can
+        # edit the card in place. Mutates the InboundMessage; caller is
+        # responsible for committing the session.
+        sent_id = await telegram.send_message_with_id(
             chat_id, text, parse_mode="HTML", reply_markup=reply_markup,
         )
-        if ok:
+        if sent_id is not None:
+            message.telegram_alert_message_id = sent_id
             logger.info(
-                "inbox_telegram_alert.sent msg_id=%d chat_id=%s", message.id, chat_id,
+                "inbox_telegram_alert.sent msg_id=%d chat_id=%s tg_msg_id=%d",
+                message.id, chat_id, sent_id,
             )
-        else:
-            logger.warning(
-                "inbox_telegram_alert.send_failed msg_id=%d chat_id=%s",
-                message.id, chat_id,
-            )
-        return ok
+            return True
+        logger.warning(
+            "inbox_telegram_alert.send_failed msg_id=%d chat_id=%s",
+            message.id, chat_id,
+        )
+        return False
     except Exception as e:
         logger.exception(
             "inbox_telegram_alert.exception msg_id=%d err=%s", message.id, e,
@@ -132,4 +137,76 @@ async def alert_founder(message: InboundMessage) -> bool:
         return False
 
 
-__all__ = ["alert_founder"]
+async def edit_card_to_done(
+    message: InboundMessage,
+    *,
+    action: str,
+    sent_reply: str | None = None,
+) -> bool:
+    """Edit the Tier 1 alert card in place to show the resolution.
+
+    Called after `/approve` or `/reject` (from either the web UI or the
+    Telegram inline button). Shows the founder which Tier 1s they've
+    handled without stacking confirmation messages on the chat.
+
+    `action` is one of "approved" / "rejected". When approved, the
+    original card body collapses to a one-line "✅ Approved · sent at
+    HH:MM UTC" header plus the reply that went out (so the founder has
+    the wire transcript without scrolling back). When rejected, the
+    card collapses to "🗑️ Rejected · HH:MM UTC".
+
+    No-op (returns False) when:
+      - telegram_alert_message_id is null (alert was never sent)
+      - founder chat_id or bot token is missing
+      - editMessageText fails (Telegram returns an error)
+
+    Best-effort: a failure here MUST NOT undo the underlying approve/
+    reject — the action stays committed; the card just doesn't refresh.
+    """
+    if message.telegram_alert_message_id is None:
+        return False
+    chat_id = settings.inbox_founder_telegram_chat_id
+    if not chat_id or not settings.telegram_bot_token:
+        return False
+
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC).strftime("%H:%M UTC")
+    if action == "approved":
+        header = f"✅ <b>Approved · sent at {now}</b>"
+    elif action == "rejected":
+        header = f"🗑️ <b>Rejected at {now}</b>"
+    else:
+        header = f"ℹ️ <b>Updated at {now}</b>"
+
+    parts: list[str] = [
+        header,
+        "",
+        f"<b>From:</b> {message.author}",
+        f"<b>Channel:</b> {_channel_label(message.channel)}",
+    ]
+    if message.subject:
+        parts.append(f"<b>Subject:</b> {_truncate(message.subject, 120)}")
+
+    # Show the resolved reply text only when something actually went out.
+    if action == "approved":
+        body_to_show = sent_reply or message.suggested_reply
+        if body_to_show:
+            parts.append("")
+            parts.append("<b>Reply sent:</b>")
+            parts.append(_truncate(body_to_show, PREVIEW_CHAR_LIMIT))
+
+    text = "\n".join(parts)
+    try:
+        return await telegram.edit_message_text(
+            chat_id, message.telegram_alert_message_id, text, parse_mode="HTML",
+        )
+    except Exception:
+        logger.exception(
+            "inbox_telegram_alert.edit_failed msg_id=%d action=%s",
+            message.id, action,
+        )
+        return False
+
+
+__all__ = ["alert_founder", "edit_card_to_done"]
