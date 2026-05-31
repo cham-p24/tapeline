@@ -19,6 +19,11 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
 
+// Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
+// `revalidate: 300` below and the file's "5-minute snapshot" contract, and
+// keeps this route off the build-time critical path (see generateStaticParams).
+export const revalidate = 300;
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
@@ -43,10 +48,10 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
     // 5-minute cache so search-engine crawls don't hammer the API.
     const res = await fetch(url, {
       next: { revalidate: 300 },
-      // Bound the build-time fetch so a degraded backend can't hang the
-      // per-page build budget and fail the whole deploy. On timeout we fall
-      // through to the [] fallback and the page renders fast; ISR refills the
-      // data within `revalidate` once the backend recovers.
+      // Bound the fetch so a degraded backend can't hang the on-demand render
+      // (this page is ISR, not build-time — see generateStaticParams). On
+      // timeout we fall through to the [] fallback and render fast; ISR refills
+      // the data within `revalidate` once the backend recovers.
       signal: AbortSignal.timeout(7000),
     });
     if (!res.ok) return [];
@@ -57,8 +62,16 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
   }
 }
 
-export function generateStaticParams() {
-  return STRATEGIES.map((s) => ({ strategy: s.slug }));
+// Deliberately NOT pre-rendered at build time. Pre-rendering coupled deploy
+// success to backend health: each strategy page fetched /api/scanner at build,
+// so a degraded api.tapeline.io could blow the per-page build budget — and the
+// build-time fan-out itself piled load onto an already-struggling backend.
+// These pages now render on-demand (dynamicParams defaults to true) and cache
+// via `revalidate` (ISR). Discovery is unaffected: every /best-stocks-for/{slug}
+// URL is emitted in app/sitemap.ts, so crawlers find them, render the first hit
+// on-demand, then serve the ISR cache. Mirrors /blog/ticker/[symbol] + /t/[symbol].
+export function generateStaticParams(): { strategy: string }[] {
+  return [];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ strategy: string }> }) {
