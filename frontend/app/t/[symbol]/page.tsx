@@ -23,7 +23,7 @@ import {
   breadcrumbJsonLd,
   faqJsonLd,
   jsonLdScript,
-  tickerReviewJsonLd,
+  tickerDatasetJsonLd,
 } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
 
@@ -637,7 +637,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
     parentCrumb,
     { name: `${data.symbol} (${data.name})`, url },
   ]);
-  const review = tickerReviewJsonLd({
+  const dataset = tickerDatasetJsonLd({
     symbol: data.symbol,
     name: data.name,
     url,
@@ -649,7 +649,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
-      <script {...jsonLdScript(review)} />
+      <script {...jsonLdScript(dataset)} />
       <script {...jsonLdScript(faqJsonLd(faqItems))} />
       <MarketingNav />
 
