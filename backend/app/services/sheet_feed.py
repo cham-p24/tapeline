@@ -319,11 +319,19 @@ async def upsert_tickers(
         # ETFs lack fundamentals); the composite math substituted NEUTRAL
         # there, but we keep None in the DB so /t/{symbol} can display
         # "—" rather than a fabricated 50.
+        #
+        # IMPORTANT: always overwrite, even when the new value is None.
+        # If we only wrote on `v is not None`, a ticker's old sub_*
+        # value (e.g. fundamentals=70 from yesterday) would persist
+        # after the Finnhub cache is wiped/stale and today's composite
+        # used the NEUTRAL fallback. The /t/{symbol} breakdown would
+        # show 70 alongside a composite computed as if the factor were
+        # 50 — the displayed numbers wouldn't add up. Writing None on
+        # cache miss clears the stale value so the UI shows "—".
+        # (Codex review on PR #225 caught this; thanks.)
         for key in ("sub_trend", "sub_rs", "sub_fundamentals",
                     "sub_smart_money", "sub_macro", "sub_momentum"):
-            v = r.get(key)
-            if v is not None:
-                setattr(t, key, v)
+            setattr(t, key, r.get(key))
 
     await session.commit()
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
