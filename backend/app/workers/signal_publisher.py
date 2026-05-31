@@ -63,6 +63,7 @@ _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
 _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
+_last_inbox_tick: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -488,11 +489,51 @@ async def tick() -> None:
             logger.exception("growth_bot.tick_failed")
         _last_growth_tick_date = today_str
 
+    # Inbox auto-handler tick: poll Reddit (the only channel that needs
+    # polling — email is webhook-driven via /api/inbox/email; Telegram
+    # alerts are dispatched at classification time). Cadence: 5 min
+    # during US market hours (more chatter), 15 min off-hours. No-ops
+    # cleanly when REDDIT_* credentials are unset.
+    global _last_inbox_tick
+    is_inbox_market_hours = (
+        started.weekday() < 5 and 13 <= started.hour < 21  # 9am-5pm ET ≈ 13-21 UTC
+    )
+    inbox_interval = 300 if is_inbox_market_hours else 900
+    if _last_inbox_tick is None or (started - _last_inbox_tick).total_seconds() >= inbox_interval:
+        _last_inbox_tick = started
+        try:
+            await _run_inbox_tick()
+        except Exception:
+            logger.exception("inbox.tick_failed")
+
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
         "tick.done snapshots=%d squeezes=%d regime=%s trades_added=%d elapsed=%.2fs",
         len(snapshots), len(squeezes), regime["regime"], len(new_trades), elapsed,
     )
+
+
+async def _run_inbox_tick() -> None:
+    """One inbox-poll cycle.
+
+    Currently only polls Reddit — email + Telegram inbound are both
+    webhook-driven so don't need a poller. The Reddit poller is the
+    safety net for the only inbound channel that doesn't get a push.
+
+    Honours the per-channel + global kill switches via the called
+    services; no need to re-check here.
+    """
+    try:
+        from app.services.reddit_inbox import poll_reddit_inbox
+        async with session_scope() as session:
+            counts = await poll_reddit_inbox(session)
+        if counts.get("total"):
+            logger.info(
+                "inbox.reddit_poll dms=%d comments=%d mentions=%d",
+                counts["dms"], counts["comments"], counts["mentions"],
+            )
+    except Exception:
+        logger.exception("inbox.reddit_poll_failed")
 
 
 async def _ensure_daily_scorecard(today: date) -> None:

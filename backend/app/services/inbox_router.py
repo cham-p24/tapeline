@@ -29,9 +29,10 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models import InboundMessage
 from app.services import inbox_templates
-from app.services.inbox_classifier import classify
+from app.services.inbox_classifier import classify_async
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +86,16 @@ async def handle_inbound(
             already_handled=True,
         )
 
-    # Classify (rule-based fast path; LLM stub for ambiguous)
-    classification = classify(body, author=author, channel=channel)
+    # Classify (rule-based fast path; real Anthropic LLM call for ambiguous).
+    # `classify_async` honours INBOX_BOT_ENABLED + the daily Claude cost cap;
+    # both failure paths return Tier 1 with no suggested reply (safe default,
+    # founder reviews via the Telegram alert).
+    classification = await classify_async(
+        body,
+        session=session,
+        author=author,
+        channel=channel,
+    )
     tier = classification.tier
 
     # For Tier 2, render the template right here so the channel adapter
@@ -155,4 +164,108 @@ async def mark_sent(
     row.handled_at = when
 
 
-__all__ = ["Channel", "HandleResult", "handle_inbound", "mark_sent"]
+# ── Tier 1.5 auto-acknowledgement ──────────────────────────────────────────
+
+TIER_1_5_ACK_BODY = (
+    "Thanks for reaching out — I've got this in my queue and will reply "
+    "within 24h. Tapeline is solo so I read every message myself, but "
+    "the response time depends on time zones (I'm in Melbourne)."
+)
+
+
+async def send_tier_1_5_ack(message: InboundMessage) -> bool:
+    """Fire an immediate "I'll get back within 24h" reply on the inbound
+    channel so US-business-hours senders aren't ghosted overnight while
+    the founder is asleep.
+
+    Routes by `message.channel`:
+      - email  → Resend send_email (persona=default, "Re:" subject)
+      - reddit_comment / reddit_dm → reddit_inbox.send_reddit_reply
+      - telegram → telegram.send_message
+
+    Honours `INBOX_BOT_ENABLED`, `INBOX_TIER1_AUTO_ACK`, the per-channel
+    enable toggle, and `INBOX_DRY_RUN`. Returns True on success.
+
+    Best-effort — failure here MUST NOT block the Tier 1 Telegram alert
+    that the caller is about to fire. We log + return False; the
+    sender just doesn't get the auto-ack this time.
+    """
+    from app.services import inbox_kill_switch
+
+    settings = get_settings()
+    if not settings.inbox_tier1_auto_ack:
+        return False
+    if not inbox_kill_switch.bot_enabled():
+        return False
+    if not inbox_kill_switch.channel_enabled(message.channel):
+        return False
+
+    if inbox_kill_switch.dry_run():
+        logger.info(
+            "inbox.tier1_5_ack.dry_run msg_id=%d channel=%s author=%s",
+            message.id, message.channel, message.author,
+        )
+        return True
+
+    try:
+        if message.channel == "email":
+            from app.services.email import send_email
+
+            subject = (
+                f"Re: {message.subject}"
+                if message.subject and not message.subject.lower().startswith("re:")
+                else (message.subject or "Re: your message to Tapeline")
+            )
+            html = (
+                f'<div style="font-family:-apple-system,Segoe UI,Helvetica,sans-serif;'
+                f'font-size:14px;line-height:1.55;color:#111;max-width:560px;">'
+                f'{TIER_1_5_ACK_BODY}'
+                f'</div>'
+            )
+            res = await send_email(
+                to=message.author,
+                subject=subject,
+                html=html,
+                text=TIER_1_5_ACK_BODY,
+                persona="default",
+            )
+            if res.get("skipped"):
+                return False
+        elif message.channel in ("reddit_comment", "reddit_dm"):
+            from app.services.reddit_inbox import send_reddit_reply
+            ok = await send_reddit_reply(message, TIER_1_5_ACK_BODY)
+            if not ok:
+                return False
+        elif message.channel == "telegram":
+            from app.services.telegram import send_message
+            ok = await send_message(message.author, TIER_1_5_ACK_BODY)
+            if not ok:
+                return False
+        else:
+            logger.info(
+                "inbox.tier1_5_ack.unsupported_channel msg_id=%d channel=%s",
+                message.id, message.channel,
+            )
+            return False
+    except Exception:
+        logger.exception(
+            "inbox.tier1_5_ack.failed msg_id=%d channel=%s",
+            message.id, message.channel,
+        )
+        return False
+
+    logger.info(
+        "inbox.tier1_5_ack.sent msg_id=%d channel=%s author=%s",
+        message.id, message.channel, message.author,
+    )
+    return True
+
+
+__all__ = [
+    "TIER_1_5_ACK_BODY",
+    "Channel",
+    "HandleResult",
+    "handle_inbound",
+    "mark_sent",
+    "send_tier_1_5_ack",
+]
