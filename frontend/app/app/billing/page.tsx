@@ -6,6 +6,7 @@ import { track } from "@vercel/analytics";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
 import { ComparisonTable } from "@/components/ComparisonTable";
+import { CancelInterceptModal } from "@/components/CancelInterceptModal";
 import {
   getWebPushStatus,
   subscribeToWebPush,
@@ -47,11 +48,13 @@ const TIER_META = {
 type TierKey = keyof typeof TIER_META;
 
 export default function BillingPage() {
-  const { user } = useUser();
+  const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "info" | "err"; text: string } | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
   const [showPlans, setShowPlans] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [winbackOffer, setWinbackOffer] = useState(false);
 
   const tier = (user?.tier || "free") as TierKey;
   const meta = TIER_META[tier] ?? TIER_META.free;
@@ -92,6 +95,16 @@ export default function BillingPage() {
         tier: qp.get("tier") || tier,
         billing_period: qp.get("billing_period") || "annual",
       });
+    }
+    // Win-back landing — the day-90 cancellation email links here with
+    // ?winback=1. Surface the returning-customer banner + open the plan
+    // picker. The 40%-off coupon itself is minted server-side at checkout,
+    // gated on "actually churned" (tier=free + canceled_at set) — the param
+    // is just the UX hint, never the source of the discount.
+    if (qp.get("winback") === "1") {
+      setWinbackOffer(true);
+      setShowPlans(true);
+      track("winback_landing", {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -196,6 +209,19 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Win-back landing banner (?winback=1 from the day-90 email). The 40%
+          discount is applied server-side at checkout for genuinely churned
+          accounts — this is purely the welcome-back framing. */}
+      {winbackOffer && tier === "free" && (
+        <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm">
+          <div className="font-semibold text-fg">Welcome back — your first 3 months are 40% off.</div>
+          <p className="mt-1 text-muted">
+            Pick a plan below and the returning-customer discount applies automatically at checkout.
+            Your saved watchlist, scans and alerts come back with you.
+          </p>
+        </div>
+      )}
+
       {/* ── Hero: current plan + next charge + trial countdown ────────────── */}
       <section className="grid gap-4 md:grid-cols-5">
         {/* Plan summary — spans 3 of 5 cols */}
@@ -235,6 +261,12 @@ export default function BillingPage() {
                 className="btn-ghost text-xs"
               >
                 {showPlans ? "Hide plans" : "Change plan"}
+              </button>
+              <button
+                onClick={() => setShowCancel(true)}
+                className="btn-ghost text-xs text-muted hover:text-down"
+              >
+                Cancel subscription
               </button>
             </div>
           )}
@@ -464,6 +496,13 @@ export default function BillingPage() {
         Email <a href="mailto:support@tapeline.io" className="text-accent hover:underline">support@tapeline.io</a>
         — usually replied to within a business day.
       </footer>
+
+      <CancelInterceptModal
+        open={showCancel}
+        onClose={() => setShowCancel(false)}
+        onChanged={refresh}
+        tier={tier}
+      />
     </div>
   );
 }

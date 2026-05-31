@@ -251,19 +251,27 @@ async def tick() -> None:
         _last_holdings_refresh = started
 
     # Daily trial-drip emails (day 3 / 7 / 13) + 14-day re-engagement for
-    # dormant non-trial users. Worker-restart-safe — User.drip_state tracks
-    # per-user per-stage delivery so no email fires twice.
+    # dormant non-trial users + 30/60/90-day post-cancellation win-back.
+    # Worker-restart-safe — User.drip_state / winback_state track per-user
+    # per-stage delivery so no email fires twice.
     global _last_drip_check
     if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
         try:
-            from app.services.email import run_daily_drip, run_re_engagement_drip
+            from app.services.email import (
+                run_daily_drip,
+                run_re_engagement_drip,
+                run_winback_drip,
+            )
             async with session_scope() as drip_session:
                 counts = await run_daily_drip(drip_session)
                 re_counts = await run_re_engagement_drip(drip_session)
+                wb_counts = await run_winback_drip(drip_session)
             if any(counts.values()):
                 logger.info("drip.sent day3=%d day7=%d day13=%d", counts["day3"], counts["day7"], counts["day13"])
             if re_counts["re14"]:
                 logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
+            if any(wb_counts.values()):
+                logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
         except Exception:
             logger.exception("drip.run_failed")
         _last_drip_check = started

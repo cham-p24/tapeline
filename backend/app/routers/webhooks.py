@@ -132,6 +132,21 @@ async def stripe_webhook(
         # Update user tier if subscription is active/trialing
         if p["status"] in ("active", "trialing"):
             user.tier = p["tier"]
+            # Clear stale retention bookkeeping so the cancel-intercept modal
+            # and winback drip never act on dead state. Two independent flips:
+            #   • un-cancel — if the sub is no longer scheduled to cancel at
+            #     period end (e.g. they hit "Renew" in the Stripe portal),
+            #     wipe canceled_at + winback_state. Keep them when it IS still
+            #     scheduled to cancel: that's the state our /cancel endpoint
+            #     just wrote and the winback clock legitimately starts from.
+            #   • auto-resume — Stripe ends a pause by clearing pause_collection
+            #     and firing .updated; mirror that so "Paused until X" doesn't
+            #     stick around past the resume date.
+            if not p["cancel_at_period_end"]:
+                user.canceled_at = None
+                user.winback_state = ""
+            if not obj.get("pause_collection"):
+                user.subscription_paused_until = None
         else:
             user.tier = "free"
 
