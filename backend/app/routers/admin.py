@@ -284,9 +284,11 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_annual_upgrade_email,
         render_email_verification_email,
         render_eod_watchlist_digest,
+        render_founder_touch_email,
         render_password_reset_email,
         render_payment_failed_email,
         render_re_engagement_email,
+        render_referral_milestone_email,
         render_referral_referee_email,
         render_referral_referrer_email,
         render_subscription_canceled_email,
@@ -358,6 +360,18 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
             "Referral: someone joined your link",
             lambda: render_referral_referrer_email(
                 "Alex", "ne***@example.com",
+            ),
+        ),
+        "referral_milestone_3": (
+            "Referral milestone · 3 signups",
+            lambda: render_referral_milestone_email(
+                "Alex", milestone=3, total_signups=3,
+            ),
+        ),
+        "referral_milestone_10": (
+            "Referral milestone · 10 signups (near free year)",
+            lambda: render_referral_milestone_email(
+                "Alex", milestone=10, total_signups=11,
             ),
         ),
         # Trial drip
@@ -432,6 +446,11 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "annual_nudge_premium": (
             "Annual nudge · Premium monthly → annual",
             lambda: render_annual_upgrade_email("Alex", tier="premium"),
+        ),
+        # Founder-touch (personal hello to high-value, engaged signups)
+        "founder_touch": (
+            "Founder-touch · personal hello (day 5-7, engaged)",
+            lambda: render_founder_touch_email("Alex"),
         ),
         "email_verification": (
             "Email verification (signup security)",

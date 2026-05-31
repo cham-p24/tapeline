@@ -261,9 +261,10 @@ async def tick() -> None:
     # Daily trial-drip emails (day 3 / 7 / 13) + 14-day re-engagement for
     # dormant non-trial users + 30/60/90-day post-cancellation win-back +
     # early-lifecycle activation nudges (first watchlist / first alert) +
-    # post-conversion monthly→annual upgrade nudge. Worker-restart-safe —
-    # User.drip_state / winback_state track per-user per-stage delivery so no
-    # email fires twice.
+    # post-conversion monthly→annual upgrade nudge + personal founder-touch to
+    # high-value engaged signups + referral-milestone celebrations (3/5/10/25).
+    # Worker-restart-safe — User.drip_state / winback_state / founder_touch_sent_at
+    # track per-user per-stage delivery so no email fires twice.
     global _last_drip_check
     if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
         try:
@@ -271,7 +272,9 @@ async def tick() -> None:
                 run_activation_drip,
                 run_annual_nudge_drip,
                 run_daily_drip,
+                run_founder_touch_drip,
                 run_re_engagement_drip,
+                run_referral_milestone_drip,
                 run_winback_drip,
             )
             async with session_scope() as drip_session:
@@ -280,6 +283,8 @@ async def tick() -> None:
                 wb_counts = await run_winback_drip(drip_session)
                 act_counts = await run_activation_drip(drip_session)
                 annual_counts = await run_annual_nudge_drip(drip_session)
+                ft_counts = await run_founder_touch_drip(drip_session)
+                refm_counts = await run_referral_milestone_drip(drip_session)
             if any(counts.values()):
                 logger.info("drip.sent day3=%d day7=%d day13=%d", counts["day3"], counts["day7"], counts["day13"])
             if re_counts["re14"]:
@@ -290,6 +295,10 @@ async def tick() -> None:
                 logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
             if annual_counts["annual_p"]:
                 logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
+            if ft_counts["founder_touch"]:
+                logger.info("drip.founder_touch_sent founder_touch=%d", ft_counts["founder_touch"])
+            if any(refm_counts.values()):
+                logger.info("drip.referral_milestone_sent %s", refm_counts)
         except Exception:
             logger.exception("drip.run_failed")
         _last_drip_check = started

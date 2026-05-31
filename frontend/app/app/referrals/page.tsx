@@ -22,12 +22,21 @@ type ReferralStats = {
   referred_users: Array<{ email: string; tier: string; converted: boolean; joined: string | null }>;
 };
 
+type LeaderboardRow = { rank: number; display: string; is_you: boolean; signups: number };
+type Leaderboard = {
+  leaderboard: LeaderboardRow[];
+  your_rank: number | null;
+  your_signups: number;
+  total_referrers: number;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function ReferralsPage() {
   const { user } = useUser();
   const { push } = useToast();
   const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [board, setBoard] = useState<Leaderboard | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/referrals/me`, { credentials: "include", cache: "no-store" })
@@ -39,6 +48,13 @@ export default function ReferralsPage() {
         return r.json();
       })
       .then(setStats)
+      .catch(() => {});
+    // Leaderboard is best-effort social proof — a freshly-deployed Vercel
+    // frontend can briefly talk to an older Fly backend that lacks this
+    // endpoint, so a 404/null just hides the section rather than erroring.
+    fetch(`${API_BASE}/api/referrals/leaderboard`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setBoard)
       .catch(() => {});
   }, []);
 
@@ -106,6 +122,52 @@ export default function ReferralsPage() {
                         <td className="px-4 py-2 text-muted text-xs">{u.joined ? new Date(u.joined).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {board && board.leaderboard.length > 0 && (
+            <>
+              <h2 className="mt-10 text-xl font-semibold">Top referrers</h2>
+              <p className="text-sm text-muted">
+                {board.your_rank
+                  ? `You're #${board.your_rank} of ${board.total_referrers} referrers.`
+                  : "Refer your first friend to land on the board."}
+              </p>
+              <div className="card mt-4 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-panel text-xs uppercase text-muted">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Rank</th>
+                      <th className="px-4 py-2 text-left">Referrer</th>
+                      <th className="px-4 py-2 text-right">Signups</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {board.leaderboard.map((row) => (
+                      <tr
+                        key={row.rank}
+                        className={`border-b border-border/50 ${row.is_you ? "bg-accent/10 font-semibold" : ""}`}
+                      >
+                        <td className="px-4 py-2 nums text-muted">#{row.rank}</td>
+                        <td className="px-4 py-2">
+                          {row.display}
+                          {row.is_you && <span className="ml-2 text-xs text-accent">(you)</span>}
+                        </td>
+                        <td className="px-4 py-2 text-right nums">{row.signups}</td>
+                      </tr>
+                    ))}
+                    {board.your_rank && board.your_rank > board.leaderboard.length && (
+                      <tr className="border-t border-border bg-accent/10 font-semibold">
+                        <td className="px-4 py-2 nums text-muted">#{board.your_rank}</td>
+                        <td className="px-4 py-2">
+                          You<span className="ml-2 text-xs text-accent">(you)</span>
+                        </td>
+                        <td className="px-4 py-2 text-right nums">{board.your_signups}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
