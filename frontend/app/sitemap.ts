@@ -153,7 +153,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  const tickers = await fetchTopTickers(500);
+  // Per-ticker pages — top 1,000 by daily $-volume.
+  //
+  // 2026-05-24 (later same day): reversed the 250 cap after founder
+  // pushback ("i want to be indexed for everything"). New approach:
+  // submit a much larger universe AND make every page substantial
+  // enough that Google's quality classifier accepts it. The content
+  // depth work happens in /t/[symbol]/page.tsx via
+  // buildEditorialCommentary() which auto-generates a 200-400 word
+  // ticker-specific editorial paragraph from the live factor
+  // sub-scores. Combined with the existing Related Tickers,
+  // news-headlines feed, and FAQ, each page now reads as genuinely
+  // ticker-specific content rather than a templated shell.
+  //
+  // 1000 (vs 250) is the right balance: covers every actively-traded
+  // US name a search query is realistically about, without flooding
+  // Google with the lowest-volume tickers that have effectively zero
+  // search demand (and where even rich content wouldn't index).
+  const tickers = await fetchTopTickers(1000);
   const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
     url: `${base}/t/${sym}`,
     lastModified: now,

@@ -12,6 +12,15 @@ Designed to be run as a Fly cron (or GitHub Actions cron) every 15
 minutes. Exits 0 when fresh, 1 when stale. The 0 / 1 is the signal a
 scheduler can act on (Fly machines stop, alerting hooks, etc.).
 
+Alert hysteresis: a state file ($STATE_PATH, default
+~/.tapeline-news-freshness-state.json) records the last-seen fresh/stale
+status. We only POST a webhook alert on a FRESH→STALE transition, not on
+every consecutive stale tick. Without this, a 4-hour stale window with
+a 15-min cron generates 16 identical Sentry alerts; with it, we get
+exactly 1 alert when it goes stale and 1 "recovered" note when it comes
+back. The exit code (0 fresh, 1 stale) is unaffected — schedulers still
+see staleness on every tick — only the webhook noise is throttled.
+
 Why this exists:
     On 2026-05-09 production news went 14 hours stale because a single
     Benzinga round-up article overflowed the tickers VARCHAR(200)
@@ -26,14 +35,17 @@ Usage:
     python -m app.scripts.check_news_freshness
     python -m app.scripts.check_news_freshness --base https://api.tapeline.io
     python -m app.scripts.check_news_freshness --webhook https://hooks.slack.com/...
+    python -m app.scripts.check_news_freshness --state-path /tmp/freshness.json
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 from datetime import UTC, datetime
+from pathlib import Path
 
 DEFAULT_BASE = "https://api.tapeline.io"
 
@@ -86,6 +98,54 @@ def is_market_hours(now_utc: datetime) -> bool:
     return session_phase(now_utc) == "active"
 
 
+DEFAULT_STATE_PATH = str(Path.home() / ".tapeline-news-freshness-state.json")
+
+
+def _load_state(path: str) -> dict:
+    """Return last-run state, or an empty dict if the file is missing/corrupt.
+
+    State shape: {"last_status": "fresh"|"stale"|"fetch_failed"|"empty_feed",
+                  "since": ISO-UTC-string, "consecutive_failures": int}.
+    A missing file is treated as "never run" → first stale tick WILL alert.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f) or {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_state(path: str, status: str, consecutive_failures: int) -> None:
+    """Best-effort state write. Never raises — a write failure must not
+    fail the cron run (we'd rather lose hysteresis than fail a healthy check).
+    """
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        payload = {
+            "last_status": status,
+            "since": datetime.now(UTC).isoformat(),
+            "consecutive_failures": consecutive_failures,
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+    except OSError as e:
+        print(f"  (state write failed: {e})", file=sys.stderr)
+
+
+def _should_alert(prev_status: str, new_status: str) -> bool:
+    """Hysteresis rule: alert only on transitions into a failure state.
+
+    fresh → stale          → alert (state changed)
+    stale → stale          → DO NOT alert (already known stale)
+    fresh → fetch_failed   → alert
+    fetch_failed → stale   → alert (different failure mode worth knowing)
+    anything → fresh       → DO NOT alert here (handled separately as recovery)
+    """
+    if new_status == "fresh":
+        return False
+    return prev_status != new_status
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", default=DEFAULT_BASE, help="API base URL")
@@ -93,7 +153,24 @@ def main() -> int:
         "--webhook",
         help="Optional webhook URL to POST a JSON alert to on failure",
     )
+    parser.add_argument(
+        "--state-path",
+        default=DEFAULT_STATE_PATH,
+        help=(
+            "Where to persist last-run status for hysteresis. "
+            f"Default: {DEFAULT_STATE_PATH}"
+        ),
+    )
+    parser.add_argument(
+        "--no-hysteresis",
+        action="store_true",
+        help="Disable hysteresis — alert on every stale tick (old behaviour).",
+    )
     args = parser.parse_args()
+
+    prev = _load_state(args.state_path)
+    prev_status = prev.get("last_status", "fresh")
+    prev_failures = int(prev.get("consecutive_failures", 0) or 0)
 
     url = args.base.rstrip("/") + "/api/news?limit=1"
     try:
@@ -102,13 +179,19 @@ def main() -> int:
             body = json.loads(resp.read().decode())
     except Exception as e:
         print(f"FAIL — could not fetch {url}: {e}", file=sys.stderr)
-        _maybe_alert(args.webhook, "fetch_failed", str(e))
+        new_status = "fetch_failed"
+        if args.no_hysteresis or _should_alert(prev_status, new_status):
+            _maybe_alert(args.webhook, new_status, str(e))
+        _save_state(args.state_path, new_status, prev_failures + 1)
         return 1
 
     items = body.get("items") or []
     if not items:
         print("FAIL — /api/news returned 0 items", file=sys.stderr)
-        _maybe_alert(args.webhook, "empty_feed", "no items in response")
+        new_status = "empty_feed"
+        if args.no_hysteresis or _should_alert(prev_status, new_status):
+            _maybe_alert(args.webhook, new_status, "no items in response")
+        _save_state(args.state_path, new_status, prev_failures + 1)
         return 1
 
     now = datetime.now(UTC)
@@ -125,12 +208,30 @@ def main() -> int:
         f"weekday={now.weekday()})"
     )
     if not fresh:
+        new_status = "stale_news"
+        detail = (
+            f"age={age_sec}s threshold={threshold}s "
+            f"title={items[0].get('title', '')[:60]!r}"
+        )
+        if args.no_hysteresis or _should_alert(prev_status, new_status):
+            _maybe_alert(args.webhook, new_status, detail)
+        else:
+            print(
+                f"  (alert suppressed — already in {prev_status} state since "
+                f"{prev.get('since', 'unknown')})"
+            )
+        _save_state(args.state_path, new_status, prev_failures + 1)
+        return 1
+
+    # Fresh path — log recovery if we were previously stale.
+    if prev_status != "fresh" and prev_status:
         _maybe_alert(
             args.webhook,
-            "stale_news",
-            f"age={age_sec}s threshold={threshold}s title={items[0].get('title', '')[:60]!r}",
+            "recovered",
+            f"news fresh again after {prev_failures} stale ticks "
+            f"(was {prev_status} since {prev.get('since', 'unknown')})",
         )
-        return 1
+    _save_state(args.state_path, "fresh", 0)
     return 0
 
 

@@ -5,6 +5,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { findPost, POSTS } from "../posts";
 import { pageMeta } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, howToJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { autoLinkTickers } from "@/lib/autoLinkTickers";
 
 export async function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -104,10 +105,13 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           <p className="mt-4 text-lg text-muted leading-relaxed">{post.excerpt}</p>
         </header>
 
-        {/* Body — content is internal trusted HTML, not user input. */}
+        {/* Body — content is internal trusted HTML, not user input.
+            autoLinkTickers turns every `$TICKER` mention into a link to
+            /t/{TICKER}, so editorial copy never has to hand-wrap them.
+            Skips text inside existing <a>/<code>/<pre> blocks. */}
         <div
           className="prose prose-invert mt-10 max-w-none text-base leading-relaxed text-fg [&_a]:text-accent [&_a:hover]:underline [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_p]:mb-4 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:mb-1.5"
-          dangerouslySetInnerHTML={{ __html: post.body }}
+          dangerouslySetInnerHTML={{ __html: autoLinkTickers(post.body) }}
         />
 
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">

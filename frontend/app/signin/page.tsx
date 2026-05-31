@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { authApi } from "@/lib/auth";
+import { errorMessage } from "@/lib/api";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { useUser } from "@/components/UserContext";
 
@@ -43,25 +44,59 @@ function SignInForm() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // 2FA second step. When the account has TOTP enabled, the password submit
+  // returns an mfa_token instead of a session; we then show the code prompt.
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+
+  // Shared post-auth handoff: push the new session into UserContext BEFORE
+  // navigating, so the destination page mounts already signed-in (and any
+  // later back-navigation sees correct state) instead of flashing signed-out.
+  async function finishSignin() {
+    await refresh();
+    router.push(next);
+    router.refresh();
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setBusy(true);
     try {
-      await authApi.signin(email, password);
-      // Push the new session into UserContext BEFORE navigating, so
-      // when the destination page mounts (and any back-navigation later)
-      // the user state is already correct. Without this, the destination
-      // briefly renders signed-out, then flips when the context's own
-      // refresh resolves.
-      await refresh();
-      router.push(next);
-      router.refresh();
-    } catch (e: any) {
-      setErr(e.message || "Sign in failed");
+      const res = await authApi.signin(email, password);
+      if ("mfa_required" in res) {
+        // Password was correct but the account needs a 2FA code. Stash the
+        // challenge token and switch to the code step; finally{} clears busy.
+        setMfaToken(res.mfa_token);
+        return;
+      }
+      await finishSignin();
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Sign in failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mfaToken) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      await authApi.signin2fa(mfaToken, mfaCode.trim());
+      await finishSignin();
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Verification failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function cancelMfa() {
+    setMfaToken(null);
+    setMfaCode("");
+    setErr(null);
   }
 
   return (
@@ -75,34 +110,90 @@ function SignInForm() {
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
           </Link>
 
-          <h1 className="mt-10 text-3xl font-bold tracking-tight">Welcome back</h1>
-          <p className="mt-2 text-sm text-muted">Sign in to your Tapeline account.</p>
+          {mfaToken ? (
+            <>
+              <h1 className="mt-10 text-3xl font-bold tracking-tight">Two-step verification</h1>
+              <p className="mt-2 text-sm text-muted">
+                Enter the 6-digit code from your authenticator app — or a recovery code.
+              </p>
 
-          <form onSubmit={submit} className="mt-8 space-y-4">
-            <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
-            <Field label="Password" type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
+              <form onSubmit={submitCode} className="mt-8 space-y-4">
+                <label className="block">
+                  <span className="text-xs font-medium text-muted">Authentication code</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value)}
+                    placeholder="123456"
+                    required
+                    className="mt-1.5 block h-11 w-full rounded-md border border-border bg-panel px-3 text-center text-lg tracking-[0.4em] nums transition-colors focus:border-accent focus:outline-none"
+                  />
+                </label>
 
-            {err && (
-              <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
-                {err}
-              </div>
-            )}
+                {err && (
+                  <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
+                    {err}
+                  </div>
+                )}
 
-            <button
-              type="submit"
-              disabled={busy}
-              className="flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-            >
-              {busy ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {busy ? "Verifying…" : "Verify"}
+                </button>
+              </form>
 
-          <OAuthButtons />
+              <button
+                type="button"
+                onClick={cancelMfa}
+                className="mt-6 text-sm text-muted underline-offset-4 hover:text-fg hover:underline"
+              >
+                &larr; Use a different account
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="mt-10 text-3xl font-bold tracking-tight">Welcome back</h1>
+              <p className="mt-2 text-sm text-muted">Sign in to your Tapeline account.</p>
 
-          <p className="mt-8 text-center text-sm text-muted">
-            Don&rsquo;t have an account?{" "}
-            <Link href={`/signup?next=${encodeURIComponent(next)}`} className="link">Sign up free</Link>
-          </p>
+              <form onSubmit={submit} className="mt-8 space-y-4">
+                <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
+                <Field label="Password" type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
+
+                <div className="flex justify-end">
+                  <Link href="/forgot-password" className="text-xs text-muted underline-offset-4 hover:text-fg hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+
+                {err && (
+                  <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
+                    {err}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {busy ? "Signing in…" : "Sign in"}
+                </button>
+              </form>
+
+              <OAuthButtons />
+
+              <p className="mt-8 text-center text-sm text-muted">
+                Don&rsquo;t have an account?{" "}
+                <Link href={`/signup?next=${encodeURIComponent(next)}`} className="link">Sign up free</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </main>

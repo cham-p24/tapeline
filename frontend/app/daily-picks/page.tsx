@@ -108,14 +108,7 @@ export default async function DailyPicksPage() {
     <main className="relative min-h-screen overflow-x-hidden">
       <MarketingNav />
 
-      <section className="relative overflow-hidden px-6 pt-12 pb-10 sm:pt-20 sm:pb-12">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute left-1/2 top-[-15%] h-[680px] w-[1400px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
-        </div>
-
+      <section className="px-6 pt-12 pb-10 sm:pt-20 sm:pb-12">
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />

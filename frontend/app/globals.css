@@ -43,14 +43,14 @@
   /* iOS systemYellow at darker shade for legible contrast on white. */
   --warn:        180 83 9;           /* amber-700                      */
   --shadow:      0 0 0 / 0.06;
-  /* Atmospheric tint opacity (used by body::before). Founder feedback
-     2026-05-20: "the rest of the page doesn't have the blue tinge in
-     the background". Bumped from 0.05 → 0.08 in light mode so the
-     iOS blue wash is actually perceptible against pure-white cards —
-     0.05 was visible only on huge unbroken background expanses, on
-     content-dense pages the cards drowned it out. 0.08 still leaves
-     enough contrast that card text stays legible. */
-  --atmosphere-opacity: 0.08;
+  /* Atmospheric tint opacity (used by body::before, restored below).
+     History: 0.05 → 0.08 → removed 2026-05-22 → restored 0.08 (am 2026-05-30)
+     → 0.16 (pm 2026-05-30, still not visible enough). The 0.08 wash in
+     light mode worked out to about rgb(245, 248, 255) over white — barely
+     distinguishable from #fff on most monitors. 0.16 lands closer to
+     rgb(235, 243, 255), a clearly perceptible iOS-blue wash in negative
+     space without darkening card surfaces or hurting text contrast. */
+  --atmosphere-opacity: 0.16;
 }
 
 [data-theme="dark"] {
@@ -70,10 +70,12 @@
   --up:          48 209 88;
   --down:        255 69 58;
   --warn:        250 204 21;          /* amber-400, legible on near-black */
+  /* Dark mode navy wash. 0.12 was painting a subtle but easy-to-miss tint
+     on monitors with cool colour profiles. 0.22 puts the wash at roughly
+     rgb(10, 37, 64) — unmistakable navy atmosphere, still well within the
+     "ambient" range (not a hero gradient). */
   --shadow:      0 0 0 / 0.45;
-  /* Dark mode keeps a visible navy wash — same overall feeling as the
-     pre-refactor 14% top stop, just uniform now (no banding). */
-  --atmosphere-opacity: 0.10;
+  --atmosphere-opacity: 0.22;
 }
 
 /*
@@ -101,7 +103,7 @@
     --down:        255 69 58;
     --warn:        250 204 21;
     --shadow:      0 0 0 / 0.45;
-    --atmosphere-opacity: 0.10;
+    --atmosphere-opacity: 0.22;
   }
 }
 
@@ -130,23 +132,22 @@
   }
 
   /*
-   * Page-wide blue atmospheric layer. Fixed-position pseudo-element so it
-   * stays on every page, regardless of which route or how long the page
-   * is, without us having to add the gradient to each page's <main> tag.
+   * Page-wide blue atmospheric layer. Fixed-position pseudo-element so
+   * it paints on every route regardless of which page's <main> renders.
    *
-   * **2026-05-20 update** — replaced the 14% / 8% / 12% gradient with a
-   * single flat opacity per theme. The gradient produced visible banding
-   * as you scrolled long pages (top heavier blue, middle lighter, bottom
-   * heavier blue again) — founder feedback "bluish tinge is not [uniform]
-   * across the entire page". A single value reads as a consistent
-   * atmospheric tint instead of a streak.
+   * Timeline:
+   *   2026-05-17: introduced as a gradient (14% top → 8% mid → 12% bot)
+   *   2026-05-20: replaced gradient with flat opacity (banding fix)
+   *   2026-05-22: REMOVED — landing page's gradient blobs + this wash
+   *               read as "too many overlays" cumulatively
+   *   2026-05-30: RESTORED — without this wash, every non-landing page
+   *               (scorecard, signals, pricing, how-it-works) felt flat
+   *               vs landing. Landing kept its blobs; this wash gives
+   *               the rest of the site matching atmospheric blue.
    *
-   * Light mode uses 5% (barely-there iOS blue wash) so the warm card
-   * surfaces stay legible against it. Dark mode keeps the visible 10%
-   * navy wash that the founder already liked.
-   *
-   * pointer-events:none so the overlay never blocks clicks; z-index:-1
-   * keeps it behind every page element including <main>.
+   * pointer-events:none so it never blocks clicks; z-index:-1 keeps it
+   * behind every body child. body is position:relative so it owns the
+   * stacking context.
    */
   body::before {
     content: "";
@@ -154,7 +155,7 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background-color: rgb(var(--accent) / var(--atmosphere-opacity, 0.05));
+    background-color: rgb(var(--accent) / var(--atmosphere-opacity, 0.08));
   }
   .nums {
     font-variant-numeric: tabular-nums;
@@ -196,6 +197,54 @@
     border-radius: 14px;
     backdrop-filter: blur(20px) saturate(140%);
     -webkit-backdrop-filter: blur(20px) saturate(140%);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  }
+
+  /*
+   * `.card-link` — opt-in interaction layer for cards that wrap a Link
+   * (sister-feature nav, blog cards, related rankings). Subtle lift +
+   * softer shadow on hover, ~iOS-style. Not applied to .card itself
+   * because most cards are containers, not clickable surfaces; adding
+   * this differentiates "this is interactive" from "this is a panel".
+   */
+  .card-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgb(var(--shadow));
+  }
+  /* Same idea but for non-`.card` linked panels — the bordered rounded
+     divs the blog index + sister-feature lists use. Reuses the same
+     transition window. */
+  .lift {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgb(var(--shadow));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-link:hover,
+    .lift:hover {
+      transform: none;
+    }
+  }
+
+  /*
+   * `.fade-in` — 150ms opacity ramp + small upward translate. Applied
+   * to top-level page <main> wrappers via the route layout so route
+   * navigations feel produced rather than hard-cut. Reduced-motion
+   * users get the final state immediately, no animation.
+   */
+  .fade-in {
+    animation: page-fade-in 0.18s ease-out both;
+  }
+  @keyframes page-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in {
+      animation: none;
+    }
   }
   /* iOS-style pill button — fully rounded, generous horizontal padding,
      subtle scale + opacity on press. */

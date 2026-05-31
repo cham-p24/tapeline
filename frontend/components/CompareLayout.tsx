@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { CompareIndex } from "@/components/CompareIndex";
 import {
   breadcrumbJsonLd,
@@ -95,10 +96,55 @@ export function CompareLayout({
     { name: "Compare", url: "https://tapeline.io/compare" },
     { name: `vs ${competitor}`, url: pageUrl },
   ]);
+
+  // Review schema — derived dynamically from the actual win/tradeoff
+  // counts on this page so no two compare pages claim the same rating.
+  // Cap at 4.8 to stay honest (no self-perfect 5.0). Star variant in
+  // SERP is typically +20-40% CTR over plain results — meaningful
+  // because compare pages get high commercial-investigation traffic.
+  // 2026-05-22: added on top of existing FAQ + breadcrumbs + head-to-
+  // head schemas, replicating the same pattern that worked on
+  // /best-finviz-alternatives (PR #167).
+  const winRatio = wins.length / Math.max(1, wins.length + tradeoffs.length);
+  const tapelineRating =
+    Math.min(4.8, Math.max(3.5, Math.round(winRatio * 5 * 10) / 10));
+  const reviewSchema = {
+    "@context": "https://schema.org",
+    "@type": "Review",
+    itemReviewed: {
+      "@type": "SoftwareApplication",
+      name: "Tapeline",
+      applicationCategory: "FinanceApplication",
+      applicationSubCategory: "Stock Scanner",
+      operatingSystem: "Web",
+      url: "https://tapeline.io",
+    },
+    reviewRating: {
+      "@type": "Rating",
+      ratingValue: tapelineRating,
+      bestRating: 5,
+      worstRating: 1,
+    },
+    author: {
+      "@type": "Organization",
+      name: "Tapeline editorial",
+      url: "https://tapeline.io/about",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Tapeline",
+      url: "https://tapeline.io",
+    },
+    datePublished: verifiedOn,
+    reviewBody: `Side-by-side comparison of Tapeline against ${competitor}: ${wins.length} categor${wins.length === 1 ? "y" : "ies"} where Tapeline wins outright and ${tradeoffs.length} honest tradeoff${tradeoffs.length === 1 ? "" : "s"} where ${competitor} is the better fit.`,
+    name: `Tapeline vs ${competitor}`,
+    url: pageUrl,
+  };
   return (
     <main className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <script {...jsonLdScript(breadcrumbs)} />
+      <script {...jsonLdScript(reviewSchema)} />
       {headToHead.map((g, i) => (
         <script key={`compld-${i}`} {...jsonLdScript(g)} />
       ))}
@@ -162,6 +208,15 @@ export function CompareLayout({
               <p className="mt-2 text-sm text-muted leading-relaxed">{r.note}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Newsletter mid-funnel capture — comparison-shoppers who haven't
+          decided yet but will read a daily Top 10 email. Lower commitment
+          than /signup; same conversion bucket via method='newsletter'. */}
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-6">
+        <div className="rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="compare" heading="" sub="" />
         </div>
       </section>
 

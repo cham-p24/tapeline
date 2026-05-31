@@ -52,6 +52,67 @@ export function handle401(status: number) {
   window.location.href = `/signin?next=${next}`;
 }
 
+/**
+ * Normalise a caught `unknown` to a display string. Lets call sites use
+ * `catch (e: unknown)` — strict, no implicit `any` — while keeping the terse
+ * `setError(errorMessage(e))` shape. `Error` (incl. TierGateError) → its
+ * `.message`; anything else → `String()`. Type-safe replacement for the old
+ * `String(e.message || e)` idiom that was repeated across ~10 catch blocks.
+ */
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
+
+/**
+ * Typed 403 — tier-gate. Thrown by every helper in this file when the
+ * backend returns 403 (Pro / Premium feature attempted from a lower
+ * tier). Carries the backend's human message + an inferred `requiredTier`
+ * so callers can render a Paywall directly without string-matching the
+ * 'Failed: 403 Forbidden' format.
+ *
+ * Detection: `if (e instanceof TierGateError) { ... }`. The backend's
+ * 403 messages are stable phrases like "Squeeze scanner is a Pro feature"
+ * — we parse `Pro` / `Premium` out for the tier label. Falls back to
+ * 'pro' if the phrase shape changes.
+ */
+export class TierGateError extends Error {
+  readonly status = 403;
+  readonly requiredTier: "pro" | "premium";
+  constructor(message: string) {
+    super(message);
+    this.name = "TierGateError";
+    this.requiredTier = /premium/i.test(message) ? "premium" : "pro";
+  }
+}
+
+/**
+ * Parse the FastAPI error envelope. Backend returns `{ detail: "<msg>" }`
+ * on HTTPException — extract that. Falls back to status text when the
+ * response isn't JSON.
+ */
+async function extractDetail(res: Response): Promise<string> {
+  try {
+    const body = await res.clone().json();
+    if (typeof body?.detail === "string") return body.detail;
+  } catch {
+    // not JSON
+  }
+  return `${res.status} ${res.statusText}`;
+}
+
+/**
+ * Centralised non-2xx handling — call from every helper after handle401()
+ * but before throwing. Throws TierGateError on 403 (with the backend's
+ * actual feature-required message); throws plain Error otherwise.
+ */
+async function throwForStatus(res: Response): Promise<never> {
+  if (res.status === 403) {
+    throw new TierGateError(await extractDetail(res));
+  }
+  throw new Error(await extractDetail(res));
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
@@ -59,7 +120,7 @@ async function get<T>(path: string): Promise<T> {
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -354,7 +415,7 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -367,7 +428,7 @@ async function del<T>(path: string, token?: string): Promise<T> {
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -384,7 +445,7 @@ async function patch<T>(path: string, body: unknown, token?: string): Promise<T>
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -397,7 +458,7 @@ async function getAuth<T>(path: string, token: string): Promise<T> {
   });
   if (!res.ok) {
     handle401(res.status);
-    throw new Error(`${res.status} ${res.statusText}`);
+    await throwForStatus(res);
   }
   return res.json();
 }
@@ -429,13 +490,57 @@ export const api = {
     });
     if (!res.ok) {
       handle401(res.status);
-      throw new Error(`${res.status} ${await res.text()}`);
+      await throwForStatus(res);
     }
     return res.json() as Promise<{ prefs: Record<EmailPrefKey, boolean> }>;
   },
   news: (symbol?: string, limit = 20) => {
     const qs = new URLSearchParams({ limit: String(limit), ...(symbol ? { symbol } : {}) });
     return get<{ count: number; items: Array<{ id: string; title: string; publisher: string; published_at: string; url: string; description: string | null; tickers: string[]; sentiment: number | null }> }>(`/api/news?${qs}`);
+  },
+  inboxList: (params: { status?: string; channel?: string; tier?: number; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status_filter", params.status);
+    if (params.channel) qs.set("channel", params.channel);
+    if (params.tier !== undefined) qs.set("tier", String(params.tier));
+    if (params.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return get<{
+      count: number;
+      items: Array<{
+        id: number;
+        channel: string;
+        author: string;
+        subject: string | null;
+        body_preview: string;
+        received_at: string;
+        tier: number | null;
+        tier_reason: string | null;
+        suggested_reply: string | null;
+        status: string;
+        handled_at: string | null;
+      }>;
+    }>(`/api/inbox${suffix}`);
+  },
+  inboxApprove: async (id: number, replyText?: string) => {
+    const res = await fetch(`${API_BASE}/api/inbox/${id}/approve`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: replyText ? JSON.stringify({ reply_text: replyText }) : undefined,
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+  },
+  inboxReject: async (id: number) => {
+    const res = await fetch(`${API_BASE}/api/inbox/${id}/reject`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
   },
   heatmap: (q?: string) => {
     const qs = new URLSearchParams(q ? { q } : {});
@@ -563,4 +668,13 @@ export const api = {
   alertEvents: (limit = 50) => getAuth<{ count: number; items: AlertEvent[] }>(
     `/api/alerts/events?limit=${limit}`, DEV_TOKEN,
   ),
+
+  // --- Two-factor auth (TOTP) — all tiers, /app/settings/security ----------
+  twoFAStatus: () => get<{ enabled: boolean }>("/api/me/2fa"),
+  twoFASetup: () =>
+    post<{ secret: string; otpauth_uri: string; qr_svg: string }>("/api/me/2fa/setup", {}, DEV_TOKEN),
+  twoFAEnable: (code: string) =>
+    post<{ ok: boolean; recovery_codes: string[] }>("/api/me/2fa/enable", { code }, DEV_TOKEN),
+  twoFADisable: (password: string) =>
+    post<{ ok: boolean }>("/api/me/2fa/disable", { password }, DEV_TOKEN),
 };

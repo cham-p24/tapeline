@@ -437,3 +437,129 @@ async def test_telegram_message(
     return {"ok": True}
 
 
+# ---- Two-factor auth (TOTP / authenticator app) -----------------------------
+#
+# Four endpoints drive the /app/settings/security page:
+#   GET    /api/me/2fa          → { enabled }            status
+#   POST   /api/me/2fa/setup    → { secret, otpauth_uri, qr_svg }  begin enrolment
+#   POST   /api/me/2fa/enable   → { ok, recovery_codes } confirm + mint codes
+#   POST   /api/me/2fa/disable  → { ok }                 turn off (re-auth w/ password)
+#
+# Available to every tier — security isn't a paid feature. Only meaningful for
+# email+password accounts, since the challenge fires on the password signin
+# path (the actual two-step verify lives in routers/auth.py:/2fa).
+
+
+class TwoFAEnableBody(BaseModel):
+    code: str = Field(..., min_length=6, max_length=10)
+
+
+class TwoFADisableBody(BaseModel):
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+@router.get("/2fa")
+async def get_2fa_status(user: User = Depends(current_user_required)) -> dict:
+    """Whether 2FA is currently active for the signed-in user."""
+    return {"enabled": bool(user.mfa_enabled)}
+
+
+@router.post("/2fa/setup")
+async def setup_2fa(
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Begin enrolment: mint a fresh TOTP secret + return the QR / manual key.
+
+    The secret is persisted immediately but `mfa_enabled` stays false until
+    the user proves possession via POST /2fa/enable. Re-calling setup before
+    enabling simply rotates the pending secret.
+    """
+    if user.password_hash is None:
+        raise HTTPException(
+            400,
+            "Two-factor auth is available for accounts that sign in with email + "
+            "password. You currently sign in with a connected provider.",
+        )
+    if user.mfa_enabled:
+        raise HTTPException(400, "Two-factor auth is already enabled.")
+    from app.services.mfa import generate_totp_secret, provisioning_uri, qr_svg
+
+    secret = generate_totp_secret()
+    user.totp_secret = secret
+    await session.commit()
+    uri = provisioning_uri(secret, user.email)
+    logger.info("me.2fa_setup_started user=%s", user.id)
+    return {"secret": secret, "otpauth_uri": uri, "qr_svg": qr_svg(uri)}
+
+
+@router.post("/2fa/enable")
+async def enable_2fa(
+    body: TwoFAEnableBody,
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Confirm enrolment with a live code, flip mfa_enabled, mint recovery codes.
+
+    Returns the 10 plaintext recovery codes ONCE — they're stored hashed and
+    can never be retrieved again. Re-enabling (after a prior enable) is blocked;
+    the user must disable first.
+    """
+    if user.mfa_enabled:
+        raise HTTPException(400, "Two-factor auth is already enabled.")
+    if not user.totp_secret:
+        raise HTTPException(400, "Start setup first — no pending secret to confirm.")
+    from app.models import MfaRecoveryCode
+    from app.services.mfa import (
+        generate_recovery_codes,
+        hash_recovery_code,
+        verify_totp,
+    )
+
+    if not verify_totp(user.totp_secret, body.code):
+        raise HTTPException(
+            400,
+            "That code didn't match. Check your authenticator app's clock and try again.",
+        )
+
+    # Fresh enable replaces any stale recovery codes from a prior enrolment.
+    await session.execute(
+        delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user.id)
+    )
+    codes = generate_recovery_codes()
+    for c in codes:
+        session.add(MfaRecoveryCode(user_id=user.id, code_hash=hash_recovery_code(c)))
+    user.mfa_enabled = True
+    await session.commit()
+    logger.info("me.2fa_enabled user=%s", user.id)
+    return {"ok": True, "recovery_codes": codes}
+
+
+@router.post("/2fa/disable")
+async def disable_2fa(
+    body: TwoFADisableBody,
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Turn 2FA off. Requires the account password as re-authentication so a
+    walk-up attacker with an open session can't silently strip it.
+
+    Clears the secret + all recovery codes. Idempotent if already off.
+    """
+    if not user.mfa_enabled:
+        return {"ok": True}
+    from app.services.session import verify_password
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(401, "Incorrect password.")
+    from app.models import MfaRecoveryCode
+
+    await session.execute(
+        delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user.id)
+    )
+    user.mfa_enabled = False
+    user.totp_secret = None
+    await session.commit()
+    logger.info("me.2fa_disabled user=%s", user.id)
+    return {"ok": True}
+
+

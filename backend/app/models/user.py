@@ -22,11 +22,30 @@ class User(Base):
     # Native auth — bcrypt hash. Null means user was created via Clerk webhook.
     password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Two-factor auth (TOTP / authenticator app). Available to all tiers, but
+    # only meaningful for email+password accounts — the challenge fires on the
+    # /api/auth/signin path, which OAuth users never hit.
+    #
+    # `totp_secret` is the base32 shared secret, written during setup BEFORE
+    # the user confirms. `mfa_enabled` only flips true after a live code
+    # verifies, so a half-finished setup never blocks signin. On disable both
+    # are cleared. See services/mfa.py + routers/me.py:2fa endpoints.
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
+
     # Stamped when the user clicks the verification link in their welcome
     # email (native signup) OR auto-set on OAuth signup (the provider already
     # proved ownership). Null = unverified. Currently informational — no
     # feature gates depend on it, but logging/auditing surfaces show it.
     email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
+    # Stamped when Resend reports a hard bounce or a spam complaint for this
+    # user's address. send_email short-circuits on this column to stop
+    # burning sender reputation on dead addresses. Cleared when the user
+    # changes their email (POST /api/me/email — not yet wired).
+    email_undeliverable_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
 
@@ -160,6 +179,36 @@ class AlertEvent(Base):
     message: Mapped[str] = mapped_column(String(400), nullable=False)
     channel: Mapped[str] = mapped_column(String(20), nullable=False)
     delivered: Mapped[bool] = mapped_column(default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+
+
+class MfaRecoveryCode(Base):
+    """Single-use 2FA recovery codes.
+
+    Ten codes are minted when a user enables TOTP 2FA and shown exactly once
+    (plaintext) in the settings UI. We store only the sha256 hash of the
+    normalised code — never the plaintext — so a DB leak can't be replayed.
+    A code is consumed (used_at stamped) the first time it's accepted at
+    /api/auth/2fa, so it can't be reused. All rows for a user are wiped on
+    disable or on a fresh enable (which re-issues a new set).
+    """
+
+    __tablename__ = "mfa_recovery_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(60),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # sha256 hex of the normalised (lowercased, dash-stripped) plaintext code.
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

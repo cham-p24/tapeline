@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export type FeatureFAQ = { q: string; a: string };
@@ -36,6 +37,20 @@ export const FEATURE_PAGES: SisterFeature[] = [
   { slug: "insider-buying",        label: "Insider buying (Form 4)" },
   { slug: "stock-market-heatmap",  label: "Stock market heatmap" },
   { slug: "market-regime",         label: "Market regime indicator" },
+];
+
+// Adjacent strategy listicles for the cross-feature nav. Each feature page
+// surfaces 3-4 of these in its "Related rankings" strip — funnels visitors
+// from a feature explanation page into a concrete ticker list, then on to
+// /signup. Strategy slugs map to /best-stocks-for/<slug>.
+export type RelatedStrategy = { slug: string; label: string };
+export const STRATEGY_LINKS: RelatedStrategy[] = [
+  { slug: "high-conviction", label: "Highest-scored stocks today" },
+  { slug: "breakouts",       label: "Stocks breaking out today" },
+  { slug: "growth-stocks",   label: "Best growth stocks" },
+  { slug: "ai-stocks",       label: "Best AI stocks" },
+  { slug: "swing-traders",   label: "Best stocks to swing trade" },
+  { slug: "day-traders",     label: "Best stocks to day trade" },
 ];
 
 type Props = {
@@ -154,6 +169,39 @@ export function SeoFeaturePage({
             ))}
           </div>
         </nav>
+
+        {/* Related rankings — links into /best-stocks-for/ listicle pages.
+            Tightens the cross-cluster link graph so the strategy + feature
+            pages reinforce each other in Google's eyes (per GSC audit, the
+            isolated feature pages weren't accumulating crawl signals
+            because they had no inbound from the rest of the site). */}
+        <nav
+          aria-label="Related ticker rankings"
+          className="mt-6 rounded-xl border border-border bg-panel/40 p-6"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
+            Related ticker rankings
+          </h2>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {STRATEGY_LINKS.slice(0, 4).map((s) => (
+              <Link
+                key={s.slug}
+                href={`/best-stocks-for/${s.slug}`}
+                className="text-muted hover:text-accent underline-offset-4 hover:underline"
+              >
+                {s.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
+        {/* Newsletter mid-funnel capture — for visitors not ready to start
+            a trial but willing to give us an email for the daily Top 10
+            digest. Lower-commitment than /signup; same conversion bucket
+            in GA4 via method='newsletter'. */}
+        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="feature" heading="" sub="" />
+        </section>
 
         {/* CTA — tier-aware copy + same gradient as the homepage final CTA. */}
         <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">

@@ -281,6 +281,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_alert_email,
         render_email_verification_email,
         render_eod_watchlist_digest,
+        render_password_reset_email,
         render_payment_failed_email,
         render_re_engagement_email,
         render_referral_referee_email,
@@ -406,6 +407,13 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                 "Alex",
                 verify_url="https://tapeline.io/verify-email?token=demo123",
                 cancel_url="https://tapeline.io/verify-email?token=demo123&action=cancel",
+            ),
+        ),
+        "password_reset": (
+            "Password reset (forgot password flow)",
+            lambda: render_password_reset_email(
+                "Alex",
+                reset_url="https://tapeline.io/reset-password?token=demo123",
             ),
         ),
         "subscription_started_pro_monthly": (
@@ -595,3 +603,60 @@ async def send_email_preview_to_admin(
         return {"status": "skipped", "reason": "no_api_key"}
     logger.info("email_preview.sent name=%s to=%s persona=%s", name, admin.email, persona)
     return {"status": "sent", "to": admin.email, "persona": persona}
+
+
+# ---------------------------------------------------------------------------
+# Growth bot — autonomous content + metrics digest
+# ---------------------------------------------------------------------------
+
+
+@router.get("/growth-tick/preview")
+async def growth_tick_preview(
+    _: User | None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return the growth-bot output WITHOUT emailing.
+
+    Useful for:
+      - Cloud-scheduled Claude sessions that want structured JSON access
+        to today's drafts + metrics without triggering an email send.
+      - Admin curl during testing.
+    """
+    from app.services.growth_bot import (
+        draft_daily_tweet,
+        draft_fintwit_reply_candidates,
+        draft_linkedin_post,
+        pull_growth_metrics,
+        pull_top_picks,
+    )
+
+    metrics = await pull_growth_metrics(session)
+    picks = await pull_top_picks(session, limit=5)
+    return {
+        "metrics": metrics.to_dict(),
+        "picks": [
+            {"symbol": p.symbol, "name": p.name, "score": p.score, "signal": p.signal,
+             "reason": p.reason}
+            for p in picks
+        ],
+        "daily_tweet": draft_daily_tweet(picks),
+        "linkedin": draft_linkedin_post(weekday=metrics.as_of.weekday()),
+        "fintwit_candidates": draft_fintwit_reply_candidates(picks),
+    }
+
+
+@router.post("/growth-tick/run")
+async def growth_tick_run(
+    _: User | None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Manually trigger a growth tick.
+
+    Runs the same path as the daily worker — pulls metrics, generates
+    drafts, sends the digest email. Use to verify the bot is healthy
+    after config changes. Respects `growth_bot_enabled` — if the kill
+    switch is off, the run is a no-op and returns `{"skipped": True}`.
+    """
+    from app.services.growth_bot import run_daily_growth_tick
+
+    return await run_daily_growth_tick(session)

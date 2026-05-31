@@ -86,6 +86,9 @@ async def send_email(
     text: str | None = None,
     *,
     persona: EmailPersona = "default",
+    unsubscribe_user_id: str | None = None,
+    unsubscribe_category: str = "all",
+    skip_if_undeliverable: bool = True,
 ) -> dict[str, Any]:
     """Send a single email via Resend. Returns the Resend response or raises.
 
@@ -95,17 +98,59 @@ async def send_email(
         send_email(..., persona="billing")   # Stripe events
         send_email(..., persona="alerts")    # automated digests
         send_email(..., )                    # everything else (transactional)
+
+    Marketing-category emails should also pass `unsubscribe_user_id` and
+    optionally `unsubscribe_category` — we inject the RFC 8058 +
+    RFC 2369 List-Unsubscribe headers so Gmail renders a native opt-out
+    button next to the sender name. Transactional emails (welcome,
+    payment-failed, verification, subscription-started) should NOT pass
+    these — they're account-state notifications the user can't opt out
+    of, and adding the header would mislead Gmail's classifier.
+
+    `skip_if_undeliverable` defaults True — checks `User.email_undeliverable_at`
+    via the email address (one extra DB query per send, acceptable at our
+    volume). Stops us burning Resend reputation on bounces / spam-flags.
+    Set False for self-test paths (admin "send to me" button) that need
+    to deliver regardless of historical bounces.
     """
     if not settings.resend_api_key:
         logger.warning(
             "email.skipped reason=no_api_key persona=%s to=%s subject=%s",
             persona, to, subject,
         )
-        return {"skipped": True}
+        return {"skipped": True, "reason": "no_api_key"}
+
+    # Stop sending to addresses Resend has already told us are dead. One
+    # cheap query per send; saves us from racking up bounces that would
+    # tank the domain's sender reputation.
+    if skip_if_undeliverable:
+        try:
+            from sqlalchemy import select
+
+            from app.db import session_scope
+            from app.models import User
+
+            async with session_scope() as s:
+                r = await s.execute(
+                    select(User.email_undeliverable_at).where(
+                        User.email == to.lower().strip(),
+                    )
+                )
+                row = r.first()
+                if row is not None and row[0] is not None:
+                    logger.info(
+                        "email.skipped reason=undeliverable persona=%s to=%s",
+                        persona, to,
+                    )
+                    return {"skipped": True, "reason": "undeliverable"}
+        except Exception:
+            # Never let a stray DB error block a send; we'd rather burn
+            # a tiny reputation hit than fail to deliver a real message.
+            logger.exception("email.undeliverable_check_failed to=%s", to)
 
     sender, reply_to = _persona_addresses(persona)
 
-    payload = {
+    payload: dict[str, Any] = {
         "from": f"Tapeline <{sender}>",
         "to": [to],
         "subject": subject,
@@ -114,6 +159,25 @@ async def send_email(
     }
     if text:
         payload["text"] = text
+
+    # RFC 8058 / 2369 List-Unsubscribe headers for marketing categories.
+    # Gmail + Outlook render a native unsubscribe button when both headers
+    # are present and the URL resolves on POST. Omitted when session_secret
+    # isn't configured (orchestrator passes the user id but unsubscribe.py
+    # returns {} for the headers).
+    if unsubscribe_user_id:
+        try:
+            from app.services.unsubscribe import list_unsubscribe_headers
+            extra_headers = list_unsubscribe_headers(
+                unsubscribe_user_id, unsubscribe_category,
+            )
+            if extra_headers:
+                payload["headers"] = extra_headers
+        except Exception:
+            logger.exception(
+                "email.unsubscribe_header_failed user=%s",
+                unsubscribe_user_id,
+            )
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -698,6 +762,84 @@ async def mint_and_send_verification(session, user) -> bool:
         return False
 
 
+# ── Password reset ───────────────────────────────────────────────────────────
+
+def render_password_reset_email(user_name: str, reset_url: str) -> str:
+    """Sent when a user clicks "Forgot password?" at /signin.
+
+    Single CTA, short TTL (60 min in the orchestrator), terse copy. The
+    "wasn't you?" angle for password reset is handled differently from
+    verification: ignoring the email leaves the account intact, so the
+    footer just tells them they can safely ignore.
+    """
+    return shell(
+        h1(f"Reset your Tapeline password, {user_name}.")
+        + lead(
+            "Click below to choose a new password. The link is good for "
+            "60 minutes — after that it stops working and you'll need "
+            "to request a new one."
+        )
+        + button("Choose a new password", reset_url)
+        + footnote(
+            "Didn't request this? You can safely ignore this email — "
+            "your password is unchanged and no one accessed your account. "
+            "If you're seeing repeat reset emails you didn't ask for, "
+            "let us know at support@tapeline.io."
+        ),
+        preheader="Reset link inside — good for 60 minutes.",
+    )
+
+
+async def mint_and_send_password_reset(session, user) -> bool:
+    """Mint a fresh 60min password-reset token for `user`, send the
+    email, return True if delivery was attempted (False if Resend was
+    skipped or render failed).
+
+    Idempotent: wipes any prior unused tokens for this user before
+    issuing a new one. Means a user spam-clicking "forgot password"
+    doesn't end up with multiple live links — only the latest works.
+    """
+    import secrets
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import delete
+
+    from app.config import get_settings as _settings_factory
+    from app.models import PasswordResetToken
+
+    s = _settings_factory()
+
+    await session.execute(
+        delete(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+    )
+
+    token = secrets.token_urlsafe(48)
+    expires = datetime.now(UTC) + timedelta(minutes=60)
+    session.add(PasswordResetToken(
+        token=token, user_id=user.id, expires_at=expires,
+    ))
+    await session.commit()
+
+    base = s.app_url.rstrip("/")
+    reset_url = f"{base}/reset-password?token={token}"
+
+    try:
+        html = render_password_reset_email(user.name or "trader", reset_url)
+        res = await send_email(
+            user.email,
+            "Reset your Tapeline password",
+            html,
+            persona="default",
+        )
+        return not res.get("skipped", False)
+    except Exception:
+        logger.exception("password_reset.send_failed user=%s", user.id)
+        return False
+
+
 # ── Payment-failed ──────────────────────────────────────────────────────────
 
 def _ordinal(n: int) -> str:
@@ -1051,6 +1193,8 @@ async def run_eod_watchlist_digest(session) -> int:
             res = await send_email(
                 user.email, f"Tapeline EOD · {_today_short()}", html,
                 persona="alerts",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="daily_digest",
             )
             if not res.get("skipped", False):
                 sent += 1
@@ -1144,7 +1288,11 @@ async def run_daily_drip(session) -> dict[str, int]:
                 # Day 3 is soft activation — keep under the default
                 # transactional sender. Day 7 onwards is the conversion push.
                 drip_persona: EmailPersona = "default" if token == "3" else "sales"
-                res = await send_email(user.email, subject, html, persona=drip_persona)
+                res = await send_email(
+                    user.email, subject, html, persona=drip_persona,
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="trial_drip",
+                )
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
                     user.drip_state = ",".join(sorted(sent_tokens))
@@ -1462,6 +1610,8 @@ async def run_weekly_newsletter(session, *, now=None) -> int:
                 f"Tapeline weekly · {week_label}",
                 html,
                 persona="alerts",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="weekly_newsletter",
             )
             if not res.get("skipped", False):
                 sent_tokens.add(token)
@@ -1522,6 +1672,8 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
             res = await send_email(
                 user.email, "Tapeline missed you", html,
                 persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
             )
             if not res.get("skipped", False):
                 sent_tokens.add("re14")

@@ -23,18 +23,11 @@ export default function LandingPage() {
           The TickerSearch previously sat under the preview, doing the same
           job twice; removed so the eye lands on one demo, not two. */}
       <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
-        {/* Decorative gradient blobs — positioned relative to the full viewport
-            (no max-w-6xl wrapper) so they bleed full-bleed rather than creating
-            a visible "boxed-in" rectangle on wide screens. Two soft, oversized
-            blobs read as ambient atmosphere, the way Linear / Stripe / Vercel
-            heroes do — page first, container second. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute left-1/2 top-[-15%] h-[680px] w-[1400px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
-          <div className="absolute left-[-8%] top-[20%] h-[420px] w-[640px] rounded-full bg-up/[0.04] blur-3xl" />
-        </div>
+        {/* Decorative gradient blobs removed 2026-05-22 — too many ambient
+            overlays were competing with the actual content + colliding with
+            the body::before atmospheric tint, producing an unintentionally
+            heavy stacked effect. Sections now use solid panel tints (below)
+            for hierarchy rather than blurred colour halos. */}
         <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
           <div className="lg:col-span-2 lg:pt-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
@@ -92,13 +85,7 @@ export default function LandingPage() {
           different visual treatments for two different jobs.
           Section is `relative overflow-hidden` so we can drop in a soft
           right-side accent blob that picks up the atmosphere from the hero. */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
-        </div>
+      <section>
         <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
         <p className="eyebrow text-accent">Why Tapeline</p>
         <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
@@ -204,16 +191,7 @@ export default function LandingPage() {
               and Google's crawl budget for a new domain never reached
               /blog → individual post. Posts are sorted newest-first; show
               the most recent 6 inline + "see all" link to /blog. */}
-      <section className="relative overflow-hidden bg-panel/10">
-        {/* Mid-page atmospheric accent — opposite side from the "Why" section
-            blob so the eye traces a soft accent zigzag down the page rather
-            than seeing a single column of colour. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
-        </div>
+      <section className="bg-panel/10">
         <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
@@ -233,7 +211,7 @@ export default function LandingPage() {
               <FadeIn key={p.slug} delayMs={0}>
                 <Link
                   href={`/blog/${p.slug}`}
-                  className="block h-full rounded-2xl border border-border bg-panel/40 p-6 transition hover:border-accent/40 hover:bg-panel/60"
+                  className="lift block h-full rounded-2xl border border-border bg-panel/40 p-6 hover:border-accent/40 hover:bg-panel/60"
                 >
                   <p className="text-xs font-mono text-subtle">
                     {new Date(p.publishedAt).toLocaleDateString("en-GB", {
@@ -267,13 +245,7 @@ export default function LandingPage() {
           Wrapped in a relative-positioned container so we can drop a soft
           accent blob behind the FAQ for visual continuity with the rest of
           the page. */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
-        </div>
+      <section>
         <div className="mx-auto max-w-3xl px-6 py-8 sm:py-12">
         <p className="eyebrow text-accent">Common questions</p>
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">

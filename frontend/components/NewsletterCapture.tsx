@@ -26,8 +26,13 @@ import { getStoredUtm } from "@/lib/utm";
  */
 type Props = {
   /** Where on the site this instance is rendered. Logged to the row's
-   * `source` column so we know which surface converts the email. */
-  source: "homepage" | "scorecard" | "pricing" | "blog" | "footer";
+   * `source` column so we know which surface converts the email.
+   * 'feature' — SEO feature landing pages (squeeze, congress, etc.)
+   * 'signals' — the /signals public universe page
+   * 'strategy' — /best-stocks-for/[strategy] listicle pages
+   * 'compare' — /compare/* head-to-head pages
+   */
+  source: "homepage" | "scorecard" | "pricing" | "blog" | "footer" | "feature" | "signals" | "strategy" | "compare";
   /** Optional headline override; defaults to "Get the daily Top 10 picks". */
   heading?: string;
   /** Optional sub-line override. */

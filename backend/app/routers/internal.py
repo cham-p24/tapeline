@@ -62,10 +62,18 @@ _sheet_debounce_lock: asyncio.Lock = asyncio.Lock()
 
 async def _run_sheet_refresh(tab: str | None) -> None:
     """Background task body — opens its own session because the request
-    session has already been closed by the time the task runs."""
+    session has already been closed by the time the task runs.
+
+    Resets the CSV content-hash cache before refreshing so the manual
+    trigger always re-parses + re-upserts, even if Google's CDN hasn't
+    bumped the byte representation yet (their published-CSV cache TTL
+    is ~5 min). The poll-based path keeps using the cache; this is
+    just the explicit "I just edited the sheet, push it through" lane.
+    """
     # Local import avoids loading the heavy sheet_feed module at app boot.
     from app.db import SessionLocal
-    from app.services.sheet_feed import refresh_all_tabs
+    from app.services.sheet_feed import refresh_all_tabs, reset_csv_hash_cache
+    reset_csv_hash_cache()
     async with SessionLocal() as session:
         try:
             counts = await refresh_all_tabs(session)

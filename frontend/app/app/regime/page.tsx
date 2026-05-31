@@ -258,8 +258,11 @@ export default function RegimePage() {
             <Kpi label="Sector leaders" value={r.sector_leaders} copy={SL_COPY} small />
           </div>
 
-          {/* Where the regime comes from — transparency block */}
-          <div className="card mt-8 p-5 text-sm">
+          {/* Where the regime comes from — transparency block. p-6 to match
+              the other top-level regime cards (Current Regime, F&G dial)
+              on this page; previously p-5 made this block look subtly
+              smaller than its peers despite carrying the same weight. */}
+          <div className="card mt-8 p-6 text-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Where this regime score comes from</h2>
             <p className="mt-3 text-muted leading-relaxed">
               The regime classifier weights four inputs: VIX percentile vs its

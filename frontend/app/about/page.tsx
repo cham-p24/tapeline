@@ -200,7 +200,7 @@ export default function AboutPage() {
                 href={p.url}
                 target="_blank"
                 rel="noopener noreferrer me"
-                className="group flex items-baseline justify-between rounded-lg border border-border bg-panel/40 px-4 py-3 transition-colors hover:border-border2 hover:bg-panel/60"
+                className="lift group flex items-baseline justify-between rounded-lg border border-border bg-panel/40 px-4 py-3 hover:border-border2 hover:bg-panel/60"
               >
                 <span className="font-medium">{p.name}</span>
                 <span className="text-xs text-subtle font-mono group-hover:text-muted">

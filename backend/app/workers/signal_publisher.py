@@ -60,11 +60,13 @@ _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top
 _last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
 _last_stale_audit_date: str | None = None  # "YYYY-MM-DD" of last stale-link audit + alert
 _last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
+_last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
 _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
+_last_inbox_tick: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -526,11 +528,79 @@ async def tick() -> None:
             logger.exception("seo_digest.weekly.failed")
         _last_seo_digest_token = seo_digest_token
 
+    # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
+    # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.
+    # Generates copy-paste-ready X / LinkedIn / fintwit drafts + a
+    # conversion-funnel snapshot, emails the package to the founder.
+    # No-op when GROWTH_BOT_ENABLED is false (default — opt-in).
+    # Weekdays only — no growth tick on Sat/Sun so the founder's inbox
+    # doesn't ping at 8am on the weekend.
+    global _last_growth_tick_date
+    if (
+        settings.growth_bot_enabled
+        and started.hour >= 22                            # 22:00 UTC onward
+        and started.weekday() < 5                         # Mon-Fri
+        and _last_growth_tick_date != today_str
+    ):
+        try:
+            from app.services.growth_bot import run_daily_growth_tick
+            async with session_scope() as gb_session:
+                result = await run_daily_growth_tick(gb_session)
+            logger.info(
+                "growth_bot.tick_complete picks=%d fintwit=%d skipped=%s",
+                result.get("picks_count", 0),
+                result.get("fintwit_candidates_count", 0),
+                result.get("skipped", False),
+            )
+        except Exception:
+            logger.exception("growth_bot.tick_failed")
+        _last_growth_tick_date = today_str
+
+    # Inbox auto-handler tick: poll Reddit (the only channel that needs
+    # polling — email is webhook-driven via /api/inbox/email; Telegram
+    # alerts are dispatched at classification time). Cadence: 5 min
+    # during US market hours (more chatter), 15 min off-hours. No-ops
+    # cleanly when REDDIT_* credentials are unset.
+    global _last_inbox_tick
+    is_inbox_market_hours = (
+        started.weekday() < 5 and 13 <= started.hour < 21  # 9am-5pm ET ≈ 13-21 UTC
+    )
+    inbox_interval = 300 if is_inbox_market_hours else 900
+    if _last_inbox_tick is None or (started - _last_inbox_tick).total_seconds() >= inbox_interval:
+        _last_inbox_tick = started
+        try:
+            await _run_inbox_tick()
+        except Exception:
+            logger.exception("inbox.tick_failed")
+
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
         "tick.done snapshots=%d squeezes=%d regime=%s trades_added=%d elapsed=%.2fs",
         len(snapshots), len(squeezes), regime["regime"], len(new_trades), elapsed,
     )
+
+
+async def _run_inbox_tick() -> None:
+    """One inbox-poll cycle.
+
+    Currently only polls Reddit — email + Telegram inbound are both
+    webhook-driven so don't need a poller. The Reddit poller is the
+    safety net for the only inbound channel that doesn't get a push.
+
+    Honours the per-channel + global kill switches via the called
+    services; no need to re-check here.
+    """
+    try:
+        from app.services.reddit_inbox import poll_reddit_inbox
+        async with session_scope() as session:
+            counts = await poll_reddit_inbox(session)
+        if counts.get("total"):
+            logger.info(
+                "inbox.reddit_poll dms=%d comments=%d mentions=%d",
+                counts["dms"], counts["comments"], counts["mentions"],
+            )
+    except Exception:
+        logger.exception("inbox.reddit_poll_failed")
 
 
 async def _ensure_daily_scorecard(today: date) -> None:

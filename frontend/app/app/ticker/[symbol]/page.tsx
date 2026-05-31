@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type TickerDetail } from "@/lib/api";
+import { api, type TickerDetail, TierGateError, errorMessage } from "@/lib/api";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
@@ -13,6 +13,7 @@ import { InsiderTab } from "@/components/InsiderTab";
 import { Paywall } from "@/components/Paywall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 
 type DetailTab = "financials" | "insider";
@@ -30,7 +31,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
 
   const load = useCallback(async () => {
     try { setData(await api.ticker(symbol)); setError(null); }
-    catch (e: any) { setError(String(e.message || e)); }
+    catch (e: unknown) { setError(errorMessage(e)); }
   }, [symbol]);
 
   useEffect(() => { load(); }, [load]);
@@ -44,8 +45,8 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     try {
       await api.watchlistAdd(symbol);
       setAddMsg(`${symbol} added to watchlist`);
-    } catch (e: any) {
-      const m = String(e.message || e);
+    } catch (e: unknown) {
+      const m = errorMessage(e);
       if (m.includes("401")) {
         window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
         return;
@@ -69,21 +70,45 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         channel: "email",
       });
       setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
-    } catch (e: any) {
-      const m = String(e.message || e);
-      if (m.includes("401")) {
-        window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
-        return;
+    } catch (e: unknown) {
+      // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
+      if (e instanceof TierGateError) {
+        // Backend's exact message — e.g. "Email alerts require Pro tier"
+        setNewsAlertMsg(`${e.message} — upgrade at /app/billing`);
+      } else {
+        const m = errorMessage(e);
+        if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
+        else setNewsAlertMsg(`Failed: ${m}`);
       }
-      if (m.includes("403")) setNewsAlertMsg("Pro plan required for email alerts");
-      else if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
-      else setNewsAlertMsg(`Failed: ${m}`);
     }
     setNewsAlerting(false);
   }
 
   if (error) return <div className="card p-8 text-down">Error: {error}</div>;
-  if (!data) return <div className="card p-8 text-muted">Loading {symbol}…</div>;
+  if (!data)
+    return (
+      <div className="space-y-4">
+        {/* Skeleton matches the post-load ticker page header + first-row
+            cards, so the layout doesn't shift when data lands. Plain
+            "Loading…" text was jarring on a page this dense. */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-3 w-32 animate-pulse rounded bg-panel" />
+            <div className="h-10 w-28 animate-pulse rounded bg-panel" />
+            <div className="h-4 w-48 animate-pulse rounded bg-panel" />
+          </div>
+          <div className="space-y-2 text-right">
+            <div className="ml-auto h-10 w-28 animate-pulse rounded bg-panel" />
+            <div className="ml-auto h-4 w-20 animate-pulse rounded bg-panel" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="card h-40 animate-pulse" />
+          <div className="card h-40 animate-pulse" />
+          <div className="card h-40 animate-pulse" />
+        </div>
+      </div>
+    );
 
   const toneSig =
     data.signal === "HIGH CONVICTION" ? "text-up bg-up/20"
@@ -92,6 +117,18 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     : data.signal === "NEUTRAL" ? "text-muted bg-muted/20"
     : data.signal === "CAUTION" ? "text-warn bg-warn/10"
     : "text-down bg-down/10";
+
+  // Animate the score number on first paint (and only first paint —
+  // useCountUp snaps on subsequent updates so the 60s live-stream
+  // refresh doesn't re-animate). Pass the integer floor; the .toFixed(1)
+  // tail is rendered separately so we only animate the meaningful part.
+  // Multiply by 10 to preserve the one-decimal precision while
+  // animating an integer.
+  const animatedScoreX10 = useCountUp(
+    data.score != null ? Math.round(data.score * 10) : null,
+  );
+  const displayScore =
+    animatedScoreX10 != null ? (animatedScoreX10 / 10).toFixed(1) : "—";
 
   return (
     <div>
@@ -162,7 +199,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
                 </span>
               )}
             </div>
-            <div className="mt-1 text-4xl font-bold">{data.score?.toFixed(1)}</div>
+            <div className="mt-1 text-4xl font-bold nums">{displayScore}</div>
             <div className={`mt-2 inline-block rounded px-2 py-0.5 text-xs ${toneSig}`}>
               {data.signal}
             </div>

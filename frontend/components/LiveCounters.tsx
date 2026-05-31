@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useCountUp } from "@/lib/useCountUp";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.tapeline.io";
 
@@ -10,49 +11,6 @@ type StatusBody = {
     worker_last_tick?: { regime?: string; age_seconds?: number };
   };
 };
-
-/**
- * Counts up to `target` over ~1.2s the first time a non-null value
- * arrives, eased. Subsequent updates snap (no re-animation per refresh).
- * Honours prefers-reduced-motion — those users see the final value
- * immediately, no animation. Returns the integer to display.
- */
-function useCountUp(target: number | null, durationMs = 1200): number | null {
-  const [value, setValue] = useState<number | null>(null);
-  const seenRef = useRef(false);
-
-  useEffect(() => {
-    if (target == null) return;
-    // After the initial draw, just snap to the latest value rather than
-    // re-animating on every 60s status refresh.
-    if (seenRef.current) {
-      setValue(target);
-      return;
-    }
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setValue(target);
-      seenRef.current = true;
-      return;
-    }
-    const start = 0;
-    const startTime = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - startTime) / durationMs);
-      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-      setValue(Math.round(start + (target - start) * eased));
-      if (t < 1) raf = requestAnimationFrame(tick);
-      else seenRef.current = true;
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, durationMs]);
-
-  return value;
-}
 
 /**
  * Live counter strip — plucked from /api/status, refreshed every 60s.
