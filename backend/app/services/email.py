@@ -968,6 +968,51 @@ def render_payment_failed_email(
     )
 
 
+def render_subscription_canceled_email(
+    user_name: str, *, tier: str, period_end_iso: str | None,
+) -> str:
+    """Transactional confirmation of a scheduled cancellation.
+
+    Reassuring, no hard sell — they keep access until period end and one
+    click reactivates. The actual win-back push comes later via the
+    30/60/90-day drip. No List-Unsubscribe header (account-state, not
+    marketing)."""
+    tier_label = (tier or "your plan").capitalize()
+    when = "the end of your current billing period"
+    if period_end_iso:
+        try:
+            from datetime import datetime as _dt
+
+            when = _dt.fromisoformat(period_end_iso).strftime("%b %d, %Y")
+        except Exception:
+            pass
+    return shell(
+        h1(f"Your plan is set to cancel, {user_name}.")
+        + lead(
+            f"We've scheduled your Tapeline {tier_label} subscription to end on "
+            f"{when}. You keep full access until then — nothing changes today, "
+            f"and you won't be charged again."
+        )
+        + muted_paragraph(
+            "After that your account moves to Free — top 20 tickers, 24-hour "
+            "delayed. Your watchlist, saved scans, and alert rules are kept on "
+            "file, so if you come back they're exactly where you left them."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Changed your mind?</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">One click keeps everything running — same plan, same price, no gap in your data.</p>'
+            + button("Keep my plan", "https://tapeline.io/app/billing"),
+            accent=True,
+        )
+        + footnote(
+            "Mind sharing why you're leaving? Just reply — every response is "
+            "read by a human (me), and it's the single biggest thing that "
+            "makes Tapeline better.<br><br>— Christian, founder."
+        ),
+        preheader=f"Access stays live until {when}. One click reactivates.",
+    )
+
+
 # ── EOD watchlist digest ────────────────────────────────────────────────────
 
 def _today_short() -> str:
@@ -1029,6 +1074,129 @@ def render_re_engagement_email(user_name: str) -> str:
             f'<a href="https://tapeline.io/how-it-works" style="color:{LIGHT_SUBTLE};text-decoration:underline;">The formula is still public.</a>'
         ),
         preheader="Two weeks since you last opened the scanner — the scorecard kept running.",
+    )
+
+
+# ── Win-back (post-cancellation 30 / 60 / 90-day drip) ──────────────────────
+
+def _winback_scorecard_line(scorecard: dict | None) -> str:
+    """One-liner of public-scorecard proof, when we have it. Drives the
+    'the track record kept running while you were gone' angle that makes
+    win-back convert better than a bare discount.
+
+    Reads defensively across the two scorecard shapes in the codebase:
+    the newsletter payload (_build_newsletter_payload) uses hit_rate_pct /
+    avg_alpha_pct / best; the scorecard router (_summary_stats) uses
+    hit_rate_beat_spy / median_alpha_vs_spy. We accept whichever the
+    caller hands us so the proof line never silently goes blank on a
+    key rename."""
+    if not scorecard:
+        return ""
+
+    def _first_num(*keys: str) -> float | None:
+        for k in keys:
+            v = scorecard.get(k)
+            if isinstance(v, (int, float)):
+                return float(v)
+        return None
+
+    hit = _first_num("hit_rate_pct", "hit_rate_beat_spy", "hit_rate")
+    alpha = _first_num("avg_alpha_pct", "median_alpha_vs_spy", "median_alpha")
+    best = scorecard.get("best")
+    best = best if isinstance(best, dict) else None
+
+    bits: list[str] = []
+    if hit is not None:
+        bits.append(f"{round(hit)}% of calls beat SPY")
+    if alpha is not None:
+        bits.append(f"{'+' if alpha >= 0 else ''}{alpha:.2f}% avg next-day alpha")
+    if best and best.get("symbol") and isinstance(best.get("alpha"), (int, float)):
+        a = float(best["alpha"])
+        bits.append(f"best call {best['symbol']} {'+' if a >= 0 else ''}{a:.2f}% vs SPY")
+    if not bits:
+        return ""
+    return paragraph(
+        "Since you left, the public "
+        f'<a href="https://tapeline.io/scorecard?utm_source=email&utm_campaign=winback&utm_medium=transactional" style="color:{ACCENT};">scorecard</a> '
+        "kept running: " + " · ".join(bits) + "."
+    )
+
+
+def render_winback_email(
+    user_name: str, *, stage: str, scorecard: dict | None = None,
+) -> str:
+    """Graduated post-cancellation win-back. `stage` in {wb30, wb60, wb90}.
+
+    wb30 — soft: your setup is still saved, here's what you've missed.
+    wb60 — proof: the public scorecard kept running; here are the numbers.
+    wb90 — last call + a real returning-customer offer (40% off 3 months,
+           server-gated on canceled_at so the link can't be farmed).
+    Win-back is gated on EmailPref.RE_ENGAGEMENT and carries a
+    List-Unsubscribe header (it's a marketing nudge, not account state)."""
+    proof = _winback_scorecard_line(scorecard)
+    if stage == "wb30":
+        return shell(
+            h1(f"Your Tapeline setup is still here, {user_name}.")
+            + lead(
+                "It's been about a month. Your watchlist, saved scans, and alert "
+                "rules are exactly where you left them — nothing was deleted."
+            )
+            + proof
+            + muted_paragraph(
+                "If the timing just wasn't right, that's completely fair. When "
+                "you want back in, one click restores Premium and everything "
+                "lights up again — no re-setup."
+            )
+            + button(
+                "Pick up where I left off",
+                "https://tapeline.io/app/billing?utm_source=email&utm_campaign=winback_30&utm_medium=transactional",
+            )
+            + footnote("Two more notes over the next two months, then I'll stop. — Christian, founder."),
+            preheader="Your watchlist + alerts are still saved — one click restores them.",
+        )
+    if stage == "wb60":
+        return shell(
+            h1("The track record kept running without you.")
+            + lead(
+                f"{user_name}, the thing most scanners hide is the one we publish: "
+                f"every daily top-10 call, back-checked against SPY the next session."
+            )
+            + (proof or paragraph(
+                "The public "
+                f'<a href="https://tapeline.io/scorecard?utm_source=email&utm_campaign=winback_60&utm_medium=transactional" style="color:{ACCENT};">scorecard</a> '
+                "shows every call we've made — hits and misses, no survivor bias."
+            ))
+            + muted_paragraph(
+                "If Tapeline didn't earn its keep last time, the scorecard is the "
+                "honest way to judge whether it would now. It's all there, public."
+            )
+            + button(
+                "See the scorecard",
+                "https://tapeline.io/scorecard?utm_source=email&utm_campaign=winback_60&utm_medium=transactional",
+            )
+            + footnote("One more note next month, then I'll stop emailing. — Christian, founder."),
+            preheader="Every call we've made since you left — public, back-checked vs SPY.",
+        )
+    # wb90 — last call, with the returning-customer discount.
+    return shell(
+        h1("Last note — and a standing offer.")
+        + lead(
+            f"{user_name}, this is the final win-back email. If Tapeline isn't "
+            f"for you, no hard feelings and no more mail."
+        )
+        + proof
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Returning-customer offer</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">Come back and your first 3 months are <strong>40% off</strong> — automatically applied at checkout. Your saved watchlist, scans, and alerts come back with you.</p>'
+            + button(
+                "Reactivate — 40% off 3 months",
+                "https://tapeline.io/app/billing?winback=1&utm_source=email&utm_campaign=winback_90&utm_medium=transactional",
+                variant="urgent",
+            ),
+            accent=True,
+        )
+        + footnote("This is the last email in this series. — Christian, founder."),
+        preheader="Last win-back note — 40% off your first 3 months back.",
     )
 
 
@@ -1682,6 +1850,114 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
                 any_sent = True
         except Exception:
             logger.exception("re_engagement.send_failed user=%s", user.id)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_winback_drip(session) -> dict[str, int]:
+    """Graduated post-cancellation win-back at ~30 / 60 / 90 days.
+
+    Population: users who cancelled (canceled_at set) AND have already
+    dropped to free. The tier=="free" gate is what makes the clock honest
+    for annual subscribers — they keep access for months after hitting
+    cancel, so canceled_at only starts "counting" toward win-back once
+    Stripe's subscription.deleted fires and the webhook drops their tier.
+    A monthly user lands in this population ~immediately at period end.
+
+    Stage selection is by elapsed days, NOT a strict ladder: we send the
+    single stage whose window the user is currently in (≥90→wb90,
+    ≥60→wb60, ≥30→wb30) and dedupe on that stage's token in
+    winback_state. If the worker was down across a window the user simply
+    skips the stale earlier note and gets the current one — we never
+    backfill a "it's been about a month" email to someone gone 70 days.
+
+    Resubscribe / pause / save-offer all clear canceled_at (billing
+    endpoints + the subscription webhook), so a returning customer drops
+    out of this query automatically. A fresh cancellation resets
+    winback_state to "" (routers/billing.py), re-arming the full series.
+
+    Marketing nudge → gated on EmailPref.RE_ENGAGEMENT and carries the
+    List-Unsubscribe header via unsubscribe_category="re_engagement".
+    No-op when RESEND_API_KEY is unset (send_email returns skipped:True).
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+
+    now = datetime.now(UTC)
+    counts = {"wb30": 0, "wb60": 0, "wb90": 0}
+
+    result = await session.execute(
+        select(User).where(
+            User.canceled_at.is_not(None),
+            User.tier == "free",
+        )
+    )
+    users = result.scalars().all()
+    if not users:
+        return counts
+
+    # Public-scorecard proof line — fetched once, best-effort. Reuses the
+    # newsletter payload builder (scorecard block only). A failure here
+    # just yields a blank proof block; the win-back email still sends.
+    scorecard = None
+    try:
+        scorecard = (await _build_newsletter_payload(session)).get("scorecard")
+    except Exception:
+        logger.exception("winback.scorecard_fetch_failed")
+
+    subjects = {
+        "wb30": "Your Tapeline setup is still saved",
+        "wb60": "The track record kept running without you",
+        "wb90": "One last note from Tapeline",
+    }
+
+    any_sent = False
+    for user in users:
+        if not user.email:
+            continue
+        # canceled_at is stored tz-aware, but SQLite hands it back naive —
+        # normalise so the subtraction never raises on the test DB.
+        ca = user.canceled_at
+        if ca.tzinfo is None:
+            ca = ca.replace(tzinfo=UTC)
+        days_since = (now - ca).days
+        if days_since >= 90:
+            stage = "wb90"
+        elif days_since >= 60:
+            stage = "wb60"
+        elif days_since >= 30:
+            stage = "wb30"
+        else:
+            continue
+
+        sent_tokens = set((user.winback_state or "").split(",")) - {""}
+        if stage in sent_tokens:
+            continue
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
+            continue
+        try:
+            html = render_winback_email(
+                user.name or "trader", stage=stage, scorecard=scorecard,
+            )
+            res = await send_email(
+                user.email, subjects[stage], html,
+                persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add(stage)
+                user.winback_state = ",".join(sorted(sent_tokens))
+                counts[stage] += 1
+                any_sent = True
+        except Exception:
+            logger.exception("winback.send_failed user=%s stage=%s", user.id, stage)
 
     if any_sent:
         await session.commit()

@@ -80,8 +80,43 @@ class User(Base):
     # The daily worker checks this before sending so a worker restart mid-day
     # doesn't double-send. Welcome (day 0) is fire-once on signup, not tracked here.
     # Also stores the re-engagement token "re14" so the dormant-user email
-    # only fires once per user (see services/email.run_re_engagement_drip).
-    drip_state: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    # only fires once per user (see services/email.run_re_engagement_drip), the
+    # weekly-newsletter "weekly_YYYYWww" tokens, and the activation / annual-nudge
+    # tokens. Widened to 255 in migration 0029 — the weekly token accrues one
+    # entry per week and overran the old String(40) within a month (Postgres
+    # raised StringDataRightTruncation on commit).
+    drip_state: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+
+    # ── Subscription-lifecycle / retention state (migration 0029) ──────────
+    # Set when a paid user pauses billing via the cancel intercept (Stripe
+    # pause_collection). The UI shows "Paused until X"; cleared on resume.
+    subscription_paused_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    # Stamped when the user accepts the one-time 50%-off-for-3-months save
+    # offer in the cancel intercept. Non-null => offer already used, so the
+    # intercept stops presenting it.
+    save_offer_redeemed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    # Stamped when the user sets their subscription to cancel-at-period-end.
+    # Drives the 30/60/90-day winback drip. Cleared if they re-subscribe.
+    canceled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    # Exit-survey capture (cancel intercept final step). reason is a short
+    # enum code; feedback is optional free text.
+    cancellation_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    cancellation_feedback: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # Comma-separated winback tokens already sent ("wb30,wb60,wb90") so the
+    # daily winback drip only fires each stage once per cancellation.
+    winback_state: Mapped[str] = mapped_column(String(60), default="", nullable=False)
+    # Stamped when a high-value signup receives the personal christian@
+    # founder-touch email (lever #4). Column front-loaded in 0029 so that
+    # feature ships migration-free.
+    founder_touch_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
 
     # Bumped on every authenticated request via current_user_optional (throttled
     # to once per hour to avoid write amplification). Drives the re-engagement

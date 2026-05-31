@@ -286,6 +286,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_re_engagement_email,
         render_referral_referee_email,
         render_referral_referrer_email,
+        render_subscription_canceled_email,
         render_subscription_started_email,
         render_trial_day3_email,
         render_trial_day7_email,
@@ -297,6 +298,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_watchlist_alert_email,
         render_weekly_market_digest,
         render_welcome_email,
+        render_winback_email,
     )
 
     sample_picks = [
@@ -314,6 +316,15 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "scorecard_picks_during_trial": 12,
         "scorecard_hit_rate": 67.0, "scorecard_alpha_avg": 0.82,
         "scorecard_best": {"symbol": "PLTR", "as_of": "2026-05-10", "alpha": 3.4},
+    }
+    # Win-back proof line — newsletter-payload scorecard shape
+    # (hit_rate_pct / avg_alpha_pct / best); _winback_scorecard_line reads
+    # it defensively so the day-60/90 emails show real track-record numbers.
+    sample_winback_scorecard = {
+        "picks": 50,
+        "hit_rate_pct": 64.0,
+        "avg_alpha_pct": 0.58,
+        "best": {"symbol": "NVDA", "alpha": 5.2},
     }
     sample_digest = [
         {"symbol": "AAPL", "score": 82, "signal": "STRONG SETUP",
@@ -431,6 +442,26 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                 amount_cents=47999, currency="usd",
                 next_charge_iso="2027-05-19T00:00:00+00:00",
             ),
+        ),
+        "subscription_canceled": (
+            "Subscription set to cancel (exit confirmation)",
+            lambda: render_subscription_canceled_email(
+                "Alex", tier="pro",
+                period_end_iso="2026-06-19T00:00:00+00:00",
+            ),
+        ),
+        # Win-back drip (30 / 60 / 90 days post-cancellation)
+        "winback_30": (
+            "Win-back · day 30 (soft, setup still saved)",
+            lambda: render_winback_email("Alex", stage="wb30", scorecard=sample_winback_scorecard),
+        ),
+        "winback_60": (
+            "Win-back · day 60 (scorecard proof)",
+            lambda: render_winback_email("Alex", stage="wb60", scorecard=sample_winback_scorecard),
+        ),
+        "winback_90": (
+            "Win-back · day 90 (last call, 40% off)",
+            lambda: render_winback_email("Alex", stage="wb90", scorecard=sample_winback_scorecard),
         ),
         "weekly_newsletter": (
             "Weekly market digest (Monday newsletter)",
@@ -581,7 +612,7 @@ async def send_email_preview_to_admin(
         persona = "billing"
     elif name.startswith(("alert", "watchlist_alert", "digest", "weekly_newsletter")):
         persona = "alerts"
-    elif name.startswith(("day7", "day11", "day13", "trial_expired", "trial_post", "re_engagement")):
+    elif name.startswith(("day7", "day11", "day13", "trial_expired", "trial_post", "re_engagement", "winback")):
         persona = "sales"
     else:
         persona = "default"
