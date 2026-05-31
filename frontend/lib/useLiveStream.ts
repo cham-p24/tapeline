@@ -29,7 +29,12 @@ export function useLiveStream(onUpdate: () => void): {
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const cb = useRef(onUpdate);
-  cb.current = onUpdate;
+  // Keep the ref pointing at the latest callback without writing during
+  // render (react-hooks/refs). A deps-less effect runs after every commit,
+  // so the SSE "update" handler below always invokes the freshest callback.
+  useEffect(() => {
+    cb.current = onUpdate;
+  });
 
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || "";

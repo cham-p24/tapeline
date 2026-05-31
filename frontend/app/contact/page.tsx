@@ -9,6 +9,7 @@
  */
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import Link from "next/link";
 import { pageMeta } from "@/lib/seo";
 import { ContactForm } from "./ContactForm";
 
@@ -77,8 +78,8 @@ export default function ContactPage() {
             <strong className="text-fg">Not a place for investment advice.</strong>{" "}
             We can&apos;t answer &quot;should I buy X?&quot; or interpret the Tapeline Score for a specific
             position — the score is descriptive, not prescriptive. For methodology questions, see{" "}
-            <a href="/how-it-works" className="text-accent hover:underline">/how-it-works</a> and the public{" "}
-            <a href="/scorecard" className="text-accent hover:underline">scorecard</a>.
+            <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link> and the public{" "}
+            <Link href="/scorecard" className="text-accent hover:underline">scorecard</Link>.
           </p>
         </section>
       </main>

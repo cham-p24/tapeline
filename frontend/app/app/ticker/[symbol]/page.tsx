@@ -38,6 +38,14 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   // Track this visit so it appears in the "Recent" pill row across the app.
   useEffect(() => { recordTickerVisit(symbol); }, [symbol]);
   const { status, lastUpdate } = useLiveStream(load);
+  // Score count-up — called unconditionally here, before the loading/error
+  // early-returns below, so the hook count never changes between renders
+  // (react-hooks/rules-of-hooks). `data` is null while loading, so pass null
+  // and let useCountUp no-op until the score lands. Snaps (not re-animates)
+  // on the 60s live refresh; ×10 keeps the one-decimal precision on an int.
+  const animatedScoreX10 = useCountUp(
+    data?.score != null ? Math.round(data.score * 10) : null,
+  );
 
   async function addWatch() {
     setAdding(true);
@@ -118,15 +126,6 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     : data.signal === "CAUTION" ? "text-warn bg-warn/10"
     : "text-down bg-down/10";
 
-  // Animate the score number on first paint (and only first paint —
-  // useCountUp snaps on subsequent updates so the 60s live-stream
-  // refresh doesn't re-animate). Pass the integer floor; the .toFixed(1)
-  // tail is rendered separately so we only animate the meaningful part.
-  // Multiply by 10 to preserve the one-decimal precision while
-  // animating an integer.
-  const animatedScoreX10 = useCountUp(
-    data.score != null ? Math.round(data.score * 10) : null,
-  );
   const displayScore =
     animatedScoreX10 != null ? (animatedScoreX10 / 10).toFixed(1) : "—";
 
