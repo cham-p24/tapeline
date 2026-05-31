@@ -92,20 +92,38 @@ LOWBALL,STOCK,Stock,MOMENTUM,B,30,42,WATCH,Weak,Watch,12+ months,12.5,FALSE,NEUT
 def test_parser_extracts_hyln_row():
     """The HYLN regression: the test that asserts the user's flagship
     complaint is closed. Sheet row with HYLN + score 100 must parse
-    cleanly into a dict whose derived signal is HIGH CONVICTION (NOT the
-    sheet's prescriptive BUY NOW)."""
+    cleanly into a dict whose derived signal stays descriptive (NOT the
+    sheet's prescriptive BUY NOW).
+
+    As of 2026-06-01 (Fix 2 of docs/SCORING_AUDIT_2026-06-01.md), `score`
+    is Tapeline's own 6-factor composite computed locally, not the
+    sheet's column-F value. The sheet's raw value is preserved in
+    `sheet_score` for transparency.
+    """
     rows = parse_all_signals_csv(_FIXTURE_CSV)
     hyln = next((r for r in rows if r["symbol"] == "HYLN"), None)
     assert hyln is not None, "parser dropped HYLN"
-    assert hyln["score"] == 100.0
-    assert hyln["signal"] == "HIGH CONVICTION"
-    assert hyln["signal"] != "BUY NOW"   # explicitly NOT the sheet's label
+    # Sheet still passes through the raw value (now under sheet_score)
+    assert hyln["sheet_score"] == 100.0
+    # Tapeline composite stays in [0, 100]
+    assert 0 <= hyln["score"] <= 100
+    # Signal is descriptive (one of the published Tapeline labels) and
+    # explicitly NOT the sheet's prescriptive BUY NOW
+    assert hyln["signal"] != "BUY NOW"
+    assert hyln["signal"] in {
+        "HIGH CONVICTION", "STRONG SETUP", "CONSTRUCTIVE",
+        "NEUTRAL", "CAUTION", "WEAK"
+    }
     assert hyln["price"] == 4.67
     assert hyln["conviction"] == "A"
     assert hyln["confidence_pct"] == 85.0   # A → 85
     assert hyln["market_regime"] == "STRONG BULL"
     assert hyln["change_pct_3m"] == 127.8
     assert hyln["rs_vs_spy_1y"] == 195.4
+    # The composite must produce all 6 sub-scores as keys
+    for sub_key in ("sub_trend", "sub_rs", "sub_fundamentals",
+                    "sub_smart_money", "sub_macro", "sub_momentum"):
+        assert sub_key in hyln, f"composite did not produce {sub_key}"
 
 
 def test_parser_skips_blank_and_repeated_header_rows():
@@ -120,14 +138,21 @@ def test_parser_skips_blank_and_repeated_header_rows():
 
 
 def test_parser_handles_low_score_rows():
-    """Lower-conviction rows still parse (and get the WEAK label) so the
-    full universe is upserted, not just the top picks. Bad bets get
-    audited too — that's the public-scorecard ethos."""
+    """Lower-conviction rows still parse (and get a low descriptive label)
+    so the full universe is upserted, not just the top picks. Bad bets get
+    audited too — that's the public-scorecard ethos.
+
+    As of 2026-06-01 the `score` field is Tapeline's composite (Fix 2);
+    `sheet_score` carries the sheet's column-F value.
+    """
     rows = parse_all_signals_csv(_FIXTURE_CSV)
     low = next((r for r in rows if r["symbol"] == "LOWBALL"), None)
     assert low is not None
-    assert low["score"] == 30.0
-    assert low["signal"] == "CAUTION"
+    assert low["sheet_score"] == 30.0
+    assert 0 <= low["score"] <= 100
+    # Negative 3M return + weak inputs should yield a below-neutral composite
+    # → signal label one of CAUTION/WEAK/NEUTRAL, never STRONG SETUP or higher
+    assert low["signal"] in {"CAUTION", "WEAK", "NEUTRAL"}
     assert low["change_pct_3m"] == -10.0
 
 
@@ -172,11 +197,17 @@ async def test_upsert_inserts_new_and_updates_existing():
         counts1 = await upsert_tickers(s, rows)
         assert counts1["total"] == 4
 
-        # Verify HYLN is in DB with the right score and derived signal
+        # Verify HYLN is in DB with the right composite score and derived
+        # signal. As of 2026-06-01, Ticker.score is Tapeline's composite,
+        # not the sheet's column F.
         hyln_q = await s.execute(select(Ticker).where(Ticker.symbol == "HYLN"))
         hyln = hyln_q.scalar_one()
-        assert hyln.score == 100.0
-        assert hyln.signal == "HIGH CONVICTION"
+        assert 0 <= hyln.score <= 100
+        # HYLN fixture has strong inputs (3M +127.8%, 1Y RS +195.4%, STRONG
+        # BULL regime, A conviction) — composite should land in
+        # STRONG SETUP / HIGH CONVICTION band (>= 70)
+        assert hyln.score >= 70, f"HYLN composite landed at {hyln.score}, expected >=70 given strong inputs"
+        assert hyln.signal in {"STRONG SETUP", "HIGH CONVICTION"}
         assert hyln.price == 4.67
         assert hyln.confidence_pct == 85.0   # A grade
 

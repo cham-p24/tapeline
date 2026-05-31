@@ -164,37 +164,64 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         if len(symbol) > 12:    # tickers are short; longer = junk
             continue
 
-        # Clamp score to the published 0-100 range. The signal-system sheet
-        # occasionally produces values above 100 for very high-conviction
-        # tickers (we have seen 131-133 in live data). The /how-it-works
-        # page tells visitors the score is on a 0-100 scale - displaying
-        # "131/100" reads as broken and undermines the transparency pitch.
-        # Clamping here keeps the brand promise true without touching the
-        # signal-system's own internal scoring.
-        raw_score = _parse_float(raw.get("Score"))
-        score = (
-            None if raw_score is None
-            else max(0.0, min(100.0, raw_score))
+        # Sheet's column-F "Score" is retained as `sheet_score` for transparency
+        # and back-compat, but Tapeline's own 6-factor composite (computed
+        # below from the raw sheet columns + Finnhub caches) is what becomes
+        # `score`. Before this change the marketed 6-factor formula on
+        # /how-it-works was a copy claim, not running code — fix 2 in
+        # docs/SCORING_AUDIT_2026-06-01.md.
+        sheet_score_raw = _parse_float(raw.get("Score"))
+        sheet_score_clamped = (
+            None if sheet_score_raw is None
+            else max(0.0, min(100.0, sheet_score_raw))
         )
         conviction = (raw.get("Conviction") or "").strip().upper()
+
+        # Stage 1: build the row with raw inputs the composite needs
+        row_for_composite = {
+            "symbol":             symbol,
+            "change_pct_3m":      _parse_float(raw.get("3M Return %")),
+            "change_pct_6m":      _parse_float(raw.get("6M Return %")),
+            "change_pct_1y":      _parse_float(raw.get("1Y Return %")),
+            "rs_vs_spy_3m":       _parse_float(raw.get("RS vs SPY 3M %")),
+            "rs_vs_spy_6m":       _parse_float(raw.get("RS vs SPY 6M %")),
+            "rs_vs_spy_1y":       _parse_float(raw.get("RS vs SPY 1Y %")),
+            "market_regime":      (raw.get("Market Regime") or "").strip(),
+            "momentum_quality":   raw.get("Momentum Quality"),
+            "near_52w_high_pct":  _parse_float(raw.get("Near 52W High %")),
+        }
+
+        # Stage 2: compute Tapeline's published composite from those inputs.
+        # `compute_tapeline_composite` lazy-imports the Finnhub caches so
+        # missing data degrades to NEUTRAL (50) per factor, never None.
+        from app.services.score import compute_tapeline_composite  # local import - keeps sheet_feed parse-time light
+        composite, subs = compute_tapeline_composite(row_for_composite)
 
         rows.append({
             "symbol":          symbol,
             "asset_class":     (raw.get("Asset Class") or "equity").strip().lower(),
-            "score":           score,
-            "signal":          score_to_signal(score),   # derived, descriptive
+            "score":           composite,                    # ← Tapeline's own composite
+            "sheet_score":     sheet_score_clamped,          # kept for transparency / diff tracking
+            "signal":          score_to_signal(composite),   # derived from Tapeline composite
             "price":           _parse_float(raw.get("Price")),
             "conviction":      conviction,
             "confidence_pct":  _CONVICTION_TO_CONFIDENCE.get(conviction),
-            "change_pct_3m":   _parse_float(raw.get("3M Return %")),
-            "change_pct_6m":   _parse_float(raw.get("6M Return %")),
-            "change_pct_1y":   _parse_float(raw.get("1Y Return %")),
-            "rs_vs_spy_3m":    _parse_float(raw.get("RS vs SPY 3M %")),
-            "rs_vs_spy_6m":    _parse_float(raw.get("RS vs SPY 6M %")),
-            "rs_vs_spy_1y":    _parse_float(raw.get("RS vs SPY 1Y %")),
-            "market_regime":   (raw.get("Market Regime") or "").strip(),
+            "change_pct_3m":   row_for_composite["change_pct_3m"],
+            "change_pct_6m":   row_for_composite["change_pct_6m"],
+            "change_pct_1y":   row_for_composite["change_pct_1y"],
+            "rs_vs_spy_3m":    row_for_composite["rs_vs_spy_3m"],
+            "rs_vs_spy_6m":    row_for_composite["rs_vs_spy_6m"],
+            "rs_vs_spy_1y":    row_for_composite["rs_vs_spy_1y"],
+            "market_regime":   row_for_composite["market_regime"],
             "strategy":        (raw.get("Strategy") or "").strip(),
             "raw_score":       _parse_float(raw.get("Raw Score")),
+            # Sub-scores from the composite — writes into Ticker.sub_* columns
+            "sub_trend":        subs["trend"],
+            "sub_rs":           subs["rs"],
+            "sub_fundamentals": subs["fundamentals"],
+            "sub_smart_money":  subs["smart_money"],
+            "sub_macro":        subs["macro"],
+            "sub_momentum":     subs["momentum"],
         })
     return rows
 
@@ -286,9 +313,17 @@ async def upsert_tickers(
         m1_proxy = _approx_change_pct_1m(r)
         if m1_proxy is not None:
             t.change_pct_1m = m1_proxy
-        rs = _approx_sub_rs(r)
-        if rs is not None:
-            t.sub_rs = rs
+
+        # Write all 6 sub-scores from the composite. Each can be None if
+        # the underlying factor isn't available for this ticker (e.g.
+        # ETFs lack fundamentals); the composite math substituted NEUTRAL
+        # there, but we keep None in the DB so /t/{symbol} can display
+        # "—" rather than a fabricated 50.
+        for key in ("sub_trend", "sub_rs", "sub_fundamentals",
+                    "sub_smart_money", "sub_macro", "sub_momentum"):
+            v = r.get(key)
+            if v is not None:
+                setattr(t, key, v)
 
     await session.commit()
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
