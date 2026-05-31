@@ -116,7 +116,7 @@ def categories_for_ui() -> list[PrefCategory]:
             key="weekly_newsletter",
             bit=int(EmailPref.WEEKLY_NEWSLETTER),
             label="Weekly market digest",
-            description="One email every Monday — top score movers of the week, current market regime, scorecard hit rate, latest headlines. Requires you to have ticked marketing-opt-in at onboarding (or here, when we add the consent toggle).",
+            description="One email every Monday — top score movers of the week, current market regime, scorecard hit rate, latest headlines. Toggling this on counts as your opt-in to marketing emails; toggling off pauses delivery without revoking consent.",
         ),
     ]
 

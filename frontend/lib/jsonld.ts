@@ -100,7 +100,7 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[]) {
   };
 }
 
-export type FinancialProductArgs = {
+export type TickerDatasetArgs = {
   symbol: string;
   name: string;
   url: string;
@@ -113,42 +113,49 @@ export type FinancialProductArgs = {
 };
 
 /**
- * Schema.org FinancialProduct for a per-ticker page.
- * Tapeline isn't selling the security itself — we publish a *rating* of it —
- * so we model the page as a Review of a FinancialProduct, with the score
- * inside reviewRating. This is the same pattern Morningstar and Zacks pages
- * use and what Google's docs recommend for analyst-rating pages.
+ * Schema.org Dataset for a per-ticker page.
+ *
+ * Deliberately NOT a Review/Rating of the security. A reviewRating on a stock
+ * is wrong on two counts:
+ *   1. Invalid structured data — Google does not accept FinancialProduct as an
+ *      `itemReviewed` type, so the page is ineligible for rich results and GSC
+ *      flags it ("Invalid object type for field itemReviewed").
+ *   2. Prescriptive framing — a Review + reviewRating authored by Tapeline reads
+ *      as "Tapeline rates this security N/100", which collides with the
+ *      descriptive-not-prescriptive posture that protects the Australian
+ *      publisher's exemption.
+ * So we model the page honestly: a dataset of quantitative factor readings.
+ * No rating semantics, no recommendation. The visible score stays on the page;
+ * it just isn't dressed up as a star rating in JSON-LD.
  */
-export function tickerReviewJsonLd(a: FinancialProductArgs) {
-  const product = {
-    "@type": "FinancialProduct",
-    name: `${a.name} (${a.symbol})`,
-    category: "Stock",
-    url: a.url,
-  };
-  if (a.score == null) {
-    return {
-      "@context": "https://schema.org",
-      ...product,
-    };
-  }
+export function tickerDatasetJsonLd(a: TickerDatasetArgs) {
+  const lead = a.why ? `${a.why.trim().replace(/\.$/, "")}. ` : "";
+  const description =
+    `${lead}Tapeline's six-factor quantitative readings for ${a.name} (${a.symbol}) — ` +
+    `trend, relative strength, fundamentals, smart money, macro, and momentum, blended into a ` +
+    `single 0-100 composite score. Descriptive market analytics, not financial advice.`;
   return {
     "@context": "https://schema.org",
-    "@type": "Review",
-    itemReviewed: product,
-    name: `Tapeline Score for ${a.symbol}`,
-    reviewBody: a.why ?? `Tapeline 6-factor quantitative score for ${a.symbol}.`,
-    reviewRating: {
-      "@type": "Rating",
-      ratingValue: a.score,
-      bestRating: 100,
-      worstRating: 0,
-    },
-    author: {
+    "@type": "Dataset",
+    name: `Tapeline quantitative scan — ${a.name} (${a.symbol})`,
+    description,
+    url: a.url,
+    isAccessibleForFree: true,
+    creator: {
       "@type": "Organization",
       name: "Tapeline",
       url: "https://tapeline.io",
     },
+    variableMeasured: [
+      "Trend",
+      "Relative strength",
+      "Fundamentals",
+      "Smart money",
+      "Macro",
+      "Momentum",
+      "Composite score (0-100)",
+    ],
+    keywords: [a.symbol, a.name, "stock scanner", "quantitative score"],
   };
 }
 
@@ -220,6 +227,50 @@ export function jsonLdScript(data: unknown) {
     type: "application/ld+json",
     dangerouslySetInnerHTML: { __html: JSON.stringify(data) },
   } as const;
+}
+
+/**
+ * HowTo schema for instructional blog posts.
+ *
+ * Unlocks Google's step-by-step rich-result variant — the SERP card with
+ * numbered steps surfaced above the fold under the post URL. Massive CTR
+ * lift on educational queries when it triggers ("how to find momentum
+ * stocks", "what is RSI", "best time to buy stocks").
+ *
+ * Apply with restraint: Google's quality classifier rejects HowTo schema
+ * on pages where the body doesn't literally walk through ordered steps.
+ * Only the genuinely instructional posts in posts.ts should pass
+ * `howToSteps` — see the type comment on BlogPost.howToSteps for the
+ * eligibility heuristic.
+ *
+ * `totalTime` is ISO 8601 duration (PT7M = 7 minutes). Conservative
+ * defaults of 5-10 min suit the long-form educational posts we ship.
+ */
+export type HowToArgs = {
+  name: string;
+  description: string;
+  url: string;
+  imageUrl?: string;
+  totalTime?: string; // ISO 8601 duration
+  steps: { name: string; text: string }[];
+};
+
+export function howToJsonLd(a: HowToArgs) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: a.name,
+    description: a.description,
+    ...(a.imageUrl ? { image: a.imageUrl } : {}),
+    ...(a.totalTime ? { totalTime: a.totalTime } : {}),
+    step: a.steps.map((s, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      name: s.name,
+      text: s.text,
+      url: `${a.url}#step-${i + 1}`,
+    })),
+  };
 }
 
 /**

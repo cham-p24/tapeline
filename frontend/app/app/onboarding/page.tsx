@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { track } from "@vercel/analytics";
+import { handle401 } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -137,6 +138,7 @@ function OnboardingForm() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
+        handle401(res.status);
         const t = await res.text();
         throw new Error(t || `${res.status} ${res.statusText}`);
       }

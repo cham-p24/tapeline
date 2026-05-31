@@ -278,13 +278,18 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
     `app.services.email` should get a row here too.
     """
     from app.services.email import (
+        render_activation_alert_email,
+        render_activation_watchlist_email,
         render_alert_email,
+        render_annual_upgrade_email,
         render_email_verification_email,
         render_eod_watchlist_digest,
+        render_password_reset_email,
         render_payment_failed_email,
         render_re_engagement_email,
         render_referral_referee_email,
         render_referral_referrer_email,
+        render_subscription_canceled_email,
         render_subscription_started_email,
         render_trial_day3_email,
         render_trial_day7_email,
@@ -296,6 +301,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_watchlist_alert_email,
         render_weekly_market_digest,
         render_welcome_email,
+        render_winback_email,
     )
 
     sample_picks = [
@@ -313,6 +319,15 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "scorecard_picks_during_trial": 12,
         "scorecard_hit_rate": 67.0, "scorecard_alpha_avg": 0.82,
         "scorecard_best": {"symbol": "PLTR", "as_of": "2026-05-10", "alpha": 3.4},
+    }
+    # Win-back proof line — newsletter-payload scorecard shape
+    # (hit_rate_pct / avg_alpha_pct / best); _winback_scorecard_line reads
+    # it defensively so the day-60/90 emails show real track-record numbers.
+    sample_winback_scorecard = {
+        "picks": 50,
+        "hit_rate_pct": 64.0,
+        "avg_alpha_pct": 0.58,
+        "best": {"symbol": "NVDA", "alpha": 5.2},
     }
     sample_digest = [
         {"symbol": "AAPL", "score": 82, "signal": "STRONG SETUP",
@@ -400,12 +415,37 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
             "14-day dormant re-engagement",
             lambda: render_re_engagement_email("Alex"),
         ),
+        # Activation nudges (early lifecycle)
+        "activation_watchlist": (
+            "Activation · no watchlist by hour 24",
+            lambda: render_activation_watchlist_email("Alex"),
+        ),
+        "activation_alert": (
+            "Activation · no alert rule by day 3",
+            lambda: render_activation_alert_email("Alex"),
+        ),
+        # Annual upgrade nudge (~30 days post monthly conversion)
+        "annual_nudge_pro": (
+            "Annual nudge · Pro monthly → annual",
+            lambda: render_annual_upgrade_email("Alex", tier="pro"),
+        ),
+        "annual_nudge_premium": (
+            "Annual nudge · Premium monthly → annual",
+            lambda: render_annual_upgrade_email("Alex", tier="premium"),
+        ),
         "email_verification": (
             "Email verification (signup security)",
             lambda: render_email_verification_email(
                 "Alex",
                 verify_url="https://tapeline.io/verify-email?token=demo123",
                 cancel_url="https://tapeline.io/verify-email?token=demo123&action=cancel",
+            ),
+        ),
+        "password_reset": (
+            "Password reset (forgot password flow)",
+            lambda: render_password_reset_email(
+                "Alex",
+                reset_url="https://tapeline.io/reset-password?token=demo123",
             ),
         ),
         "subscription_started_pro_monthly": (
@@ -423,6 +463,26 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                 amount_cents=47999, currency="usd",
                 next_charge_iso="2027-05-19T00:00:00+00:00",
             ),
+        ),
+        "subscription_canceled": (
+            "Subscription set to cancel (exit confirmation)",
+            lambda: render_subscription_canceled_email(
+                "Alex", tier="pro",
+                period_end_iso="2026-06-19T00:00:00+00:00",
+            ),
+        ),
+        # Win-back drip (30 / 60 / 90 days post-cancellation)
+        "winback_30": (
+            "Win-back · day 30 (soft, setup still saved)",
+            lambda: render_winback_email("Alex", stage="wb30", scorecard=sample_winback_scorecard),
+        ),
+        "winback_60": (
+            "Win-back · day 60 (scorecard proof)",
+            lambda: render_winback_email("Alex", stage="wb60", scorecard=sample_winback_scorecard),
+        ),
+        "winback_90": (
+            "Win-back · day 90 (last call, 40% off)",
+            lambda: render_winback_email("Alex", stage="wb90", scorecard=sample_winback_scorecard),
         ),
         "weekly_newsletter": (
             "Weekly market digest (Monday newsletter)",
@@ -516,3 +576,139 @@ async def render_email_preview(
         )
 
     return HTMLResponse(content=html)
+
+
+@router.post("/email-preview/{name}/send")
+async def send_email_preview_to_admin(
+    name: str,
+    admin: User | None = Depends(require_admin),
+) -> dict:
+    """Send the rendered preview to the calling admin's email address.
+
+    Closes the "I want to see how this actually looks in Gmail / Apple Mail"
+    loop — the iframe in the preview UI shows what the rendered HTML LOOKS
+    like, but real clients massage it (Gmail's preview pane, Outlook's
+    desktop renderer, etc.). This button delivers a real copy via Resend
+    so you can preview in any inbox.
+
+    Admin-gated and sender-locked: the email always goes to the admin's
+    own address. We do NOT accept an arbitrary `to` parameter — that
+    would turn the admin endpoint into an open relay.
+
+    Returns:
+      - {"status": "sent", "to": "..."} on success
+      - {"status": "skipped", "reason": "no_api_key"} when Resend isn't
+        configured (local dev). Same shape send_email itself uses.
+      - 503 when the legacy admin-API-key path was used (no real user
+        attached, so no `to` address to send to).
+    """
+    if admin is None:
+        # Caller authenticated via the legacy X-Admin-Key header — no user
+        # row, so we have no email address to send to. Tell them, don't
+        # 500.
+        raise HTTPException(
+            503,
+            "send-to-me requires a user-session admin login (cookie-based). "
+            "The X-Admin-Key header doesn't carry a destination address.",
+        )
+    if not admin.email:
+        raise HTTPException(503, "Admin user has no email address on file")
+
+    samples = _email_samples()
+    if name not in samples:
+        raise HTTPException(404, f"Unknown email: {name}")
+    desc, renderer = samples[name]
+    try:
+        html = renderer()
+    except Exception as exc:
+        logger.exception("email_preview.send_render_failed name=%s", name)
+        raise HTTPException(500, f"Renderer failed: {exc}") from exc
+
+    # Pick the right persona based on what category the email is. We can't
+    # introspect renderer intent so the heuristic is name-based: anything
+    # starting with `subscription_` / `payment_` goes via billing@, alert
+    # + digest + newsletter go via alerts@, sales drips via christian@.
+    # Everything else (welcome, verification, referrals) is default/hello@.
+    if name.startswith(("subscription_", "payment_")):
+        persona = "billing"
+    elif name.startswith(("alert", "watchlist_alert", "digest", "weekly_newsletter")):
+        persona = "alerts"
+    elif name.startswith(("day7", "day11", "day13", "trial_expired", "trial_post", "re_engagement", "winback")):
+        persona = "sales"
+    else:
+        persona = "default"
+
+    from app.services.email import send_email
+
+    try:
+        res = await send_email(
+            admin.email,
+            f"[Preview] {desc}",
+            html,
+            persona=persona,  # type: ignore[arg-type]
+        )
+    except Exception as exc:
+        logger.exception("email_preview.send_failed name=%s admin=%s", name, admin.id)
+        raise HTTPException(502, f"Send failed: {exc}") from exc
+
+    if res.get("skipped"):
+        return {"status": "skipped", "reason": "no_api_key"}
+    logger.info("email_preview.sent name=%s to=%s persona=%s", name, admin.email, persona)
+    return {"status": "sent", "to": admin.email, "persona": persona}
+
+
+# ---------------------------------------------------------------------------
+# Growth bot — autonomous content + metrics digest
+# ---------------------------------------------------------------------------
+
+
+@router.get("/growth-tick/preview")
+async def growth_tick_preview(
+    _: User | None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return the growth-bot output WITHOUT emailing.
+
+    Useful for:
+      - Cloud-scheduled Claude sessions that want structured JSON access
+        to today's drafts + metrics without triggering an email send.
+      - Admin curl during testing.
+    """
+    from app.services.growth_bot import (
+        draft_daily_tweet,
+        draft_fintwit_reply_candidates,
+        draft_linkedin_post,
+        pull_growth_metrics,
+        pull_top_picks,
+    )
+
+    metrics = await pull_growth_metrics(session)
+    picks = await pull_top_picks(session, limit=5)
+    return {
+        "metrics": metrics.to_dict(),
+        "picks": [
+            {"symbol": p.symbol, "name": p.name, "score": p.score, "signal": p.signal,
+             "reason": p.reason}
+            for p in picks
+        ],
+        "daily_tweet": draft_daily_tweet(picks),
+        "linkedin": draft_linkedin_post(weekday=metrics.as_of.weekday()),
+        "fintwit_candidates": draft_fintwit_reply_candidates(picks),
+    }
+
+
+@router.post("/growth-tick/run")
+async def growth_tick_run(
+    _: User | None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Manually trigger a growth tick.
+
+    Runs the same path as the daily worker — pulls metrics, generates
+    drafts, sends the digest email. Use to verify the bot is healthy
+    after config changes. Respects `growth_bot_enabled` — if the kill
+    switch is off, the run is a no-op and returns `{"skipped": True}`.
+    """
+    from app.services.growth_bot import run_daily_growth_tick
+
+    return await run_daily_growth_tick(session)

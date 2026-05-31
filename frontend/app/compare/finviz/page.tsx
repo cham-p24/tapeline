@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { CompareIndex } from "@/components/CompareIndex";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -140,7 +141,7 @@ export default function VsFinvizPage() {
       ))}
       <MarketingNav />
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
         <p className="eyebrow">Comparison</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Tapeline vs Finviz — why traders switch.
@@ -230,7 +231,7 @@ export default function VsFinvizPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-12 text-center">
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
         <p className="mt-3 text-muted">No credit card. Cancel in one click.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -266,6 +267,7 @@ export default function VsFinvizPage() {
         update within 48 hours.
       </p>
 
+      <CompareIndex currentSlug="finviz" />
       <MarketingFooter />
     </main>
   );

@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
+import { UtmCapture } from "@/components/UtmCapture";
 import { PostHogProvider } from "@/components/PostHogProvider";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -111,6 +112,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             src={PLAUSIBLE_SCRIPT}
           />
         )}
+        {/* RSS feed discovery — browsers + aggregators (Feedly, Inoreader,
+            NewsBlur, etc.) look for this link tag to auto-detect the
+            site's feed. Pointing at /feed.xml (RSS 2.0 of the daily
+            Top 10) gets the scorecard into aggregator pipelines without
+            anyone needing to know the URL. */}
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title="Tapeline — Daily Top 10"
+          href="/feed.xml"
+        />
       </head>
       <body>
         {/* SEO structured data — Google + LinkedIn parse this for rich
@@ -180,9 +192,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // — Google will learn the wrong Knowledge Graph link.
               //
               // Removed 2026-05-11: Substack, YouTube (HEAD-404).
-              // Removed 2026-05-12: linkedin.com/company/tapeline (it's a
-              //   European agroecology research project — different brand).
-              //   Restore once we claim a unique slug like /company/tapeline-io.
+              // 2026-05-12 → 2026-05-31: linkedin.com/company/tapeline is a
+              //   European agroecology research project (different brand), so we
+              //   claimed the unique slug /company/tapeline-io instead. Verified
+              //   live + admin-owned (company id 118593983) on 2026-05-31 →
+              //   RESTORED to sameAs below.
               // Removed 2026-05-13: producthunt /products/tapeline (HTTP 404),
               //   capterra /p/tapeline (HTTP 404), stocktwits /tapeline
               //   (HTTP 404). Restore each entry as the profile is claimed.
@@ -196,6 +210,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               // canonical paste-ready copy when claiming each.
               sameAs: [
                 "https://x.com/tapeline_io",
+                "https://www.linkedin.com/company/tapeline-io",
                 "https://github.com/cham-p24/tapeline",
                 "https://www.reddit.com/user/tapeline_io",
               ],
@@ -322,6 +337,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PostHogProvider>{children}</PostHogProvider>
           </UserProvider>
         </ThemeProvider>
+        {/* First-touch UTM capture — runs once per page-load and writes
+            ?utm_* query params to localStorage with a 30-day TTL. The
+            signup page + newsletter capture component both read this
+            back on submit so we attribute revenue to the original
+            paid-channel landing, not the eventual direct-return signup. */}
+        <UtmCapture />
         {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
             config needed — auto-detects when deployed on Vercel and is a
             no-op in local dev. Page-view + custom-event tracking +

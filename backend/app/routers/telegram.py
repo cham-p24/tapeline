@@ -40,6 +40,20 @@ async def telegram_webhook(secret: str, request: Request) -> dict:
         raise HTTPException(404)
 
     update = await request.json()
+
+    # First: is this an inbox-bot action (founder tapped an Approve/Reject
+    # button on a Tier 1 alert card, or typed /approve_<id>)? Telegram allows
+    # only ONE webhook URL per bot, so the inbox callbacks ride in on this
+    # same endpoint. process_telegram_update() returns None for anything that
+    # isn't an inbox action — including the /start <token> account-link flow
+    # below — so we fall straight through when it's not ours.
+    from app.routers.inbox import process_telegram_update
+
+    async with SessionLocal() as session:
+        inbox_result = await process_telegram_update(update, session)
+    if inbox_result is not None:
+        return inbox_result
+
     message = update.get("message") or update.get("edited_message")
     if not message:
         return {"ok": True}

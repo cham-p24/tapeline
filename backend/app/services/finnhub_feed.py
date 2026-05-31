@@ -745,6 +745,19 @@ async def fetch_news_for_ticker(
     cache_key = f"news_{sym}_{days_back}d_{limit}"
     cached = _load_cache(cache_key, CACHE_TTL_NEWS_HOURS)
     if cached is not None:
+        # The on-disk cache stores published_at as an ISO string (a datetime
+        # isn't JSON-serializable). Re-hydrate to a tz-aware datetime so this
+        # function returns the SAME type on a cache hit as on a cache miss —
+        # and the same type as benzinga/edgar/massive. news_feed.merge sorts
+        # the combined list by published_at and raises TypeError if some rows
+        # are str and others datetime.
+        for r in cached:
+            pa = r.get("published_at")
+            if isinstance(pa, str):
+                try:
+                    r["published_at"] = datetime.fromisoformat(pa)
+                except ValueError:
+                    r["published_at"] = datetime.now(UTC)
         return cached
 
     today = date.today()
@@ -788,7 +801,22 @@ async def fetch_news_for_ticker(
             "tickers": sym,
             "sentiment": None,
         }))
-    _save_cache(cache_key, rows)
+    # published_at is a datetime, which json.dumps can't serialize — so
+    # _save_cache was silently TypeError-ing (logged as cache_write_failed)
+    # and news was NEVER cached. Every /api/ticker render then re-hit Finnhub
+    # (httpx 15s, 60/min rate-limited) while holding a DB connection, the core
+    # driver of the QueuePool-exhaustion latency. Serialize published_at to ISO
+    # for the on-disk copy only; the returned `rows` keep their datetimes and
+    # the cache-hit path above re-hydrates.
+    _save_cache(cache_key, [
+        {
+            **r,
+            "published_at": r["published_at"].isoformat()
+            if hasattr(r.get("published_at"), "isoformat")
+            else r.get("published_at"),
+        }
+        for r in rows
+    ])
     return rows
 
 

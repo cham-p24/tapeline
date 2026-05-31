@@ -42,7 +42,14 @@ async function fetchSectorTickers(apiSector: string): Promise<ScannerRow[]> {
       sort: "score",
       order: "desc",
     }).toString()}`;
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await fetch(url, {
+      next: { revalidate: 300 },
+      // Bound the build-time fetch so a degraded backend can't hang the
+      // per-page build budget and fail the whole deploy. On timeout we fall
+      // through to the [] fallback and the page renders fast; ISR refills the
+      // data within `revalidate` once the backend recovers.
+      signal: AbortSignal.timeout(7000),
+    });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: ScannerRow[] };
     return body.items ?? [];
@@ -104,7 +111,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
 
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },
-    { name: "Sectors", url: "https://tapeline.io/scorecard" },
+    { name: "Sectors", url: "https://tapeline.io/sectors" },
     { name: sector.display, url },
   ]);
 
@@ -114,8 +121,23 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-12">
-        <p className="eyebrow">Sector ranking</p>
+      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+        {/* Visible breadcrumb — mirrors the BreadcrumbList JSON-LD */}
+        <nav aria-label="Breadcrumb" className="text-xs text-subtle">
+          <ol className="flex flex-wrap items-center gap-1.5">
+            <li>
+              <Link href="/" className="hover:text-accent">Tapeline</Link>
+            </li>
+            <li aria-hidden className="text-border">/</li>
+            <li>
+              <Link href="/sectors" className="hover:text-accent">Sectors</Link>
+            </li>
+            <li aria-hidden className="text-border">/</li>
+            <li className="text-muted">{sector.display}</li>
+          </ol>
+        </nav>
+
+        <p className="eyebrow mt-4">Sector ranking</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Top {sector.display} Stocks by Tapeline Score
         </h1>

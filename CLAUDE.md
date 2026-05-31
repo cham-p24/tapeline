@@ -137,6 +137,40 @@ Three live delivery channels for alerts (`backend/app/services/alerts.py:_fire`)
 
 End-of-day watchlist email digest fires daily ~21:00 UTC for every Pro+ user with watchlist items (`services/email.py:run_eod_watchlist_digest`).
 
+## Inbox auto-handler bot
+Server-side bot that triages inbound messages across Reddit, email, and Telegram into Tier 1 / 2 / 3. Tier 2 auto-replies via deterministic templates (ticker_score / pricing / trial / thanks). Tier 1 gets the real Anthropic Claude classifier + a drafted reply, then routes to the founder's Telegram for inline-button approval. Tier 1.5 fires an immediate "I'll get back within 24h" auto-ack so US-business-hours senders aren't ghosted overnight while the Melbourne founder is asleep.
+
+**Architecture (after the LLM + Reddit + safety-nets port, 2026-05-24):**
+- **Classifier** (`services/inbox_classifier.py`) — rule-based fast path catches ~70% of obvious cases. Ambiguous messages hit the real Anthropic Claude API (default `claude-haiku-4-5`, override via `INBOX_CLAUDE_MODEL`). Prompt-cached system block. Every LLM call logs to `inbox_classification_log` table (cost + latency + tier audit). `classify_async()` is the async entry; `classify()` kept as a sync compatibility wrapper.
+- **Kill switches** (`services/inbox_kill_switch.py`) — `bot_enabled()` / `dry_run()` / `channel_enabled(channel)` / `cap_exceeded(session)`. Backed by env vars. `spend_today()` SUMs today's classification cost with 60s in-process cache.
+- **Router** (`services/inbox_router.py`) — `handle_inbound()` is the canonical dispatcher used by every channel. Status state machine: `new → classified → [approved | auto_replied | ignored] → sent`. `send_tier_1_5_ack()` fires the immediate "within 24h" reply on the inbound channel for Tier 1.
+- **Tier 2 templates** (`services/inbox_templates.py`) — async renderers for ticker_score (HTTP call to live API), pricing, trial, thanks. Voice-rule-locked: never "buy"/"sell"/"you should"/"recommend"; unsigned.
+- **Tier 1 alerts** (`services/inbox_telegram_alert.py`) — formatted card to `INBOX_FOUNDER_TELEGRAM_CHAT_ID` with inline keyboard (Approve / Reject buttons + "Edit in browser" deep-link). Callback handler in `routers/inbox.py` processes the button taps.
+- **Channel adapters:**
+  * **Email** (`routers/inbox.py:POST /api/inbox/email`) — Resend inbound webhook, Svix-signed against `RESEND_INBOUND_SECRET`. Fail-closed when secret unset.
+  * **Reddit** (`services/reddit_inbox.py`) — PRAW poller for DMs + comment-replies on own posts + finance-sub mentions (r/wallstreetbets, r/stocks, r/investing, r/SecurityAnalysis, r/ValueInvesting by default). Reply-loop guards (`_is_self_authored`, `_is_parent_self_authored`) prevent infinite ping-pong. New-account throttle caps replies at 3/day when account < `REDDIT_NEW_ACCOUNT_THROTTLE_DAYS` days old. Wrapped in `asyncio.to_thread` so PRAW's sync calls don't block the event loop.
+  * **Telegram** (existing webhook in `routers/telegram.py` + `inbox_telegram_alert` callback handler) — strangers messaging the bot get classified; founder approval flow uses inline-button callbacks.
+- **Worker integration** — `signal_publisher.tick()` calls `_run_inbox_tick()` every 5 min during US market hours, 15 min off-hours. Currently only polls Reddit; email + Telegram are webhook-driven.
+
+**Kill switches** (all `INBOX_*` env vars, default on):
+- `INBOX_BOT_ENABLED=false` — master pause; classify + send both skip
+- `INBOX_DRY_RUN=true` — full pipeline runs but adapter calls log instead of sending
+- `INBOX_<CHANNEL>_ENABLED=false` — per-channel kill (reddit/email/telegram)
+- `INBOX_CLAUDE_DAILY_CAP_USD=5.0` — daily LLM spend cap (default $5/day ≈ 7.5K Haiku classifications); once tripped, ambiguous messages default to Tier 1 manual review until UTC midnight
+- `INBOX_TIER1_AUTO_ACK=false` — disable the immediate Tier 1.5 auto-ack
+
+**Required secrets to actually run** (none currently set on Fly):
+- `ANTHROPIC_API_KEY` — without it, every ambiguous message defaults to Tier 1
+- `INBOX_FOUNDER_TELEGRAM_CHAT_ID` — founder's chat_id for Tier 1 alerts (DM `@userinfobot` to find)
+- `RESEND_INBOUND_SECRET` — Resend dashboard, plus MX records for `inbound@tapeline.io` → Resend
+- `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` — script-tier app at https://www.reddit.com/prefs/apps (use an aged Reddit account to dodge new-account anti-spam triggers)
+
+**Voice rules (legal-critical):** descriptive language only — never "buy"/"sell"/"you should"/"recommend". Australian publisher exemption from AFSL depends on this. `tests/test_inbox_voice_rules.py` is the regression guard.
+
+**Observability:** `GET /api/inbox/stats` (admin-only) returns today's classification spend, cap-tripped flag, tier/channel/status counts, p50/p95 latency, cache hit ratio, pending queue depth, and the live bot_enabled / dry_run state. Surfaced as a chip strip + cap-tripped / dry-run banners at the top of `/app/inbox` (polled every 30s).
+
+**Test coverage:** 97 inbox-specific tests across `test_inbox_*.py` (classifier rule-based + LLM, kill switch, voice rules, router, reddit poller, telegram alerts, stats endpoint).
+
 ## Per-ticker confidence
 Each Ticker row carries a `confidence_pct` (0-100) that varies with which underlying data feeds returned data for that symbol. Mega-caps with full Quiver/Finnhub/FINRA coverage land 88-96, ETFs without traditional fundamentals land 45-70, the typical liquid stock lands 60-85. Surfaced as a column on the scanner table + as an inline pill on the ticker page. Documented on `/how-it-works`. Pattern ported from the personal signal-system. Mock value via `mock_feed._compute_mock_confidence(symbol)` (deterministic per symbol). Real polygon_feed should compute from actual data-feed presence.
 
@@ -189,9 +223,26 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `docs/ARCHITECTURE.md` — system overview, deployment plan
 - `docs/LEGAL_CHECKLIST.md` — pre-launch legal must-dos
 - `docs/DATA_SOURCES.md` — what's licensed vs not
+- `backend/app/routers/inbox.py` — Resend inbound webhook + Tier 1 Telegram callback handler + admin list/approve/reject
+- `backend/app/services/inbox_classifier.py` — rule-based + Anthropic LLM tier classification (`classify_async` is the real path; `classify` is the sync compat wrapper)
+- `backend/app/services/inbox_kill_switch.py` — bot_enabled / dry_run / channel_enabled / cap_exceeded gates
+- `backend/app/services/inbox_router.py` — `handle_inbound()` canonical dispatcher + `send_tier_1_5_ack()` immediate-ack
+- `backend/app/services/inbox_templates.py` — Tier 2 reply templates (ticker_score / pricing / trial / thanks)
+- `backend/app/services/inbox_telegram_alert.py` — Tier 1 founder alert card with inline-button keyboard
+- `backend/app/services/reddit_inbox.py` — PRAW poller (DMs + comments + mentions) + reply adapter + reply-loop guards + new-account throttle
+- `backend/app/models/inbox.py` — `InboundMessage` (idempotent on channel+msg_id)
+- `backend/app/models/inbox_classification_log.py` — per-LLM-call audit row backing the daily cost cap
+- `frontend/app/app/inbox/page.tsx` — admin inbox review UI
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
 Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Benzinga, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Vercel frontend.
+
+**Inbox bot go-live secrets** (the bot is shipped but dormant until set):
+- `ANTHROPIC_API_KEY` — Anthropic console; without it every ambiguous message defaults to Tier 1 manual review
+- `INBOX_FOUNDER_TELEGRAM_CHAT_ID` — DM `@userinfobot` on Telegram → copy the id
+- `RESEND_INBOUND_SECRET` + MX records for `inbound@tapeline.io` → Resend (configure inbound webhook to POST `https://api.tapeline.io/api/inbox/email`)
+- `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` — script-tier app at https://www.reddit.com/prefs/apps; use an aged Reddit account
+- Recommended first deploy: `INBOX_DRY_RUN=true` for the first week so the bot classifies + logs but doesn't actually send. Shadow-audit via `/app/inbox`, then flip to live.
 
 Short list of what's actually left:
 

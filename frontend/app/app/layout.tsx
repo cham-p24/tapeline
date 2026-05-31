@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { useUser } from "@/components/UserContext";
@@ -12,6 +13,7 @@ import { TrialEarlyCapture } from "@/components/TrialEarlyCapture";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 
 /**
  * Platform-aware shortcut key for the Search button.
@@ -48,6 +50,11 @@ const tabs = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Path key for the fade-in wrapper — remounts the children on every
+  // route change so the .fade-in CSS animation re-fires. Without the
+  // key, client-side nav reuses the same div and the animation only
+  // runs once on first mount.
+  const pathname = usePathname();
   return (
     <ToastProvider>
       <div className="min-h-screen">
@@ -106,10 +113,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="mx-auto max-w-7xl px-6 py-6">
           <StaleDataBanner />
+          <EmailVerificationBanner />
           <TrialBanner />
           <BreakingNewsBar />
           <OnboardingTip />
-          {children}
+          {/* fade-in: 180ms opacity + 4px translateY on every route entry.
+              `key={pathname}` forces a remount on each client-side nav so
+              the CSS animation re-fires; without it the animation would
+              only run on initial page load. Reduced-motion users get the
+              final state immediately. */}
+          <div key={pathname} className="fade-in">{children}</div>
         </div>
 
         {/* Card-capture moments. Both are self-gating on user/tier state:

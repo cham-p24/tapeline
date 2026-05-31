@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { errorMessage } from "@/lib/api";
 
 type StatusResponse = {
   status: "ok" | "degraded";
@@ -43,8 +44,8 @@ export default function StatusPage() {
       setData(body);
       setError(null);
       setFetchedAt(new Date());
-    } catch (e: any) {
-      setError(e.message || "Status endpoint unreachable");
+    } catch (e: unknown) {
+      setError(errorMessage(e) || "Status endpoint unreachable");
       setFetchedAt(new Date());
     }
   }
@@ -64,7 +65,7 @@ export default function StatusPage() {
     : { label: "Checking…", tone: "bg-muted/10 border-border text-muted" };
 
   return (
-    <main className="min-h-screen px-6 py-16">
+    <main className="min-h-screen px-6 py-10">
       <div className="mx-auto max-w-3xl">
         <div className="text-xs uppercase tracking-wider text-subtle">Tapeline</div>
         <h1 className="mt-2 text-4xl font-bold tracking-tight">System status</h1>

@@ -109,6 +109,10 @@ def _all_html_outputs() -> list[tuple[str, str]]:
             amount_cents=2999, currency="usd",
             next_charge_iso="2026-06-19T00:00:00+00:00",
         )),
+        ("password_reset", e.render_password_reset_email(
+            "Alex",
+            reset_url="https://tapeline.io/reset-password?token=demo",
+        )),
     ]
 
 

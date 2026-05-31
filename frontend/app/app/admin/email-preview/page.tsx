@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { handle401 } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -31,16 +32,27 @@ export default function EmailPreviewPage() {
   const [theme, setTheme] = useState<Theme>("auto");
   const [width, setWidth] = useState<Width>("desktop");
   const [err, setErr] = useState<string | null>(null);
+  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "skipped" | "error">("idle");
+  const [sendMsg, setSendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
-    if (!user || !user.is_admin) {
+    if (!user) {
       router.push("/signin?next=/app/admin/email-preview");
+      return;
+    }
+    // Signed-in non-admins: bounce to a safe page (NOT /signin — that
+    // would loop because the backend returns 401 for non-admins).
+    if (!user.is_admin) {
+      router.push("/app/scanner");
       return;
     }
     fetch(`${API_BASE}/api/admin/email-preview`, { credentials: "include" })
       .then((r) => {
-        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        if (!r.ok) {
+          handle401(r.status);
+          throw new Error(`${r.status} ${r.statusText}`);
+        }
         return r.json();
       })
       .then((data: { items: PreviewItem[] }) => {
@@ -55,6 +67,13 @@ export default function EmailPreviewPage() {
     const qs = new URLSearchParams({ theme });
     return `${API_BASE}/api/admin/email-preview/${active}?${qs}`;
   }, [active, theme]);
+
+  // Reset the send-to-me state when the user picks a different email so
+  // a stale "✓ Sent" doesn't claim the new variant was already delivered.
+  useEffect(() => {
+    setSendState("idle");
+    setSendMsg(null);
+  }, [active]);
 
   if (loading) return <div className="p-8 text-sm text-muted">Loading…</div>;
   if (!user || !user.is_admin) return null;
@@ -126,14 +145,49 @@ export default function EmailPreviewPage() {
             onChange={(v) => setWidth(v as Width)}
           />
           {active && (
-            <a
-              href={iframeSrc}
-              target="_blank"
-              rel="noreferrer"
-              className="ml-auto text-xs text-muted underline-offset-4 hover:text-fg hover:underline"
-            >
-              Open in new tab ↗
-            </a>
+            <div className="ml-auto flex items-center gap-3">
+              <SendToMeButton
+                name={active}
+                state={sendState}
+                msg={sendMsg}
+                onClick={async () => {
+                  setSendState("sending");
+                  setSendMsg(null);
+                  try {
+                    const r = await fetch(
+                      `${API_BASE}/api/admin/email-preview/${active}/send`,
+                      { method: "POST", credentials: "include" },
+                    );
+                    if (!r.ok) {
+                      handle401(r.status);
+                      const txt = await r.text();
+                      setSendState("error");
+                      setSendMsg(txt || `${r.status} ${r.statusText}`);
+                      return;
+                    }
+                    const body = await r.json();
+                    if (body.status === "sent") {
+                      setSendState("sent");
+                      setSendMsg(`Delivered to ${body.to}`);
+                    } else if (body.status === "skipped") {
+                      setSendState("skipped");
+                      setSendMsg("Resend not configured (local dev?)");
+                    }
+                  } catch (e: unknown) {
+                    setSendState("error");
+                    setSendMsg(String((e as Error)?.message || e));
+                  }
+                }}
+              />
+              <a
+                href={iframeSrc}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted underline-offset-4 hover:text-fg hover:underline"
+              >
+                Open in new tab ↗
+              </a>
+            </div>
           )}
         </div>
 
@@ -162,6 +216,49 @@ export default function EmailPreviewPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function SendToMeButton({
+  name,
+  state,
+  msg,
+  onClick,
+}: {
+  name: string;
+  state: "idle" | "sending" | "sent" | "skipped" | "error";
+  msg: string | null;
+  onClick: () => void;
+}) {
+  const label =
+    state === "sending" ? "Sending…" :
+    state === "sent"    ? "✓ Sent" :
+    state === "skipped" ? "⚠ Skipped" :
+    state === "error"   ? "Retry" :
+    "Send to my inbox";
+  const className =
+    state === "sent"
+      ? "rounded-md bg-up/10 px-3 py-1 text-xs font-medium text-up"
+      : state === "error"
+      ? "rounded-md bg-down/10 px-3 py-1 text-xs font-medium text-down hover:bg-down/20"
+      : state === "skipped"
+      ? "rounded-md bg-warn/10 px-3 py-1 text-xs font-medium text-warn"
+      : "rounded-md bg-accent/10 px-3 py-1 text-xs font-medium text-accent hover:bg-accent/20 disabled:opacity-50";
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={state === "sending"}
+        className={className}
+        title={`Deliver the rendered ${name} preview to your own email`}
+      >
+        {label}
+      </button>
+      {msg && (
+        <span className="text-[11px] text-muted">{msg}</span>
+      )}
     </div>
   );
 }

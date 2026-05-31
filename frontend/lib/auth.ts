@@ -48,7 +48,25 @@ type SignupExtras = {
   company?: string;             // honeypot — must be empty for humans
   turnstile_token?: string;     // Cloudflare Turnstile token (if configured)
   device_fingerprint?: string;  // 16-char hex hash from lib/fingerprint.ts
+  // Marketing-attribution UTMs — read from localStorage on submit via
+  // lib/utm.ts:getStoredUtm(). Backend writes them once to the User
+  // row's signup_utm_* columns; never updated. Optional everywhere
+  // since direct/un-tagged traffic is a legitimate signup path.
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
 };
+
+// Signin can resolve two ways: a normal success (session cookie set, user
+// returned) or a 2FA challenge — the account has TOTP enabled, so instead of
+// a session we get a short-lived `mfa_token` to exchange at /api/auth/2fa
+// along with an authenticator code. The signin page narrows on the
+// `mfa_required` discriminant.
+export type SigninResult =
+  | { user: SessionUser }
+  | { mfa_required: true; mfa_token: string };
 
 export const authApi = {
   session: () => req<{ user: SessionUser | null }>("/api/auth/session"),
@@ -58,9 +76,15 @@ export const authApi = {
       body: JSON.stringify({ email, password, name, ...extras }),
     }),
   signin: (email: string, password: string) =>
-    req<{ user: SessionUser }>("/api/auth/signin", {
+    req<SigninResult>("/api/auth/signin", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    }),
+  // Second step of a 2FA signin. `code` is a 6-digit TOTP or a recovery code.
+  signin2fa: (mfa_token: string, code: string) =>
+    req<{ user: SessionUser }>("/api/auth/2fa", {
+      method: "POST",
+      body: JSON.stringify({ mfa_token, code }),
     }),
   signout: () => req<{ ok: boolean }>("/api/auth/signout", { method: "POST" }),
 };

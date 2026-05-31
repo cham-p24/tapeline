@@ -4,6 +4,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { LiveCounters } from "@/components/LiveCounters";
 import { FadeIn } from "@/components/FadeIn";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
@@ -22,18 +23,11 @@ export default function LandingPage() {
           The TickerSearch previously sat under the preview, doing the same
           job twice; removed so the eye lands on one demo, not two. */}
       <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
-        {/* Decorative gradient blobs — positioned relative to the full viewport
-            (no max-w-6xl wrapper) so they bleed full-bleed rather than creating
-            a visible "boxed-in" rectangle on wide screens. Two soft, oversized
-            blobs read as ambient atmosphere, the way Linear / Stripe / Vercel
-            heroes do — page first, container second. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute left-1/2 top-[-15%] h-[680px] w-[1400px] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
-          <div className="absolute left-[-8%] top-[20%] h-[420px] w-[640px] rounded-full bg-up/[0.04] blur-3xl" />
-        </div>
+        {/* Decorative gradient blobs removed 2026-05-22 — too many ambient
+            overlays were competing with the actual content + colliding with
+            the body::before atmospheric tint, producing an unintentionally
+            heavy stacked effect. Sections now use solid panel tints (below)
+            for hierarchy rather than blurred colour halos. */}
         <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
           <div className="lg:col-span-2 lg:pt-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
@@ -78,7 +72,7 @@ export default function LandingPage() {
       {/* LIVE COUNTERS — concrete numbers from /api/status, refreshed every 60s.
           Replaces vague "live" with specifics: how many tickers, how many
           news items, current regime, last tick. */}
-      <section className="bg-panel/20">
+      <section className="border-y border-border/60">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <LiveCounters />
         </div>
@@ -91,14 +85,8 @@ export default function LandingPage() {
           different visual treatments for two different jobs.
           Section is `relative overflow-hidden` so we can drop in a soft
           right-side accent blob that picks up the atmosphere from the hero. */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute right-[-10%] top-[10%] h-[480px] w-[760px] rounded-full bg-accent/[0.07] blur-3xl" />
-        </div>
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+      <section>
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
         <p className="eyebrow text-accent">Why Tapeline</p>
         <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
           Three things every other scanner won&rsquo;t do.
@@ -161,7 +149,7 @@ export default function LandingPage() {
       {/* HOW IT WORKS — three-step process. Cards are appropriate here
           because each step is sequential and self-contained. */}
       <section className="bg-panel/10">
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
           <p className="eyebrow text-accent">How it works</p>
           <h2 className="mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
             From data to decision in one glance.
@@ -203,17 +191,8 @@ export default function LandingPage() {
               and Google's crawl budget for a new domain never reached
               /blog → individual post. Posts are sorted newest-first; show
               the most recent 6 inline + "see all" link to /blog. */}
-      <section className="relative overflow-hidden bg-panel/10">
-        {/* Mid-page atmospheric accent — opposite side from the "Why" section
-            blob so the eye traces a soft accent zigzag down the page rather
-            than seeing a single column of colour. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute left-[-12%] top-[20%] h-[440px] w-[680px] rounded-full bg-accent/[0.06] blur-3xl" />
-        </div>
-        <div className="mx-auto max-w-6xl px-6 py-12 sm:py-20">
+      <section className="bg-panel/10">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
           <p className="eyebrow text-accent">From the blog</p>
           <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
             How the score works, on the record.
@@ -232,7 +211,7 @@ export default function LandingPage() {
               <FadeIn key={p.slug} delayMs={0}>
                 <Link
                   href={`/blog/${p.slug}`}
-                  className="block h-full rounded-2xl border border-border bg-panel/40 p-6 transition hover:border-accent/40 hover:bg-panel/60"
+                  className="lift block h-full rounded-2xl border border-border bg-panel/40 p-6 hover:border-accent/40 hover:bg-panel/60"
                 >
                   <p className="text-xs font-mono text-subtle">
                     {new Date(p.publishedAt).toLocaleDateString("en-GB", {
@@ -266,14 +245,8 @@ export default function LandingPage() {
           Wrapped in a relative-positioned container so we can drop a soft
           accent blob behind the FAQ for visual continuity with the rest of
           the page. */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
-        >
-          <div className="absolute right-[-6%] top-[15%] h-[420px] w-[620px] rounded-full bg-accent/[0.05] blur-3xl" />
-        </div>
-        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-20">
+      <section>
+        <div className="mx-auto max-w-3xl px-6 py-8 sm:py-12">
         <p className="eyebrow text-accent">Common questions</p>
         <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
           Things people ask before signing up.
@@ -339,7 +312,7 @@ export default function LandingPage() {
           continuous canvas now; the old `from-panel/20 to-transparent`
           here created a visible seam against the FAQ above. */}
       <section>
-        <div className="mx-auto max-w-3xl px-6 py-10 sm:py-14 text-center">
+        <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10 text-center">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
             One score. One sentence. <br />
             <span className="text-accent">One public record.</span>
@@ -359,6 +332,38 @@ export default function LandingPage() {
           <p className="mt-4 text-xs text-muted">
             No credit card &middot; Cancel in one click &middot; 7-day refund
             on monthly
+          </p>
+        </div>
+      </section>
+
+      {/* Newsletter lead-magnet — second-chance email capture for visitors
+          who scrolled past the trial CTAs. Lower commitment than /signup
+          (no card, no account). Once they're in the list, the daily Top 10
+          send + the in-email Premium CTA do the eventual conversion lift.
+          Placed before the footer so it's the last thing the eye sees on
+          the way out, not competing with the primary trial CTA above. */}
+      <section className="border-t border-border bg-panel/30">
+        <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
+              Free · no card
+            </div>
+            <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
+              Not ready for a trial?
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-muted text-sm sm:text-base leading-relaxed">
+              Get the daily Top 10 picks in your inbox each market morning.
+              One email, one minute, no card. Unsubscribe in one click.
+            </p>
+          </div>
+          <div className="mx-auto max-w-md">
+            <NewsletterCapture source="homepage" heading="" sub="" />
+          </div>
+          <p className="mx-auto mt-4 max-w-md text-center text-xs text-muted">
+            Want to see today&rsquo;s picks first?{" "}
+            <Link href="/daily-picks" className="text-accent hover:underline">
+              Preview today&rsquo;s Top 10 →
+            </Link>
           </p>
         </div>
       </section>

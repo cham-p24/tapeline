@@ -7,11 +7,15 @@ ticker page doesn't block on the upstream rating call.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.db import SessionLocal, get_session
 from app.models import NewsItem, SqueezeSetup, Ticker, User
 from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
@@ -20,75 +24,172 @@ from app.services.news_feed import fetch_news_for_ticker
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# --- News freshness strategy (incident fix 2026-05-31, rev 2) --------------
+# /api/ticker MUST be fast: it backs both the SSR'd public /t/{symbol} page
+# and the daily SEO audit, which HEADs ~1.1k of those pages. The previous
+# design live-fetched news (Benzinga ∥ Massive ∥ Finnhub — ~3 parallel
+# upstream calls) synchronously inside the request. Even after the earlier
+# fix today stopped holding a pooled DB connection across that fetch, the
+# multi-second call — multiplied by the audit's concurrency AND the
+# frontend's 2x SSR retry on slow responses — let in-flight requests pile up
+# on the single small API machine and drove a latency death-spiral
+# (2.8s → 20s → timeout). That tripped the frontend's 7s SSR timeout, so the
+# /t/{symbol} pages 500'd (by design, as a "retry later" signal to Googlebot)
+# during every audit window.
+#
+# Fix: serve news straight from the DB — the same warm cache /api/news reads,
+# kept fresh by the worker (~every 5 min) plus EDGAR 8-Ks. The request path
+# now makes ZERO upstream calls; it's pure indexed DB reads, sub-second under
+# any load. Freshness for cold / long-tail tickers (e.g. BUR, which Massive
+# serves stale) is preserved by an OPPORTUNISTIC background refresh that is:
+#   • deduped per symbol     — never two concurrent refreshes for one symbol,
+#   • throttled per symbol   — re-fetch at most once / NEWS_REFRESH_MIN_INTERVAL,
+#   • globally capped         — ≤ MAX_CONCURRENT_NEWS_REFRESH in flight machine-wide,
+#   • hard-timeout-bounded    — a wedged upstream can't hold an in-flight slot.
+# So the audit's ~1.1k cold symbols can never spawn ~1.1k concurrent fetches:
+# at most a small trickle drains in the background while every request that
+# touched them has already returned.
+NEWS_REFRESH_TIMEOUT_S = 12.0          # hard cap on a single background refresh
+NEWS_REFRESH_MIN_INTERVAL_S = 600.0    # don't re-fetch the same symbol < 10 min apart
+MAX_CONCURRENT_NEWS_REFRESH = 3        # machine-wide ceiling on background fetches
+
+# Per-process state for the background refresh (one set of these per API worker).
+_news_refresh_inflight: set[str] = set()          # symbols currently mid-refresh
+_news_last_refresh_at: dict[str, datetime] = {}   # symbol -> last refresh start (UTC)
+_news_bg_tasks: set[asyncio.Task] = set()         # strong refs so tasks aren't GC'd
+
+
+async def _refresh_news_bg(symbol: str) -> None:
+    """Background, fire-and-forget news refresh for one symbol.
+
+    Runs OFF the request path: live-fetches the feed (hard-capped via
+    wait_for so a wedged upstream releases its in-flight slot), then
+    id-deduped-inserts any unseen rows in its own short-lived session and
+    COMMITS (the request path only reads — this is what actually persists new
+    articles). Every failure mode is swallowed: this is opportunistic
+    freshness, never load-bearing.
+    """
+    try:
+        live = await asyncio.wait_for(
+            fetch_news_for_ticker(symbol, limit=8), timeout=NEWS_REFRESH_TIMEOUT_S
+        )
+        if not live:
+            return
+        async with SessionLocal() as session:
+            inserted = 0
+            for it in live:
+                try:
+                    existing = await session.execute(
+                        select(NewsItem).where(NewsItem.id == it["id"])
+                    )
+                    if existing.scalar_one_or_none() is None:
+                        session.add(NewsItem(**it))
+                        inserted += 1
+                except Exception:
+                    pass
+            if inserted:
+                try:
+                    await session.commit()
+                except Exception:
+                    try:
+                        await session.rollback()
+                    except Exception:
+                        pass
+    except Exception:
+        logger.warning("ticker.news_bg_refresh_failed symbol=%s", symbol)
+    finally:
+        _news_refresh_inflight.discard(symbol)
+
+
+def _maybe_refresh_news(symbol: str) -> None:
+    """Opportunistically schedule a background news refresh for `symbol`.
+
+    Cheap, synchronous, non-blocking guard: applies per-symbol dedup + a
+    per-symbol throttle + a global concurrency ceiling, then spawns a detached
+    task and returns immediately. The request never waits on the refresh, and
+    under heavy fan-out (the SEO audit) the global ceiling caps machine-wide
+    background work regardless of request volume.
+    """
+    if symbol in _news_refresh_inflight:
+        return
+    now = datetime.now(UTC)
+    last = _news_last_refresh_at.get(symbol)
+    if last is not None and (now - last).total_seconds() < NEWS_REFRESH_MIN_INTERVAL_S:
+        return
+    if len(_news_refresh_inflight) >= MAX_CONCURRENT_NEWS_REFRESH:
+        return  # at capacity — skip; the DB news we already served stands
+    _news_refresh_inflight.add(symbol)
+    _news_last_refresh_at[symbol] = now
+    task = asyncio.create_task(_refresh_news_bg(symbol))
+    _news_bg_tasks.add(task)
+    task.add_done_callback(_news_bg_tasks.discard)
 
 
 @router.get("/{symbol}")
-async def ticker_detail(
-    symbol: str,
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Complete view of a single ticker — score breakdown, squeeze status, news."""
+async def ticker_detail(symbol: str) -> dict:
+    """Complete view of a single ticker — score breakdown, squeeze status, news.
+
+    Connection + latency discipline (incident fix 2026-05-31, rev 2): this
+    endpoint backs the SSR'd public /t/{symbol} page and the daily SEO audit
+    that HEADs ~1.1k of them, so it MUST be fast and cheap. It does only
+    indexed DB reads in a SINGLE short txn (connection released on exit) and
+    makes NO upstream calls in the request path — news is served from the same
+    warm DB cache /api/news reads (worker-refreshed ~every 5 min + EDGAR 8-Ks).
+    A bounded, deduped, throttled background task (see _maybe_refresh_news)
+    keeps long-tail tickers fresh without ever blocking the response or letting
+    load pile up. `expire_on_commit=False` (see app.db) keeps the ORM objects
+    readable after the `async with` closes, so building the payload outside the
+    txn is safe.
+
+    History: the news fetch used to run inline. First it held a pooled
+    connection across the multi-second Benzinga→Massive→Finnhub chain →
+    QueuePool exhaustion. Then, after the connection was released but the fetch
+    stayed inline, the multi-second call (× audit concurrency × the frontend's
+    2x SSR retry) drove a latency death-spiral that 500'd the SSR pages. Both
+    failure modes are gone now that the request path touches only the DB.
+    """
     symbol = symbol.upper()
 
-    # Core ticker
-    result = await session.execute(select(Ticker).where(Ticker.symbol == symbol))
-    t = result.scalar_one_or_none()
-    if t is None:
-        raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+    # Single short read txn: core ticker + squeeze + latest news. The pooled
+    # connection is checked out only for these indexed lookups, then returned
+    # to the pool on context exit — no upstream call ever holds it.
+    async with SessionLocal() as session:
+        t = (
+            await session.execute(select(Ticker).where(Ticker.symbol == symbol))
+        ).scalar_one_or_none()
+        if t is None:
+            raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+        sq = (
+            await session.execute(
+                select(SqueezeSetup).where(SqueezeSetup.symbol == symbol)
+            )
+        ).scalar_one_or_none()
+        news_rows = (
+            await session.execute(
+                select(NewsItem)
+                .where(NewsItem.tickers.like(f"%{symbol}%"))
+                .order_by(desc(NewsItem.published_at))
+                .limit(8)
+            )
+        ).scalars().all()
+        news_payload = [
+            {
+                "id": n.id,
+                "title": n.title,
+                "publisher": n.publisher,
+                "published_at": n.published_at.isoformat() if hasattr(n.published_at, "isoformat") else str(n.published_at),
+                "url": n.url,
+                "sentiment": getattr(n, "sentiment", None),
+            }
+            for n in news_rows
+        ]
 
-    # Squeeze setup if present
-    sq_result = await session.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == symbol))
-    sq = sq_result.scalar_one_or_none()
-
-    # News — ALWAYS live-fetch on every visit (Benzinga → Massive → Finnhub
-    # chain), persist any new articles, then return the latest 8 from DB.
-    #
-    # Previous version short-circuited on cache hit ("if not news_rows"),
-    # which meant tickers like BUR (UK ADR with 5 stale 2024 Massive
-    # articles cached) never re-fetched. Visitors saw 2-year-old news
-    # forever. The new flow:
-    #   1. Live fetch through the fallback chain (Benzinga first; falls
-    #      through to Finnhub which has fresh BUR/UK/international coverage).
-    #   2. Insert any unseen articles into NewsItem (id-deduped, per-row
-    #      try/except so one bad insert can't poison the rest).
-    #   3. SELECT the 8 most-recent — fresh articles rank above stale ones
-    #      naturally via ORDER BY published_at DESC.
-    try:
-        live = await fetch_news_for_ticker(symbol, limit=8)
-        for it in live:
-            try:
-                existing = await session.execute(
-                    select(NewsItem).where(NewsItem.id == it["id"])
-                )
-                if existing.scalar_one_or_none() is None:
-                    session.add(NewsItem(**it))
-            except Exception:
-                # Don't let one bad row kill the request — log + continue.
-                pass
-        await session.flush()
-    except Exception:
-        # Live fetch failure isn't fatal — fall through to cached news.
-        # CRITICAL: roll the session back too. SQLAlchemy marks the
-        # session as dirty after a failed flush, and every subsequent
-        # query on the same session raises PendingRollbackError until we
-        # explicitly clear it. Without this rollback, a single oversized
-        # news URL or an upstream ReadTimeout cascades into a 500 for
-        # the entire ticker page request. (Was the 12-event Sentry
-        # PendingRollbackError storm — fixed defensively at the news
-        # builder layer in news_feed.clip_news_row, and again here so a
-        # future regression at the vendor level can't re-cascade.)
-        try:
-            await session.rollback()
-        except Exception:
-            pass
-
-    news_result = await session.execute(
-        select(NewsItem)
-        .where(NewsItem.tickers.like(f"%{symbol}%"))
-        .order_by(desc(NewsItem.published_at))
-        .limit(8)
-    )
-    news_rows = news_result.scalars().all()
+    # Opportunistic, non-blocking freshness top-up for cold / long-tail tickers.
+    # Bounded + deduped + throttled inside the helper; returns instantly so the
+    # response (built from the DB read above) is never delayed by an upstream.
+    _maybe_refresh_news(symbol)
 
     return {
         "symbol": t.symbol,
@@ -121,24 +222,9 @@ async def ticker_detail(
             "suggested_window": sq.suggested_window,
             "reason": sq.reason,
         },
-        "news": [
-            {
-                "id": n.id,
-                "title": n.title,
-                "publisher": n.publisher,
-                "published_at": n.published_at.isoformat() if hasattr(n.published_at, "isoformat") else str(n.published_at),
-                "url": n.url,
-                "sentiment": getattr(n, "sentiment", None),
-            }
-            for n in news_rows
-        ],
+        "news": news_payload,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
     }
-
-
-class _DictNews:
-    """Tiny adapter so live-fetched news items render through the same serializer."""
-    def __init__(self, **kw): self.__dict__.update(kw)
 
 
 @router.get("/{symbol}/ratings")

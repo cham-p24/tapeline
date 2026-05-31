@@ -19,6 +19,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
@@ -161,7 +162,7 @@ export default async function SignalsPage() {
       <MarketingNav />
       <script {...jsonLdScript(breadcrumb)} />
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section className="mx-auto max-w-6xl px-6 py-8">
         <p className="eyebrow">Public universe</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Every ticker we score.
@@ -190,13 +191,16 @@ export default async function SignalsPage() {
             a glance and signals to crawlers that this is a data-rich page
             worth indexing. */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <CountTile label="High conviction" count={counts.high} tone="bg-up/15 text-up" />
-          <CountTile label="Strong setup" count={counts.strong} tone="bg-up/10 text-up/90" />
-          <CountTile label="Constructive" count={counts.constructive} tone="bg-accent/15 text-accent" />
-          <CountTile label="Neutral" count={counts.neutral} tone="bg-muted/20 text-muted" />
-          <CountTile label="Caution" count={counts.caution} tone="bg-warn/15 text-warn" />
-          <CountTile label="Weak" count={counts.weak} tone="bg-down/15 text-down" />
+          <CountTile label="High conviction" count={counts.high} tone="bg-up/15 text-up" href="/signal/high-conviction" />
+          <CountTile label="Strong setup" count={counts.strong} tone="bg-up/10 text-up/90" href="/signal/strong-setup" />
+          <CountTile label="Constructive" count={counts.constructive} tone="bg-accent/15 text-accent" href="/signal/constructive" />
+          <CountTile label="Neutral" count={counts.neutral} tone="bg-muted/20 text-muted" href="/signal/neutral" />
+          <CountTile label="Caution" count={counts.caution} tone="bg-warn/15 text-warn" href="/signal/caution" />
+          <CountTile label="Weak" count={counts.weak} tone="bg-down/15 text-down" href="/signal/weak" />
         </div>
+        <p className="mt-3 text-xs text-subtle">
+          Tap any tier to see every stock currently at that signal level, with the methodology behind the band.
+        </p>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-16">
@@ -326,11 +330,18 @@ export default async function SignalsPage() {
           is per-ticker data confidence — mega-caps with full data coverage land
           80–95; less-followed names sit lower. None of the labels are
           prescriptive — see{" "}
-          <Link href="/legal/disclosure" className="link">
+          <Link href="/legal/risk" className="link">
             disclosure
           </Link>
           .
         </p>
+
+        {/* Newsletter mid-funnel capture — anonymous + free users see this
+            below the signup gate; paid users see it below the scanner CTA.
+            Either way it's a lower-commitment funnel step. */}
+        <section className="mt-8 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="signals" heading="" sub="" />
+        </section>
 
         {isSignedIn && (
           <div className="mt-8 rounded-xl border border-border bg-panel p-6">
@@ -359,15 +370,24 @@ function CountTile({
   label,
   count,
   tone,
+  href,
 }: {
   label: string;
   count: number;
   tone: string;
+  href: string;
 }) {
+  // Each tile links to its /signal/{slug} ranking page. This is the signal
+  // cluster's hub-link: /signals (in the main nav + footer) now feeds crawl
+  // equity down to all six per-signal-level pages, which were previously
+  // only reachable via the sitemap and sibling cross-links.
   return (
-    <div className={`rounded-md border border-border p-3 ${tone}`}>
+    <Link
+      href={href}
+      className={`block rounded-md border border-border p-3 transition-colors hover:border-accent/60 ${tone}`}
+    >
       <div className="text-xs uppercase tracking-wide opacity-80">{label}</div>
       <div className="mt-1 text-2xl font-bold nums">{count}</div>
-    </div>
+    </Link>
   );
 }

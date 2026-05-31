@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { CardSkeleton } from "@/components/Skeleton";
 import { userLocale } from "@/lib/datetime";
+import { handle401, errorMessage } from "@/lib/api";
 
 type Stats = {
   users_total: number; users_pro: number; users_premium: number;
@@ -31,7 +32,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function adminGet<T>(path: string): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  if (!r.ok) {
+    handle401(r.status);
+    throw new Error(`${r.status} ${r.statusText}`);
+  }
   return r.json();
 }
 
@@ -41,7 +45,10 @@ async function adminPatch(path: string, body: any) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  if (!r.ok) {
+    handle401(r.status);
+    throw new Error(`${r.status} ${r.statusText}`);
+  }
   return r.json();
 }
 
@@ -56,6 +63,12 @@ export default function AdminPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push("/signin?next=/app/admin"); return; }
+    // Backend /api/admin/* returns 401 (not 403) for non-admins — without
+    // this client-side guard, a signed-in non-admin who bookmarks /app/admin
+    // hits the API, gets 401, gets redirected to /signin, signs in again
+    // (already signed in!), bounces back to /app/admin, and loops. Bounce
+    // them to /app/scanner with a notice instead.
+    if (!user.is_admin) { router.push("/app/scanner"); return; }
     Promise.all([
       adminGet<Stats>("/api/admin/stats"),
       adminGet<{ items: UserRow[] }>("/api/admin/users"),
@@ -68,7 +81,7 @@ export default function AdminPage() {
     try {
       await adminPatch(`/api/admin/users/${userId}/tier`, { tier });
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, tier } : u));
-    } catch (e: any) { alert(e.message); }
+    } catch (e: unknown) { alert(errorMessage(e)); }
   }
 
   if (loading) return <CardSkeleton rows={6} />;
@@ -89,6 +102,7 @@ export default function AdminPage() {
 
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
         <a href="/app/admin/email-preview" className="link">Email preview &rarr;</a>
+        <a href="/app/inbox" className="link">Inbox auto-handler &rarr;</a>
       </div>
 
       {stats && (

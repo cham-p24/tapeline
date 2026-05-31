@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type EmailPrefKey, type EmailPrefsResponse } from "@/lib/api";
+import { CardSkeleton } from "@/components/Skeleton";
 
 /**
  * Per-user email preferences.
@@ -68,7 +69,7 @@ export default function EmailSettingsPage() {
       </div>
     );
   if (!state)
-    return <div className="card p-6 text-sm text-muted">Loading…</div>;
+    return <CardSkeleton rows={5} />;
 
   return (
     <div className="mx-auto max-w-2xl">

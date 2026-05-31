@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type AlertEvent, type AlertRule } from "@/lib/api";
+import { api, type AlertEvent, type AlertRule, TierGateError, errorMessage } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
+import { TableSkeleton } from "@/components/Skeleton";
 
 type RuleType = AlertRule["rule_type"];
 type Channel = AlertRule["channel"];
@@ -37,8 +38,8 @@ export default function AlertsPage() {
       setRules(r.items);
       setEvents(e.items);
       setError(null);
-    } catch (e: any) {
-      const m = String(e.message || e);
+    } catch (e: unknown) {
+      const m = errorMessage(e);
       if (m.includes("401")) {
         window.location.href = `/signin?next=${encodeURIComponent("/app/alerts")}`;
         return;
@@ -65,14 +66,16 @@ export default function AlertsPage() {
       });
       if (def.needsSymbol) setSymbol("");
       load();
-    } catch (e: any) {
-      const m = String(e.message || e);
-      if (m.includes("401")) {
-        window.location.href = `/signin?next=${encodeURIComponent("/app/alerts")}`;
-        return;
+    } catch (e: unknown) {
+      // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
+      // 403 is typed via TierGateError carrying the backend's actual message
+      // ("Telegram alerts require Premium tier", etc.) — surface it verbatim
+      // instead of inventing copy from the channel name.
+      if (e instanceof TierGateError) {
+        setError(`${e.message} Upgrade at /app/billing.`);
+      } else {
+        setError(errorMessage(e));
       }
-      if (m.includes("403")) setError(`${channel === "telegram" ? "Telegram" : channel === "web_push" ? "Web push" : "Email"} alerts require a higher tier. Upgrade at /app/billing.`);
-      else setError(m);
     } finally {
       setCreating(false);
     }
@@ -82,8 +85,8 @@ export default function AlertsPage() {
     try {
       await api.alertRuleDelete(id);
       setRules((r) => r.filter((x) => x.id !== id));
-    } catch (e: any) {
-      const m = String(e.message || e);
+    } catch (e: unknown) {
+      const m = errorMessage(e);
       if (m.includes("401")) {
         window.location.href = `/signin?next=${encodeURIComponent("/app/alerts")}`;
         return;
@@ -111,8 +114,11 @@ export default function AlertsPage() {
         </div>
       </div>
 
-      {/* Create form */}
-      <div className="card mt-6 p-5">
+      {/* Create form — p-4 to match the watchlist "add ticker" form's
+          compactness. Both are top-of-page input blocks of the same
+          shape; before this they were drifting at p-5 vs p-4 which
+          read as two slightly different design languages. */}
+      <div className="card mt-6 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">New rule</h2>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -189,7 +195,7 @@ export default function AlertsPage() {
       </h2>
 
       {loading ? (
-        <div className="card p-6 text-sm text-muted">Loading…</div>
+        <div className="card overflow-hidden"><TableSkeleton cols={6} rows={4} /></div>
       ) : rules.length === 0 ? (
         <div className="card p-6 text-sm text-muted">
           No alert rules yet. Create one above, or visit the{" "}
