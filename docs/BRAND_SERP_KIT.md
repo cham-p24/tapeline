@@ -1,6 +1,6 @@
 # Brand SERP Kit — paste-ready off-site copy + launch pitch
 
-**Last updated:** 2026-05-31
+**Last updated:** 2026-06-01
 **Owner:** Founder (operator actions — Claude cannot create accounts or send these)
 **Companion to:** [`OFFSITE.md`](./OFFSITE.md) (the *where + steps*) and
 [`layout.tsx`](../frontend/app/layout.tsx) `Organization.sameAs` (the entity graph these feed).
@@ -81,6 +81,44 @@ in `Organization.sameAs` (X, LinkedIn, GitHub, Reddit are already live). Claim i
 this order — each one, once live, gets added back to `sameAs` and strengthens the
 brand entity. After claiming *any* profile, do the **post-claim checklist** at the
 bottom of Part A.
+
+### A0 · Google Business Profile — `business.google.com/create`
+
+> **Different from the six below.** GBP isn't a `sameAs` 404 — it's the single
+> highest-impact entity profile *for Google specifically* (it feeds the Knowledge
+> Panel + Maps). It's also the slowest: it needs **mailed-postcard verification
+> (~7–14 days)**, so claim it FIRST even though copy below is faster to deploy.
+> Set it up as a **service-area business** (SaaS, no storefront) so no street
+> address is shown.
+
+- **Business name:** `Tapeline`
+- **Primary category:** `Software company`
+- **Secondary category:** *leave blank, or use a software/data category.* ⚠️ Do
+  **not** pick `Financial consultant` / `Financial planner` / `Investment service`
+  — those labels imply you give financial advice, which cuts directly against the
+  publisher's-exemption voice. (This overrides the older "Financial consultant"
+  note in `OFFSITE.md` — your call, but the advice-implying category is a real
+  legal-posture risk.)
+- **Service area:** `United States` (primary market = the ticker universe); add
+  `Australia` (home) and any others you actively serve. Hide the physical address.
+- **Hours:** `Open 24 hours` (the product is always-on).
+- **Website:** `https://tapeline.io`
+- **Phone:** optional — skip it, or use a Google Voice / VoIP number (never a personal mobile).
+- **Description (paste — GBP allows ≤750 chars, NO URLs / NO pricing / NO promo
+  language, so this is a policy-clean variant of the canonical paragraph):**
+  ```
+  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the formula and the track record should both be public. Every active US ticker gets one 0-100 composite score blended from six published factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — updated in under 60 seconds during US market hours, each with a plain-English explanation of the reading. Every top-10 daily pick is logged to a public, back-checked scorecard showing its realized next-day return versus the S&P 500. Tapeline provides descriptive market analytics, not financial advice. Bootstrapped and built in Melbourne, Australia; launched in 2026.
+  ```
+  *(686 chars — under GBP's 750 limit. Note: GBP descriptions forbid URLs, phone numbers, pricing, and
+  promotional/sales language — so this drops the tapeline.io / $-tiers / competitor
+  list that the canonical paragraph carries. Everything else is voice-identical.)*
+- **Logo:** export `tapeline.io/favicon.svg` to PNG, **min 250×250** (720×720 ideal).
+- **Cover photo:** `tapeline.io/opengraph-image` (1200×630 — clears the 1080×608 min).
+- **After postcard verification:** request the Knowledge Panel at
+  `support.google.com/business/answer/9692654`, supplying the
+  [`/about`](../frontend/app/about/page.tsx) URL as the canonical entity reference.
+  Then add the public listing URL (`g.page/...` or the Maps URL) to `sameAs` per
+  the post-claim checklist below.
 
 ### A1 · Product Hunt — `producthunt.com/posts/new`
 
