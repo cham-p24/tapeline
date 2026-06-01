@@ -15,7 +15,7 @@ The personal trading system at `C:\signal-system\` is a separate project. Tapeli
 - 5-min refresh throttle (`SIGNAL_SHEET_REFRESH_SECONDS`)
 - Sheet's prescriptive labels (BUY NOW / ACCUMULATE / HOLD / WATCH / AVOID) are NEVER passed through — `sheet_feed.score_to_signal()` re-derives Tapeline's descriptive labels (HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK) from the composite score per the publisher-exemption posture
 
-Phase 2+ will pull the other tabs (SPIKE INTELLIGENCE, MARKET INTELLIGENCE, SMART MONEY & CONGRESS, ETF BENCHMARKS) into matching Tapeline tables. The sheet's column order is documented in `services/sheet_feed.parse_all_signals_csv()`.
+All four other tabs (SPIKE INTELLIGENCE, MARKET INTELLIGENCE, SMART MONEY & CONGRESS, ETF BENCHMARKS) are **already wired and ingesting in prod** (not "Phase 2 future" — that framing is stale). Each has a parser + upsert in `services/sheet_feed.py`, the worker calls all five every tick (`signal_publisher.py`), and all five `*_CSV_URL` secrets are set on Fly (each gated independently by its own URL). `refresh_all_tabs()` + the `/api/internal/sheet-changed` webhook drive the live-push path; per-tab column order is documented in each `parse_*_csv()`. (RUN HEALTH is deliberately not pulled.) **Caveat:** SMART MONEY only boosts `sub_smart_money` by per-ticker appearance count — the individual congress/insider/13F trades are read but NOT stored as structured rows; each tab also keeps only a subset of its columns.
 
 ## Operational facts
 - **Git is live** at https://github.com/cham-p24/tapeline. CI deploys main → Fly.io (backend) + Vercel (frontend). Use normal commit/push flow.
@@ -34,7 +34,7 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
 - **Pro** $29.99/mo OR **$24.99/mo billed annually** ($299.99/yr · save $60) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
-- **Premium** $49.99/mo OR **$39.99/mo billed annually** ($479.99/yr · save $120) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (Public-API row was removed from marketing pending the actual API-key endpoint shipping; `api_requests_per_day=1000` is still in `tier.py:TIER_LIMITS` for when it does.)
+- **Premium** $49.99/mo OR **$39.99/mo billed annually** ($479.99/yr · save $120) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing row is still NOT re-surfaced — `ComparisonTable.tsx` keeps it commented out and `PricingTable.tsx` has no API line — so the endpoint is live but unadvertised, pending a marketing call.)
 
 **Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
 
