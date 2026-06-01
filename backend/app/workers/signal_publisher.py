@@ -67,6 +67,7 @@ _last_sector_backfill: datetime | None = None
 _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
 _last_inbox_tick: datetime | None = None
+_last_checkout_recovery: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -313,6 +314,24 @@ async def tick() -> None:
         except Exception:
             logger.exception("drip.run_failed")
         _last_drip_check = started
+
+    # Checkout abandonment recovery — HOURLY (not daily like the drips above):
+    # the targeting window is a tight 1-24h after a user mints a Stripe Checkout
+    # Session without completing it, so a daily cadence would miss most of them.
+    # checkout_started_at is the abandonment signal (cleared by the
+    # checkout.session.completed webhook); the "abandon1" drip_state token makes
+    # each attempt a one-shot. No-op without RESEND_API_KEY.
+    global _last_checkout_recovery
+    if _last_checkout_recovery is None or (started - _last_checkout_recovery).total_seconds() >= 3600:
+        try:
+            from app.services.email import run_checkout_abandonment_recovery
+            async with session_scope() as recovery_session:
+                rec_counts = await run_checkout_abandonment_recovery(recovery_session)
+            if rec_counts["abandon1"]:
+                logger.info("drip.checkout_recovery_sent abandon1=%d", rec_counts["abandon1"])
+        except Exception:
+            logger.exception("checkout_recovery.run_failed")
+        _last_checkout_recovery = started
 
     # Signal-system Google Sheet refresh — pulls ALL SIGNALS + the Phase 2
     # intelligence tabs (SPIKE / MARKET / SMART MONEY / ETF) and upserts to

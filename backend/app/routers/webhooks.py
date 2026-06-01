@@ -105,6 +105,13 @@ async def stripe_webhook(
             user = result.scalar_one_or_none()
             if user:
                 user.stripe_customer_id = customer_id
+                # Checkout completed — clear the in-flight markers so the
+                # abandonment-recovery worker never nudges a customer who
+                # actually converted. (drip_state's "abandon1" token is left
+                # as-is; it's inert once checkout_started_at is None.)
+                user.checkout_started_at = None
+                user.checkout_tier = None
+                user.checkout_billing_period = None
                 await session.commit()
                 logger.info("stripe.customer_linked user=%s customer=%s", user_id, customer_id)
 
