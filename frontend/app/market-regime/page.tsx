@@ -40,6 +40,10 @@ async function fetchRegime(): Promise<{ data: RegimePreview; live: boolean }> {
   try {
     const res = await fetch(`${API_BASE}/api/public/regime`, {
       next: { revalidate: 600 },
+      // Bound the build-time fetch so a degraded/slow API can't hang static
+      // export past Next's 60s budget (a hang isn't caught by try/catch).
+      // Matches /stocks + /signals; falls back to SHOWCASE below.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { data: SHOWCASE, live: false };
     const body = (await res.json()) as Partial<RegimePreview> & { available?: boolean };

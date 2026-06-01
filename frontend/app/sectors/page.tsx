@@ -50,6 +50,11 @@ async function fetchSignals(): Promise<SignalRow[]> {
   try {
     const res = await fetch(`${API_BASE}/api/public/signals?limit=1000`, {
       next: { revalidate: 300 },
+      // Abort a hung/slow API so static export never exceeds Next's 60s
+      // per-page budget (a hang isn't caught by the try/catch — only a
+      // thrown error is). Matches the /stocks + sitemap pattern; ISR
+      // (revalidate:300) backfills real data on the next successful fetch.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: SignalRow[] };

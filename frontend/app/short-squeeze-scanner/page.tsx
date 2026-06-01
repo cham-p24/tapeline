@@ -44,6 +44,10 @@ async function fetchSqueeze(): Promise<{ items: SqueezeRow[]; live: boolean }> {
   try {
     const res = await fetch(`${API_BASE}/api/public/squeeze?limit=5`, {
       next: { revalidate: 300 },
+      // Bound the build-time fetch so a degraded/slow API can't hang static
+      // export past Next's 60s budget (a hang isn't caught by try/catch).
+      // Matches /stocks + /signals; falls back to SHOWCASE_ROWS below.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { items: SHOWCASE_ROWS, live: false };
     const body = (await res.json()) as { items?: SqueezeRow[] };
