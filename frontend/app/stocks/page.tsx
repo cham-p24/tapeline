@@ -58,21 +58,49 @@ type SignalsResponse = {
   items: DirectoryRow[];
 };
 
+// /api/public/signals hard-caps each RESPONSE at 2,000 rows, but the scored
+// universe is larger (~4,600 as of 2026-06-01 and growing via auto-discovery)
+// and ordered score-DESC, so a single limit=2000 call returns only the top
+// slice — and that slice's membership churns every tick (low-vol large-caps
+// like SO/DUK/AVA flap across the rank-2,000 boundary). Page through via
+// &offset= until a short page so the directory lists EVERY scored ticker,
+// durably, matching the sitemap (app/sitemap.ts → fetchUniverseSymbols) exactly.
+const UNIVERSE_PAGE_SIZE = 2000;
+const UNIVERSE_MAX_PAGES = 8; // safety bound: 8 × 2000 = 16k ≫ today's ~4.6k pool
+
 async function fetchUniverse(): Promise<DirectoryRow[]> {
+  const all: DirectoryRow[] = [];
+  const seen = new Set<string>();
   try {
-    // limit=2000 returns the full scored universe in one call (currently a
-    // few hundred names; the endpoint hard-caps at 2000). revalidate keeps
-    // the fetch behind the 1h ISR cache so crawlers don't hit the API live.
-    const res = await fetch(`${API_BASE}/api/public/signals?limit=2000`, {
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const body = (await res.json()) as SignalsResponse;
-    return body.items ?? [];
+    for (let page = 0; page < UNIVERSE_MAX_PAGES; page++) {
+      const offset = page * UNIVERSE_PAGE_SIZE;
+      // revalidate keeps each page behind the 1h ISR cache so crawlers don't
+      // hit the API live; each distinct offset URL is cached separately.
+      const res = await fetch(
+        `${API_BASE}/api/public/signals?limit=${UNIVERSE_PAGE_SIZE}&offset=${offset}`,
+        {
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+      if (!res.ok) break;
+      const body = (await res.json()) as SignalsResponse;
+      const items = body.items ?? [];
+      // De-dupe by symbol — offset windows can overlap if the score order
+      // shifts between the separate page fetches.
+      for (const r of items) {
+        if (r.symbol && !seen.has(r.symbol)) {
+          seen.add(r.symbol);
+          all.push(r);
+        }
+      }
+      if (items.length < UNIVERSE_PAGE_SIZE) break;
+    }
   } catch {
-    return [];
+    // Use whatever we collected; an empty result renders the "refreshing"
+    // empty state below.
   }
+  return all;
 }
 
 // A rendered section: a GICS sector (with a /sector hub link) or the
