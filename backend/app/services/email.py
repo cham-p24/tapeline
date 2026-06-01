@@ -988,17 +988,29 @@ def render_subscription_started_email(
 
 
 def render_payment_failed_email(
-    user_name: str, tier: str, attempt_count: int = 1,
+    user_name: str, tier: str, attempt_count: int = 1, *, final_attempt: bool = False,
 ) -> str:
     """Stripe `invoice.payment_failed`. Tone is calm + practical, not
     alarmist. First-attempt failures are usually transient (bank fraud
-    flag, expired card)."""
+    flag, expired card).
+
+    `final_attempt` flips the copy to the last-chance variant: Stripe has
+    no further automatic retries scheduled (`next_payment_attempt` is None),
+    so the next failure ends the grace window and the account drops to Free.
+    This is the most urgent touch in the dunning sequence."""
     tier_label = tier.capitalize()
-    urgency_line = (
-        "Stripe will retry automatically over the next few days."
-        if attempt_count == 1
-        else f"This is the {_ordinal(attempt_count)} attempt — if it fails again, your account drops to Free."
-    )
+    if final_attempt:
+        urgency_line = (
+            f"This was the last automatic retry. Update your card now or your "
+            f"account drops to Free and you lose live {tier_label} access."
+        )
+    elif attempt_count == 1:
+        urgency_line = "Stripe will retry automatically over the next few days."
+    else:
+        urgency_line = (
+            f"This is the {_ordinal(attempt_count)} attempt — if it fails "
+            f"again, your account drops to Free."
+        )
     return shell(
         h1(f"{user_name}, your last payment didn't go through.")
         + lead(
@@ -1018,6 +1030,34 @@ def render_payment_failed_email(
         )
         + footnote("Anything weird? Reply to this email — billing@tapeline.io reads every reply."),
         preheader=f"Your {tier_label} renewal charge was declined — fix it in two clicks.",
+    )
+
+
+def render_payment_recovered_email(user_name: str, *, tier: str) -> str:
+    """Closes the dunning loop: a previously-failed renewal finally cleared
+    (Stripe `invoice.payment_succeeded` while the account was mid-dunning).
+    Reassures the customer they're square and nothing lapsed. Transactional
+    (account-state), persona billing, no List-Unsubscribe."""
+    tier_label = (tier or "your plan").capitalize()
+    return shell(
+        h1(f"You're all set, {user_name}.")
+        + lead(
+            f"Your Tapeline {tier_label} payment just went through — the card "
+            f"on file was charged successfully and your subscription is fully "
+            f"current again."
+        )
+        + muted_paragraph(
+            f"Nothing lapsed: your {tier_label} access ran uninterrupted the "
+            f"whole time. There's nothing you need to do."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Back to it</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">Jump back into the scanner — your watchlist, alerts, and saved scans are exactly where you left them.</p>'
+            + button("Open Tapeline", "https://tapeline.io/app"),
+            accent=True,
+        )
+        + footnote("Questions about the charge? Reply here — billing@tapeline.io reads every reply."),
+        preheader=f"Payment received — your {tier_label} subscription is current again.",
     )
 
 

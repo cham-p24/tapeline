@@ -147,6 +147,16 @@ async def stripe_webhook(
                 user.winback_state = ""
             if not obj.get("pause_collection"):
                 user.subscription_paused_until = None
+        elif p["status"] == "past_due":
+            # Dunning grace window. A failed renewal flips the sub to
+            # past_due while Stripe retries the card on its Smart Retries
+            # schedule. Keep the customer on their paid tier the whole time
+            # — yanking access mid-retry kills recovery and feels punitive
+            # for what's usually an expired card or a bank fraud flag. Tier
+            # only drops when retries exhaust and Stripe moves the sub to a
+            # terminal status (unpaid / canceled), handled by the else below
+            # and by customer.subscription.deleted.
+            user.tier = p["tier"]
         else:
             user.tier = "free"
 
@@ -232,36 +242,102 @@ async def stripe_webhook(
             logger.info("stripe.subscription_cancelled user=%s", user.id)
 
     elif evt_type == "invoice.payment_failed":
-        # Card declined on a renewal charge. Email the user with a fix-it link.
-        # Idempotency is already enforced by the StripeWebhookEvent dedup at
-        # the top of this handler — Stripe's auto-retries for the same event_id
-        # will short-circuit before reaching this branch.
+        # Card declined on a renewal charge — dunning. Email the customer a
+        # fix-it link, escalating per Stripe retry attempt. Exact event
+        # redeliveries are blocked by the StripeWebhookEvent dedup at the top
+        # of this handler; the per-attempt `dun{n}` token in drip_state guards
+        # against double-touching the same attempt across *distinct* events
+        # and is wiped on recovery (invoice.payment_succeeded below).
         customer_id = obj.get("customer")
         attempt_count = int(obj.get("attempt_count") or 1)
+        # Stripe nulls next_payment_attempt once it has exhausted its automatic
+        # Smart Retries — that makes this the last-chance touch before the sub
+        # goes terminal and the account drops to Free.
+        final_attempt = obj.get("next_payment_attempt") is None
         result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
         if user and user.email:
-            try:
-                from app.services.email import render_payment_failed_email, send_email
-                html = render_payment_failed_email(
-                    user.name or "trader",
-                    tier=user.tier or "Pro",
-                    attempt_count=attempt_count,
-                )
-                await send_email(
-                    user.email,
-                    "Your Tapeline payment didn't go through",
-                    html,
-                    persona="billing",
-                )
+            token = f"dun{attempt_count}"
+            tokens = [t for t in (user.drip_state or "").split(",") if t]
+            if token in tokens:
                 logger.info(
-                    "stripe.payment_failed_email_sent user=%s attempt=%d",
+                    "stripe.payment_failed_deduped user=%s attempt=%d",
                     user.id, attempt_count,
                 )
-            except Exception:
-                logger.exception("stripe.payment_failed_email_error user=%s", user.id)
+            else:
+                try:
+                    from app.services.email import render_payment_failed_email, send_email
+                    html = render_payment_failed_email(
+                        user.name or "trader",
+                        tier=user.tier or "Pro",
+                        attempt_count=attempt_count,
+                        final_attempt=final_attempt,
+                    )
+                    subject = (
+                        "Action needed: your Tapeline access is about to lapse"
+                        if final_attempt
+                        else "Your Tapeline payment didn't go through"
+                    )
+                    res = await send_email(user.email, subject, html, persona="billing")
+                    # Stamp the dedup token only on a real send, mirroring the
+                    # drip orchestrators — a skipped send (no RESEND key /
+                    # undeliverable) leaves the token unset so a later genuine
+                    # event can still try.
+                    if not res.get("skipped", False):
+                        user.drip_state = ",".join([*tokens, token])
+                        await session.commit()
+                    logger.info(
+                        "stripe.payment_failed_email user=%s attempt=%d final=%s skipped=%s",
+                        user.id, attempt_count, final_attempt, res.get("skipped", False),
+                    )
+                except Exception:
+                    logger.exception("stripe.payment_failed_email_error user=%s", user.id)
         else:
             logger.warning("stripe.payment_failed_without_user customer=%s", customer_id)
+
+    elif evt_type == "invoice.payment_succeeded":
+        # A renewal charge cleared. Most of these are routine — every monthly
+        # renewal lands here — so we act ONLY when the customer was mid-dunning
+        # (carries one or more `dun{n}` tokens from prior failed attempts). In
+        # that case the declined charge just recovered: send the all-clear and
+        # wipe the dunning tokens so the next episode starts clean. No token =
+        # ordinary renewal = stay silent (we don't email every successful
+        # charge — Stripe's own receipt covers that).
+        customer_id = obj.get("customer")
+        result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
+        user = result.scalar_one_or_none()
+        if user:
+            tokens = [t for t in (user.drip_state or "").split(",") if t]
+            dun_tokens = [t for t in tokens if t.startswith("dun")]
+            if dun_tokens:
+                # Clear dunning state first and commit — the state change is the
+                # source of truth; the recovery email is best-effort and must
+                # not be able to strand the tokens if Resend hiccups.
+                user.drip_state = ",".join(t for t in tokens if not t.startswith("dun"))
+                await session.commit()
+                if user.email:
+                    try:
+                        from app.services.email import (
+                            render_payment_recovered_email,
+                            send_email,
+                        )
+                        html = render_payment_recovered_email(
+                            user.name or "trader", tier=user.tier or "Pro",
+                        )
+                        await send_email(
+                            user.email,
+                            "Payment received — you're all set",
+                            html,
+                            persona="billing",
+                        )
+                        logger.info(
+                            "stripe.payment_recovered_email user=%s cleared=%d",
+                            user.id, len(dun_tokens),
+                        )
+                    except Exception:
+                        logger.exception(
+                            "stripe.payment_recovered_email_error user=%s", user.id,
+                        )
 
     # Mark event as processed so the next delivery is treated as a replay
     if event_id:
