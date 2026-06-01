@@ -27,11 +27,14 @@ const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
 // Google Ads conversion tag (AW-XXXXXXXXXX). DISTINCT from GA4: this is what
 // makes ad clicks -> signups countable as conversions in the Google Ads
 // dashboard, which Smart Bidding / ROAS depend on. Without it a paid search
-// campaign is flying blind. Unset by default (no-op); set
-// NEXT_PUBLIC_GOOGLE_ADS_ID in Vercel once the campaign + conversion action
-// exist. Shares the gtag.js loader with GA4 below; per-event send_to labels
-// live in lib/gtag.ts (NEXT_PUBLIC_GOOGLE_ADS_*_LABEL).
-const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "";
+// campaign is flying blind. Defaults to the production conversion tag
+// (AW-18169833652) now that the "Tapeline - Search Test (Jun 2026)" campaign +
+// conversion action are live; override via NEXT_PUBLIC_GOOGLE_ADS_ID in Vercel
+// (or set to empty string to disable on a preview/staging deploy). Shares the
+// gtag.js loader with GA4 below; per-event send_to labels live in lib/gtag.ts
+// (NEXT_PUBLIC_GOOGLE_ADS_*_LABEL — still unset until the conversion label is
+// pulled from the Ads conversion action, at which point signups start counting).
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
 
 // Title template is "%s" so each page owns its full <title>. Putting the
 // brand suffix in the template double-applies it on pages that already
