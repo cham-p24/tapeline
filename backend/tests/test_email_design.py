@@ -198,7 +198,7 @@ def test_day13_uses_urgent_button_variant() -> None:
 def test_non_urgent_renderers_use_accent_button() -> None:
     """Sanity check: the non-T-1 renderers should NOT use the amber urgency
     colour for their primary CTA — that visual cue is reserved."""
-    blue = "#3b82f6"  # ACCENT
+    blue = e.ACCENT  # reference the token, not a hardcoded hex, so it can't drift
     amber = "#f59e0b"
     for name, html in [
         ("welcome", e.render_welcome_email("Alex", picks=None)),
