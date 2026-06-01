@@ -51,6 +51,23 @@ export type TapelineEvent =
   | "view_ticker"          // Visit /t/[symbol]
   | "open_scanner";        // Open /app/scanner
 
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "";
+
+/**
+ * Per-event Google Ads conversion labels. Each label comes from a Google Ads
+ * conversion action (Goals -> Conversions -> New conversion action ->
+ * Website). When the Ads ID AND the matching label are set, trackEvent
+ * forwards that event to Google Ads as a `conversion` (send_to:
+ * AW-XXXX/LABEL) so paid-search ROAS + Smart Bidding optimise on real
+ * signups / subscriptions. Any unset label is simply skipped — GA4 still
+ * gets the event regardless.
+ */
+const ADS_CONVERSION_LABEL: Partial<Record<TapelineEvent, string>> = {
+  sign_up: process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL || "",
+  start_trial: process.env.NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL || "",
+  subscribe: process.env.NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL || "",
+};
+
 /**
  * Track a typed event. No-op on the server, no-op if GA4 hasn't
  * loaded yet (e.g. ad-blocker, network failure). Never throws — fire
@@ -64,6 +81,13 @@ export function trackEvent(
   if (typeof window.gtag !== "function") return;
   try {
     window.gtag("event", event, params ?? {});
+    // Mirror conversion-worthy events to Google Ads (no-op unless an Ads ID +
+    // matching label are configured). This is what makes paid-search clicks
+    // attributable to real signups/subscriptions in the Ads dashboard.
+    const adsLabel = ADS_CONVERSION_LABEL[event];
+    if (GOOGLE_ADS_ID && adsLabel) {
+      window.gtag("event", "conversion", { send_to: `${GOOGLE_ADS_ID}/${adsLabel}` });
+    }
   } catch {
     // Analytics must never break the page.
   }
