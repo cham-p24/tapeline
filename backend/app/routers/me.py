@@ -21,6 +21,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _upgrade_nudge(user: User) -> dict[str, str | int] | None:
+    """Server-authoritative in-app upgrade nudge for Free-tier users.
+
+    Returns None for paid tiers (Pro/Premium) and for users mid-trial — a
+    trialing user is already on Premium, so nudging them to "upgrade" reads
+    as incoherent; the TrialBanner owns that conversion moment instead.
+
+    For genuine Free users it returns a stable `id` plus the Free-tier caps
+    the frontend folds into copy, so the numbers (top-20, 24h delay,
+    5-ticker watchlist) come straight from tier.py and never drift from a
+    hardcoded string. Dismissal + frequency are handled client-side; the
+    server only decides eligibility, which keeps that decision in one place
+    if we later want to suppress the nudge (e.g. brand-new accounts).
+    """
+    if user.tier != "free":
+        return None
+    return {
+        "id": "free_upgrade",
+        "scanner_cap": limit(Tier.FREE, "scanner_rows"),
+        "delayed_hours": limit(Tier.FREE, "data_delay_minutes") // 60,
+        "watchlist_cap": limit(Tier.FREE, "watchlist_tickers"),
+    }
+
+
 @router.get("")
 async def me(
     user: User | None = Depends(current_user_optional),
@@ -60,6 +84,9 @@ async def me(
         "tier": user.tier,
         "on_trial": on_trial,
         "billing": billing,
+        # Free→Pro upgrade nudge (None for paid/trial). Drives the global
+        # UpgradeNudge banner + the scanner's inline cap hint.
+        "nudge": _upgrade_nudge(user),
         "telegram_chat_id": user.telegram_chat_id,
         "features": {f: has_feature(tier, f) for f in FEATURES},
         # effective_limit applies trial-state throttling for the abuse-attractive

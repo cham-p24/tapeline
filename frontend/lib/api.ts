@@ -468,7 +468,16 @@ export const api = {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
     );
-    return get<{ count: number; items: ScannerRow[] }>(`/api/scanner?${qs}`);
+    // `tier` / `row_cap` / `data_delayed_minutes` are the server-computed
+    // gating facts (Free is capped + delayed). The scanner page reads them to
+    // render its inline upgrade hint instead of recomputing tier math client-side.
+    return get<{
+      count: number;
+      tier: string;
+      row_cap: number;
+      data_delayed_minutes: number;
+      items: ScannerRow[];
+    }>(`/api/scanner?${qs}`);
   },
   squeeze: () => get<{ count: number; items: SqueezeRow[] }>("/api/squeeze"),
   regime: () => get<Regime>("/api/regime"),
