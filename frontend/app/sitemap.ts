@@ -44,37 +44,57 @@ const UNIVERSE_TIMEOUT_MS = 8000;
 // from /stocks is also explicitly listed here for discovery + lastmod hints.
 //
 // 2026-06-01: switched from /api/public/top-tickers (hard-capped at 1,000 rows
-// on the backend, ordered by score/$-volume) to /api/public/signals?limit=2000
-// (the full universe). The old top-1,000 cut silently EXCLUDED real large-caps
-// — e.g. SO (Southern Co), DUK (Duke Energy), AWK (American Water) — because
-// they trade at lower dollar-volume than 1,000 higher-beta names, leaving
-// their live, content-rich, index/follow /t/ pages stuck in GSC "Crawled -
-// currently not indexed" with no sitemap reinforcement. Aligning the sitemap
-// to the universe (itself the curated, actively-scored set, already fully
-// linked from /stocks) is the logical completion of the 250→1000→"index
-// everything" expansion. Both /api/public/* endpoints are no-auth and not
-// tier-gated; /api/scanner would cap anonymous callers at the FREE-tier 20
-// rows, defeating the SEO expansion entirely.
+// on the backend) to /api/public/signals, AND paginate it. /api/public/signals
+// hard-caps each RESPONSE at 2,000 rows (main.py), but the scored universe is
+// larger — ~4,600 names as of 2026-06-01 and growing via weekly auto-discovery.
+// Because the endpoint is ORDER BY score DESC, a single limit=2000 call returns
+// only the top 2,000 by score, and the membership of that slice CHURNS every
+// scoring tick: low-volatility large-caps (regulated utilities / power & water
+// — SO, DUK, AVA, AEE, ATO, AQN, BKH …) score low on the momentum-tilted
+// formula, so they flap in and out of the top-2,000 between ticks. That left
+// their live, content-rich, index/follow /t/ pages intermittently missing from
+// the sitemap and stuck in GSC "Crawled - currently not indexed". Fix: page
+// through the universe via &offset= until a short page, unioning every symbol,
+// so EVERY scored ticker is durably listed regardless of its score rank. This
+// is the logical completion of the 250→1000→2000→"index everything" expansion.
+// Both /api/public/* endpoints are no-auth and not tier-gated; /api/scanner
+// would cap anonymous callers at the FREE-tier 20 rows, defeating it entirely.
+// (Frontend-only: the backend 2,000-per-response cap is untouched — we just
+// make more calls. Raising that cap would need a manual Fly deploy.)
+const UNIVERSE_PAGE_SIZE = 2000; // = backend hard cap per /api/public/signals response
+const UNIVERSE_MAX_PAGES = 8;    // safety bound: 8 × 2000 = 16k ≫ today's ~4.6k pool
+
 async function fetchUniverseSymbols(): Promise<string[]> {
+  const all: string[] = [];
   try {
-    const res = await fetch(`${API_BASE}/api/public/signals?limit=2000`, {
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(UNIVERSE_TIMEOUT_MS),
-    });
-    if (!res.ok) return FALLBACK_TICKERS;
-    const body = (await res.json()) as { items?: { symbol?: string }[] };
-    const syms = (body.items ?? [])
-      .map((i) => i.symbol)
-      .filter((s): s is string => typeof s === "string" && s.length > 0);
-    // De-dupe defensively — the feed is unique per symbol, but duplicate
-    // <loc> entries are a sitemap-validity warning.
-    const unique = Array.from(new Set(syms));
-    return unique.length > 0 ? unique : FALLBACK_TICKERS;
+    for (let page = 0; page < UNIVERSE_MAX_PAGES; page++) {
+      const offset = page * UNIVERSE_PAGE_SIZE;
+      const res = await fetch(
+        `${API_BASE}/api/public/signals?limit=${UNIVERSE_PAGE_SIZE}&offset=${offset}`,
+        {
+          next: { revalidate: 3600 },
+          signal: AbortSignal.timeout(UNIVERSE_TIMEOUT_MS),
+        },
+      );
+      if (!res.ok) break;
+      const body = (await res.json()) as { items?: { symbol?: string }[] };
+      const items = body.items ?? [];
+      for (const i of items) {
+        if (typeof i.symbol === "string" && i.symbol.length > 0) all.push(i.symbol);
+      }
+      // A short page (fewer rows than the cap) means we've reached the end.
+      if (items.length < UNIVERSE_PAGE_SIZE) break;
+    }
   } catch {
-    // Timeout / network error → fall back to the mega-cap list so the
-    // sitemap still emits a valid (if smaller) document.
-    return FALLBACK_TICKERS;
+    // Timeout / network error mid-pagination. Fall through: if we collected at
+    // least one page we use it (graceful degradation to a smaller-but-valid
+    // sitemap); an empty result drops to the mega-cap fallback below.
   }
+  // De-dupe defensively — duplicate <loc> entries are a sitemap-validity
+  // warning, and because the order is score-DESC and can shift between the
+  // separate page fetches, offset windows can in theory overlap.
+  const unique = Array.from(new Set(all));
+  return unique.length > 0 ? unique : FALLBACK_TICKERS;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -193,14 +213,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // Per-ticker pages — the ENTIRE scored universe (~2,000), matching
-  // /stocks and /api/public/signals exactly.
+  // Per-ticker pages — the ENTIRE scored universe (~4,600 and growing),
+  // matching /stocks and /api/public/signals exactly.
   //
   // 2026-05-24: reversed an earlier 250 cap after founder pushback ("i want
   // to be indexed for everything"), then capped at the top 1,000 by
-  // $-volume. 2026-06-01: dropped the 1,000 cut entirely — it silently
-  // excluded real large-caps (SO, DUK, AWK …) that happen to trade at lower
-  // dollar-volume, stranding their /t/ pages in GSC "Crawled - not indexed."
+  // $-volume. 2026-06-01: dropped the cap entirely — first to the top 2,000,
+  // then (same day) to the full universe via offset pagination, because even
+  // 2,000 silently excluded real large-caps (SO, DUK, AWK …) that score low
+  // on the momentum-tilted formula and churn across the rank-2,000 boundary
+  // every tick, stranding their /t/ pages in GSC "Crawled - not indexed."
   // Every page is already substantial enough for Google's quality classifier
   // to accept: /t/[symbol]/page.tsx → buildEditorialCommentary() auto-writes
   // a 200-400 word ticker-specific editorial paragraph from the live factor
