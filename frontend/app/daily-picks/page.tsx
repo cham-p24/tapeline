@@ -65,6 +65,10 @@ async function fetchTopTen(): Promise<ScannerRow[]> {
     // delay. We slice to 10 to match the email digest exactly.
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
+      // Bound the build-time fetch so a degraded/slow API can't hang static
+      // export past Next's 60s budget (a hang isn't caught by try/catch).
+      // Matches /stocks + /signals; falls back to [] below, ISR backfills.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: ScannerRow[] };

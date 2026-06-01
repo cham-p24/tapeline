@@ -39,6 +39,10 @@ async function fetchHeatmap(): Promise<{ sectors: SectorTile[]; live: boolean }>
   try {
     const res = await fetch(`${API_BASE}/api/public/heatmap`, {
       next: { revalidate: 300 },
+      // Bound the build-time fetch so a degraded/slow API can't hang static
+      // export past Next's 60s budget (a hang isn't caught by try/catch).
+      // Matches /stocks + /signals; falls back to SHOWCASE_SECTORS below.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { sectors: SHOWCASE_SECTORS, live: false };
     const body = (await res.json()) as { sectors?: SectorTile[] };
