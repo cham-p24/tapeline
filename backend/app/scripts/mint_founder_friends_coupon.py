@@ -84,7 +84,10 @@ def main() -> int:
         promo = existing.data[0]
         logger.info(f"[promo]  existing: {promo.code} (active={promo.active}, redemptions={promo.times_redeemed}/{promo.max_redemptions})")
     else:
-        promo = stripe.PromotionCode.create(
+        # `coupon` is a real Stripe API parameter on PromotionCode.create
+        # (the docs require it — a promo code wraps a coupon). The stripe-python
+        # type stubs don't expose it as a typed kwarg, hence the call-arg ignore.
+        promo = stripe.PromotionCode.create(  # type: ignore[call-arg]
             code=PROMO_CODE,
             coupon=coupon.id,
             max_redemptions=MAX_REDEMPTIONS,
