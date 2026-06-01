@@ -53,6 +53,34 @@ const nextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      // Keep Next's auto-generated social-card image routes OUT of Google's
+      // index without Disallow'ing them in robots.txt (a Disallow also blocks
+      // facebookexternalhit / Twitterbot / LinkedInBot / Slackbot, which strips
+      // the preview image from every shared link). `X-Robots-Tag: noindex`
+      // lets scrapers fetch the PNG (cards render) while telling Google not to
+      // index the route — and it actively drains the existing "Crawled - not
+      // indexed" entries. `:path*` matches the dynamic routes at any depth
+      // (/opengraph-image, /t/AAPL/opengraph-image, /blog/[slug]/..., etc.).
+      // The query-string cache-buster Next appends doesn't affect path match.
+      {
+        source: "/opengraph-image",
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
+      {
+        source: "/:path*/opengraph-image",
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
+      // No twitter-image routes exist today (Next reuses opengraph-image for
+      // twitter:image), but cover the path defensively so any future
+      // twitter-image route is noindexed automatically, matching the OG rule.
+      {
+        source: "/twitter-image",
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
+      {
+        source: "/:path*/twitter-image",
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
     ];
   },
 };
