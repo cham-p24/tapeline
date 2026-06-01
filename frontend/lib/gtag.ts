@@ -51,7 +51,10 @@ export type TapelineEvent =
   | "view_ticker"          // Visit /t/[symbol]
   | "open_scanner";        // Open /app/scanner
 
-const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "";
+// Production Google Ads conversion tag (Jun-2026 search campaign). Env still
+// overrides; mirrors the hardcoded GA4 default in app/layout.tsx. Conversion
+// forwarding stays a no-op until the matching *_LABEL below is also set.
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
 
 /**
  * Per-event Google Ads conversion labels. Each label comes from a Google Ads
