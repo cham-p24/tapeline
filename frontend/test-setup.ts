@@ -1,6 +1,26 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+// jsdom doesn't implement matchMedia. Components read it on mount —
+// ThemeProvider (prefers-color-scheme), FadeIn + useCountUp (prefers-reduced-
+// motion), ExitIntentModal (pointer: coarse) — and throw without this stub.
+// `matches: false` is the safe default; the affected tests assert on cycle
+// logic / rendered copy, not on the resolved media value.
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  configurable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(), // legacy API — some libs still call it
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(() => false),
+  })),
+});
+
 // Stub Next.js navigation hooks (jsdom doesn't have them)
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
