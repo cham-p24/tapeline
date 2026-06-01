@@ -21,7 +21,6 @@ from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions
 from app.services.news_feed import fetch_news_for_ticker
-from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
@@ -216,16 +215,7 @@ async def ticker_detail(symbol: str) -> dict:
     2x SSR retry) drove a latency death-spiral that 500'd the SSR pages. Both
     failure modes are gone now that the request path touches only the DB.
     """
-    # Validate the symbol SHAPE before touching the DB. A junk-shaped request
-    # — an emoji/space-decorated cell like "🏆 IVV" that a legacy ghost row may
-    # still match exactly, or anything that isn't a real ticker — gets a clean
-    # 404 instead of rendering a fabricated page (and handing Google a
-    # duplicate-content /t/🏆 IVV URL). clean_symbol also strips + uppercases,
-    # so "  ivv " → "IVV". Mirrors the ingestion chokepoint in sheet_feed.
-    cleaned = clean_symbol(symbol)
-    if cleaned is None:
-        raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
-    symbol = cleaned
+    symbol = symbol.upper()
 
     # Single short read txn: core ticker + squeeze (both indexed point lookups).
     # The pooled connection is checked out only for these, then returned on
