@@ -27,31 +27,49 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
-// Bound the upstream call. /api/public/top-tickers does an unindexed
-// ORDER BY score DESC and can briefly stall (Neon scale-to-zero cold start
-// or a heavy worker tick — observed >30s before recovering). Without a
-// timeout the sitemap ISR regeneration inherits that stall, which can 5xx
-// the /sitemap.xml route. That's a double miss: Google sees no sitemap, and
-// the daily stale-link audit reads "sitemap_unavailable" so IndexNow submits
-// nothing. An 8s cap lets a slow-but-fine call through while turning a true
-// hang into a clean fallback. AbortSignal.timeout is not part of Next's
-// fetch cache key, so the 1h ISR cache is preserved.
-const TOP_TICKERS_TIMEOUT_MS = 8000;
+// Bound the upstream call. /api/public/signals does an ORDER BY score DESC
+// over the full scored universe and can briefly stall (Neon scale-to-zero
+// cold start or a heavy worker tick — observed >30s before recovering).
+// Without a timeout the sitemap ISR regeneration inherits that stall, which
+// can 5xx the /sitemap.xml route. That's a double miss: Google sees no
+// sitemap, and the daily stale-link audit reads "sitemap_unavailable" so
+// IndexNow submits nothing. An 8s cap lets a slow-but-fine call through while
+// turning a true hang into a clean fallback. AbortSignal.timeout is not part
+// of Next's fetch cache key, so the 1h ISR cache is preserved.
+const UNIVERSE_TIMEOUT_MS = 8000;
 
-async function fetchTopTickers(limit = 500): Promise<string[]> {
+// Full scored universe, symbols only. Deliberately the SAME source /stocks
+// uses (app/stocks/page.tsx → fetchUniverse) so the sitemap and the HTML
+// coverage directory can never drift: every /t/{symbol} we internally link
+// from /stocks is also explicitly listed here for discovery + lastmod hints.
+//
+// 2026-06-01: switched from /api/public/top-tickers (hard-capped at 1,000 rows
+// on the backend, ordered by score/$-volume) to /api/public/signals?limit=2000
+// (the full universe). The old top-1,000 cut silently EXCLUDED real large-caps
+// — e.g. SO (Southern Co), DUK (Duke Energy), AWK (American Water) — because
+// they trade at lower dollar-volume than 1,000 higher-beta names, leaving
+// their live, content-rich, index/follow /t/ pages stuck in GSC "Crawled -
+// currently not indexed" with no sitemap reinforcement. Aligning the sitemap
+// to the universe (itself the curated, actively-scored set, already fully
+// linked from /stocks) is the logical completion of the 250→1000→"index
+// everything" expansion. Both /api/public/* endpoints are no-auth and not
+// tier-gated; /api/scanner would cap anonymous callers at the FREE-tier 20
+// rows, defeating the SEO expansion entirely.
+async function fetchUniverseSymbols(): Promise<string[]> {
   try {
-    // /api/public/top-tickers is the no-auth, no-tier-gating endpoint built
-    // specifically for sitemap use. The /api/scanner endpoint caps anonymous
-    // callers to the FREE-tier 20-row limit, which would defeat the SEO
-    // expansion entirely.
-    const res = await fetch(`${API_BASE}/api/public/top-tickers?limit=${limit}`, {
+    const res = await fetch(`${API_BASE}/api/public/signals?limit=2000`, {
       next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(TOP_TICKERS_TIMEOUT_MS),
+      signal: AbortSignal.timeout(UNIVERSE_TIMEOUT_MS),
     });
     if (!res.ok) return FALLBACK_TICKERS;
-    const body = (await res.json()) as { symbols?: string[] };
-    const syms = body.symbols ?? [];
-    return syms.length > 0 ? syms : FALLBACK_TICKERS;
+    const body = (await res.json()) as { items?: { symbol?: string }[] };
+    const syms = (body.items ?? [])
+      .map((i) => i.symbol)
+      .filter((s): s is string => typeof s === "string" && s.length > 0);
+    // De-dupe defensively — the feed is unique per symbol, but duplicate
+    // <loc> entries are a sitemap-validity warning.
+    const unique = Array.from(new Set(syms));
+    return unique.length > 0 ? unique : FALLBACK_TICKERS;
   } catch {
     // Timeout / network error → fall back to the mega-cap list so the
     // sitemap still emits a valid (if smaller) document.
@@ -175,24 +193,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // Per-ticker pages — top 1,000 by daily $-volume.
+  // Per-ticker pages — the ENTIRE scored universe (~2,000), matching
+  // /stocks and /api/public/signals exactly.
   //
-  // 2026-05-24 (later same day): reversed the 250 cap after founder
-  // pushback ("i want to be indexed for everything"). New approach:
-  // submit a much larger universe AND make every page substantial
-  // enough that Google's quality classifier accepts it. The content
-  // depth work happens in /t/[symbol]/page.tsx via
-  // buildEditorialCommentary() which auto-generates a 200-400 word
-  // ticker-specific editorial paragraph from the live factor
-  // sub-scores. Combined with the existing Related Tickers,
-  // news-headlines feed, and FAQ, each page now reads as genuinely
-  // ticker-specific content rather than a templated shell.
-  //
-  // 1000 (vs 250) is the right balance: covers every actively-traded
-  // US name a search query is realistically about, without flooding
-  // Google with the lowest-volume tickers that have effectively zero
-  // search demand (and where even rich content wouldn't index).
-  const tickers = await fetchTopTickers(1000);
+  // 2026-05-24: reversed an earlier 250 cap after founder pushback ("i want
+  // to be indexed for everything"), then capped at the top 1,000 by
+  // $-volume. 2026-06-01: dropped the 1,000 cut entirely — it silently
+  // excluded real large-caps (SO, DUK, AWK …) that happen to trade at lower
+  // dollar-volume, stranding their /t/ pages in GSC "Crawled - not indexed."
+  // Every page is already substantial enough for Google's quality classifier
+  // to accept: /t/[symbol]/page.tsx → buildEditorialCommentary() auto-writes
+  // a 200-400 word ticker-specific editorial paragraph from the live factor
+  // sub-scores, alongside Related Tickers, the news-headlines feed, and FAQ.
+  // The universe is the curated, actively-scored set (not a raw ticker dump),
+  // and /stocks already internally links all of it, so listing it here just
+  // reinforces discovery with per-URL lastmod hints.
+  const tickers = await fetchUniverseSymbols();
   const tickerEntries: MetadataRoute.Sitemap = tickers.map((sym) => ({
     url: `${base}/t/${sym}`,
     lastModified: now,
