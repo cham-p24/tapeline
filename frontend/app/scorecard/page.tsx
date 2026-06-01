@@ -160,6 +160,17 @@ export default function ScorecardPage() {
         </div>
       )}
 
+      {/* Best-day callout — leads the eye with the strongest real result
+          BEFORE the aggregate stats. Conversion hierarchy: visitor reads
+          the specific winning day first (cashtags, real numbers, real
+          date), then the aggregate transparency strip directly below. We
+          don't hide the negative aggregate — it's still in the 4-stat
+          grid 20px down — but humans buy on a result they can picture,
+          not on a 14-day median. Picks the day with the most ≥5% alpha
+          winners; outliers (|alpha| > 50%, usually unadjusted-for-split
+          vendor data) filtered out same as the aggregate stats use. */}
+      <BestDayCallout days={data.days} />
+
       {/* Summary stats.
           We surface MEDIAN as the headline 1D / alpha because:
             1. Median is robust to vendor-data outliers (unadjusted-for-split
@@ -172,7 +183,7 @@ export default function ScorecardPage() {
                mean (see _is_outlier in routers/scorecard.py); the median
                here is therefore robust within a clean subset.
           The exclusion count is disclosed inline so the filter is auditable. */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-4">
         <Stat label="Days tracked" value={data.summary.days_tracked} />
         <Stat label="Median 1D return" value={data.summary.median_1d_return} decimals={2} suffix="%" tone={data.summary.median_1d_return != null ? (data.summary.median_1d_return > 0 ? "up" : "down") : undefined} />
         <Stat label="Median alpha vs SPY" value={data.summary.median_alpha_vs_spy} decimals={2} suffix="%" tone={data.summary.median_alpha_vs_spy != null ? (data.summary.median_alpha_vs_spy > 0 ? "up" : "down") : undefined} />
@@ -343,6 +354,126 @@ export default function ScorecardPage() {
  * cards only ever render client-side (the page returns a skeleton until the
  * data fetch resolves), so there's no SSR value to mismatch against.
  */
+/**
+ * Best-day callout — surfaces the single trading day where the top-10
+ * had the strongest collective result. Picks the day with the most
+ * picks at ≥5% alpha vs SPY (tie-broken by sum-of-alphas). Outliers
+ * (|alpha| > 50%, vendor unadjusted-for-split corruption) excluded same
+ * as the aggregate stats below.
+ *
+ * Why it exists: visitors landing on /scorecard see four KPI cards
+ * including median alpha. When the running median is mildly negative
+ * (early days of a back-test with low sample size + a few bad-tape
+ * sessions) the visual hierarchy hands the visitor a "this lost money"
+ * read before they understand the methodology. Leading with a real
+ * winning day, then the aggregate transparency stat row directly under
+ * it, keeps the page honest without front-loading the worst frame.
+ *
+ * Renders nothing when no day has ≥3 winners yet — early-launch
+ * gracefully falls through to the existing stat grid.
+ */
+function BestDayCallout({ days }: { days: Record<string, ScorecardEntry[]> }) {
+  // Match the backend predicate exactly. `backend/app/routers/scorecard.py`
+  // excludes rows where |change_pct_1d_after| > 50 from the aggregate
+  // stats; filtering on |alpha| here instead would make the callout
+  // eligible to feature rows the disclosure directly below says were
+  // excluded (e.g. a +51% 1-day pick on a +2% SPY day → alpha 49%
+  // passes the alpha filter but should be excluded). Codex caught this
+  // mismatch on PR #230.
+  const ONE_DAY_OUTLIER = 50.0;
+  const MIN_WINNERS = 3;
+
+  let bestDate: string | null = null;
+  let bestPicks: ScorecardEntry[] = [];
+  let bestWinners = 0;
+  let bestSum = -Infinity;
+  let bestSpy: number | null = null;
+
+  for (const [date, picks] of Object.entries(days)) {
+    const valid = picks.filter(
+      (p) =>
+        p.alpha_vs_spy != null &&
+        p.change_pct_1d_after != null &&
+        Math.abs(p.change_pct_1d_after) <= ONE_DAY_OUTLIER,
+    );
+    if (valid.length === 0) continue;
+    const winners = valid.filter((p) => (p.alpha_vs_spy ?? 0) >= 5).length;
+    const sum = valid.reduce((acc, p) => acc + (p.alpha_vs_spy ?? 0), 0);
+    if (winners > bestWinners || (winners === bestWinners && sum > bestSum)) {
+      bestWinners = winners;
+      bestSum = sum;
+      bestDate = date;
+      bestPicks = valid
+        .slice()
+        .sort((a, b) => (b.alpha_vs_spy ?? 0) - (a.alpha_vs_spy ?? 0))
+        .slice(0, 4);
+      bestSpy = picks.find((p) => p.spy_change_pct_1d != null)?.spy_change_pct_1d ?? null;
+    }
+  }
+
+  if (!bestDate || bestWinners < MIN_WINNERS) return null;
+
+  // Human-readable date: "May 22, 2026"
+  const pretty = new Date(bestDate + "T00:00:00Z").toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+  return (
+    <div className="mt-8 overflow-hidden rounded-xl border border-up/30 bg-gradient-to-br from-up/10 via-panel/50 to-panel">
+      <div className="grid gap-6 p-6 sm:grid-cols-5 sm:p-7">
+        <div className="sm:col-span-2">
+          <div className="text-xs uppercase tracking-wider text-up">Strongest day</div>
+          <div className="mt-1 text-xl font-semibold text-fg">{pretty}</div>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            {bestWinners} picks beat SPY by 5%+ in a single session
+            {bestSpy != null && (
+              <>
+                {" "}— SPY was {bestSpy >= 0 ? "+" : ""}
+                {bestSpy.toFixed(2)}% that day
+              </>
+            )}
+            . All flagged before the open, all in the top-10 ranks.
+          </p>
+        </div>
+        <div className="sm:col-span-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {bestPicks.map((p) => (
+              <div
+                key={p.symbol}
+                className="flex items-baseline justify-between rounded-md border border-border/50 bg-panel/60 px-3 py-2"
+              >
+                <Link
+                  href={`/t/${p.symbol}`}
+                  className="font-mono text-sm font-semibold text-fg hover:text-accent"
+                >
+                  ${p.symbol}
+                </Link>
+                <div className="text-right nums">
+                  <div className={`text-sm font-semibold ${(p.change_pct_1d_after ?? 0) >= 0 ? "text-up" : "text-down"}`}>
+                    {p.change_pct_1d_after != null
+                      ? `${p.change_pct_1d_after >= 0 ? "+" : ""}${p.change_pct_1d_after.toFixed(1)}%`
+                      : "—"}
+                  </div>
+                  <div className="text-xs text-muted">
+                    alpha {p.alpha_vs_spy != null ? `${p.alpha_vs_spy >= 0 ? "+" : ""}${p.alpha_vs_spy.toFixed(1)}%` : "—"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-border/40 bg-panel/30 px-6 py-3 text-xs text-subtle sm:px-7">
+        The losing days are on the same page. Aggregate stats across all back-checked picks are directly below — published whether they help the pitch or hurt it.
+      </div>
+    </div>
+  );
+}
+
+
 function Stat({
   label,
   value,
