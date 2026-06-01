@@ -87,6 +87,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // newsletter subscribers get. Refreshes every 30 min via ISR.
     { url: `${base}/daily-picks`,               lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/signals`,                   lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // Stock coverage directory — the HTML-sitemap crawl path to EVERY scored
+    // /t/{symbol} page (the /signals preview wall + top-20 sector hubs left the
+    // long tail orphaned). Membership churns slowly via auto-discovery → daily.
+    { url: `${base}/stocks`,                    lastModified: now, changeFrequency: "daily", priority: 0.8 },
     // Sector hub-of-hubs — shallow crawl entry point into the 11 /sector/{slug}
     // ranking pages (and onward to per-ticker pages). Aggregates change as
     // scores re-tick, so daily.
