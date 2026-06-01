@@ -37,6 +37,8 @@ describe("SignUpPage", () => {
 
   it("shows the 14-day trial commitment", () => {
     render(<SignUpPage />);
-    expect(screen.getByText(/14-day Pro trial/i)).toBeInTheDocument();
+    // Trial is 14-day Premium; the after-trial transparency footer headlines
+    // the commitment as "After your 14 days" (signup/page.tsx).
+    expect(screen.getByText(/After your 14 days/i)).toBeInTheDocument();
   });
 });

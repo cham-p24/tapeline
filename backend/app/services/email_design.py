@@ -59,26 +59,28 @@ from __future__ import annotations
 # Tapeline" to anyone who's been on the site. Email clients vary in
 # CSS gradient support (Outlook desktop renders nothing) so a solid
 # tint is more reliable than a gradient.
-LIGHT_BG = "#f4f8ff"           # soft blue-tinted canvas (was #ffffff)
-LIGHT_PANEL = "#fafafa"        # container/card background
-LIGHT_BORDER = "#e5e7eb"       # hairline borders
-LIGHT_FG = "#111827"           # primary text
-LIGHT_MUTED = "#6b7280"        # secondary text
-LIGHT_SUBTLE = "#9ca3af"       # footnote / footer text
+LIGHT_BG = "#e8f0fc"           # blue-tinted atmosphere (canvas + card insets) —
+                               # matches the web app's accent-glow background
+LIGHT_PANEL = "#ffffff"        # clean white reading surface the content floats on
+LIGHT_BORDER = "#dbe3f0"       # soft blue-grey hairline
+LIGHT_FG = "#0a0a0a"           # primary text (web --fg)
+LIGHT_MUTED = "#52525b"        # secondary text — darkened from #6b7280 for legibility
+LIGHT_SUBTLE = "#6b7280"       # footnote / footer — darkened from #9ca3af, which
+                               # failed WCAG AA (2.8:1) on the panel
 
 # Dark mode (used in `@media (prefers-color-scheme: dark)`)
 # DARK_BG was #0a0a0a — bumped to a faint blue-shifted near-black for
 # parity with the light-mode blue tint above. Still effectively dark
 # but with the same brand hue at the canvas level.
-DARK_BG = "#0a0d14"
-DARK_PANEL = "#121214"
-DARK_BORDER = "#1f1f23"
-DARK_FG = "#f4f4f5"
-DARK_MUTED = "#9ca3af"
-DARK_SUBTLE = "#6b7280"
+DARK_BG = "#0a0d14"            # blue-shifted near-black atmosphere (canvas + insets)
+DARK_PANEL = "#121723"        # blue-tinted dark reading surface
+DARK_BORDER = "#252b38"       # blue-grey hairline (more visible than #1f1f23)
+DARK_FG = "#f4f4f5"           # primary text (web --fg)
+DARK_MUTED = "#a9b1bf"        # secondary text — brightened from #9ca3af for legibility
+DARK_SUBTLE = "#8b93a3"       # footnote / footer — brightened from #6b7280 for contrast
 
-ACCENT = "#3b82f6"              # Tapeline blue — same in both modes
-ACCENT_HOVER = "#2563eb"
+ACCENT = "#007AFF"             # iOS systemBlue — matches the web app's --accent
+ACCENT_HOVER = "#0064dc"
 
 # Signal palette — saturated enough to read on both light and dark.
 SIG_BULL = "#10b981"            # HIGH CONVICTION / STRONG SETUP
@@ -187,7 +189,7 @@ def _brand_header() -> str:
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;">
       <tr>
         <td style="vertical-align:middle;padding-right:10px;">
-          <div style="width:28px;height:6px;border-radius:999px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);"></div>
+          <div style="width:28px;height:6px;border-radius:999px;background:linear-gradient(90deg,#007AFF,#5856D6);"></div>
         </td>
         <td class="tl-fg" style="vertical-align:middle;font-size:16px;font-weight:600;letter-spacing:-0.01em;color:{LIGHT_FG};font-family:{FONT_SANS};">
           Tapeline

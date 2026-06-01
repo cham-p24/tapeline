@@ -1,0 +1,106 @@
+name: Deploy backend (Fly.io)
+
+# Auto-deploys the FastAPI backend + worker to Fly.io on every push to main
+# that touches backend code, the Docker image, or the Fly config. The frontend
+# already auto-deploys via Vercel; this removes the LAST manual step
+# (`fly deploy` from a laptop) so shipping is fully hands-off.
+#
+# It also closes a real failure mode: deploying from a dirty local checkout.
+# That is how an uncommitted module (app.services.symbols) ended up imported by
+# code on main while never being committed — the manual deploy "worked" locally
+# but main was broken. With this workflow, MAIN is the single source of truth
+# for what's deployed, and the test gate below refuses to deploy a main that
+# can't even import / pass tests (which a direct-to-main push can otherwise slip
+# past, since PR CI is bypassed).
+#
+# ── ONE-TIME SETUP (operator, ~60 seconds) ───────────────────────────────────
+# Create a Fly deploy token and add it as a GitHub Actions secret:
+#
+#     fly tokens create deploy -a tapeline-backend        # copy the whole token
+#
+#   then: GitHub repo → Settings → Secrets and variables → Actions →
+#         New repository secret → name = FLY_API_TOKEN, value = (paste).
+#
+# Until that secret exists this workflow still runs GREEN but SKIPS the deploy
+# (it logs a notice), so it never blocks anything. The moment the secret is
+# added, the next backend push to main deploys automatically — no other action
+# ever needed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "infra/Dockerfile"
+      - "fly.toml"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch: {}   # manual "deploy now" button in the Actions tab
+
+concurrency:
+  # Serialize deploys; never cancel an in-flight one (the release_command runs
+  # `alembic upgrade head` — interrupting a migration mid-flight is unsafe).
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Backend test gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Lint (ruff)
+        run: ruff check app
+      - name: Type check (mypy)
+        run: mypy app --ignore-missing-imports --no-strict-optional
+      - name: Tests (pytest)
+        run: |
+          cp ../.env.example ../.env
+          pytest -x
+
+  deploy:
+    name: Deploy to Fly.io
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gracefully no-op until the operator adds FLY_API_TOKEN, so merging this
+      # workflow never produces a red build. Secrets can't be read in a job/step
+      # `if:`, so gate via an env check that writes a step output.
+      - name: Check for deploy token
+        id: gate
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice title=Deploy skipped::FLY_API_TOKEN secret not set. Add it (see workflow header) to enable hands-off backend deploys."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup flyctl
+        if: steps.gate.outputs.ready == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy (remote build + alembic release_command)
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        # --remote-only builds on Fly's builders (no Docker daemon needed in CI).
+        # Uses the repo-root fly.toml -> infra/Dockerfile; the [deploy]
+        # release_command runs `alembic upgrade head` before the new release
+        # goes live, so migrations ship with the code automatically.
+        run: flyctl deploy --remote-only --config fly.toml

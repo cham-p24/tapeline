@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import SessionLocal, get_session
+from app.db import SessionLocal, get_session, is_sqlite
 from app.models import NewsItem, SqueezeSetup, Ticker, User
 from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
@@ -55,6 +55,21 @@ logger = logging.getLogger(__name__)
 NEWS_REFRESH_TIMEOUT_S = 12.0          # hard cap on a single background refresh
 NEWS_REFRESH_MIN_INTERVAL_S = 600.0    # don't re-fetch the same symbol < 10 min apart
 MAX_CONCURRENT_NEWS_REFRESH = 3        # machine-wide ceiling on background fetches
+
+# Per-ticker headline read window + hard cap (incident fix 2026-06-01) ---------
+# The headline lookup is `WHERE tickers LIKE '%SYM%' ORDER BY published_at DESC
+# LIMIT 8`. The leading-wildcard LIKE can't use the tickers B-tree index, so
+# Postgres serves the LIMIT by walking the published_at index newest→oldest and
+# filtering each row until it collects 8. For a symbol that's RARE in recent
+# news (TSLA, GME, NIO, …) that walk ran to the end of the table — a 30s+ hang
+# that held a pooled connection the whole time; under fan-out (the SEO audit /
+# a crawl) those holds exhausted the 30-slot pool and 500'd EVERY /t page. The
+# window caps how far the walk can scan; the per-statement timeout is the
+# backstop that kills any still-slow scan so the page degrades to no-news
+# instead of hanging. (A symbol abundant in recent news — AMD, "F" — always
+# found 8 immediately, which is why only a subset of tickers ever 500'd.)
+NEWS_LOOKBACK_DAYS = 90                 # only scan the last N days of headlines
+NEWS_QUERY_TIMEOUT_MS = 2500           # Postgres per-statement cap on the scan
 
 # Per-process state for the background refresh (one set of these per API worker).
 _news_refresh_inflight: set[str] = set()          # symbols currently mid-refresh
@@ -128,6 +143,56 @@ def _maybe_refresh_news(symbol: str) -> None:
     task.add_done_callback(_news_bg_tasks.discard)
 
 
+async def _fetch_ticker_news(symbol: str) -> list[dict]:
+    """Newest ≤8 headlines mentioning `symbol` — bounded so it can never wedge.
+
+    Two guards added after the 2026-06-01 incident (see NEWS_LOOKBACK_DAYS):
+      • a recency window caps how far the published_at-DESC index walk can scan
+        when `symbol` is rare in recent news (the root cause of the 30s hangs),
+      • a short per-statement timeout (Postgres only — SQLite ignores it) is the
+        backstop: a still-slow scan is cancelled server-side and we serve the
+        page with no news instead of 500ing it.
+    Runs in its OWN short session so a slow or cancelled headline scan can never
+    hold the core read's connection or corrupt the core ticker payload. Every
+    failure mode degrades to [] — news is never load-bearing for the page.
+    """
+    try:
+        async with SessionLocal() as session:
+            # Bound the scan server-side first (Postgres); harmless no-op skip on
+            # SQLite, which has no statement_timeout.
+            if not is_sqlite():
+                await session.execute(
+                    text(f"SET LOCAL statement_timeout = '{NEWS_QUERY_TIMEOUT_MS}ms'")
+                )
+            cutoff = datetime.now(UTC) - timedelta(days=NEWS_LOOKBACK_DAYS)
+            rows = (
+                await session.execute(
+                    select(NewsItem)
+                    .where(
+                        NewsItem.tickers.like(f"%{symbol}%"),
+                        NewsItem.published_at >= cutoff,
+                    )
+                    .order_by(desc(NewsItem.published_at))
+                    .limit(8)
+                )
+            ).scalars().all()
+        return [
+            {
+                "id": n.id,
+                "title": n.title,
+                "publisher": n.publisher,
+                "published_at": n.published_at.isoformat() if hasattr(n.published_at, "isoformat") else str(n.published_at),
+                "url": n.url,
+                "sentiment": getattr(n, "sentiment", None),
+            }
+            for n in rows
+        ]
+    except Exception:
+        # Slow scan (timed out), aborted txn, or any read error → no news.
+        logger.warning("ticker.news_query_degraded symbol=%s", symbol)
+        return []
+
+
 @router.get("/{symbol}")
 async def ticker_detail(symbol: str) -> dict:
     """Complete view of a single ticker — score breakdown, squeeze status, news.
@@ -161,19 +226,25 @@ async def ticker_detail(symbol: str) -> dict:
         raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
     symbol = cleaned
 
-    # Single short read txn: core ticker + squeeze + latest news. The pooled
-    # connection is checked out only for these indexed lookups, then returned
-    # to the pool on context exit — no upstream call ever holds it.
+    # Single short read txn: core ticker + squeeze (both indexed point lookups).
+    # The pooled connection is checked out only for these, then returned on
+    # context exit. News is read separately afterward (its own bounded session)
+    # so a slow headline scan can never hold THIS connection — no upstream call
+    # ever holds it either.
     async with SessionLocal() as session:
         t = (
             await session.execute(select(Ticker).where(Ticker.symbol == symbol))
         ).scalar_one_or_none()
         if t is None:
             raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
-        # Corruption guard: the composite is clamped 0-100 at every write path,
-        # so score > 100 is a legacy pre-clamp ghost (e.g. MCW=104) that dropped
-        # out of the universe. Don't serve it as a real conviction page —
-        # consistent with public_top_tickers excluding score>100 from the sitemap.
+        # Corruption guard: the composite is clamped 0-100 at every write path
+        # (score.py:compute_tapeline_composite), so a score > 100 can only be a
+        # legacy pre-clamp ghost that dropped out of the universe and was never
+        # re-scored (e.g. MCW=104). Don't serve it as a real conviction page —
+        # it would show an impossible score and overstate a stale ghost. 404
+        # keeps this consistent with public_top_tickers (which excludes
+        # score > 100 from the sitemap), so Google is never pointed at a URL
+        # that then 404s. A genuinely-current ticker can never trip this.
         if t.score is not None and t.score > 100:
             raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
         sq = (
@@ -181,25 +252,16 @@ async def ticker_detail(symbol: str) -> dict:
                 select(SqueezeSetup).where(SqueezeSetup.symbol == symbol)
             )
         ).scalar_one_or_none()
-        news_rows = (
-            await session.execute(
-                select(NewsItem)
-                .where(NewsItem.tickers.like(f"%{symbol}%"))
-                .order_by(desc(NewsItem.published_at))
-                .limit(8)
-            )
-        ).scalars().all()
-        news_payload = [
-            {
-                "id": n.id,
-                "title": n.title,
-                "publisher": n.publisher,
-                "published_at": n.published_at.isoformat() if hasattr(n.published_at, "isoformat") else str(n.published_at),
-                "url": n.url,
-                "sentiment": getattr(n, "sentiment", None),
-            }
-            for n in news_rows
-        ]
+        # News is fetched separately, AFTER this core read txn closes (see
+        # _fetch_ticker_news) — its own bounded session so a slow/timed-out
+        # headline scan can never hold THIS pooled connection or affect the
+        # core payload. This is what stops the 2026-06-01 pool-exhaustion
+        # death-spiral at the root.
+
+    # Per-ticker headlines — newest ≤8 mentioning this symbol. Bounded (recency
+    # window + Postgres statement timeout) and isolated, so a slow scan degrades
+    # to [] instead of 500ing the page or wedging the pool (incident 2026-06-01).
+    news_payload = await _fetch_ticker_news(symbol)
 
     # Opportunistic, non-blocking freshness top-up for cold / long-tail tickers.
     # Bounded + deduped + throttled inside the helper; returns instantly so the

@@ -24,6 +24,15 @@ const PLAUSIBLE_SCRIPT =
 // GA4 shows what they did after (event "sign_up" on the success page).
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
 
+// Google Ads conversion tag (AW-XXXXXXXXXX). DISTINCT from GA4: this is what
+// makes ad clicks -> signups countable as conversions in the Google Ads
+// dashboard, which Smart Bidding / ROAS depend on. Without it a paid search
+// campaign is flying blind. Unset by default (no-op); set
+// NEXT_PUBLIC_GOOGLE_ADS_ID in Vercel once the campaign + conversion action
+// exist. Shares the gtag.js loader with GA4 below; per-event send_to labels
+// live in lib/gtag.ts (NEXT_PUBLIC_GOOGLE_ADS_*_LABEL).
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "";
+
 // Title template is "%s" so each page owns its full <title>. Putting the
 // brand suffix in the template double-applies it on pages that already
 // include " — Tapeline" in their own title (most of them do, for SEO).
@@ -351,29 +360,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             view; Vercel adds per-route + Web Vitals). */}
         <Analytics />
         <SpeedInsights />
-        {/* Google Analytics 4 — loaded after-interactive so it never blocks
-            first paint or interactivity. Two scripts per Google docs: (1)
-            the gtag loader; (2) the inline config. Once mounted, fire events
-            with `gtag('event','sign_up')` from any client component (see
-            lib/gtag.ts for the typed helper). Cross-references with Search
-            Console under GSC → Settings → Associations so query data flows
-            into GA4's Acquisition reports. */}
-        {GA4_ID && (
+        {/* Google tag (gtag.js) — one loader, shared by GA4 (analytics + the
+            GSC attribution loop) AND Google Ads (paid-search conversion
+            tracking). Loaded after-interactive so it never blocks first paint.
+            Fire events via the typed helper in lib/gtag.ts; conversion-worthy
+            events (sign_up / start_trial / subscribe) auto-forward to Google
+            Ads when NEXT_PUBLIC_GOOGLE_ADS_ID + the matching label are set.
+            Cross-reference GA4 with Search Console under GSC -> Settings ->
+            Associations so query data flows into Acquisition reports. */}
+        {(GA4_ID || GOOGLE_ADS_ID) && (
           <>
             <Script
-              id="ga4-loader"
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
+              id="gtag-loader"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID || GOOGLE_ADS_ID}`}
               strategy="afterInteractive"
             />
             <Script
-              id="ga4-config"
+              id="gtag-config"
               strategy="afterInteractive"
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){dataLayer.push(arguments);}
                   gtag('js', new Date());
-                  gtag('config', '${GA4_ID}');
+                  ${GA4_ID ? `gtag('config', '${GA4_ID}');` : ""}
+                  ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ""}
                 `,
               }}
             />

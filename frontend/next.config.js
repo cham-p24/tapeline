@@ -37,6 +37,13 @@ const nextConfig = {
       { source: "/blog/ticker", destination: "/blog", permanent: true },
       { source: "/embed/score", destination: "/embed", permanent: true },
 
+      // /badge is the bare parent of /badge/[symbol] — an SVG score-badge
+      // asset route (route.ts, image/svg+xml), not a page. A developer who
+      // strips the symbol off an embedded badge URL lands here; send them to
+      // /embed, which documents the badge. Permanent: the embed hub is stable.
+      // Exact-match: never catches /badge/{symbol}, so the SVG keeps serving.
+      { source: "/badge", destination: "/embed", permanent: true },
+
       // Temporary (307) for these two: a proper /compare and /best-stocks-for
       // index hub is a plausible future build, so don't let browsers/Google
       // permanently cache the fallback target. /best-stock-scanners is the
