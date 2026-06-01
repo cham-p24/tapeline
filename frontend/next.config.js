@@ -22,6 +22,27 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/favicon.ico", destination: "/favicon.svg", permanent: true },
+
+      // Bare section roots → their real hub/index.
+      //
+      // Each of these is a programmatic cluster with only [param] children and
+      // NO index route, so a type-in, a truncated deep URL, or a stray backlink
+      // to the bare parent hard-404'd. None are advertised in sitemap.ts or
+      // linked internally, so there's no link equity to preserve — this is
+      // purely "don't dead-end the visitor / keep the GSC 404 bucket clean".
+      // Mirrors the /t and /t/ → /signals redirect already in middleware.ts.
+      // Exact-match sources: "/sector" never catches "/sector/{slug}".
+      { source: "/sector", destination: "/sectors", permanent: true },
+      { source: "/signal", destination: "/signals", permanent: true },
+      { source: "/blog/ticker", destination: "/blog", permanent: true },
+      { source: "/embed/score", destination: "/embed", permanent: true },
+
+      // Temporary (307) for these two: a proper /compare and /best-stocks-for
+      // index hub is a plausible future build, so don't let browsers/Google
+      // permanently cache the fallback target. /best-stock-scanners is the
+      // existing scanner-comparison roundup; /signals is the live universe.
+      { source: "/compare", destination: "/best-stock-scanners", permanent: false },
+      { source: "/best-stocks-for", destination: "/signals", permanent: false },
     ];
   },
 
