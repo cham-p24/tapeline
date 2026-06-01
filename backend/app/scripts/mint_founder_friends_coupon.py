@@ -98,8 +98,8 @@ def main() -> int:
     logger.info("FOUNDER-FRIENDS COUPON READY")
     logger.info("=" * 60)
     logger.info(f"Code:     {promo.code}")
-    logger.info(f"Discount: 50% off Premium for 3 months")
-    logger.info(f"Then:     auto-rolls to retail $39.99/mo unless cancelled")
+    logger.info("Discount: 50% off Premium for 3 months")
+    logger.info("Then:     auto-rolls to retail $39.99/mo unless cancelled")
     logger.info(f"Remaining redemptions: {MAX_REDEMPTIONS - promo.times_redeemed}")
     logger.info("")
     logger.info("How to use it:")
@@ -107,7 +107,7 @@ def main() -> int:
     logger.info("  2. They sign up at tapeline.io/signup (14-day trial auto-starts, no card)")
     logger.info("  3. Day 5-7 of trial they go to /app/billing → Premium → enter FOUNDERFRIENDS")
     logger.info("  4. Stripe applies the 50% off for the next 3 monthly invoices")
-    logger.info(f"     ($19.99 × 3 = $59.97 total before retail kicks in)")
+    logger.info("     ($19.99 × 3 = $59.97 total before retail kicks in)")
     logger.info("")
     return 0
 
