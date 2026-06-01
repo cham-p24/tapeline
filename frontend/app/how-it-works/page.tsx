@@ -146,7 +146,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* Signals */}
-      <section className="border-t border-border/60">
+      <section>
         <div className="section py-8 sm:py-10">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Signal labels</p>
@@ -173,7 +173,7 @@ export default function HowItWorksPage() {
       </section>
 
       {/* FAQ — visible content that mirrors HOW_FAQ JSON-LD above. */}
-      <section className="border-t border-border/60">
+      <section>
         <div className="section py-10">
           <div className="mx-auto max-w-3xl">
             <p className="eyebrow">Common questions</p>

@@ -140,7 +140,7 @@ export default async function DailyPicksPage() {
         </div>
       </section>
 
-      <section className="border-y border-border/60 bg-panel/20 py-10 sm:py-14">
+      <section className="bg-panel/20 py-10 sm:py-14">
         <div className="mx-auto max-w-3xl px-6">
           <div className="mb-6 flex items-end justify-between">
             <div>
@@ -276,7 +276,7 @@ export default async function DailyPicksPage() {
         </div>
       </section>
 
-      <section className="border-t border-border/60 bg-panel/10 py-10 sm:py-14">
+      <section className="bg-panel/10 py-10 sm:py-14">
         <div className="mx-auto max-w-3xl px-6">
           <p className="eyebrow text-accent">Common questions</p>
           <div className="mt-6 divide-y divide-border/60">
