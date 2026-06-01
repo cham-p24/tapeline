@@ -68,9 +68,9 @@ const SECTIONS: Section[] = [
     rows: [
       { label: "Congressional trades feed", free: "—", pro: "—", premium: "✓" },
       { label: "Recent insider buys (SEC Form 4)", free: "—", pro: "—", premium: "✓" },
-      // Public API row removed — programmatic /api/v1/* with API-key auth
-      // isn't built yet. Re-add when the endpoint ships rather than leaving
-      // a 1,000 req/day claim that has no backing implementation.
+      // Public API shipped 2026-06-01 (PR8): key-authenticated /api/v1/* with a
+      // 1,000 req/day Premium quota. Backed by services/api_keys + routers/api_v1.
+      { label: "Public API access", free: "—", pro: "—", premium: "1,000 requests/day" },
       { label: "CSV export", free: "—", pro: "✓", premium: "✓" },
     ],
   },

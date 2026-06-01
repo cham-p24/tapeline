@@ -655,3 +655,12 @@ from app.routers import presets, watchlists
 
 app.include_router(watchlists.router, prefix="/api/watchlists", tags=["watchlists"])
 app.include_router(presets.router, prefix="/api/presets", tags=["presets"])
+
+# Premium public API — key management (session-authed) + the versioned,
+# key-authenticated read surface (PR8, 2026-06-01). The /api/v1 router
+# enforces the Premium tier gate + per-key daily quota in its dependency.
+from app.routers import api_keys as api_keys_router
+from app.routers import api_v1
+
+app.include_router(api_keys_router.router, prefix="/api/api-keys", tags=["api-keys"])
+app.include_router(api_v1.router, prefix="/api/v1", tags=["api-v1"])

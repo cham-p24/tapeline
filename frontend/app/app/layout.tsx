@@ -220,6 +220,9 @@ function UserChip() {
           <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Email preferences
           </Link>
+          <Link href="/app/api-keys" className="block px-4 py-2 text-sm hover:bg-panel-hover">
+            API keys
+          </Link>
           <div className="border-t border-border" />
           {/* Theme picker — iOS-style three-segment group. System mode
               respects OS prefers-color-scheme so a user who has Dark Mode
