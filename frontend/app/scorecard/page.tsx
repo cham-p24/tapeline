@@ -373,7 +373,14 @@ export default function ScorecardPage() {
  * gracefully falls through to the existing stat grid.
  */
 function BestDayCallout({ days }: { days: Record<string, ScorecardEntry[]> }) {
-  const ALPHA_OUTLIER = 50.0;
+  // Match the backend predicate exactly. `backend/app/routers/scorecard.py`
+  // excludes rows where |change_pct_1d_after| > 50 from the aggregate
+  // stats; filtering on |alpha| here instead would make the callout
+  // eligible to feature rows the disclosure directly below says were
+  // excluded (e.g. a +51% 1-day pick on a +2% SPY day → alpha 49%
+  // passes the alpha filter but should be excluded). Codex caught this
+  // mismatch on PR #230.
+  const ONE_DAY_OUTLIER = 50.0;
   const MIN_WINNERS = 3;
 
   let bestDate: string | null = null;
@@ -384,7 +391,10 @@ function BestDayCallout({ days }: { days: Record<string, ScorecardEntry[]> }) {
 
   for (const [date, picks] of Object.entries(days)) {
     const valid = picks.filter(
-      (p) => p.alpha_vs_spy != null && Math.abs(p.alpha_vs_spy) <= ALPHA_OUTLIER,
+      (p) =>
+        p.alpha_vs_spy != null &&
+        p.change_pct_1d_after != null &&
+        Math.abs(p.change_pct_1d_after) <= ONE_DAY_OUTLIER,
     );
     if (valid.length === 0) continue;
     const winners = valid.filter((p) => (p.alpha_vs_spy ?? 0) >= 5).length;
