@@ -132,18 +132,23 @@
   }
 
   /*
-   * Page-wide blue atmospheric layer. Fixed-position pseudo-element so
-   * it paints on every route regardless of which page's <main> renders.
+   * Page-wide blue atmospheric layer — a soft glow pooling in the four
+   * corners that fades to a clean (transparent) centre, so the page bg
+   * stays neutral (white / near-black) with blue tinge only in the edge
+   * negative space. Fixed-position pseudo-element so it paints on every
+   * route regardless of which page's <main> renders.
    *
    * Timeline:
-   *   2026-05-17: introduced as a gradient (14% top → 8% mid → 12% bot)
-   *   2026-05-20: replaced gradient with flat opacity (banding fix)
-   *   2026-05-22: REMOVED — landing page's gradient blobs + this wash
-   *               read as "too many overlays" cumulatively
-   *   2026-05-30: RESTORED — without this wash, every non-landing page
-   *               (scorecard, signals, pricing, how-it-works) felt flat
-   *               vs landing. Landing kept its blobs; this wash gives
-   *               the rest of the site matching atmospheric blue.
+   *   2026-05-17: introduced as a vertical linear gradient
+   *   2026-05-20: flattened to a solid background-color (banding fix)
+   *   2026-05-22: REMOVED — landing blobs + this wash = too many overlays
+   *   2026-05-30: RESTORED as a flat fill, then bumped to 0.16 / 0.22
+   *   2026-06-01: reworked to a four-corner radial glow. The flat fill was
+   *               washing the ENTIRE viewport blue — it read as a solid
+   *               "blue background", not ambient atmosphere. Corner-radial
+   *               keeps the centre transparent; --atmosphere-opacity is now
+   *               the corner peak alpha. Echoes the old landing-page corner
+   *               blobs, applied site-wide.
    *
    * pointer-events:none so it never blocks clicks; z-index:-1 keeps it
    * behind every body child. body is position:relative so it owns the
@@ -155,7 +160,16 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background-color: rgb(var(--accent) / var(--atmosphere-opacity, 0.08));
+    /* Four corner glows; each fades to transparent well before the centre. */
+    background:
+      radial-gradient(60% 55% at 0% 0%,
+        rgb(var(--accent) / var(--atmosphere-opacity, 0.08)) 0%, transparent 70%),
+      radial-gradient(60% 55% at 100% 0%,
+        rgb(var(--accent) / var(--atmosphere-opacity, 0.08)) 0%, transparent 70%),
+      radial-gradient(60% 55% at 0% 100%,
+        rgb(var(--accent) / var(--atmosphere-opacity, 0.08)) 0%, transparent 70%),
+      radial-gradient(60% 55% at 100% 100%,
+        rgb(var(--accent) / var(--atmosphere-opacity, 0.08)) 0%, transparent 70%);
   }
   .nums {
     font-variant-numeric: tabular-nums;
