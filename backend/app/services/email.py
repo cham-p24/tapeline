@@ -1468,6 +1468,79 @@ def render_annual_upgrade_email(user_name: str, *, tier: str) -> str:
     )
 
 
+# ── Proactive billing notices (renewal reminder + card-expiring) ─────────────
+#
+# Both are TRANSACTIONAL (billing/account state, not marketing): persona
+# "billing", no List-Unsubscribe, no email_prefs gate. They head off
+# *involuntary* churn — a courtesy heads-up before an annual plan auto-renews
+# (kills surprise-renewal disputes), and a nudge to refresh a card BEFORE it
+# expires and a renewal declines into the dunning sequence.
+
+def render_annual_renewal_reminder_email(
+    user_name: str, *, tier: str, amount_label: str, renew_date_label: str,
+) -> str:
+    """T-7 heads-up before an ANNUAL plan auto-renews. Gives a clean window to
+    update a card or cancel, and stops the renewal charge being a surprise."""
+    tier_label = tier.capitalize()
+    return shell(
+        h1(f"Your {tier_label} plan renews {renew_date_label}.")
+        + lead(
+            f"{user_name}, a quick heads-up so it's never a surprise: your "
+            f"Tapeline {tier_label} annual plan renews on {renew_date_label} "
+            f"for {amount_label}. It renews automatically — you don't need to "
+            "do anything."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Upcoming renewal</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+            f'<strong>{amount_label}</strong> on <strong>{renew_date_label}</strong> &middot; {tier_label} annual. '
+            "Want to switch plans, update your card, or cancel? It's all one click from billing.</p>"
+            + button(
+                "Manage billing",
+                "https://tapeline.io/app/billing?utm_source=email&utm_campaign=renewal_reminder&utm_medium=transactional",
+            ),
+        )
+        + muted_paragraph(
+            "If everything looks right, there's nothing to do — this note just "
+            "makes sure the charge never catches you off guard."
+        )
+        + footnote("Questions about your bill? Reply to this email — billing@tapeline.io reads every one."),
+        preheader=f"Your Tapeline {tier_label} plan renews {renew_date_label} for {amount_label} — nothing to do.",
+    )
+
+
+def render_card_expiring_email(
+    user_name: str, *, brand: str, last4: str, exp_label: str,
+) -> str:
+    """The card on file expires at month-end (Stripe customer.source.expiring).
+    Nudge an update BEFORE the next renewal declines into dunning."""
+    card_label = f"{brand} ending {last4}" if last4 else "the card on file"
+    return shell(
+        h1(f"Your card expires soon, {user_name}.")
+        + lead(
+            f"The card we have on file — {card_label} — expires {exp_label}. "
+            "Update it before your next renewal so your Tapeline access never "
+            "skips a beat."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Update your card</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+            "Open billing, click &ldquo;Update payment method&rdquo;, paste the new card. "
+            "Takes about thirty seconds — nothing on your plan changes.</p>"
+            + button(
+                "Update card",
+                "https://tapeline.io/app/billing?utm_source=email&utm_campaign=card_expiring&utm_medium=transactional",
+            ),
+            accent=True,
+        )
+        + muted_paragraph(
+            "Already updated it? Then you're all set — you can ignore this."
+        )
+        + footnote("Anything weird? Reply to this email — billing@tapeline.io reads every reply."),
+        preheader=f"The card on file ({card_label}) expires {exp_label} — update it to avoid an interruption.",
+    )
+
+
 # ── Founder-touch (lever #4: personal hello to high-value, engaged users) ────
 
 def render_founder_touch_email(user_name: str) -> str:
@@ -2451,6 +2524,89 @@ async def run_annual_nudge_drip(session) -> dict[str, int]:
                 handled.add(user.id)
         except Exception:
             logger.exception("annual_nudge.send_failed user=%s", user.id)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
+    """Courtesy heads-up ~7 days before an ANNUAL plan auto-renews.
+
+    Population: active annual subscriptions whose current_period_end falls in
+    (now+6d, now+8d) and aren't already set to cancel. Uses the real
+    `Subscription.billing_period` column (added 0031) — no period-length
+    inference needed. Transactional: always sent (no email_prefs gate, no
+    List-Unsubscribe), persona "billing".
+
+    Dedup is per renewal CYCLE via a date-stamped token "renA{YYMMDD}" keyed on
+    current_period_end — so the reminder fires once each year (a fresh period
+    end → a fresh token), not once ever. No-op when RESEND_API_KEY is unset.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import Subscription, User
+    from app.services.tier import TIER_PRICES
+
+    now = datetime.now(UTC)
+    counts = {"renewal_reminder": 0}
+    lower, upper = now + timedelta(days=6), now + timedelta(days=8)
+
+    rows = (
+        await session.execute(
+            select(User, Subscription)
+            .join(Subscription, Subscription.user_id == User.id)
+            .where(
+                Subscription.status == "active",
+                Subscription.billing_period == "annual",
+                Subscription.cancel_at_period_end.is_(False),
+                Subscription.current_period_end >= lower,
+                Subscription.current_period_end < upper,
+            )
+        )
+    ).all()
+
+    any_sent = False
+    handled: set[str] = set()
+    for user, sub in rows:
+        if not user.email or user.id in handled:
+            continue
+        cpe = sub.current_period_end
+        if cpe.tzinfo is None:
+            cpe = cpe.replace(tzinfo=UTC)
+        token = "renA" + cpe.strftime("%y%m%d")
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if token in sent_tokens:
+            handled.add(user.id)
+            continue
+        tier = (sub.tier or user.tier or "pro").lower()
+        price = TIER_PRICES.get((tier, "annual"))
+        amount_label = f"${price:,.2f}" if price else "your annual rate"
+        # Portable day-without-leading-zero (Windows strftime lacks %-d).
+        renew_date_label = f"{cpe.strftime('%B')} {cpe.day}, {cpe.year}"
+        try:
+            html = render_annual_renewal_reminder_email(
+                user.name or "trader",
+                tier=tier,
+                amount_label=amount_label,
+                renew_date_label=renew_date_label,
+            )
+            res = await send_email(
+                user.email,
+                f"Your Tapeline {tier.capitalize()} plan renews {renew_date_label}",
+                html,
+                persona="billing",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add(token)
+                user.drip_state = ",".join(sorted(sent_tokens))
+                counts["renewal_reminder"] += 1
+                any_sent = True
+                handled.add(user.id)
+        except Exception:
+            logger.exception("renewal_reminder.send_failed user=%s", user.id)
 
     if any_sent:
         await session.commit()

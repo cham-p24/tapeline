@@ -426,7 +426,9 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_activation_alert_email,
         render_activation_watchlist_email,
         render_alert_email,
+        render_annual_renewal_reminder_email,
         render_annual_upgrade_email,
+        render_card_expiring_email,
         render_email_verification_email,
         render_eod_watchlist_digest,
         render_founder_touch_email,
@@ -553,6 +555,19 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "payment_recovered": (
             "Payment recovered · dunning all-clear",
             lambda: render_payment_recovered_email("Alex", tier="premium"),
+        ),
+        "annual_renewal_reminder": (
+            "Annual renewal reminder · T-7 (transactional)",
+            lambda: render_annual_renewal_reminder_email(
+                "Alex", tier="premium", amount_label="$479.99",
+                renew_date_label="June 8, 2026",
+            ),
+        ),
+        "card_expiring": (
+            "Card expiring soon · proactive billing",
+            lambda: render_card_expiring_email(
+                "Alex", brand="Visa", last4="4242", exp_label="06/2026",
+            ),
         ),
         # Alerts + digest
         "alert_rule": (
