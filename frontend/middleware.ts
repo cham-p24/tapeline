@@ -117,8 +117,18 @@ export function middleware(request: NextRequest) {
  * Valid ticker shape: 1-6 alpha + optional dot-suffix (BRK.B). Symbols
  * containing dots route via Next's static dispatch (matcher excludes
  * paths with dots), so this regex only sees no-dot paths in practice.
+ *
+ * SINGLE SEGMENT ONLY — the capture is ([^/]+), not (.+). A greedy (.+)
+ * also swallowed nested metadata routes like /t/AAPL/opengraph-image
+ * (raw = "AAPL/opengraph-image"), which fails VALID_TICKER_RE and got
+ * 308'd to /search — silently breaking the og:image / twitter:image PNG
+ * for EVERY per-ticker (and /blog/ticker) page (social-card previews on
+ * X/LinkedIn/Slack/Facebook went imageless). Matching one segment lets
+ * those image sub-routes fall through to Next so they render. Genuine
+ * multi-segment garbage under /t/* now just 404s (negligibly rare) — a
+ * fair trade for working social cards.
  */
-const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/(.+)$/;
+const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/([^/]+)$/;
 const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
 
 function handleTickerRoute(request: NextRequest): NextResponse | null {
