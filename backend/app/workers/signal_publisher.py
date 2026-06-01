@@ -283,6 +283,7 @@ async def tick() -> None:
             from app.services.email import (
                 run_activation_drip,
                 run_annual_nudge_drip,
+                run_annual_renewal_reminder_drip,
                 run_daily_drip,
                 run_founder_touch_drip,
                 run_re_engagement_drip,
@@ -295,6 +296,7 @@ async def tick() -> None:
                 wb_counts = await run_winback_drip(drip_session)
                 act_counts = await run_activation_drip(drip_session)
                 annual_counts = await run_annual_nudge_drip(drip_session)
+                renewal_counts = await run_annual_renewal_reminder_drip(drip_session)
                 ft_counts = await run_founder_touch_drip(drip_session)
                 refm_counts = await run_referral_milestone_drip(drip_session)
             if any(counts.values()):
@@ -307,6 +309,8 @@ async def tick() -> None:
                 logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
             if annual_counts["annual_p"]:
                 logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
+            if renewal_counts["renewal_reminder"]:
+                logger.info("drip.renewal_reminder_sent renewal_reminder=%d", renewal_counts["renewal_reminder"])
             if ft_counts["founder_touch"]:
                 logger.info("drip.founder_touch_sent founder_touch=%d", ft_counts["founder_touch"])
             if any(refm_counts.values()):

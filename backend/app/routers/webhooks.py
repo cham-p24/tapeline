@@ -303,6 +303,42 @@ async def stripe_webhook(
         else:
             logger.warning("stripe.payment_failed_without_user customer=%s", customer_id)
 
+    elif evt_type == "customer.source.expiring":
+        # The card on file expires at month-end. Proactively nudge an update
+        # BEFORE the next renewal declines into dunning — cheaper to keep a
+        # customer than to recover one. Replays are blocked by the
+        # StripeWebhookEvent id-dedup at the top of this handler. The event's
+        # data.object IS the card (top-level brand/last4/exp_*, with a nested
+        # "card" fallback for source-shaped payloads).
+        customer_id = obj.get("customer")
+        result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
+        user = result.scalar_one_or_none()
+        if user and user.email:
+            try:
+                from app.services.email import render_card_expiring_email, send_email
+                nested = obj.get("card") or {}
+                brand = str(obj.get("brand") or nested.get("brand") or "Card")
+                last4 = str(obj.get("last4") or nested.get("last4") or "")
+                exp_month = obj.get("exp_month") or nested.get("exp_month")
+                exp_year = obj.get("exp_year") or nested.get("exp_year")
+                exp_label = (
+                    f"{int(exp_month):02d}/{exp_year}" if exp_month and exp_year else "soon"
+                )
+                html = render_card_expiring_email(
+                    user.name or "trader", brand=brand, last4=last4, exp_label=exp_label,
+                )
+                await send_email(
+                    user.email,
+                    "Your card on file is about to expire",
+                    html,
+                    persona="billing",
+                )
+                logger.info("stripe.card_expiring_email user=%s exp=%s", user.id, exp_label)
+            except Exception:
+                logger.exception("stripe.card_expiring_email_error user=%s", user.id)
+        else:
+            logger.warning("stripe.card_expiring_without_user customer=%s", customer_id)
+
     elif evt_type == "invoice.payment_succeeded":
         # A renewal charge cleared. Most of these are routine — every monthly
         # renewal lands here — so we act ONLY when the customer was mid-dunning
