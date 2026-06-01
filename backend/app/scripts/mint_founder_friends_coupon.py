@@ -62,6 +62,14 @@ def main() -> int:
         logger.error("STRIPE_API_KEY not set. Refusing to mint against unknown Stripe account.")
         return 1
     stripe.api_key = api_key
+    # Pin the API version for this script. Stripe's 2026-05-27.dahlia release
+    # restructured PromotionCode.create's `coupon` parameter (rejected with
+    # "Received unknown parameter: coupon" on first prod attempt 2026-06-01).
+    # 2024-04-10 is a stable older version where the documented top-level
+    # `coupon` kwarg still works. Script is one-off + idempotent so locking
+    # to an older API is safe — when we migrate to dahlia's new shape, update
+    # this line and re-run.
+    stripe.api_version = "2024-04-10"
 
     # ---- Coupon: 50% off, 3-month duration ---------------------------------
     try:
@@ -73,7 +81,8 @@ def main() -> int:
             percent_off=50,
             duration="repeating",
             duration_in_months=3,
-            name="Founder Friends — 50% off Premium for 3 months",
+            # Stripe caps coupon.name at 40 chars
+            name="Founder Friends — 50% off / 3 months",
         )
         logger.info(f"[coupon] created: {coupon.id}")
 
