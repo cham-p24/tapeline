@@ -47,6 +47,7 @@ class CheckoutRequest(BaseModel):
 async def create_checkout(
     body: CheckoutRequest,
     user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
     if body.tier not in ("pro", "premium"):
         raise HTTPException(400, "tier must be 'pro' or 'premium'")
@@ -72,6 +73,20 @@ async def create_checkout(
         # any, takes precedence inside create_checkout_session.
         winback=(user.tier == "free" and user.canceled_at is not None),
     )
+    # Mark the checkout as in-flight for abandonment recovery. If the user
+    # never completes, the hourly worker (run_checkout_abandonment_recovery)
+    # emails a one-shot resume nudge ~1-24h later; checkout.session.completed
+    # clears checkout_started_at, so a converted user is never nudged. Stripping
+    # the "abandon1" token re-arms the nudge for this fresh attempt even if a
+    # prior abandoned checkout already consumed it. Stamped only after the
+    # session minted successfully (a Stripe error above raises before this).
+    user.checkout_started_at = datetime.now(UTC)
+    user.checkout_tier = body.tier
+    user.checkout_billing_period = body.billing_period
+    user.drip_state = ",".join(
+        t for t in (user.drip_state or "").split(",") if t and t != "abandon1"
+    )
+    await session.commit()
     return {"url": url}
 
 

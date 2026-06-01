@@ -118,6 +118,23 @@ class User(Base):
         DateTime(timezone=True), nullable=True,
     )
 
+    # ── Checkout abandonment recovery (migration 0030) ─────────────────────
+    # Stamped when the user mints a Stripe Checkout Session (POST
+    # /api/billing/checkout) and cleared the moment checkout.session.completed
+    # lands. So a non-null value aged 1-24h IS an abandoned checkout: the
+    # hourly worker task run_checkout_abandonment_recovery emails a one-shot
+    # "finish upgrading" nudge, dedup'd via the "abandon1" drip_state token
+    # (re-armed each time a fresh checkout is started). checkout_tier /
+    # checkout_billing_period capture what they were buying so the recovery
+    # email copy + resume link land on the right plan.
+    checkout_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    checkout_tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    checkout_billing_period: Mapped[str | None] = mapped_column(
+        String(20), nullable=True,
+    )
+
     # Bumped on every authenticated request via current_user_optional (throttled
     # to once per hour to avoid write amplification). Drives the re-engagement
     # drip — a user with last_seen_at >= 14 days ago is dormant and gets a

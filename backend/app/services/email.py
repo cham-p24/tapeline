@@ -1061,6 +1061,64 @@ def render_payment_recovered_email(user_name: str, *, tier: str) -> str:
     )
 
 
+def render_checkout_abandoned_email(
+    user_name: str, *, tier: str, billing_period: str = "monthly",
+) -> str:
+    """Checkout abandonment recovery — sent ~1-24h after a user mints a Stripe
+    Checkout Session (clicked Subscribe) but never completed it.
+
+    Tone: helpful, not pushy. They already decided to upgrade — this just
+    clears the small friction of finishing. We don't deep-link the original
+    Stripe session URL (it expires in 24h and may be dead by send time); the
+    resume link lands on /app/billing with the tier + period pre-selected so a
+    single click re-opens checkout on the right plan.
+
+    Descriptive voice only — no "buy"/"sell"/"recommend" (publisher exemption).
+    Marketing-class conversion nudge: persona "sales", gated on
+    EmailPref.RE_ENGAGEMENT + carries List-Unsubscribe at the send site."""
+    tier_label = (tier or "pro").capitalize()
+    period = billing_period if billing_period in ("monthly", "annual") else "monthly"
+    sticker = {
+        ("pro", "monthly"): "$29.99/mo",
+        ("pro", "annual"): "$299.99/yr",
+        ("premium", "monthly"): "$49.99/mo",
+        ("premium", "annual"): "$479.99/yr",
+    }.get((tier.lower() if tier else "pro", period), "")
+    price_line = f"Tapeline {tier_label} · {sticker}" if sticker else f"Tapeline {tier_label}"
+    resume_url = (
+        f"https://tapeline.io/app/billing?resume=1&tier={tier or 'pro'}"
+        f"&billing_period={period}"
+        f"&utm_source=email&utm_campaign=checkout_recovery&utm_medium=sales"
+    )
+    return shell(
+        h1(f"You're one step away, {user_name}.")
+        + lead(
+            f"You started upgrading to Tapeline <strong>{tier_label}</strong> but "
+            f"didn't quite finish. Your checkout is still saved — picking it back "
+            f"up takes one click, and nothing was charged."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your plan</div>'
+            f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">{price_line}</div>'
+            f'<p class="tl-fg" style="margin:10px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+            f"Full universe scanner, live scores, squeeze + regime + heatmap, and "
+            f"every alert channel — unlocked the moment you finish."
+            f"</p>"
+            + button(f"Finish upgrading to {tier_label}", resume_url),
+            accent=True,
+        )
+        + muted_paragraph(
+            "Changed your mind, or hit a snag on the payment page? Just reply — a "
+            "human reads every message."
+        )
+        + footnote(
+            "You're getting this because you started a checkout on Tapeline. "
+            "Not ready yet? No problem — this is the only reminder we'll send."
+        ),
+        preheader=f"Your Tapeline {tier_label} checkout is still saved — finish in one click.",
+    )
+
+
 def render_subscription_canceled_email(
     user_name: str, *, tier: str, period_end_iso: str | None,
 ) -> str:
@@ -2542,6 +2600,92 @@ async def run_referral_milestone_drip(session) -> dict[str, int]:
                 any_sent = True
         except Exception:
             logger.exception("referral_milestone.send_failed user=%s", user.id)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_checkout_abandonment_recovery(session) -> dict[str, int]:
+    """Recover started-but-incomplete Stripe checkouts. Returns {"abandon1": n}.
+
+    Population: users whose checkout_started_at sits in the 1-24h window —
+    long enough that they're plainly not still mid-card-entry, recent enough
+    that the nudge is timely (and not creepy). checkout_started_at is stamped
+    when POST /api/billing/checkout mints the Stripe session and CLEARED by the
+    checkout.session.completed webhook, so a converted user drops out of this
+    query automatically — the timestamp itself is the abandonment signal (no
+    tier check needed; a trial user converting early counts too).
+
+    One email, ever, per checkout attempt: dedup'd on the "abandon1" drip_state
+    token. A fresh checkout (POST /checkout) strips that token, re-arming the
+    nudge for the new attempt.
+
+    Marketing-class conversion nudge → gated on EmailPref.RE_ENGAGEMENT and
+    carries the List-Unsubscribe header via unsubscribe_category="re_engagement".
+    Only stamps the token on a NON-skipped send, so no RESEND_API_KEY = no-op
+    (send_email returns skipped:True and the token stays unset for a later run).
+
+    The 1-24h window is evaluated in Python (not SQL) after a coarse
+    is_not(None) filter, normalising SQLite's naive datetimes to UTC — the same
+    tz-safety dance run_winback_drip does, and robust across SQLite + Postgres.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+
+    now = datetime.now(UTC)
+    counts = {"abandon1": 0}
+
+    result = await session.execute(
+        select(User).where(User.checkout_started_at.is_not(None))
+    )
+    users = result.scalars().all()
+    if not users:
+        return counts
+
+    lower = timedelta(hours=1).total_seconds()
+    upper = timedelta(hours=24).total_seconds()
+
+    any_sent = False
+    for user in users:
+        if not user.email:
+            continue
+        started = user.checkout_started_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        age = (now - started).total_seconds()
+        if age < lower or age > upper:
+            continue
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if "abandon1" in sent_tokens:
+            continue
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
+            continue
+        tier = user.checkout_tier or "pro"
+        period = user.checkout_billing_period or "monthly"
+        try:
+            html = render_checkout_abandoned_email(
+                user.name or "trader", tier=tier, billing_period=period,
+            )
+            res = await send_email(
+                user.email,
+                f"You're one step from Tapeline {tier.capitalize()}",
+                html,
+                persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add("abandon1")
+                user.drip_state = ",".join(sorted(sent_tokens))
+                counts["abandon1"] += 1
+                any_sent = True
+        except Exception:
+            logger.exception("checkout_recovery.send_failed user=%s", user.id)
 
     if any_sent:
         await session.commit()
