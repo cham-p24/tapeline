@@ -73,7 +73,7 @@ export default function PricingPage() {
       {/* Comparison — soft section break, no bg band (was striping
           unevenly with the atmospheric tint on body::before; the new
           comparison card carries its own surface treatment now). */}
-      <section className="border-t border-border/60">
+      <section>
         <div className="section py-10 sm:py-12">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Every feature, every limit.</h2>

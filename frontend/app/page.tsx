@@ -72,7 +72,7 @@ export default function LandingPage() {
       {/* LIVE COUNTERS — concrete numbers from /api/status, refreshed every 60s.
           Replaces vague "live" with specifics: how many tickers, how many
           news items, current regime, last tick. */}
-      <section className="border-y border-border/60">
+      <section>
         <div className="mx-auto max-w-6xl px-6 py-8">
           <LiveCounters />
         </div>
@@ -342,7 +342,7 @@ export default function LandingPage() {
           send + the in-email Premium CTA do the eventual conversion lift.
           Placed before the footer so it's the last thing the eye sees on
           the way out, not competing with the primary trial CTA above. */}
-      <section className="border-t border-border bg-panel/30">
+      <section className="bg-panel/30">
         <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
           <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
