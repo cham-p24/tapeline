@@ -1954,13 +1954,17 @@ async def _build_newsletter_payload(session) -> dict:
     except Exception:
         logger.exception("newsletter.regime_failed")
 
-    # Top movers — top 5 by current score
+    # Top movers — top 5 by current score (freshness + data-quality floored;
+    # no stale ghosts, no corrupt score>100 / emoji-symbol / <2-factor rows)
     try:
+        from app.services.ticker_freshness import live_clauses
+        _mv_stmt = select(
+            Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason
+        )
+        for _clause in await live_clauses(session):
+            _mv_stmt = _mv_stmt.where(_clause)
         r = await session.execute(
-            select(Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason)
-            .where(Ticker.score.is_not(None))
-            .order_by(desc(Ticker.score))
-            .limit(5)
+            _mv_stmt.order_by(desc(Ticker.score)).limit(5)
         )
         out["movers"] = [
             {"symbol": s, "score": sc, "signal": sg, "reason": rs}

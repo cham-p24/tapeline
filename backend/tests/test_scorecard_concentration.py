@@ -26,6 +26,11 @@ from app.workers.signal_publisher import (
 
 def _make_ticker(symbol: str, score: float, sector: str = "Tech",
                  sub_macro: float | None = 60.0, price: float = 100.0) -> Ticker:
+    # sub_trend + sub_rs populated alongside sub_macro so the row reads as a
+    # real composite: the candidate pool in signal_publisher applies the
+    # data-quality floor (app.services.ticker_freshness), which drops rows with
+    # <2 of 6 populated factors. The macro gate only reads sub_macro, and score
+    # is set explicitly here, so these extra factors don't change test intent.
     return Ticker(
         symbol=symbol,
         name=symbol,
@@ -33,6 +38,8 @@ def _make_ticker(symbol: str, score: float, sector: str = "Tech",
         signal="STRONG SETUP",
         price=price,
         sector=sector,
+        sub_trend=score,
+        sub_rs=score,
         sub_macro=sub_macro,
         asset_class="equity",
     )

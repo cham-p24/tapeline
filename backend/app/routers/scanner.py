@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import Ticker, User
 from app.services.auth import current_user_optional
+from app.services.ticker_freshness import live_clauses
 from app.services.tier import Tier
 from app.services.tier import limit as tier_limit
 
@@ -43,19 +44,25 @@ async def popular_tickers(
 
     # Compute "popularity" as price * volume so a thinly-traded $400 stock
     # doesn't outrank a $40 stock with 10x the share volume. Skip rows
-    # missing either field. Cap to actively-scored tickers (score IS NOT NULL)
-    # so we don't seed the watchlist with stale rows from auto-discovery.
-    rows = (await session.execute(
-        select(Ticker)
-        .where(
-            Ticker.score.isnot(None),
-            Ticker.price.isnot(None),
-            Ticker.volume.isnot(None),
-            Ticker.volume > 0,
-        )
+    # missing either field.
+    # live_clauses() applies the full "a user may see this" floor: scored,
+    # fresh (relative window), and data-quality clean (no raw >100 scores,
+    # no space/emoji-in-symbol annotations, >=2 real factors) — so a
+    # delisted/dropped ghost still carrying a high last-known price*volume
+    # can't seed the watchlist. See app.services.ticker_freshness.
+    pop_stmt = select(Ticker).where(
+        Ticker.price.isnot(None),
+        Ticker.volume.isnot(None),
+        Ticker.volume > 0,
+    )
+    for clause in await live_clauses(session):
+        pop_stmt = pop_stmt.where(clause)
+    pop_stmt = (
+        pop_stmt
         .order_by(desc(Ticker.price * Ticker.volume))
         .limit(max(n * 2, 16))  # over-fetch so we have a fallback if some have NULL fields
-    )).scalars().all()
+    )
+    rows = (await session.execute(pop_stmt)).scalars().all()
 
     items = [
         {"symbol": r.symbol, "name": r.name, "sector": r.sector, "score": r.score}
@@ -95,8 +102,8 @@ async def list_scanner(
     row_cap = tier_limit(tier, "scanner_rows")  # free=10, pro/elite=1000
     if limit > row_cap:
         limit = row_cap
+    # Ticker.score IS NOT NULL is enforced by live_clauses() below.
     stmt = select(Ticker).where(
-        Ticker.score.isnot(None),
         Ticker.score >= min_score,
         Ticker.score <= max_score,
     )
@@ -116,6 +123,14 @@ async def list_scanner(
         needle = q.strip().upper()
         if needle:
             stmt = stmt.where(Ticker.symbol.like(f"%{needle}%"))
+
+    # Freshness + data-quality floor — exclude stale "ghost" rows AND corrupt
+    # rows so the score sort reflects the current, clean universe. Without it,
+    # delisted tickers carrying raw pre-composite scores (>=98) or corrupt rows
+    # (score>100, emoji-in-symbol annotations, <2 factors) outrank every fresh
+    # 6-factor composite. See app.services.ticker_freshness.
+    for clause in await live_clauses(session):
+        stmt = stmt.where(clause)
 
     col = getattr(Ticker, sort)
     stmt = stmt.order_by(desc(col) if order == "desc" else col)

@@ -147,12 +147,17 @@ async def _generate_sitewide(
     personalise_cta: bool = False,
 ) -> str:
     """Original briefing layout — site-wide top scores + squeezes."""
+    from app.services.ticker_freshness import live_clauses
+
+    # Freshness + data-quality floor — keep stale ghost rows AND corrupt
+    # (score>100 / emoji-symbol / <2-factor) rows out of the briefing.
+    # (score IS NOT NULL is part of the floor.) See app.services.ticker_freshness.
+    _top_stmt = select(Ticker)
+    for _clause in await live_clauses(session):
+        _top_stmt = _top_stmt.where(_clause)
     top = (
         await session.execute(
-            select(Ticker)
-            .where(Ticker.score.isnot(None))
-            .order_by(desc(Ticker.score))
-            .limit(3)
+            _top_stmt.order_by(desc(Ticker.score)).limit(3)
         )
     ).scalars().all()
 

@@ -36,6 +36,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -45,6 +46,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models import Ticker
 from app.services.score import compute_tapeline_composite
+# Symbol-shape validation is shared with the serving layer (routers.ticker),
+# so the canonical implementation lives in app.services.symbols. Re-exported
+# under the original private name for the four tab parsers below + the tests.
+from app.services.symbols import clean_symbol as _clean_symbol  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -217,13 +222,10 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = (raw.get("Ticker") or "").strip().upper()
-        # Skip the header (if csv module didn't), blank rows, summary
-        # rows like "TOTAL", and any row that doesn't look like a stock
-        # ticker (a 1-5 letter all-caps string with optional .X suffix).
-        if not symbol or symbol == "TICKER":
-            continue
-        if len(symbol) > 12:    # tickers are short; longer = junk
+        symbol = _clean_symbol(raw.get("Ticker"))
+        # _clean_symbol drops the header, blanks, dividers, summary rows, and
+        # emoji/space-decorated cells like "🏆 IVV". None → skip the row.
+        if symbol is None:
             continue
 
         # Sheet's column-F "Score" is retained as `sheet_score` for transparency
@@ -509,12 +511,9 @@ def parse_spike_intelligence_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = (raw.get("Ticker") or "").strip().upper()
-        if not symbol or symbol == "TICKER" or len(symbol) > 12:
-            continue
-        # Skip section headers / blank rows. The sheet sometimes has
-        # category dividers with non-ticker-looking content in column B.
-        if symbol.startswith("-") or symbol.startswith("="):
+        symbol = _clean_symbol(raw.get("Ticker"))
+        # None → header, blank, category divider, or emoji/space-decorated cell.
+        if symbol is None:
             continue
 
         spike_score = _parse_float(raw.get("Spike Score"))
@@ -670,11 +669,9 @@ def parse_etf_benchmarks_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = (raw.get("Ticker") or "").strip().upper()
-        if not symbol or symbol == "TICKER" or len(symbol) > 12:
-            continue
-        # Section headers have non-ticker-looking content
-        if symbol.startswith("-") or symbol.startswith("="):
+        symbol = _clean_symbol(raw.get("Ticker"))
+        # None → header, blank, section divider, or emoji/space-decorated cell.
+        if symbol is None:
             continue
 
         signal_raw = (raw.get("Signal") or "").strip().upper()
@@ -820,8 +817,6 @@ def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
     RegimeState table. Missing fields default to safe values so an
     incomplete sheet doesn't crash the upsert.
     """
-    import re
-
     reader = csv.DictReader(io.StringIO(text))
     # indicator -> (value_details, note) — store both so number extraction
     # can prefer the column that actually holds the digit.
@@ -982,10 +977,10 @@ def parse_smart_money_csv(text: str) -> list[dict[str, Any]]:
     appearances: dict[str, int] = {}
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = (raw.get("Ticker") or "").strip().upper()
+        symbol = _clean_symbol(raw.get("Ticker"))
         category = (raw.get("Category") or "").strip()
-        # Skip section headers, data-source explainers, blank rows
-        if not symbol or symbol == "TICKER" or symbol == "—" or len(symbol) > 12:
+        # None → header, blank, em-dash, divider, or emoji/space-decorated cell.
+        if symbol is None:
             continue
         if "Section header" in category or "Data freshness" in category:
             continue

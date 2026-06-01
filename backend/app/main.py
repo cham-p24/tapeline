@@ -180,9 +180,23 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
 
     capped = max(1, min(limit, 1000))
     async with session_scope() as session:
+        # Deliberately do NOT apply the FULL freshness/factor floor here: the
+        # sitemap wants breadth (every real /t/{symbol} page Google should know
+        # about), and a slightly-stale row still has a valid ticker page.
+        # BUT exclude the two CORRUPTION signatures so the sitemap never points
+        # Google at a URL that routers.ticker now 404s (which would be the exact
+        # crawled-not-indexed problem):
+        #   • space/emoji-in-symbol rows ("🏆 IVV") — sheet annotations ingested
+        #     as symbols; broken /t/🏆 IVV URLs + dupes of real ETFs. notlike(
+        #     "% %") keeps legit futures like CL=F.
+        #   • score > 100 — impossible for the clamped composite, so it can only
+        #     be a legacy pre-clamp ghost (e.g. MCW=104) that dropped out of the
+        #     universe. A real ticker never exceeds 100, so breadth is unharmed.
         result = await session.execute(
             select(Ticker.symbol)
             .where(Ticker.score.is_not(None))
+            .where(Ticker.score <= 100)
+            .where(Ticker.symbol.notlike("% %"))
             .order_by(desc(Ticker.score))
             .limit(capped)
         )
@@ -219,18 +233,24 @@ async def public_signals(
 
     from app.db import session_scope
     from app.models import Ticker
+    from app.services.ticker_freshness import live_clauses
 
     capped = max(1, min(limit, 2000))
-    stmt = (
-        select(Ticker)
-        .where(Ticker.score.is_not(None))
-        .where(Ticker.score >= min_score)
-    )
+    # Ticker.score IS NOT NULL is enforced by live_clauses() below.
+    stmt = select(Ticker).where(Ticker.score >= min_score)
     if signal:
         stmt = stmt.where(Ticker.signal == signal)
-    stmt = stmt.order_by(desc(Ticker.score)).limit(capped).offset(max(0, offset))
 
     async with session_scope() as session:
+        # Freshness + data-quality floor — drop stale "ghost" rows (delisted
+        # tickers still carrying a pre-refresh raw score that outranks fresh
+        # composites) AND corrupt rows (score>100, emoji-in-symbol annotations,
+        # <2 factors) so the public /signals front door ranks the live, clean
+        # universe — not 12-day-old ghosts or ingestion artifacts. See
+        # app.services.ticker_freshness.
+        for clause in await live_clauses(session):
+            stmt = stmt.where(clause)
+        stmt = stmt.order_by(desc(Ticker.score)).limit(capped).offset(max(0, offset))
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
@@ -407,15 +427,22 @@ async def public_heatmap() -> dict[str, object]:
     from app.db import session_scope
     from app.models import Ticker
     from app.services.sector import canonical_sector
+    from app.services.ticker_freshness import live_clauses
 
     async with session_scope() as session:
-        result = await session.execute(
+        # Freshness + data-quality floor — exclude stale ghost rows AND corrupt
+        # rows from the aggregate so a dropped/ghost ticker's last-known 1D move
+        # can't skew a sector tile. (Ticker.score IS NOT NULL is part of the
+        # floor.) See app.services.ticker_freshness.
+        stmt = (
             select(Ticker.sector, Ticker.change_pct_1d, Ticker.price, Ticker.volume)
-            .where(Ticker.score.is_not(None))
             .where(Ticker.change_pct_1d.is_not(None))
             .where(Ticker.price.is_not(None))
             .where(Ticker.volume.is_not(None))
         )
+        for clause in await live_clauses(session):
+            stmt = stmt.where(clause)
+        result = await session.execute(stmt)
         rows = result.all()
 
     buckets: dict[str, list[tuple[float, float]]] = defaultdict(list)

@@ -772,8 +772,16 @@ async def _ensure_daily_scorecard(today: date) -> None:
 
         # Pull a wider candidate pool (50) so the concentration filter has
         # room to skip clustered picks without running out before reaching 10.
+        # Freshness + data-quality floor — never freeze a stale ghost row OR a
+        # corrupt (score>100 / emoji-symbol / <2-factor) row into the permanent
+        # public scorecard record. (score IS NOT NULL is part of the floor.)
+        # See app.services.ticker_freshness.
+        from app.services.ticker_freshness import live_clauses
+        _cand_stmt = select(Ticker)
+        for _clause in await live_clauses(session):
+            _cand_stmt = _cand_stmt.where(_clause)
         candidates = await session.execute(
-            select(Ticker).where(Ticker.score.isnot(None)).order_by(desc(Ticker.score)).limit(50)
+            _cand_stmt.order_by(desc(Ticker.score)).limit(50)
         )
 
         sector_counts: dict[str, int] = {}

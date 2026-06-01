@@ -257,12 +257,19 @@ async def signup(
 
             from app.models import Ticker
             from app.services.email import render_welcome_email, send_email
+            from app.services.ticker_freshness import live_clauses
 
+            # Freshness + data-quality floor — a new signup's first email should
+            # show live, clean top picks, not stale ghost rows or corrupt
+            # (score>100 / emoji-symbol / <2-factor) artifacts. (score IS NOT
+            # NULL is part of the floor.) See app.services.ticker_freshness.
+            _top_stmt = select(
+                Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason
+            )
+            for _clause in await live_clauses(session):
+                _top_stmt = _top_stmt.where(_clause)
             top_result = await session.execute(
-                select(Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason)
-                .where(Ticker.score.is_not(None))
-                .order_by(_desc(Ticker.score))
-                .limit(3)
+                _top_stmt.order_by(_desc(Ticker.score)).limit(3)
             )
             picks = [
                 {"symbol": r[0], "score": r[1], "signal": r[2], "reason": r[3]}

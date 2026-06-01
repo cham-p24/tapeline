@@ -11,7 +11,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions
 from app.services.news_feed import fetch_news_for_ticker
+from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
@@ -150,7 +151,15 @@ async def ticker_detail(symbol: str) -> dict:
     2x SSR retry) drove a latency death-spiral that 500'd the SSR pages. Both
     failure modes are gone now that the request path touches only the DB.
     """
-    symbol = symbol.upper()
+    # Validate the symbol SHAPE before touching the DB — junk like "🏆 IVV" (a
+    # legacy ghost row may match it exactly) 404s instead of rendering a
+    # fabricated page + a duplicate-content /t/🏆 IVV URL for Google.
+    # clean_symbol also strips + uppercases. Mirrors the ingestion chokepoint in
+    # sheet_feed. (Re-applied after a concurrent ticker.py revert dropped it.)
+    cleaned = clean_symbol(symbol)
+    if cleaned is None:
+        raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
+    symbol = cleaned
 
     # Single short read txn: core ticker + squeeze + latest news. The pooled
     # connection is checked out only for these indexed lookups, then returned
@@ -160,6 +169,12 @@ async def ticker_detail(symbol: str) -> dict:
             await session.execute(select(Ticker).where(Ticker.symbol == symbol))
         ).scalar_one_or_none()
         if t is None:
+            raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+        # Corruption guard: the composite is clamped 0-100 at every write path,
+        # so score > 100 is a legacy pre-clamp ghost (e.g. MCW=104) that dropped
+        # out of the universe. Don't serve it as a real conviction page —
+        # consistent with public_top_tickers excluding score>100 from the sitemap.
+        if t.score is not None and t.score > 100:
             raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
         sq = (
             await session.execute(
@@ -228,10 +243,7 @@ async def ticker_detail(symbol: str) -> dict:
 
 
 @router.get("/{symbol}/ratings")
-async def ticker_ratings(
-    symbol: str,
-    user: User = Depends(current_user_required),
-) -> dict:
+async def ticker_ratings(symbol: str, request: Request) -> dict:
     """Analyst ratings consensus + recent events for a ticker — Premium-only.
 
     Trial users (auto-Premium for 14 days) and paid Premium subscribers see
@@ -245,7 +257,16 @@ async def ticker_ratings(
     same with an empty events list so the frontend renders a clean empty
     state.
     """
-    if not has_feature(Tier(user.tier), "ratings.analyst"):
+    # Resolve + tier-gate the user in a SHORT-LIVED session that is released
+    # BEFORE the upstream Benzinga call. Holding a pooled DB connection across
+    # the multi-second upstream is what exhausted the pool and downed the API on
+    # 2026-06-01 — the same anti-pattern the ticker_detail rev2 fix removed for
+    # the news fetch. The auth read is sub-ms; the connection must not stay
+    # pinned for the duration of the upstream request. See app/db.py.
+    async with SessionLocal() as session:
+        user = await current_user_required(request, session)
+        allowed = has_feature(Tier(user.tier), "ratings.analyst")
+    if not allowed:
         raise HTTPException(403, "Analyst consensus requires Premium tier")
     return await fetch_analyst_ratings(symbol.upper())
 
@@ -274,8 +295,8 @@ async def ticker_financials(symbol: str) -> dict:
 @router.get("/{symbol}/insider")
 async def ticker_insider(
     symbol: str,
+    request: Request,
     days_back: int = 90,
-    user: User = Depends(current_user_required),
 ) -> dict:
     """Recent Form 4 insider transactions for a ticker — Premium only.
 
@@ -292,7 +313,13 @@ async def ticker_insider(
 
     Cached 24h at the adapter layer (per-symbol).
     """
-    if not has_feature(Tier(user.tier), "insider.form4"):
+    # Short-lived session, released BEFORE the upstream Finnhub call (see the
+    # ticker_ratings note + app/db.py — avoids pinning a pooled connection
+    # across the multi-second upstream, which exhausted the pool on 2026-06-01).
+    async with SessionLocal() as session:
+        user = await current_user_required(request, session)
+        allowed = has_feature(Tier(user.tier), "insider.form4")
+    if not allowed:
         raise HTTPException(403, "Insider transactions require Premium tier")
 
     sym = symbol.upper()
