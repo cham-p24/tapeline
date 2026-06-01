@@ -49,6 +49,7 @@ identical definition of "a row a user may see". Usage::
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import cast
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,8 +82,12 @@ _FACTOR_COLUMNS = (
 )
 
 # SQL expression: count of non-NULL sub-factors for a row (0..6).
-_FACTOR_COUNT = sum(
-    case((col.isnot(None), 1), else_=0) for col in _FACTOR_COLUMNS
+# cast: Python's builtin sum() is typed -> int, but SQLAlchemy's __radd__ builds
+# a column expression at runtime; tell mypy the truth so `>= MIN_FACTORS` reads
+# as ColumnElement[bool] (not bool) for valid_composite_clauses()'s return type.
+_FACTOR_COUNT = cast(
+    "ColumnElement[int]",
+    sum(case((col.isnot(None), 1), else_=0) for col in _FACTOR_COLUMNS),
 )
 
 

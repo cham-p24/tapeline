@@ -16,7 +16,7 @@ from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, get_session, is_sqlite
-from app.models import NewsItem, SqueezeSetup, Ticker, User
+from app.models import NewsItem, SqueezeSetup, Ticker
 from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions

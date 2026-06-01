@@ -46,10 +46,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models import Ticker
 from app.services.score import compute_tapeline_composite
+
 # Symbol-shape validation is shared with the serving layer (routers.ticker),
 # so the canonical implementation lives in app.services.symbols. Re-exported
 # under the original private name for the four tab parsers below + the tests.
-from app.services.symbols import clean_symbol as _clean_symbol  # noqa: F401
+from app.services.symbols import clean_symbol as _clean_symbol
 
 logger = logging.getLogger(__name__)
 
