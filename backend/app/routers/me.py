@@ -41,7 +41,7 @@ async def me(
     # Dunning banner state. Only paid tiers can be past_due (a failed renewal
     # keeps the customer on their tier during the Stripe retry grace window),
     # so free/anonymous skip the subscriptions lookup on this hot endpoint.
-    billing = {"past_due": False}
+    billing: dict[str, bool | str] = {"past_due": False}
     if user.tier != "free":
         sub_row = await session.execute(
             select(Subscription)
