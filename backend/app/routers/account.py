@@ -11,7 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import AlertEvent, AlertRule, Subscription, User, WatchlistItem
+from app.models import AlertEvent, AlertRule, ApiKey, Subscription, User, WatchlistItem
 from app.services.auth import current_user_required
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ async def delete_my_account(
     await session.execute(delete(AlertRule).where(AlertRule.user_id == user_id))
     await session.execute(delete(WatchlistItem).where(WatchlistItem.user_id == user_id))
     await session.execute(delete(Subscription).where(Subscription.user_id == user_id))
+    await session.execute(delete(ApiKey).where(ApiKey.user_id == user_id))
     await session.execute(delete(User).where(User.id == user_id))
     await session.commit()
     logger.info("account.deleted user=%s", user_id)
