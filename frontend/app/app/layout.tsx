@@ -12,6 +12,7 @@ import { TrialEndedModal } from "@/components/TrialEndedModal";
 import { TrialEarlyCapture } from "@/components/TrialEarlyCapture";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
 import { DunningBanner } from "@/components/DunningBanner";
+import { UpgradeNudge } from "@/components/UpgradeNudge";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
@@ -117,6 +118,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <StaleDataBanner />
           <EmailVerificationBanner />
           <TrialBanner />
+          {/* Free→Pro nudge. Trialing users are on Premium → TrialBanner owns
+              their conversion moment; genuine Free users get this instead, so
+              the two never show together. Self-gating on /api/me.nudge. */}
+          <UpgradeNudge />
           <BreakingNewsBar />
           <OnboardingTip />
           {/* fade-in: 180ms opacity + 4px translateY on every route entry.
