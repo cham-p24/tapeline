@@ -196,6 +196,12 @@ class Subscription(Base):
     tier: Mapped[str] = mapped_column(String(20), nullable=False)
     current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     cancel_at_period_end: Mapped[bool] = mapped_column(default=False, nullable=False)
+    # "monthly" | "annual" — drives exact MRR/ARR in the admin revenue
+    # dashboard (services/tier.mrr_contribution). Nullable: rows synced before
+    # migration 0031 are NULL and treated as monthly until their next renewal
+    # webhook re-stamps them. Derived from the Stripe price's recurring.interval
+    # ("year" → annual, else monthly) in billing.subscription_payload.
+    billing_period: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

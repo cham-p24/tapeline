@@ -101,6 +101,7 @@ export default function AdminPage() {
       <p className="text-sm text-muted">Owner-only operational dashboard.</p>
 
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
+        <a href="/app/admin/revenue" className="link">Revenue &rarr;</a>
         <a href="/app/admin/email-preview" className="link">Email preview &rarr;</a>
         <a href="/app/inbox" className="link">Inbox auto-handler &rarr;</a>
       </div>
@@ -114,7 +115,7 @@ export default function AdminPage() {
           <Stat label="Trials active" value={String(stats.trials_active)} tone="accent" />
           <Stat label="Trials end ≤7d" value={String(stats.trials_expiring_7d)} tone={stats.trials_expiring_7d > 0 ? "warn" : undefined} />
           <Stat label="Alerts sent" value={String(stats.alerts_delivered)} />
-          <Stat label="MRR (est)" value={`$${stats.mrr_usd}`} tone="up" />
+          <Stat label="MRR" value={`$${stats.mrr_usd.toLocaleString()}`} tone="up" />
         </div>
       )}
 

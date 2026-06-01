@@ -282,10 +282,12 @@ def parse_webhook(payload: bytes, signature: str) -> stripe.Event:
 def subscription_payload(sub: Any) -> dict[str, Any]:
     """Extract the fields we persist from a Stripe subscription object."""
     item = sub["items"]["data"][0]
+    interval = (item["price"].get("recurring") or {}).get("interval", "month")
     return {
         "id": sub["id"],
         "status": sub["status"],
         "tier": _tier_from_price(item["price"]["id"]),
         "current_period_end": datetime.fromtimestamp(sub["current_period_end"], UTC),
         "cancel_at_period_end": bool(sub.get("cancel_at_period_end", False)),
+        "billing_period": "annual" if interval == "year" else "monthly",
     }
