@@ -287,6 +287,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_founder_touch_email,
         render_password_reset_email,
         render_payment_failed_email,
+        render_payment_recovered_email,
         render_re_engagement_email,
         render_referral_milestone_email,
         render_referral_referee_email,
@@ -399,6 +400,14 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "payment_failed_third": (
             "Payment failed · 3rd attempt (urgent)",
             lambda: render_payment_failed_email("Alex", "premium", 3),
+        ),
+        "payment_failed_final": (
+            "Payment failed · final attempt (last chance)",
+            lambda: render_payment_failed_email("Alex", "premium", 4, final_attempt=True),
+        ),
+        "payment_recovered": (
+            "Payment recovered · dunning all-clear",
+            lambda: render_payment_recovered_email("Alex", tier="premium"),
         ),
         # Alerts + digest
         "alert_rule": (

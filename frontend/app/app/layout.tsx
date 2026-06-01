@@ -11,6 +11,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { TrialEndedModal } from "@/components/TrialEndedModal";
 import { TrialEarlyCapture } from "@/components/TrialEarlyCapture";
 import { StaleDataBanner } from "@/components/StaleDataBanner";
+import { DunningBanner } from "@/components/DunningBanner";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
@@ -112,6 +113,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <GlobalSearch />
 
         <div className="mx-auto max-w-7xl px-6 py-6">
+          <DunningBanner />
           <StaleDataBanner />
           <EmailVerificationBanner />
           <TrialBanner />

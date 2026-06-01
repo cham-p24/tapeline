@@ -8,12 +8,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import TelegramLinkToken, User
+from app.models import Subscription, TelegramLinkToken, User
 from app.services.auth import current_user_optional, current_user_required
 from app.services.tier import FEATURES, Tier, effective_limit, has_feature, is_on_trial, limit
 
@@ -22,7 +22,10 @@ router = APIRouter()
 
 
 @router.get("")
-async def me(user: User | None = Depends(current_user_optional)) -> dict:
+async def me(
+    user: User | None = Depends(current_user_optional),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
     if user is None:
         return {
             "authenticated": False,
@@ -35,6 +38,20 @@ async def me(user: User | None = Depends(current_user_optional)) -> dict:
         }
     tier = Tier(user.tier)
     on_trial = is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
+    # Dunning banner state. Only paid tiers can be past_due (a failed renewal
+    # keeps the customer on their tier during the Stripe retry grace window),
+    # so free/anonymous skip the subscriptions lookup on this hot endpoint.
+    billing = {"past_due": False}
+    if user.tier != "free":
+        sub_row = await session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == user.id)
+            .order_by(Subscription.current_period_end.desc())
+            .limit(1)
+        )
+        sub = sub_row.scalar_one_or_none()
+        if sub is not None and sub.status in ("past_due", "unpaid"):
+            billing = {"past_due": True, "status": sub.status}
     return {
         "authenticated": True,
         "id": user.id,
@@ -42,6 +59,7 @@ async def me(user: User | None = Depends(current_user_optional)) -> dict:
         "name": user.name,
         "tier": user.tier,
         "on_trial": on_trial,
+        "billing": billing,
         "telegram_chat_id": user.telegram_chat_id,
         "features": {f: has_feature(tier, f) for f in FEATURES},
         # effective_limit applies trial-state throttling for the abuse-attractive
