@@ -19,6 +19,11 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "../sectors";
 
+// Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
+// `revalidate: 300` below and the "5-minute snapshot" contract, and keeps this
+// route off the build-time critical path (see generateStaticParams).
+export const revalidate = 300;
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
@@ -44,10 +49,10 @@ async function fetchSectorTickers(apiSector: string): Promise<ScannerRow[]> {
     }).toString()}`;
     const res = await fetch(url, {
       next: { revalidate: 300 },
-      // Bound the build-time fetch so a degraded backend can't hang the
-      // per-page build budget and fail the whole deploy. On timeout we fall
-      // through to the [] fallback and the page renders fast; ISR refills the
-      // data within `revalidate` once the backend recovers.
+      // Bound the fetch so a degraded backend can't hang the on-demand render
+      // (this page is ISR, not build-time — see generateStaticParams). On
+      // timeout we fall through to the [] fallback and render fast; ISR refills
+      // the data within `revalidate` once the backend recovers.
       signal: AbortSignal.timeout(7000),
     });
     if (!res.ok) return [];
@@ -58,8 +63,12 @@ async function fetchSectorTickers(apiSector: string): Promise<ScannerRow[]> {
   }
 }
 
-export function generateStaticParams() {
-  return SECTORS.map((s) => ({ sector: s.slug }));
+// Deliberately NOT pre-rendered at build time — render on-demand (ISR) so a
+// degraded backend can't blow the per-page build budget or get hammered by the
+// build-time fetch fan-out. Discovery is unaffected: every /sector/{slug} URL is
+// emitted in app/sitemap.ts. Mirrors /best-stocks-for, /blog/ticker, /t/[symbol].
+export function generateStaticParams(): { sector: string }[] {
+  return [];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ sector: string }> }) {
