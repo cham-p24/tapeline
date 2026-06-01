@@ -19,7 +19,7 @@
  * re-emit the /t/[symbol] score card (zero JSX duplication, no drift). The
  * route-segment config is declared locally (Next analyses it in the route
  * file itself). The PNG inherits X-Robots-Tag: noindex from the existing
- * next.config.js /:path*/opengraph-image header rule. Card corner shows
+ * next.config.js opengraph-image header rule. Card corner shows
  * tapeline.io/t/{SYM} — fine, the canonical page for the same symbol.
  *
  * (A bespoke track-record card — hit rate / median alpha — would be more
