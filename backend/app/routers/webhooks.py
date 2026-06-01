@@ -133,6 +133,7 @@ async def stripe_webhook(
             existing.tier = p["tier"]
             existing.current_period_end = p["current_period_end"]
             existing.cancel_at_period_end = p["cancel_at_period_end"]
+            existing.billing_period = p["billing_period"]
         else:
             session.add(Subscription(user_id=user.id, **p))
 
@@ -205,15 +206,15 @@ async def stripe_webhook(
                     render_subscription_started_email,
                     send_email,
                 )
-                # Pull amount + billing period inline from the Stripe payload.
-                # subscription_payload() doesn't capture them — they're only
-                # needed for the receipt line in the email, not the DB row.
+                # Pull amount + currency inline for the receipt line — these
+                # aren't persisted on the Subscription row, so subscription_
+                # payload() doesn't capture them. billing_period it does, so
+                # reuse p["billing_period"] rather than re-deriving the interval.
                 item = obj.get("items", {}).get("data", [{}])[0]
                 price = item.get("price", {}) or {}
                 amount_cents = price.get("unit_amount") or None
                 currency = (price.get("currency") or "usd").lower()
-                interval = (price.get("recurring") or {}).get("interval", "month")
-                billing_period = "annual" if interval == "year" else "monthly"
+                billing_period = p["billing_period"]
                 next_charge_iso: str | None = None
                 try:
                     from datetime import UTC, datetime

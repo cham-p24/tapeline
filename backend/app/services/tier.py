@@ -120,6 +120,51 @@ def limit(user_tier: Tier | str, key: str) -> int:
     return TIER_LIMITS[actual].get(key, 0)
 
 
+# ---- Pricing (canonical $ source-of-truth for revenue math) -----------------
+#
+# Sticker prices, charm-priced, kept here so the admin revenue dashboard can
+# compute MRR/ARR off ONE map rather than re-deriving from Stripe price IDs
+# (which aren't available at aggregate-query time). Hand-synced with
+# frontend/components/PricingTable.tsx + docs/PRICING.md — there's no build
+# check, so change all three together.
+#
+# TIER_PRICES = the amount actually charged per billing cycle (what hits the
+# card): ("pro","monthly") bills $29.99/mo; ("pro","annual") bills $299.99 once
+# a year.
+TIER_PRICES: dict[tuple[str, str], float] = {
+    ("pro", "monthly"): 29.99,
+    ("pro", "annual"): 299.99,
+    ("premium", "monthly"): 49.99,
+    ("premium", "annual"): 479.99,
+}
+
+# Per-recognized-month revenue (what an accountant books each month). Annual
+# uses the advertised monthly-equivalent rate we show on the pricing toggle
+# ($24.99 / $39.99), NOT lump/12 ($24.999.. / $39.999..) — this keeps the
+# dashboard's MRR aligned with the pricing page with zero rounding drift.
+_MRR_CONTRIBUTION: dict[tuple[str, str], float] = {
+    ("pro", "monthly"): 29.99,
+    ("pro", "annual"): 24.99,
+    ("premium", "monthly"): 49.99,
+    ("premium", "annual"): 39.99,
+}
+
+
+def mrr_contribution(user_tier: str | None, billing_period: str | None) -> float:
+    """Monthly-recurring-revenue contribution of one active subscription.
+
+    Unknown tier (e.g. a stray "free" Subscription row) → 0.0. Null /
+    unrecognised billing_period falls back to "monthly" — most subscribers are
+    monthly, and the few legacy rows synced before the column existed re-stamp
+    to their real rate on the next renewal webhook.
+    """
+    tier = (user_tier or "").lower()
+    period = (billing_period or "monthly").lower()
+    if period not in ("monthly", "annual"):
+        period = "monthly"
+    return _MRR_CONTRIBUTION.get((tier, period), 0.0)
+
+
 # ---- Trial-aware throttling -------------------------------------------------
 #
 # A user is "on trial" when their tier was auto-elevated to PREMIUM at signup

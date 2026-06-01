@@ -13,7 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import AlertEvent, DailyScorecardEntry, Subscription, User
+from app.models import (
+    AlertEvent,
+    DailyScorecardEntry,
+    StripeWebhookEvent,
+    Subscription,
+    User,
+)
+from app.services.tier import mrr_contribution
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -223,29 +230,21 @@ async def platform_stats(
         )
     )).scalar() or 0
 
-    # MRR — only count subscriptions in Stripe's "active" state. Excludes:
+    # MRR — exact, off the canonical price map (services/tier.mrr_contribution)
+    # now that Subscription.billing_period (migration 0031) distinguishes a
+    # $29.99 monthly Pro from a $24.99/mo annual Pro. Only "active" subs count:
     #   - trialing (no card on file, will likely churn to free at trial end)
     #   - past_due / unpaid / canceled (also $0 in the bank)
-    # When Subscription.tier is missing (very early launch with no Stripe sync
-    # yet), falls back to 0 — better than overstating MRR before any actual
-    # revenue exists.
-    paying_pro = (await session.execute(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.status == "active",
-            Subscription.tier == "pro",
-        )
-    )).scalar() or 0
-    paying_premium = (await session.execute(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.status == "active",
-            Subscription.tier == "premium",
-        )
-    )).scalar() or 0
-    # NOTE: monthly-rate approximation. Annual subscribers contribute $24.92 /
-    # $39.92 per recognized month; we'd need billing_period on the Subscription
-    # row (or a Stripe per-row lookup) to disambiguate. Acceptable approximation
-    # until annual subscriber count is non-trivial.
-    mrr_usd = paying_pro * 29 + paying_premium * 49
+    # are all excluded. Legacy rows with NULL billing_period fall back to the
+    # monthly rate inside mrr_contribution and self-heal on their next renewal.
+    paying_rows = (await session.execute(
+        select(Subscription.tier, Subscription.billing_period, func.count().label("n"))
+        .where(Subscription.status == "active")
+        .group_by(Subscription.tier, Subscription.billing_period)
+    )).all()
+    mrr_usd = round(sum(mrr_contribution(t, p) * n for t, p, n in paying_rows), 2)
+    paying_pro = sum(n for t, _p, n in paying_rows if t == "pro")
+    paying_premium = sum(n for t, _p, n in paying_rows if t == "premium")
 
     return {
         "users_total": users_total,
@@ -260,6 +259,152 @@ async def platform_stats(
         "paying_pro": paying_pro,
         "paying_premium": paying_premium,
         "mrr_usd": mrr_usd,
+    }
+
+
+@router.get("/revenue")
+async def revenue_dashboard(
+    _: None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Founder revenue deep-dive — admin only.
+
+    Exact MRR/ARR (per tier x period, not the monthly-rate shortcut the /stats
+    card historically used), the subscription book sliced by tier/period/status,
+    the signup->paid funnel, churn + cancellation reasons, retention-save
+    uptake, dunning load, in-flight checkouts, the referral ledger, lifecycle-
+    drip reach, and lifetime webhook volume. One screen showing where revenue
+    is and where it leaks.
+    """
+    now = datetime.now(UTC)
+
+    # ── Subscription book — single scan, bucketed in Python ───────────────
+    sub_rows = (await session.execute(
+        select(
+            Subscription.tier,
+            Subscription.billing_period,
+            Subscription.status,
+            func.count().label("n"),
+        ).group_by(Subscription.tier, Subscription.billing_period, Subscription.status)
+    )).all()
+
+    mrr = 0.0
+    subs_by_tier: dict[str, int] = {}
+    subs_by_period: dict[str, int] = {}
+    subs_by_status: dict[str, int] = {}
+    active_subscriptions = 0
+    for tier, period, status, n in sub_rows:
+        subs_by_status[status] = subs_by_status.get(status, 0) + n
+        # tier / period breakdowns are revenue-facing → active subs only.
+        if status == "active":
+            active_subscriptions += n
+            subs_by_tier[tier] = subs_by_tier.get(tier, 0) + n
+            subs_by_period[period or "monthly"] = subs_by_period.get(period or "monthly", 0) + n
+            mrr += mrr_contribution(tier, period) * n
+    mrr_usd = round(mrr, 2)
+    arr_usd = round(mrr * 12, 2)
+
+    # ── Funnel — every signup auto-starts a trial, so signup->paid IS the
+    # trial->paid rate. paid_customers = anyone who reached Stripe billing. ─
+    users_total = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
+    trials_active = (await session.execute(
+        select(func.count()).select_from(User).where(
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at >= now,
+            User.tier.in_(["pro", "premium"]),
+            User.stripe_customer_id.is_(None),
+        )
+    )).scalar() or 0
+    paid_customers = (await session.execute(
+        select(func.count()).select_from(User).where(User.stripe_customer_id.isnot(None))
+    )).scalar() or 0
+
+    # ── Churn / cancellation ──────────────────────────────────────────────
+    cancellations_scheduled = (await session.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.cancel_at_period_end.is_(True),
+            Subscription.status == "active",
+        )
+    )).scalar() or 0
+    reason_rows = (await session.execute(
+        select(User.cancellation_reason, func.count().label("n"))
+        .where(User.cancellation_reason.isnot(None))
+        .group_by(User.cancellation_reason)
+    )).all()
+    cancellation_reasons: dict[str, int] = {row[0]: row[1] for row in reason_rows}
+
+    # ── Retention saves ───────────────────────────────────────────────────
+    save_offers_redeemed = (await session.execute(
+        select(func.count()).select_from(User).where(User.save_offer_redeemed_at.isnot(None))
+    )).scalar() or 0
+    subscriptions_paused = (await session.execute(
+        select(func.count()).select_from(User).where(
+            User.subscription_paused_until.isnot(None),
+            User.subscription_paused_until >= now,
+        )
+    )).scalar() or 0
+
+    # ── Dunning load — drip_state carries dun1/dun2/dun3; one LIKE catches
+    # all three. past_due is the Stripe-side mirror of the same population. ─
+    in_dunning = (await session.execute(
+        select(func.count()).select_from(User).where(User.drip_state.like("%dun%"))
+    )).scalar() or 0
+
+    # ── In-flight checkouts (PR6 lever's live recovery population) ─────────
+    checkouts_in_flight = (await session.execute(
+        select(func.count()).select_from(User).where(User.checkout_started_at.isnot(None))
+    )).scalar() or 0
+
+    # ── Referral ledger ───────────────────────────────────────────────────
+    referred_users = (await session.execute(
+        select(func.count()).select_from(User).where(User.referred_by.isnot(None))
+    )).scalar() or 0
+    referral_credits_outstanding = (await session.execute(
+        select(func.coalesce(func.sum(User.referral_credit_months), 0)).select_from(User)
+    )).scalar() or 0
+
+    # ── Lifecycle-drip reach — how many users each automated lever has
+    # touched (token presence in drip_state / winback_state). One COUNT per
+    # token; admin-only + low QPS, so the simple loop beats a CASE pivot. ──
+    drip_reach: dict[str, int] = {}
+    for tok in ("abandon1", "re14", "annual_p", "ref_m3", "ref_m5", "ref_m10", "ref_m25"):
+        drip_reach[tok] = (await session.execute(
+            select(func.count()).select_from(User).where(User.drip_state.like(f"%{tok}%"))
+        )).scalar() or 0
+    for tok in ("wb30", "wb60", "wb90"):
+        drip_reach[tok] = (await session.execute(
+            select(func.count()).select_from(User).where(User.winback_state.like(f"%{tok}%"))
+        )).scalar() or 0
+
+    # ── Lifetime Stripe webhook volume, by event type ─────────────────────
+    webhook_rows = (await session.execute(
+        select(StripeWebhookEvent.event_type, func.count().label("n"))
+        .group_by(StripeWebhookEvent.event_type)
+    )).all()
+    webhook_events: dict[str, int] = {row[0]: row[1] for row in webhook_rows}
+
+    return {
+        "mrr_usd": mrr_usd,
+        "arr_usd": arr_usd,
+        "active_subscriptions": active_subscriptions,
+        "subs_by_tier": subs_by_tier,
+        "subs_by_period": subs_by_period,
+        "subs_by_status": subs_by_status,
+        "users_total": users_total,
+        "trials_active": trials_active,
+        "paid_customers": paid_customers,
+        "signup_to_paid_pct": round(paid_customers / users_total * 100, 1) if users_total else 0.0,
+        "cancellations_scheduled": cancellations_scheduled,
+        "cancellation_reasons": cancellation_reasons,
+        "save_offers_redeemed": save_offers_redeemed,
+        "subscriptions_paused": subscriptions_paused,
+        "in_dunning": in_dunning,
+        "checkouts_in_flight": checkouts_in_flight,
+        "referred_users": referred_users,
+        "referral_credits_outstanding": referral_credits_outstanding,
+        "drip_reach": drip_reach,
+        "webhook_events": webhook_events,
+        "generated_at": now.isoformat(),
     }
 
 
