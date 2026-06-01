@@ -841,7 +841,17 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             14-day Premium trial unlocks the full ~2,500-ticker live universe, smart alerts, congressional trades, and recent insider buys (SEC Form 4).
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href={`/signup?next=${encodeURIComponent(`/app/ticker/${sym}`)}`} className="btn-accent">
+            {/* rel=nofollow: every public /t/{SYMBOL} page emits this CTA with a
+                unique ?next=/app/ticker/{SYMBOL} query string. Google was crawling
+                ~1000 param variants of the same /signup page and parking them in
+                "Crawled - currently not indexed". nofollow stops the crawl spend;
+                the self-canonical in app/signup/layout.tsx consolidates any already
+                discovered. Params still drive runtime behaviour (useSearchParams). */}
+            <Link
+              href={`/signup?next=${encodeURIComponent(`/app/ticker/${sym}`)}`}
+              className="btn-accent"
+              rel="nofollow"
+            >
               Try Premium free for 14 days →
             </Link>
             <Link href="/scorecard" className="btn-ghost">

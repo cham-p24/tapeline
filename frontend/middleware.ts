@@ -52,11 +52,13 @@ function localeForCountry(country: string | undefined): string {
 }
 
 export function middleware(request: NextRequest) {
-  // Ticker route handling — two responsibilities (see handleTickerRoute):
+  // Ticker route handling — three responsibilities (see handleTickerRoute):
+  //   - Redirect bare /t and /t/ (no symbol) → 308 → /signals so the
+  //     symbol-less root resolves instead of hard-404'ing
   //   - Case-normalize lowercase backlinks like /t/aapl → 308 → /t/AAPL
   //   - Redirect non-ticker /t/* URLs (template placeholders, garbage)
   //     to /search?q=<raw> instead of letting them 404
-  // Either of these returns early so auth+locale don't run on the redirect.
+  // Any of these returns early so auth+locale don't run on the redirect.
   const tickerHandled = handleTickerRoute(request);
   if (tickerHandled) return tickerHandled;
 
@@ -121,6 +123,17 @@ const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
 
 function handleTickerRoute(request: NextRequest): NextResponse | null {
   const pathname = request.nextUrl.pathname;
+
+  // Bare ticker-section root — /t and /t/ carry no symbol, so the [symbol]
+  // dynamic route can't match and Next serves a hard 404. GSC logged /t in
+  // its "Not found (404)" bucket. Redirect to the public signals universe so
+  // the URL resolves (308 → 200) and the 404 clears on Validate Fix.
+  // Exact-match ONLY: /scorecard and /blog/ticker are real index pages served
+  // by their own route files and must never be caught here.
+  if (pathname === "/t" || pathname === "/t/") {
+    return NextResponse.redirect(new URL("/signals", request.url), 308);
+  }
+
   const m = TICKER_PREFIX_RE.exec(pathname);
   if (!m) return null;
   const [, prefix, raw] = m;
