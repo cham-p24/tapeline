@@ -104,3 +104,25 @@ jobs:
         # release_command runs `alembic upgrade head` before the new release
         # goes live, so migrations ship with the code automatically.
         run: flyctl deploy --remote-only --config fly.toml
+
+      - name: Post-deploy smoke check
+        if: steps.gate.outputs.ready == 'true'
+        # Fail the deploy if prod isn't actually healthy after the release, so a
+        # bad ship surfaces here instead of silently serving 5xx/404. Retries
+        # cover the brief post-restart universe-warming window. Public endpoints
+        # only — no secrets needed.
+        run: |
+          base="https://api.tapeline.io"
+          code=000
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$base/api/status" || echo 000)
+            [ "$code" = "200" ] && break
+            echo "status attempt $i: $code — retrying in 10s"; sleep 10
+          done
+          [ "$code" = "200" ] || { echo "::error title=Smoke check failed::/api/status returned $code after deploy"; exit 1; }
+          # 401 = the public API router is mounted and key-gated (i.e. live).
+          # 404 would mean the build shipped without the api_v1 routes (the
+          # exact regression the clobbered v128/v129 deploys caused).
+          v1=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$base/api/v1/signals" || echo 000)
+          [ "$v1" = "401" ] || { echo "::error title=Smoke check failed::/api/v1/signals returned $v1 (expected 401 = live + key-gated)"; exit 1; }
+          echo "✅ Post-deploy smoke check passed (status 200, /api/v1 mounted + gated)."
