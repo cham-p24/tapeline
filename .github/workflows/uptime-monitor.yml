@@ -1,0 +1,46 @@
+name: Prod uptime + perf monitor
+
+# Self-monitoring so production runs UNWATCHED: every 6 hours this probes the
+# live site + API and FAILS LOUDLY (a failed run emails the repo owner) if
+# anything is down or the heavy public endpoint is slow. That last check is
+# deliberate — it catches the connection-saturation/regression class that took
+# /api/public/signals from 0.4s to >70s once. No repo checkout (just curls
+# public URLs), so it's cheap and has zero action-version deprecation surface.
+#
+# Cadence is conservative (every 6h ≈ 120 Actions-minutes/month) to stay well
+# under the private-repo free tier alongside CI + deploy workflows. Tighten the
+# cron if you want faster detection, or point a free external monitor
+# (UptimeRobot etc.) at the same URLs for sub-minute checks without CI minutes.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    name: Probe production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check live site + API
+        run: |
+          fail=0
+          # check <url> <expected_code> <max_seconds> — one retry to absorb a blip
+          check() {
+            for attempt in 1 2; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$3" "$1" || echo "000")
+              if [ "$code" = "$2" ]; then echo "ok    $1 -> $code"; return 0; fi
+              echo "retry $1 -> $code (attempt $attempt, expected $2)"; sleep 5
+            done
+            echo "::error title=Uptime check failed::$1 returned $code (expected $2)"
+            fail=1
+          }
+          check "https://tapeline.io/"                                  200 20
+          check "https://tapeline.io/signals"                           200 20
+          check "https://tapeline.io/scorecard"                         200 20
+          check "https://tapeline.io/t/AAPL/opengraph-image"            200 20
+          check "https://api.tapeline.io/api/health"                    200 20
+          # Heavy public endpoint must return 200 within 20s (catches saturation).
+          check "https://api.tapeline.io/api/public/signals?limit=2000" 200 20
+          if [ "$fail" -ne 0 ]; then echo "PRODUCTION CHECK FAILED"; exit 1; fi
+          echo "All production checks passed."
