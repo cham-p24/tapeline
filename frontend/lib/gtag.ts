@@ -52,8 +52,10 @@ export type TapelineEvent =
   | "open_scanner";        // Open /app/scanner
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
-// overrides; mirrors the hardcoded GA4 default in app/layout.tsx. Conversion
-// forwarding stays a no-op until the matching *_LABEL below is also set.
+// overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up
+// conversion label is now live (see ADS_CONVERSION_LABEL below), so signups
+// forward as conversions; trial/subscribe forwarding stays a no-op until their
+// labels are set too.
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
 
 /**
@@ -66,7 +68,17 @@ const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
  * gets the event regardless.
  */
 const ADS_CONVERSION_LABEL: Partial<Record<TapelineEvent, string>> = {
-  sign_up: process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL || "",
+  // sign_up label is LIVE: the "Sign-up" conversion action (Manual event,
+  // Primary, count=One) created in Google Ads account 271-638-2397 on
+  // 2026-06-05. The label is not a secret — it ships in client-side JS by
+  // design (it's only meaningful paired with the public AW-ID). Hardcoded as
+  // the default, mirroring GOOGLE_ADS_ID above, so signups count as
+  // conversions from signup #1 with no Vercel env var required. Env still
+  // overrides if ever needed.
+  sign_up: process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL || "PLnpCJvM8LgcELTRhthD",
+  // start_trial + subscribe conversion actions not created yet — these stay
+  // no-op (GA4 still gets the events) until their actions exist in Ads and
+  // their labels are filled in here the same way.
   start_trial: process.env.NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL || "",
   subscribe: process.env.NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL || "",
 };

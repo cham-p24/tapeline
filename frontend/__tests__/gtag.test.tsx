@@ -48,6 +48,22 @@ describe("trackEvent → Google Ads conversion forwarding", () => {
     });
   });
 
+  it("forwards sign_up using the hardcoded production default label when the label env is unset", async () => {
+    // Pin the id deterministically; intentionally do NOT stub the label env so
+    // the hardcoded default in lib/gtag.ts is exercised. This guards the live
+    // Google Ads "Sign-up" conversion label — a typo there = signups silently
+    // stop counting as conversions and Smart Bidding goes blind.
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_ID", "AW-18169833652");
+    const gtag = installGtag();
+    const { trackEvent } = await import("@/lib/gtag");
+
+    trackEvent("sign_up", { method: "email" });
+
+    expect(gtag).toHaveBeenCalledWith("event", "conversion", {
+      send_to: "AW-18169833652/PLnpCJvM8LgcELTRhthD",
+    });
+  });
+
   it("fires NO Ads conversion when the Ads id is unset (GA4 event still fires)", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_ID", "");
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL", "");
