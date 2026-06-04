@@ -285,3 +285,18 @@ async def test_downgraded_owner_loses_api_access(client, monkeypatch):
         await _set_tier(uid, "free", paying=False)
         r = await client.get("/api/v1/me", headers={"X-API-Key": raw})
         assert r.status_code == 403, r.text
+
+
+def test_ticker_dict_clamps_score_to_public_0_100_contract():
+    """The /api/v1 score field is documented 0-100. The composite already
+    clamps at write (services/score.py), but a stale pre-clamp row — the
+    signal-system has published 131-133 — must not leak >100 through the
+    public API. _ticker_dict guards the contract boundary."""
+    from app.models import Ticker
+    from app.routers.api_v1 import _ticker_dict
+
+    assert _ticker_dict(Ticker(symbol="APLS", name="Apellis", score=131.0))["score"] == 100.0
+    assert _ticker_dict(Ticker(symbol="ZZZ", name="Z", score=-5.0))["score"] == 0.0
+    assert _ticker_dict(Ticker(symbol="NUL", name="N", score=None))["score"] is None
+    # In-range scores pass through unchanged.
+    assert _ticker_dict(Ticker(symbol="OK", name="Ok", score=72.4))["score"] == 72.4

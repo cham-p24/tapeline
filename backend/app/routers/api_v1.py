@@ -41,7 +41,11 @@ def _ticker_dict(r: Ticker) -> dict:
         "name": r.name,
         "sector": r.sector,
         "asset_class": r.asset_class,
-        "score": r.score,
+        # Defensively clamp to the documented 0-100 public contract. The
+        # composite already clamps at write (services/score.py), but a stale
+        # pre-clamp row (the signal-system has published 131-133) shouldn't
+        # leak >100 through the public API — guard at the contract boundary.
+        "score": None if r.score is None else max(0.0, min(100.0, r.score)),
         "signal": r.signal,
         "price": r.price,
         "change_pct_1d": r.change_pct_1d,
