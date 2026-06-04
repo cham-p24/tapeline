@@ -30,18 +30,25 @@ deliberate. Ranked by leverage:
    Until set, the deploy workflow runs green but skips (backend stays manual:
    `fly deploy` from `C:\Project 1`).
 
-2. **Finish ad conversion tracking** — the Google Ads *tag* is already live
-   (`AW-18169833652`, hardcoded default in `app/layout.tsx`), so the "missing
-   Google tag" warning is cleared. To make signups *count as conversions*:
-   - In Google Ads, open the "Sign-up" conversion action → copy its **label**.
-   - In Vercel, set `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL` to that label → redeploy.
-   - `lib/gtag.ts` then fires `gtag('event','conversion', {send_to:'AW-18169833652/<label>'})`
-     on every signup automatically.
-   - Note: the GA4-*import* route can't be used yet — pre-launch, no `sign_up`
-     events have occurred for Ads to import. The tag route above works from
-     signup #1, which is why it's the right one for now.
+2. **Complete Google Ads advertiser identity verification** — by **2026-07-04**,
+   or Google pauses/limits the live search campaign ("Tapeline - Search Test",
+   A$21.24/day, already spending — 740 impr / 30 clicks / A$58 as of 2026-06-05).
+   Requires the founder's ID / business docs in the Ads account, so it's an
+   identity action — operator-only. This is the near-term risk to ad spend now
+   that conversion tracking is wired.
 
 3. **Rotate the leaked PostHog `phx_…` key** — PostHog dashboard (your login).
+
+### ✅ Done since first draft
+- **Ad conversion tracking is live.** The "Sign-up" conversion action (Manual
+  event, Primary, count=One, value A$1, data-driven attribution; enhanced
+  conversions deliberately OFF) is created in Google Ads, and its label
+  (`PLnpCJvM8LgcELTRhthD`) is hardcoded in `lib/gtag.ts` (PR #266) and verified
+  live in the production bundle. Signups now count as conversions from signup
+  #1 — **no Vercel env var needed**. The label is not a secret (it ships in
+  client-side JS by design, only meaningful paired with the public AW-ID). The
+  GA4-*import* route stays unusable pre-launch (no `sign_up` events to import);
+  the tag/label route works from signup #1, which is why it was the right one.
 
 ## Why these specific things stay human
 - **Secrets / tokens** must be minted in the vendor dashboard by an
