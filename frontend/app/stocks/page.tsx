@@ -287,7 +287,7 @@ export default async function StocksDirectoryPage() {
             wired into the rest of the crawl graph rather than a dead end. */}
         <nav
           aria-label="Related pages"
-          className="mt-14 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-6 text-sm text-muted"
+          className="mt-14 flex flex-wrap gap-x-6 gap-y-2 pt-6 text-sm text-muted"
         >
           <Link href="/signals" className="hover:text-fg underline-offset-4 hover:underline">
             Live signals universe

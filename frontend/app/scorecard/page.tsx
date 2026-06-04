@@ -466,7 +466,7 @@ function BestDayCallout({ days }: { days: Record<string, ScorecardEntry[]> }) {
           </div>
         </div>
       </div>
-      <div className="border-t border-border/40 bg-panel/30 px-6 py-3 text-xs text-subtle sm:px-7">
+      <div className="bg-panel/30 px-6 py-3 text-xs text-subtle sm:px-7">
         The losing days are on the same page. Aggregate stats across all back-checked picks are directly below — published whether they help the pitch or hurt it.
       </div>
     </div>
