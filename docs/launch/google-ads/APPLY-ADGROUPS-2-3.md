@@ -1,5 +1,21 @@
 # Apply Ad Groups 2–3 + Negatives — Handoff
 
+> ## ✅ COMPLETED — applied and verified live 2026-06-06
+> Everything in this handoff is done; the steps below are kept for history only.
+> Verified directly in account 271-638-2397 on 2026-06-06:
+> - **Ad groups 2 & 3 are live + Eligible** — "Track Record" and "Best Stock
+>   Screener" are both present under the campaign (uploaded 2026-06-01 via
+>   `tapeline-adgroups-2-3-import.csv`, "16 successful"). "Best Stock Screener"
+>   is already pulling traffic (1,229 impr / 53 clicks / A$103.78 as of
+>   2026-06-06); "Track Record" is Eligible but low search volume (0 impr).
+> - **All 28 campaign Phrase negatives are live** (verified 28/28).
+> - RSAs were later improved via `tapeline-rsa-improved.csv` (2026-06-05).
+> - Conversion tracking is now also wired: **Sign-up** (PR #266) and
+>   **Subscribe** (PR #269) conversions are live and forwarding.
+>
+> **Do NOT re-import `tapeline-adgroups-2-3-import.csv`** — it would create
+> duplicate ad groups + keywords. Nothing in this file is still pending.
+
 **Status (2026-06-01):** Campaign **"Tapeline - Search Test (Jun 2026)"** (ID `23891985522`)
 is **LIVE / Enabled / Eligible**, bid strategy still **learning**, **A$0.00 spent**.
 It currently has **1 ad group** ("Ad group 1" = Finviz Alternative — complete RSA, keywords live).

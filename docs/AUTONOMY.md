@@ -49,6 +49,20 @@ deliberate. Ranked by leverage:
   client-side JS by design, only meaningful paired with the public AW-ID). The
   GA4-*import* route stays unusable pre-launch (no `sign_up` events to import);
   the tag/label route works from signup #1, which is why it was the right one.
+- **Subscribe (revenue) conversion is live.** The "Subscribe" conversion action
+  (Manual event, Primary, count=One, "use different values" so it reads the
+  per-tier price) is created in Google Ads; its label (`1GH_CIT50rkcELTRhthD`)
+  is hardcoded in `lib/gtag.ts`, and `/app/billing` fires it on Stripe
+  checkout-success with the tier's first-charge value in USD (PR #269, verified
+  live in prod). The campaign can now optimise toward paying customers, not just
+  signups. (`start_trial` is intentionally left unwired — it fires at the same
+  instant as `sign_up`, so a separate conversion would double-count.)
+- **Ad groups 2–3 + 28 campaign negatives confirmed already applied.** Verified
+  live in account 271-638-2397 on 2026-06-06 (the founder uploaded them
+  2026-06-01). The campaign has 3 ad groups (Finviz Alternative, Best Stock
+  Screener, Track Record) + 28 Phrase negatives. The
+  `docs/launch/google-ads/APPLY-ADGROUPS-2-3.md` handoff is therefore done —
+  do NOT re-import its CSV (would duplicate).
 
 ## Why these specific things stay human
 - **Secrets / tokens** must be minted in the vendor dashboard by an
