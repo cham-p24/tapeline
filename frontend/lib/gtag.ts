@@ -53,9 +53,9 @@ export type TapelineEvent =
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
 // overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up
-// conversion label is now live (see ADS_CONVERSION_LABEL below), so signups
-// forward as conversions; trial/subscribe forwarding stays a no-op until their
-// labels are set too.
+// and subscribe conversion labels are now live (see ADS_CONVERSION_LABEL
+// below), so signups + paid subscriptions forward as conversions; only
+// start_trial forwarding stays a no-op (deliberately — see note below).
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
 
 /**
@@ -76,11 +76,16 @@ const ADS_CONVERSION_LABEL: Partial<Record<TapelineEvent, string>> = {
   // conversions from signup #1 with no Vercel env var required. Env still
   // overrides if ever needed.
   sign_up: process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL || "PLnpCJvM8LgcELTRhthD",
-  // start_trial + subscribe conversion actions not created yet — these stay
-  // no-op (GA4 still gets the events) until their actions exist in Ads and
-  // their labels are filled in here the same way.
+  // subscribe label is LIVE: the "Subscribe" conversion action (Manual event,
+  // Primary, count=One, value="use different values" so it reads the per-tier
+  // first-charge price the checkout-success page passes) created in Google Ads
+  // account 271-638-2397 on 2026-06-06. Hardcoded default, like sign_up above.
+  subscribe: process.env.NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL || "1GH_CIT50rkcELTRhthD",
+  // start_trial is intentionally left unset: the 14-day trial auto-starts at
+  // signup, so trackEvent("start_trial") fires at the SAME instant as
+  // trackEvent("sign_up"). A separate Ads conversion would double-count the
+  // same click. GA4 still gets the start_trial event for funnel analysis.
   start_trial: process.env.NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL || "",
-  subscribe: process.env.NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL || "",
 };
 
 /**
@@ -101,7 +106,18 @@ export function trackEvent(
     // attributable to real signups/subscriptions in the Ads dashboard.
     const adsLabel = ADS_CONVERSION_LABEL[event];
     if (GOOGLE_ADS_ID && adsLabel) {
-      window.gtag("event", "conversion", { send_to: `${GOOGLE_ADS_ID}/${adsLabel}` });
+      const conversion: Record<string, unknown> = {
+        send_to: `${GOOGLE_ADS_ID}/${adsLabel}`,
+      };
+      // Pass a revenue value when the caller provides one (subscribe sends the
+      // tier's first-charge price + currency). The matching Ads conversion
+      // action must be set to "use different values" to read it. Value-less
+      // conversions (sign_up, set to a fixed value in Ads) just omit these.
+      if (typeof params?.value === "number") {
+        conversion.value = params.value;
+        if (typeof params.currency === "string") conversion.currency = params.currency;
+      }
+      window.gtag("event", "conversion", conversion);
     }
   } catch {
     // Analytics must never break the page.

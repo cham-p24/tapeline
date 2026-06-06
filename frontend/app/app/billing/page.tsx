@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/gtag";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
 import { ComparisonTable } from "@/components/ComparisonTable";
@@ -91,9 +92,21 @@ export default function BillingPage() {
     if (typeof window === "undefined") return;
     const qp = new URLSearchParams(window.location.search);
     if (qp.get("checkout") === "success") {
-      track("trial_converted", {
-        tier: qp.get("tier") || tier,
-        billing_period: qp.get("billing_period") || "annual",
+      const paidTier = qp.get("tier") || tier;
+      const period = qp.get("billing_period") || "annual";
+      track("trial_converted", { tier: paidTier, billing_period: period });
+      // GA4 + Google Ads "Subscribe" (revenue) conversion. Stripe's success_url
+      // brings the customer back here right after the first charge, so this is
+      // the correct client-side moment to fire it. Value = the tier's
+      // first-charge price (annual total or monthly) in USD — Stripe charges USD
+      // (see priceCurrency in lib/jsonld.ts). This lets Smart Bidding optimise
+      // the paid-search campaign toward paying customers, not just signups.
+      const meta = TIER_META[paidTier as keyof typeof TIER_META];
+      const value = meta ? (period === "annual" ? meta.annual : meta.monthly) : undefined;
+      trackEvent("subscribe", {
+        tier: paidTier,
+        billing_period: period,
+        ...(value ? { value, currency: "USD" } : {}),
       });
     }
     // Win-back landing — the day-90 cancellation email links here with

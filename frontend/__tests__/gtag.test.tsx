@@ -64,6 +64,51 @@ describe("trackEvent → Google Ads conversion forwarding", () => {
     });
   });
 
+  it("forwards subscribe with value + currency when the caller supplies them", async () => {
+    // subscribe carries a revenue value (the tier's first-charge price). The
+    // Ads "Subscribe" action is set to "use different values", so the snippet
+    // must include value + currency for value-based / ROAS bidding.
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_ID", "AW-123456789");
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL", "subLABEL");
+    const gtag = installGtag();
+    const { trackEvent } = await import("@/lib/gtag");
+
+    trackEvent("subscribe", {
+      tier: "pro",
+      billing_period: "annual",
+      value: 299.99,
+      currency: "USD",
+    });
+
+    expect(gtag).toHaveBeenCalledWith("event", "conversion", {
+      send_to: "AW-123456789/subLABEL",
+      value: 299.99,
+      currency: "USD",
+    });
+  });
+
+  it("forwards subscribe using the hardcoded production default label", async () => {
+    // Pin the id; do NOT stub the label so the hardcoded default is exercised.
+    // Guards the live "Subscribe" revenue conversion label — a typo there =
+    // paying customers stop counting and value-based bidding goes blind.
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_ID", "AW-18169833652");
+    const gtag = installGtag();
+    const { trackEvent } = await import("@/lib/gtag");
+
+    trackEvent("subscribe", {
+      tier: "premium",
+      billing_period: "monthly",
+      value: 49.99,
+      currency: "USD",
+    });
+
+    expect(gtag).toHaveBeenCalledWith("event", "conversion", {
+      send_to: "AW-18169833652/1GH_CIT50rkcELTRhthD",
+      value: 49.99,
+      currency: "USD",
+    });
+  });
+
   it("fires NO Ads conversion when the Ads id is unset (GA4 event still fires)", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_ID", "");
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL", "");
