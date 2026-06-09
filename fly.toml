@@ -47,7 +47,13 @@ primary_region = "syd"              # Sydney — lowest latency for Melbourne fo
     timeout = "5s"
     method = "get"
     path = "/api/health"
-    grace_period = "10s"
+    # 10s → 60s (2026-06-09): a fresh api machine was failing the rollout
+    # health check before it finished warming up (uvicorn boot + first Neon
+    # connection through a scale-to-zero cold-start can exceed 10s), so Fly
+    # aborted the cutover every deploy and left the OLD machine running —
+    # which is why /api/version's boot_time was frozen days behind HEAD.
+    # 60s gives the cold-start room so deploys actually replace the machine.
+    grace_period = "60s"
 
 # Two processes: API and worker share the same image
 [processes]
