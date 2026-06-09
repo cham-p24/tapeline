@@ -54,10 +54,18 @@ primary_region = "syd"              # Sydney — lowest latency for Melbourne fo
   api = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
   worker = "python -m app.workers.signal_publisher"
 
+# API machine bumped 2026-06-01 from shared-cpu-1x:512mb after two prod wedges
+# in one session: the no-DB /api/health endpoint timed out, i.e. the event loop
+# starved while requests piled up behind a slow/cold Neon. More CPU lets the
+# single machine churn the backlog + recover instead of fully stalling; the RAM
+# headroom avoids GC thrash at 512mb. NOTE: the *root* cause is Neon scale-to-
+# zero cold-starts — disable autosuspend / bump compute in the Neon dashboard.
+# Deliberately NOT adding a 2nd api machine: each adds pool_size+overflow (~30)
+# connections, and more connections to a cold/limited Neon makes the stall worse.
 [[vm]]
-  memory = "512mb"
+  memory = "1024mb"
   cpu_kind = "shared"
-  cpus = 1
+  cpus = 2
   processes = ["api"]
 
 [[vm]]
