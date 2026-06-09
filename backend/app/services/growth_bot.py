@@ -174,14 +174,19 @@ class TopPick:
 
 async def pull_top_picks(session: AsyncSession, limit: int = 5) -> list[TopPick]:
     """Top N tickers by current composite score, score-not-null only."""
+    from app.services.ticker_freshness import live_clauses
+
+    # Freshness + data-quality floor — never auto-post a stale ghost ticker or
+    # a corrupt (score>100 / emoji-symbol / <2-factor) row. (score IS NOT NULL
+    # is part of the floor.) See app.services.ticker_freshness.
+    _stmt = select(
+        Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal, Ticker.reason,
+    )
+    for _clause in await live_clauses(session):
+        _stmt = _stmt.where(_clause)
     rows = (
         await session.execute(
-            select(
-                Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal, Ticker.reason,
-            )
-            .where(Ticker.score.is_not(None))
-            .order_by(desc(Ticker.score))
-            .limit(limit),
+            _stmt.order_by(desc(Ticker.score)).limit(limit),
         )
     ).all()
     return [

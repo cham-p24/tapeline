@@ -35,7 +35,19 @@ def is_sqlite() -> bool:
 # SQLite doesn't use connection pools the same way; skip pool args for it
 _engine_kwargs: dict = {"echo": False}
 if not settings.database_url.startswith("sqlite"):
-    _engine_kwargs.update({"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20})
+    _engine_kwargs.update({
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20,
+        # Fail fast instead of hanging on a busy pool. Without this, a checkout
+        # waits the SQLAlchemy default of 30s — long enough that exhausted-pool
+        # requests pile up until even /api/health blocks, Fly's healthcheck
+        # trips, and the machine is marked unhealthy (the 2026-06-01 outage).
+        # A 10s ceiling surfaces a fast 5xx instead. pool_recycle drops
+        # server-side-idle-killed connections on the managed PG (Supabase/Neon).
+        "pool_timeout": 10,
+        "pool_recycle": 1800,
+    })
 
 engine = create_async_engine(_normalize_url(settings.database_url), **_engine_kwargs)
 

@@ -271,15 +271,19 @@ async def run_daily_digest(
     from sqlalchemy import desc
 
     from app.models import Ticker
+    from app.services.ticker_freshness import live_clauses
 
+    # Freshness + data-quality floor — don't email subscribers stale ghost
+    # picks or corrupt (score>100 / emoji-symbol / <2-factor) artifacts.
+    # (score IS NOT NULL is part of the floor.) See app.services.ticker_freshness.
+    _top_stmt = select(
+        Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal,
+        Ticker.reason, Ticker.price, Ticker.change_pct_1d,
+    )
+    for _clause in await live_clauses(session):
+        _top_stmt = _top_stmt.where(_clause)
     top_q = await session.execute(
-        select(
-            Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal,
-            Ticker.reason, Ticker.price, Ticker.change_pct_1d,
-        )
-        .where(Ticker.score.is_not(None))
-        .order_by(desc(Ticker.score))
-        .limit(10)
+        _top_stmt.order_by(desc(Ticker.score)).limit(10)
     )
     picks = [
         {

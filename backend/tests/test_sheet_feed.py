@@ -17,6 +17,7 @@ from sqlalchemy import select
 from app.db import session_scope
 from app.models import Ticker
 from app.services.sheet_feed import (
+    _clean_symbol,
     _parse_float,
     parse_all_signals_csv,
     score_to_signal,
@@ -77,6 +78,51 @@ def test_parse_float_handles_sheet_quirks():
     assert _parse_float("not a number") is None
 
 
+# ---- _clean_symbol ----------------------------------------------------------
+
+def test_clean_symbol_preserves_every_real_symbol_shape():
+    """The false-positive guard: NO real US symbol may be rejected. Covers
+    plain equities, ETFs, class shares (dot + dash), and futures continuous
+    contracts (the `=F` suffix that forced the display filter to stay
+    space-based rather than reject all non-alnum). Also normalizes case +
+    surrounding whitespace the way the old `.strip().upper()` did."""
+    for sym in ("IVV", "AAPL", "GS", "TSLA", "VTI", "VOO", "BRK.B",
+                "BRK-B", "CL=F", "ZC=F", "SPY"):
+        assert _clean_symbol(sym) == sym, f"rejected real symbol {sym!r}"
+    # Case + whitespace normalization (sheet cells arrive padded / lowercased)
+    assert _clean_symbol("  ivv ") == "IVV"
+    assert _clean_symbol("aapl") == "AAPL"
+
+
+def test_clean_symbol_rejects_every_corruption_shape():
+    """The active bleed + the structural junk. Each must return None so the
+    caller skips the row instead of ingesting it as a standalone ticker."""
+    # The trophy-emoji "winner" badge — with AND without the space. This is
+    # the exact corruption that produced /t/🏆 IVV ghost rows + sitemap URLs.
+    assert _clean_symbol("🏆 IVV") is None
+    assert _clean_symbol("🏆IVV") is None
+    # Embedded space of any kind (the display filter's `notlike("% %")` case)
+    assert _clean_symbol("ZZ WSPACE") is None
+    # Section dividers the sheet uses between categories
+    assert _clean_symbol("=== SECTION HEADER ===") is None
+    assert _clean_symbol("--- 3. INTERNATIONAL ---") is None
+    assert _clean_symbol("===") is None
+    assert _clean_symbol("---") is None
+    # Summary / empty tokens
+    assert _clean_symbol("—") is None
+    assert _clean_symbol("") is None
+    assert _clean_symbol("   ") is None
+    assert _clean_symbol(None) is None
+    # The header itself (csv.DictReader usually eats it, but a re-declared
+    # header mid-sheet must still be dropped)
+    assert _clean_symbol("TICKER") is None
+    assert _clean_symbol("ticker") is None
+    # Leading separator / digit can't be a real US symbol
+    assert _clean_symbol("=F") is None
+    assert _clean_symbol(".SPX") is None
+    assert _clean_symbol("123") is None
+
+
 # ---- parse_all_signals_csv --------------------------------------------------
 
 _FIXTURE_CSV = """Ticker,Type,Asset Class,Strategy,Conviction,Score,Raw Score,Signal,Verdict,Action,Hold Duration,Price,Above 200DMA,Market Regime,Beats SPY?,Momentum Quality,3M Return %,6M Return %,1Y Return %,RS vs SPY 3M %,RS vs SPY 6M %,RS vs SPY 1Y %,RS vs Sector 3M %,Near 52W High %
@@ -135,6 +181,25 @@ def test_parser_skips_blank_and_repeated_header_rows():
     assert len(rows) == 4
     symbols = {r["symbol"] for r in rows}
     assert symbols == {"HYLN", "OXY", "GS", "LOWBALL"}
+
+
+_EMOJI_DUPE_CSV = """Ticker,Type,Asset Class,Strategy,Conviction,Score,Raw Score,Signal,Verdict,Action,Hold Duration,Price,Above 200DMA,Market Regime,Beats SPY?,Momentum Quality,3M Return %,6M Return %,1Y Return %,RS vs SPY 3M %,RS vs SPY 6M %,RS vs SPY 1Y %,RS vs Sector 3M %,Near 52W High %
+IVV,ETF,ETF,TREND,A,96,98,BUY NOW,Buy,Buy & Hold,6-12 months,612.5,TRUE,STRONG BULL,Yes (+4.1%),All 3 positive,8.2,15.1,22.3,2.1,4.1,6.0,,
+🏆 IVV,ETF,ETF,TREND,A,96,104,BUY NOW,Buy,Buy & Hold,6-12 months,612.5,TRUE,STRONG BULL,Yes (+4.1%),All 3 positive,8.2,15.1,22.3,2.1,4.1,6.0,,
+"""
+
+
+def test_parser_drops_emoji_decorated_dupe_keeps_real_symbol():
+    """Regression for the ghost-row bug at its source: the signal-system
+    wrote a trophy-badge "🏆 IVV" cell alongside the real "IVV" row. The
+    decorated cell must be dropped at ingestion (no ghost row, no broken
+    /t/🏆 IVV URL) while the genuine IVV row survives untouched. No symbol
+    in the output may contain a space."""
+    rows = parse_all_signals_csv(_EMOJI_DUPE_CSV)
+    symbols = [r["symbol"] for r in rows]
+    assert symbols == ["IVV"], f"expected only the clean IVV row, got {symbols}"
+    assert all(" " not in s for s in symbols)
+    assert all(s == s.strip() and s.isascii() for s in symbols)
 
 
 def test_parser_handles_low_score_rows():
