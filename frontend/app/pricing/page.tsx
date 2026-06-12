@@ -65,6 +65,26 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {/* Founding-beta offer — surfaced honestly on the page rather than
+            gated behind a "DM for the code" pattern (that variant was
+            debated 2026-06 and rejected as a dark pattern). The code is
+            public; Stripe enforces the 100-redemption cap and the 3-month
+            window, so there's nothing to police client-side. This is the
+            landing surface every FOUNDERFRIENDS outreach DM points at. */}
+        <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-accent/30 bg-accent/5 px-6 py-5 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-accent">
+            Founding-beta cohort open
+          </p>
+          <p className="mt-2 text-sm text-muted leading-relaxed">
+            Code{" "}
+            <span className="rounded bg-panel2 px-1.5 py-0.5 font-mono font-semibold text-fg">
+              FOUNDERFRIENDS
+            </span>{" "}
+            at checkout takes 50% off Premium for your first 3 months.
+            First 100 subscribers only &mdash; when it&rsquo;s gone, it&rsquo;s gone.
+          </p>
+        </div>
+
         <div className="mt-12">
           <PricingTable />
         </div>
