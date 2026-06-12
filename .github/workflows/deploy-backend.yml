@@ -76,20 +76,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Gracefully no-op until the operator adds FLY_API_TOKEN, so merging this
-      # workflow never produces a red build. Secrets can't be read in a job/step
-      # `if:`, so gate via an env check that writes a step output.
+      # FAIL HARD when the token is missing. This used to skip-green "until the
+      # operator adds FLY_API_TOKEN" — which silently froze prod for 12 days
+      # (Jun 1-12, 2026): six PRs of revenue/stability fixes merged, every
+      # deploy run reported SUCCESS, and nothing shipped. The secret is set
+      # now (2026-06-13); if it ever disappears the deploy must go RED, not
+      # green-but-no-op.
       - name: Check for deploy token
         id: gate
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           if [ -z "$FLY_API_TOKEN" ]; then
-            echo "::notice title=Deploy skipped::FLY_API_TOKEN secret not set. Add it (see workflow header) to enable hands-off backend deploys."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Deploy BLOCKED::FLY_API_TOKEN secret is not set — prod is NOT receiving merges. Re-arm: fly tokens create deploy -a tapeline-backend, then gh secret set FLY_API_TOKEN."
+            exit 1
           fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      # Capture the running api machine's boot_time BEFORE deploying so the
+      # post-deploy check can prove the machine actually cut over. The Jun
+      # 1-9 era had a second silent failure mode: deploys "succeeded" but the
+      # api machine never restarted (10s health grace too short), so any
+      # 200-serving old machine passed the smoke check. boot_time advancing
+      # is the only honest cutover signal.
+      - name: Capture pre-deploy boot_time
+        id: predeploy
+        run: |
+          pre=$(curl -s --max-time 20 "https://api.tapeline.io/api/version?cb=${GITHUB_RUN_ID}" | python3 -c "import sys,json;print(json.load(sys.stdin).get('boot_time',''))" 2>/dev/null || echo "")
+          echo "boot_time=$pre" >> "$GITHUB_OUTPUT"
+          echo "pre-deploy boot_time: ${pre:-<unreachable>}"
 
       - name: Setup flyctl
         if: steps.gate.outputs.ready == 'true'
@@ -125,4 +140,12 @@ jobs:
           # exact regression the clobbered v128/v129 deploys caused).
           v1=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$base/api/v1/signals" || echo 000)
           [ "$v1" = "401" ] || { echo "::error title=Smoke check failed::/api/v1/signals returned $v1 (expected 401 = live + key-gated)"; exit 1; }
-          echo "✅ Post-deploy smoke check passed (status 200, /api/v1 mounted + gated)."
+          # Cutover proof: boot_time must have ADVANCED past the pre-deploy
+          # capture. A 200 from the OLD machine is not a successful deploy.
+          pre="${{ steps.predeploy.outputs.boot_time }}"
+          post=$(curl -s --max-time 20 "$base/api/version?cb=${GITHUB_RUN_ID}-post" | python3 -c "import sys,json;print(json.load(sys.stdin).get('boot_time',''))" 2>/dev/null || echo "")
+          if [ -n "$pre" ] && [ -n "$post" ] && [ "$post" = "$pre" ]; then
+            echo "::error title=Cutover failed::api machine boot_time unchanged ($post) — the old machine is still serving. Check 'fly machines list -a tapeline-backend' and the health-check grace period."
+            exit 1
+          fi
+          echo "✅ Post-deploy smoke check passed (status 200, /api/v1 gated, boot_time ${pre:-?} → ${post:-?})."
