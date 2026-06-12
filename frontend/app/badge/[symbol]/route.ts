@@ -42,7 +42,7 @@ type TickerData = {
 async function fetchTickerForBadge(symbol: string): Promise<TickerData | null> {
   try {
     const res = await fetch(`${API_BASE}/api/ticker/${symbol.toUpperCase()}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 1800 },
     });
     if (!res.ok) return null;
     return (await res.json()) as TickerData;

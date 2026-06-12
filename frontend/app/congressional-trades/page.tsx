@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
 
-export const revalidate = 600;
+export const revalidate = 3600;
 
 export const metadata = pageMeta({
   title: "Congressional Stock Trades — Live Tracker for House + Senate Disclosures | Tapeline",
