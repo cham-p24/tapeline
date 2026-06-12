@@ -36,6 +36,27 @@ export default function robots(): MetadataRoute.Robots {
 
   return {
     rules: [
+      // High-volume SEO-tool crawlers that bring zero referral traffic but
+      // hammer the ~8,400 programmatic pages and trigger ISR regeneration
+      // (each regen = a Vercel function invocation + CPU). These bots all
+      // honour robots.txt. Added 2026-06-13 after crawler-driven ISR burned
+      // 335% of the Hobby plan's CPU limit and Vercel paused the account.
+      // Googlebot/Bingbot/DuckDuckBot etc. remain fully allowed via "*".
+      {
+        userAgent: [
+          "AhrefsBot",
+          "SemrushBot",
+          "MJ12bot",
+          "DotBot",
+          "BLEXBot",
+          "DataForSeoBot",
+          "PetalBot",
+          "Bytespider",
+          "serpstatbot",
+          "ZoominfoBot",
+        ],
+        disallow: "/",
+      },
       {
         userAgent: "*",
         allow: "/",

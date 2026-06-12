@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -38,7 +38,7 @@ const SHOWCASE_SECTORS: SectorTile[] = [
 async function fetchHeatmap(): Promise<{ sectors: SectorTile[]; live: boolean }> {
   try {
     const res = await fetch(`${API_BASE}/api/public/heatmap`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to SHOWCASE_SECTORS below.

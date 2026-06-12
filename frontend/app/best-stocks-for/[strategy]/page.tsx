@@ -19,10 +19,10 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
 
-// Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
-// `revalidate: 300` below and the file's "5-minute snapshot" contract, and
+// Render on-demand and cache for 1 hour (ISR). Matches the per-fetch
+// `revalidate: 3600` below (data rolls daily; hourly is plenty), and
 // keeps this route off the build-time critical path (see generateStaticParams).
-export const revalidate = 300;
+export const revalidate = 3600;
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -45,9 +45,9 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
       Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
     ).toString();
     const url = `${API_BASE}/api/scanner?${qs}`;
-    // 5-minute cache so search-engine crawls don't hammer the API.
+    // 1-hour cache so search-engine crawls don't hammer the API (or Vercel CPU).
     const res = await fetch(url, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
       // Bound the fetch so a degraded backend can't hang the on-demand render
       // (this page is ISR, not build-time — see generateStaticParams). On
       // timeout we fall through to the [] fallback and render fast; ISR refills
@@ -146,7 +146,7 @@ export default async function BestStocksForStrategyPage({
             <div className="rounded-xl border border-border bg-panel p-8 text-center">
               <p className="text-muted">No live snapshot available right now.</p>
               <p className="mt-3 text-sm text-subtle">
-                This ranking refreshes every 5 minutes — check back shortly, or{" "}
+                This ranking refreshes hourly — check back shortly, or{" "}
                 <Link href="/app/scanner" className="text-accent hover:underline">
                   open the full live scanner
                 </Link>
@@ -326,7 +326,7 @@ export default async function BestStocksForStrategyPage({
         </section>
 
         <p className="mt-10 text-xs text-subtle text-center">
-          Snapshot cached 5 minutes. Sub-60s tick during US market hours. Not investment advice — see{" "}
+          Snapshot cached hourly. Sub-60s tick during US market hours. Not investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">
             risk disclosure
           </Link>

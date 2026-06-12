@@ -42,7 +42,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How often does the day-trading list update?",
-        a: "Underlying scores update sub-60 seconds during US market hours. The 1-day change column is live. This snapshot view caches for 5 minutes server-side to avoid hammering the API on every search-engine crawl; the live scanner at /app/scanner shows the real-time ranking.",
+        a: "Underlying scores update sub-60 seconds during US market hours. The 1-day change column is live. This snapshot view caches for an hour server-side to avoid hammering the API on every search-engine crawl; the live scanner at /app/scanner shows the real-time ranking.",
       },
       {
         q: "What's the difference between this and your live scanner?",

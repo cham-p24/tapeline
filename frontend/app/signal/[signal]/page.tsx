@@ -15,9 +15,9 @@ import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SIGNALS } from "../signals";
 
 // Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
-// `revalidate: 300` below and the "5-minute snapshot" contract, and keeps this
+// `revalidate: 3600` below and the "5-minute snapshot" contract, and keeps this
 // route off the build-time critical path (see generateStaticParams).
-export const revalidate = 300;
+export const revalidate = 3600;
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -43,7 +43,7 @@ async function fetchSignalTickers(signalLabel: string): Promise<ScannerRow[]> {
       order: "desc",
     }).toString()}`;
     const res = await fetch(url, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
       // Bound the fetch so a degraded backend can't hang the on-demand render
       // (this page is ISR, not build-time — see generateStaticParams). On
       // timeout we fall through to the [] fallback and render fast; ISR refills

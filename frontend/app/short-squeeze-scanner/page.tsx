@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 
 // 5-minute server-cache. Fresh enough to feel live, cheap enough that
 // crawler hits + thundering-herd organic traffic doesn't hammer the API.
-export const revalidate = 300;
+export const revalidate = 3600;
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -43,7 +43,7 @@ type SqueezeRow = {
 async function fetchSqueeze(): Promise<{ items: SqueezeRow[]; live: boolean }> {
   try {
     const res = await fetch(`${API_BASE}/api/public/squeeze?limit=5`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to SHOWCASE_ROWS below.

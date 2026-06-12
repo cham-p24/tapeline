@@ -27,6 +27,16 @@ import {
 } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
 
+// ISR: regenerate at most hourly. This route has ~8,400 ticker pages and is
+// the site's biggest crawl surface; without a page-level revalidate it
+// inherited the shortest fetch revalidate (60s), so every crawler visit
+// >60s apart re-rendered the page server-side. That burned 13h25m of Vercel
+// Fluid CPU / 1.3M function invocations in one Hobby cycle (limits 4h / 1M)
+// and got the account PAUSED on 2026-06-13 — the whole site served 402.
+// Public scanner data rolls on a daily cadence; hourly regeneration is
+// already generous.
+export const revalidate = 3600;
+
 /**
  * Map a backend sector string (GICS display, e.g. "Information Technology")
  * to its /sector/[slug] hub URL. Returns null when the ticker's sector has
@@ -117,7 +127,7 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
       const res = await fetch(url, {
         // Cache for 60s — matches the worker tick cadence so the page is fresh
         // without hammering the API on every social-card crawl.
-        next: { revalidate: 60 },
+        next: { revalidate: 1800 },
         // Bound each attempt; AbortSignal is not part of Next's fetch cache
         // key, so the 60s ISR cache above is preserved.
         signal: AbortSignal.timeout(TICKER_FETCH_TIMEOUT_MS),
@@ -321,7 +331,7 @@ async function fetchTickerNews(symbol: string): Promise<NewsArticle[]> {
       `${API_BASE}/api/news?symbol=${symbol.toUpperCase()}&limit=5`,
       // 5-min cache; news changes much slower than the score, no point
       // hammering the API on every crawl. Matches /api/scanner cadence.
-      { next: { revalidate: 300 } },
+      { next: { revalidate: 3600 } },
     );
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: NewsArticle[] };
@@ -365,7 +375,7 @@ async function fetchRelatedTickers(
       limit: "60",
     });
     const res = await fetch(`${API_BASE}/api/scanner?${params.toString()}`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
     });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: RelatedRow[] };

@@ -74,7 +74,7 @@ type SignalsResponse = {
 async function fetchSignals(): Promise<SignalsResponse | null> {
   try {
     const res = await fetch(`${API_BASE}/api/public/signals?limit=2000`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
       // Abort a hung/slow API so static export never blows Next's 60s
       // per-page budget. A hang is NOT caught by the try/catch (only a
       // thrown error is) — the timeout turns it into a catchable
