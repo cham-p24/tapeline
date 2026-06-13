@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // Self-hosted output for the Fly.io deployment — a Vercel-independent
+  // host so the site is never hostage to one provider's billing again
+  // (added 2026-06-13 after a Vercel Hobby pause took the whole site down
+  // with HTTP 402). `standalone` emits a minimal node server + traced deps
+  // that the Dockerfile copies into a slim runner image. No-op on Vercel.
+  output: "standalone",
+
   async rewrites() {
     return [
       {

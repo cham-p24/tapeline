@@ -1,0 +1,33 @@
+# Tapeline frontend on Fly.io — Vercel-independent host.
+# Sydney region to match the backend (tapeline-backend) and the Melbourne
+# founder. Public Next.js standalone server on :3000.
+app = "tapeline-web"
+primary_region = "syd"
+
+[build]
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "4s"
+  grace_period = "30s"
+  method = "GET"
+  path = "/how-it-works"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
