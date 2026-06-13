@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env*
+e2e
+__tests__
+playwright-report
+test-results
+*.log
+.vercel
+README*.md
