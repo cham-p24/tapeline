@@ -322,7 +322,7 @@ export default function BestStockScannersPage() {
             Tapeline Premium trial. No credit card. Cancel in one click.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup" className="btn-primary">
+            <Link href="/signup?from=screener" className="btn-primary">
               Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">

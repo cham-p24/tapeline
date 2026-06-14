@@ -224,7 +224,7 @@ export function CompareLayout({
         <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
         <p className="mt-3 text-muted">No credit card. Cancel in one click.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup" className="btn-primary">Try Premium free →</Link>
+          <Link href="/signup?from=compare" className="btn-primary">Try Premium free →</Link>
           <Link href={ctaSecondaryHref} className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">
