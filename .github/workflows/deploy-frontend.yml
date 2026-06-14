@@ -1,0 +1,62 @@
+name: Deploy frontend (Fly.io)
+
+# The site is hosted on Fly (app: tapeline-web), serving tapeline.io directly —
+# Vercel-independent since 2026-06-14 after a Vercel Hobby pause caused a
+# multi-day total outage. This ships frontend changes automatically so the
+# Fly host never drifts behind main. Mirrors deploy-backend.yml's hardening:
+# fail hard if the token is missing, prove the site is healthy after deploy.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # FAIL (don't skip-green) if the deploy token is missing — the same
+      # silent-freeze trap the backend pipeline hit. Re-arm with:
+      #   fly tokens create deploy -a tapeline-web
+      #   gh secret set FLY_WEB_API_TOKEN
+      - name: Check for deploy token
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error title=Deploy BLOCKED::FLY_WEB_API_TOKEN secret is not set — the Fly frontend is NOT receiving merges."
+            exit 1
+          fi
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy frontend to Fly
+        working-directory: frontend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
+        # Dockerfile bakes the production NEXT_PUBLIC_* defaults (API_URL,
+        # APP_URL); no build args needed here. Remote builders, no Docker in CI.
+        run: flyctl deploy --remote-only --config fly.toml --ha=false
+
+      - name: Post-deploy smoke check
+        run: |
+          # Hit the live domain (Cloudflare-fronted) cache-busted; require 200
+          # and that real HTML (not an error shell) is served.
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /tmp/home.html -w "%{http_code}" --max-time 20 "https://tapeline.io/?cb=${GITHUB_RUN_ID}-$i" || echo 000)
+            [ "$code" = "200" ] && break
+            echo "attempt $i: $code — retrying in 8s"; sleep 8
+          done
+          [ "$code" = "200" ] || { echo "::error title=Smoke failed::tapeline.io returned $code after deploy"; exit 1; }
+          grep -qi "tapeline" /tmp/home.html || { echo "::error title=Smoke failed::200 but page body missing 'tapeline'"; exit 1; }
+          echo "✅ Post-deploy smoke check passed (tapeline.io 200 + real content)."
