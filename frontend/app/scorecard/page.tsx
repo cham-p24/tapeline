@@ -345,6 +345,7 @@ export default function ScorecardPage() {
         </div>
       </div>
       </div>
+      <TransparencyStrip current="/scorecard" />
       <MarketingFooter />
     </main>
   );
