@@ -7,6 +7,7 @@ import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
 import { UtmCapture } from "@/components/UtmCapture";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { PRICING, usd } from "@/lib/pricing";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
@@ -52,7 +53,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Tapeline.io is a transparent quantitative stock scanner: every US ticker gets one 0-100 score from a public 6-factor formula, and every top-10 pick is logged at /scorecard with the next-day return. Pro from $24.99/mo. 14-day Premium trial, no card.",
+    `Tapeline.io is a transparent quantitative stock scanner: every US ticker gets one 0-100 score from a public 6-factor formula, and every top-10 pick is logged at /scorecard with the next-day return. Pro from ${usd(PRICING.pro.annualPerMonth)}/mo. 14-day Premium trial, no card.`,
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -74,7 +75,7 @@ export const metadata: Metadata = {
     // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
-      "Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro $24.99/mo, Premium $39.99/mo. 14-day Premium trial, no card.",
+      `Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo. 14-day Premium trial, no card.`,
     url: "/",
     siteName: "Tapeline",
     type: "website",
@@ -283,63 +284,76 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               operatingSystem: "Web",
               description:
                 "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus squeeze detection, market regime, congressional trades, and a public scorecard.",
-              // Four explicit offers — monthly + annual for each tier — so
-              // SERPs can show the cheapest entry point ($24.99 Pro annual)
-              // and the highest commit ($479 Premium annual).
-              offers: [
-                {
-                  "@type": "Offer",
-                  name: "Pro · monthly",
-                  price: "29.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "29.99",
-                    priceCurrency: "USD",
-                    unitText: "MONTH",
+              // Offers are derived from lib/pricing.ts (single source of truth)
+              // so the rich-result price can never drift from the visible price.
+              // AggregateOffer.lowPrice is the advertised headline — Pro billed
+              // annually at $24.99/mo — so Google surfaces "From $24.99/mo"
+              // instead of the $29.99 month-to-month rate (the prior bug: the
+              // annual offers were priced as yearly totals in "ANN" units, so
+              // the lowest per-offer price was the $29.99 monthly). Every offer
+              // is a real per-month price for its billing term; the annual
+              // yearly total is carried in the offer name.
+              offers: {
+                "@type": "AggregateOffer",
+                priceCurrency: PRICING.currency,
+                lowPrice: PRICING.pro.annualPerMonth.toFixed(2),
+                highPrice: PRICING.premium.monthly.toFixed(2),
+                offerCount: 4,
+                offers: [
+                  {
+                    "@type": "Offer",
+                    name: `Pro — billed annually (${usd(PRICING.pro.annual)}/yr)`,
+                    priceCurrency: PRICING.currency,
+                    price: PRICING.pro.annualPerMonth.toFixed(2),
+                    priceSpecification: {
+                      "@type": "UnitPriceSpecification",
+                      price: PRICING.pro.annualPerMonth.toFixed(2),
+                      priceCurrency: PRICING.currency,
+                      unitText: "MONTH",
+                    },
+                    url: "https://tapeline.io/pricing",
                   },
-                  url: "https://tapeline.io/pricing",
-                },
-                {
-                  "@type": "Offer",
-                  name: "Pro · annual",
-                  price: "299.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "299.99",
-                    priceCurrency: "USD",
-                    unitText: "ANN",
+                  {
+                    "@type": "Offer",
+                    name: "Pro — monthly",
+                    priceCurrency: PRICING.currency,
+                    price: PRICING.pro.monthly.toFixed(2),
+                    priceSpecification: {
+                      "@type": "UnitPriceSpecification",
+                      price: PRICING.pro.monthly.toFixed(2),
+                      priceCurrency: PRICING.currency,
+                      unitText: "MONTH",
+                    },
+                    url: "https://tapeline.io/pricing",
                   },
-                  url: "https://tapeline.io/pricing",
-                },
-                {
-                  "@type": "Offer",
-                  name: "Premium · monthly",
-                  price: "49.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "49.99",
-                    priceCurrency: "USD",
-                    unitText: "MONTH",
+                  {
+                    "@type": "Offer",
+                    name: `Premium — billed annually (${usd(PRICING.premium.annual)}/yr)`,
+                    priceCurrency: PRICING.currency,
+                    price: PRICING.premium.annualPerMonth.toFixed(2),
+                    priceSpecification: {
+                      "@type": "UnitPriceSpecification",
+                      price: PRICING.premium.annualPerMonth.toFixed(2),
+                      priceCurrency: PRICING.currency,
+                      unitText: "MONTH",
+                    },
+                    url: "https://tapeline.io/pricing",
                   },
-                  url: "https://tapeline.io/pricing",
-                },
-                {
-                  "@type": "Offer",
-                  name: "Premium · annual",
-                  price: "479.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "479.99",
-                    priceCurrency: "USD",
-                    unitText: "ANN",
+                  {
+                    "@type": "Offer",
+                    name: "Premium — monthly",
+                    priceCurrency: PRICING.currency,
+                    price: PRICING.premium.monthly.toFixed(2),
+                    priceSpecification: {
+                      "@type": "UnitPriceSpecification",
+                      price: PRICING.premium.monthly.toFixed(2),
+                      priceCurrency: PRICING.currency,
+                      unitText: "MONTH",
+                    },
+                    url: "https://tapeline.io/pricing",
                   },
-                  url: "https://tapeline.io/pricing",
-                },
-              ],
+                ],
+              },
               url: "https://tapeline.io",
             }),
           }}
