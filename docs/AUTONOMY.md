@@ -64,6 +64,30 @@ deliberate. Ranked by leverage:
   `docs/launch/google-ads/APPLY-ADGROUPS-2-3.md` handoff is therefore done —
   do NOT re-import its CSV (would duplicate).
 
+### Decided against (for now) — server-side conversion upload
+Considered moving the **subscribe** conversion server-side: capture `gclid` →
+upload offline conversions from the Stripe webhook via the Google Ads API
+(normally more robust than the client-side gtag tag — immune to ad-blockers and
+the user closing the tab before the success page loads). **Not viable for this
+account**, confirmed by research on 2026-06-14:
+
+- Google's `UploadClickConversions` endpoint **fails, as of 2026-06-15, for any
+  developer token with no prior offline-conversion upload history** — new
+  integrations are directed to the newer **Data Manager API**. Tapeline's Ads
+  account is brand-new (zero upload history), so this exact path would fail.
+- It would also require the operator-only Google Ads API credentials: a
+  developer-token *approval* process (days), plus an OAuth client + refresh
+  token.
+
+So the client-side gtag conversions (`lib/gtag.ts`, PRs #266/#269) **remain the
+path** — they already attribute ad-driven signups/subscriptions via the `gclid`
+the Google tag reads automatically. Revisit server-side only if/when value-based
+ROAS bidding at volume is wanted, and then via the **Data Manager API** (not
+`UploadClickConversions`). The full researched REST contract (v24 endpoint,
+OAuth refresh→access exchange, ClickConversion field schema, `orderId` dedup,
+gclid/gbraid/wbraid semantics) lives in this session's research output if a
+future integration needs it.
+
 ## Why these specific things stay human
 - **Secrets / tokens** must be minted in the vendor dashboard by an
   authenticated human; an AI minting + installing them would leak them into
