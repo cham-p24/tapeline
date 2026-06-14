@@ -40,6 +40,7 @@ export function MarketingFooter() {
             <FooterLink href="/signals">All signals</FooterLink>
             <FooterLink href="/sectors">Sectors</FooterLink>
             <FooterLink href="/stocks">Stock directory</FooterLink>
+            <FooterLink href="/developers">API for developers</FooterLink>
             <FooterLink href="/blog">Blog</FooterLink>
             <FooterLink href="/changelog">Changelog</FooterLink>
           </FooterCol>
