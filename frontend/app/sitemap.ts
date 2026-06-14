@@ -177,6 +177,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // intentionally (the embed views themselves are noindex; this docs
     // page IS the marketing landing page for the widget).
     { url: `${base}/embed`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // Developer/API landing page — public marketing + human-readable contract
+    // for the Premium /api/v1 surface. Targets "stock data API" intent.
+    { url: `${base}/developers`,                lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
     { url: `${base}/signup`,                    lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/contact`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.4 },
     // /signin removed from sitemap — auth pages shouldn't be in search
