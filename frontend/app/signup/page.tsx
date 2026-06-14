@@ -38,6 +38,36 @@ if (typeof window !== "undefined") {
   };
 }
 
+// Source-aware signup headlines (message-match). Paid landing pages and the
+// /compare/* pages append ?from=<source> to their "Try Premium free" CTA; we
+// restate that exact promise in the H1 here so a visitor who clicked a "Finviz
+// alternative" ad doesn't hit a generic "Try Premium free" form and bounce.
+// Ad → landing message-match is the single highest-confidence funnel lever
+// (Unbounce / NN-group information-scent research). Unknown/absent `from`
+// falls back to `_default` (the original generic copy — never worse).
+const FROM_COPY: Record<string, { h1: string; sub: string }> = {
+  _default: {
+    h1: "Try Premium free for 14 days",
+    sub: "No credit card. Cancel anytime.",
+  },
+  finviz: {
+    h1: "The Finviz alternative — free for 14 days.",
+    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. No credit card.",
+  },
+  screener: {
+    h1: "The scanner that shows its receipts.",
+    sub: "One score, one sentence, and every pick logged public vs SPY. 14 days of Premium free — no credit card.",
+  },
+  scorecard: {
+    h1: "You've seen the record. Now run the scanner.",
+    sub: "The full live universe, every name scored. 14-day Premium trial, no credit card.",
+  },
+  compare: {
+    h1: "Switching to Tapeline? Start free.",
+    sub: "One transparent score per ticker plus a public track record. 14 days of Premium free — no credit card.",
+  },
+};
+
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
 export default function SignUpPage() {
   return (
@@ -54,6 +84,8 @@ function SignUpForm() {
   // Referral code from /signup?ref=ABCDEFGH. Backend grants both parties
   // 1 free month of Premium when this resolves to a valid existing user.
   const refCode = (qp.get("ref") || "").trim().toUpperCase();
+  // Restate the source's promise in the headline (see FROM_COPY above).
+  const headline = FROM_COPY[(qp.get("from") || "").toLowerCase()] ?? FROM_COPY._default;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -180,8 +212,8 @@ function SignUpForm() {
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
           </Link>
 
-          <h1 className="mt-10 text-3xl font-bold tracking-tight">Try Premium free for 14 days</h1>
-          <p className="mt-2 text-sm text-muted">No credit card. Cancel anytime.</p>
+          <h1 className="mt-10 text-3xl font-bold tracking-tight">{headline.h1}</h1>
+          <p className="mt-2 text-sm text-muted">{headline.sub}</p>
 
           {/* Public-record proof — leads with the SIZE + DISCIPLINE of the
               track record (true, on-brand, decision-safe) rather than the

@@ -101,7 +101,7 @@ export default function ScorecardPage() {
             gated, so an anonymous paid-traffic visitor clicking it was bounced
             to /signin (a returning-user login wall). The trust-builder page now
             converts cold traffic straight to the no-card trial. */}
-        <Link href="/signup" className="btn-primary text-sm">Start free &mdash; no card &rarr;</Link>
+        <Link href="/signup?from=scorecard" className="btn-primary text-sm">Start free &mdash; no card &rarr;</Link>
       </div>
 
       <h1 className="text-4xl font-bold tracking-tight">Public scorecard</h1>
