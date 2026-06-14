@@ -97,7 +97,11 @@ export default function ScorecardPage() {
         <Link href="/pricing" className="text-sm text-muted hover:text-fg">
           See pricing →
         </Link>
-        <Link href="/app/scanner" className="btn-primary text-sm">Open live scanner &rarr;</Link>
+        {/* Primary hero CTA points at /signup, NOT /app/scanner: the scanner is
+            gated, so an anonymous paid-traffic visitor clicking it was bounced
+            to /signin (a returning-user login wall). The trust-builder page now
+            converts cold traffic straight to the no-card trial. */}
+        <Link href="/signup" className="btn-primary text-sm">Start free &mdash; no card &rarr;</Link>
       </div>
 
       <h1 className="text-4xl font-bold tracking-tight">Public scorecard</h1>

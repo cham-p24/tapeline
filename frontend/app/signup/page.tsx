@@ -286,8 +286,14 @@ function SignUpForm() {
               disabled={busy}
               className="flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
             >
-              {busy ? "Creating account…" : "Create account"}
+              {busy ? "Starting your trial…" : "Start my free trial"}
             </button>
+            {/* Reassurance adjacent to the highest-intent click — kills the
+                "will I be charged?" objection right where hesitation happens,
+                not only in the H1 subhead far above. */}
+            <p className="text-center text-xs text-muted">
+              No credit card &middot; cancel in one click
+            </p>
 
             <p className="text-xs text-subtle">
               By signing up you agree to our{" "}

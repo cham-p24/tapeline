@@ -63,7 +63,7 @@ export function MarketingNav() {
             ))}
             <ThemeToggle />
             <Link href="/signup" className="btn-primary text-sm whitespace-nowrap">
-              Start free
+              Try Premium free
             </Link>
           </div>
 
@@ -75,7 +75,7 @@ export function MarketingNav() {
               href="/signup"
               className="btn-primary text-sm whitespace-nowrap"
             >
-              Start free
+              Try Premium free
             </Link>
             <button
               type="button"

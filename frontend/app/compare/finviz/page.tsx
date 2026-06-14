@@ -153,6 +153,17 @@ export default function VsFinvizPage() {
           the second one if you want a tool that does the synthesis for you — and shows
           its work.
         </p>
+
+        {/* Above-the-fold CTA — paid traffic lands here; the in-body trial CTA
+            is otherwise only at the very bottom of the comparison. */}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/signup" className="btn-primary">
+            Try Premium free &mdash; 14 days, no card &rarr;
+          </Link>
+          <Link href="/scorecard" className="btn-ghost">
+            See the public scorecard
+          </Link>
+        </div>
         {/* Hype pill removed 2026-05 — counting categories Tapeline "wins
             outright" reads as marketing not honesty. The table below speaks
             for itself; the tradeoffs section names the places Finviz wins. */}
