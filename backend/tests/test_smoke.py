@@ -291,6 +291,52 @@ def test_ip_signup_rate_limit():
     assert signup_count_24h(ip) == 3
 
 
+def test_fingerprint_cap_is_tolerant():
+    """The signup handler calls fingerprint_allowed(fp, max_in_window=5), not the
+    hard default of 1. The homemade 8-byte device fingerprint collides across
+    same-model phones / corporate Chrome fleets / canvas-blocking browsers, so a
+    max of 1 false-positive-409'd legitimate paid-traffic cohorts. Guard against
+    reverting to the intolerant cap."""
+    from app.services.trial_abuse import fingerprint_allowed, record_fingerprint_signup
+    fp = "deadbeefcafe1234"  # 16-hex, unused elsewhere
+    for _ in range(5):
+        assert fingerprint_allowed(fp, max_in_window=5)
+        record_fingerprint_signup(fp)
+    assert not fingerprint_allowed(fp, max_in_window=5), "6th from same fingerprint blocked"
+
+
+@pytest.mark.asyncio
+async def test_signup_ip_cap_keys_off_xforwarded_for(client, monkeypatch):
+    """Regression guard for the global-cap bug. Behind Fly's edge proxy,
+    request.client.host is the proxy's internal peer IP (identical for every
+    visitor), so the per-IP signup cap MUST key off X-Forwarded-For — otherwise
+    it collapses into a GLOBAL 3-per-24h limit that 429s everyone. We prove the
+    fix by confirming the signup is accounted under the XFF client IP, not the
+    loopback test-client IP. If the handler reverts to request.client.host, the
+    count under the XFF IP stays 0 and this fails."""
+    from app.routers import auth as auth_module
+    from app.services.trial_abuse import signup_count_24h
+
+    async def _ok(*_args, **_kwargs):
+        return True
+
+    # Leave signup_allowed + fingerprint REAL so the handler derives + records
+    # the IP itself. No device_fingerprint is sent, so the fingerprint gate
+    # short-circuits to allowed; the XFF IP below is fresh so the IP cap passes.
+    monkeypatch.setattr(auth_module, "verify_turnstile", _ok)
+    xff_ip = "203.0.113.7"  # TEST-NET-3; unused elsewhere
+    assert signup_count_24h(xff_ip) == 0
+    async with client:
+        r = await client.post(
+            "/api/auth/signup",
+            json={"email": _random_email(), "password": "TestPassword!2026"},
+            headers={"X-Forwarded-For": f"{xff_ip}, 10.0.0.1"},
+        )
+        assert r.status_code in (200, 201), r.text
+    assert signup_count_24h(xff_ip) == 1, \
+        "signup IP cap must account under the X-Forwarded-For client IP, not the proxy IP"
+
+
 @pytest.mark.asyncio
 async def test_signup_disposable_email_blocked(client, monkeypatch):
     """Disposable-email signups must 400. The block list is the second

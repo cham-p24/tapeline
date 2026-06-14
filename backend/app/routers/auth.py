@@ -128,7 +128,18 @@ async def signup(
         logger.warning("auth.disposable_email_blocked email=%s", email)
         raise HTTPException(400, "This email provider isn't supported. Please use a regular email address.")
 
-    client_ip = request.client.host if request.client else None
+    # Real client IP behind Fly's edge proxy. request.client.host is the proxy's
+    # internal peer address — IDENTICAL for every external visitor — so using it
+    # would collapse the per-IP signup cap below into a GLOBAL 3-per-24h limit
+    # (after any 3 site-wide signups in a window, every visitor 429s). Read the
+    # leftmost X-Forwarded-For entry (the original client) exactly as
+    # services/rate_limit already does for limit_auth.
+    xff = request.headers.get("X-Forwarded-For", "")
+    client_ip = (
+        xff.split(",")[0].strip()
+        if xff
+        else (request.client.host if request.client else None)
+    )
     if not await verify_turnstile(body.turnstile_token, client_ip):
         raise HTTPException(400, "Bot challenge failed. Please refresh and try again.")
 
@@ -143,10 +154,15 @@ async def signup(
             "share an IP with several legitimate users.",
         )
 
-    # Device-fingerprint check — same browser can't mint multiple trials in
-    # a 30-day window, even with VPN + new email. Generic 409 message so
-    # we don't tell the attacker which signal tripped the check.
-    if not fingerprint_allowed(body.device_fingerprint):
+    # Device-fingerprint check — same browser can't mint MANY trials in a
+    # 30-day window. Tolerant cap (5, not the default 1): the homemade 8-byte
+    # fingerprint (lib/fingerprint.ts) collides across same-model phones,
+    # corporate Chrome fleets, and canvas-blocking privacy browsers, so a hard
+    # max=1 returned a false-positive 409 to legitimate paid-traffic cohorts
+    # (and blocked the founder from testing the funnel twice). Email-uniqueness
+    # + the per-IP cap + Turnstile remain the primary abuse defences. Generic
+    # 409 message so we don't reveal which signal tripped.
+    if not fingerprint_allowed(body.device_fingerprint, max_in_window=5):
         logger.warning("auth.fingerprint_rate_limited fp=%s email=%s",
                        (body.device_fingerprint or "")[:8], email)
         raise HTTPException(
