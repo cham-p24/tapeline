@@ -250,6 +250,27 @@ export default async function SectorsIndexPage() {
           </div>
         </section>
 
+        {/* Conversion CTA — /sectors was the lone SEO page with no in-body
+            signup ask, leaking organic "sector rotation" traffic. Honest
+            data-access framing (drill into the live scanner), no edge claim. */}
+        <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
+          <h2 className="text-2xl font-bold tracking-tight">
+            See which stocks are driving each sector.
+          </h2>
+          <p className="mt-3 text-sm text-muted">
+            Drill from any sector into its top-scoring names on the live scanner.
+            14-day Premium trial, no card — the full ~2,500-ticker live universe.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link href="/signup" className="btn-primary">
+              Try Premium free →
+            </Link>
+            <Link href="/scorecard" className="btn-ghost">
+              See the public scorecard
+            </Link>
+          </div>
+        </section>
+
         <p className="mt-10 text-xs text-subtle text-center">
           Snapshot cached 5 minutes. Sub-60s tick during market hours. Not investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">

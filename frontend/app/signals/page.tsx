@@ -189,7 +189,7 @@ export default async function SignalsPage() {
           ) : (
             <>
               Anonymous visitors see the top {PREVIEW_ROWS} —{" "}
-              <Link href="/signup" className="link">sign up free</Link> for the full universe.
+              <Link href="/signup" className="link">sign up free</Link> for a 14-day Premium trial of the full universe.
             </>
           )}
         </p>
@@ -307,12 +307,12 @@ export default async function SignalsPage() {
             <div className="p-6 sm:p-8 text-center">
               <p className="eyebrow text-accent">{hiddenCount.toLocaleString()} more tickers behind the wall</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-                Sign up free to see the full universe.
+                Unlock the full universe — free for 14 days.
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
                 You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
-                Free account unlocks the rest, with a 14-day Premium trial — no card,
-                same public 6-factor formula on every row.
+                Your free account includes a 14-day Premium trial — the full live universe,
+                no card, same public 6-factor formula on every row.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">

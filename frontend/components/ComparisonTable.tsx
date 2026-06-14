@@ -114,7 +114,7 @@ export function ComparisonTable() {
               </th>
               <th className="relative px-3 py-5 text-center align-bottom">
                 <span className="absolute left-1/2 top-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fg px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.08em] text-background">
-                  Most popular
+                  Best value
                 </span>
                 <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-fg">Pro</span>
                 <span className="mt-2 block text-lg font-bold text-fg nums">$24.99</span>
@@ -135,7 +135,7 @@ export function ComparisonTable() {
         </table>
       </div>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
-        All prices in USD · Monthly billing $4 / $10 higher
+        All prices in USD · Monthly billing $5 / $10 higher
       </div>
     </div>
   );

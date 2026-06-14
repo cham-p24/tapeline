@@ -329,11 +329,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   "@type": "Offer",
                   name: "Premium · annual",
-                  price: "479",
+                  price: "479.99",
                   priceCurrency: "USD",
                   priceSpecification: {
                     "@type": "UnitPriceSpecification",
-                    price: "479",
+                    price: "479.99",
                     priceCurrency: "USD",
                     unitText: "ANN",
                   },

@@ -32,7 +32,7 @@ const PLANS = [
       "Email alerts (10/day) · daily briefing",
       "TradingView charts · CSV export",
     ],
-    cta: "Try Premium free",
+    cta: "Start free trial",
     ctaHref: "/signup?plan=pro",
     highlight: false,
   },

@@ -48,7 +48,7 @@ export function Paywall({
                 Try Premium free &rarr;
               </Link>
             )}
-            <Link href="/#pricing" className="btn-ghost">See all plans</Link>
+            <Link href="/pricing" className="btn-ghost">See all plans</Link>
           </div>
         </div>
       </div>
