@@ -839,7 +839,12 @@ async def _ensure_daily_scorecard(today: date) -> None:
                 as_of=today,
                 symbol=t.symbol,
                 rank=rank,
-                score_at_flag=t.score or 0,
+                # Defensive cap: live_clauses() above already excludes any
+                # score>100 candidate, but clamp at the write too so a corrupt
+                # composite can never be frozen onto the permanent public trust
+                # record (the 2026-05-22..06-05 137-score rows came from a
+                # pre-live_clauses snapshot path).
+                score_at_flag=min(t.score, 100.0) if t.score else 0,
                 price_at_flag=float(t.price),
             ))
 

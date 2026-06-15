@@ -422,7 +422,12 @@ async def upsert_tickers(
         # written before normalize_asset_class existed (emoji-prefixed
         # "📈 stock", "🥇 commodity etf", …) self-heals on the next refresh.
         t.asset_class = r["asset_class"] or "equity"
-        t.score = r["score"]
+        # Clamp to the documented 0-100 composite AT THE COLUMN BOUNDARY. The
+        # composite already clamps in score.compute_tapeline_composite, but
+        # guarding the write itself means no future scorer change or new write
+        # path can ever leak a raw factor value (>100) into Ticker.score — the
+        # root cause behind the corrupt public-scorecard rows.
+        t.score = None if r["score"] is None else max(0.0, min(100.0, r["score"]))
         t.signal = r["signal"]
         t.price = r["price"]
         if r.get("confidence_pct") is not None:
@@ -788,7 +793,8 @@ async def upsert_etfs(
                 t.sector = r["sector"]
             updated += 1
 
-        t.score = r["score"]
+        # Same 0-100 column-boundary clamp as the equity upsert above.
+        t.score = None if r["score"] is None else max(0.0, min(100.0, r["score"]))
         t.signal = r["signal"]
         # 1M proxy from 3M / 3 (ETFs barely move intraday; coarser is fine)
         if r["change_pct_3m"] is not None:
