@@ -577,6 +577,34 @@ async def enable_2fa(
     user.mfa_enabled = True
     await session.commit()
     logger.info("me.2fa_enabled user=%s", user.id)
+
+    # Security-confirmation receipt — fire-and-forget so a Resend hiccup
+    # never fails the enable. Account-state notification (the user can't opt
+    # out of it): persona "default", no List-Unsubscribe. Gives an
+    # "if this wasn't you" recovery path if someone turned 2FA on that the
+    # real owner didn't request.
+    if user.email:
+        try:
+            from app.services.email import (
+                render_security_confirmation_email,
+                send_email,
+            )
+
+            html = render_security_confirmation_email(
+                user.name or "trader",
+                change="Two-factor authentication was enabled",
+            )
+            await send_email(
+                user.email,
+                "Two-factor authentication was enabled on your Tapeline account",
+                html,
+                persona="default",
+            )
+        except Exception:  # email must never block the enable
+            logger.exception(
+                "me.2fa_enable_confirmation_email_failed user=%s", user.id
+            )
+
     return {"ok": True, "recovery_codes": codes}
 
 
@@ -605,6 +633,34 @@ async def disable_2fa(
     user.totp_secret = None
     await session.commit()
     logger.info("me.2fa_disabled user=%s", user.id)
+
+    # Security-confirmation receipt — fire-and-forget so a Resend hiccup
+    # never fails the disable. Account-state notification (the user can't opt
+    # out of it): persona "default", no List-Unsubscribe. Gives an
+    # "if this wasn't you" recovery path if someone turned 2FA off that the
+    # real owner didn't request.
+    if user.email:
+        try:
+            from app.services.email import (
+                render_security_confirmation_email,
+                send_email,
+            )
+
+            html = render_security_confirmation_email(
+                user.name or "trader",
+                change="Two-factor authentication was turned off",
+            )
+            await send_email(
+                user.email,
+                "Two-factor authentication was turned off on your Tapeline account",
+                html,
+                persona="default",
+            )
+        except Exception:  # email must never block the disable
+            logger.exception(
+                "me.2fa_disable_confirmation_email_failed user=%s", user.id
+            )
+
     return {"ok": True}
 
 
