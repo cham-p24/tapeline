@@ -410,7 +410,7 @@ async def revenue_dashboard(
 
 # ── Email preview ──────────────────────────────────────────────────────────
 #
-# Renders any of the 15 email templates with representative sample data so the
+# Renders any of the email templates with representative sample data so the
 # admin can iterate on copy + layout without sending themselves a real email.
 # Admin-only. The companion frontend page at /app/admin/email-preview embeds
 # /api/admin/email-preview/{name} in an iframe with light/dark/mobile toggles.
@@ -432,6 +432,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_email_verification_email,
         render_eod_watchlist_digest,
         render_founder_touch_email,
+        render_gdpr_confirmation_email,
         render_password_reset_email,
         render_payment_failed_email,
         render_payment_recovered_email,
@@ -439,6 +440,8 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_referral_milestone_email,
         render_referral_referee_email,
         render_referral_referrer_email,
+        render_save_offer_accepted_email,
+        render_security_confirmation_email,
         render_subscription_canceled_email,
         render_subscription_started_email,
         render_trial_day3_email,
@@ -636,6 +639,22 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                 reset_url="https://tapeline.io/reset-password?token=demo123",
             ),
         ),
+        "security_confirmation": (
+            "Security confirmation (password changed)",
+            lambda: render_security_confirmation_email(
+                "Alex",
+                change="Your password was changed",
+                when_label="June 16, 2026 at 9:14am AEST",
+            ),
+        ),
+        "gdpr_export": (
+            "GDPR data export ready (Art. 15)",
+            lambda: render_gdpr_confirmation_email("Alex", kind="export"),
+        ),
+        "gdpr_deletion": (
+            "GDPR account deleted (Art. 17)",
+            lambda: render_gdpr_confirmation_email("Alex", kind="deletion"),
+        ),
         "subscription_started_pro_monthly": (
             "Subscription started · Pro monthly",
             lambda: render_subscription_started_email(
@@ -658,6 +677,12 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
                 "Alex", tier="pro",
                 period_end_iso="2026-06-19T00:00:00+00:00",
             ),
+        ),
+        # Named `subscription_*` so the send-to-me persona heuristic routes
+        # this billing/account-state email via billing@.
+        "subscription_save_offer_accepted": (
+            "Save offer accepted (50% off 3 months — retention)",
+            lambda: render_save_offer_accepted_email("Alex", tier="premium"),
         ),
         # Win-back drip (30 / 60 / 90 days post-cancellation)
         "winback_30": (

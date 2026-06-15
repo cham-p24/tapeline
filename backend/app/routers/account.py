@@ -38,6 +38,23 @@ async def export_my_data(
         "subscriptions": [{"id": s.id, "status": s.status, "tier": s.tier, "current_period_end": s.current_period_end.isoformat()} for s in subs],
     }
 
+    # GDPR Art. 15 confirmation — fire-and-forget so a Resend hiccup never
+    # breaks the export download. Account-state notification (can't opt out):
+    # persona "default", no List-Unsubscribe.
+    if user.email:
+        try:
+            from app.services.email import render_gdpr_confirmation_email, send_email
+
+            html = render_gdpr_confirmation_email(user.name or "trader", kind="export")
+            await send_email(
+                user.email,
+                "Your Tapeline data export is ready",
+                html,
+                persona="default",
+            )
+        except Exception:  # confirmation must never block the export
+            logger.exception("account.export_confirmation_email_failed user=%s", user.id)
+
     buf = io.BytesIO(json.dumps(bundle, indent=2).encode("utf-8"))
     return StreamingResponse(
         buf,
@@ -53,6 +70,28 @@ async def delete_my_account(
 ) -> dict:
     """Hard-delete all user data. GDPR Art. 17."""
     user_id = user.id
+    # Capture identity BEFORE deletion — once the User row is gone we can't
+    # render or address the confirmation. This is the LAST email the account
+    # ever receives, so we send it up front and swallow any failure (a Resend
+    # hiccup must never block an erasure request).
+    user_email = user.email
+    user_name = user.name or "trader"
+    if user_email:
+        try:
+            from app.services.email import render_gdpr_confirmation_email, send_email
+
+            html = render_gdpr_confirmation_email(user_name, kind="deletion")
+            await send_email(
+                user_email,
+                "Your Tapeline account has been deleted",
+                html,
+                persona="default",
+                # The undeliverable check runs a separate DB query against the
+                # User row — fine here since we send before the deletes land.
+            )
+        except Exception:  # confirmation must never block the erasure
+            logger.exception("account.deletion_confirmation_email_failed user=%s", user_id)
+
     # Cascade delete user-owned rows
     await session.execute(delete(AlertEvent).where(AlertEvent.user_id == user_id))
     await session.execute(delete(AlertRule).where(AlertRule.user_id == user_id))

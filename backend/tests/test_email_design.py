@@ -113,6 +113,15 @@ def _all_html_outputs() -> list[tuple[str, str]]:
             "Alex",
             reset_url="https://tapeline.io/reset-password?token=demo",
         )),
+        ("save_offer_accepted", e.render_save_offer_accepted_email(
+            "Alex", tier="premium",
+        )),
+        ("security_confirmation", e.render_security_confirmation_email(
+            "Alex", change="Your password was changed",
+            when_label="June 16, 2026 at 9:14am AEST",
+        )),
+        ("gdpr_export", e.render_gdpr_confirmation_email("Alex", kind="export")),
+        ("gdpr_deletion", e.render_gdpr_confirmation_email("Alex", kind="deletion")),
     ]
 
 

@@ -531,6 +531,34 @@ async def reset_password(
     row.used_at = datetime.now(UTC)
     await session.commit()
     logger.info("auth.password_reset_completed user=%s", user.id)
+
+    # Security-confirmation receipt — fire-and-forget so a Resend hiccup
+    # never fails the reset. Account-state notification (the user can't opt
+    # out of it): persona "default", no List-Unsubscribe. Gives an
+    # "if this wasn't you" recovery path if someone reset a password the
+    # real owner didn't request.
+    if user.email:
+        try:
+            from app.services.email import (
+                render_security_confirmation_email,
+                send_email,
+            )
+
+            html = render_security_confirmation_email(
+                user.name or "trader",
+                change="Your password was changed",
+            )
+            await send_email(
+                user.email,
+                "Your Tapeline password was changed",
+                html,
+                persona="default",
+            )
+        except Exception:  # email must never block the reset
+            logger.exception(
+                "auth.password_reset_confirmation_email_failed user=%s", user.id
+            )
+
     return {"status": "reset"}
 
 
