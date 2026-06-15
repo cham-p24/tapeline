@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -7,6 +8,29 @@ import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
 import { UtmCapture } from "@/components/UtmCapture";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import {
+  jsonLdScript,
+  organizationJsonLd,
+  websiteJsonLd,
+  softwareApplicationJsonLd,
+} from "@/lib/jsonld";
+
+// Self-hosted Google Fonts via next/font — no render-blocking <link> to
+// fonts.googleapis.com, no extra DNS/preconnect round-trips. display:"swap"
+// keeps text visible during font load; the CSS vars are wired into the
+// Tailwind sans/mono stacks (tailwind.config.ts).
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600"],
+  variable: "--font-jetbrains-mono",
+});
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
@@ -51,8 +75,11 @@ export const metadata: Metadata = {
     default: "Tapeline — Read the tape · Stock scanner with public formula",
     template: "%s",
   },
+  // SERP meta description — kept <=160 chars so Google doesn't truncate it,
+  // keyword-front-loaded ("Stock scanner"). og:description below stays richer
+  // for share cards where the length budget is more forgiving.
   description:
-    "Tapeline.io is a transparent quantitative stock scanner: every US ticker gets one 0-100 score from a public 6-factor formula, and every top-10 pick is logged at /scorecard with the next-day return. Pro from $24.99/mo. 14-day Premium trial, no card.",
+    "Stock scanner with one 0-100 score per US ticker from a public 6-factor formula. Every top-10 pick logged to a back-checked scorecard. Pro from $24.99/mo.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -104,18 +131,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
         {/* Theme boot — runs synchronously in <head> before React mounts so
             users with a saved "light" preference don't flash dark on first
             paint. Pulls from localStorage('tapeline_theme'). */}
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        {/* Fonts are self-hosted via next/font (see top of file) — no
+            render-blocking <link> to Google Fonts, no preconnect needed. */}
         {/* Plausible analytics — env-gated, lazy, no cookies. */}
         {PLAUSIBLE_DOMAIN && (
           <script
@@ -143,207 +166,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               - WebSite (with SearchAction) so Google can render a sitelinks
                 search box under our brand result
               - SoftwareApplication for the product so price + description
-                surface in SERPs */}
-        <Script
-          id="ld-org"
-          type="application/ld+json"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              name: "Tapeline",
-              // Entity disambiguation for brand-name SERP. Per Search Console
-              // (2026-05-19 audit) the bare query "tapeline" returns us at
-              // position 15.1 with 13 imp / 0 clicks over 90 days — the
-              // measuring-tool brands and a UK insurance broker outrank us
-              // for our own name. The fix is heavier entity signal: legalName,
-              // explicit description, slogan, knowsAbout, and country so
-              // Google's Knowledge Graph learns "Tapeline = US stock scanner
-              // SaaS" rather than "Tapeline = generic word."
-              legalName: "Tapeline",
-              alternateName: "Tapeline.io",
-              slogan: "Read the tape",
-              description:
-                "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from a publicly-documented six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
-              url: "https://tapeline.io",
-              logo: "https://tapeline.io/favicon.svg",
-              foundingDate: "2026",
-              // Country-only address — full street suppressed per founder
-              // privacy. Country signal alone is enough to help Google
-              // localise the brand entity vs the UK/AU "tapeline" measuring-
-              // tool sellers.
-              address: {
-                "@type": "PostalAddress",
-                addressCountry: "AU",
-              },
-              // knowsAbout teaches the Knowledge Graph what topics this
-              // entity is about — strongest available signal for brand-query
-              // disambiguation. Each entry is a topic Google has its own
-              // entity page for.
-              knowsAbout: [
-                "Stock scanner",
-                "Quantitative trading",
-                "US equities",
-                "Exchange-traded fund",
-                "Technical analysis",
-                "Fundamental analysis",
-                "Market data",
-                "Financial technology",
-              ],
-              // sameAs is the canonical "this is the same entity" graph that
-              // feeds Google's Knowledge Panel and Knowledge Graph. Each URL
-              // here should be the actual public profile page on an
-              // authoritative platform (no redirects, no short links).
-              // Coverage checklist + submission instructions live in
-              // docs/OFFSITE.md. Update entries when a profile is created;
-              // remove if a profile is genuinely abandoned.
-              // sameAs lists only profiles that actually resolve AND
-              // belong to Tapeline (the stock scanner). A 404 is a negative
-              // trust signal; a 200 pointing at a DIFFERENT entity is worse
-              // — Google will learn the wrong Knowledge Graph link.
-              //
-              // Removed 2026-05-11: Substack, YouTube (HEAD-404).
-              // 2026-05-12 → 2026-05-31: linkedin.com/company/tapeline is a
-              //   European agroecology research project (different brand), so we
-              //   claimed the unique slug /company/tapeline-io instead. Verified
-              //   live + admin-owned (company id 118593983) on 2026-05-31 →
-              //   RESTORED to sameAs below.
-              // Removed 2026-05-13: producthunt /products/tapeline (HTTP 404),
-              //   capterra /p/tapeline (HTTP 404), stocktwits /tapeline
-              //   (HTTP 404). Restore each entry as the profile is claimed.
-              //   crunchbase / alternativeto / g2 also Cloudflare-blocked but
-              //   per seo-tools/disclosure/profile_kits.md these are known-
-              //   unclaimed; gating them behind verification too. Restore as
-              //   each platform's profile is claimed and reachable.
-              //
-              // Only entries below have been confirmed to resolve AND belong
-              // to Tapeline. See seo-tools/disclosure/profile_kits.md for the
-              // canonical paste-ready copy when claiming each.
-              sameAs: [
-                "https://x.com/tapeline_io",
-                "https://www.linkedin.com/company/tapeline-io",
-                "https://github.com/cham-p24/tapeline",
-                "https://www.reddit.com/user/tapeline_io",
-              ],
-              contactPoint: [
-                {
-                  "@type": "ContactPoint",
-                  email: "support@tapeline.io",
-                  contactType: "customer support",
-                  availableLanguage: ["en"],
-                },
-                {
-                  "@type": "ContactPoint",
-                  email: "press@tapeline.io",
-                  contactType: "press inquiries",
-                  availableLanguage: ["en"],
-                },
-              ],
-            }),
-          }}
-        />
-        <Script
-          id="ld-website"
-          type="application/ld+json"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebSite",
-              name: "Tapeline",
-              url: "https://tapeline.io",
-              potentialAction: {
-                "@type": "SearchAction",
-                // SearchAction must point at a URL Googlebot can actually
-                // crawl with a substituted query. /t/{search_term_string} was
-                // logging a literal-placeholder 404 in Search Console because
-                // Google was test-fetching the template URL itself. /search
-                // accepts ?q=, validates as a ticker, and redirects to /t/.
-                target: {
-                  "@type": "EntryPoint",
-                  urlTemplate: "https://tapeline.io/search?q={search_term_string}",
-                },
-                "query-input": "required name=search_term_string",
-              },
-            }),
-          }}
-        />
-        <Script
-          id="ld-product"
-          type="application/ld+json"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              name: "Tapeline",
-              applicationCategory: "FinanceApplication",
-              applicationSubCategory: "Stock Scanner",
-              operatingSystem: "Web",
-              description:
-                "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus squeeze detection, market regime, congressional trades, and a public scorecard.",
-              // Four explicit offers — monthly + annual for each tier — so
-              // SERPs can show the cheapest entry point ($24.99 Pro annual)
-              // and the highest commit ($479 Premium annual).
-              offers: [
-                {
-                  "@type": "Offer",
-                  name: "Pro · monthly",
-                  price: "29.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "29.99",
-                    priceCurrency: "USD",
-                    unitText: "MONTH",
-                  },
-                  url: "https://tapeline.io/pricing",
-                },
-                {
-                  "@type": "Offer",
-                  name: "Pro · annual",
-                  price: "299.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "299.99",
-                    priceCurrency: "USD",
-                    unitText: "ANN",
-                  },
-                  url: "https://tapeline.io/pricing",
-                },
-                {
-                  "@type": "Offer",
-                  name: "Premium · monthly",
-                  price: "49.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "49.99",
-                    priceCurrency: "USD",
-                    unitText: "MONTH",
-                  },
-                  url: "https://tapeline.io/pricing",
-                },
-                {
-                  "@type": "Offer",
-                  name: "Premium · annual",
-                  price: "479.99",
-                  priceCurrency: "USD",
-                  priceSpecification: {
-                    "@type": "UnitPriceSpecification",
-                    price: "479.99",
-                    priceCurrency: "USD",
-                    unitText: "ANN",
-                  },
-                  url: "https://tapeline.io/pricing",
-                },
-              ],
-              url: "https://tapeline.io",
-            }),
-          }}
-        />
+                surface in SERPs
+            Plain <script> (not next/script) so the JSON-LD is in the static
+            HTML payload — beforeInteractive Script tags get injected client-
+            side, which crawlers that don't run JS miss. Builders live in
+            lib/jsonld.ts. */}
+        <script {...jsonLdScript(organizationJsonLd())} />
+        <script {...jsonLdScript(websiteJsonLd())} />
+        <script {...jsonLdScript(softwareApplicationJsonLd())} />
         <ThemeProvider>
           <UserProvider>
             <PostHogProvider>{children}</PostHogProvider>
@@ -355,14 +185,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             back on submit so we attribute revenue to the original
             paid-channel landing, not the eventual direct-return signup. */}
         <UtmCapture />
-        {/* Vercel Analytics + Speed Insights. Free tier on Vercel; no env
-            config needed — auto-detects when deployed on Vercel and is a
-            no-op in local dev. Page-view + custom-event tracking +
-            Web Vitals (Core Web Vitals + custom metrics). Complementary
-            to Plausible above (Plausible is the privacy-first aggregate
-            view; Vercel adds per-route + Web Vitals). */}
-        <Analytics />
-        <SpeedInsights />
+        {/* Vercel Analytics + Speed Insights. Free tier on Vercel; page-view +
+            custom-event tracking + Web Vitals (Core Web Vitals + custom
+            metrics). Complementary to Plausible above (Plausible is the
+            privacy-first aggregate view; Vercel adds per-route + Web Vitals).
+
+            Env-gated on NEXT_PUBLIC_VERCEL === "1": the SDKs do NOT reliably
+            self-detect the host, so off-Vercel (local dev, other hosts) they'd
+            fire beacons to /_vercel/* that 404. Set NEXT_PUBLIC_VERCEL=1 in the
+            Vercel project env to enable. (track() from @vercel/analytics is
+            still imported elsewhere and works regardless of this gate.) */}
+        {process.env.NEXT_PUBLIC_VERCEL === "1" && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
         {/* Google tag (gtag.js) — one loader, shared by GA4 (analytics + the
             GSC attribution loop) AND Google Ads (paid-search conversion
             tracking). Loaded after-interactive so it never blocks first paint.

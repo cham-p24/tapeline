@@ -14,7 +14,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Stock Data API — Programmatic Stock Scores | Tapeline",
   description:
-    "The Tapeline API: one 0-100 score and six sub-scores per US stock as read-only JSON. Key-authenticated, 1,000 requests/day on Premium. REST endpoints for the full scored universe, any ticker, and the live macro regime.",
+    "The Tapeline API: one 0-100 score plus six sub-scores per US stock as read-only JSON. Key-authenticated, 1,000 requests/day on Premium. REST, full universe.",
   path: "/developers",
 });
 

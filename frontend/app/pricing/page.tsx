@@ -10,7 +10,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Tapeline Pricing: Pro $24.99/mo · Premium $39.99/mo · 14-Day Free Trial",
   description:
-    "Tapeline plans: Free (top 20 tickers, 24-hour delayed), Pro from $24.99/mo (annual) for the live ~2,500-ticker universe, Premium from $39.99/mo (annual) adds Congressional trades, recent insider buys (SEC Form 4), Telegram alerts. 14-day Premium trial, no credit card.",
+    "Tapeline pricing: Free (top 20, delayed), Pro $24.99/mo for the live ~2,500-ticker universe, Premium $39.99/mo adds Congress + insider buys. 14-day trial.",
   path: "/pricing",
 });
 

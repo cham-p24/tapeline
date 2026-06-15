@@ -388,6 +388,14 @@ function CountTile({
   // cluster's hub-link: /signals (in the main nav + footer) now feeds crawl
   // equity down to all six per-signal-level pages, which were previously
   // only reachable via the sitemap and sibling cross-links.
+  //
+  // Hide a band tile when its count is 0. The momentum-tilted formula
+  // currently never floats names into CAUTION (25–39) or WEAK (<25), so
+  // those tiles were perpetually empty — a dead click that lands on a
+  // 0-row ranking page. Suppressing the empty tile keeps the strip honest
+  // (only shows bands users can actually drill into) without touching any
+  // scoring code; the tile reappears automatically if the band ever fills.
+  if (count === 0) return null;
   return (
     <Link
       href={href}

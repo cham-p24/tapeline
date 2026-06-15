@@ -590,13 +590,13 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
     slug: "why-we-score-2500-not-5000",
     title: "Why we score 2,500 tickers, not 5,000.",
     excerpt:
-      "The a third-party market-data feed feed gives us 5,757 US tickers. We actively score 2,500. Here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
+      "A third-party market-data feed covers thousands of US tickers. We actively score ~2,500 by daily dollar-volume — here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
     publishedAt: "2026-05-03",
     author: "Tapeline",
     body: `
       <p>The data feed (a third-party market-data feed) gives us coverage of
-      every listed US security. About 5,757 tickers, after filtering out
-      OTC. We actively score the top 2,500 by daily dollar-volume.
+      every listed US security — the full liquid US universe, after filtering
+      out OTC. We actively score the top ~2,500 by daily dollar-volume.
       Roughly half the new-user feedback is "why isn't $XYZ scored?" — so
       here's the reasoning, written once.</p>
 
@@ -613,23 +613,23 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <p>Trend, momentum, and macro work fine on any ticker with a year
       of bars. Fundamentals and insider Form 4 are sparse for sub-$200M
       caps — small companies just file less often, and analyst coverage
-      thins out. Forcing a score across the entire 5,757-row universe
-      would mean ~3,200 confidence values landing under 40%. That's
+      thins out. Forcing a score across the entire liquid US universe
+      would mean thousands of confidence values landing under 40%. That's
       noise, not signal — exactly the experience we're trying to
       replace.</p>
 
-      <h2>What we do with the other 3,200</h2>
-      <p>The full 5,757-row universe table is auto-populated weekly from
+      <h2>What we do with the rest</h2>
+      <p>The full universe table is auto-populated weekly from
       a third-party market-data feed's reference API. We use it for: watchlist tracking (you
       can watch any ticker, scored or not), per-ticker pages with price
       and 1-day change, news feeds with sentiment tagging, and ranking —
       so when liquidity grows on a name, it gets promoted into the
       active 2,500 automatically on the next refresh cycle.</p>
 
-      <h2>Why not just score all 5,757?</h2>
+      <h2>Why not just score the whole universe?</h2>
       <p>Two reasons. First, the noise above. Second, a third-party data feed's free tier
-      is 60 calls/minute — enough for the fundamentals refresh on 2,500
-      names but not 5,000+. A bigger universe means a bigger a third-party data feed bill,
+      is 60 calls/minute — enough for the fundamentals refresh on ~2,500
+      names but not the full universe. A bigger universe means a bigger a third-party data feed bill,
       not a better product. We'll only expand if customer behaviour says
       the marginal names are actually being scanned.</p>
 

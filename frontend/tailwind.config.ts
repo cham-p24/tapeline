@@ -27,10 +27,12 @@ const config: Config = {
     extend: {
       fontFamily: {
         // iOS-first system stack so the app inherits SF Pro on Apple devices
-        // and Segoe UI Variable on Windows 11. Inter remains the explicit
+        // and Segoe UI Variable on Windows 11. Inter (self-hosted via
+        // next/font, exposed as the --font-inter CSS var) remains the explicit
         // web font for non-system browsers; the system-ui keyword does the
         // right thing on macOS / iOS / iPadOS.
         sans: [
+          "var(--font-inter)",
           "-apple-system",
           "BlinkMacSystemFont",
           "Inter",
@@ -40,7 +42,7 @@ const config: Config = {
           "system-ui",
           "sans-serif",
         ],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        mono: ["var(--font-jetbrains-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
       },
       colors: {
         // Tokens with full RGB triplet — Tailwind's <alpha-value> slot

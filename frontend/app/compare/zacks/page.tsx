@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How does Tapeline pricing compare to Zacks Premium?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr); Premium is $39.99/mo billed annually ($479/yr). Zacks Premium is approximately $21/mo (annual-only, $249/yr). Tapeline offers month-to-month pricing as well; Zacks Premium is annual-only. Tapeline Premium adds Congressional trades and a live insider activity feed (SEC Form 4) that Zacks does not include.",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). Zacks Premium is approximately $21/mo (annual-only, $249/yr). Tapeline offers month-to-month pricing as well; Zacks Premium is annual-only. Tapeline Premium adds Congressional trades and a live insider activity feed (SEC Form 4) that Zacks does not include.",
   },
   {
     q: "Does Zacks publish a track record?",
@@ -110,9 +110,9 @@ const TRADEOFFS = [
   },
   {
     label: "Universe size",
-    tapeline: "~2,500 actively scored (top by $-volume) · 5,757 tracked",
+    tapeline: "~2,500 actively scored (top by $-volume) from the full liquid US universe",
     competitor: "4,400+ US stocks ranked daily",
-    note: "Zacks ranks more names. Tapeline scores the top ~2,500 by daily dollar-volume — covers everything liquid down to small-caps. Below that, bid-ask spreads make a Rank #1 on a $0.20 micro-cap with 50K shares of daily volume non-actionable. The other ~3,200 names in our universe table are tracked for watchlist + news + per-ticker pages, just not actively scored.",
+    note: "Zacks ranks more names. Tapeline scores the top ~2,500 by daily dollar-volume — covers everything liquid down to small-caps. Below that, bid-ask spreads make a Rank #1 on a $0.20 micro-cap with 50K shares of daily volume non-actionable. The rest of our universe table is tracked for watchlist + news + per-ticker pages, just not actively scored.",
   },
 ];
 

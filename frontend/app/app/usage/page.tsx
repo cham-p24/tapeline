@@ -94,7 +94,7 @@ export default function UsagePage() {
 }
 
 function tierName(t: string) {
-  return t === "premium" ? "Max" : t === "pro" ? "Pro" : "Free";
+  return t === "premium" ? "Premium" : t === "pro" ? "Pro" : "Free";
 }
 
 function UsageCard({

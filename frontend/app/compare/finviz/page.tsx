@@ -21,7 +21,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How does Tapeline pricing compare to Finviz Elite?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr) or $29/mo monthly. Premium is $39.99/mo billed annually ($479/yr) or $49/mo monthly. Finviz Elite is $24.96/mo billed annually or $39.50/mo monthly. Effectively identical at the entry tier, with Tapeline including the score, sentence, and scorecard at the same price.",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr) or $29.99/mo monthly. Premium is $39.99/mo billed annually ($479.99/yr) or $49.99/mo monthly. Finviz Elite is $24.96/mo billed annually or $39.50/mo monthly. Effectively identical at the entry tier, with Tapeline including the score, sentence, and scorecard at the same price.",
   },
   {
     q: "Does Finviz publish its scoring formula?",
@@ -29,7 +29,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Does Tapeline cover penny stocks like Finviz?",
-    a: "Tapeline tracks 5,757 US tickers but actively scores the top ~2,500 by daily dollar-volume — covering everything liquid down to small-caps. Finviz indexes everything including OTC and sub-$1 stocks and you filter manually. If your strategy depends on penny stocks below the liquidity cutoff, Finviz is the better fit.",
+    a: "Tapeline actively scores the top ~2,500 US tickers by daily dollar-volume from the full liquid US universe — covering everything liquid down to small-caps. Finviz indexes everything including OTC and sub-$1 stocks and you filter manually. If your strategy depends on penny stocks below the liquidity cutoff, Finviz is the better fit.",
   },
   {
     q: "Can I try Tapeline before paying?",
@@ -97,9 +97,9 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Universe size",
-    tapeline: "~2,500 actively scored (top by $-volume) · 5,757 tracked",
+    tapeline: "~2,500 actively scored (top by $-volume) from the full liquid US universe",
     competitor: "9,000+ including OTC + penny stocks",
-    note: "Finviz indexes everything including OTC + sub-$1 stocks; you filter manually. Tapeline scores the top ~2,500 by daily dollar-volume — covers everything liquid down to small-caps. Below that, bid-ask spreads make a high score on a $0.20 stock with 80K shares/day non-actionable. The other ~3,200 names in our universe are tracked for watchlist + news + per-ticker pages, just not actively scored.",
+    note: "Finviz indexes everything including OTC + sub-$1 stocks; you filter manually. Tapeline scores the top ~2,500 by daily dollar-volume — covers everything liquid down to small-caps. Below that, bid-ask spreads make a high score on a $0.20 stock with 80K shares/day non-actionable. The rest of the universe is tracked for watchlist + news + per-ticker pages, just not actively scored.",
   },
   {
     label: "Number of raw filters",

@@ -143,8 +143,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         </div>
         <div className="text-right">
           <div className="text-4xl font-bold nums">${data.price?.toFixed(2)}</div>
-          <div className={`nums ${(data.change_pct_1d ?? 0) > 0 ? "text-up" : "text-down"}`}>
-            {(data.change_pct_1d ?? 0) >= 0 ? "+" : ""}{data.change_pct_1d?.toFixed(2)}% today
+          <div className={`nums ${data.change_pct_1d == null || data.change_pct_1d === 0 ? "text-muted" : data.change_pct_1d > 0 ? "text-up" : "text-down"}`}>
+            {data.change_pct_1d == null
+              ? "—"
+              : `${data.change_pct_1d >= 0 ? "+" : ""}${data.change_pct_1d.toFixed(2)}% today`}
           </div>
           {/* Share opens X with the public /t/[symbol] URL pre-filled. The
               social card crawler hits opengraph-image.tsx and renders the

@@ -79,7 +79,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Trade Ideas?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr); Premium is $39.99/mo annual ($479/yr). Trade Ideas Standard is approximately $120/mo, Premium $240/mo, with Holly AI auto-trading as an add-on. Tapeline is roughly 1/5 the entry price; Trade Ideas justifies the premium with intraday speed and the AI execution layer.",
+    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo annual ($479.99/yr). Trade Ideas Standard is approximately $120/mo, Premium $240/mo, with Holly AI auto-trading as an add-on. Tapeline is roughly 1/5 the entry price; Trade Ideas justifies the premium with intraday speed and the AI execution layer.",
   },
   {
     q: "Is Trade Ideas' Holly AI a black box?",
