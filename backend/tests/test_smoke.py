@@ -1097,6 +1097,60 @@ async def test_2fa_enable_and_two_step_signin(client, monkeypatch):
         assert r9.status_code == 401
 
 
+@pytest.mark.asyncio
+async def test_2fa_enable_sends_security_confirmation_email(client, monkeypatch):
+    """Completing 2FA-enable fires a security-confirmation receipt to the
+    account owner. send_email is captured so we assert the FACT of the send
+    (without it, the no-RESEND short-circuit returns {"skipped": True}); the
+    receipt is fire-and-forget so it must never block the enable."""
+    _patch_signup_gates(monkeypatch)
+    import pyotp
+
+    from app.services import email as email_module
+
+    class _Capture:
+        def __init__(self) -> None:
+            self.calls: list[dict] = []
+
+        async def __call__(self, to, subject, html, persona=None, **_kw):
+            self.calls.append(
+                {"to": to, "subject": subject, "html": html, "persona": persona}
+            )
+            return {"id": "test-msg"}
+
+    cap = _Capture()
+    monkeypatch.setattr(email_module, "send_email", cap)
+
+    email = _random_email()
+    password = "TestPassword!2026"
+
+    async with client:
+        r = await client.post(
+            "/api/auth/signup",
+            json={"email": email, "password": password, "name": "MFA"},
+        )
+        assert r.status_code == 200, r.text
+        cookies = r.cookies
+
+        r1 = await client.post("/api/me/2fa/setup", cookies=cookies)
+        assert r1.status_code == 200, r1.text
+        secret = r1.json()["secret"]
+
+        r2 = await client.post(
+            "/api/me/2fa/enable",
+            json={"code": pyotp.TOTP(secret).now()},
+            cookies=cookies,
+        )
+        assert r2.status_code == 200, r2.text
+
+    # The enable success path emailed this user a security-confirmation receipt.
+    sent = [c for c in cap.calls if c["to"] == email]
+    assert sent, "2FA enable did not send a security-confirmation email"
+    msg = sent[-1]
+    assert msg["persona"] == "default"
+    assert "two-factor authentication was enabled" in msg["html"].lower()
+
+
 # NOTE: keep this test LAST. The rate-limiter is process-global and stays
 # triggered for ~60s after this test fires; subsequent tests would all 429.
 @pytest.mark.asyncio
