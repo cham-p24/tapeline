@@ -9,6 +9,8 @@ import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { WatchlistTabs } from "@/components/WatchlistTabs";
 import { useUser } from "@/components/UserContext";
+import { SearchBox, useDebounced } from "@/components/FilterBar";
+import { matchesQuery } from "@/lib/filters";
 
 // Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
 // start before the worker has populated any scored tickers). Same shape
@@ -31,6 +33,10 @@ export default function WatchlistPage() {
   const [symbol, setSymbol] = useState("");
   const [threshold, setThreshold] = useState(10);
   const [seeding, setSeeding] = useState(false);
+  // Client-side search over the loaded watchlist items (by ticker). The
+  // watchlist endpoint returns the whole list; we just narrow what's shown.
+  const [searchItems, setSearchItems] = useState("");
+  const debouncedSearchItems = useDebounced(searchItems);
   const [starter, setStarter] = useState<string[]>(STARTER_FALLBACK);
   // Phase A: multi-list state. `lists` is the user's named watchlists;
   // `activeId` is the currently-selected tab (null = "All items" view).
@@ -78,6 +84,10 @@ export default function WatchlistPage() {
   const { status, lastUpdate } = useLiveStream(load);
 
   const watchlistsCap = WATCHLISTS_CAP_BY_TIER[user?.tier ?? "free"] ?? 1;
+
+  // Search narrows the visible rows by ticker. Never filters during the
+  // initial load (we want the skeleton to show against the real count).
+  const visibleItems = items.filter((w) => matchesQuery(debouncedSearchItems, [w.symbol]));
 
   async function add() {
     if (!symbol.trim()) return;
@@ -228,6 +238,20 @@ export default function WatchlistPage() {
         </div>
       )}
 
+      {/* Search the list — only shown once there are enough items to be worth
+          filtering. Client-side, by ticker. */}
+      {!loading && items.length > 5 && (
+        <div className="mt-6">
+          <SearchBox
+            value={searchItems}
+            onChange={setSearchItems}
+            placeholder="Search your watchlist (ticker)…"
+            ariaLabel="Search watchlist by ticker"
+            maxLength={20}
+          />
+        </div>
+      )}
+
       {/* Items */}
       {(loading || items.length > 0) && (
       <div className="card mt-6 overflow-hidden">
@@ -249,7 +273,13 @@ export default function WatchlistPage() {
             {loading && (
               <tr><td colSpan={9}><TableSkeleton cols={9} rows={5} /></td></tr>
             )}
-            {items.map((w) => (
+            {!loading && visibleItems.length === 0 && items.length > 0 && (
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-muted">
+                <p>No watched tickers match &ldquo;{searchItems.trim()}&rdquo;.</p>
+                <button onClick={() => setSearchItems("")} className="mt-3 text-xs text-accent hover:underline">Clear search</button>
+              </td></tr>
+            )}
+            {visibleItems.map((w) => (
               <tr key={w.id} className={`border-b border-border/20 hover:bg-panel/60 ${w.alert_triggered ? "bg-warn/5" : ""}`}>
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${w.symbol}`} className="hover:text-accent">{w.symbol}</Link>

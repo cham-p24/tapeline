@@ -13,6 +13,13 @@ import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { PresetMenu } from "@/components/PresetMenu";
 import { useUser } from "@/components/UserContext";
+import {
+  FilterBar,
+  SearchBox,
+  SelectFilter,
+  NumberFilter,
+} from "@/components/FilterBar";
+import { matchesAssetBucket, type AssetBucket } from "@/lib/filters";
 
 type SortKey = "score" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
 
@@ -21,11 +28,57 @@ type SortKey = "score" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "
 // lack the new keys; we treat missing keys as "no filter / default".
 type ScannerFilters = {
   minScore: number;
+  maxScore?: number;
   sort: SortKey;
   order: "asc" | "desc";
   sector: string;
+  signal?: string;
+  assetClass?: AssetBucket;
   search: string;
 };
+
+// Canonical signal bands written by the scoring service
+// (backend/app/services). The scanner backend accepts an exact `signal`
+// query param, so this is a server-side filter, not client-side.
+const SIGNAL_OPTIONS = [
+  { value: "", label: "All signals" },
+  { value: "HIGH CONVICTION", label: "High conviction" },
+  { value: "STRONG SETUP", label: "Strong setup" },
+  { value: "CONSTRUCTIVE", label: "Constructive" },
+  { value: "NEUTRAL", label: "Neutral" },
+  { value: "CAUTION", label: "Caution" },
+  { value: "WEAK", label: "Weak" },
+];
+
+// Asset-class buckets. There is NO server-side asset_class param on
+// /api/scanner, so this filters the already-fetched rows client-side
+// (per the brief: client-side when no backend param exists).
+const ASSET_OPTIONS: Array<{ value: AssetBucket; label: string }> = [
+  { value: "", label: "All assets" },
+  { value: "equity", label: "Stocks" },
+  { value: "etf", label: "ETFs & funds" },
+  { value: "other", label: "Other" },
+];
+
+const SECTOR_OPTIONS = [
+  { value: "", label: "All sectors" },
+  ...[
+    "Information Technology",
+    "Health Care",
+    "Financials",
+    "Industrials",
+    "Consumer Discretionary",
+    "Consumer Staples",
+    "Communication Services",
+    "Energy",
+    "Materials",
+    "Utilities",
+    "Real Estate",
+    "Commodities",
+    "Funds & ETFs",
+    "Uncategorized",
+  ].map((s) => ({ value: s, label: s })),
+];
 
 // Mirror of `saved_scans` caps from backend/app/services/tier.py. The
 // server-side cap is the authoritative gate; this just disables the UI
@@ -44,10 +97,15 @@ export default function ScannerPage() {
   // capped (row_cap) + delayed (data_delayed_minutes > 0); Pro/Premium get
   // the full universe live. Drives the inline upgrade hint below the filters.
   const [meta, setMeta] = useState<{ tier: string; rowCap: number; delayMinutes: number } | null>(null);
-  const [minScore, setMinScore] = useState(0);
+  const [minScore, setMinScore] = useState<number | "">(0);
+  const [maxScore, setMaxScore] = useState<number | "">("");
   const [sort, setSort] = useState<SortKey>("score");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [sector, setSector] = useState<string>("");
+  const [signal, setSignal] = useState<string>("");
+  // Asset-class is filtered client-side (no backend param), so it does not
+  // belong in the server query and never triggers a refetch.
+  const [assetClass, setAssetClass] = useState<AssetBucket>("");
   const [loading, setLoading] = useState(true);
 
   // Restore filter state from a saved preset blob. JSON-parsed by
@@ -56,9 +114,12 @@ export default function ScannerPage() {
   // still applies cleanly.
   const applyPreset = useCallback((f: ScannerFilters) => {
     if (typeof f.minScore === "number") setMinScore(f.minScore);
+    if (typeof f.maxScore === "number") setMaxScore(f.maxScore);
     if (f.sort) setSort(f.sort);
     if (f.order === "asc" || f.order === "desc") setOrder(f.order);
     if (typeof f.sector === "string") setSector(f.sector);
+    if (typeof f.signal === "string") setSignal(f.signal);
+    if (typeof f.assetClass === "string") setAssetClass(f.assetClass as AssetBucket);
     if (typeof f.search === "string") setSearch(f.search);
   }, []);
 
@@ -73,18 +134,52 @@ export default function ScannerPage() {
 
   const load = useCallback(async () => {
     try {
-      const params: Record<string, string | number> = { min_score: minScore, sort, order, limit: 100 };
+      // All of these map to EXISTING /api/scanner query params
+      // (min_score, max_score, sector, signal, q, sort, order) — we wire to
+      // the backend rather than filtering client-side wherever the param
+      // exists. Empty min/max score inputs fall back to the backend
+      // defaults (0 / 100).
+      const params: Record<string, string | number> = {
+        min_score: minScore === "" ? 0 : minScore,
+        max_score: maxScore === "" ? 100 : maxScore,
+        sort,
+        order,
+        limit: 100,
+      };
       if (sector) params.sector = sector;
+      if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       const r = await api.scanner(params);
       setRows(r.items);
       setMeta({ tier: r.tier, rowCap: r.row_cap, delayMinutes: r.data_delayed_minutes });
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [minScore, sort, order, sector, debouncedSearch]);
+  }, [minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  // Asset-class is the only client-side filter on this page (no backend
+  // param). Everything else is already applied server-side, so we only
+  // post-filter on the bucket here.
+  const visibleRows = rows.filter((r) => matchesAssetBucket(assetClass, r.asset_class));
+
+  const filtersActive =
+    (minScore !== "" && minScore !== 0) ||
+    maxScore !== "" ||
+    !!sector ||
+    !!signal ||
+    !!assetClass ||
+    !!search.trim();
+
+  const resetFilters = () => {
+    setMinScore(0);
+    setMaxScore("");
+    setSector("");
+    setSignal("");
+    setAssetClass("");
+    setSearch("");
+  };
 
   // Funnel event: activation = "did the user actually open the scanner".
   // localStorage flag dedupes across sessions per browser so we count the
@@ -118,118 +213,76 @@ export default function ScannerPage() {
         <RecentTickers />
       </div>
 
-      {/* Filters */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        {/* Symbol search — first filter, widest, so it's clearly the primary way
-            to find a specific ticker. Server-side substring match. */}
-        <div className="card flex items-center gap-2 px-3 py-2 min-w-[220px]">
-          <svg className="h-4 w-4 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ticker (AAPL, NVDA, TSLA...)"
-            className="flex-1 bg-transparent text-base outline-none placeholder:text-muted"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={20}
-            aria-label="Search ticker symbol"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="text-xs text-muted hover:text-fg"
-              aria-label="Clear search"
-            >
-              clear
-            </button>
-          )}
-        </div>
-        <div className="card px-3 py-2">
-          <label className="block text-xs text-muted">Min score</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={minScore}
-            onChange={(e) => setMinScore(Number(e.target.value))}
-            className="w-20 bg-transparent text-base nums"
-          />
-        </div>
-        <div className="card px-3 py-2">
-          <label className="block text-xs text-muted">Sector</label>
-          {/*
-           * 2026-05-17: dropdown values must match the canonical sector
-           * strings written by services/sector.canonical_sector() — the
-           * backend now stores GICS-canonical labels ("Information
-           * Technology", "Health Care", "Funds & ETFs") rather than the
-           * Finnhub-raw or pre-cleanup labels ("Technology", "Healthcare",
-           * "ETF"). User selecting a stale dropdown option returned zero
-           * rows because the WHERE clause never matched.
-           *
-           * Source of truth: backend/app/services/sector.py CANONICAL_ORDER.
-           * Same 14 buckets the heatmap renders.
-           */}
-          <select
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-            className="bg-transparent text-base"
-          >
-            <option value="">All sectors</option>
-            {[
-              "Information Technology",
-              "Health Care",
-              "Financials",
-              "Industrials",
-              "Consumer Discretionary",
-              "Consumer Staples",
-              "Communication Services",
-              "Energy",
-              "Materials",
-              "Utilities",
-              "Real Estate",
-              "Commodities",
-              "Funds & ETFs",
-              "Uncategorized",
-            ].map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div className="card px-3 py-2">
-          <label className="block text-xs text-muted">Sort by</label>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="bg-transparent text-base"
-          >
-            <option value="score">Score</option>
-            <option value="change_pct_1d">1D change</option>
-            <option value="change_pct_5d">5D change</option>
-            <option value="change_pct_1m">1M change</option>
-            <option value="volume">Volume</option>
-            <option value="symbol">Ticker A→Z</option>
-          </select>
-        </div>
+      {/* Filters — search + score range + sector/signal/asset filters, plus
+          sort. Search / score / sector / signal all map to existing
+          /api/scanner query params (server-side); asset class is the only
+          client-side post-filter. */}
+      <FilterBar
+        trailing={
+          <>Showing <strong className="text-fg">{visibleRows.length}</strong> · refresh every 10s</>
+        }
+      >
+        {/* Symbol/name search — widest, primary. Server-side substring match. */}
+        <SearchBox
+          value={search}
+          onChange={setSearch}
+          placeholder="Search ticker (AAPL, NVDA, TSLA...)"
+          ariaLabel="Search ticker symbol"
+          maxLength={20}
+        />
+        <NumberFilter label="Min score" value={minScore} onChange={setMinScore} min={0} max={100} />
+        <NumberFilter label="Max score" value={maxScore} onChange={setMaxScore} min={0} max={100} placeholder="100" />
+        {/*
+         * 2026-05-17: sector dropdown values must match the canonical sector
+         * strings written by services/sector.canonical_sector() — the backend
+         * stores GICS-canonical labels ("Information Technology", "Health
+         * Care", "Funds & ETFs"). Source of truth:
+         * backend/app/services/sector.py CANONICAL_ORDER. Same 14 buckets the
+         * heatmap renders.
+         */}
+        <SelectFilter label="Sector" value={sector} onChange={setSector} options={SECTOR_OPTIONS} />
+        <SelectFilter label="Signal" value={signal} onChange={setSignal} options={SIGNAL_OPTIONS} />
+        <SelectFilter
+          label="Asset class"
+          value={assetClass}
+          onChange={(v) => setAssetClass(v as AssetBucket)}
+          options={ASSET_OPTIONS}
+        />
+        <SelectFilter
+          label="Sort by"
+          value={sort}
+          onChange={(v) => setSort(v as SortKey)}
+          options={[
+            { value: "score", label: "Score" },
+            { value: "change_pct_1d", label: "1D change" },
+            { value: "change_pct_5d", label: "5D change" },
+            { value: "change_pct_1m", label: "1M change" },
+            { value: "volume", label: "Volume" },
+            { value: "symbol", label: "Ticker A→Z" },
+          ]}
+        />
         <button
           onClick={() => setOrder(order === "desc" ? "asc" : "desc")}
           className="btn-ghost text-sm"
         >
           {order === "desc" ? "↓ high first" : "↑ low first"}
         </button>
+        {filtersActive && (
+          <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
+        )}
         {/* Phase A: scanner-preset save + load. Free tier (cap=0) sees
             the load dropdown but the Save button is disabled with an
             upgrade tooltip. */}
         <PresetMenu<ScannerFilters>
           cap={savedScansCap}
-          currentFilters={{ minScore, sort, order, sector, search }}
+          currentFilters={{
+            minScore: minScore === "" ? 0 : minScore,
+            maxScore: maxScore === "" ? 100 : maxScore,
+            sort, order, sector, signal, assetClass, search,
+          }}
           onApply={applyPreset}
         />
-        <span className="ml-auto self-center text-xs text-muted">
-          Showing <strong className="text-fg">{rows.length}</strong> · refresh every 10s
-        </span>
-      </div>
+      </FilterBar>
 
       {/* Inline Free-tier cap hint. Keys off the server's data_delayed_minutes
           (>0 only for Free) so the copy can't claim a cap the backend isn't
@@ -273,15 +326,15 @@ export default function ScannerPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && rows.length === 0 ? (
+            {loading && visibleRows.length === 0 ? (
               <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
-            ) : rows.length === 0 ? (
+            ) : visibleRows.length === 0 ? (
               <tr><td colSpan={11} className="px-4 py-12 text-center">
-                {minScore > 0 || sector ? (
+                {filtersActive ? (
                   <div className="text-muted">
                     <p>No tickers match these filters.</p>
                     <button
-                      onClick={() => { setMinScore(0); setSector(""); }}
+                      onClick={resetFilters}
                       className="mt-3 text-xs text-accent hover:underline"
                     >
                       Clear filters
@@ -294,7 +347,7 @@ export default function ScannerPage() {
                   </div>
                 )}
               </td></tr>
-            ) : rows.map((r) => (
+            ) : visibleRows.map((r) => (
               <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">
                   <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>

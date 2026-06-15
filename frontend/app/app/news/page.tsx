@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { FilterBar, SearchBox, SelectFilter, useDebounced } from "@/components/FilterBar";
+import { matchesSelect } from "@/lib/filters";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 
 type NewsRow = {
@@ -12,16 +14,41 @@ type NewsRow = {
   url: string; description: string | null; tickers: string[]; sentiment: number | null;
 };
 
+const SENTIMENT_OPTIONS = [
+  { value: "", label: "All sentiment" },
+  { value: "positive", label: "Positive" },
+  { value: "neutral", label: "Neutral" },
+  { value: "negative", label: "Negative" },
+];
+
+// Bucket a -1..1 sentiment score the same way the severity dot does (±0.15
+// neutral band) so the dropdown and the coloured sentiment label agree.
+function sentimentBucket(s: number | null): string {
+  if (s == null) return "neutral";
+  if (s > 0.15) return "positive";
+  if (s < -0.15) return "negative";
+  return "neutral";
+}
+
 export default function NewsPage() {
   const [items, setItems] = useState<NewsRow[]>([]);
+  // Ticker filter is server-side (api.news accepts a symbol param); debounce
+  // so typing doesn't fire a request per keystroke.
   const [symbol, setSymbol] = useState("");
+  const debouncedSymbol = useDebounced(symbol.trim().toUpperCase());
+  // Sentiment is client-side over the fetched headlines (no backend param).
+  const [sentiment, setSentiment] = useState("");
 
   const load = useCallback(async () => {
-    const r = await api.news(symbol || undefined, 50);
+    const r = await api.news(debouncedSymbol || undefined, 50);
     setItems(r.items);
-  }, [symbol]);
+  }, [debouncedSymbol]);
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  const visibleItems = items.filter((n) => matchesSelect(sentiment, sentimentBucket(n.sentiment)));
+  const filtersActive = !!symbol.trim() || !!sentiment;
+  const resetFilters = () => { setSymbol(""); setSentiment(""); };
 
   return (
     <div>
@@ -33,23 +60,31 @@ export default function NewsPage() {
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
-      <div className="mt-6 flex gap-3">
-        <input
+      {/* Ticker filter is server-side (api.news); sentiment is client-side. */}
+      <FilterBar
+        trailing={<>Showing <strong className="text-fg">{visibleItems.length}</strong> headlines</>}
+      >
+        <SearchBox
           value={symbol}
-          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+          onChange={(v) => setSymbol(v.toUpperCase())}
           placeholder="Filter by ticker (e.g. NVDA)"
-          className="rounded-md border border-border bg-panel px-3 py-2 text-sm nums font-mono w-64"
+          ariaLabel="Filter news by ticker"
+          maxLength={20}
         />
-        {symbol && <button onClick={() => setSymbol("")} className="btn-ghost text-sm">Clear</button>}
-      </div>
+        <SelectFilter label="Sentiment" value={sentiment} onChange={setSentiment} options={SENTIMENT_OPTIONS} />
+        {filtersActive && (
+          <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
+        )}
+      </FilterBar>
 
       <div className="mt-6 space-y-3">
-        {items.length === 0 && (
+        {visibleItems.length === 0 && (
           <div className="card p-8 text-center text-muted">
-            No news{symbol ? ` for ${symbol}` : ""} yet. Try again in a few minutes.
+            No news{symbol ? ` for ${symbol.trim().toUpperCase()}` : ""}
+            {sentiment ? ` with ${sentiment} sentiment` : ""} yet. Try again in a few minutes.
           </div>
         )}
-        {items.map((n) => {
+        {visibleItems.map((n) => {
           const sev = severity(n);
           return (
             <div key={n.id} className="card p-4">

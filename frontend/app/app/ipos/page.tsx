@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { FilterBar, SearchBox, SelectFilter, useDebounced } from "@/components/FilterBar";
+import { matchesQuery, matchesSelect } from "@/lib/filters";
 import { userLocale } from "@/lib/datetime";
 import { handle401 } from "@/lib/api";
 
@@ -19,6 +21,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 export default function IPOPage() {
   const [ipos, setIpos] = useState<IPO[]>([]);
   const [filter, setFilter] = useState<"all" | "upcoming" | "priced">("all");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
+  const [sector, setSector] = useState("");
 
   const load = useCallback(async () => {
     const r = await fetch(`${API_BASE}/api/ipos?days=180`, { credentials: "include", cache: "no-store" });
@@ -29,7 +34,23 @@ export default function IPOPage() {
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
 
-  const filtered = filter === "all" ? ipos : ipos.filter((i) => i.status === filter);
+  // Sector dropdown derived from the loaded listings (sectors vary by source
+  // and the IPO set is small), so we never show a sector with zero rows.
+  const sectorOptions = useMemo(() => {
+    const seen = Array.from(new Set(ipos.map((i) => i.sector).filter((s): s is string => !!s))).sort();
+    return [{ value: "", label: "All sectors" }, ...seen.map((s) => ({ value: s, label: s }))];
+  }, [ipos]);
+
+  // All filtering is client-side (no /api/ipos filter params). Search matches
+  // ticker OR company name.
+  const filtered = ipos.filter(
+    (i) =>
+      (filter === "all" || i.status === filter) &&
+      matchesQuery(debouncedSearch, [i.symbol, i.company_name]) &&
+      matchesSelect(sector, i.sector),
+  );
+  const searchOrSectorActive = !!search.trim() || !!sector;
+  const resetFilters = () => { setSearch(""); setSector(""); setFilter("all"); };
 
   return (
     <div>
@@ -41,11 +62,29 @@ export default function IPOPage() {
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
-      <div className="mt-6 flex gap-2">
+      {/* Search + sector filters (client-side). The status segmented control
+          is kept below as a quick toggle. */}
+      <FilterBar
+        trailing={<>{filtered.length} listings</>}
+      >
+        <SearchBox
+          value={search}
+          onChange={setSearch}
+          placeholder="Search ticker or company…"
+          ariaLabel="Search IPO by ticker or company"
+        />
+        <SelectFilter label="Sector" value={sector} onChange={setSector} options={sectorOptions} />
+        {searchOrSectorActive && (
+          <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
+        )}
+      </FilterBar>
+
+      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by status">
         {(["all", "upcoming", "priced"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={`rounded-md border px-3 py-1.5 text-sm ${
               filter === f ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-fg"
             }`}
@@ -53,7 +92,6 @@ export default function IPOPage() {
             {f === "all" ? "All" : f === "upcoming" ? "Upcoming" : "Recently priced"}
           </button>
         ))}
-        <span className="ml-auto self-center text-xs text-muted">{filtered.length} listings</span>
       </div>
 
       <div className="card mt-4 overflow-x-auto">
@@ -73,7 +111,16 @@ export default function IPOPage() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-muted">No upcoming IPOs in window.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-muted">
+                {searchOrSectorActive || filter !== "all" ? (
+                  <>
+                    <p>No IPOs match these filters.</p>
+                    <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
+                  </>
+                ) : (
+                  <p>No upcoming IPOs in window.</p>
+                )}
+              </td></tr>
             ) : filtered.map((i) => (
               <tr key={i.id} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2">{new Date(i.expected_date).toLocaleDateString(userLocale(), { day: "numeric", month: "short", year: "numeric" })}</td>
