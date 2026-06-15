@@ -21,9 +21,12 @@ This module enforces TWO independent floors, both required:
 2. Deterministic DATA-QUALITY clauses (``valid_composite_clauses``). The time
    floor alone is necessary but not sufficient: live verification of the
    2026-06-01 universe showed corrupt rows only 2-3 days old (inside the 7-day
-   window) plus an ONGOING ingestion bug that mints fresh corrupt rows. Three
-   signatures were verified false-positive-free against the fresh universe
-   (every degenerate row matched one; zero fresh composites did):
+   window) from an ingestion bug that minted fresh corrupt rows. The root cause
+   is now clamped at write time (score.compute_tapeline_composite plus a 0-100
+   clamp at every Ticker.score column write in sheet_feed), so this floor is
+   now defense-in-depth: it still drops any row that slips past a future
+   regression. Three signatures were verified false-positive-free against the
+   fresh universe (every degenerate row matched one; zero fresh composites did):
 
      - ``score > 100``     -> impossible for a clamped 0-100 composite, so the
                               value is a *raw* factor that leaked in as a score.

@@ -296,6 +296,32 @@ async def test_upsert_inserts_new_and_updates_existing():
         await s.commit()
 
 
+@pytest.mark.asyncio
+async def test_upsert_clamps_score_above_100_at_column_boundary():
+    """Root-cause guard: even if a raw factor value (>100) reaches the upsert
+    dict — bypassing score.compute_tapeline_composite's clamp — the
+    Ticker.score column write MUST clamp it to <=100. This is what stops the
+    raw 131-137 values that leaked onto the public scorecard from ever entering
+    Ticker.score again."""
+    rows = parse_all_signals_csv(_FIXTURE_CSV)
+    rows[0]["score"] = 137.0  # simulate a raw factor leaking past the composite
+    sym = rows[0]["symbol"]
+    async with session_scope() as s:
+        for t in (await s.execute(select(Ticker).where(Ticker.symbol == sym))).scalars().all():
+            await s.delete(t)
+        await s.commit()
+
+        await upsert_tickers(s, rows)
+        row = (await s.execute(select(Ticker).where(Ticker.symbol == sym))).scalar_one()
+        assert row.score == 100.0, f"expected column-boundary clamp to 100, got {row.score}"
+
+        for sym2 in ("HYLN", "OXY", "GS", "LOWBALL"):
+            r = (await s.execute(select(Ticker).where(Ticker.symbol == sym2))).scalar_one_or_none()
+            if r is not None:
+                await s.delete(r)
+        await s.commit()
+
+
 # ============================================================================
 # Phase 2A — SPIKE INTELLIGENCE
 # ============================================================================
