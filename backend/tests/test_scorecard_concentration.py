@@ -42,6 +42,10 @@ def _make_ticker(symbol: str, score: float, sector: str = "Tech",
         sub_rs=score,
         sub_macro=sub_macro,
         asset_class="equity",
+        # Non-null core display fields — valid_composite_clauses() now requires
+        # change_pct_1d + confidence_pct so incomplete rows can't rank publicly.
+        change_pct_1d=0.5,
+        confidence_pct=80.0,
     )
 
 
