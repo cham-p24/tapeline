@@ -776,8 +776,13 @@ async def test_daily_digest_sends_once_per_utc_day_and_dedupes(client, monkeypat
             if existing is None:
                 s.add(Ticker(
                     symbol=sym, name=sym, sector="Test",
-                    asset_class="📈 stock", score=sc, signal="STRONG SETUP",
+                    asset_class="equity", score=sc, signal="STRONG SETUP",
                     reason=f"test reason {sym}", price=10.0, confidence_pct=95.0,
+                    # Full valid shape so live_clauses() keeps them: >=2 factors
+                    # + non-null change_pct_1d/confidence_pct (the daily digest
+                    # ranks via the freshness floor). Makes the test self-
+                    # contained instead of relying on other tests' seeded rows.
+                    change_pct_1d=1.0, sub_trend=80.0, sub_rs=80.0,
                 ))
         # Seed a confirmed subscriber.
         sub = NewsletterSubscriber(

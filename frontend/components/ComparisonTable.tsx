@@ -1,5 +1,7 @@
 "use client";
 
+import { PRICING, usd, annualSaving } from "@/lib/pricing";
+
 /**
  * Three-column comparison: Free / Pro ($29.99/mo or $24.99/mo annual) /
  * Premium ($49.99/mo or $39.99/mo annual). Mirrors the gating in
@@ -117,13 +119,13 @@ export function ComparisonTable() {
                   Best value
                 </span>
                 <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-fg">Pro</span>
-                <span className="mt-2 block text-lg font-bold text-fg nums">$24.99</span>
-                <span className="block text-[10px] text-subtle">/mo · annual · save $60</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">{usd(PRICING.pro.annualPerMonth)}</span>
+                <span className="block text-[10px] text-subtle">{`/mo · annual · save $${annualSaving(PRICING.pro)}`}</span>
               </th>
               <th className="bg-accent/[0.04] px-3 py-5 text-center align-bottom">
                 <span className="block text-xs font-semibold uppercase tracking-wider text-accent">Premium</span>
-                <span className="mt-2 block text-lg font-bold text-fg nums">$39.99</span>
-                <span className="block text-[10px] text-subtle">/mo · annual · save $120</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">{usd(PRICING.premium.annualPerMonth)}</span>
+                <span className="block text-[10px] text-subtle">{`/mo · annual · save $${annualSaving(PRICING.premium)}`}</span>
               </th>
             </tr>
           </thead>
@@ -135,7 +137,7 @@ export function ComparisonTable() {
         </table>
       </div>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
-        All prices in USD · Monthly billing $5 / $10 higher
+        {`All prices in USD · Monthly billing $${(PRICING.pro.monthly - PRICING.pro.annualPerMonth).toFixed(0)} / $${(PRICING.premium.monthly - PRICING.premium.annualPerMonth).toFixed(0)} higher`}
       </div>
     </div>
   );

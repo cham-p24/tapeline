@@ -21,16 +21,26 @@ SEO endpoints.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Security
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import ApiKey, RegimeState, Ticker, User
-from app.services.api_keys import api_key_context, api_key_user
+from app.services.api_keys import api_key_context, api_key_header, api_key_user
 from app.services.tier import effective_limit
 
 router = APIRouter()
+
+# Docs-only metadata: standard error responses every key-authenticated route
+# can return. Wired into each GET decorator's `responses=` so the OpenAPI
+# schema (and the generated client docs) document the 401/403/429 contract
+# enforced in services/api_keys.authenticate_api_key. No runtime behaviour.
+_AUTH_RESPONSES: dict[int | str, dict] = {
+    401: {"description": "Missing, malformed, or unknown API key."},
+    403: {"description": "Key owner is not on a tier with API access (Premium)."},
+    429: {"description": "Daily API request quota for this key is exhausted."},
+}
 
 
 def _ticker_dict(r: Ticker) -> dict:
@@ -62,8 +72,9 @@ def _ticker_dict(r: Ticker) -> dict:
     }
 
 
-@router.get("/me")
+@router.get("/me", responses=_AUTH_RESPONSES)
 async def api_me(
+    _scheme: None = Security(api_key_header),
     ctx: tuple[User, ApiKey] = Depends(api_key_context),
 ) -> dict:
     """Identity + live quota for the presented key. Useful for clients to
@@ -82,12 +93,13 @@ async def api_me(
     }
 
 
-@router.get("/signals")
+@router.get("/signals", responses=_AUTH_RESPONSES)
 async def api_signals(
     limit: int = 1000,
     offset: int = 0,
-    min_score: float = 0,
+    min_score: float = Query(0, ge=0, le=100),
     signal: str | None = None,
+    _scheme: None = Security(api_key_header),
     _user: User = Depends(api_key_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -101,7 +113,9 @@ async def api_signals(
         .where(Ticker.score >= min_score)
     )
     if signal:
-        stmt = stmt.where(Ticker.signal == signal)
+        # Case-insensitive, whitespace-tolerant exact match so 'high conviction'
+        # and 'HIGH CONVICTION' both resolve to the same descriptive label.
+        stmt = stmt.where(func.upper(Ticker.signal) == signal.strip().upper())
     stmt = stmt.order_by(desc(Ticker.score)).limit(capped).offset(max(0, offset))
 
     rows = (await session.execute(stmt)).scalars().all()
@@ -113,9 +127,10 @@ async def api_signals(
     }
 
 
-@router.get("/ticker/{symbol}")
+@router.get("/ticker/{symbol}", responses=_AUTH_RESPONSES)
 async def api_ticker(
     symbol: str,
+    _scheme: None = Security(api_key_header),
     _user: User = Depends(api_key_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -130,8 +145,9 @@ async def api_ticker(
     return _ticker_dict(row)
 
 
-@router.get("/regime")
+@router.get("/regime", responses=_AUTH_RESPONSES)
 async def api_regime(
+    _scheme: None = Security(api_key_header),
     _user: User = Depends(api_key_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:

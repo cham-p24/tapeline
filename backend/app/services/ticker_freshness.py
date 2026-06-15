@@ -116,12 +116,19 @@ def valid_composite_clauses() -> list[ColumnElement[bool]]:
     ``Ticker`` query. Excludes the three corruption signatures (raw score >100,
     space/emoji-in-symbol annotations, <2 populated factors) while keeping
     legitimate futures (``=F``) and lightly-covered names (2+ factors).
+
+    Also requires the core display fields (``change_pct_1d`` + ``confidence_pct``)
+    be non-null: stale incomplete rows (e.g. crypto names that ingest a score but
+    never a 1-day change or confidence) would otherwise rank with blank columns on
+    the scanner / public signals surfaces.
     """
     return [
         Ticker.score.isnot(None),
         Ticker.score <= MAX_VALID_SCORE,
         Ticker.symbol.notlike("% %"),
         _FACTOR_COUNT >= MIN_FACTORS,
+        Ticker.change_pct_1d.isnot(None),
+        Ticker.confidence_pct.isnot(None),
     ]
 
 

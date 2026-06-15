@@ -84,6 +84,7 @@ async def test_public_signals_filters_by_signal_label(client):
         s.add_all([
             Ticker(symbol="TEST_HIC", name="Hic Inc", asset_class="equity",
                    score=92.0, signal="HIGH CONVICTION",
+                   change_pct_1d=1.2, confidence_pct=90,
                    sub_trend=90, sub_rs=88, sub_momentum=92),
             Ticker(symbol="TEST_NEU", name="Neutral Inc", asset_class="equity",
                    score=45.0, signal="NEUTRAL",
@@ -122,6 +123,7 @@ async def test_public_signals_min_score_floor(client):
         s.add_all([
             Ticker(symbol="TEST_HI", name="High Inc", asset_class="equity",
                    score=95.0, signal="HIGH CONVICTION",
+                   change_pct_1d=2.1, confidence_pct=92,
                    sub_trend=95, sub_rs=93, sub_momentum=96),
             Ticker(symbol="TEST_LO", name="Low Inc", asset_class="equity",
                    score=20.0, signal="WEAK",
@@ -179,7 +181,7 @@ async def test_public_signals_excludes_stale_ghost(client):
             # Fresh: lower score, current timestamp — anchors the window.
             Ticker(symbol="TEST_FRESH", name="Fresh Inc", asset_class="equity",
                    score=70.0, signal="STRONG SETUP",
-                   updated_at=now,
+                   updated_at=now, change_pct_1d=0.5, confidence_pct=75,
                    sub_trend=68, sub_rs=72, sub_momentum=70),
         ])
         await s.commit()
@@ -250,10 +252,12 @@ async def test_public_signals_excludes_corrupt_rows(client):
             # proves the symbol filter is space-specific, not "any non-alnum".
             Ticker(symbol="TESTOIL=F", name="Test Oil Future", asset_class="future",
                    score=80.0, signal="STRONG SETUP", updated_at=now,
+                   change_pct_1d=0.9, confidence_pct=65,
                    sub_trend=70, sub_rs=75, sub_macro=80),
             # Exactly two factors: the >=2 threshold is inclusive, so KEEP.
             Ticker(symbol="TEST_2F", name="Two Factor Inc", asset_class="equity",
                    score=70.0, signal="STRONG SETUP", updated_at=now,
+                   change_pct_1d=-0.4, confidence_pct=55,
                    sub_trend=65, sub_rs=75),
         ])
         await s.commit()

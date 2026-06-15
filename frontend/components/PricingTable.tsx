@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { PRICING } from "@/lib/pricing";
 
 type Billing = "monthly" | "annual";
 
@@ -22,7 +23,7 @@ const PLANS = [
   {
     name: "Pro",
     tagline: "Live scanner. Daily edge.",
-    prices: { monthly: 29.99, annual: 299.99 },
+    prices: { monthly: PRICING.pro.monthly, annual: PRICING.pro.annual },
     highlights: [
       "Full ~2,500 ticker universe, live",
       "Score + plain-English Why on every row",
@@ -39,7 +40,7 @@ const PLANS = [
   {
     name: "Premium",
     tagline: "For the serious operator.",
-    prices: { monthly: 49.99, annual: 479.99 },
+    prices: { monthly: PRICING.premium.monthly, annual: PRICING.premium.annual },
     // Premium-only additions on top of everything in Pro. Rendered in a
     // visually distinct block under the price so the upgrade reason is
     // obvious — not buried in a 7-bullet list that looks like Pro's.
