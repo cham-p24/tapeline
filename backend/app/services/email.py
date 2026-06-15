@@ -2181,6 +2181,7 @@ async def _build_newsletter_payload(session) -> dict:
     from sqlalchemy import desc, select
 
     from app.models import DailyScorecardEntry, NewsItem, RegimeState, Ticker
+    from app.models.news import exclude_mock_clause
 
     out: dict = {
         "regime": None, "movers": [], "scorecard": None, "headlines": [],
@@ -2257,7 +2258,12 @@ async def _build_newsletter_payload(session) -> dict:
     # Headlines — 3 most recent
     try:
         r = await session.execute(
-            select(NewsItem).order_by(desc(NewsItem.published_at)).limit(3)
+            # Never put a fabricated mock headline in an outbound email (LEGAL
+            # read-path invariant). See models.news.exclude_mock_clause.
+            select(NewsItem)
+            .where(exclude_mock_clause())
+            .order_by(desc(NewsItem.published_at))
+            .limit(3)
         )
         items = r.scalars().all()
         out["headlines"] = [

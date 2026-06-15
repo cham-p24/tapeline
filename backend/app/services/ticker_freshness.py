@@ -54,7 +54,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import cast
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -124,6 +124,18 @@ def valid_composite_clauses() -> list[ColumnElement[bool]]:
     be non-null: stale incomplete rows (e.g. crypto names that ingest a score but
     never a 1-day change or confidence) would otherwise rank with blank columns on
     the scanner / public signals surfaces.
+
+    Finally requires ``asset_class`` be a CLEAN, single-token ASCII value. The
+    sheet publishes the column with a leading emoji/icon and free spacing
+    ("\U0001F4C8 stock", "₿ crypto", "\U0001F947 commodity etf");
+    sheet_feed.normalize_asset_class strips that to a bare token at WRITE time,
+    but a row written before that normaliser existed — or one that slipped past
+    it — can still carry a decorated value and leak to /api/public/signals (the
+    "OPAL" with asset_class "\U0001F4C8 stock" leak). Like the symbol filter
+    (``notlike('% %')``) this is a *shape* test, not a whitelist, so legitimate
+    bare tokens — ``stock``, ``equity``, ``etf``, ``crypto``, ``commodity``,
+    ``future`` and any future addition — all pass untouched, while every
+    decorated/multi-word raw value is dropped. See asset_class_clean_clauses.
     """
     return [
         Ticker.score.isnot(None),
@@ -132,6 +144,41 @@ def valid_composite_clauses() -> list[ColumnElement[bool]]:
         _FACTOR_COUNT >= MIN_FACTORS,
         Ticker.change_pct_1d.isnot(None),
         Ticker.confidence_pct.isnot(None),
+        *asset_class_clean_clauses(),
+    ]
+
+
+# A clean, normalised asset_class is a single lowercase ASCII word: no spaces,
+# no emoji/icon decoration. The sheet's raw cell is "<emoji> <word>" (e.g.
+# "\U0001F4C8 stock") or multi-word ("commodity etf"); both have a space, which
+# the no-space clause rejects. The leading-ASCII-letter clause is the explicit
+# backstop for a hypothetical bare-emoji value ("\U0001F4C8stock") with no space.
+# 26 single-char patterns is the portable way to assert "first char is a-z/A-Z"
+# across Postgres + SQLite (neither shares a regex/GLOB operator).
+_ASCII_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def asset_class_clean_clauses() -> list[ColumnElement[bool]]:
+    """Predicates dropping any decorated / non-canonical ``asset_class``.
+
+    Two dialect-agnostic clauses:
+
+      1. ``notlike('% %')`` — no whitespace anywhere. Rejects the emoji-prefixed
+         "<emoji> <word>" form AND multi-word raws ("commodity etf").
+      2. first character is an ASCII letter — rejects any value starting with an
+         emoji/icon/non-letter. Implemented as an OR over single-char ``like``
+         patterns because Postgres (``~``) and SQLite (``GLOB``) don't share a
+         portable regex operator; ``like('a%') OR like('b%') OR …`` does.
+
+    Together they keep bare tokens (stock/equity/etf/crypto/commodity/future/…)
+    and drop "\U0001F4C8 stock", "₿ crypto", "" (empty), and "commodity etf".
+    """
+    first_char_is_letter = or_(
+        *[Ticker.asset_class.like(f"{c}%") for c in _ASCII_LETTERS]
+    )
+    return [
+        Ticker.asset_class.notlike("% %"),
+        first_char_is_letter,
     ]
 
 

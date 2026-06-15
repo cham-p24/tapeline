@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, get_session, is_sqlite
 from app.models import NewsItem, SqueezeSetup, Ticker
+from app.models.news import exclude_mock_clause
 from app.services.auth import current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions
@@ -169,6 +170,9 @@ async def _fetch_ticker_news(symbol: str) -> list[dict]:
                 await session.execute(
                     select(NewsItem)
                     .where(
+                        # Never surface fabricated mock headlines (LEGAL
+                        # read-path invariant). See models.news.exclude_mock_clause.
+                        exclude_mock_clause(),
                         NewsItem.tickers.like(f"%{symbol}%"),
                         NewsItem.published_at >= cutoff,
                     )

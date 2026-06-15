@@ -5,10 +5,10 @@ import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.db import get_session, is_sqlite
 from app.models import Ticker, User
 from app.services.auth import current_user_optional
 from app.services.ticker_freshness import live_clauses
@@ -16,6 +16,13 @@ from app.services.tier import Tier
 from app.services.tier import limit as tier_limit
 
 router = APIRouter()
+
+# Per-statement ceiling for the scanner's filtered/sorted scan. The 2026-06-01
+# pool-exhaustion incident was an unbounded query holding a pooled connection
+# until the pool drained; an 8s server-side cap (Postgres only — SQLite has no
+# statement_timeout) means a pathological filter combo is cancelled and 500s
+# fast instead of wedging the pool. Mirrors routers/ticker.py's news-scan guard.
+SCANNER_QUERY_TIMEOUT_MS = 8000
 
 # Module-level cache for /popular — recomputed every hour. The query is cheap
 # but we'd rather not run it on every empty-state render in /app/watchlist.
@@ -135,6 +142,16 @@ async def list_scanner(
     col = getattr(Ticker, sort)
     stmt = stmt.order_by(desc(col) if order == "desc" else col)
     stmt = stmt.limit(limit).offset(offset)
+
+    # Cap the scan server-side (Postgres only; SQLite has no statement_timeout
+    # and ignores this no-op skip) so a pathological filter combo can't hold a
+    # pooled connection open and drain the pool (the 2026-06-01 incident). A
+    # timed-out query raises and 500s fast instead of wedging — paired with the
+    # new composite index (migration 0035) the healthy path stays well under 8s.
+    if not is_sqlite():
+        await session.execute(
+            text(f"SET LOCAL statement_timeout = '{SCANNER_QUERY_TIMEOUT_MS}ms'")
+        )
 
     result = await session.execute(stmt)
     rows = result.scalars().all()

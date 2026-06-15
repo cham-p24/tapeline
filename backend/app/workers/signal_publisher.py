@@ -1427,11 +1427,44 @@ async def _seed_calendar() -> None:
     logger.info("calendar.refreshed")
 
 
+def _init_sentry() -> None:
+    """Initialise Sentry for the STANDALONE worker process.
+
+    The worker runs as its own ``python -m app.workers.signal_publisher``
+    process — it never imports app.main, so the Sentry init there (main.py:60)
+    does NOT run here. Without this, the ``tick.timeout_streak`` capture below
+    (and any unhandled worker exception) goes nowhere. Mirrors main.py's
+    env-gated config exactly: no-op when SENTRY_DSN is blank (dev / opt-out),
+    and any init failure is swallowed so the worker still runs unmonitored.
+    """
+    if not settings.sentry_dsn:
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.sentry_environment or settings.app_env,
+            traces_sample_rate=settings.sentry_traces_sample_rate,
+            release="tapeline@0.1.0",
+            # No request lifecycle in the worker — APM tracing isn't useful, but
+            # we keep the rate consistent with the API for spend predictability.
+            send_default_pii=False,
+        )
+        logger.info(
+            "sentry.initialized component=worker env=%s",
+            settings.sentry_environment or settings.app_env,
+        )
+    except Exception:
+        logger.exception("sentry.init_failed — worker continuing unmonitored")
+
+
 async def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    _init_sentry()
     logger.info("signal_publisher.start interval=%ds", settings.score_refresh_seconds)
 
     # Seed universe on first boot (idempotent)
@@ -1468,6 +1501,22 @@ async def main() -> None:
                     "consider `fly machine restart`",
                     consecutive_timeouts,
                 )
+                # logger.critical alone goes only to stdout/Fly logs — nobody
+                # is paged. Capture to Sentry (level=fatal) so the timeout
+                # streak actually surfaces. Guarded: a no-op when SENTRY_DSN is
+                # unset (sentry_sdk.init never ran) and never crashes the loop.
+                try:
+                    import sentry_sdk
+
+                    sentry_sdk.capture_message(
+                        f"signal_publisher tick timeout streak "
+                        f"(consecutive={consecutive_timeouts}, "
+                        f"limit={TICK_TIMEOUT_SECONDS}s) — worker appears "
+                        f"wedged; consider `fly machine restart`",
+                        level="fatal",
+                    )
+                except Exception:
+                    logger.exception("tick.timeout_streak.sentry_capture_failed")
         except Exception:
             logger.exception("tick.failure")
         await asyncio.sleep(settings.score_refresh_seconds)
