@@ -12,6 +12,9 @@ import { ScannerLegend } from "@/components/ScannerLegend";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { PresetMenu } from "@/components/PresetMenu";
+import { RegimeLabel } from "@/components/RegimeLabel";
+import { EarningsPill } from "@/components/EarningsPill";
+import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { useUser } from "@/components/UserContext";
 import {
   FilterBar,
@@ -107,6 +110,9 @@ export default function ScannerPage() {
   // belong in the server query and never triggers a refetch.
   const [assetClass, setAssetClass] = useState<AssetBucket>("");
   const [loading, setLoading] = useState(true);
+  // Upcoming-earnings lookup (symbol → next report date) for the row-level
+  // "reports in Nd" pill. Fetched once; non-fatal if it fails.
+  const earningsBySymbol = useEarningsCalendar(14);
 
   // Restore filter state from a saved preset blob. JSON-parsed by
   // PresetMenu before we get here; missing keys fall through to current
@@ -204,7 +210,14 @@ export default function ScannerPage() {
           <h1 className="text-2xl font-bold tracking-tight">Scanner</h1>
           <p className="text-sm text-muted">Every liquid US stock &amp; ETF, scored live on 6 factors.</p>
         </div>
-        <LiveBadge status={status} lastUpdate={lastUpdate} />
+        <div className="flex items-center gap-3">
+          {/* Market-regime context: every score below is computed under this
+              regime (it multiplies the composite). Stating it once at the
+              top is the honest read since the regime is market-wide, not
+              per-row. */}
+          <RegimeLabel />
+          <LiveBadge status={status} lastUpdate={lastUpdate} />
+        </div>
       </div>
 
       <ScannerLegend />
@@ -350,7 +363,22 @@ export default function ScannerPage() {
             ) : visibleRows.map((r) => (
               <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">
-                  <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
+                      {/* Earnings pill — only shows when a report is within
+                          the next week. Descriptive ("Reports in 3d"), never
+                          prescriptive. */}
+                      <EarningsPill reportDate={earningsBySymbol.get(r.symbol)} />
+                    </div>
+                    {/* Company name. `name` ships on the scanner row but was
+                        previously unused, so the name column read blank. Fall
+                        back to the symbol when the name is genuinely absent so
+                        it's never empty. */}
+                    <span className="text-xs font-normal text-muted">
+                      {companyName(r.name, r.symbol)}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-2 text-muted text-xs">{r.sector}</td>
                 <td className={`px-4 py-2 text-right ${scoreColor(r.score)}`}>
@@ -427,6 +455,16 @@ function confidenceLabel(c: number | null | undefined) {
   if (c >= 60) return `${c.toFixed(0)}% — typical liquid stock, core data present`;
   if (c >= 40) return `${c.toFixed(0)}% — only basic price/trend data`;
   return `${c.toFixed(0)}% — sparse data, deprioritise`;
+}
+// Company name with a graceful fallback. Some un-enriched tickers come back
+// with a null/blank/placeholder name (the backend occasionally echoes the
+// symbol when it hasn't resolved a name yet) — in every such case fall back
+// to the symbol so the name column is never blank.
+function companyName(name: string | null | undefined, symbol: string): string {
+  const n = (name ?? "").trim();
+  if (!n) return symbol;
+  if (n.toUpperCase() === symbol.toUpperCase()) return symbol;
+  return n;
 }
 function fmt(n: number | null) { return n == null ? "—" : (n >= 0 ? "+" : "") + n.toFixed(2) + "%"; }
 function compactNum(n: number | null) {

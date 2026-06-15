@@ -96,6 +96,9 @@ async def get_heatmap(
         bucket = canonical_sector(t.sector, t.asset_class)
         sectors[bucket].append({
             "symbol": t.symbol,
+            # Company name so the frontend can show it (tile tooltip) instead
+            # of leaving the name blank for tickers the UI couldn't resolve.
+            "name": t.name,
             "score": t.score,
             "price": t.price,
             "change_pct_1d": t.change_pct_1d,

@@ -258,7 +258,7 @@ export default function HeatmapPage() {
                     key={t.symbol}
                     href={`/app/ticker/${t.symbol}`}
                     style={bgStyle}
-                    title={`${t.symbol} · ${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${vol.toLocaleString()} vol`}
+                    title={`${tileName(t.name, t.symbol)} · ${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${vol.toLocaleString()} vol`}
                     className={`${size} flex flex-col items-center justify-center rounded-md px-2 text-center transition hover:ring-2 hover:ring-accent hover:ring-offset-1 hover:ring-offset-background`}
                   >
                     <span className="font-mono text-sm font-bold leading-tight">{t.symbol}</span>
@@ -275,4 +275,13 @@ export default function HeatmapPage() {
       </Paywall>
     </div>
   );
+}
+
+// Tile tooltip label — prefer the company name; fall back to the symbol when
+// the name is null/blank or just echoes the symbol, so the tooltip is never
+// just an empty " · +1.20% · 1,234 vol".
+function tileName(name: string | null | undefined, symbol: string): string {
+  const n = (name ?? "").trim();
+  if (!n || n.toUpperCase() === symbol.toUpperCase()) return symbol;
+  return `${symbol} — ${n}`;
 }

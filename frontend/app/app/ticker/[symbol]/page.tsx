@@ -15,6 +15,8 @@ import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
+import { EarningsPill } from "@/components/EarningsPill";
+import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 
 type DetailTab = "financials" | "insider";
 
@@ -28,6 +30,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const [newsAlerting, setNewsAlerting] = useState(false);
   const [newsAlertMsg, setNewsAlertMsg] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("financials");
+  // Upcoming-earnings lookup for the header pill. 14-day window matches the
+  // earnings page; non-fatal if it fails (pill just won't show).
+  const earningsBySymbol = useEarningsCalendar(14);
 
   const load = useCallback(async () => {
     try { setData(await api.ticker(symbol)); setError(null); }
@@ -138,7 +143,12 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
             <Link href="/app/scanner" className="text-muted hover:text-fg text-sm">&larr; Scanner</Link>
             <LiveBadge status={status} lastUpdate={lastUpdate} />
           </div>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight font-mono">{data.symbol}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-4xl font-bold tracking-tight font-mono">{data.symbol}</h1>
+            {/* Earnings pill — surfaces an imminent report as a catalyst.
+                Descriptive ("Reports in 3d"), never prescriptive. */}
+            <EarningsPill reportDate={earningsBySymbol.get(data.symbol)} />
+          </div>
           <p className="mt-1 text-muted">{data.name} &middot; {data.sector}</p>
         </div>
         <div className="text-right">

@@ -240,6 +240,9 @@ export type HeatmapSector = {
   sector: string;
   tickers: Array<{
     symbol: string;
+    // Company name — optional for backwards-compat with any cached response
+    // that predates the backend adding it. The UI falls back to the symbol.
+    name?: string | null;
     score: number;
     price: number;
     change_pct_1d: number;
@@ -502,6 +505,34 @@ export const api = {
       await throwForStatus(res);
     }
     return res.json() as Promise<{ prefs: Record<EmailPrefKey, boolean> }>;
+  },
+  /**
+   * Earnings calendar — next `days` of US equity earnings reports. Same
+   * endpoint the /app/earnings page consumes; surfaced here so the scanner
+   * and ticker pages can build a symbol → next-report-date lookup for the
+   * row-level "earnings this week" pill without a bespoke fetch. Rows come
+   * back ordered by report_date ascending, so the first hit per symbol is
+   * the soonest upcoming report.
+   */
+  earnings: (params: { days?: number; symbol?: string } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set("days", String(params.days ?? 14));
+    if (params.symbol) qs.set("symbol", params.symbol);
+    return get<{
+      count: number;
+      items: Array<{
+        id: number;
+        symbol: string;
+        report_date: string; // YYYY-MM-DD
+        report_time: string;
+        fiscal_quarter: string;
+        eps_estimate: number | null;
+        eps_actual: number | null;
+        revenue_estimate_m: number | null;
+        revenue_actual_m: number | null;
+        surprise_pct: number | null;
+      }>;
+    }>(`/api/earnings?${qs}`);
   },
   news: (symbol?: string, limit = 20) => {
     const qs = new URLSearchParams({ limit: String(limit), ...(symbol ? { symbol } : {}) });
