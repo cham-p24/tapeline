@@ -154,34 +154,43 @@ export default function VsZacksPage() {
           Tapeline if you want transparency + speed; pick Zacks if 37 years of brand
           history outweighs everything else.
         </p>
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-up/30 bg-up/5 px-4 py-2 text-sm text-up">
-          <span className="text-base">✓</span>
-          <span><strong>11 categories</strong> Tapeline wins outright. <strong>3</strong> honest tradeoffs.</span>
-        </div>
+        {/* Hype pill removed 2026-06-16 — counting categories Tapeline "wins
+            outright" reads as marketing, not honesty (matches the finviz
+            reference page). The table below speaks for itself. */}
       </section>
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-up">
-            Where Tapeline wins
-          </h2>
-          <span className="text-[10px] uppercase tracking-wider text-subtle">All prices in USD</span>
-        </div>
+        {/* "All prices in USD" used to float top-right next to this heading —
+            looked orphaned, especially because the table has no prices.
+            Moved into the data-provenance footer at the bottom of the page. */}
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-up">
+          Where Tapeline wins
+        </h2>
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+          <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: "32%" }} />
+              <col style={{ width: "36%" }} />
+              <col style={{ width: "32%" }} />
+            </colgroup>
+            <thead className="border-b border-border bg-panel/60 text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">Feature</th>
-                <th className="px-4 py-3 text-left text-accent">Tapeline</th>
-                <th className="px-4 py-3 text-left">Zacks Premium</th>
+                <th className="px-4 py-3 text-left text-accent border-l border-border/40">Tapeline</th>
+                <th className="px-4 py-3 text-left border-l border-border/40">Zacks Premium</th>
               </tr>
             </thead>
             <tbody>
-              {WINS.map((r) => (
-                <tr key={r.label} className="border-b border-border/30">
-                  <td className="px-4 py-3 font-medium">{r.label}</td>
-                  <td className="px-4 py-3 font-medium text-accent">{r.tapeline}</td>
-                  <td className="px-4 py-3 text-subtle">{r.competitor}</td>
+              {WINS.map((r, i) => (
+                <tr
+                  key={r.label}
+                  className={"border-b border-border/30 " + (i % 2 === 1 ? "bg-panel/40" : "")}
+                >
+                  <td className="px-4 py-3 font-medium align-top min-h-[3rem]">{r.label}</td>
+                  <td className="px-4 py-3 font-medium text-accent align-top border-l border-border/30 min-h-[3rem]">{r.tapeline}</td>
+                  <td className="px-4 py-3 text-muted align-top border-l border-border/30 min-h-[3rem]">
+                    {r.competitor === "—" ? "Not available" : r.competitor}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -238,7 +247,7 @@ export default function VsZacksPage() {
       </section>
 
       <p className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 text-center text-[11px] text-subtle">
-        Comparison data verified {VERIFIED_ON}. Competitor pricing and feature claims sourced from
+        Comparison data verified {VERIFIED_ON}. All prices in USD. Competitor pricing and feature claims sourced from
         their public pages. Spot a mistake?{" "}
         <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> — we
         update within 48 hours.
