@@ -158,6 +158,31 @@ async def accept_save_offer(
     user.canceled_at = None
     user.winback_state = ""
     await session.commit()
+
+    # Transactional confirmation — fire-and-forget so a Resend hiccup never
+    # 500s the save-offer accept. No List-Unsubscribe header: it's account
+    # state (a billing change the user just made), not marketing.
+    if user.email:
+        try:
+            from app.services.email import render_save_offer_accepted_email, send_email
+
+            html = render_save_offer_accepted_email(
+                user.name or "trader",
+                tier=user.tier,
+            )
+            await send_email(
+                user.email,
+                "Your Tapeline discount is applied — 50% off for 3 months",
+                html,
+                persona="billing",
+            )
+        except Exception:  # email must never block the save-offer accept
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "billing.save_offer_email_failed user=%s", user.id
+            )
+
     return {
         "ok": True,
         "message": "Done — your next 3 months are 50% off. Same plan, half the price.",

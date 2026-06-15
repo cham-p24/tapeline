@@ -1164,6 +1164,49 @@ def render_subscription_canceled_email(
     )
 
 
+def render_save_offer_accepted_email(user_name: str, *, tier: str) -> str:
+    """Transactional confirmation that the one-time 50%-off-3-months save
+    offer was applied (POST /billing/save-offer → accept_save_offer).
+
+    Sent right after we stamp `User.save_offer_redeemed_at`. The customer was
+    on the way out, accepted the retention coupon, and is staying — so the tone
+    is warm + reassuring, confirming exactly what changed (half price for three
+    months, same plan, nothing else moves) without any advice language.
+    Transactional/account-state: persona "billing", no List-Unsubscribe."""
+    tier_label = (tier or "your plan").capitalize()
+    return shell(
+        h1(f"You're staying — and it's 50% off, {user_name}.")
+        + lead(
+            f"Done. Your Tapeline {tier_label} subscription stays exactly as it "
+            f"is, and the discount is already applied — nothing else changes, and "
+            f"your watchlist, alerts, and saved scans carry on uninterrupted."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Discount applied</div>'
+            f'<div style="margin-top:6px;font-family:{FONT_MONO};font-size:24px;font-weight:700;color:{SIG_BULL};line-height:1;">50% off · 3 months</div>'
+            f'<p class="tl-fg" style="margin:10px 0 0;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+            f"Your next three {tier_label} charges are half price, applied "
+            "automatically — there's no code to enter. After three months it "
+            "returns to the standard rate, and you can change or cancel any time."
+            "</p>",
+            accent=True,
+        )
+        + muted_paragraph(
+            "Glad you're sticking around. Pick up right where you left off — the "
+            "scanner, your watchlist, and every alert channel are all live."
+        )
+        + button(
+            "Open the scanner",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=save_offer&utm_medium=transactional",
+        )
+        + footnote(
+            "Questions about the discount or your bill? Reply to this email — "
+            "billing@tapeline.io reads every reply."
+        ),
+        preheader=f"Your {tier_label} stays at 50% off for 3 months — applied automatically.",
+    )
+
+
 # ── EOD watchlist digest ────────────────────────────────────────────────────
 
 def _today_short() -> str:
@@ -1573,6 +1616,137 @@ def render_founder_touch_email(user_name: str) -> str:
         + footnote("Thanks for giving it a shot. — Christian, founder, Tapeline"),
         preheader="A quick personal hello from Tapeline's founder.",
     )
+
+
+# ── Security + privacy confirmations ─────────────────────────────────────────
+#
+# Account-state notifications a user can't opt out of: persona "default"
+# (transactional onboarding/account hub, hello@), no List-Unsubscribe, no
+# email_prefs gate. Calm + procedural voice — these are "for your records"
+# receipts, not marketing. Descriptive only; no advice language.
+
+def render_security_confirmation_email(
+    user_name: str,
+    *,
+    change: str,
+    when_label: str | None = None,
+) -> str:
+    """Confirmation that a security-relevant change just happened on the
+    account — e.g. a completed password reset.
+
+    `change` is a short human phrase describing what changed (e.g.
+    "Your password was changed"). The email reassures the user it was them,
+    and gives a clear "wasn't me?" recovery path if it wasn't. We never echo
+    the new password or any secret — just the fact that the change occurred.
+
+    Sent immediately after the change lands (e.g. password-reset completion).
+    Transactional security receipt: persona "default", no List-Unsubscribe."""
+    when_line = f" on {when_label}" if when_label else ""
+    return shell(
+        h1(f"{change}, {user_name}.")
+        + lead(
+            f"This is a confirmation for your records: {change.lower()}"
+            f"{when_line}. If this was you, you're all set — there's nothing "
+            "else to do."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Didn\'t make this change?</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+            "If you didn't do this, your account may be at risk. Reset your "
+            "password right away, and reply to this email so we can help secure "
+            "things — every reply reaches a real person.</p>"
+            + button(
+                "Secure my account",
+                "https://tapeline.io/app/account?utm_source=email&utm_campaign=security_confirmation&utm_medium=transactional",
+            ),
+            accent=True,
+        )
+        + footnote(
+            "We send this whenever a sensitive change happens on your account "
+            "so an unexpected one never slips by unnoticed. Questions? Reply or "
+            "email support@tapeline.io."
+        ),
+        preheader=f"Security confirmation: {change.lower()}{when_line}.",
+    )
+
+
+def render_gdpr_confirmation_email(
+    user_name: str,
+    *,
+    kind: str,
+) -> str:
+    """Confirmation of a data-rights request. `kind` in {"export", "deletion"}.
+
+    Wired into the account router:
+      - "export"   — GDPR Art. 15 data-access export (GET /account/export)
+      - "deletion" — GDPR Art. 17 erasure (DELETE /account)
+
+    For deletion, this is the LAST email the account ever receives — so it must
+    be sent before (or be captured from) the user row being removed. Calm,
+    procedural, reassuring. Descriptive only; no advice language."""
+    if kind == "deletion":
+        body = (
+            h1(f"Your account has been deleted, {user_name}.")
+            + lead(
+                "As you requested, we've permanently deleted your Tapeline "
+                "account and the personal data tied to it — your profile, "
+                "watchlist, alert rules, alert history, and subscription "
+                "records. This action is final and can't be undone."
+            )
+            + card(
+                f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">What happens now</div>'
+                f'<p class="tl-fg" style="margin:8px 0 0;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+                "You won't receive any further emails from us. A small amount "
+                "of information may persist in routine backups for a short "
+                "retention window before it's overwritten, and we may keep "
+                "limited records where the law requires (for example, billing "
+                "history for tax purposes).</p>",
+                accent=True,
+            )
+            + muted_paragraph(
+                "If you'd like to use Tapeline again in the future, you're "
+                "always welcome to sign up fresh. Thanks for giving it a try."
+            )
+            + footnote(
+                "Sent to confirm your erasure request (GDPR Article 17). "
+                "Didn't request this? Reply to this email immediately — "
+                "support@tapeline.io reaches a real person."
+            )
+        )
+        preheader = "Confirming your Tapeline account and personal data have been deleted."
+    else:
+        body = (
+            h1(f"Your data export is ready, {user_name}.")
+            + lead(
+                "As you requested, we've generated a copy of the personal data "
+                "we hold about you — your profile, watchlist, alert rules, "
+                "alert history, and subscription records — and started the "
+                "download in your browser."
+            )
+            + card(
+                f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your export</div>'
+                f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
+                "The file is a single JSON document. If the download didn't "
+                "start, open your account page and request it again — it's "
+                "ready any time.</p>"
+                + button(
+                    "Open my account",
+                    "https://tapeline.io/app/account?utm_source=email&utm_campaign=gdpr_export&utm_medium=transactional",
+                ),
+                accent=True,
+            )
+            + muted_paragraph(
+                "We send this confirmation so you have a record of when a copy "
+                "of your data was generated."
+            )
+            + footnote(
+                "Sent to confirm your data-access request (GDPR Article 15). "
+                "Didn't request this? Reply to this email — support@tapeline.io "
+                "reaches a real person."
+            )
+        )
+        preheader = "Your Tapeline data export is ready — download started in your browser."
+    return shell(body, preheader=preheader)
 
 
 # ── Worker orchestration ────────────────────────────────────────────────────
