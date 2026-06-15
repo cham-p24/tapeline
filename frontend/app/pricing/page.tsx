@@ -11,7 +11,7 @@ import { PRICING, usd } from "@/lib/pricing";
 export const metadata = pageMeta({
   title: `Tapeline Pricing: Pro ${usd(PRICING.pro.annualPerMonth)}/mo · Premium ${usd(PRICING.premium.annualPerMonth)}/mo · 14-Day Free Trial`,
   description:
-    `Tapeline plans: Free (top 20 tickers, 24-hour delayed), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo (annual) for the live ~2,500-ticker universe, Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (annual) adds Congressional trades, recent insider buys (SEC Form 4), Telegram alerts. 14-day Premium trial, no credit card.`,
+    `Tapeline pricing: Free (top 20, delayed), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo, Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (Congress + insider Form 4). 14-day Premium trial, no card.`,
   path: "/pricing",
 });
 
