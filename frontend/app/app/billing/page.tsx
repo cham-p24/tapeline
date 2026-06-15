@@ -16,12 +16,13 @@ import {
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
+import { PRICING, usd, annualSaving } from "@/lib/pricing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-// Tier metadata used by the hero + upgrade flow. Single source of truth — when
-// pricing changes, edit here and the comparison/pricing pages stay in sync via
-// the shared ComparisonTable + PricingTable components.
+// Tier metadata used by the hero + upgrade flow. Prices come from the shared
+// single source of truth in lib/pricing.ts so this page, the comparison/pricing
+// tables, the page metadata, and the JSON-LD Offer blocks can never drift apart.
 const TIER_META = {
   free: {
     name: "Free",
@@ -32,16 +33,16 @@ const TIER_META = {
   },
   pro: {
     name: "Pro",
-    monthly: 29.99,
-    annual: 299.99,
-    annualMonthly: 24.99,
+    monthly: PRICING.pro.monthly,
+    annual: PRICING.pro.annual,
+    annualMonthly: PRICING.pro.annualPerMonth,
     blurb: "Live scanner. Daily edge.",
   },
   premium: {
     name: "Premium",
-    monthly: 49.99,
-    annual: 479.99,
-    annualMonthly: 39.99,
+    monthly: PRICING.premium.monthly,
+    annual: PRICING.premium.annual,
+    annualMonthly: PRICING.premium.annualPerMonth,
     blurb: "Everything, no limits.",
   },
 } as const;
@@ -407,8 +408,8 @@ export default function BillingPage() {
             />
             <Plan
               name="Pro"
-              price={billingPeriod === "annual" ? "$24.99" : "$29.99"}
-              note={billingPeriod === "annual" ? "$299.99/yr · billed annually · save $60" : "billed monthly"}
+              price={billingPeriod === "annual" ? usd(TIER_META.pro.annualMonthly) : usd(TIER_META.pro.monthly)}
+              note={billingPeriod === "annual" ? `${usd(TIER_META.pro.annual)}/yr · billed annually · save $${annualSaving(TIER_META.pro)}` : "billed monthly"}
               items={[
                 "Full ~2,500 ticker universe, live",
                 "Score breakdown + Why on every row",
@@ -426,8 +427,8 @@ export default function BillingPage() {
             />
             <Plan
               name="Premium"
-              price={billingPeriod === "annual" ? "$39.99" : "$49.99"}
-              note={billingPeriod === "annual" ? "$479.99/yr · billed annually · save $120" : "billed monthly"}
+              price={billingPeriod === "annual" ? usd(TIER_META.premium.annualMonthly) : usd(TIER_META.premium.monthly)}
+              note={billingPeriod === "annual" ? `${usd(TIER_META.premium.annual)}/yr · billed annually · save $${annualSaving(TIER_META.premium)}` : "billed monthly"}
               proPlus
               items={[
                 "Congressional trades feed (House + Senate)",
@@ -469,7 +470,7 @@ export default function BillingPage() {
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
               title="Bloomberg-grade data"
-              body="Same shape of inputs quant funds use — live market data, macro indicators, fundamentals, SEC filings. Bloomberg Terminal: $31,980/yr. You: $479.99/yr."
+              body={`Same shape of inputs quant funds use — live market data, macro indicators, fundamentals, SEC filings. Bloomberg Terminal: $31,980/yr. You: ${usd(PRICING.premium.annual)}/yr.`}
             />
             <Selling
               title="Public scorecard, day 1"
