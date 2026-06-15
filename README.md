@@ -2,7 +2,7 @@
 
 **A live quantitative market scanner for retail traders.**
 
-Tapeline surfaces high-conviction technical and fundamental signals across US equities, ETFs, and crypto. It scores ~2,500 tickers every minute during market hours, detects Bollinger Band squeezes and volume expansions, tracks Congressional trades and institutional flows, and classifies the overall market regime.
+Tapeline surfaces high-conviction technical and fundamental signals across US stocks and ETFs. It scores ~2,500 tickers every minute during market hours, detects Bollinger Band squeezes and volume expansions, tracks Congressional trades and institutional flows, and classifies the overall market regime.
 
 Built on the same engine that powers a production personal trading bot.
 

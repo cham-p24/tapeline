@@ -296,6 +296,39 @@ async def inbox_stats(
     cap_usd = float(settings.inbox_claude_daily_cap_usd)
     cap_tripped = await inbox_kill_switch.cap_exceeded(session)
 
+    # LLM error/failure surfacing. classify_with_llm logs every failed
+    # Anthropic call (timeout, 401 on a dead key, parse failure, …) to
+    # inbox_classification_log with a non-null `error` and falls back to a
+    # Tier-1 manual-review default — silently. On the $0-Anthropic-credit
+    # incident EVERY call 401'd but the bot looked "up" because tier counts
+    # kept moving. Surface a 24h error count + last-error timestamp so the
+    # operator strip turns red the moment classification starts failing.
+    error_row = (await session.execute(
+        select(
+            func.count(InboxClassificationLog.id),
+            func.max(InboxClassificationLog.created_at),
+        ).where(
+            InboxClassificationLog.created_at >= day_start,
+            InboxClassificationLog.error.isnot(None),
+        )
+    )).one()
+    llm_errors_24h = int(error_row[0] or 0)
+    last_error_at = error_row[1].isoformat() if error_row[1] else None
+
+    # Error RATE over the same 24h window: how many of the LLM-attempted
+    # classifications failed. A high rate (→ 1.0) means the LLM path is broadly
+    # broken even if absolute volume is low. We count only rows that actually
+    # attempted a model call (model name starts with 'claude-') as the
+    # denominator — the rule-based / cap-exceeded / no-api-key short-circuits
+    # never hit the API, so including them would mask the failure rate.
+    llm_attempts_24h = int((await session.execute(
+        select(func.count(InboxClassificationLog.id)).where(
+            InboxClassificationLog.created_at >= day_start,
+            InboxClassificationLog.model.like("claude-%"),
+        )
+    )).scalar_one() or 0)
+    llm_error_rate = (llm_errors_24h / llm_attempts_24h) if llm_attempts_24h > 0 else 0.0
+
     # Tier counts today + last 7 days (group by tier).
     async def _tier_counts(since: datetime) -> dict[str, int]:
         rows = (await session.execute(
@@ -369,6 +402,12 @@ async def inbox_stats(
         "today_classifications": today_classifications,
         "cap_usd": cap_usd,
         "cap_tripped": bool(cap_tripped),
+        # LLM health — non-zero llm_errors_24h means classification calls are
+        # failing and the bot has silently degraded to manual-review-everything.
+        "llm_errors_24h": llm_errors_24h,
+        "llm_attempts_24h": llm_attempts_24h,
+        "llm_error_rate": round(llm_error_rate, 3),
+        "last_error_at": last_error_at,
         "tier_counts_today": tier_counts_today,
         "tier_counts_last_7d": tier_counts_7d,
         "channel_counts_today": channel_counts_today,

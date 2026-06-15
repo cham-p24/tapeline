@@ -36,6 +36,7 @@ from app.models import (
     User,
     WatchlistItem,
 )
+from app.models.news import exclude_mock_clause
 from app.services.email import render_alert_email, render_watchlist_alert_email, send_email
 
 logger = logging.getLogger(__name__)
@@ -306,6 +307,9 @@ async def evaluate_news_rules(session: AsyncSession) -> int:
         wrapped = literal_column("(',' || tickers || ',')")
         q = (
             select(NewsItem)
+            # Never fire a news alert on a fabricated mock headline (LEGAL
+            # read-path invariant). See models.news.exclude_mock_clause.
+            .where(exclude_mock_clause())
             .where(NewsItem.published_at > cutoff)
             .where(wrapped.like(like_pattern))
             .order_by(desc(NewsItem.published_at))

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import NewsItem
+from app.models.news import exclude_mock_clause
 
 router = APIRouter()
 
@@ -27,12 +28,21 @@ async def list_news(
     symbol: str | None = None,
     limit: int = Query(30, ge=1, le=100),
 ) -> dict:
-    stmt = select(NewsItem).order_by(desc(NewsItem.published_at)).limit(limit)
+    # Permanent read-path invariant: never serve fabricated mock headlines.
+    # See app.models.news.exclude_mock_clause — defence-in-depth on top of the
+    # write-path boot purge in workers/signal_publisher.py.
+    stmt = (
+        select(NewsItem)
+        .where(exclude_mock_clause())
+        .order_by(desc(NewsItem.published_at))
+        .limit(limit)
+    )
     if symbol:
         cutoff = datetime.now(UTC) - timedelta(days=NEWS_LOOKBACK_DAYS)
         stmt = (
             select(NewsItem)
             .where(
+                exclude_mock_clause(),
                 NewsItem.tickers.like(f"%{symbol.upper()}%"),
                 NewsItem.published_at >= cutoff,
             )

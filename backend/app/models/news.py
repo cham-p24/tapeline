@@ -5,8 +5,34 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, Float, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.db import Base
+
+# Prefix stamped on every synthetic headline minted by
+# news_feed._mock_news ("mock-{symbol}-{uuid}"). It is the ONLY deterministic
+# mock marker: the mock path reuses real publisher names (Reuters, Bloomberg,
+# …) so `publisher` can't be trusted as a discriminator. The boot-time purge in
+# workers/signal_publisher.py deletes these rows, but a future _mock_news
+# fallback could re-mint them; this prefix is the read-path invariant's anchor.
+MOCK_ID_PREFIX = "mock-"
+
+
+def exclude_mock_clause() -> ColumnElement[bool]:
+    """WHERE clause that drops fabricated mock headlines from any read.
+
+    LEGAL invariant: mock headlines include analyst-style "Buy"/"Overweight"
+    lines (see news_feed._MOCK_HEADLINES). Tapeline publishes transparent
+    historical model output, never fabricated recommendations — so NO public
+    news read path may ever serve a `mock-` row, even if the write-path boot
+    purge (workers/signal_publisher.py) hasn't run or a future fallback
+    re-mints them. Apply on every public NewsItem query::
+
+        stmt = select(NewsItem).where(exclude_mock_clause())
+
+    Defence-in-depth, not a substitute for the write-path purge.
+    """
+    return NewsItem.id.notlike(f"{MOCK_ID_PREFIX}%")
 
 
 class NewsItem(Base):
