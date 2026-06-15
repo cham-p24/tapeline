@@ -23,6 +23,7 @@ import secrets
 from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request
+from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +40,14 @@ _PREFIX_LEN = 16
 MAX_KEYS_PER_USER = 10
 # Feature flag gating both minting and authentication (Premium).
 API_FEATURE = "api.access"
+
+# OpenAPI security scheme — documents the `X-API-Key` header on the `/api/v1/*`
+# surface so the generated schema (and any client codegen) advertises key auth.
+# `auto_error=False` makes this a pure no-op at runtime: the real key extraction
+# + tier/quota enforcement still happens in `_extract_key` + `authenticate_api_key`
+# (which also accept `Authorization: Bearer tl_live_…`). Wire it as a
+# `Security(api_key_header)` dependency on each route for the docs metadata only.
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def hash_key(raw: str) -> str:

@@ -81,6 +81,35 @@ def _vendor_key() -> str:
     return settings.massive_api_key or settings.polygon_api_key or ""
 
 
+def _any_vendor_configured() -> bool:
+    """True when ANY real news vendor (Massive/Polygon, Benzinga, Finnhub) has
+    a key set.
+
+    Used to gate `_mock_news`: in prod (a vendor is configured) we must NEVER
+    fall back to synthesised headlines — those contain prescriptive "Buy"
+    language that would breach the publisher-exemption posture and present
+    fabricated data as live. When a vendor IS configured but returns nothing
+    for a genuine long-tail ticker, callers return [] so the UI shows an
+    empty "no recent news" state instead of fakes. `_mock_news` stays as a
+    pure no-key dev fallback only.
+    """
+    if _vendor_key():
+        return True
+    try:
+        from app.services import benzinga_feed as bz
+        if bz.is_configured():
+            return True
+    except Exception:
+        logger.exception("news.benzinga_config_check_failed")
+    try:
+        from app.services import finnhub_feed as fh
+        if fh.configured():
+            return True
+    except Exception:
+        logger.exception("news.finnhub_config_check_failed")
+    return False
+
+
 async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, Any]]:
     """Get recent news items mentioning a specific symbol.
 
@@ -125,7 +154,9 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
 
     coros = [t for t in (bz_task, massive_task, fh_task) if t is not None]
     if not coros:
-        return _mock_news(symbol, limit)
+        # No source resolved. If a vendor is configured (prod) this is a
+        # genuine no-coverage long-tail ticker — return empty, never mock.
+        return [] if _any_vendor_configured() else _mock_news(symbol, limit)
 
     results = await asyncio.gather(*coros, return_exceptions=True)
 
@@ -138,7 +169,9 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
             merged.extend(r)
 
     if not merged:
-        return _mock_news(symbol, limit)
+        # Every configured source returned nothing — true no-coverage ticker.
+        # In prod (a vendor is configured) render an empty state, never mock.
+        return [] if _any_vendor_configured() else _mock_news(symbol, limit)
 
     # Dedupe by id (different sources can occasionally surface the same
     # article via licensing partnerships).
@@ -175,6 +208,10 @@ async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
                 return rows
         except Exception:
             logger.exception("news.latest_fetch_failed")
+    # A vendor is configured but produced nothing this cycle — return empty
+    # rather than synthesised headlines. Mock is a pure no-key dev fallback.
+    if _any_vendor_configured():
+        return []
     # Mix of tickers for the markets/news landing
     from app.services.mock_feed import TICKER_UNIVERSE
     tickers = random.sample([t[0] for t in TICKER_UNIVERSE], k=min(limit, len(TICKER_UNIVERSE)))

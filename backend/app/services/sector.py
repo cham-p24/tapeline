@@ -219,6 +219,8 @@ def canonical_sector(raw: str | None, asset_class: str | None = None) -> str:
     # tags its 32 commodity ETFs that way explicitly).
     if asset_class:
         ac = asset_class.strip().lower()
+        if ac in ("commodity", "commodities"):
+            return TAPE_COMMODITIES
         if ac in ("etf", "fund"):
             return TAPE_ETF
     return TAPE_UNCATEGORIZED

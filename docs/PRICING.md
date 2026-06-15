@@ -25,7 +25,7 @@
 **$49.99/mo** or **$39.99/mo billed annually** ($479.99/yr · save $120)
 - Everything in Pro
 - **Congressional trade feed** (daily updates, ticker aggregation)
-- **Elite 13F holdings** (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer)
+- **Recent insider buys** — live SEC Form 4 transactions across the active universe, refreshed daily
 - **Telegram alerts** (unlimited)
 - **API access** (1,000 requests/day)
 - Email alerts: unlimited
