@@ -890,6 +890,11 @@ async def _refresh_news() -> None:
     skipped_dup = 0
     failed = 0
     for it in items:
+        # Defense-in-depth: a mock row must never be persisted in prod. The
+        # boot wipe + news_feed's vendor guard should already prevent this,
+        # but belt-and-suspenders here too.
+        if str(it.get("id", "")).startswith("mock-"):
+            continue
         try:
             async with session_scope() as session:
                 exists = await session.execute(
@@ -959,6 +964,9 @@ async def _refresh_watchlisted_news() -> None:
             logger.exception("watchlisted_news.fetch_failed symbol=%s", sym)
             continue
         for it in articles:
+            # Defense-in-depth: never persist a mock row in prod.
+            if str(it.get("id", "")).startswith("mock-"):
+                continue
             try:
                 async with session_scope() as session:
                     exists = await session.execute(

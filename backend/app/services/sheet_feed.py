@@ -86,6 +86,49 @@ _CONVICTION_TO_CONFIDENCE: dict[str, float] = {
 }
 
 
+# The sheet publishes Asset Class with a leading emoji/icon and free spacing,
+# e.g. "📈 stock", "₿ crypto", "🥇 commodity etf", "🏢 holding co". Passed
+# through raw those dirty strings fragment the asset_class column (and the
+# heatmap bucketing in services/sector.canonical_sector). Normalize to a small
+# clean enum at ingest. Unknown/blank inputs default to "equity" — the column's
+# pre-existing default — so a new sheet label never produces a junk value.
+_ASSET_CLASS_MAP: dict[str, str] = {
+    "stock":            "equity",
+    "equity":           "equity",
+    "equities":         "equity",
+    "holding co":       "equity",
+    "holding company":  "equity",
+    "crypto":           "crypto",
+    "cryptocurrency":   "crypto",
+    "etf":              "etf",
+    "future_commodity": "commodity",
+    "commodity":        "commodity",
+}
+
+
+def normalize_asset_class(raw: Any) -> str:
+    """Map a raw sheet Asset Class cell to a clean enum value.
+
+    Strips a leading emoji / non-ascii decoration + surrounding whitespace,
+    lowercases, then maps via `_ASSET_CLASS_MAP`. A trailing "etf" wins
+    (so "commodity etf", "sector etf", etc. → "etf"). Anything unrecognised
+    (or blank) falls back to "equity", the asset_class column's default.
+    """
+    if raw is None:
+        return "equity"
+    # Drop leading non-ascii (emoji/icons) + whitespace, collapse inner spacing.
+    s = re.sub(r"^[^\x00-\x7f\s]+", "", str(raw)).strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    if not s:
+        return "equity"
+    if s in _ASSET_CLASS_MAP:
+        return _ASSET_CLASS_MAP[s]
+    # "* etf" (commodity etf, sector etf, bond etf, …) → etf
+    if s.endswith(" etf") or s == "etf":
+        return "etf"
+    return "equity"
+
+
 def score_to_signal(score: float | None) -> str | None:
     """Map composite 0-100 to Tapeline's descriptive label.
 
@@ -270,7 +313,7 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
 
         rows.append({
             "symbol":          symbol,
-            "asset_class":     (raw.get("Asset Class") or "equity").strip().lower(),
+            "asset_class":     normalize_asset_class(raw.get("Asset Class")),
             "score":           composite,                    # ← Tapeline's own composite
             "sheet_score":     sheet_score_clamped,          # kept for transparency / diff tracking
             "signal":          score_to_signal(composite),   # derived from Tapeline composite
@@ -375,6 +418,10 @@ async def upsert_tickers(
         else:
             updated += 1
 
+        # Overwrite asset_class on existing rows too, so any dirty value
+        # written before normalize_asset_class existed (emoji-prefixed
+        # "📈 stock", "🥇 commodity etf", …) self-heals on the next refresh.
+        t.asset_class = r["asset_class"] or "equity"
         t.score = r["score"]
         t.signal = r["signal"]
         t.price = r["price"]

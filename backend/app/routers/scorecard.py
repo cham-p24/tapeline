@@ -136,7 +136,10 @@ async def get_scorecard(
         by_date.setdefault(d, []).append({
             "rank": e.rank,
             "symbol": e.symbol,
-            "score_at_flag": e.score_at_flag,
+            # Belt-and-suspenders clamp: corrupt historical rows stored raw
+            # factor values >100 in score_at_flag. Write-side is fixed, but
+            # clamp on read so impossible scores never reach the trust page.
+            "score_at_flag": min(e.score_at_flag, 100.0) if e.score_at_flag is not None else None,
             "price_at_flag": e.price_at_flag,
             "price_next_day": e.price_next_day,
             "change_pct_1d_after": e.change_pct_1d_after,
@@ -224,7 +227,8 @@ async def get_scorecard_for_symbol(
         {
             "as_of": e.as_of.isoformat(),
             "rank": e.rank,
-            "score_at_flag": e.score_at_flag,
+            # Belt-and-suspenders clamp: see universe-wide endpoint above.
+            "score_at_flag": min(e.score_at_flag, 100.0) if e.score_at_flag is not None else None,
             "price_at_flag": e.price_at_flag,
             "price_next_day": e.price_next_day,
             "change_pct_1d_after": e.change_pct_1d_after,
