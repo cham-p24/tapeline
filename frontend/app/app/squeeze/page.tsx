@@ -4,15 +4,41 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type SqueezeRow } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { FilterBar, SearchBox, SelectFilter, NumberFilter, useDebounced } from "@/components/FilterBar";
+import { matchesQuery, matchesSelect, inRange } from "@/lib/filters";
+
+// OBV direction buckets the worker emits. /api/squeeze has no filter params,
+// so OBV / min-score / search are all client-side over the fetched rows.
+const OBV_OPTIONS = [
+  { value: "", label: "All OBV" },
+  { value: "RISING", label: "Rising (accumulation)" },
+  { value: "FALLING", label: "Falling (distribution)" },
+  { value: "FLAT", label: "Flat" },
+];
 
 export default function SqueezePage() {
   const [rows, setRows] = useState<SqueezeRow[]>([]);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
+  const [minScore, setMinScore] = useState<number | "">("");
+  const [obv, setObv] = useState("");
+
   const load = useCallback(async () => {
     const r = await api.squeeze();
     setRows(r.items);
   }, []);
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  const visibleRows = rows.filter(
+    (r) =>
+      matchesQuery(debouncedSearch, [r.symbol]) &&
+      matchesSelect(obv, r.obv_trend) &&
+      inRange(r.spike_score, minScore === "" ? null : minScore, null),
+  );
+
+  const filtersActive = !!search.trim() || minScore !== "" || !!obv;
+  const resetFilters = () => { setSearch(""); setMinScore(""); setObv(""); };
 
   return (
     <div>
@@ -51,7 +77,26 @@ export default function SqueezePage() {
         </div>
       </details>
 
-      <div className="card mt-6 overflow-hidden">
+      {/* Filters — all client-side over the fetched rows (no /api/squeeze
+          filter params). */}
+      <FilterBar
+        trailing={<>Showing <strong className="text-fg">{visibleRows.length}</strong> of {rows.length}</>}
+      >
+        <SearchBox
+          value={search}
+          onChange={setSearch}
+          placeholder="Search ticker (AAPL, NVDA…)"
+          ariaLabel="Search ticker symbol"
+          maxLength={20}
+        />
+        <NumberFilter label="Min score" value={minScore} onChange={setMinScore} min={0} max={100} placeholder="0" />
+        <SelectFilter label="OBV" value={obv} onChange={setObv} options={OBV_OPTIONS} />
+        {filtersActive && (
+          <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
+        )}
+      </FilterBar>
+
+      <div className="card mt-4 overflow-hidden">
         <table className="w-full text-sm nums">
           <thead className="text-xs uppercase text-muted">
             <tr>
@@ -66,7 +111,18 @@ export default function SqueezePage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {visibleRows.length === 0 ? (
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-muted">
+                {filtersActive ? (
+                  <>
+                    <p>No squeezes match these filters.</p>
+                    <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
+                  </>
+                ) : (
+                  <p>No squeeze setups right now. The worker rescans every ~60 seconds.</p>
+                )}
+              </td></tr>
+            ) : visibleRows.map((r) => (
               <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
                 <td className="px-4 py-2 font-medium">{r.symbol}</td>
                 <td className={`px-4 py-2 text-right ${(r.spike_score ?? 0) >= 75 ? "text-up font-semibold" : ""}`}>

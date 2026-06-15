@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { FilterBar, SearchBox, SelectFilter, useDebounced } from "@/components/FilterBar";
+import { matchesQuery, matchesSelect } from "@/lib/filters";
 import { userLocale } from "@/lib/datetime";
 import { handle401 } from "@/lib/api";
 
@@ -15,8 +17,18 @@ type Earnings = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+const TIME_OPTIONS = [
+  { value: "", label: "Any time" },
+  { value: "BMO", label: "Before open (BMO)" },
+  { value: "AMC", label: "After close (AMC)" },
+  { value: "DMH", label: "During hours (DMH)" },
+];
+
 export default function EarningsPage() {
   const [rows, setRows] = useState<Earnings[]>([]);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
+  const [reportTime, setReportTime] = useState("");
 
   const load = useCallback(async () => {
     const r = await fetch(`${API_BASE}/api/earnings?days=14`, { credentials: "include", cache: "no-store" });
@@ -26,9 +38,19 @@ export default function EarningsPage() {
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
 
+  // Client-side filtering (no /api/earnings filter params), applied before
+  // we group by date so empty days drop out of the grouped view entirely.
+  const visibleRows = rows.filter(
+    (r) =>
+      matchesQuery(debouncedSearch, [r.symbol]) &&
+      matchesSelect(reportTime, r.report_time),
+  );
+  const filtersActive = !!search.trim() || !!reportTime;
+  const resetFilters = () => { setSearch(""); setReportTime(""); };
+
   // Group by date
   const byDate: Record<string, Earnings[]> = {};
-  for (const r of rows) {
+  for (const r of visibleRows) {
     (byDate[r.report_date] ??= []).push(r);
   }
 
@@ -51,9 +73,36 @@ export default function EarningsPage() {
         </div>
       </details>
 
+      {/* Filters — client-side over the fetched rows, applied before the
+          by-date grouping. */}
+      <FilterBar
+        trailing={<>Showing <strong className="text-fg">{visibleRows.length}</strong> of {rows.length}</>}
+      >
+        <SearchBox
+          value={search}
+          onChange={setSearch}
+          placeholder="Search ticker (AAPL, NVDA…)"
+          ariaLabel="Search ticker symbol"
+          maxLength={20}
+        />
+        <SelectFilter label="Report time" value={reportTime} onChange={setReportTime} options={TIME_OPTIONS} />
+        {filtersActive && (
+          <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
+        )}
+      </FilterBar>
+
       <div className="mt-6 space-y-4">
         {Object.keys(byDate).length === 0 && (
-          <div className="card p-8 text-center text-muted">No earnings reports in the next 14 days.</div>
+          <div className="card p-8 text-center text-muted">
+            {filtersActive ? (
+              <>
+                <p>No earnings match these filters.</p>
+                <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
+              </>
+            ) : (
+              <p>No earnings reports in the next 14 days.</p>
+            )}
+          </div>
         )}
         {Object.keys(byDate).sort().map((d) => (
           <div key={d} className="card">

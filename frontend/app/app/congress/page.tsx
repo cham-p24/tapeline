@@ -1,14 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type CongressTrade } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { Paywall } from "@/components/Paywall";
+import { FilterBar, SearchBox, SelectFilter, useDebounced } from "@/components/FilterBar";
+import { matchesQuery, matchesSelect } from "@/lib/filters";
 import { formatAbsolute } from "@/lib/datetime";
+
+const ACTION_OPTIONS = [
+  { value: "", label: "All actions" },
+  { value: "BUY", label: "Buy" },
+  { value: "SELL", label: "Sell" },
+];
 
 export default function CongressPage() {
   const [rows, setRows] = useState<CongressTrade[]>([]);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounced(search);
+  const [chamber, setChamber] = useState("");
+  const [action, setAction] = useState("");
+
   const load = useCallback(async () => {
     try {
       const r = await api.congress();
@@ -19,6 +32,25 @@ export default function CongressPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  // Chamber options are derived from the data so we never show a filter that
+  // matches zero rows (chamber labels vary by source: "House"/"Senate").
+  const chamberOptions = useMemo(() => {
+    const seen = Array.from(new Set(rows.map((r) => r.chamber).filter(Boolean)));
+    return [{ value: "", label: "All chambers" }, ...seen.map((c) => ({ value: c, label: c }))];
+  }, [rows]);
+
+  // Search matches ticker OR politician name — /api/congress has no filter
+  // params, so all three filters run client-side over the fetched rows.
+  const visibleRows = rows.filter(
+    (r) =>
+      matchesQuery(debouncedSearch, [r.symbol, r.politician]) &&
+      matchesSelect(chamber, r.chamber) &&
+      matchesSelect(action, r.direction),
+  );
+
+  const filtersActive = !!search.trim() || !!chamber || !!action;
+  const resetFilters = () => { setSearch(""); setChamber(""); setAction(""); };
 
   return (
     <div>
@@ -55,6 +87,24 @@ export default function CongressPage() {
           </div>
         </details>
 
+        {/* Filters — client-side over the fetched rows (no /api/congress
+            filter params). Search matches ticker or politician name. */}
+        <FilterBar
+          trailing={<>Showing <strong className="text-fg">{visibleRows.length}</strong> of {rows.length}</>}
+        >
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder="Search ticker or politician…"
+            ariaLabel="Search ticker or politician"
+          />
+          <SelectFilter label="Chamber" value={chamber} onChange={setChamber} options={chamberOptions} />
+          <SelectFilter label="Action" value={action} onChange={setAction} options={ACTION_OPTIONS} />
+          {filtersActive && (
+            <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
+          )}
+        </FilterBar>
+
         <div className="card mt-4 overflow-hidden">
           <table className="w-full text-sm nums">
             <thead className="text-xs uppercase text-muted">
@@ -69,7 +119,18 @@ export default function CongressPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {visibleRows.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">
+                  {filtersActive ? (
+                    <>
+                      <p>No disclosed trades match these filters.</p>
+                      <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
+                    </>
+                  ) : (
+                    <p>No disclosed trades loaded yet. We sync from Quiver multiple times per day.</p>
+                  )}
+                </td></tr>
+              ) : visibleRows.map((r) => (
                 <tr key={r.id} className="border-b border-border/20 hover:bg-panel/60">
                   <td className="px-4 py-2 text-muted">{formatAbsolute(r.disclosed_at)}</td>
                   <td className="px-4 py-2 font-medium">{r.politician}
