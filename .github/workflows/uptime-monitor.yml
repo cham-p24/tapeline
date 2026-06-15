@@ -1,46 +1,116 @@
-name: Prod uptime + perf monitor
+name: Cloud watchdog (uptime + alert + auto-recover)
 
-# Self-monitoring so production runs UNWATCHED: every 6 hours this probes the
-# live site + API and FAILS LOUDLY (a failed run emails the repo owner) if
-# anything is down or the heavy public endpoint is slow. That last check is
-# deliberate — it catches the connection-saturation/regression class that took
-# /api/public/signals from 0.4s to >70s once. No repo checkout (just curls
-# public URLs), so it's cheap and has zero action-version deprecation surface.
+# Cloud-resident watchdog so production is watched even when the founder's PC
+# is OFF (the local Windows fly_health_watchdog.ps1 only runs while that
+# machine is on + logged in). Every 30 min this probes the live site + API
+# and, on a CONFIRMED outage, (1) attempts auto-recovery by restarting the
+# relevant Fly app's machines, then (2) alerts via Telegram + email. A failed
+# run also still emails the repo owner via GitHub's default notifications.
 #
-# Cadence is conservative (every 6h ≈ 120 Actions-minutes/month) to stay well
-# under the private-repo free tier alongside CI + deploy workflows. Tighten the
-# cron if you want faster detection, or point a free external monitor
-# (UptimeRobot etc.) at the same URLs for sub-minute checks without CI minutes.
+# Cadence: every 30 min ~ 1,440 runs/mo; normal runs are ~20s (just curls),
+# and flyctl is only installed when a recovery is actually needed, so Actions
+# minutes stay modest. Widen the cron or add an external monitor (UptimeRobot)
+# if you want sub-minute detection without CI minutes.
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch: {}
 
+concurrency:
+  group: cloud-watchdog
+  cancel-in-progress: false
+
 jobs:
-  probe:
-    name: Probe production
+  watchdog:
+    name: Probe / recover / alert
     runs-on: ubuntu-latest
     steps:
-      - name: Check live site + API
+      - name: Probe production, recover + alert on failure
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_WEB_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
         run: |
-          fail=0
-          # check <url> <expected_code> <max_seconds> — one retry to absorb a blip
-          check() {
-            for attempt in 1 2; do
-              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$3" "$1" || echo "000")
-              if [ "$code" = "$2" ]; then echo "ok    $1 -> $code"; return 0; fi
-              echo "retry $1 -> $code (attempt $attempt, expected $2)"; sleep 5
+          set +e
+
+          # confirm_down <url> <expected> <timeout>: 3 tries w/ backoff.
+          # echoes "" if up, else the last HTTP code seen.
+          confirm_down() {
+            local code
+            for i in 1 2 3; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$3" "$1?cb=${GITHUB_RUN_ID}-$i" || echo 000)
+              if [ "$code" = "$2" ]; then echo ""; return; fi
+              sleep 10
             done
-            echo "::error title=Uptime check failed::$1 returned $code (expected $2)"
-            fail=1
+            echo "$code"
           }
-          check "https://tapeline.io/"                                  200 20
-          check "https://tapeline.io/signals"                           200 20
-          check "https://tapeline.io/scorecard"                         200 20
-          check "https://tapeline.io/t/AAPL/opengraph-image"            200 20
-          check "https://api.tapeline.io/api/health"                    200 20
-          # Heavy public endpoint must return 200 within 20s (catches saturation).
-          check "https://api.tapeline.io/api/public/signals?limit=2000" 200 20
-          if [ "$fail" -ne 0 ]; then echo "PRODUCTION CHECK FAILED"; exit 1; fi
-          echo "All production checks passed."
+
+          notify() {  # $1 = message text
+            if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT" ]; then
+              curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                -d chat_id="${TG_CHAT}" --data-urlencode "text=$1" >/dev/null
+            fi
+            if [ -n "$RESEND_API_KEY" ]; then
+              body=$(jq -nc --arg t "$1" '{from:"alerts@tapeline.io",to:"cpiyatilaka@gmail.com",subject:"[watchdog] Tapeline production alert",text:$t}')
+              curl -s -X POST "https://api.resend.com/emails" \
+                -H "Authorization: Bearer ${RESEND_API_KEY}" -H "Content-Type: application/json" \
+                -d "$body" >/dev/null
+            fi
+          }
+
+          ensure_flyctl() {
+            command -v flyctl >/dev/null 2>&1 && return
+            curl -L https://fly.io/install.sh | sh >/dev/null 2>&1
+            export FLYCTL_INSTALL="/home/runner/.fly"
+            export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          }
+
+          recover() {  # $1 = fly app, $2 = token
+            ensure_flyctl
+            FLY_API_TOKEN="$2" flyctl machines list -a "$1" --json 2>/dev/null \
+              | jq -r '.[].id' \
+              | while read -r mid; do
+                  [ -n "$mid" ] && FLY_API_TOKEN="$2" flyctl machine restart "$mid" -a "$1" >/dev/null 2>&1 \
+                    && echo "restarted $1/$mid"
+                done
+          }
+
+          fail=0
+
+          # ---- backend API ----
+          api_down=$(confirm_down "https://api.tapeline.io/api/health" 200 20)
+          if [ -n "$api_down" ]; then
+            fail=1
+            echo "::error::api.tapeline.io DOWN (HTTP $api_down) - recovering tapeline-backend"
+            recover "tapeline-backend" "$FLY_API_TOKEN"
+            sleep 25
+            still=$(confirm_down "https://api.tapeline.io/api/health" 200 20)
+            if [ -n "$still" ]; then
+              notify "🔴 Tapeline API DOWN (HTTP ${api_down}). Auto-restart attempted but STILL down (HTTP ${still}). Manual check: fly machines list -a tapeline-backend"
+            else
+              notify "🔁 Tapeline API went down (HTTP ${api_down}) - watchdog auto-restarted the Fly machine and it is back UP."
+            fi
+          fi
+
+          # ---- frontend ----
+          web_down=$(confirm_down "https://tapeline.io/" 200 20)
+          if [ -n "$web_down" ]; then
+            fail=1
+            echo "::error::tapeline.io frontend DOWN (HTTP $web_down) - recovering tapeline-web"
+            recover "tapeline-web" "$FLY_WEB_API_TOKEN"
+            sleep 25
+            still=$(confirm_down "https://tapeline.io/" 200 20)
+            extra=""
+            [ "$web_down" = "402" ] && extra=" (HTTP 402 = a billing pause - if DNS ever points back to Vercel, check that host)"
+            if [ -n "$still" ]; then
+              notify "🔴 tapeline.io DOWN (HTTP ${web_down})${extra}. Auto-restart attempted but STILL down (HTTP ${still}). Manual check needed."
+            else
+              notify "🔁 tapeline.io went down (HTTP ${web_down}) - watchdog auto-restarted the Fly machine and it is back UP."
+            fi
+          fi
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "All production checks passed (site + API healthy)."
