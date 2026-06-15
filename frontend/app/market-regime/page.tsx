@@ -12,7 +12,7 @@ const API_BASE =
 export const metadata = pageMeta({
   title: "Market Regime Indicator — Live VIX + Breadth + Rate Direction | Tapeline",
   description:
-    "Tapeline's market regime classifier synthesizes VIX, breadth, rate direction, and SPY momentum into one read on macro conditions: Risk On, Neutral, Cautious, Risk Off. Live update every 60s.",
+    "Tapeline's market regime classifier synthesizes VIX, breadth, rate direction, and SPY momentum into one read on macro conditions: Risk On, Neutral, Cautious, Risk Off. Cached snapshot, refreshed hourly.",
   path: "/market-regime",
 });
 
@@ -154,9 +154,9 @@ export default async function MarketRegimePage() {
           <div className="flex items-center gap-2">
             <p className="text-xs uppercase tracking-wider text-muted">Current regime</p>
             {live && (
-              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-up">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
-                Live
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted">
+                <span className="h-1.5 w-1.5 rounded-full bg-muted" />
+                Cached
               </span>
             )}
           </div>
@@ -198,7 +198,7 @@ export default async function MarketRegimePage() {
       </div>
 
       <p className="mt-3 text-xs text-subtle">
-        {live ? "Live snapshot — regenerates every 10 minutes." : "Snapshot example."} The{" "}
+        {live ? "Cached snapshot — refreshes hourly." : "Snapshot example."} The{" "}
         <Link href="/app/regime" className="text-accent hover:underline">
           live regime panel
         </Link>{" "}

@@ -323,9 +323,9 @@ export default function ScannerPage() {
                 </td>
                 <td className="px-4 py-2"><SignalPill v={r.signal} /></td>
                 <td className="px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}%</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}%</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}%</td>
+                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
+                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
+                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
                 <td className="px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
                 <td className="hidden md:table-cell px-2 sm:px-4 py-2 text-xs text-muted leading-snug max-w-[520px]" title={r.reason ?? ""}>
                   {r.reason || "—"}
@@ -375,7 +375,7 @@ function confidenceLabel(c: number | null | undefined) {
   if (c >= 40) return `${c.toFixed(0)}% — only basic price/trend data`;
   return `${c.toFixed(0)}% — sparse data, deprioritise`;
 }
-function fmt(n: number | null) { return n == null ? "—" : (n >= 0 ? "+" : "") + n.toFixed(2); }
+function fmt(n: number | null) { return n == null ? "—" : (n >= 0 ? "+" : "") + n.toFixed(2) + "%"; }
 function compactNum(n: number | null) {
   if (n == null) return "—";
   if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";

@@ -218,6 +218,171 @@ export function articleJsonLd(a: ArticleArgs) {
 }
 
 /**
+ * Organization schema for the brand. Rendered in the root layout so it lands
+ * in static HTML (Google + LinkedIn parse it for the Knowledge Panel).
+ *
+ * Heavy entity signal — legalName, slogan, knowsAbout, address country, and a
+ * verified sameAs graph — to disambiguate "Tapeline = US stock scanner SaaS"
+ * from the measuring-tool brands and a UK insurance broker that outrank us for
+ * the bare brand query (per the 2026-05-19 Search Console audit).
+ */
+export function organizationJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Tapeline",
+    legalName: "Tapeline",
+    alternateName: "Tapeline.io",
+    slogan: "Read the tape",
+    description:
+      "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from a publicly-documented six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
+    url: "https://tapeline.io",
+    logo: "https://tapeline.io/favicon.svg",
+    foundingDate: "2026",
+    // Country-only address — full street suppressed per founder privacy.
+    // Country signal alone is enough to help Google localise the brand entity
+    // vs the UK/AU "tapeline" measuring-tool sellers.
+    address: {
+      "@type": "PostalAddress",
+      addressCountry: "AU",
+    },
+    // knowsAbout teaches the Knowledge Graph what topics this entity is about
+    // — strongest available signal for brand-query disambiguation.
+    knowsAbout: [
+      "Stock scanner",
+      "Quantitative trading",
+      "US equities",
+      "Exchange-traded fund",
+      "Technical analysis",
+      "Fundamental analysis",
+      "Market data",
+      "Financial technology",
+    ],
+    // sameAs lists only profiles that actually resolve AND belong to Tapeline
+    // (the stock scanner). A 404 is a negative trust signal; a 200 pointing at
+    // a DIFFERENT entity is worse. See seo-tools/disclosure/profile_kits.md for
+    // the canonical paste-ready copy when claiming each.
+    sameAs: [
+      "https://x.com/tapeline_io",
+      "https://www.linkedin.com/company/tapeline-io",
+      "https://github.com/cham-p24/tapeline",
+      "https://www.reddit.com/user/tapeline_io",
+    ],
+    contactPoint: [
+      {
+        "@type": "ContactPoint",
+        email: "support@tapeline.io",
+        contactType: "customer support",
+        availableLanguage: ["en"],
+      },
+      {
+        "@type": "ContactPoint",
+        email: "press@tapeline.io",
+        contactType: "press inquiries",
+        availableLanguage: ["en"],
+      },
+    ],
+  };
+}
+
+/**
+ * WebSite schema with SearchAction so Google can render a sitelinks search box
+ * under our brand result. Rendered in the root layout (static HTML).
+ */
+export function websiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Tapeline",
+    url: "https://tapeline.io",
+    potentialAction: {
+      "@type": "SearchAction",
+      // SearchAction must point at a URL Googlebot can actually crawl with a
+      // substituted query. /search accepts ?q=, validates as a ticker, and
+      // redirects to /t/.
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: "https://tapeline.io/search?q={search_term_string}",
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
+/**
+ * SoftwareApplication schema for the product, with four explicit offers
+ * (monthly + annual for each tier) so SERPs can show the cheapest entry point
+ * and the highest commit. Rendered in the root layout (static HTML).
+ */
+export function softwareApplicationJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Tapeline",
+    applicationCategory: "FinanceApplication",
+    applicationSubCategory: "Stock Scanner",
+    operatingSystem: "Web",
+    description:
+      "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus squeeze detection, market regime, congressional trades, and a public scorecard.",
+    offers: [
+      {
+        "@type": "Offer",
+        name: "Pro · monthly",
+        price: "29.99",
+        priceCurrency: "USD",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: "29.99",
+          priceCurrency: "USD",
+          unitText: "MONTH",
+        },
+        url: "https://tapeline.io/pricing",
+      },
+      {
+        "@type": "Offer",
+        name: "Pro · annual",
+        price: "299.99",
+        priceCurrency: "USD",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: "299.99",
+          priceCurrency: "USD",
+          unitText: "ANN",
+        },
+        url: "https://tapeline.io/pricing",
+      },
+      {
+        "@type": "Offer",
+        name: "Premium · monthly",
+        price: "49.99",
+        priceCurrency: "USD",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: "49.99",
+          priceCurrency: "USD",
+          unitText: "MONTH",
+        },
+        url: "https://tapeline.io/pricing",
+      },
+      {
+        "@type": "Offer",
+        name: "Premium · annual",
+        price: "479.99",
+        priceCurrency: "USD",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: "479.99",
+          priceCurrency: "USD",
+          unitText: "ANN",
+        },
+        url: "https://tapeline.io/pricing",
+      },
+    ],
+    url: "https://tapeline.io",
+  };
+}
+
+/**
  * Render helper: returns the props for a <script> tag.
  * Usage:
  *   <script {...jsonLdScript(faqJsonLd([...]))} />
@@ -623,7 +788,7 @@ export function compareJsonLd(a: CompareArgs) {
         "Public scorecard — every top-10 daily pick back-checked vs SPY next session",
         "Sub-60-second refresh during market hours",
         "Plain-English reasoning per ticker (free tier included)",
-        "~2,500 actively scored liquid US tickers, 5,757 tracked",
+        "~2,500 actively scored from the full liquid US universe",
         "Squeeze + market-regime detection",
         "Congressional trades + recent insider buys via SEC Form 4 (Premium)",
       ],

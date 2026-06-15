@@ -59,7 +59,7 @@ const WINS: CompareRow[] = [
 const TRADEOFFS: CompareTradeoff[] = [
   {
     label: "Stock universe coverage",
-    tapeline: "~2,500 actively scored (top by $-volume) · 5,757 tracked",
+    tapeline: "~2,500 actively scored (top by $-volume) from the full liquid US universe",
     competitor: "35,000+ stocks rated globally",
     note: "Tipranks covers a much wider universe including global tickers and small/micro-caps. Tapeline deliberately scores the top ~2,500 by daily dollar-volume — bid-ask spreads make a Smart Score on a $0.20 micro-cap with 50K shares/day non-actionable. If your strategy depends on coverage breadth (e.g., screening international tickers), Tipranks wins.",
   },

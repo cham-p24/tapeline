@@ -83,7 +83,7 @@ export async function generateMetadata({ params }: { params: Promise<{ sector: s
   }
   return pageMeta({
     title: `Top ${sector.display} Stocks Ranked by Tapeline Score (2026)`,
-    description: `Live ranking of ${sector.display} sector stocks by the Tapeline 6-factor composite score. Trend, relative strength, fundamentals, smart money, macro, and momentum — all updated sub-60s during US market hours.`,
+    description: `Live ranking of ${sector.display} stocks by the Tapeline 6-factor composite score, updated sub-60s during US market hours. Transparent public methodology.`,
     path: `/sector/${sector.slug}`,
   });
 }

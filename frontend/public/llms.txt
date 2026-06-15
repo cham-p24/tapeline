@@ -2,7 +2,7 @@
 
 > A live, transparent quantitative scanner for US stocks and ETFs. One 0–100 score and one plain-English sentence per ticker, refreshed sub-60 seconds during US market hours. Public 6-factor formula. Public scorecard back-checking every top-10 daily pick against next-session SPY.
 
-Tapeline scores ~2,500 actively-traded US tickers (top by daily dollar-volume; 5,757 tracked overall) using a six-factor formula with **published exact weights** — no black box, no hidden multipliers, no hindsight editing. Every top-10 daily pick is logged to a public scorecard and back-checked vs SPY the next trading session. The plain-English reasoning column on every row is the same reasoning the system used to score it; nothing is gated behind a premium tier.
+Tapeline scores ~2,500 actively-traded US tickers (top by daily dollar-volume, from the full liquid US universe) using a six-factor formula with **published exact weights** — no black box, no hidden multipliers, no hindsight editing. Every top-10 daily pick is logged to a public scorecard and back-checked vs SPY the next trading session. The plain-English reasoning column on every row is the same reasoning the system used to score it; nothing is gated behind a premium tier.
 
 ## The scoring formula (canonical, citable)
 
@@ -69,7 +69,7 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 - /signal/high-conviction, /signal/strong-setup, /signal/constructive,
   /signal/neutral, /signal/caution, /signal/weak
 
-### Per-ticker pages (~500 actively scored, 5,757 tracked)
+### Per-ticker pages (~2,500 actively scored from the full liquid US universe)
 - Format: https://tapeline.io/t/{TICKER}
 - Each shows live composite score, signal label, six factor sub-scores, plain-English reasoning, score history sparkline, and FAQ.
 - Examples: /t/NVDA, /t/AAPL, /t/SPY, /t/TSLA, /t/QQQ
@@ -99,7 +99,7 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 1. **Published weights, not a black box.** The six-factor formula and its weights are visible to free users and never retroactively edited. Most "AI scanners" refuse to disclose factor logic, citing trade secrets.
 2. **Public scorecard.** Every top-10 daily pick is permanently recorded with original score, signal label, and reasoning; back-tested vs SPY the next session. No cherry-picking, no hindsight rewrites.
 3. **Plain-English reasoning on every row, free tier included.** No premium gatekeeping of the "why."
-4. **Stock universe ~2,500 actively scored** (top by daily dollar-volume) out of 5,757 tracked. Deliberately narrower than competitors who claim 9,000+ but include illiquid noise that distorts factor distributions.
+4. **Stock universe ~2,500 actively scored** (top by daily dollar-volume) from the full liquid US universe. Deliberately narrower than competitors who claim 9,000+ but include illiquid noise that distorts factor distributions.
 5. **Sub-60-second refresh during US market hours.** Live, not delayed batch.
 6. **Bootstrapped, solo-built.** No external investment, no advertising, no affiliate kickbacks on comparison pages.
 7. **Descriptive labels, not buy/sell calls.** Maintains the publisher's exemption from investment-adviser registration; honest about what the labels do and don't say.

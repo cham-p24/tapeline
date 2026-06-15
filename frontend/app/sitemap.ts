@@ -115,7 +115,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const HOWITWORKS_LAST_MODIFIED = new Date("2026-05-17");
 
   const staticEntries: MetadataRoute.Sitemap = [
-    { url: `${base}/`,                          lastModified: STATIC_LAST_MODIFIED, priority: 1.0 },
+    { url: base,                                lastModified: STATIC_LAST_MODIFIED, priority: 1.0 },
     { url: `${base}/pricing`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.9 },
     { url: `${base}/how-it-works`,              lastModified: HOWITWORKS_LAST_MODIFIED, priority: 0.9 },
     { url: `${base}/data-sources`,              lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },

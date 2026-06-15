@@ -120,11 +120,18 @@ export function PresetMenu<T>({ cap, currentFilters, onApply }: Props<T>) {
               </div>
             ) : (
               presets.map((p) => (
-                <button
+                <div
                   key={p.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => applyPreset(p)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-panel/60"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      applyPreset(p);
+                    }
+                  }}
+                  className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-panel/60"
                 >
                   <span className="truncate">{p.name}</span>
                   <button
@@ -135,7 +142,7 @@ export function PresetMenu<T>({ cap, currentFilters, onApply }: Props<T>) {
                   >
                     ×
                   </button>
-                </button>
+                </div>
               ))
             )}
           </div>

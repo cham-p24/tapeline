@@ -8,7 +8,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "How Tapeline Works: 6-Factor Stock Scoring Formula (Public Weights)",
   description:
-    "How the Tapeline Score is calculated: a transparent weighted blend of Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Public weights, exact methodology, no black box.",
+    "How the Tapeline Score is calculated: a weighted blend of Trend 25%, RS 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%. No black box.",
   path: "/how-it-works",
 });
 

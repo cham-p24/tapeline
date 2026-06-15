@@ -78,7 +78,7 @@ export async function generateMetadata({ params }: { params: Promise<{ signal: s
   }
   return pageMeta({
     title: `${signal.display} Stocks Today (Tapeline Score ${signal.range})`,
-    description: `Live ranking of US stocks at the ${signal.display} signal level (Tapeline Score ${signal.range}). ${signal.blurb} Updated sub-60s during US market hours, public 6-factor formula.`,
+    description: `Live ranking of US stocks at the ${signal.display} signal level (Tapeline Score ${signal.range}). Sub-60s updates in US market hours, public 6-factor formula.`,
     path: `/signal/${signal.slug}`,
   });
 }
