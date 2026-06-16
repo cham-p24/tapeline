@@ -23,6 +23,7 @@ sender used across all channels.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -38,6 +39,56 @@ from app.services.inbox_classifier import classify_async
 logger = logging.getLogger(__name__)
 
 Channel = Literal["reddit_comment", "reddit_dm", "email", "telegram"]
+
+
+# ── Publisher-safety guard (ASIC / AU publisher-exemption posture) ──────────
+#
+# Tapeline's legal posture depends on NEVER emitting prescriptive financial
+# advice in an automated reply. Until now that rule was enforced ONLY in
+# tests (tests/test_inbox_voice_rules.py) against the static Tier-2 template
+# renderers — there was no RUNTIME guard on the wire. That left two unguarded
+# send surfaces:
+#   1. Tier-2 auto-send (templates interpolate a live API `signal` label that
+#      we don't control character-for-character).
+#   2. Tier-1 founder-approved replies, where the LLM-drafted `suggested_reply`
+#      is delivered verbatim on a one-tap Telegram approve — a prompt-drift or
+#      jailbreak in the inbound message could land prescriptive language in the
+#      draft that a busy founder taps straight through.
+#
+# This guard is the last line of defence on BOTH surfaces. It is intentionally
+# fail-CLOSED: if a candidate reply contains a banned phrase we refuse to send
+# and surface the offending phrase to the caller (the row stays drafted, never
+# flips to 'sent'), so a human handles it instead of the bot shipping advice.
+#
+# The phrase list mirrors the one already validated as false-positive-safe in
+# tests/test_inbox_voice_rules.py (word-boundary " buy "/" sell " so "buyer's
+# market"/"selling point" don't trip it). Matching is case-insensitive on a
+# whitespace-normalised copy so "you   should" / newlines can't slip past.
+_BANNED_PHRASES: tuple[str, ...] = (
+    " buy ", " sell ",
+    "you should", "we recommend", "i recommend",
+    "guaranteed", "will moon", "going to ",
+)
+
+
+def find_prescriptive_phrase(text: str) -> str | None:
+    """Return the first banned prescriptive phrase found in `text`, or None
+    if the text is publisher-safe. Case-insensitive; whitespace is collapsed
+    so multi-space / newline gaps can't smuggle a phrase past the check.
+
+    The leading/trailing spaces around the candidate are normalised by
+    padding so a phrase like ' buy ' still matches a reply that *ends* with
+    'buy' or starts with 'buy '."""
+    if not text:
+        return None
+    # Collapse all runs of whitespace to single spaces, pad with one space on
+    # each side so the boundary-anchored phrases (" buy "/" sell ") match at
+    # the very start/end of the reply too.
+    normalised = " " + re.sub(r"\s+", " ", text.lower()) + " "
+    for phrase in _BANNED_PHRASES:
+        if phrase in normalised:
+            return phrase.strip()
+    return None
 
 
 @dataclass
@@ -266,6 +317,7 @@ __all__ = [
     "TIER_1_5_ACK_BODY",
     "Channel",
     "HandleResult",
+    "find_prescriptive_phrase",
     "handle_inbound",
     "mark_sent",
     "send_tier_1_5_ack",

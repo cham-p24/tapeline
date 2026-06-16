@@ -37,7 +37,12 @@ from app.models import InboundMessage, User
 from app.services import email as email_service
 from app.services import telegram as telegram_service
 from app.services.auth import current_user_required
-from app.services.inbox_router import handle_inbound, mark_sent, send_tier_1_5_ack
+from app.services.inbox_router import (
+    find_prescriptive_phrase,
+    handle_inbound,
+    mark_sent,
+    send_tier_1_5_ack,
+)
 from app.services.inbox_telegram_alert import alert_founder
 
 logger = logging.getLogger(__name__)
@@ -146,6 +151,21 @@ async def email_inbound(
     # handle_inbound already optimistically set status='auto_replied'; we
     # only flip it to 'sent' once Resend actually accepts the message.
     if result.tier == 2 and result.auto_reply_text:
+        # Publisher-safety guard on the auto-send path too: the ticker_score
+        # template interpolates a live API `signal` label we don't control
+        # char-for-char. If a banned phrase slips in, do NOT auto-send — leave
+        # the row at 'auto_replied' (drafted, not delivered) for founder review.
+        banned = find_prescriptive_phrase(result.auto_reply_text)
+        if banned is not None:
+            logger.warning(
+                "inbox.email.auto_reply_blocked_prescriptive msg_id=%d phrase=%r",
+                result.message.id, banned,
+            )
+            await session.commit()
+            return {
+                "ok": True, "auto_replied": False, "blocked": "prescriptive_language",
+                "phrase": banned, "tier": 2, "message_id": result.message.id,
+            }
         try:
             res = await email_service.send_email(
                 to=sender,
@@ -491,6 +511,22 @@ async def _approve_core(
     final_reply = reply_text or row.suggested_reply
     if not final_reply:
         return {"ok": False, "error": "no_reply_text"}
+
+    # Publisher-safety guard — last line of defence before the wire. Refuse to
+    # send any reply containing prescriptive advice language ("buy"/"sell"/
+    # "you should"/...), even one the founder one-tap-approved, because an
+    # LLM-drafted suggested_reply can drift off the system-prompt voice rules.
+    # Fail CLOSED: leave the row untouched (status unchanged) so a human edits
+    # and re-submits a clean reply rather than the bot shipping advice.
+    banned = find_prescriptive_phrase(final_reply)
+    if banned is not None:
+        logger.warning(
+            "inbox.approve.blocked_prescriptive id=%d phrase=%r", row.id, banned,
+        )
+        return {
+            "ok": False, "error": "prescriptive_language",
+            "phrase": banned, "id": row.id,
+        }
 
     row.suggested_reply = final_reply
     row.status = "approved"

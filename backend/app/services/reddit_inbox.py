@@ -51,7 +51,11 @@ from app.config import get_settings
 from app.db import session_scope
 from app.models import InboundMessage
 from app.services import inbox_kill_switch
-from app.services.inbox_router import handle_inbound, mark_sent
+from app.services.inbox_router import (
+    find_prescriptive_phrase,
+    handle_inbound,
+    mark_sent,
+)
 from app.services.inbox_telegram_alert import alert_founder
 
 logger = logging.getLogger(__name__)
@@ -352,7 +356,19 @@ async def _dispatch_inbound(
         return None
 
     if result.tier == 2 and result.auto_reply_text:
-        if allow_auto_reply:
+        # Publisher-safety guard before any auto-comment goes out: a banned
+        # prescriptive phrase (from a live-data template interpolation) must
+        # never ship. On a hit, route to the founder instead of auto-replying.
+        banned = find_prescriptive_phrase(result.auto_reply_text)
+        if banned is not None:
+            logger.warning(
+                "inbox.reddit.auto_reply_blocked_prescriptive msg_id=%d phrase=%r",
+                result.message.id, banned,
+            )
+            result.message.status = "classified"
+            await session.commit()
+            await alert_founder(result.message)
+        elif allow_auto_reply:
             ok = await send_reddit_reply(result.message, result.auto_reply_text)
             if ok:
                 await mark_sent(session, result.message.id, when=datetime.now(UTC))
