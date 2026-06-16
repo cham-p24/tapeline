@@ -18,6 +18,39 @@ from app.db import Base
 MOCK_ID_PREFIX = "mock-"
 
 
+def tickers_match_clause(symbol: str) -> ColumnElement[bool]:
+    """WHERE clause matching `symbol` as a WHOLE token in `news_items.tickers`.
+
+    ``tickers`` is a comma-separated, no-whitespace token list (every feed joins
+    with ``","`` — see services/{benzinga,edgar,finnhub}_feed.py, news_feed.py),
+    e.g. ``"AAPL,GME,NVDA"``. The old per-ticker filter used
+    ``tickers LIKE '%SYM%'``, a substring test, so ``%GM%`` also matched
+    ``"GME"``, ``"MGM"``, ``"AMGN"`` etc. — surfacing the wrong company's
+    headlines on a ticker page. This tightens it to exact CSV membership: the
+    symbol must be a complete comma-delimited token, one of
+
+        SYM            (the only ticker)         -> col = 'SYM'
+        SYM,...        (first token)             -> col LIKE 'SYM,%'
+        ...,SYM        (last token)              -> col LIKE '%,SYM'
+        ...,SYM,...     (a middle token)          -> col LIKE '%,SYM,%'
+
+    so ``GM`` matches ``"GM"`` / ``"GM,TSLA"`` / ``"F,GM"`` / ``"F,GM,TSLA"`` but
+    NEVER a ``"GME"``-only row. Behaviour for the legit symbol is preserved.
+
+    Perf note: the three LIKE arms keep wildcards, so the pg_trgm GIN index
+    (migration 0033) still serves them — the leading-wildcard death-spiral guard
+    is unchanged. On SQLite (dev) LIKE is case-insensitive for ASCII, which is
+    harmless here since both the column and `symbol` are upshifted.
+    """
+    sym = symbol.upper()
+    return (
+        (NewsItem.tickers == sym)
+        | NewsItem.tickers.like(f"{sym},%")
+        | NewsItem.tickers.like(f"%,{sym}")
+        | NewsItem.tickers.like(f"%,{sym},%")
+    )
+
+
 def exclude_mock_clause() -> ColumnElement[bool]:
     """WHERE clause that drops fabricated mock headlines from any read.
 

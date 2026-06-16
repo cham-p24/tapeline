@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import NewsItem
-from app.models.news import exclude_mock_clause
+from app.models.news import exclude_mock_clause, tickers_match_clause
 
 router = APIRouter()
 
@@ -43,7 +43,9 @@ async def list_news(
             select(NewsItem)
             .where(
                 exclude_mock_clause(),
-                NewsItem.tickers.like(f"%{symbol.upper()}%"),
+                # Exact comma-delimited token match: 'GM' must NOT match a
+                # 'GME'-only row. See models.news.tickers_match_clause.
+                tickers_match_clause(symbol),
                 NewsItem.published_at >= cutoff,
             )
             .order_by(desc(NewsItem.published_at))
