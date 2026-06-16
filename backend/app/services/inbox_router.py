@@ -81,10 +81,11 @@ def find_prescriptive_phrase(text: str) -> str | None:
     'buy' or starts with 'buy '."""
     if not text:
         return None
-    # Collapse all runs of whitespace to single spaces, pad with one space on
-    # each side so the boundary-anchored phrases (" buy "/" sell ") match at
-    # the very start/end of the reply too.
-    normalised = " " + re.sub(r"\s+", " ", text.lower()) + " "
+    # Treat ANY run of non-alphanumeric chars (whitespace AND punctuation) as a
+    # single space, then pad, so the boundary-anchored phrases (" buy "/" sell ")
+    # match at the start/end of the reply AND when punctuation-adjacent
+    # ("...time to sell." / "buy!"), while still NOT tripping on "buyer"/"selling".
+    normalised = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()).strip() + " "
     for phrase in _BANNED_PHRASES:
         if phrase in normalised:
             return phrase.strip()
