@@ -154,34 +154,47 @@ export function CompareLayout({
         <p className="eyebrow">{eyebrow}</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">{heading}</h1>
         <p className="mt-4 text-lg text-muted">{lede}</p>
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-up/30 bg-up/5 px-4 py-2 text-sm text-up">
-          <span className="text-base">✓</span>
-          <span>
-            <strong>{wins.length} categories</strong> Tapeline wins outright.{" "}
-            <strong>{tradeoffs.length}</strong> honest tradeoff{tradeoffs.length === 1 ? "" : "s"}.
-          </span>
-        </div>
+        {/* Hype pill removed 2026-06-16 — counting categories Tapeline "wins
+            outright" reads as marketing, not honesty (matches the finviz
+            reference page). The table below speaks for itself and the
+            tradeoffs section names where the competitor wins. */}
       </section>
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-up">
           Where Tapeline wins
         </h2>
+        {/* Polished comparison table — mirrors the /compare/finviz reference:
+            fixed column widths, 1px column dividers, theme-aware alternating
+            row tint, per-cell min-height + align-top for a consistent row
+            rhythm even when one cell wraps, and bare "—" competitor cells
+            normalised to "Not available" so an empty cell reads as a
+            deliberate "absent here" contrast rather than a data error. */}
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+          <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: "32%" }} />
+              <col style={{ width: "36%" }} />
+              <col style={{ width: "32%" }} />
+            </colgroup>
+            <thead className="border-b border-border bg-panel/60 text-xs uppercase text-muted">
               <tr>
                 <th className="px-4 py-3 text-left">Feature</th>
-                <th className="px-4 py-3 text-left text-accent">Tapeline</th>
-                <th className="px-4 py-3 text-left">{competitor}</th>
+                <th className="px-4 py-3 text-left text-accent border-l border-border/40">Tapeline</th>
+                <th className="px-4 py-3 text-left border-l border-border/40">{competitor}</th>
               </tr>
             </thead>
             <tbody>
-              {wins.map((r) => (
-                <tr key={r.label} className="border-b border-border/30">
-                  <td className="px-4 py-3 font-medium">{r.label}</td>
-                  <td className="px-4 py-3 font-medium text-accent">{r.tapeline}</td>
-                  <td className="px-4 py-3 text-subtle">{r.competitor}</td>
+              {wins.map((r, i) => (
+                <tr
+                  key={r.label}
+                  className={"border-b border-border/30 " + (i % 2 === 1 ? "bg-panel/40" : "")}
+                >
+                  <td className="px-4 py-3 font-medium align-top min-h-[3rem]">{r.label}</td>
+                  <td className="px-4 py-3 font-medium text-accent align-top border-l border-border/30 min-h-[3rem]">{r.tapeline}</td>
+                  <td className="px-4 py-3 text-muted align-top border-l border-border/30 min-h-[3rem]">
+                    {r.competitor === "—" ? "Not available" : r.competitor}
+                  </td>
                 </tr>
               ))}
             </tbody>
