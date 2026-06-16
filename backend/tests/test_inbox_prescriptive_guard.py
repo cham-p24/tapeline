@@ -121,7 +121,7 @@ class TestApproveCoreGuard:
         approve. The send adapter is NOT called and the row stays untouched."""
         msg_id = await _insert(
             "email", author="reply@example.com",
-            suggested_reply="Honestly you should buy $NVDA before earnings.",
+            suggested_reply="Honestly you should review $NVDA before earnings.",
         )
         with patch(
             "app.services.email.send_email", new=AsyncMock(),
