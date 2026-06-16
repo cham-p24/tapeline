@@ -36,6 +36,12 @@ type InboxStats = {
   today_classifications: number;
   cap_usd: number;
   cap_tripped: boolean;
+  // LLM health (PR #292) — non-zero llm_errors_24h means classifier calls are
+  // failing and the bot has silently degraded to manual-review-everything.
+  llm_errors_24h: number;
+  llm_attempts_24h: number;
+  llm_error_rate: number;
+  last_error_at: string | null;
   tier_counts_today: { "1": number; "2": number; "3": number; unclassified: number };
   tier_counts_last_7d: { "1": number; "2": number; "3": number; unclassified: number };
   channel_counts_today: Record<string, number>;
@@ -379,7 +385,7 @@ export default function InboxPage() {
  * prompt cache. A drop near 0.0 means the cache_control header isn't
  * landing, which would balloon spend silently.
  */
-function StatsStrip({ stats }: { stats: InboxStats }) {
+export function StatsStrip({ stats }: { stats: InboxStats }) {
   const banners: { tone: "warn" | "down"; label: string; detail: string }[] = [];
   if (!stats.bot_enabled) {
     banners.push({
@@ -400,6 +406,20 @@ function StatsStrip({ stats }: { stats: InboxStats }) {
       tone: "warn",
       label: "Dry-run mode",
       detail: "INBOX_DRY_RUN=true — classifier + pipeline run, but adapters log instead of sending. No real replies going out.",
+    });
+  }
+  // Silent-classifier-degradation guard. Non-zero llm_errors_24h means
+  // Anthropic calls are failing (dead key, timeout, parse error) and every
+  // ambiguous message is falling back to Tier 1 manual review while tier
+  // counts keep moving — the bot LOOKS up but isn't classifying. Surface it
+  // loudly so the operator catches it within a stats tick.
+  if (stats.llm_errors_24h > 0) {
+    const lastAt = stats.last_error_at ? formatErrorTime(stats.last_error_at) : null;
+    const ratePct = Math.round(stats.llm_error_rate * 100);
+    banners.push({
+      tone: "down",
+      label: `LLM errors: ${stats.llm_errors_24h}${lastAt ? ` (last ${lastAt})` : ""}`,
+      detail: `${stats.llm_errors_24h} of ${stats.llm_attempts_24h} classifier call${stats.llm_attempts_24h === 1 ? "" : "s"} failed in the last 24h (${ratePct}% error rate). Ambiguous messages are defaulting to Tier 1 manual review — check the Anthropic key and logs.`,
     });
   }
 
@@ -468,9 +488,43 @@ function StatsStrip({ stats }: { stats: InboxStats }) {
             </span>
           </Chip>
         )}
+        {/* LLM errors chip — always shown when any classifier calls were
+            attempted, so a healthy 0/N reads as an explicit "all good".
+            A red dot + count flags silent classifier degradation. */}
+        {stats.llm_attempts_24h > 0 && (
+          <Chip label="LLM errors">
+            {stats.llm_errors_24h > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-down"
+                  aria-hidden="true"
+                />
+                <span className="font-semibold nums text-down">
+                  {stats.llm_errors_24h}
+                </span>
+                {stats.last_error_at && (
+                  <span className="text-subtle">
+                    (last {formatErrorTime(stats.last_error_at)})
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="font-semibold nums text-up">0</span>
+            )}
+            <span className="text-subtle"> / {stats.llm_attempts_24h}</span>
+          </Chip>
+        )}
       </div>
     </div>
   );
+}
+
+// Short local-time HH:MM for the "last error" hint. Falls back to the raw
+// string if the timestamp doesn't parse so we never render "Invalid Date".
+function formatErrorTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function Chip({ label, children }: { label: string; children: React.ReactNode }) {

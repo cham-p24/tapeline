@@ -136,7 +136,7 @@ export function CompareLayout({
       url: "https://tapeline.io",
     },
     datePublished: verifiedOn,
-    reviewBody: `Side-by-side comparison of Tapeline against ${competitor}: ${wins.length} categor${wins.length === 1 ? "y" : "ies"} where Tapeline wins outright and ${tradeoffs.length} honest tradeoff${tradeoffs.length === 1 ? "" : "s"} where ${competitor} is the better fit.`,
+    reviewBody: `Side-by-side comparison of Tapeline against ${competitor}: ${wins.length} categor${wins.length === 1 ? "y" : "ies"} compared and ${tradeoffs.length} honest tradeoff${tradeoffs.length === 1 ? "" : "s"} where ${competitor} is the better fit.`,
     name: `Tapeline vs ${competitor}`,
     url: pageUrl,
   };
