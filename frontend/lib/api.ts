@@ -587,6 +587,12 @@ export const api = {
     today_classifications: number;
     cap_usd: number;
     cap_tripped: boolean;
+    // LLM health (added PR #292) — non-zero llm_errors_24h means classification
+    // calls are failing and the bot has silently degraded to manual review.
+    llm_errors_24h: number;
+    llm_attempts_24h: number;
+    llm_error_rate: number;
+    last_error_at: string | null;
     tier_counts_today: { "1": number; "2": number; "3": number; unclassified: number };
     tier_counts_last_7d: { "1": number; "2": number; "3": number; unclassified: number };
     channel_counts_today: Record<string, number>;
