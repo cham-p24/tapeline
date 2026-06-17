@@ -56,13 +56,20 @@ def _verify_resend_signature(body: bytes, header_signature: str | None) -> bool:
     body using `RESEND_INBOUND_SECRET`. Constant-time compare so a
     leaky signature can't be timing-attacked.
 
-    Returns True when the secret isn't configured AT ALL (dev /
-    local) so the endpoint stays usable for manual testing. In prod
-    the secret MUST be set or any attacker who guesses the URL can
-    inject a fake email.
+    Fails CLOSED in production: when the secret isn't configured the
+    request is REJECTED, so an attacker who guesses the URL can't inject
+    a fake inbound email. Outside production (development / staging) an
+    unset secret is bypassed so the endpoint stays usable for manual
+    testing.
     """
     secret = getattr(settings, "resend_inbound_secret", None)
     if not secret:
+        if settings.app_env == "production":
+            logger.error(
+                "inbox.resend_signature.fail_closed — RESEND_INBOUND_SECRET "
+                "unset in production; rejecting unsigned inbound webhook"
+            )
+            return False
         logger.warning(
             "inbox.resend_signature.dev_bypass — RESEND_INBOUND_SECRET not set"
         )
@@ -674,6 +681,15 @@ async def process_telegram_update(
     """
     founder_chat_id = settings.inbox_founder_telegram_chat_id
 
+    def _is_unauthorised(sender_chat_id: str) -> bool:
+        # Fail CLOSED in production: an unset founder chat id means nobody is
+        # authorised, so every approve/command action is rejected (an attacker
+        # who reaches the webhook can't self-approve). Outside production an
+        # unset id stays permissive for local testing.
+        if not founder_chat_id:
+            return settings.app_env == "production"
+        return sender_chat_id != founder_chat_id
+
     # --- Callback query (inline-button tap) ---
     cb = payload.get("callback_query")
     if cb:
@@ -685,7 +701,7 @@ async def process_telegram_update(
         original_message_id = message_obj.get("message_id")
         original_chat_id = str((message_obj.get("chat") or {}).get("id") or "")
 
-        if founder_chat_id and from_chat_id != founder_chat_id:
+        if _is_unauthorised(from_chat_id):
             # Not the founder — ack the button so they don't see a
             # forever-spinner, but don't action anything.
             await telegram_service.answer_callback_query(
@@ -742,7 +758,7 @@ async def process_telegram_update(
     if message:
         text = (message.get("text") or "").strip()
         from_chat_id = str((message.get("from") or {}).get("id") or "")
-        if founder_chat_id and from_chat_id != founder_chat_id:
+        if _is_unauthorised(from_chat_id):
             return None
 
         # Match /approve_42 or /reject_42.
