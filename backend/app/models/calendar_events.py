@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, Integer, String, func
+from sqlalchemy import BigInteger, Date, DateTime, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -20,7 +20,7 @@ class IPOEvent(Base):
     expected_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     price_low: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_high: Mapped[float | None] = mapped_column(Float, nullable=True)
-    shares_offered: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shares_offered: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="upcoming", nullable=False)
     # upcoming | priced | trading | postponed | withdrawn
     lead_underwriter: Mapped[str | None] = mapped_column(String(120), nullable=True)
