@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, func
+from sqlalchemy import BigInteger, DateTime, Float, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -24,7 +24,9 @@ class Ticker(Base):
     change_pct_1d: Mapped[float | None] = mapped_column(Float, nullable=True)
     change_pct_5d: Mapped[float | None] = mapped_column(Float, nullable=True)
     change_pct_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
-    volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # BigInteger: 32-bit INTEGER overflowed on high-turnover names (e.g. ADTX
+    # ~5.28B shares > 2.147B int max), failing the whole scan-tick bulk write.
+    volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     # Score breakdown — the synthesis moat. Always sums (weighted) to `score`.
     sub_trend: Mapped[float | None] = mapped_column(Float, nullable=True)
