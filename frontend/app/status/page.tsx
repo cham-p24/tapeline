@@ -144,9 +144,11 @@ export default function StatusPage() {
     // it instead of a second round-trip. Only set it when the body parses.
     try {
       const res = await fetch(`${API_BASE}/api/status`, { cache: "no-store" });
-      if (res.ok) setDetail((await res.json()) as StatusResponse);
+      // Clear stale detail on a failed refresh — otherwise a later outage/500
+      // keeps showing the last healthy payload while the probe row says Down.
+      setDetail(res.ok ? ((await res.json()) as StatusResponse) : null);
     } catch {
-      // Detail is best-effort; the probe row above already reflects API health.
+      setDetail(null);
     }
   }, []);
 
