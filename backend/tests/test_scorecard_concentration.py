@@ -13,7 +13,7 @@ worker tick — just the freeze function in isolation.
 import datetime as dt
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from app.db import session_scope
 from app.models import DailyScorecardEntry, Ticker
@@ -46,20 +46,21 @@ def _make_ticker(symbol: str, score: float, sector: str = "Tech",
         # change_pct_1d + confidence_pct so incomplete rows can't rank publicly.
         change_pct_1d=0.5,
         confidence_pct=80.0,
-        # Explicit fresh updated_at. The freshness floor (ticker_freshness.
-        # live_clauses) keeps rows with updated_at >= max(updated_at) - 7d. With
-        # updated_at left NULL these rows only survived on an otherwise-empty
-        # table (max=NULL -> no cutoff); once a sibling test's ticker carries a
-        # real updated_at on the same DB, NULL-dated rows get filtered out and
-        # the freeze finds 0 candidates. Stamping now() makes the test robust to
-        # cross-test pollution / xdist worker co-location.
-        updated_at=dt.datetime.now(dt.timezone.utc),
     )
 
 
 def _next_monday(d: dt.date) -> dt.date:
-    """Return a known trading day (Mon-Fri, no holiday) for the test fixture."""
-    while d.weekday() >= 5:
+    """Return the first real trading day at/after ``d``.
+
+    The bare ``weekday() >= 5`` check only skipped weekends, so on a week whose
+    target landed on a market holiday (e.g. Juneteenth) this returned a
+    non-trading day — and ``_ensure_daily_scorecard`` correctly skips the freeze
+    on non-trading days, surfacing as a spurious "expected 10 picks, got 0".
+    Use the same ``is_trading_day`` the freeze uses so they always agree.
+    """
+    from app.services.scorecard_backcheck import is_trading_day
+
+    while not is_trading_day(d):
         d = d + dt.timedelta(days=1)
     return d
 
@@ -72,15 +73,12 @@ async def test_sector_cap_enforced():
     today = _next_monday(dt.date.today())
 
     async with session_scope() as s:
-        # Clean slate. CI runs `pytest -x` against ONE shared SQLite DB that is
-        # never dropped or rolled back between tests (conftest only resets
-        # in-memory rate-limiters), so rows accumulate across the run. An earlier
-        # test (test_scorecard_backcheck) leaves Ticker + DailyScorecardEntry
-        # rows that pollute the candidate pool / max(updated_at) freshness window
-        # and made this freeze return 0 picks. Wipe both so the test owns its
-        # universe deterministically regardless of collection order.
-        await s.execute(delete(DailyScorecardEntry))
-        await s.execute(delete(Ticker))
+        # Clear any pre-existing rows for the test day
+        existing = await s.execute(
+            select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+        )
+        for e in existing.scalars().all():
+            await s.delete(e)
 
         # Seed 8 chip stocks at the highest scores, plus 12 stocks from
         # other sectors at slightly lower scores
@@ -105,27 +103,6 @@ async def test_sector_cap_enforced():
         await s.commit()
 
     try:
-        # --- TEMP DIAGNOSTIC (remove once root cause found) ---
-        from sqlalchemy import func as _func
-
-        from app.services.scorecard_backcheck import is_trading_day
-        from app.services.ticker_freshness import freshness_cutoff, live_clauses
-        async with session_scope() as s:
-            _tc = (await s.execute(select(_func.count()).select_from(Ticker))).scalar()
-            _existing = (await s.execute(
-                select(_func.count()).select_from(DailyScorecardEntry).where(
-                    DailyScorecardEntry.as_of == today))).scalar()
-            _cutoff = await freshness_cutoff(s)
-            _cstmt = select(_func.count()).select_from(Ticker)
-            for _c in await live_clauses(s):
-                _cstmt = _cstmt.where(_c)
-            _cand = (await s.execute(_cstmt)).scalar()
-        print(f"SCDIAG today={today} trading_day={is_trading_day(today)} "
-              f"tickers={_tc} existing_entries={_existing} cutoff={_cutoff} "
-              f"candidates_pass_live={_cand} min_macro={_MIN_MACRO_FOR_INCLUSION} "
-              f"max_per_sector={_MAX_PER_SECTOR}")
-        # --- END DIAGNOSTIC ---
-
         await _ensure_daily_scorecard(today)
 
         async with session_scope() as s:
