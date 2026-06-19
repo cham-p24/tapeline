@@ -26,6 +26,19 @@ def test_keeps_real_bug():
     assert before_send({}, _exc_hint(ValueError("a real bug"))) is not None
 
 
+def test_keeps_unhandled_transient():
+    # A transient timeout that ESCAPED a handler (mechanism handled=False) is a
+    # real incident — it must reach Sentry even though its type is transient.
+    event = {"exception": {"values": [{"mechanism": {"handled": False}}]}}
+    assert before_send(event, _exc_hint(httpx.ReadTimeout("escaped"))) is not None
+
+
+def test_drops_handled_transient_with_mechanism():
+    # Same exception type, but flagged handled=True -> still dropped as noise.
+    event = {"exception": {"values": [{"mechanism": {"handled": True}}]}}
+    assert before_send(event, _exc_hint(httpx.ReadTimeout("caught"))) is None
+
+
 def test_drops_per_cycle_tick_timeout_log():
     event = {"logentry": {"message": "tick.timeout elapsed=60.0s limit=60s consecutive=1"}}
     assert before_send(event, {}) is None

@@ -39,8 +39,25 @@ _NOISE_PREFIXES: tuple[str, ...] = (
 )
 
 
+def _is_unhandled(event: dict[str, Any]) -> bool:
+    """True if any exception on the event is flagged as UNHANDLED (mechanism
+    handled=False) — i.e. it escaped a request handler / the worker tick rather
+    than being caught and logged. Those are real incidents we must never drop."""
+    exc = event.get("exception")
+    values = exc.get("values") if isinstance(exc, dict) else None
+    for val in values or []:
+        if isinstance(val, dict) and (val.get("mechanism") or {}).get("handled") is False:
+            return True
+    return False
+
+
 def before_send(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any] | None:
     """Return the event to send it to Sentry, or None to drop it."""
+    # NEVER drop an unhandled exception — a transient timeout escaping a handler
+    # or the worker tick() is a genuine incident, not handled vendor noise.
+    if _is_unhandled(event):
+        return event
+
     exc_info = hint.get("exc_info")
     if exc_info and len(exc_info) >= 2 and isinstance(exc_info[1], _TRANSIENT_EXC):
         return None
