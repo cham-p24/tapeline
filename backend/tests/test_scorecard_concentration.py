@@ -50,8 +50,17 @@ def _make_ticker(symbol: str, score: float, sector: str = "Tech",
 
 
 def _next_monday(d: dt.date) -> dt.date:
-    """Return a known trading day (Mon-Fri, no holiday) for the test fixture."""
-    while d.weekday() >= 5:
+    """Return the first real trading day at/after ``d``.
+
+    The bare ``weekday() >= 5`` check only skipped weekends, so on a week whose
+    target landed on a market holiday (e.g. Juneteenth) this returned a
+    non-trading day — and ``_ensure_daily_scorecard`` correctly skips the freeze
+    on non-trading days, surfacing as a spurious "expected 10 picks, got 0".
+    Use the same ``is_trading_day`` the freeze uses so they always agree.
+    """
+    from app.services.scorecard_backcheck import is_trading_day
+
+    while not is_trading_day(d):
         d = d + dt.timedelta(days=1)
     return d
 
