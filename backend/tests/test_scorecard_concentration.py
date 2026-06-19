@@ -46,6 +46,14 @@ def _make_ticker(symbol: str, score: float, sector: str = "Tech",
         # change_pct_1d + confidence_pct so incomplete rows can't rank publicly.
         change_pct_1d=0.5,
         confidence_pct=80.0,
+        # Explicit fresh updated_at. The freshness floor (ticker_freshness.
+        # live_clauses) keeps rows with updated_at >= max(updated_at) - 7d. With
+        # updated_at left NULL these rows only survived on an otherwise-empty
+        # table (max=NULL -> no cutoff); once a sibling test's ticker carries a
+        # real updated_at on the same DB, NULL-dated rows get filtered out and
+        # the freeze finds 0 candidates. Stamping now() makes the test robust to
+        # cross-test pollution / xdist worker co-location.
+        updated_at=dt.datetime.now(dt.timezone.utc),
     )
 
 
