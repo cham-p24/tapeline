@@ -1442,8 +1442,11 @@ def _init_sentry() -> None:
     try:
         import sentry_sdk
 
+        from app.sentry_filter import before_send
+
         sentry_sdk.init(
             dsn=settings.sentry_dsn,
+            before_send=before_send,
             environment=settings.sentry_environment or settings.app_env,
             traces_sample_rate=settings.sentry_traces_sample_rate,
             release="tapeline@0.1.0",

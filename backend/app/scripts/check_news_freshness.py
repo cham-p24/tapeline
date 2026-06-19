@@ -78,7 +78,11 @@ def threshold_seconds(now_utc: datetime) -> int:
     """Pick the right freshness threshold based on the current session phase."""
     phase = session_phase(now_utc)
     if phase == "active":
-        return 30 * 60        # 30 min during the regular NYSE session
+        # 60 min: the 30-min bar cried wolf on routine ingestion lag (e.g. a
+        # 35-min-old article during a slow Benzinga minute), emailing a CI
+        # failure each time. 60 min still catches a genuine stall within the
+        # hour without alerting on normal jitter.
+        return 60 * 60
     if phase == "extended":
         return 90 * 60        # 90 min during pre/post-market (sparser news)
     if phase == "overnight":
