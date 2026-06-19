@@ -29,7 +29,7 @@ _TRANSIENT_EXC: tuple[type[BaseException], ...] = (
 try:  # httpx is the vendor HTTP client — add its timeout + transport families
     import httpx
 
-    _TRANSIENT_EXC = _TRANSIENT_EXC + (httpx.TimeoutException, httpx.TransportError)
+    _TRANSIENT_EXC = (*_TRANSIENT_EXC, httpx.TimeoutException, httpx.TransportError)
 except Exception:  # pragma: no cover - httpx is always present in prod
     pass
 
