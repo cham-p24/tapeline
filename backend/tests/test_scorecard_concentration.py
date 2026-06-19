@@ -105,6 +105,27 @@ async def test_sector_cap_enforced():
         await s.commit()
 
     try:
+        # --- TEMP DIAGNOSTIC (remove once root cause found) ---
+        from sqlalchemy import func as _func
+
+        from app.services.scorecard_backcheck import is_trading_day
+        from app.services.ticker_freshness import freshness_cutoff, live_clauses
+        async with session_scope() as s:
+            _tc = (await s.execute(select(_func.count()).select_from(Ticker))).scalar()
+            _existing = (await s.execute(
+                select(_func.count()).select_from(DailyScorecardEntry).where(
+                    DailyScorecardEntry.as_of == today))).scalar()
+            _cutoff = await freshness_cutoff(s)
+            _cstmt = select(_func.count()).select_from(Ticker)
+            for _c in await live_clauses(s):
+                _cstmt = _cstmt.where(_c)
+            _cand = (await s.execute(_cstmt)).scalar()
+        print(f"SCDIAG today={today} trading_day={is_trading_day(today)} "
+              f"tickers={_tc} existing_entries={_existing} cutoff={_cutoff} "
+              f"candidates_pass_live={_cand} min_macro={_MIN_MACRO_FOR_INCLUSION} "
+              f"max_per_sector={_MAX_PER_SECTOR}")
+        # --- END DIAGNOSTIC ---
+
         await _ensure_daily_scorecard(today)
 
         async with session_scope() as s:
