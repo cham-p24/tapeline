@@ -13,7 +13,7 @@ worker tick — just the freeze function in isolation.
 import datetime as dt
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.db import session_scope
 from app.models import DailyScorecardEntry, Ticker
@@ -72,12 +72,15 @@ async def test_sector_cap_enforced():
     today = _next_monday(dt.date.today())
 
     async with session_scope() as s:
-        # Clear any pre-existing rows for the test day
-        existing = await s.execute(
-            select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
-        )
-        for e in existing.scalars().all():
-            await s.delete(e)
+        # Clean slate. CI runs `pytest -x` against ONE shared SQLite DB that is
+        # never dropped or rolled back between tests (conftest only resets
+        # in-memory rate-limiters), so rows accumulate across the run. An earlier
+        # test (test_scorecard_backcheck) leaves Ticker + DailyScorecardEntry
+        # rows that pollute the candidate pool / max(updated_at) freshness window
+        # and made this freeze return 0 picks. Wipe both so the test owns its
+        # universe deterministically regardless of collection order.
+        await s.execute(delete(DailyScorecardEntry))
+        await s.execute(delete(Ticker))
 
         # Seed 8 chip stocks at the highest scores, plus 12 stocks from
         # other sectors at slightly lower scores
