@@ -141,7 +141,7 @@ async def add_to_watchlist(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(409, f"{symbol} already in watchlist")
 
-    # Tier cap. Free=5, Pro=50, Premium=200. Enforced server-side because the
+    # Tier cap. Free=3, Pro=50, Premium=200. Enforced server-side because the
     # client could be old/forked. effective_limit also handles the trial-aware
     # throttle for no-card Premium trials, though this cap isn't trial-throttled
     # (watchlist isn't an abuse vector the same way api/telegram caps are).
