@@ -156,10 +156,7 @@ def consume_anon_lookup(ip: str | None) -> dict:
     today = _utc_today()
 
     entry = _anon_lookups.get(key)
-    if entry is None or entry[0] != today:
-        used = 0
-    else:
-        used = entry[1]
+    used = 0 if entry is None or entry[0] != today else entry[1]
 
     if used >= cap:
         # Keep the (today, used) entry as-is — don't advance past the cap.
