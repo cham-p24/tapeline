@@ -36,7 +36,13 @@ export function useCountUp(
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
+    // A hidden/background tab pauses requestAnimationFrame, so the rAF-driven
+    // animation below never runs and the value would stay stuck at null (the UI
+    // shows "—" / 0.0 indefinitely — e.g. when the page is opened in a
+    // background tab). Snap straight to the final value in that case, same as
+    // for reduced-motion users.
+    const hidden = typeof document !== "undefined" && document.hidden;
+    if (reduce || hidden) {
       setValue(target);
       seenRef.current = true;
       return;
