@@ -77,4 +77,5 @@ def test_effective_limit_unaffected_keys_unchanged_during_trial():
 def test_effective_limit_free_user_unchanged():
     user = _user("free", None, None)
     assert effective_limit(user, "api_requests_per_day") == 0
-    assert effective_limit(user, "watchlist_tickers") == 5
+    # Post-freemium-retune (2026-06-20): Free watchlist cap is 3 (was 5).
+    assert effective_limit(user, "watchlist_tickers") == 3

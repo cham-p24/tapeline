@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from app.models import User
@@ -72,16 +72,38 @@ def has_feature(user_tier: Tier | str, feature: str) -> bool:
     return _ORDER[actual] >= _ORDER[required]
 
 
+# ── Tunable freemium caps (single source of truth) ───────────────────────────
+#
+# These are the levers product/growth tweaks most often, so they live as named
+# constants right here — change the number, redeploy, done. The TIER_LIMITS map
+# below references them so a value never drifts between two places.
+#
+# UNLIMITED is the explicit "no cap" sentinel for daily metering. We use None
+# (not 0 — 0 already means "zero allowed" for the alert caps, e.g. free users
+# get email_alerts_per_day=0). The usage meter treats a None daily_lookups cap
+# as "never meter, always allow" for Pro/Premium/active-trial users.
+UNLIMITED: Final[None] = None
+
+# FREE tier (forever; the tier trial users lapse to). LIVE data — no 24h cliff.
+FREE_DATA_DELAY_MINUTES = 0      # live (was 1440 = 24h before the freemium retune)
+FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)
+FREE_WATCHLIST_TICKERS = 3       # 3 saved tickers (was 5)
+FREE_DAILY_LOOKUPS = 5           # 5 ticker-detail (/api/ticker/{symbol}) views per UTC day
+
+# ANONYMOUS (no account at all): a small taste before sign-up is required.
+ANON_DAILY_LOOKUPS = 2           # 2 ticker-detail views per UTC day, per IP
+
+
 # Usage caps — aligned with docs/PRICING.md.
-TIER_LIMITS: dict[Tier, dict[str, int]] = {
+TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
     Tier.FREE: {
-        # Hardened 2026-04-27: 20 tickers, 24-hour delay.
-        # Trial expiry now drops to a meaningfully worse experience (yesterday's
-        # data, narrow universe) so loss aversion does the conversion work.
-        # Watchlist of 5 stays — alerts can't fire on stale data anyway, so this
-        # is a frustration vector that nudges toward upgrade rather than utility.
-        "scanner_rows": 20,
-        "watchlist_tickers": 5,
+        # Freemium retune 2026-06-20: FREE is now LIVE-but-limited (no more 24h
+        # delay cliff). Trial users lapse here. Conversion pressure now comes
+        # from the row cap, watchlist cap, and the daily ticker-lookup meter —
+        # not from stale data. Values are the FREE_* constants above so they're
+        # trivially tunable.
+        "scanner_rows": FREE_SCANNER_ROWS,
+        "watchlist_tickers": FREE_WATCHLIST_TICKERS,
         # `watchlists` (Phase A): how many named lists the user can have.
         # Free=1 preserves the current single-list UX exactly; Pro+ can split
         # into themed buckets like "Tech" / "AI Plays" / "My Core".
@@ -90,7 +112,10 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
         "telegram_alerts_per_day": 0,
         "api_requests_per_day": 0,
         "saved_scans": 0,
-        "data_delay_minutes": 1440,  # 24 hours
+        # Single-ticker detailed-score views per UTC day (GET /api/ticker/{sym}).
+        # Enforced via app/services/usage.consume_ticker_lookup.
+        "daily_lookups": FREE_DAILY_LOOKUPS,
+        "data_delay_minutes": FREE_DATA_DELAY_MINUTES,  # 0 = live
     },
     Tier.PRO: {
         "scanner_rows": 1000,
@@ -100,6 +125,7 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
         "telegram_alerts_per_day": 0,
         "api_requests_per_day": 0,
         "saved_scans": 10,
+        "daily_lookups": UNLIMITED,   # no metering for paid tiers
         "data_delay_minutes": 0,
     },
     Tier.PREMIUM: {
@@ -110,12 +136,19 @@ TIER_LIMITS: dict[Tier, dict[str, int]] = {
         "telegram_alerts_per_day": 10_000, # effectively unlimited
         "api_requests_per_day": 1_000,
         "saved_scans": 100,
+        "daily_lookups": UNLIMITED,   # no metering for paid tiers
         "data_delay_minutes": 0,
     },
 }
 
 
-def limit(user_tier: Tier | str, key: str) -> int:
+def limit(user_tier: Tier | str, key: str) -> int | None:
+    """Return the configured cap for `key` on `user_tier`.
+
+    Returns the UNLIMITED sentinel (None) for keys explicitly set to "no cap"
+    (e.g. daily_lookups on Pro/Premium). Falls back to 0 for an unknown key —
+    callers that may receive None must handle the sentinel (see usage.py).
+    """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
     return TIER_LIMITS[actual].get(key, 0)
 
@@ -227,12 +260,13 @@ def is_on_trial(
     return trial_ends_at > now
 
 
-def effective_limit(user: User, key: str) -> int:
+def effective_limit(user: User, key: str) -> int | None:
     """Return the cap for `key` accounting for trial-state throttling.
 
     Paid users get `limit(tier, key)` unchanged. Trial-state Premium users
     get the throttled value for keys in `_TRIAL_PREMIUM_REDUCTIONS`, and the
-    regular Premium cap for everything else.
+    regular Premium cap for everything else. May return the UNLIMITED sentinel
+    (None) for uncapped keys like daily_lookups.
     """
     base = limit(user.tier, key)
     if key not in _TRIAL_PREMIUM_REDUCTIONS:

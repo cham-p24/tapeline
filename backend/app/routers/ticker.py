@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import SessionLocal, get_session, is_sqlite
 from app.models import NewsItem, SqueezeSetup, Ticker
 from app.models.news import exclude_mock_clause, tickers_match_clause
-from app.services.auth import current_user_required
+from app.services.auth import current_user_optional, current_user_required
 from app.services.benzinga_feed import fetch_analyst_ratings
 from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions
 from app.services.news_feed import fetch_news_for_ticker
@@ -199,9 +199,29 @@ async def _fetch_ticker_news(symbol: str) -> list[dict]:
         return []
 
 
+def _client_ip(request: Request) -> str | None:
+    """Real client IP behind Fly's edge proxy. Mirrors routers/auth +
+    services/rate_limit: request.client.host is the proxy's internal peer (the
+    SAME for every external visitor), so prefer the leftmost X-Forwarded-For
+    entry (the original client). Used to key the anonymous lookup meter."""
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
 @router.get("/{symbol}")
-async def ticker_detail(symbol: str) -> dict:
+async def ticker_detail(symbol: str, request: Request) -> dict:
     """Complete view of a single ticker — score breakdown, squeeze status, news.
+
+    Freemium metering (added 2026-06-20): a "lookup" is one of these detailed
+    views. Pro / Premium / active-trial callers are never metered. A logged-in
+    FREE user gets tier.FREE_DAILY_LOOKUPS per UTC day; an anonymous (no-account)
+    caller gets tier.ANON_DAILY_LOOKUPS per IP per day. Over-cap callers get a
+    402 per the shared API contract (error "free_lookup_limit" for free users,
+    "signup_required" for anon). The lookup is only counted AFTER the symbol is
+    confirmed to resolve to a real ticker, so a 404/invalid symbol never burns
+    the caller's daily budget.
 
     Connection + latency discipline (incident fix 2026-05-31, rev 2): this
     endpoint backs the SSR'd public /t/{symbol} page and the daily SEO audit
@@ -253,6 +273,45 @@ async def ticker_detail(symbol: str) -> dict:
         # that then 404s. A genuinely-current ticker can never trip this.
         if t.score is not None and t.score > 100:
             raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+
+        # ── Freemium daily-lookup metering ──────────────────────────────────
+        # Only NOW that the symbol is confirmed to be a real, servable ticker do
+        # we charge a lookup against the caller's daily budget — a 404 above
+        # never reaches here, so an invalid/missing symbol never burns budget.
+        # Pro/Premium/active-trial callers are uncapped (consume_* returns
+        # allowed=True with no increment). Over-cap free/anon callers get a 402
+        # per the shared contract (the frontend renders an upgrade / sign-up
+        # wall). We resolve the caller in THIS short read txn (sub-ms auth read)
+        # — the connection is still released on context exit before the news
+        # fetch, preserving the rev2 connection discipline above.
+        from app.services.usage import consume_anon_lookup, consume_ticker_lookup
+
+        user = await current_user_optional(request, session)
+        if user is None:
+            anon = consume_anon_lookup(_client_ip(request))
+            if not anon["allowed"]:
+                raise HTTPException(
+                    402,
+                    detail={
+                        "error": "signup_required",
+                        "used": anon["used"],
+                        "limit": anon["limit"],
+                        "tier": "anon",
+                    },
+                )
+        else:
+            meter = await consume_ticker_lookup(session, user)
+            if not meter["allowed"]:
+                raise HTTPException(
+                    402,
+                    detail={
+                        "error": "free_lookup_limit",
+                        "used": meter["used"],
+                        "limit": meter["limit"],
+                        "tier": "free",
+                    },
+                )
+
         sq = (
             await session.execute(
                 select(SqueezeSetup).where(SqueezeSetup.symbol == symbol)

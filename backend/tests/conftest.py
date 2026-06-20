@@ -54,9 +54,15 @@ def _reset_rate_limiter() -> None:
     behaviour is exercised by test_zz_rate_limit_kicks_in; the trial-
     abuse caps by tests in test_trial_throttle.py.
     """
-    from app.services import trial_abuse
+    from app.services import trial_abuse, usage
     from app.services.rate_limit import limiter
 
     limiter._buckets.clear()
     trial_abuse._signup_log.clear()
     trial_abuse._fingerprint_log.clear()
+    # 4. `usage._anon_lookups` — the in-memory per-IP anonymous ticker-lookup
+    #    meter (freemium, 2/day). Leaks the same way across tests; reset so each
+    #    test starts with a clean anon budget. (The logged-in counter is durable
+    #    on the users table, scoped to a freshly-created user per test, so it
+    #    needs no reset here.)
+    usage._anon_lookups.clear()

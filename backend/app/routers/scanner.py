@@ -156,8 +156,10 @@ async def list_scanner(
     result = await session.execute(stmt)
     rows = result.scalars().all()
 
-    # Read the delay from tier.py (Free is 1440 = 24 hours; Pro/Premium = 0)
-    # so the timestamp display matches what /how-it-works and /pricing advertise.
+    # Read the delay from tier.py. Post-freemium-retune (2026-06-20) every tier
+    # is LIVE (data_delay_minutes = 0) — the old 24h Free delay cliff is gone;
+    # Free is now gated by row-cap + the daily ticker-lookup meter instead. Kept
+    # config-driven so re-introducing a delay is a one-line tier.py change.
     delay_minutes = tier_limit(tier, "data_delay_minutes")
     return {
         "count": len(rows),

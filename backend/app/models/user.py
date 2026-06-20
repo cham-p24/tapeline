@@ -1,9 +1,9 @@
 """User + subscription + alert rule models."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -142,6 +142,17 @@ class User(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True,
     )
+
+    # ── Freemium daily ticker-lookup meter (migration 0037) ────────────────
+    # A "lookup" = one detailed single-ticker score view (GET /api/ticker/
+    # {symbol}, which powers /t/{symbol} + the in-app ticker page). FREE users
+    # get a tunable daily cap (tier.FREE_DAILY_LOOKUPS); Pro/Premium/active-
+    # trial users are never metered. `lookups_today` is the running count for
+    # the current UTC day; `lookups_reset_on` is the UTC date that count
+    # belongs to. When lookups_reset_on != today, the counter rolls to 0 before
+    # the next increment. Enforced via app/services/usage.consume_ticker_lookup.
+    lookups_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lookups_reset_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Per-user email preferences bitmask. See app.services.email_prefs for
     # the bit constants. Default 15 = all four suppressable categories on.
