@@ -11,7 +11,7 @@ import { PRICING, usd } from "@/lib/pricing";
 export const metadata = pageMeta({
   title: `Tapeline Pricing: Pro ${usd(PRICING.pro.annualPerMonth)}/mo · Premium ${usd(PRICING.premium.annualPerMonth)}/mo · 14-Day Free Trial`,
   description:
-    `Tapeline pricing: Free (top 20, delayed), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo, Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (Congress + insider Form 4). 14-day Premium trial, no card.`,
+    `Tapeline pricing: Free forever (live scores, 5 look-ups/day, top-10 scanner), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo (unlimited look-ups, real-time full-universe scanner), Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (Congress + insider Form 4). 14-day Premium trial, no card.`,
   path: "/pricing",
 });
 
@@ -20,7 +20,7 @@ export const metadata = pageMeta({
 const FAQ_ITEMS = [
   {
     q: "What happens when my trial ends?",
-    a: "Your account drops to Free — top 20 tickers, 24-hour delayed. Watchlists and settings stay intact. Add a card any time to keep Premium.",
+    a: "Your account moves to Free forever — live scores, 5 ticker look-ups a day, the top-10 scanner, and a 3-ticker watchlist. Watchlists and settings stay intact. Add a card any time to keep Premium.",
   },
   {
     q: "Can I switch plans later?",
@@ -115,7 +115,7 @@ export default function PricingPage() {
           <div className="mt-8 divide-y divide-border/60">
             <Faq
               q="What happens when my trial ends?"
-              a="Your account drops to Free — top 20 tickers, 24-hour delayed. Watchlists and settings stay intact. Add a card any time to keep Premium."
+              a="Your account moves to Free forever — live scores, 5 ticker look-ups a day, the top-10 scanner, and a 3-ticker watchlist. Watchlists and settings stay intact. Add a card any time to keep Premium."
             />
             <Faq
               q="Can I switch plans later?"
