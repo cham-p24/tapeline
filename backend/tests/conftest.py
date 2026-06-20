@@ -11,13 +11,37 @@ tables already exist.
 """
 from __future__ import annotations
 
-import asyncio
+import os
 
-import pytest
+# Neutralize live-service credentials BEFORE any app import caches Settings, so
+# the suite can never POST to live Resend / Telegram / Anthropic / data-vendor
+# APIs. Previously, when these were exported in the shell env, email tests
+# actually sent real mail to the seeded @example.com addresses (and burned
+# Resend quota). A test that needs a key set should monkeypatch it locally.
+# (Signing/verification secrets like SESSION_SECRET and *_WEBHOOK_SECRET are
+# deliberately left intact — clearing them would break auth/webhook tests.)
+for _live_key in (
+    "RESEND_API_KEY",
+    "TELEGRAM_BOT_TOKEN",
+    "ANTHROPIC_API_KEY",
+    "MASSIVE_API_KEY",
+    "POLYGON_API_KEY",
+    "FINNHUB_API_KEY",
+    "FRED_API_KEY",
+    "BENZINGA_API_KEY",
+    "QUIVER_API_KEY",
+    "REDDIT_CLIENT_ID",
+    "REDDIT_CLIENT_SECRET",
+):
+    os.environ.pop(_live_key, None)
+
+import asyncio  # noqa: E402
+
+import pytest  # noqa: E402
 
 # Importing the models package registers all tables on Base.metadata
-import app.models  # noqa: F401
-from app.db import Base, engine
+import app.models  # noqa: E402,F401
+from app.db import Base, engine  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
