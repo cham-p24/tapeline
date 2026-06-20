@@ -237,6 +237,15 @@ async def signup(
     record_signup(client_ip)
     record_fingerprint_signup(body.device_fingerprint)
 
+    # Real-time founder ping so a new signup / live trial never goes unnoticed.
+    # Self-guarding + never raises (no-op if the Telegram channel isn't set).
+    from app.services.telegram import notify_founder_new_signup
+
+    await notify_founder_new_signup(
+        email=user.email, tier=user.tier,
+        trial_ends_at=user.trial_ends_at, source="email",
+    )
+
     token = issue_session_token(user.id)
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signup user=%s referred_by=%s", user.id, referred_by_id or "none")

@@ -52,6 +52,38 @@ async def send_message(
     return True
 
 
+async def notify_founder_new_signup(
+    *,
+    email: str,
+    tier: str,
+    trial_ends_at: datetime | None,
+    source: str,
+) -> None:
+    """Real-time Telegram ping to the founder on every new signup.
+
+    Without this, signups (and the live trials they start) land silently in the
+    DB and the founder only finds out by manually querying — so a 14-day trial
+    can lapse unconverted before anyone reaches out. No-op when the founder
+    chat id / bot token isn't configured. NEVER raises — a notification failure
+    must not affect the signup itself.
+    """
+    chat_id = settings.inbox_founder_telegram_chat_id
+    if not chat_id or not settings.telegram_bot_token:
+        return
+    try:
+        te = trial_ends_at.date().isoformat() if trial_ends_at else "no trial"
+        text = (
+            "🎉 New Tapeline signup\n"
+            f"{email}\n"
+            f"tier: {tier} · trial ends: {te}\n"
+            f"via: {source}"
+        )
+        # parse_mode="" => plain text, so emails with _ / * don't break Markdown.
+        await send_message(chat_id, text, parse_mode="")
+    except Exception:
+        logger.exception("telegram.signup_alert_failed email=%s", email)
+
+
 async def answer_callback_query(callback_query_id: str, text: str = "") -> bool:
     """Acknowledge a callback_query (button tap). Required by Telegram —
     without it the user sees a loading spinner on the button forever."""

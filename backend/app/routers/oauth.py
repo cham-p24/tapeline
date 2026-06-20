@@ -341,6 +341,14 @@ async def oauth_callback(
     # straight to the scanner.
     token = issue_session_token(user.id)
     if is_new:
+        # Real-time founder ping (same as native signup) so a new OAuth signup /
+        # live trial never goes unnoticed. Self-guarding + never raises.
+        from app.services.telegram import notify_founder_new_signup
+
+        await notify_founder_new_signup(
+            email=user.email, tier=user.tier,
+            trial_ends_at=user.trial_ends_at, source=provider,
+        )
         redirect_url = f"{settings.app_url}/app/onboarding?next=/app/scanner"
     else:
         redirect_url = f"{settings.app_url}/app/scanner"
