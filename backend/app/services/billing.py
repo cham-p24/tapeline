@@ -1,6 +1,7 @@
 """Stripe billing — checkout sessions, customer portal, webhook handling."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -15,6 +16,7 @@ settings = get_settings()
 
 if settings.stripe_secret_key:
     stripe.api_key = settings.stripe_secret_key
+stripe.max_network_retries = 1
 
 
 def _tier_from_price(price_id: str) -> str:
@@ -89,7 +91,8 @@ async def create_checkout_session(
         # promo codes. The customer can still apply a promo on a later checkout
         # once any auto-applied coupon is spent.
         if referral_credit_months > 0:
-            coupon = stripe.Coupon.create(
+            coupon = await asyncio.to_thread(
+                stripe.Coupon.create,
                 percent_off=100,
                 duration="repeating",
                 duration_in_months=referral_credit_months,
@@ -99,7 +102,8 @@ async def create_checkout_session(
             kwargs["discounts"] = [{"coupon": coupon.id}]
             sub_metadata["referral_credits_to_consume"] = str(referral_credit_months)
         elif winback:
-            coupon = stripe.Coupon.create(
+            coupon = await asyncio.to_thread(
+                stripe.Coupon.create,
                 percent_off=40,
                 duration="repeating",
                 duration_in_months=3,
@@ -112,7 +116,7 @@ async def create_checkout_session(
             kwargs["allow_promotion_codes"] = True
 
         kwargs["subscription_data"] = {"metadata": sub_metadata}
-        session = stripe.checkout.Session.create(**kwargs)
+        session = await asyncio.to_thread(stripe.checkout.Session.create, **kwargs)
         return session.url  # type: ignore[return-value]
     except stripe.error.StripeError as exc:
         logger.exception("stripe.checkout_create_failed")
@@ -122,7 +126,11 @@ async def create_checkout_session(
 async def create_portal_session(customer_id: str, return_url: str) -> str:
     """Create a customer portal session for self-serve billing management."""
     try:
-        s = stripe.billing_portal.Session.create(customer=customer_id, return_url=return_url)
+        s = await asyncio.to_thread(
+            stripe.billing_portal.Session.create,
+            customer=customer_id,
+            return_url=return_url,
+        )
         return s.url  # type: ignore[return-value]
     except stripe.error.StripeError as exc:
         logger.exception("stripe.portal_create_failed")
@@ -147,14 +155,16 @@ def _require_stripe() -> None:
         raise HTTPException(503, "Billing isn't configured (no Stripe key).")
 
 
-def _primary_subscription(customer_id: str) -> Any:
+async def _primary_subscription(customer_id: str) -> Any:
     """Return the customer's primary Stripe subscription object, or raise 404.
 
     Prefers active/trialing over past_due/paused. Raises HTTPException(404)
     when the customer has no subscription Stripe will let us act on.
     """
     try:
-        subs = stripe.Subscription.list(customer=customer_id, status="all", limit=20)
+        subs = await asyncio.to_thread(
+            stripe.Subscription.list, customer=customer_id, status="all", limit=20,
+        )
     except stripe.error.StripeError as exc:
         logger.exception("stripe.subscription_list_failed customer=%s", customer_id)
         raise HTTPException(502, f"Stripe error: {exc}") from exc
@@ -194,10 +204,11 @@ async def pause_subscription(customer_id: str, months: int) -> datetime:
     _require_stripe()
     if months < 1 or months > 3:
         raise HTTPException(400, "Pause length must be 1-3 months.")
-    sub = _primary_subscription(customer_id)
+    sub = await _primary_subscription(customer_id)
     resumes_at = datetime.now(UTC) + timedelta(days=30 * months)
     try:
-        stripe.Subscription.modify(
+        await asyncio.to_thread(
+            stripe.Subscription.modify,
             _sub_id(sub),
             pause_collection={"behavior": "void", "resumes_at": int(resumes_at.timestamp())},
         )
@@ -210,9 +221,9 @@ async def pause_subscription(customer_id: str, months: int) -> datetime:
 async def resume_subscription(customer_id: str) -> None:
     """Clear pause_collection so billing resumes immediately."""
     _require_stripe()
-    sub = _primary_subscription(customer_id)
+    sub = await _primary_subscription(customer_id)
     try:
-        stripe.Subscription.modify(_sub_id(sub), pause_collection="")
+        await asyncio.to_thread(stripe.Subscription.modify, _sub_id(sub), pause_collection="")
     except stripe.error.StripeError as exc:
         logger.exception("stripe.resume_failed customer=%s", customer_id)
         raise HTTPException(502, f"Stripe error: {exc}") from exc
@@ -225,9 +236,10 @@ async def apply_save_offer_coupon(customer_id: str) -> None:
     this function just does the Stripe side.
     """
     _require_stripe()
-    sub = _primary_subscription(customer_id)
+    sub = await _primary_subscription(customer_id)
     try:
-        coupon = stripe.Coupon.create(
+        coupon = await asyncio.to_thread(
+            stripe.Coupon.create,
             percent_off=50,
             duration="repeating",
             duration_in_months=3,
@@ -239,7 +251,8 @@ async def apply_save_offer_coupon(customer_id: str) -> None:
         # discount a sub that's still set to lapse. cancel_at_period_end=False
         # is a no-op when the sub wasn't scheduled to cancel (the common
         # pre-emptive-save path), so this is safe either way.
-        stripe.Subscription.modify(
+        await asyncio.to_thread(
+            stripe.Subscription.modify,
             _sub_id(sub),
             discounts=[{"coupon": coupon.id}],
             cancel_at_period_end=False,
@@ -257,9 +270,11 @@ async def set_cancel_at_period_end(customer_id: str) -> datetime | None:
     the period-end datetime so the UI/email can show "access until X".
     """
     _require_stripe()
-    sub = _primary_subscription(customer_id)
+    sub = await _primary_subscription(customer_id)
     try:
-        updated = stripe.Subscription.modify(_sub_id(sub), cancel_at_period_end=True)
+        updated = await asyncio.to_thread(
+            stripe.Subscription.modify, _sub_id(sub), cancel_at_period_end=True,
+        )
     except stripe.error.StripeError as exc:
         logger.exception("stripe.cancel_failed customer=%s", customer_id)
         raise HTTPException(502, f"Stripe error: {exc}") from exc

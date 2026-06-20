@@ -21,6 +21,7 @@ from app.db import get_session
 from app.models import User
 from app.services.auth import current_user_optional, current_user_required
 from app.services.briefing import generate_briefing_html
+from app.services.rate_limit import limit_strict
 
 router = APIRouter()
 
@@ -38,7 +39,7 @@ async def preview_briefing(
     return await generate_briefing_html(session, user)
 
 
-@router.post("/send")
+@router.post("/send", dependencies=[Depends(limit_strict)])
 async def send_test_briefing(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),

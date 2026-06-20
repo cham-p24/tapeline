@@ -48,14 +48,24 @@ class TokenBucket:
 limiter = TokenBucket()
 
 
+def client_ip(request: Request) -> str:
+    """Best client IP. Prefer Cloudflare's un-forgeable cf-connecting-ip header
+    (set by the proxy, not the client), then fall back to the leftmost
+    X-Forwarded-For token, then the direct socket peer."""
+    xff = request.headers.get("X-Forwarded-For", "")
+    return (
+        request.headers.get("cf-connecting-ip")
+        or (xff.split(",")[0].strip() if xff else "")
+        or (request.client.host if request.client else "anon")
+    )
+
+
 def _client_key(request: Request) -> str:
     """Prefer Authorization user, fall back to IP."""
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return f"tok:{auth[-20:]}"  # last 20 chars is enough to distinguish users
-    xff = request.headers.get("X-Forwarded-For", "")
-    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "anon")
-    return f"ip:{ip}"
+    return f"ip:{client_ip(request)}"
 
 
 async def limit_api(request: Request, capacity: int = 120, per_seconds: int = 60) -> None:
@@ -78,8 +88,7 @@ async def limit_auth(request: Request) -> None:
     Slows down credential-stuffing and trial-account-creation bots.
     Always IP-keyed (auth has no token yet).
     """
-    xff = request.headers.get("X-Forwarded-For", "")
-    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "anon")
+    ip = client_ip(request)
     ok = await limiter.consume(f"auth:{ip}", 10, 60)
     if not ok:
         raise HTTPException(status_code=429, detail="Too many auth attempts. Wait a minute and try again.")

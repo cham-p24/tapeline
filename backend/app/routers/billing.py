@@ -19,6 +19,7 @@ from app.services.billing import (
     resume_subscription,
     set_cancel_at_period_end,
 )
+from app.services.rate_limit import limit_strict
 
 router = APIRouter()
 settings = get_settings()
@@ -43,7 +44,7 @@ class CheckoutRequest(BaseModel):
     billing_period: str = "monthly"        # "monthly" or "annual"
 
 
-@router.post("/checkout")
+@router.post("/checkout", dependencies=[Depends(limit_strict)])
 async def create_checkout(
     body: CheckoutRequest,
     user: User = Depends(current_user_required),
@@ -90,7 +91,7 @@ async def create_checkout(
     return {"url": url}
 
 
-@router.post("/portal")
+@router.post("/portal", dependencies=[Depends(limit_strict)])
 async def open_portal(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
@@ -142,7 +143,7 @@ async def retention_options(user: User = Depends(current_user_required)) -> dict
     }
 
 
-@router.post("/save-offer")
+@router.post("/save-offer", dependencies=[Depends(limit_strict)])
 async def accept_save_offer(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
@@ -189,7 +190,7 @@ async def accept_save_offer(
     }
 
 
-@router.post("/pause")
+@router.post("/pause", dependencies=[Depends(limit_strict)])
 async def pause(
     body: PauseRequest,
     user: User = Depends(current_user_required),
@@ -205,7 +206,7 @@ async def pause(
     return {"ok": True, "resumes_at": resumes_at.isoformat()}
 
 
-@router.post("/resume")
+@router.post("/resume", dependencies=[Depends(limit_strict)])
 async def resume(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
@@ -218,7 +219,7 @@ async def resume(
     return {"ok": True}
 
 
-@router.post("/cancel")
+@router.post("/cancel", dependencies=[Depends(limit_strict)])
 async def cancel(
     body: CancelRequest,
     user: User = Depends(current_user_required),

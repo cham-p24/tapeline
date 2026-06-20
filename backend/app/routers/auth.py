@@ -19,6 +19,7 @@ from app.services.bot_protection import (
     is_honeypot_tripped,
     verify_turnstile,
 )
+from app.services.rate_limit import client_ip as resolve_client_ip
 from app.services.rate_limit import limit_auth
 from app.services.session import (
     SESSION_COOKIE,
@@ -131,15 +132,11 @@ async def signup(
     # Real client IP behind Fly's edge proxy. request.client.host is the proxy's
     # internal peer address — IDENTICAL for every external visitor — so using it
     # would collapse the per-IP signup cap below into a GLOBAL 3-per-24h limit
-    # (after any 3 site-wide signups in a window, every visitor 429s). Read the
-    # leftmost X-Forwarded-For entry (the original client) exactly as
+    # (after any 3 site-wide signups in a window, every visitor 429s). Use the
+    # shared resolver, which prefers Cloudflare's un-forgeable cf-connecting-ip
+    # header and falls back to the leftmost X-Forwarded-For entry exactly as
     # services/rate_limit already does for limit_auth.
-    xff = request.headers.get("X-Forwarded-For", "")
-    client_ip = (
-        xff.split(",")[0].strip()
-        if xff
-        else (request.client.host if request.client else None)
-    )
+    client_ip = resolve_client_ip(request)
     if not await verify_turnstile(body.turnstile_token, client_ip):
         raise HTTPException(400, "Bot challenge failed. Please refresh and try again.")
 

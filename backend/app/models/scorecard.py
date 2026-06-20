@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, Integer, String, func
+from sqlalchemy import Date, DateTime, Float, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -12,6 +12,13 @@ from app.db import Base
 class DailyScorecardEntry(Base):
     """One row per (date, symbol) — the top-10 tickers we flagged that day + how they performed."""
     __tablename__ = "daily_scorecard"
+
+    # Composite index serves the symbol-filtered read (GET /api/scorecard/symbol/{symbol}):
+    # the equality predicate on `symbol` plus the `ORDER BY as_of DESC` are both satisfied
+    # from one B-tree, so the per-ticker history query stops full-scanning as the table grows.
+    __table_args__ = (
+        Index("ix_daily_scorecard_symbol_as_of", "symbol", "as_of"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     as_of: Mapped[date] = mapped_column(Date, nullable=False, index=True)

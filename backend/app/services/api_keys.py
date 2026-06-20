@@ -24,7 +24,7 @@ from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyHeader
-from sqlalchemy import select
+from sqlalchemy import case, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -115,19 +115,43 @@ async def authenticate_api_key(session: AsyncSession, raw: str | None) -> tuple[
 
     cap = effective_limit(user, "api_requests_per_day")
     today = _today()
-    if row.requests_day != today:
-        row.requests_day = today
-        row.requests_today = 0
-    if row.requests_today >= cap:
+
+    # Atomic read-modify-write: a single UPDATE that (a) resets the counter to 1
+    # on a day-rollover else increments it by 1, and (b) only matches when the
+    # key is under quota for *today*, encoded in the WHERE clause. Concurrent
+    # requests on one key serialise on the row write, so two callers can't both
+    # pass the cap and both increment. rowcount==0 means the quota guard in the
+    # WHERE rejected the bump -> over quota. (SQLite ignores row-level locking
+    # but is single-writer per transaction, so this is still safe in dev.)
+    new_today = case(
+        (ApiKey.requests_day != today, 1),
+        else_=ApiKey.requests_today + 1,
+    )
+    result = await session.execute(
+        update(ApiKey)
+        .where(
+            ApiKey.id == row.id,
+            (ApiKey.requests_day != today) | (ApiKey.requests_today < cap),
+        )
+        .values(
+            requests_day=today,
+            requests_today=new_today,
+            request_count_total=ApiKey.request_count_total + 1,
+            last_used_at=datetime.now(UTC),
+        )
+    )
+    if result.rowcount == 0:  # type: ignore[attr-defined]  # CursorResult.rowcount (DML)
+        # WHERE didn't match -> the key is at/over its cap for today.
+        await session.rollback()
         raise HTTPException(
             429,
             f"Daily API quota of {cap:,} requests reached for this key. Resets at 00:00 UTC.",
         )
 
-    row.requests_today += 1
-    row.request_count_total += 1
-    row.last_used_at = datetime.now(UTC)
     await session.commit()
+    # Reflect the just-committed counters on the returned row (callers read
+    # these), without trusting the stale pre-UPDATE in-session values.
+    await session.refresh(row)
     return user, row
 
 
