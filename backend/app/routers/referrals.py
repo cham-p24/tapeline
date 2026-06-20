@@ -86,16 +86,16 @@ async def referral_leaderboard(
     they're outside the top 10, so the page can always render "you're #N".
     Open to every logged-in user — referrals aren't tier-gated.
     """
-    rows = (
+    top = (
         await session.execute(
             select(User.referred_by, func.count().label("n"))
             .where(User.referred_by.is_not(None))
             .group_by(User.referred_by)
             .order_by(func.count().desc())
+            .limit(10)
         )
     ).all()
-    ranked = [(rid, n) for rid, n in rows if rid]
-    if not ranked:
+    if not top:
         return {
             "leaderboard": [],
             "your_rank": None,
@@ -103,7 +103,6 @@ async def referral_leaderboard(
             "total_referrers": 0,
         }
 
-    top = ranked[:10]
     needed_ids = {rid for rid, _ in top} | {user.id}
     resolved = (
         await session.execute(select(User).where(User.id.in_(list(needed_ids))))
@@ -120,16 +119,44 @@ async def referral_leaderboard(
         for i, (rid, n) in enumerate(top, start=1)
     ]
 
+    # Caller's own count + rank without scanning the full ranked list. Rank is
+    # one past the number of referrers with strictly more signups than the
+    # caller; None when the caller has referred nobody (matches prior behaviour
+    # of omitting non-referrers from the ranking).
+    your_signups = (
+        await session.scalar(
+            select(func.count()).where(User.referred_by == user.id)
+        )
+    ) or 0
+
     your_rank: int | None = None
-    your_signups = 0
-    for i, (rid, n) in enumerate(ranked, start=1):
-        if rid == user.id:
-            your_rank, your_signups = i, n
-            break
+    if your_signups:
+        per_referrer = (
+            select(func.count().label("n"))
+            .where(User.referred_by.is_not(None))
+            .group_by(User.referred_by)
+            .subquery()
+        )
+        ahead = (
+            await session.scalar(
+                select(func.count()).select_from(per_referrer).where(
+                    per_referrer.c.n > your_signups
+                )
+            )
+        ) or 0
+        your_rank = ahead + 1
+
+    total_referrers = (
+        await session.scalar(
+            select(func.count(func.distinct(User.referred_by))).where(
+                User.referred_by.is_not(None)
+            )
+        )
+    ) or 0
 
     return {
         "leaderboard": leaderboard,
         "your_rank": your_rank,
         "your_signups": your_signups,
-        "total_referrers": len(ranked),
+        "total_referrers": total_referrers,
     }

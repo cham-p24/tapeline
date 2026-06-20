@@ -22,6 +22,7 @@ or use https://vapidkeys.com/.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -73,11 +74,13 @@ async def send_web_push(
     payload = json.dumps({"title": title, "body": body[:300], "url": url})
 
     try:
-        webpush(
+        await asyncio.to_thread(
+            webpush,
             subscription_info=subscription,
             data=payload,
             vapid_private_key=settings.vapid_private_key,
             vapid_claims={"sub": settings.vapid_subject},
+            timeout=10,
         )
         return True
     except WebPushException as exc:

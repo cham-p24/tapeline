@@ -45,6 +45,7 @@ Tier definitions (also documented in models/inbox.py):
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -426,18 +427,28 @@ async def classify_with_llm(
         # suite mock it cleanly.
         import anthropic  # type: ignore[import-not-found]
 
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-        response = await client.messages.create(
-            model=model,
-            max_tokens=512,
-            system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=[{"role": "user", "content": user_block}],
+        # Bound the call so we never hold the pooled DB connection across a
+        # hung LLM request (SDK default timeout is ~600s). The SDK timeout
+        # caps the underlying HTTP request; asyncio.wait_for is a backstop in
+        # case the SDK itself stalls. Both a TimeoutError and the SDK's
+        # APITimeoutError fail closed into the except-path below (Tier 1).
+        client = anthropic.AsyncAnthropic(
+            api_key=settings.anthropic_api_key, timeout=20.0
+        )
+        response = await asyncio.wait_for(
+            client.messages.create(
+                model=model,
+                max_tokens=512,
+                system=[
+                    {
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=[{"role": "user", "content": user_block}],
+            ),
+            timeout=25,
         )
     except Exception as exc:
         latency_ms = int((time.perf_counter() - started) * 1000)

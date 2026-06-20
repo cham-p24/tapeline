@@ -91,7 +91,11 @@ async def telegram_webhook(secret: str, request: Request) -> dict:
             select(TelegramLinkToken).where(TelegramLinkToken.token == token)
         )).scalar_one_or_none()
 
-        if row is None or row.expires_at < datetime.now(UTC):
+        expires_at = row.expires_at if row is not None else None
+        if expires_at is not None and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+
+        if row is None or expires_at < datetime.now(UTC):
             await send_message(
                 chat_id,
                 "That link expired. Click *Connect Telegram* again on "

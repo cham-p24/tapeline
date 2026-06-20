@@ -11,7 +11,19 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import AlertEvent, AlertRule, ApiKey, Subscription, User, WatchlistItem
+from app.models import (
+    AlertEvent,
+    AlertRule,
+    ApiKey,
+    RoadmapVote,
+    ScannerPreset,
+    Subscription,
+    TelegramLinkToken,
+    User,
+    Watchlist,
+    WatchlistItem,
+    WebPushSubscription,
+)
 from app.services.auth import current_user_required
 
 logger = logging.getLogger(__name__)
@@ -95,7 +107,14 @@ async def delete_my_account(
     # Cascade delete user-owned rows
     await session.execute(delete(AlertEvent).where(AlertEvent.user_id == user_id))
     await session.execute(delete(AlertRule).where(AlertRule.user_id == user_id))
+    # WatchlistItem before Watchlist — items FK the parent list (ON DELETE
+    # CASCADE), but both also key users.id directly, so delete child first.
     await session.execute(delete(WatchlistItem).where(WatchlistItem.user_id == user_id))
+    await session.execute(delete(Watchlist).where(Watchlist.user_id == user_id))
+    await session.execute(delete(ScannerPreset).where(ScannerPreset.user_id == user_id))
+    await session.execute(delete(WebPushSubscription).where(WebPushSubscription.user_id == user_id))
+    await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.user_id == user_id))
+    await session.execute(delete(RoadmapVote).where(RoadmapVote.user_id == user_id))
     await session.execute(delete(Subscription).where(Subscription.user_id == user_id))
     await session.execute(delete(ApiKey).where(ApiKey.user_id == user_id))
     await session.execute(delete(User).where(User.id == user_id))
