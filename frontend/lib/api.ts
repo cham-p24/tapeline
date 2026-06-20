@@ -87,6 +87,57 @@ export class TierGateError extends Error {
 }
 
 /**
+ * Typed 402 — daily free/anon lookup cap reached. Thrown only by the
+ * single-ticker detail call (`api.ticker`) when a FREE or ANONYMOUS user
+ * exceeds their per-UTC-day quota of detailed score look-ups.
+ *
+ * Shared API contract (backend implements, frontend handles):
+ *   HTTP 402 with body
+ *     { "detail": { "error": "free_lookup_limit" | "signup_required",
+ *                   "used": <int>, "limit": <int>,
+ *                   "tier": "free" | "anon" } }
+ *
+ * - "free_lookup_limit" → logged-in free user over their 5/day cap; the
+ *   ticker page renders an UPGRADE wall.
+ * - "signup_required"   → anonymous visitor over their 2/day cap; the
+ *   ticker page renders a SIGN-UP-FREE wall.
+ *
+ * Pro / Premium / active-trial users are unlimited and never see a 402,
+ * so this never fires for them.
+ *
+ * Detection at the call site: `if (e instanceof LookupLimitError) { … }`.
+ * The reason code drives which wall variant renders (see LookupWall).
+ */
+export type LookupLimitReason = "free_lookup_limit" | "signup_required";
+
+export class LookupLimitError extends Error {
+  readonly status = 402;
+  readonly reason: LookupLimitReason;
+  readonly used: number | null;
+  readonly limit: number | null;
+  readonly tier: "free" | "anon" | null;
+  constructor(detail: {
+    error?: string;
+    used?: number;
+    limit?: number;
+    tier?: string;
+  }) {
+    super(detail?.error ?? "lookup_limit");
+    this.name = "LookupLimitError";
+    // Default to the signup wall when the reason is missing/unrecognised —
+    // it's the safer, less-aggressive variant (invites a free signup rather
+    // than pushing a paid upgrade at someone who might not even have an
+    // account yet).
+    this.reason =
+      detail?.error === "free_lookup_limit" ? "free_lookup_limit" : "signup_required";
+    this.used = typeof detail?.used === "number" ? detail.used : null;
+    this.limit = typeof detail?.limit === "number" ? detail.limit : null;
+    this.tier =
+      detail?.tier === "free" || detail?.tier === "anon" ? detail.tier : null;
+  }
+}
+
+/**
  * Parse the FastAPI error envelope. Backend returns `{ detail: "<msg>" }`
  * on HTTPException — extract that. Falls back to status text when the
  * response isn't JSON.
@@ -102,11 +153,35 @@ async function extractDetail(res: Response): Promise<string> {
 }
 
 /**
+ * Parse the 402 lookup-limit envelope. The backend nests the structured
+ * payload under `detail` (FastAPI's HTTPException(detail=...) convention),
+ * so `detail` is an object here, not a string. Returns a best-effort shape;
+ * the LookupLimitError constructor fills in safe defaults for any missing
+ * fields.
+ */
+async function extractLookupDetail(
+  res: Response,
+): Promise<{ error?: string; used?: number; limit?: number; tier?: string }> {
+  try {
+    const body = await res.clone().json();
+    const detail = body?.detail;
+    if (detail && typeof detail === "object") return detail;
+  } catch {
+    // not JSON — fall through to empty, constructor applies defaults
+  }
+  return {};
+}
+
+/**
  * Centralised non-2xx handling — call from every helper after handle401()
- * but before throwing. Throws TierGateError on 403 (with the backend's
- * actual feature-required message); throws plain Error otherwise.
+ * but before throwing. Throws LookupLimitError on 402 (free/anon daily
+ * lookup cap), TierGateError on 403 (with the backend's actual
+ * feature-required message); throws plain Error otherwise.
  */
 async function throwForStatus(res: Response): Promise<never> {
+  if (res.status === 402) {
+    throw new LookupLimitError(await extractLookupDetail(res));
+  }
   if (res.status === 403) {
     throw new TierGateError(await extractDetail(res));
   }

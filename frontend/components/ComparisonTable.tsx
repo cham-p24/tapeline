@@ -33,16 +33,17 @@ const SECTIONS: Section[] = [
   {
     name: "Data & coverage",
     rows: [
-      { label: "Ticker universe", free: "Top 20", pro: "~2,500 US equities, ETFs & commodity ETFs", premium: "~2,500 US equities, ETFs & commodity ETFs" },
-      { label: "Data freshness", free: "24-hour delayed", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
+      { label: "Scanner rows", free: "Top 10", pro: "Full ~2,500-ticker universe", premium: "Full ~2,500-ticker universe" },
+      { label: "Data freshness", free: "Live — no delay", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
+      { label: "Ticker look-ups per day", free: "5", pro: "Unlimited", premium: "Unlimited" },
       { label: "News feed", free: "Headlines only", pro: "Real-time news + sentiment", premium: "Real-time news + sentiment" },
     ],
   },
   {
     name: "Scoring & analysis",
     rows: [
-      { label: "6-factor score breakdown", free: "Top 20 only", pro: "Every ticker, every row", premium: "Every ticker, every row" },
-      { label: "Plain-English Why column", free: "—", pro: "✓", premium: "✓" },
+      { label: "6-factor score breakdown", free: "5 look-ups/day", pro: "Every ticker, every row", premium: "Every ticker, every row" },
+      { label: "Plain-English Why column", free: "On look-ups", pro: "✓", premium: "✓" },
       { label: "TradingView charts", free: "—", pro: "On every ticker page", premium: "On every ticker page" },
     ],
   },
@@ -58,7 +59,7 @@ const SECTIONS: Section[] = [
   {
     name: "Watchlist & alerts",
     rows: [
-      { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+      { label: "Watchlist", free: "3 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
       { label: "Browser push", free: "—", pro: "✓", premium: "✓" },

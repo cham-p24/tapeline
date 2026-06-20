@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, type TickerDetail, TierGateError, errorMessage } from "@/lib/api";
+import { api, type TickerDetail, TierGateError, LookupLimitError, errorMessage } from "@/lib/api";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
@@ -11,6 +11,7 @@ import { AnalystRatings } from "@/components/AnalystRatings";
 import { FinancialsTab } from "@/components/FinancialsTab";
 import { InsiderTab } from "@/components/InsiderTab";
 import { Paywall } from "@/components/Paywall";
+import { LookupWall } from "@/components/LookupWall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { useCountUp } from "@/lib/useCountUp";
@@ -25,6 +26,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const symbol = rawSymbol.toUpperCase();
   const [data, setData] = useState<TickerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when GET /api/ticker returns 402 (free/anon daily look-up cap). When
+  // present we render the LookupWall instead of ticker data or the generic
+  // error card. Pro/Premium/active-trial users are unlimited and never hit this.
+  const [lookupLimit, setLookupLimit] = useState<LookupLimitError | null>(null);
   const [adding, setAdding] = useState(false);
   const [addMsg, setAddMsg] = useState<string | null>(null);
   const [newsAlerting, setNewsAlerting] = useState(false);
@@ -35,8 +40,22 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const earningsBySymbol = useEarningsCalendar(14);
 
   const load = useCallback(async () => {
-    try { setData(await api.ticker(symbol)); setError(null); }
-    catch (e: unknown) { setError(errorMessage(e)); }
+    try {
+      setData(await api.ticker(symbol));
+      setError(null);
+      setLookupLimit(null);
+    } catch (e: unknown) {
+      // 402 → free/anon daily look-up cap. Render the LookupWall (upgrade or
+      // sign-up variant) instead of the generic error card. Clear any stale
+      // data so the wall replaces the ticker rather than overlaying it.
+      if (e instanceof LookupLimitError) {
+        setLookupLimit(e);
+        setData(null);
+        setError(null);
+        return;
+      }
+      setError(errorMessage(e));
+    }
   }, [symbol]);
 
   useEffect(() => { load(); }, [load]);
@@ -97,6 +116,14 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     setNewsAlerting(false);
   }
 
+  // Free/anon daily look-up cap reached — render the wall (checked before the
+  // generic error so a 402 never falls through to the raw error card).
+  if (lookupLimit)
+    return (
+      <div className="py-8">
+        <LookupWall reason={lookupLimit.reason} symbol={symbol} limit={lookupLimit.limit} />
+      </div>
+    );
   if (error) return <div className="card p-8 text-down">Error: {error}</div>;
   if (!data)
     return (

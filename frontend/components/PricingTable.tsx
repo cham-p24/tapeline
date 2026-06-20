@@ -9,12 +9,14 @@ type Billing = "monthly" | "annual";
 const PLANS = [
   {
     name: "Free",
-    tagline: "See what's possible",
+    tagline: "Free forever — live scores",
     prices: { monthly: 0, annual: 0 },
     highlights: [
-      "Top 20 tickers, 24-hour delayed",
-      "Public scorecard + basic regime",
-      "Watchlist (5 tickers, no alerts)",
+      "Live scores — no delay",
+      "5 ticker look-ups per day",
+      "Top-10 scanner rows",
+      "Watchlist (3 tickers)",
+      "Public scorecard, fully open",
     ],
     cta: "Start free",
     ctaHref: "/signup",
@@ -25,7 +27,8 @@ const PLANS = [
     tagline: "Live scanner. Daily edge.",
     prices: { monthly: PRICING.pro.monthly, annual: PRICING.pro.annual },
     highlights: [
-      "Full ~2,500 ticker universe, live",
+      "Unlimited ticker look-ups",
+      "Real-time, full ~2,500-ticker scanner",
       "Score + plain-English Why on every row",
       "Squeeze Watch · Regime · Heatmap",
       "IPOs · Earnings · News calendars",
