@@ -62,6 +62,7 @@ export async function GET(): Promise<Response> {
   try {
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
+      signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
       const body = (await res.json()) as { items?: ScannerRow[] };

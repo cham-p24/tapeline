@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { track } from "@vercel/analytics";
 import { handle401 } from "@/lib/api";
+import { safeNext } from "@/lib/safeNext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -101,7 +102,9 @@ export default function OnboardingPage() {
 function OnboardingForm() {
   const router = useRouter();
   const qp = useSearchParams();
-  const next = qp.get("next") || "/app/scanner";
+  // Guard the post-submit redirect against open-redirect payloads
+  // (//evil.com, https://evil.com) forwarded from /signup?next=…
+  const next = safeNext(qp.get("next"));
 
   const [experience, setExperience] = useState<Experience | "">("");
   const [style, setStyle] = useState<Style | "">("");

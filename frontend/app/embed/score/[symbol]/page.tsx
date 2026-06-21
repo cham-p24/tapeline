@@ -47,6 +47,7 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   try {
     const res = await fetch(`${API_BASE}/api/ticker/${symbol.toUpperCase()}`, {
       next: { revalidate: 1800 },
+      signal: AbortSignal.timeout(7000),
     });
     if (!res.ok) return null;
     return (await res.json()) as TickerData;

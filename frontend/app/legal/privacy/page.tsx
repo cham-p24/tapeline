@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <div className="prose prose-invert mt-8 max-w-none text-sm leading-relaxed text-muted">
           <h2 className="mt-8 text-lg font-semibold text-fg">Summary in one paragraph</h2>
           <p>
-            We collect the minimum personal data needed to run the product: your email and password for the account; your name, watchlist, alerts and subscription state for the features that need them; plus contextual identifiers when you opt in to extras like Telegram or SMS alerts. We do not store IP addresses or browser fingerprints to the database, do not run third-party tracking pixels, do not sell or share data with advertisers, and do not see your payment-card details (Stripe handles them).
+            We collect the minimum personal data needed to run the product: your email and password for the account; your name, watchlist, alerts and subscription state for the features that need them; plus contextual identifiers when you opt in to extras like Telegram or SMS alerts. We do not store IP addresses or browser fingerprints to the database, and do not see your payment-card details (Stripe handles them). For product analytics and advertising measurement we use Google Analytics 4, Google Ads, and PostHog, which set cookies and receive limited usage and conversion data — detailed in the Cookies and Sub-processors sections below. We do not sell your personal data.
           </p>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">What we collect at signup</h2>
@@ -60,9 +60,7 @@ export default function PrivacyPage() {
             <li><strong>IP addresses in the database</strong>. We use them transiently in memory for rate limiting, but we don't persist them.</li>
             <li><strong>Browser fingerprints in the database</strong>. Same as IPs — used for in-memory anti-abuse checks, never written down.</li>
             <li><strong>Location or geolocation data.</strong></li>
-            <li><strong>Cookies for third-party trackers or advertising networks.</strong> We set exactly one cookie — a same-site session token. No ad cookies, no analytics cookies.</li>
-            <li><strong>Behavioural analytics</strong> beyond Vercel's privacy-respecting Web Analytics (cookieless, IP-anonymised, no per-user dossier).</li>
-            <li>Any data <strong>for the purpose of selling or sharing with advertisers</strong>. We don't sell data. We don't share data with ad networks. We never will.</li>
+            <li>We do <strong>not sell your personal data</strong> to anyone. (We do use Google Analytics, Google Ads, and PostHog for analytics and advertising measurement — see Cookies and Sub-processors below.)</li>
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Sub-processors</h2>
@@ -72,6 +70,8 @@ export default function PrivacyPage() {
             <li><strong>Resend</strong> — transactional email delivery. Sees your email, your name (if set), and the message content of emails we send you.</li>
             <li><strong>Cloudflare</strong> — DNS, Turnstile bot challenges, and Email Routing for inbound mail to <code>@tapeline.io</code>. Sees email metadata and the bot-challenge interaction.</li>
             <li><strong>Vercel</strong> — frontend hosting and privacy-friendly Web Analytics (no cookies, no per-user identifiers, anonymised IPs).</li>
+            <li><strong>Google (Analytics 4 &amp; Google Ads)</strong> — usage analytics and advertising measurement (US). Receives page views, in-app events, and signup/subscription conversion signals; sets analytics and advertising cookies (e.g. <code>_ga</code>, <code>_ga_*</code>, <code>_gcl_*</code>).</li>
+            <li><strong>PostHog</strong> — product analytics (US). Receives your user ID, email, account tier, and product-usage events to build a per-user product profile; sets analytics cookies.</li>
             <li><strong>Fly.io</strong> — backend hosting in Sydney. Sees the full database state since they host the database.</li>
             <li><strong>Sentry</strong> — error tracking. May capture stack traces with limited non-PII context when something breaks.</li>
             <li><strong>Telegram</strong> — only if you connect your Telegram for alerts. Sees the chat ID you provided and the alert content.</li>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Cookies</h2>
-          <p>Tapeline sets exactly one cookie: an HTTP-only, secure, same-site <code>session</code> JWT with a 30-day expiry. That's it. There are no analytics cookies, advertising cookies, or third-party trackers.</p>
+          <p>The only strictly-necessary cookie is a same-site, HTTP-only, secure <code>session</code> JWT with a 30-day expiry, used for authentication. In addition, Google Analytics 4, Google Ads, and PostHog set their own analytics and advertising cookies (for example <code>_ga</code>, <code>_ga_*</code>, <code>_gcl_*</code>, and PostHog session cookies) to measure product usage and advertising performance. We are adding a cookie-consent control so you can opt out of these non-essential cookies; until then you can block them with your browser's cookie settings or an extension.</p>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Data retention</h2>
           <p><strong>Active accounts:</strong> data retained as long as the account is open. <strong>Cancelled or deleted accounts:</strong> 30 days, then permanent deletion from primary stores; backup snapshots roll off within 90 days. <strong>Stripe-side data</strong> follows Stripe's own retention policy (typically 7 years for tax purposes).</p>

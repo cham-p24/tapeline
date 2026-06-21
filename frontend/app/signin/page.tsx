@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { authApi } from "@/lib/auth";
 import { errorMessage } from "@/lib/api";
+import { safeNext } from "@/lib/safeNext";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { useUser } from "@/components/UserContext";
 
@@ -20,7 +21,10 @@ export default function SignInPage() {
 function SignInForm() {
   const router = useRouter();
   const qp = useSearchParams();
-  const next = qp.get("next") || "/app/scanner";
+  // Sanitize at the source: `next` drives router navigation AND the
+  // /signup?next=… link below, so guarding here covers both. Rejects
+  // open-redirect payloads (//evil.com, https://evil.com) → safe default.
+  const next = safeNext(qp.get("next"));
 
   const { user, loading: userLoading, refresh } = useUser();
 

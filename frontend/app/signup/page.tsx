@@ -7,6 +7,7 @@ import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
+import { safeNext } from "@/lib/safeNext";
 import { getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
@@ -80,7 +81,10 @@ export default function SignUpPage() {
 function SignUpForm() {
   const router = useRouter();
   const qp = useSearchParams();
-  const next = qp.get("next") || "/app/scanner";
+  // Sanitize at the source: `next` is forwarded into /app/onboarding?next=…
+  // and the /signin?next=… link below, so guarding here covers every use.
+  // Rejects open-redirect payloads (//evil.com, https://evil.com).
+  const next = safeNext(qp.get("next"));
   // Referral code from /signup?ref=ABCDEFGH. Backend grants both parties
   // 1 free month of Premium when this resolves to a valid existing user.
   const refCode = (qp.get("ref") || "").trim().toUpperCase();
