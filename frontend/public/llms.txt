@@ -30,7 +30,7 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 
 ## Pricing
 
-- **Free** (forever) — live scores, top-10 scanner rows, 3-ticker watchlist, 5 ticker look-ups/day (anonymous: 2/day), full public scorecard. Real product, narrower.
+- **Free** (forever, signed-in) — live scores, top-10 scanner rows, 3-ticker watchlist, 5 ticker look-ups/day, full public scorecard. Public ticker pages are open to everyone. Real product, narrower.
 - **Pro** — $29.99/mo OR $24.99/mo billed annually ($299.99/yr) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push.
 - **Premium** — $49.99/mo OR $39.99/mo billed annually ($479.99/yr) — everything in Pro plus Congressional trades, recent insider buys (SEC Form 4), unlimited Telegram + email, public API (1,000/day), priority support.
 

@@ -5,8 +5,11 @@ Contract under test (services/usage + routers/ticker):
   - FREE (logged-in) user : tier.FREE_DAILY_LOOKUPS successful lookups per UTC
     day, then HTTP 402 {"error":"free_lookup_limit", tier:"free"}.
   - PRO / PREMIUM / active-trial : unlimited, never 402, counter never moves.
-  - ANONYMOUS (no account) : tier.ANON_DAILY_LOOKUPS lookups per IP per day,
-    then HTTP 402 {"error":"signup_required", tier:"anon"}.
+  - ANONYMOUS (no account) : NOT metered on this endpoint. The public
+    /t/{symbol} SEO pages are server-rendered from one frontend IP, so a per-IP
+    anon cap here 402'd our own SSR and took down the /t/ surface.
+    consume_anon_lookup stays a dormant utility (unit-tested below) for a future
+    client-side anon gate.
   - The counter rolls over on the UTC day boundary (simulated by stamping
     lookups_reset_on = yesterday).
   - A 404 (invalid / unknown symbol) never burns budget.
@@ -209,65 +212,22 @@ async def test_active_trial_user_unlimited(client, monkeypatch):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# ANONYMOUS — N lookups then 402 signup_required
+# ANONYMOUS — NOT metered on this endpoint (public SSR/SEO must stay open)
 # ════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-async def test_anon_gets_cap_then_402_signup_required(client):
+async def test_anon_is_not_capped_on_endpoint(client):
+    """Anonymous callers must NOT be metered here: the public /t/{symbol} pages
+    are server-rendered from one frontend IP, so a per-IP cap would 402 our own
+    SSR and take down the whole /t/ surface. Anon gets unlimited 200s well past
+    the (dormant) ANON_DAILY_LOOKUPS value, even from a single IP."""
     async with client:
         await _seed_ticker()
-        ip = "203.0.113.42"  # fixed per-test IP; conftest clears the anon meter
-        headers = {"X-Forwarded-For": ip}
-
-        for i in range(ANON_DAILY_LOOKUPS):
+        headers = {"X-Forwarded-For": "203.0.113.42"}
+        for i in range(ANON_DAILY_LOOKUPS + 5):
             r = await client.get(f"/api/ticker/{SEEDED}", headers=headers)
             assert r.status_code == 200, f"anon lookup {i + 1}: {r.text}"
-
-        r = await client.get(f"/api/ticker/{SEEDED}", headers=headers)
-        assert r.status_code == 402, r.text
-        detail = r.json()["detail"]
-        assert detail["error"] == "signup_required"
-        assert detail["tier"] == "anon"
-        assert detail["limit"] == ANON_DAILY_LOOKUPS
-        assert detail["used"] == ANON_DAILY_LOOKUPS
-
-
-@pytest.mark.asyncio
-async def test_anon_404_does_not_burn_budget(client):
-    """A 404 must not consume the anon budget — proven by getting a full set of
-    successful lookups AFTER a burst of misses from the same IP."""
-    async with client:
-        await _seed_ticker()
-        ip = "203.0.113.99"
-        headers = {"X-Forwarded-For": ip}
-
-        for _ in range(ANON_DAILY_LOOKUPS + 3):
-            r = await client.get("/api/ticker/ZZZQXNONE", headers=headers)
-            assert r.status_code == 404, r.text
-
-        # Full budget still available.
-        for _ in range(ANON_DAILY_LOOKUPS):
-            r = await client.get(f"/api/ticker/{SEEDED}", headers=headers)
-            assert r.status_code == 200, r.text
-
-
-@pytest.mark.asyncio
-async def test_anon_meter_is_per_ip(client):
-    """Two distinct IPs each get their own independent anon budget."""
-    async with client:
-        await _seed_ticker()
-        ip_a, ip_b = "198.51.100.1", "198.51.100.2"
-
-        # Exhaust IP A.
-        for _ in range(ANON_DAILY_LOOKUPS):
-            r = await client.get(f"/api/ticker/{SEEDED}", headers={"X-Forwarded-For": ip_a})
-            assert r.status_code == 200, r.text
-        r = await client.get(f"/api/ticker/{SEEDED}", headers={"X-Forwarded-For": ip_a})
-        assert r.status_code == 402
-
-        # IP B is untouched.
-        r = await client.get(f"/api/ticker/{SEEDED}", headers={"X-Forwarded-For": ip_b})
-        assert r.status_code == 200, r.text
+            assert r.json()["symbol"] == SEEDED
 
 
 # ════════════════════════════════════════════════════════════════════════════

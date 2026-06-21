@@ -284,22 +284,20 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # wall). We resolve the caller in THIS short read txn (sub-ms auth read)
         # — the connection is still released on context exit before the news
         # fetch, preserving the rev2 connection discipline above.
-        from app.services.usage import consume_anon_lookup, consume_ticker_lookup
+        from app.services.usage import consume_ticker_lookup
 
         user = await current_user_optional(request, session)
-        if user is None:
-            anon = consume_anon_lookup(_client_ip(request))
-            if not anon["allowed"]:
-                raise HTTPException(
-                    402,
-                    detail={
-                        "error": "signup_required",
-                        "used": anon["used"],
-                        "limit": anon["limit"],
-                        "tier": "anon",
-                    },
-                )
-        else:
+        # Anonymous callers are NOT metered on this endpoint. The public
+        # /t/{symbol} SEO pages are server-rendered from the single frontend
+        # machine, so a per-IP anon cap here counted our OWN renders and 402'd
+        # every ticker page after the first couple — the whole /t/ surface 500'd.
+        # That data is meant to be public for SEO anyway. Anonymous "sign up to
+        # keep looking" gating, if we want it, belongs as a client-side prompt on
+        # the page itself, not on this shared SSR/public endpoint. Logged-in FREE
+        # users are still capped (durable per-user counter); Pro/Premium/active-
+        # trial remain uncapped. (consume_anon_lookup stays in services.usage as
+        # a dormant utility for that future client-side gate.)
+        if user is not None:
             meter = await consume_ticker_lookup(session, user)
             if not meter["allowed"]:
                 raise HTTPException(
