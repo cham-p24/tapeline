@@ -19,8 +19,8 @@
  *   prop for the recurring email. Different SERP intent, different CTA
  *   placement, different content.
  *
- * Data source: /api/scanner anonymously (returns the FREE tier — top 20
- * by score, 24-hour delayed). We take 10. Same data we put in the email.
+ * Data source: /api/scanner anonymously (returns the FREE tier — the
+ * top-scoring rows, live). We take 10. Same data we put in the email.
  *
  * Caching: 30-min ISR so we're not hammering the backend on every crawler
  * hit, but the page stays fresh enough to feel "today's picks."
@@ -32,8 +32,8 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
-// Refresh every 30 min — backend free-tier data is 24-hour delayed
-// anyway, so sub-minute freshness is wasted budget.
+// Refresh every 30 min — this is a marketing snapshot of the daily Top 10,
+// not the live in-app scanner, so sub-minute freshness is wasted budget.
 export const revalidate = 1800;
 
 const API_BASE =
@@ -61,8 +61,8 @@ type ScannerRow = {
 
 async function fetchTopTen(): Promise<ScannerRow[]> {
   try {
-    // Anonymous request returns FREE tier — top 20 by score with 24h
-    // delay. We slice to 10 to match the email digest exactly.
+    // Anonymous request returns FREE tier — the top-scoring rows, live.
+    // We slice to 10 to match the email digest exactly.
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
       // Bound the build-time fetch so a degraded/slow API can't hang static
@@ -153,8 +153,8 @@ export default async function DailyPicksPage() {
                 The Top 10 right now
               </h2>
               <p className="mt-2 text-sm text-muted">
-                Free-tier view (24-hour delayed). Email subscribers get the
-                same picks, fresher.
+                Free-tier view (live scores). Email subscribers get the same
+                picks delivered each US market morning.
               </p>
             </div>
             <Link

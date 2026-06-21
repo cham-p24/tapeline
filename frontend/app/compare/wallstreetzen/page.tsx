@@ -96,9 +96,9 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Free tier strength",
-    tapeline: "20 tickers, 24-hour delayed, watchlist of 5",
+    tapeline: "Live scores, top-10 scanner, 3-ticker watchlist, 5 look-ups/day",
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
-    note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is hard-capped on purpose so the trial-to-paid transition is meaningful — same product, narrower window.",
+    note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is narrower on purpose but free forever — same product, smaller window.",
   },
   {
     label: "Cheapest paid tier",
@@ -228,7 +228,7 @@ export default function VsWallStreetZenPage() {
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
         <p className="mt-3 text-muted">
-          Free tier is hard-capped on purpose (20 tickers, 24h delayed). Start the trial to see the live product properly. No card.
+          Free tier is narrower on purpose (live scores, top-10 scanner, 5 look-ups/day) — free forever. Start the trial to see the full real-time universe. No card.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/signup" className="btn-primary">Try Premium free →</Link>

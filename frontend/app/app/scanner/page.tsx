@@ -97,8 +97,9 @@ export default function ScannerPage() {
   const { user } = useUser();
   const [rows, setRows] = useState<ScannerRow[]>([]);
   // Server-computed gating facts from /api/scanner. Free users come back
-  // capped (row_cap) + delayed (data_delayed_minutes > 0); Pro/Premium get
-  // the full universe live. Drives the inline upgrade hint below the filters.
+  // capped to the top rows (row_cap) with live scores (data_delayed_minutes
+  // is 0); Pro/Premium get the full universe. Drives the inline upgrade hint
+  // below the filters.
   const [meta, setMeta] = useState<{ tier: string; rowCap: number; delayMinutes: number } | null>(null);
   const [minScore, setMinScore] = useState<number | "">(0);
   const [maxScore, setMaxScore] = useState<number | "">("");
@@ -297,17 +298,18 @@ export default function ScannerPage() {
         />
       </FilterBar>
 
-      {/* Inline Free-tier cap hint. Keys off the server's data_delayed_minutes
-          (>0 only for Free) so the copy can't claim a cap the backend isn't
-          actually applying. The global UpgradeNudge banner is suppressed on
-          this route, so this is the only upgrade prompt a Free user sees here. */}
-      {meta && meta.tier === "free" && meta.delayMinutes > 0 && (
+      {/* Inline Free-tier cap hint. Keys off the server-reported tier + row
+          cap so the copy can't claim a cap the backend isn't actually applying.
+          Free scores are live now (the gating is breadth, not freshness), so the
+          hint describes the row cap rather than a data delay. The global
+          UpgradeNudge banner is suppressed on this route, so this is the only
+          upgrade prompt a Free user sees here. */}
+      {meta && meta.tier === "free" && meta.rowCap > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
           <span className="text-muted">
-            Free plan — showing the top{" "}
-            <strong className="text-fg">{meta.rowCap}</strong> tickers, prices
-            delayed <strong className="text-fg">{Math.round(meta.delayMinutes / 60)}h</strong>.
-            Pro unlocks the full universe, live.
+            Free plan — showing live scores for the top{" "}
+            <strong className="text-fg">{meta.rowCap}</strong> rows.
+            Pro unlocks the full ~2,500-ticker universe, real-time.
           </span>
           <Link
             href="/app/billing"

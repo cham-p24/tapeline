@@ -148,7 +148,7 @@ const FAQ = [
   },
   {
     q: "What's the best free stock scanner?",
-    a: "Stockanalysis.com offers the most usable free tier — full screener access, clean fundamental tables, ETF coverage, no paywall on basics. TradingView's free tier covers charting and a basic screener well. Tapeline's free tier covers the top 20 tickers with a 24-hour delay. Each is honest about what's included.",
+    a: "Stockanalysis.com offers the most usable free tier — full screener access, clean fundamental tables, ETF coverage, no paywall on basics. TradingView's free tier covers charting and a basic screener well. Tapeline's free tier covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever. Each is honest about what's included.",
   },
   {
     q: "What's the best stock scanner with a public track record?",

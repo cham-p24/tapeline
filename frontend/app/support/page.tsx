@@ -67,12 +67,13 @@ export default function SupportPage() {
             }
           />
           <Faq
-            q="My scanner only shows 20 tickers."
+            q="My scanner only shows 10 tickers."
             a={
               <>
-                Your account is on Free tier. Free is hard-capped to 20 tickers and 24-hour delayed
+                Your account is on Free tier. Free shows live scores for the top 10 scanner rows
                 by design — it's the same product, just narrower. Sign up gets you a 14-day Premium trial
-                automatically (no card). At trial end, no card on file = back to Free.{" "}
+                automatically (no card). At trial end, no card on file = back to Free forever (live scores,
+                top-10 scanner, 5 look-ups/day, 3-ticker watchlist).{" "}
                 <Link href="/app/billing" className="text-accent hover:underline">Add a card →</Link>
               </>
             }

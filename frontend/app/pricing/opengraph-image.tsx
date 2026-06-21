@@ -79,7 +79,7 @@ export default async function OG() {
             tier="Free"
             price="$0"
             sub="forever"
-            note="Top 20 tickers · 24-hr delayed"
+            note="Live scores · top-10 scanner · 5 look-ups/day"
           />
           <Tile
             tier="Pro"
