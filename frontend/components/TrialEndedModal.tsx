@@ -60,9 +60,9 @@ export function TrialEndedModal() {
           Your 14-day Premium trial has ended.
         </h2>
         <p className="mt-3 text-sm text-muted">
-          Your watchlist + saved scans + alert rules are all intact &mdash; only
-          the data feed changes. You&rsquo;re now on Free: top 20 tickers,
-          24-hour delayed, no Telegram, no smart alerts.
+          Your watchlist + saved scans + alert rules are all intact. You&rsquo;re
+          now on Free forever: live scores for the top 10 scanner rows, 5 look-ups
+          a day, a 3-ticker watchlist &mdash; no Telegram, no smart alerts.
         </p>
 
         {/* Pricing anchor — anchor on annual ($39.99/mo) because that's the

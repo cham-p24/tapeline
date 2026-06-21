@@ -27,9 +27,9 @@ function mockMe(nudge: unknown) {
 
 const FREE_NUDGE = {
   id: "free_upgrade",
-  scanner_cap: 20,
-  delayed_hours: 24,
-  watchlist_cap: 5,
+  scanner_cap: 10,
+  delayed_hours: 0,
+  watchlist_cap: 3,
 };
 
 beforeEach(() => {
@@ -45,9 +45,11 @@ describe("UpgradeNudge", () => {
     mockMe(FREE_NUDGE);
     render(<UpgradeNudge />);
     // Caps come from /api/me.nudge, not a hardcoded string.
-    expect(await screen.findByText(/top 20 tickers/i)).toBeInTheDocument();
-    expect(screen.getByText(/24h delayed/i)).toBeInTheDocument();
-    expect(screen.getByText(/5-ticker watchlist/i)).toBeInTheDocument();
+    expect(await screen.findByText(/top 10 tickers/i)).toBeInTheDocument();
+    expect(screen.getByText(/live scores/i)).toBeInTheDocument();
+    expect(screen.getByText(/3-ticker watchlist/i)).toBeInTheDocument();
+    // Free is live now — no "Nh delayed" clause should render.
+    expect(screen.queryByText(/delayed/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /see pro plans/i }),
     ).toBeInTheDocument();

@@ -433,7 +433,7 @@ const MIGRATION_STEPS = [
 const FAQ = [
   {
     q: "What's the closest free alternative to Finviz Elite?",
-    a: "Stockanalysis.com offers the closest free experience — full screener access without a paywall, fundamental data tables, and ETF/IPO coverage. Tapeline's free tier covers the top 20 tickers with a 24-hour delay. TradingView's free tier covers charting and a basic screener. None of these match Finviz Elite's 60+ raw screener fields, but each is honest about what it provides.",
+    a: "Stockanalysis.com offers the closest free experience — full screener access without a paywall, fundamental data tables, and ETF/IPO coverage. Tapeline's free tier covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever. TradingView's free tier covers charting and a basic screener. None of these match Finviz Elite's 60+ raw screener fields, but each is honest about what it provides.",
   },
   {
     q: "Why isn't Finviz the right tool for everyone?",

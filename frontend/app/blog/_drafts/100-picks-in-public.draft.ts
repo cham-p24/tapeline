@@ -144,9 +144,9 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
 
     <p>If you want to be there for the next 100 picks before the receipts
     look this good in public, the 14-day Premium trial is at
-    <a href="/signup">/signup</a> — no credit card. The free tier (top 20
-    tickers, 24-hour delayed) is forever, and the full scorecard is and
-    always will be at <a href="/scorecard">/scorecard</a>.</p>
+    <a href="/signup">/signup</a> — no credit card. The free tier (live scores
+    for the top 10 scanner rows, 5 look-ups a day) is forever, and the full
+    scorecard is and always will be at <a href="/scorecard">/scorecard</a>.</p>
 
     <p>Thanks for reading. See you on the next pick.</p>
 

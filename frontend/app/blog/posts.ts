@@ -465,8 +465,8 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       composite, the radar, the factor sub-scores, and the why sentence.
       If you want them all in one view ranked by score, the live
       <a href="/app/scanner">scanner</a> is the home for that — Free
-      gets the top 20 tickers 24h-delayed, the
-      <a href="/signup">14-day trial</a> opens the full universe live.</p>
+      gets live scores for the top 10 rows plus 5 look-ups a day, the
+      <a href="/signup">14-day trial</a> opens the full real-time universe with unlimited look-ups.</p>
     `,
   },
   {
@@ -512,9 +512,9 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <h2>4. Is the cheapest tier real?</h2>
       <p>Test it. If the free or cheapest paid tier strips out so many
       features the product is unusable, the team is incentivised to
-      upgrade-trap rather than retain. Tapeline Free is hard-capped to
-      20 tickers and 24-hour delayed by design — the real product, just
-      narrower — because that's the most honest preview.</p>
+      upgrade-trap rather than retain. Tapeline Free shows live scores for
+      the top 10 scanner rows plus 5 look-ups a day, free forever — the real
+      product, just narrower — because that's the most honest preview.</p>
 
       <h2>5. Can you cancel in one click?</h2>
       <p>If you have to email support to cancel, that's a tell about how
@@ -1170,13 +1170,13 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li>Finviz free: 15-minute delay. Elite: real-time.</li>
         <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>
         <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
-        <li>Tapeline free: 24-hour delay (intentional gating; full
-        universe ~60-second freshness on Pro+).</li>
+        <li>Tapeline free: live scores (no delay) on the top 10 scanner rows;
+        full ~2,500-ticker universe at ~60-second freshness on Pro+.</li>
       </ul>
 
-      <p>Tapeline's free tier delay is the harshest of the four, which
-      is a deliberate trade-off — we want Pro to be obviously
-      differentiated. If you're testing the product, the
+      <p>Tapeline gates on breadth rather than freshness — Free is live, just
+      narrower (top 10 rows, 5 look-ups a day), and Pro opens the full real-time
+      universe. If you're testing the product, the
       <a href="/scorecard">public scorecard</a> shows the real
       composite quality at full freshness.</p>
 
@@ -1582,7 +1582,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Public scoring formula with weights</td>
               <td>Yes — <a href="/how-it-works">/how-it-works</a> with exact weights</td></tr>
           <tr><td>Data freshness</td>
-              <td>60s composite refresh on Pro+; 24h delayed on Free (intentional)</td></tr>
+              <td>60s composite refresh on Pro+; live scores on Free too (gated on breadth, not freshness)</td></tr>
           <tr><td>Cancel friction</td>
               <td>One-click cancel, 7-day refund, no card required for trial</td></tr>
         </tbody>

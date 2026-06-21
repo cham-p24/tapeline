@@ -29,7 +29,7 @@ const TIER_META = {
     monthly: 0,
     annual: 0,
     annualMonthly: 0,
-    blurb: "Top 20 tickers, 24-hour delayed",
+    blurb: "Live scores, top-10 scanner, 5 look-ups/day",
   },
   pro: {
     name: "Pro",
@@ -305,8 +305,8 @@ export default function BillingPage() {
                 {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
-                Add a card before then to lock in {meta.name} access. Otherwise your account drops to Free
-                — top 20 tickers, 24-hour delayed.
+                Add a card before then to lock in {meta.name} access. Otherwise your account moves to Free
+                forever — live scores, top-10 scanner, 5 look-ups/day, 3-ticker watchlist.
               </p>
               <button onClick={() => setShowPlans(true)} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
@@ -400,9 +400,9 @@ export default function BillingPage() {
               price="$0"
               note="Forever free"
               items={[
-                "Top 20 tickers, 24-hour delayed",
+                "Live scores, top-10 scanner, 5 look-ups/day",
                 "Public scorecard + basic regime",
-                "Watchlist of 5, no alerts",
+                "Watchlist of 3, no alerts",
               ]}
               highlight={tier === "free"}
             />

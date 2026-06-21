@@ -229,7 +229,7 @@ export function CancelInterceptModal({
             <p className="mt-3 text-sm text-muted">
               {opts?.canceled_at
                 ? "You'll keep full access until the end of your billing period. Changed your mind? Here's a reason to stay."
-                : "Cancelling means dropping to Free: top 20 tickers, 24-hour delayed, no alerts. Two ways to stay on better terms first."}
+                : "Cancelling means moving to Free: live scores for the top 10 scanner rows, 5 look-ups a day, no alerts. Two ways to stay on better terms first."}
             </p>
 
             {error && <ErrorNote text={error} />}

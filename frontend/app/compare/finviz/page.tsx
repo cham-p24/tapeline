@@ -33,7 +33,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Can I try Tapeline before paying?",
-    a: "Yes — 14-day Premium trial, no credit card required, cancel in one click. Free tier (top 20 tickers, 24-hour delayed) stays available indefinitely.",
+    a: "Yes — 14-day Premium trial, no credit card required, cancel in one click. Free tier (live scores for the top 10 scanner rows, 5 look-ups/day) is free forever.",
   },
 ];
 

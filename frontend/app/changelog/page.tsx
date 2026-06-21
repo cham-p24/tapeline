@@ -132,7 +132,7 @@ const ENTRIES: Entry[] = [
     title: "Elite 13F holdings, harder Free tier, three competitor comparisons",
     body: [
       "Elite-fund 13F holdings live for Premium: latest positions from Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer.",
-      "Free tier set to 20 tickers and 24-hour delayed data so the trial-end transition is meaningful — keep your card on file or step back to a clearly narrower view.",
+      "Free tier reworked at the time so the trial-end transition was meaningful. (Since superseded: Free is now live scores on the top-10 scanner with 5 look-ups/day, free forever — see /pricing.)",
       "Plain-English Why on every scanner row rewritten with sector-aware language across ~100 phrase variants.",
       "Side-by-side comparison pages live for Finviz, Zacks, and WallStreetZen.",
     ],
