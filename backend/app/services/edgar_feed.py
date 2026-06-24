@@ -1,7 +1,7 @@
 """SEC EDGAR direct adapter — 8-K material event filings, free + fast.
 
 Why this exists:
-    The news wires (Benzinga, Massive) re-report material 8-K filings
+    The news wires (Massive, Finnhub) re-report material 8-K filings
     after they hit EDGAR — typically 5-30 minutes lag for the bigger
     items, longer for smaller filers. EDGAR itself publishes the raw
     filing the moment the filer submits, with no rate limit beyond fair-

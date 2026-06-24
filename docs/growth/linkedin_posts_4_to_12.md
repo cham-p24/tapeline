@@ -151,7 +151,7 @@ A few things I've learned building Tapeline solo from Melbourne over the last fe
 
 2. The time zone is a feature, not a bug. The US market closes at 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time US-East-Coast traders are at their desks, the next day's picks are already frozen.
 
-3. The hardest part wasn't the scoring formula — it was the data plumbing. Polygon (now Massive) for prices, Finnhub for fundamentals + insider Form 4, FRED for macro indicators, Benzinga for news, SEC EDGAR for 8-K filings. Each one has its own auth pattern, rate limits, and failure modes. Half the codebase is reconciling sources.
+3. The hardest part wasn't the scoring formula — it was the data plumbing. Polygon (now Massive) for prices, Finnhub for fundamentals + insider Form 4 + news, FRED for macro indicators, SEC EDGAR for 8-K filings. Each one has its own auth pattern, rate limits, and failure modes. Half the codebase is reconciling sources.
 
 4. There's no support team to fall back on. Every bug is mine. Every customer email is mine. Every regulatory decision is mine. That's the trade for not having a co-founder yet.
 

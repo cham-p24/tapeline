@@ -18,8 +18,8 @@ ad-hoc analyses in chat.
 - Production scoring engine on Fly: 6-factor formula (Trend 25% · RS
   20% · Fundamentals 15% · Smart money 15% · Macro 15% · Momentum
   10%) running across ~2,500 actively-scored tickers
-- Sub-60s tick cadence; news refresh every 5 min (Benzinga primary,
-  Massive fallback, Finnhub fallback for international names)
+- Sub-60s tick cadence; news refresh every 5 min (Massive + Finnhub
+  parallel merge, including international names)
 - Public surfaces: `/`, `/pricing`, `/how-it-works`, `/scorecard`,
   `/security`, `/status`, `/changelog`, `/blog`, `/compare/{finviz,
   zacks, wallstreetzen}`, `/t/{symbol}` per-ticker pages, `/legal/*`

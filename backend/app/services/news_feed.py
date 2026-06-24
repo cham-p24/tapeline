@@ -1,13 +1,14 @@
 """
 News feed adapter.
 
-Source preference (first non-empty wins):
+Sources (queried in parallel, merged by published_at desc):
 
-    1. Benzinga (BENZINGA_API_KEY)  — faster wire, better ticker tagging.
-    2. Massive / Polygon (MASSIVE_API_KEY or POLYGON_API_KEY) — included
+    1. Massive / Polygon (MASSIVE_API_KEY or POLYGON_API_KEY) — included
        with the data subscription we already pay for.
-    3. Mock — synthesised headlines so the UI has something to render
-       before either key exists. Cleared on first real fetch.
+    2. Finnhub (FINNHUB_API_KEY) — broader international / UK-ADR coverage.
+    3. SEC EDGAR 8-Ks — fed into the same news table by the worker.
+    4. Mock — synthesised headlines so the UI has something to render
+       before any key exists. Cleared on first real fetch.
 """
 from __future__ import annotations
 
@@ -82,8 +83,7 @@ def _vendor_key() -> str:
 
 
 def _any_vendor_configured() -> bool:
-    """True when ANY real news vendor (Massive/Polygon, Benzinga, Finnhub) has
-    a key set.
+    """True when ANY real news vendor (Massive/Polygon, Finnhub) has a key set.
 
     Used to gate `_mock_news`: in prod (a vendor is configured) we must NEVER
     fall back to synthesised headlines — those contain prescriptive "Buy"
@@ -96,12 +96,6 @@ def _any_vendor_configured() -> bool:
     if _vendor_key():
         return True
     try:
-        from app.services import benzinga_feed as bz
-        if bz.is_configured():
-            return True
-    except Exception:
-        logger.exception("news.benzinga_config_check_failed")
-    try:
         from app.services import finnhub_feed as fh
         if fh.configured():
             return True
@@ -113,8 +107,8 @@ def _any_vendor_configured() -> bool:
 async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, Any]]:
     """Get recent news items mentioning a specific symbol.
 
-    Queries all three sources (Benzinga, Massive, Finnhub) in parallel,
-    merges by `published_at desc`, dedupes by id, returns top N.
+    Queries both sources (Massive, Finnhub) in parallel, merges by
+    `published_at desc`, dedupes by id, returns top N.
 
     Why parallel-merge instead of fallback chain:
     The previous "first non-empty wins" pattern broke for tickers like
@@ -124,23 +118,15 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
     Parallel-merge sorts everything by date and naturally surfaces the
     freshest article regardless of which source produced it.
 
-    Quota cost is only marginally higher (3 requests instead of 1-2)
-    and worth it for accuracy. Falls back to mock when all three return
+    Quota cost is only marginally higher (2 requests instead of 1)
+    and worth it for accuracy. Falls back to mock when all sources return
     nothing.
     """
     import asyncio
 
     # Resolve each source to a coroutine (or None if not configured).
-    bz_task = None
     massive_task = None
     fh_task = None
-
-    try:
-        from app.services import benzinga_feed as bz
-        if bz.is_configured():
-            bz_task = bz.fetch_news_for_ticker(symbol, limit)
-    except Exception:
-        logger.exception("news.benzinga_setup_failed symbol=%s", symbol)
 
     if _vendor_key():
         massive_task = _fetch_from_polygon([symbol], limit)
@@ -152,7 +138,7 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
     except Exception:
         logger.exception("news.finnhub_setup_failed symbol=%s", symbol)
 
-    coros = [t for t in (bz_task, massive_task, fh_task) if t is not None]
+    coros = [t for t in (massive_task, fh_task) if t is not None]
     if not coros:
         # No source resolved. If a vendor is configured (prod) this is a
         # genuine no-coverage long-tail ticker — return empty, never mock.
@@ -191,16 +177,6 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
 
 async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
     """Get recent news across the universe."""
-    # Benzinga first.
-    try:
-        from app.services import benzinga_feed as bz
-        if bz.is_configured():
-            rows = await bz.fetch_latest_news(limit)
-            if rows:
-                return rows
-    except Exception:
-        logger.exception("news.benzinga_latest_failed")
-
     if _vendor_key():
         try:
             rows = await _fetch_from_polygon(None, limit)
@@ -244,9 +220,9 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
 
     rows = []
     for a in body.get("results", []):
-        # Match benzinga_feed: column widened to String(2000) in
-        # migration 0014; we cap at 1900 with a comma-boundary truncate
-        # to avoid partial symbols and leave headroom.
+        # The tickers column was widened to String(2000) in migration 0014;
+        # we cap at 1900 with a comma-boundary truncate to avoid partial
+        # symbols and leave headroom.
         tickers_str = ",".join(a.get("tickers", []) or [])
         if len(tickers_str) > 1900:
             cutoff = tickers_str.rfind(",", 0, 1900)

@@ -17,7 +17,7 @@ scorecard, real-time edge) breaks visually if news is stale.
 ## Confirmed symptom (2026-05-08)
 
 Querying `/api/news?limit=5` against `api.tapeline.io` returns articles
-**821 minutes (~13.7 hours) old**, all sourced from Benzinga. Worker
+**821 minutes (~13.7 hours) old**, all sourced from the news wire. Worker
 itself is healthy (`worker_last_tick.age_seconds < 60` on `/api/status`).
 So the worker is ticking, but `_refresh_news` either:
 - fails silently (try/except swallows it),
@@ -37,8 +37,8 @@ So the worker is ticking, but `_refresh_news` either:
 
 ### OUT of scope
 - News UI changes (the news bar component is fine; it's a data problem)
-- Changing the news source preference order (Benzinga → Massive →
-  Finnhub is the right chain — the Finnhub fallback was just added in
+- Changing the news source preference order (Massive + Finnhub parallel
+  merge is the right shape — the Finnhub fallback was just added in
   commit `e2ffb76`)
 - Per-ticker page rendering (already does live fetch on cache miss)
 
@@ -47,9 +47,9 @@ So the worker is ticking, but `_refresh_news` either:
 ### 1. Reproduce + diagnose
 - [ ] Read `backend/app/workers/signal_publisher.py` — find `_refresh_news`
 - [ ] Tail Fly logs: `fly logs -a tapeline-backend | grep -E "news\."`
-  Look for `news.refreshed`, `news.refresh_failed`, `news.benzinga_*`
-- [ ] If Benzinga returns 0 articles for `fetch_latest_news()`, confirm
-  the Benzinga `/api/v2/news` endpoint with no ticker filter works at
+  Look for `news.refreshed`, `news.refresh_failed`, `news.*_failed`
+- [ ] If the wire returns 0 articles for `fetch_latest_news()`, confirm
+  the Massive `/v2/reference/news` endpoint with no ticker filter works at
   all (the per-ticker probe returned 200 in the earlier session)
 - [ ] If insert dedupe is the issue (every "new" article matches an
   existing id), check `news_feed._fetch_from_polygon` — Massive's news
@@ -75,14 +75,14 @@ Likely fixes (rank-ordered, pick what diagnosis points to):
 - [ ] Queries `WatchlistItem` for the union of all Premium-tier
   watchlist tickers (cap at 1000 unique to bound work)
 - [ ] For each, calls `fetch_news_for_ticker(symbol, limit=5)` — uses
-  the new Benzinga → Massive → Finnhub chain
+  the Massive + Finnhub parallel merge
 - [ ] Inserts new (id-deduped) into `NewsItem`
 - [ ] Logs counts: `watchlisted_news.refreshed unique_tickers=X
   new_articles=Y`
 
-Quota math: 1000 tickers × hourly = 24,000/day = 16/min. Both Benzinga
-(4000/min) and Finnhub (60/min — would need batching here) can absorb.
-Massive doesn't bill per-call. Stays well under all limits.
+Quota math: 1000 tickers × hourly = 24,000/day = 16/min. Finnhub
+(60/min — would need batching here) can absorb it and Massive doesn't
+bill per-call. Stays well under all limits.
 
 ### 4. Observability — add news-health to `/api/status`
 - [ ] Extend `app/routers/status.py` (or wherever the status check
@@ -107,9 +107,8 @@ Massive doesn't bill per-call. Stays well under all limits.
 
 ```
 backend/app/workers/signal_publisher.py     # _refresh_news, _refresh_universe, etc.
-backend/app/services/news_feed.py           # fetch_latest_news, fetch_news_for_ticker, fallback chain
-backend/app/services/benzinga_feed.py       # primary news source
-backend/app/services/finnhub_feed.py        # 3rd fallback (just added)
+backend/app/services/news_feed.py           # fetch_latest_news, fetch_news_for_ticker, parallel merge
+backend/app/services/finnhub_feed.py        # news source + analyst recs
 backend/app/routers/news.py                 # /api/news endpoint
 backend/app/routers/status.py (or main.py)  # /api/status — extend with news health
 backend/app/models/news.py (or models/__init__.py)  # NewsItem
@@ -121,7 +120,7 @@ frontend/components/LiveCounters.tsx        # the "1,316 news indexed" counter
 ## Tools / integrations needed
 
 - Fly CLI (`fly logs -a tapeline-backend`)
-- Direct API access to Benzinga + Massive + Finnhub (keys already in
+- Direct API access to Massive + Finnhub (keys already in
   `.env` and Fly secrets)
 - `pytest` for regression tests
 - `ruff` for backend lint compliance (CI gates on it)

@@ -581,7 +581,7 @@ async def status() -> dict[str, object]:
                     latest_news = latest_news.replace(tzinfo=UTC)
                 news_age = (datetime.now(UTC) - latest_news).total_seconds()
                 # Market-hours-aware thresholds (matches the freshness
-                # regression cron). Benzinga's wire goes very quiet on
+                # regression cron). The news wire goes very quiet on
                 # weekends and off-hours, so a flat 1h threshold would
                 # paint the pill yellow every weekend. Tuned to catch
                 # genuine pipeline failures without false-alarming on

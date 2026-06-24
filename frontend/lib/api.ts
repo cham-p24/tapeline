@@ -375,7 +375,7 @@ export type AnalystRatings = {
     pt_prior: number | null;
     url: string | null;
   }>;
-  source: "benzinga" | "empty";
+  source: "finnhub" | "empty";
 };
 
 export type TickerFinancials = {

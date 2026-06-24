@@ -67,7 +67,7 @@ The formula is on /how-it-works:
 
 Weights are version-controlled. /scorecard is uneditable history. /changelog logs every methodology revision.
 
-Stack: Next.js 16 + FastAPI + Polygon/Massive + Finnhub + FRED + Benzinga, deployed on Vercel + Fly.io. Source for the scoring formula and the scorecard back-check service is open on /how-it-works in pseudocode form (the production code is closed but mirror-able from the published spec).
+Stack: Next.js 16 + FastAPI + Polygon/Massive + Finnhub + FRED, deployed on Vercel + Fly.io. Source for the scoring formula and the scorecard back-check service is open on /how-it-works in pseudocode form (the production code is closed but mirror-able from the published spec).
 
 Free tier: top 20 tickers, 24h delay. Pro $24.99/mo annual. Premium $39.99/mo annual. 14-day trial, no card.
 

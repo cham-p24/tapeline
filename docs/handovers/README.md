@@ -35,8 +35,7 @@ from scratch.
 | Source | Purpose | Status | Key |
 |---|---|---|---|
 | Massive (formerly Polygon.io) | Market data + reference + news | Live | `MASSIVE_API_KEY` |
-| Finnhub | Fundamentals + earnings + IPO + news fallback + analyst recs | Live | `FINNHUB_API_KEY` |
-| Benzinga | News wire + analyst ratings | Live | `BENZINGA_API_KEY` |
+| Finnhub | Fundamentals + earnings + IPO + news + analyst recs | Live | `FINNHUB_API_KEY` |
 | FRED | Macro indicators (DXY, 10Y, VIX) | Live | `FRED_API_KEY` |
 | Quiver QuantData | 13F + Congressional trades | Live | `QUIVER_API_KEY` |
 | Resend | Transactional email | Live | `RESEND_API_KEY` |

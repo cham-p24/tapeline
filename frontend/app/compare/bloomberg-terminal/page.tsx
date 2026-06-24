@@ -78,9 +78,9 @@ const TRADEOFFS = [
   },
   {
     label: "News + research",
-    tapeline: "Benzinga + Polygon news wire on per-ticker pages",
+    tapeline: "Polygon/Massive + Finnhub news wire on per-ticker pages",
     competitor: "Bloomberg News exclusive content, analyst research aggregation, IB chat",
-    note: "Bloomberg News is its own newsroom with exclusive scoops and analyst research no one else has. Tapeline integrates third-party news (Benzinga, Polygon) tagged to scored tickers. For news edge, Bloomberg wins decisively. For score-in-context news, Tapeline is enough.",
+    note: "Bloomberg News is its own newsroom with exclusive scoops and analyst research no one else has. Tapeline integrates third-party news (Polygon/Massive, Finnhub) tagged to scored tickers. For news edge, Bloomberg wins decisively. For score-in-context news, Tapeline is enough.",
   },
   {
     label: "Real-time depth + order book",
