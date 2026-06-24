@@ -354,7 +354,7 @@ No counsel-by-committee. Got the Holley Nethercote lawyers in Melbourne queued f
 ```
 The hard parts weren't the scoring formula. They were the data pipelines.
 
-Polygon/Massive, Finnhub, FRED, Benzinga, SEC EDGAR. Each one's own auth, rate limits, failure modes. Half the codebase is reconciling sources when they disagree about a ticker's last close.
+Polygon/Massive, Finnhub, FRED, SEC EDGAR. Each one's own auth, rate limits, failure modes. Half the codebase is reconciling sources when they disagree about a ticker's last close.
 ```
 
 **URL reply**:

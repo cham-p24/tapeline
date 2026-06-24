@@ -317,8 +317,8 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         <ScoreSparkline symbol={data.symbol} days={60} />
       </div>
 
-      {/* Analyst ratings — Premium tier only. Benzinga primary (US names),
-          Finnhub aggregate fallback (UK / international ADRs). Trial users
+      {/* Analyst ratings — Premium tier only. Finnhub aggregate consensus
+          (US + UK / international ADRs). Trial users
           see this for free since trial = Premium for 14 days; post-trial
           Free + Pro users see the Paywall instead. Mirrors how other
           Premium intelligence (Congress, insider Form 4, Telegram) is gated. */}

@@ -1,9 +1,9 @@
 """GET /api/ticker/{symbol} — detailed single-ticker view with breakdown + news.
 
-Also: GET /api/ticker/{symbol}/ratings — analyst ratings consensus + recent
-events from Benzinga (with Finnhub aggregate fallback). Premium-only —
-mirrors holdings.elite gating. Lazy-loaded by the frontend so the main
-ticker page doesn't block on the upstream rating call.
+Also: GET /api/ticker/{symbol}/ratings — analyst ratings consensus from
+Finnhub's aggregate recommendations. Premium-only — mirrors holdings.elite
+gating. Lazy-loaded by the frontend so the main ticker page doesn't block on
+the upstream rating call.
 """
 from __future__ import annotations
 
@@ -19,8 +19,11 @@ from app.db import SessionLocal, get_session, is_sqlite
 from app.models import NewsItem, SqueezeSetup, Ticker
 from app.models.news import exclude_mock_clause, tickers_match_clause
 from app.services.auth import current_user_optional, current_user_required
-from app.services.benzinga_feed import fetch_analyst_ratings
-from app.services.finnhub_feed import fetch_basic_financials, fetch_insider_transactions
+from app.services.finnhub_feed import (
+    fetch_analyst_ratings,
+    fetch_basic_financials,
+    fetch_insider_transactions,
+)
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
@@ -31,8 +34,8 @@ logger = logging.getLogger(__name__)
 # --- News freshness strategy (incident fix 2026-05-31, rev 2) --------------
 # /api/ticker MUST be fast: it backs both the SSR'd public /t/{symbol} page
 # and the daily SEO audit, which HEADs ~1.1k of those pages. The previous
-# design live-fetched news (Benzinga ∥ Massive ∥ Finnhub — ~3 parallel
-# upstream calls) synchronously inside the request. Even after the earlier
+# design live-fetched news (Massive ∥ Finnhub — parallel upstream calls)
+# synchronously inside the request. Even after the earlier
 # fix today stopped holding a pooled DB connection across that fetch, the
 # multi-second call — multiplied by the audit's concurrency AND the
 # frontend's 2x SSR retry on slow responses — let in-flight requests pile up
@@ -236,7 +239,7 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     txn is safe.
 
     History: the news fetch used to run inline. First it held a pooled
-    connection across the multi-second Benzinga→Massive→Finnhub chain →
+    connection across the multi-second Massive→Finnhub chain →
     QueuePool exhaustion. Then, after the connection was released but the fetch
     stayed inline, the multi-second call (× audit concurrency × the frontend's
     2x SSR retry) drove a latency death-spiral that 500'd the SSR pages. Both
@@ -377,13 +380,12 @@ async def ticker_ratings(symbol: str, request: Request) -> dict:
     API call.
 
     Lazy-loaded — the main ticker payload doesn't include this so the page
-    paints before the upstream Benzinga call completes. When both Benzinga
-    and the Finnhub fallback have no coverage, the response shape stays the
-    same with an empty events list so the frontend renders a clean empty
-    state.
+    paints before the upstream ratings call completes. When Finnhub has no
+    coverage, the response shape stays the same with an empty events list so
+    the frontend renders a clean empty state.
     """
     # Resolve + tier-gate the user in a SHORT-LIVED session that is released
-    # BEFORE the upstream Benzinga call. Holding a pooled DB connection across
+    # BEFORE the upstream ratings call. Holding a pooled DB connection across
     # the multi-second upstream is what exhausted the pool and downed the API on
     # 2026-06-01 — the same anti-pattern the ticker_detail rev2 fix removed for
     # the news fetch. The auth read is sub-ms; the connection must not stay

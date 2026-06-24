@@ -14,7 +14,6 @@ Tapeline → real customer at $24.99-49.99/mo → customer sees data on screen �
 | Polygon / Massive | Stocks Starter $29/mo | Core: live prices, OHLC, snapshots for entire universe | ❌ Personal/non-business only |
 | Finnhub | Free | Fundamentals, insider Form 4, calendars, sector backfill | ❌ Personal/non-business only |
 | Quiver | Trader $30/mo | Smart-money signal via sheet | ❌ No commercial use rights |
-| Benzinga | Premium (not yet quoted) | News + analyst ratings | 🟡 Not audited — news content licensing typically restrictive |
 | FRED | Free | Macro indicators | ✅ Public domain |
 | SEC EDGAR direct | Free | 8-K filings | ✅ Public record |
 | Resend / Stripe / Telegram / Cloudflare / Sentry | various | Infra | ✅ Service, not data |

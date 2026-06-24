@@ -82,22 +82,20 @@ Three application-level layers (Cloudflare Bot Fight Mode is the recommended fre
 
 Rate limit: `services/rate_limit.py` `limit_auth` caps `/api/auth/*` at 10 attempts per IP per minute (vs default 120 for /api/*).
 
-## Benzinga (news + analyst ratings)
-Wired 2026-05-08 with `BENZINGA_API_KEY` env var. Two products in one adapter
-(`services/benzinga_feed.py`):
-- **News** — when configured, `news_feed.py` prefers Benzinga over Massive
-  for the live news bar + per-ticker headlines. Faster wire, richer cashtag
-  tagging. Falls through to Massive on error so news never goes dark.
-- **Analyst ratings** — `fetch_analyst_ratings(symbol)` returns consensus
-  tally (Buy/Hold/Sell — bucketed via `_BULL_TOKENS`/`_BEAR_TOKENS` to
-  normalise across firm-specific phrasing), avg price target, and recent
-  rating events. Endpoint `/api/ticker/{symbol}/ratings`, lazy-loaded by the
-  `<AnalystRatings>` widget on the ticker page. 6h in-memory cache per symbol
-  with single-flight lock to avoid stampede on hot tickers. **Not factored
-  into the 6-factor score** — displayed alongside it as a complement.
+## News + analyst ratings
+- **News** — `news_feed.py` queries Massive/Polygon and Finnhub in parallel,
+  merges by `published_at desc`, dedupes by id. SEC EDGAR 8-Ks are fed into
+  the same news table by the worker. Per-ticker headlines + the live news bar
+  read from this combined feed.
+- **Analyst ratings** — `finnhub_feed.fetch_analyst_ratings(symbol)` returns a
+  consensus tally (Buy/Hold/Sell) and total from Finnhub's aggregate
+  `/stock/recommendation` endpoint. Endpoint `/api/ticker/{symbol}/ratings`,
+  lazy-loaded by the `<AnalystRatings>` widget on the ticker page. Cached 12h
+  per symbol. Finnhub's free tier exposes only the aggregate, so per-firm
+  events + avg price target are empty. **Not factored into the 6-factor
+  score** — displayed alongside it as a complement.
 
-Without a key both features no-op cleanly: news falls back to Massive, the
-ratings widget renders a "No analyst coverage" empty state.
+Without coverage the ratings widget renders a "No analyst coverage" empty state.
 
 ## Smart-money / Recent insider buys
 **Marketing pivot 2026-05-17 (PR #74).** Premium no longer promises "Elite 13F holdings" — that copy was stripped across 15 frontend files (PricingTable, ComparisonTable, JSON-LD, llms.txt, OG image, blog, how-it-works, roadmap, share pages, ScannerPreview, etc.). The driver was Quiver Trader-tier TOS: "No Commercial Use Rights" (see `docs/LICENSE_AUDIT.md`). Premium's smart-money surface is now **Recent insider buys** — SEC Form 4 transactions across the active universe via Finnhub, refreshed daily.
@@ -235,7 +233,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `frontend/app/app/inbox/page.tsx` — admin inbox review UI
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
-Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Benzinga, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Vercel frontend.
+Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Vercel frontend.
 
 **Inbox bot go-live secrets** (the bot is shipped but dormant until set):
 - `ANTHROPIC_API_KEY` — Anthropic console; without it every ambiguous message defaults to Tier 1 manual review

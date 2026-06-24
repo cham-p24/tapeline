@@ -33,7 +33,7 @@ Pro $24.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
 Premium $39.99/mo: + Congress trades, insider Form 4 activity, Telegram alerts.
 14-day Premium trial, no card required.
 
-Stack: Next.js 14 + FastAPI + Polygon (now Massive) + Finnhub + FRED + Benzinga. Deployed on Vercel + Fly.io.
+Stack: Next.js 14 + FastAPI + Polygon (now Massive) + Finnhub + FRED. Deployed on Vercel + Fly.io.
 
 Built solo over the last few months. Genuinely curious what HN finds wrong with the scoring methodology — it's the part I want to harden first.
 ```

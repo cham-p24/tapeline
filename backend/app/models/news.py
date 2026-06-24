@@ -22,7 +22,7 @@ def tickers_match_clause(symbol: str) -> ColumnElement[bool]:
     """WHERE clause matching `symbol` as a WHOLE token in `news_items.tickers`.
 
     ``tickers`` is a comma-separated, no-whitespace token list (every feed joins
-    with ``","`` — see services/{benzinga,edgar,finnhub}_feed.py, news_feed.py),
+    with ``","`` — see services/{edgar,finnhub}_feed.py, news_feed.py),
     e.g. ``"AAPL,GME,NVDA"``. The old per-ticker filter used
     ``tickers LIKE '%SYM%'``, a substring test, so ``%GM%`` also matched
     ``"GME"``, ``"MGM"``, ``"AMGN"`` etc. — surfacing the wrong company's
@@ -81,7 +81,7 @@ class NewsItem(Base):
 
     # Comma-separated tickers; indexed via LIKE searches (fine at MVP scale).
     # Widened from String(200) → String(2000) in migration 0014 after a
-    # production incident where Benzinga round-up articles tagged 50+ symbols
+    # production incident where news round-up articles tagged 50+ symbols
     # broke the entire batch INSERT.
     tickers: Mapped[str] = mapped_column(String(2000), nullable=False, default="", index=True)
 

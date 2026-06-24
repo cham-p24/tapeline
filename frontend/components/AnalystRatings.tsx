@@ -113,10 +113,9 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
         </div>
       </div>
 
-      {/* Recent events — Benzinga returns per-firm rating actions; Finnhub
-          returns only aggregate counts (no events). When events is empty
-          but consensus is non-zero, show a short note instead of a header
-          + empty list. */}
+      {/* Recent events — Finnhub's free tier returns only aggregate counts
+          (no per-firm events). When events is empty but consensus is
+          non-zero, show a short note instead of a header + empty list. */}
       {events.length === 0 ? (
         <div className="px-5 py-4 text-xs text-muted">
           Aggregate consensus from a wire feed — individual firm-by-firm rating

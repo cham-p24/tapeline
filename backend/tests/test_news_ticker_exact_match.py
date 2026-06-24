@@ -1,7 +1,7 @@
 """Correctness guard: per-ticker news filters match the WHOLE symbol token.
 
 ``news_items.tickers`` is a comma-separated, no-whitespace token list (every
-feed joins with ``","`` — services/{benzinga,edgar,finnhub}_feed.py and
+feed joins with ``","`` — services/{edgar,finnhub}_feed.py and
 news_feed.py). The per-ticker headline filter on both public read paths
 
   - GET /api/news?symbol=…              (routers/news.py)

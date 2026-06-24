@@ -28,7 +28,6 @@ for _live_key in (
     "POLYGON_API_KEY",
     "FINNHUB_API_KEY",
     "FRED_API_KEY",
-    "BENZINGA_API_KEY",
     "QUIVER_API_KEY",
     "REDDIT_CLIENT_ID",
     "REDDIT_CLIENT_SECRET",

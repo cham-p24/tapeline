@@ -204,8 +204,8 @@ async def tick() -> None:
     if _last_news_refresh is None or (started - _last_news_refresh).total_seconds() > 300:
         await _refresh_news()
         # SEC EDGAR 8-K direct — runs alongside the wire-news refresh so material
-        # filings hit the news bar ~5-30 min earlier than they would via Benzinga/
-        # Massive. Free + zero-API-key. Idempotent (uses EDGAR accession number
+        # filings hit the news bar ~5-30 min earlier than they would via the
+        # Massive/Finnhub wires. Free + zero-API-key. Idempotent (uses EDGAR accession number
         # as the NewsItem.id PK) so re-runs don't duplicate rows.
         try:
             from app.services.edgar_feed import refresh_8k_into_news_items
@@ -256,8 +256,8 @@ async def tick() -> None:
     # Broad sweep + Massive cover the loud names; this fan-out covers the
     # tickers users specifically care about — small-caps, UK ADRs (BUR
     # etc.), niche names where the broad sweep doesn't surface anything.
-    # Quota math: 1000 unique tickers × 1/hour = 24k Benzinga calls/day,
-    # well under the 4000/min limit. Finnhub (60/min) handled via fallback.
+    # Quota math: 1000 unique tickers × 1/hour = 24k calls/day across
+    # Massive + Finnhub (60/min), comfortably within the rate limits.
     global _last_watchlisted_news_refresh
     if _last_watchlisted_news_refresh is None or (started - _last_watchlisted_news_refresh).total_seconds() >= 3600:
         await _refresh_watchlisted_news()
@@ -887,7 +887,7 @@ async def _refresh_news() -> None:
 
     # Insert each article in its own session/transaction. Previous version
     # used a single session for the whole batch — when ONE article failed
-    # the column-width check (tickers VARCHAR(200) and one Benzinga article
+    # the column-width check (tickers VARCHAR(200) and one round-up article
     # tagged with 50+ symbols), the entire batch rolled back, leaving DB
     # 14h+ stale. Per-article isolation means a bad row can't poison the
     # rest. Tracked: 2026-05-09 production incident.
@@ -924,9 +924,9 @@ async def _refresh_watchlisted_news() -> None:
 
     The 5-min broad sweep covers high-volume names. Long-tail tickers
     (small-caps, UK ADRs like BUR, niche ETFs) often never appear in the
-    broad sweep because Benzinga prioritises trending US large-caps. This
+    broad sweep because the wires prioritise trending US large-caps. This
     fan-out fetches per-ticker news for every symbol on every Premium-
-    tier user's watchlist, using the Benzinga → Massive → Finnhub chain.
+    tier user's watchlist, using the Massive + Finnhub parallel merge.
 
     Cap at 1000 unique tickers per cycle to bound work. Inserts use the
     same per-article isolation pattern as `_refresh_news` so one bad row

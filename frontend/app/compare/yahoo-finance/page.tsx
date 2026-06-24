@@ -80,7 +80,7 @@ const TRADEOFFS = [
     label: "News + earnings calendar coverage",
     tapeline: "Real-time news bar + earnings calendar on /app/earnings",
     competitor: "Industry-leading news aggregation + earnings transcripts on Premium",
-    note: "Yahoo's news aggregation (especially their PR Newswire integration) is best-in-class. Tapeline focuses on news that affects scoring (tagged via Benzinga + Polygon/Massive); for breaking news and earnings transcripts, Yahoo is the better feed.",
+    note: "Yahoo's news aggregation (especially their PR Newswire integration) is best-in-class. Tapeline focuses on news that affects scoring (tagged via Polygon/Massive + Finnhub); for breaking news and earnings transcripts, Yahoo is the better feed.",
   },
   {
     label: "Mobile app",

@@ -1,6 +1,6 @@
 """Sentry before_send filter — drop handled operational noise.
 
-Vendor feeds (Massive/Polygon, Finnhub, Benzinga, EDGAR, FRED) throw transient
+Vendor feeds (Massive/Polygon, Finnhub, EDGAR, FRED) throw transient
 network/timeout errors constantly on free tiers; each is caught with a graceful
 fallback, but Sentry's LoggingIntegration still turns every ``logger.exception``
 into a billable event + alert email. Likewise the scan worker logs

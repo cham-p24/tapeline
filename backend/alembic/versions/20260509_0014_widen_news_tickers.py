@@ -1,6 +1,6 @@
 """Widen news_items.tickers from VARCHAR(200) to VARCHAR(2000)
 
-Production incident 2026-05-09: Benzinga occasionally tags a single
+Production incident 2026-05-09: a news wire occasionally tags a single
 article with 50+ ticker symbols (market round-up pieces, "Stocks That
 Moved Today" articles). The concatenated tickers string exceeds
 VARCHAR(200), every batch INSERT containing such an article fails,
@@ -13,7 +13,7 @@ the heaviest cashtag-bombed articles (~80 tickers × 5 chars + commas
 increases without another migration.
 
 A code-level truncate at 200 chars was also added in the news
-adapters as belt-and-suspenders — if a future Benzinga update produces
+adapters as belt-and-suspenders — if a future wire update produces
 even longer strings, articles still land (just with a truncated
 ticker set rather than failing the batch).
 

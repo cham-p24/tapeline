@@ -23,7 +23,7 @@ see staleness on every tick — only the webhook noise is throttled.
 
 Why this exists:
     On 2026-05-09 production news went 14 hours stale because a single
-    Benzinga round-up article overflowed the tickers VARCHAR(200)
+    round-up news article overflowed the tickers VARCHAR(200)
     column and rolled back the whole batch INSERT. The bug was
     invisible from the homepage — `worker_last_tick` showed healthy,
     `/api/status` reported "ok", but news.latest_article_age was
@@ -79,7 +79,7 @@ def threshold_seconds(now_utc: datetime) -> int:
     phase = session_phase(now_utc)
     if phase == "active":
         # 60 min: the 30-min bar cried wolf on routine ingestion lag (e.g. a
-        # 35-min-old article during a slow Benzinga minute), emailing a CI
+        # 35-min-old article during a slow news-wire minute), emailing a CI
         # failure each time. 60 min still catches a genuine stall within the
         # hour without alerting on normal jitter.
         return 60 * 60
@@ -87,13 +87,13 @@ def threshold_seconds(now_utc: datetime) -> int:
         return 90 * 60        # 90 min during pre/post-market (sparser news)
     if phase == "overnight":
         # 5 h weekday overnight. 1–4 AM ET is the deepest US news quiet window:
-        # Benzinga has zero output for hours on a normal weekday morning and a
+        # the news wire has zero output for hours on a normal weekday morning and a
         # tighter 4h threshold ended up firing a borderline alert on 2026-05-14
         # at 1:03 AM ET (article was 4h 28min old — 28 min past the threshold).
         # 5h absorbs that without making the check toothless — if news genuinely
         # breaks during this window we'll still catch it within ~75 min.
         return 5 * 60 * 60
-    return 16 * 60 * 60       # 16 h weekend — Benzinga goes very quiet
+    return 16 * 60 * 60       # 16 h weekend — the news wire goes very quiet
 
 
 # Backwards-compat alias used by some test/CLI code that imports it.

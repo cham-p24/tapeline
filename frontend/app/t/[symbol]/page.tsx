@@ -898,7 +898,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               Recent {data.symbol} news
             </h2>
             <p className="mt-2 text-sm text-muted">
-              Latest market-moving headlines mentioning {data.symbol}, sourced from Tapeline&rsquo;s news feed (Benzinga + Polygon).
+              Latest market-moving headlines mentioning {data.symbol}, sourced from Tapeline&rsquo;s news feed (Polygon/Massive + Finnhub).
             </p>
             <ul className="mt-6 divide-y divide-border/40 rounded-lg border border-border bg-panel/30">
               {news.map((n) => {

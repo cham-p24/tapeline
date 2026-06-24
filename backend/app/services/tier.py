@@ -50,7 +50,7 @@ FEATURES: dict[str, Tier] = {
     "alerts.telegram": Tier.PREMIUM,
     "api.access": Tier.PREMIUM,
     "holdings.elite": Tier.PREMIUM,   # Quiver elite-fund 13F holdings
-    "ratings.analyst": Tier.PREMIUM,  # Benzinga + Finnhub analyst consensus widget
+    "ratings.analyst": Tier.PREMIUM,  # Finnhub analyst consensus widget
     "insider.form4": Tier.PREMIUM,    # Per-ticker SEC Form 4 insider transactions
     # Removed 2026-05-04: alerts.discord (low usage, webhook setup friction
     # turned out to be a real conversion blocker) and alerts.sms (Twilio

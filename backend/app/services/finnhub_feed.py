@@ -714,14 +714,12 @@ async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[d
 
 
 # ---------------------------------------------------------------------------
-# News + analyst coverage — Benzinga gap fillers
+# News + analyst coverage
 # ---------------------------------------------------------------------------
-# Benzinga has wide coverage of US-domiciled tickers but goes thin on
-# international / UK-listed names (BUR, RIO ADR, etc.). Finnhub's coverage
-# is broader on the international side because they aggregate from a wider
-# wire net. We use these as the third tier in news_feed's fallback chain
-# (after Benzinga + Massive) and as the secondary source for analyst
-# ratings when Benzinga returns empty.
+# Finnhub has broad coverage including international / UK-listed names (BUR,
+# RIO ADR, etc.) because they aggregate from a wide wire net. Used as the
+# secondary news source in news_feed (alongside Massive) and as the source
+# for the per-ticker analyst-ratings widget.
 
 CACHE_TTL_NEWS_HOURS = 0.25  # 15 min — news is the most time-sensitive
 CACHE_TTL_RECS_HOURS = 12    # Analyst recs aggregate is monthly; 12h is plenty
@@ -732,9 +730,9 @@ async def fetch_news_for_ticker(
 ) -> list[dict[str, Any]]:
     """Per-ticker news from Finnhub /company-news.
 
-    Used as the third fallback in news_feed when Benzinga returns nothing
-    (UK-listed names, smaller US ADRs, etc.). Returns the canonical
-    news-row shape so consumers don't care which source served it.
+    One of the parallel sources in news_feed (alongside Massive), with
+    broad coverage of UK-listed names, smaller US ADRs, etc. Returns the
+    canonical news-row shape so consumers don't care which source served it.
     """
     from datetime import datetime
 
@@ -748,7 +746,7 @@ async def fetch_news_for_ticker(
         # The on-disk cache stores published_at as an ISO string (a datetime
         # isn't JSON-serializable). Re-hydrate to a tz-aware datetime so this
         # function returns the SAME type on a cache hit as on a cache miss —
-        # and the same type as benzinga/edgar/massive. news_feed.merge sorts
+        # and the same type as edgar/massive. news_feed.merge sorts
         # the combined list by published_at and raises TypeError if some rows
         # are str and others datetime.
         for r in cached:
@@ -823,10 +821,9 @@ async def fetch_news_for_ticker(
 async def fetch_analyst_recommendations(symbol: str) -> dict[str, Any] | None:
     """Aggregate analyst tally from Finnhub /stock/recommendation.
 
-    Returns the latest-period buy/hold/sell consensus in the same shape
-    benzinga_feed.fetch_analyst_ratings produces, so the frontend renders
-    identically. Used as fallback when Benzinga has no coverage for the
-    ticker (which is common for UK-listed and international names).
+    Returns the latest-period buy/hold/sell consensus in the canonical
+    ratings shape the frontend's Analyst Ratings widget renders. Covers
+    US, UK-listed, and international names.
 
     Note: Finnhub's free tier only exposes the AGGREGATE — individual
     rating events (firm-by-firm with prior/current + price targets) are
@@ -877,3 +874,44 @@ async def fetch_analyst_recommendations(symbol: str) -> dict[str, Any] | None:
     }
     _save_cache(cache_key, result)
     return result
+
+
+def _empty_ratings(symbol: str) -> dict[str, Any]:
+    return {
+        "symbol": symbol,
+        "consensus": {"bull": 0, "bear": 0, "neutral": 0, "total": 0},
+        "avg_pt": None,
+        "events": [],
+        "source": "empty",
+    }
+
+
+async def fetch_analyst_ratings(symbol: str) -> dict[str, Any]:
+    """Recent analyst ratings + consensus for a ticker — backs the per-ticker
+    Analyst Ratings widget (GET /api/ticker/{symbol}/ratings).
+
+    Returns the canonical ratings shape:
+
+        {
+          "symbol": "AAPL",
+          "consensus": {"bull": int, "bear": int, "neutral": int, "total": int},
+          "avg_pt": float | None,
+          "events": [...],          # per-firm events (empty on Finnhub free tier)
+          "source": "finnhub" | "empty",
+        }
+
+    When there's no analyst coverage for the ticker (common for thinly-covered
+    long-tail names), returns the empty shape so the frontend renders a clean
+    "no consensus tracked" state.
+    """
+    symbol = (symbol or "").upper()
+    if not symbol:
+        return _empty_ratings(symbol)
+    try:
+        data = await fetch_analyst_recommendations(symbol)
+    except Exception:
+        logger.exception("finnhub.ratings_fetch_failed symbol=%s", symbol)
+        return _empty_ratings(symbol)
+    if data and data.get("consensus", {}).get("total", 0) > 0:
+        return data
+    return _empty_ratings(symbol)
