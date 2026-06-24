@@ -66,7 +66,7 @@ export default function CongressPage() {
         {/* Why "trade date" looks stale: the STOCK Act gives politicians up
             to 45 days to disclose a trade. So a recent disclosure ("today")
             often reports a trade from weeks ago. The list IS up to date —
-            we sync from Quiver multiple times per day. */}
+            we sync multiple times per day. */}
         <details className="card mt-4 cursor-pointer p-4 text-sm">
           <summary className="font-semibold">
             Why is the trade date weeks ago?{" "}
@@ -127,7 +127,7 @@ export default function CongressPage() {
                       <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
                     </>
                   ) : (
-                    <p>No disclosed trades loaded yet. We sync from Quiver multiple times per day.</p>
+                    <p>No disclosed trades loaded yet. We sync multiple times per day.</p>
                   )}
                 </td></tr>
               ) : visibleRows.map((r) => (
