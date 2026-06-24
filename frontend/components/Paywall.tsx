@@ -103,7 +103,7 @@ export function PaywallModal({
     "alerts.web_push": "Browser push alerts",
     "briefing": "Daily briefing email",
     "api": "API access",
-    "holdings.elite": "Elite institutional holdings",
+    "holdings.elite": "Recent insider activity",
     "csv_export": "CSV export",
   } as Record<string, string>)[feature] || "This feature";
 

@@ -169,10 +169,6 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_subject: str = "mailto:owner@tapeline.io"
 
-    # ---- Quiver QuantData (elite 13F holdings + Congress) ----
-    # Free tier available; without a key, smart-money enrichment falls back to mock.
-    quiver_api_key: str = ""
-
     # ---- Finnhub (fundamentals, insider Form 4, earnings + IPO calendars) ----
     # Free tier 60 calls/min covers Tapeline (weekly fundamentals refresh = ~125/day).
     # Without a key, sub_fundamentals stays mock-random and calendars use mock_upcoming_*.

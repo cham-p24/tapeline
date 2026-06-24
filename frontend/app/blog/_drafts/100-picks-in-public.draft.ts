@@ -114,7 +114,7 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
     years and actively trading my own portfolio for {{YEARS_TRADING}}+. The
     scoring engine that powers Tapeline ran for ~12 months as my personal
     trading bot before becoming a product — paper-traded via Alpaca, fed by
-    Massive (the rebranded Polygon.io), Finnhub, Quiver, and FRED. The same
+    Massive (the rebranded Polygon.io), Finnhub, and FRED. The same
     formula. The same factor weights. The same scorecard discipline.</p>
 
     <p>You can find me at:</p>

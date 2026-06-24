@@ -104,10 +104,15 @@ What's live now:
 - `/app/holdings` page renders Form 4 buys/sales with date / insider / shares / price / value columns. Same `holdings.elite` Premium feature gate (kept for migration simplicity — name is stale but the gate works).
 - `/api/holdings` returns Form 4 transactions from `get_recent_insider_transactions_db()` (Finnhub-backed). The legacy `/api/holdings/funds` endpoint exists for frontend compatibility but returns `{"items": []}` — the "elite funds" concept is off-roadmap.
 
-What's still running but never surfaced in marketing:
-- `services/quiver_feed.py` still exists. `fetch_elite_13f_holdings()` + `mock_elite_13f_holdings()` are intact.
-- Worker task `_refresh_elite_13f` (`signal_publisher.py:970`) still runs daily and writes to the `InstitutionalHolding` table — falls back to mock data without `QUIVER_API_KEY`. No frontend reads from this table anymore. Keep the table + worker task in place; cheap insurance if Premium ever re-adds an elite-13F surface under a commercial Quiver tier or a different vendor.
-- `Paywall.tsx:106` still labels `holdings.elite` as "Elite institutional holdings" — stale string, harmless (only shown when a non-Premium user hits the gate; the page itself titles the section "Recent insider buys").
+Quiver 13F removed (subscription cancelled — never wired in production, so the
+feature only ever served mock data):
+- `services/quiver_feed.py`, the `_refresh_elite_13f` worker task, the
+  `InstitutionalHolding` model, and `quiver_api_key` are all deleted. The
+  `institutional_holdings` DB table is left as a harmless orphan (no migration —
+  CI asserts a single migration head).
+- `holdings.elite` feature flag + `/app/holdings` + `/api/holdings` are KEPT —
+  they now gate/serve the Finnhub Form 4 "Recent insider buys" feed, not Quiver.
+- `Paywall.tsx` labels `holdings.elite` as "Recent insider activity".
 
 ## Known issues / partially-built
 - **`rate_direction` is now live from FRED** — `polygon_feed.fetch_regime` reads the 10Y yield's last 30 obs from FRED and classifies RISING / FALLING / SIDEWAYS via `fred_feed._direction()` (0.5 % threshold). Falls back to SIDEWAYS without a FRED key. Breadth_pct still placeholder; sector_leaders computed live each tick.
@@ -198,8 +203,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/auth.py` — native + Clerk JWT verification + dev-bypass
 - `backend/app/services/mock_feed.py` — fake data generator (112 tickers incl. 32 commodity ETFs)
 - `backend/app/services/polygon_feed.py` — real Polygon adapter (stubbed in places)
-- `backend/app/services/quiver_feed.py` — Quiver 13F + tracked elite funds. **Marketing-stripped 2026-05-17 (PR #74)**: worker still writes to `InstitutionalHolding` table daily but no frontend surface reads it. Kept on disk for possible future commercial-tier re-enable.
-- `backend/app/routers/holdings.py` — `/api/holdings` (Recent insider buys, Form 4 via Finnhub). `/api/holdings/funds` is a legacy empty-stub for frontend compatibility.
+- `backend/app/routers/holdings.py` — `/api/holdings` (Recent insider buys, Form 4 via Finnhub). `/api/holdings/funds` is a legacy empty-stub for frontend compatibility. (Quiver 13F `quiver_feed.py` was deleted when the Quiver subscription was cancelled — it only ever served mock data.)
 - `backend/app/services/finnhub_feed.py` — Finnhub fundamentals + earnings + IPO calendars + insider Form 4. Calendar replacement wired into `calendar_feed.upcoming_*`; fundamentals → score wiring still TODO.
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
@@ -247,7 +251,7 @@ Short list of what's actually left:
 1. **Microsoft OAuth** client ID + secret (Google is done; Microsoft setup steps in `docs/launch/LAUNCH_PLAYBOOK.md` §6)
 2. **Lawyer consult** — Holley Nethercote Melbourne ($400-800). Now higher-priority than before: `docs/LICENSE_AUDIT.md` (2026-05-17) flagged that Polygon/Massive Starter + Finnhub Free are also "personal/non-business only" — Quiver was just the most visibly-marketed exposure.
 
-**No longer a launch blocker:** Quiver QuantData key. Premium dropped "Elite 13F holdings" from marketing in PR #74 (Quiver Trader-tier TOS says "No Commercial Use Rights"). The `_refresh_elite_13f` worker task still runs with mock-fallback so the `InstitutionalHolding` table stays populated, but nothing surfaces it. Only revisit if Premium ever re-adds elite 13F under a commercial Quiver license or alternative vendor.
+**Quiver QuantData removed (subscription cancelled).** Premium had already dropped "Elite 13F holdings" from marketing in PR #74 (Quiver Trader-tier TOS says "No Commercial Use Rights"); the feature only ever served mock data because `QUIVER_API_KEY` was never provisioned in production. The `quiver_feed.py` adapter, `_refresh_elite_13f` worker task, `InstitutionalHolding` model, and `quiver_api_key` config are now deleted; the `institutional_holdings` table is left as a harmless orphan. Smart-money inputs are SEC Form 4 insider data (Finnhub) + Congressional disclosures.
 
 ## Communication style
 - The user prefers tight, factual responses over long narration.

@@ -40,8 +40,8 @@ look-ahead bias in feature construction.
   use the numbers: as a smoke test of the formula's structural properties
   (does top-N consistently beat random? does the alpha series have any
   signal?), not as a forecast of live results.
-- Smart-money factor zeroed for historical periods (insider Form 4 +
-  Quiver 13F aren't backfilled historically in any cache we own).
+- Smart-money factor zeroed for historical periods (insider Form 4 isn't
+  backfilled historically in any cache we own).
 - Fundamentals factor uses the Finnhub cache if a key is set; otherwise
   zeroed for the period.
 - Universe is static across the back-test window (no delistings, no IPO

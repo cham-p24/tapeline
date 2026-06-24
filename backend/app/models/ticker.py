@@ -36,8 +36,8 @@ class Ticker(Base):
     sub_macro: Mapped[float | None] = mapped_column(Float, nullable=True)
     sub_smart_money: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Per-ticker confidence (0-100) — varies with which underlying data feeds
-    # returned data. Mega-caps with full Quiver/Finnhub/FINRA coverage hit ~90+;
-    # less-followed names where fundamentals or institutional data is sparse
+    # returned data. Mega-caps with full Finnhub/FINRA coverage hit ~90+;
+    # less-followed names where fundamentals or smart-money data is sparse
     # land in the 40-60 band. Surfaced in the scanner so users can deprioritise
     # signals built on thin data. Pattern ported from the personal signal-system.
     confidence_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
