@@ -17,7 +17,6 @@ from app.db import session_scope
 from app.models import (
     CongressTrade,
     DailyScorecardEntry,
-    InstitutionalHolding,
     NewsItem,
     RegimeState,
     SqueezeSetup,
@@ -29,8 +28,9 @@ from app.models import (
 # Hybrid swap (2026-05-02): real prices + live macro from Massive (api.massive.com).
 # Squeeze detection stays mock for now — running per-ticker /v2/aggs across the full
 # universe each tick burns API calls; revisit once a daily back-fill job is built.
-# Congress trades stay mock — Polygon/Massive don't offer that data; Quiver
-# Commercial tier needed for real (deferred per CLAUDE.md known-issues).
+# Congress trades stay mock unless the smart_money_congress Google Sheet is
+# configured — Polygon/Massive don't offer that data (deferred per CLAUDE.md
+# known-issues).
 from app.services.mock_feed import (
     fetch_congress_trades,
     fetch_squeezes,
@@ -49,7 +49,6 @@ _last_backcheck: datetime | None = None
 _last_telegram_digest: datetime | None = None
 _last_calendar_seed: datetime | None = None
 _last_trial_check: datetime | None = None
-_last_holdings_refresh: datetime | None = None
 _last_drip_check: datetime | None = None
 _last_universe_refresh: datetime | None = None
 _last_sheet_refresh: datetime | None = None
@@ -262,13 +261,6 @@ async def tick() -> None:
     if _last_watchlisted_news_refresh is None or (started - _last_watchlisted_news_refresh).total_seconds() >= 3600:
         await _refresh_watchlisted_news()
         _last_watchlisted_news_refresh = started
-
-    # Daily 13F holdings refresh (Quiver, with mock fallback).
-    # 24h cadence is conservative — SEC reporting window is 45 days anyway.
-    global _last_holdings_refresh
-    if _last_holdings_refresh is None or (started - _last_holdings_refresh).total_seconds() >= 86400:
-        await _refresh_elite_13f()
-        _last_holdings_refresh = started
 
     # Daily trial-drip emails (day 3 / 7 / 13) + 14-day re-engagement for
     # dormant non-trial users + 30/60/90-day post-cancellation win-back +
@@ -1373,30 +1365,6 @@ async def _refresh_universe() -> None:
                 added += 1
 
     logger.info("universe.refreshed added=%d total_polygon=%d", added, len(new_rows))
-
-
-async def _refresh_elite_13f() -> None:
-    """
-    Daily 24h refresh of elite-fund 13F holdings.
-
-    Tries Quiver first; if QUIVER_API_KEY is unset OR every fund fetch fails,
-    falls back to deterministic mock data so the /api/holdings endpoint
-    never returns empty in dev.
-    """
-    from app.services.quiver_feed import fetch_elite_13f_holdings, mock_elite_13f_holdings
-
-    rows = await fetch_elite_13f_holdings()
-    source = "quiver"
-    if rows is None:
-        rows = mock_elite_13f_holdings()
-        source = "mock"
-
-    async with session_scope() as session:
-        await session.execute(delete(InstitutionalHolding))
-        for r in rows:
-            session.add(InstitutionalHolding(**r))
-
-    logger.info("holdings.13f_refreshed source=%s count=%d", source, len(rows))
 
 
 async def _seed_calendar() -> None:

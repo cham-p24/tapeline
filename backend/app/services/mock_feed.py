@@ -230,7 +230,7 @@ def _compute_mock_confidence(symbol: str) -> float:
     that returned non-null data).
 
     Bands (matching the personal signal-system layout the user already validated):
-    - 95%+:  full data on every signal feature (premium + Quiver + Finnhub + FINRA)
+    - 95%+:  full data on every signal feature (premium + Finnhub + FINRA)
     - 80-95%: most features, missing 1-3 minor data points
     - 60-80%: core scoring data + most fundamentals — typical liquid stock
     - 40-60%: only basic price/trend data (typical for ETFs without P/E)
@@ -239,8 +239,8 @@ def _compute_mock_confidence(symbol: str) -> float:
     seed = sum(ord(c) for c in symbol) * 7919  # arbitrary prime mixer
     rng = random.Random(seed)
 
-    # Mega-caps — every data provider covers these, Quiver elites hold them,
-    # Finnhub fundamentals fully populated, news volume high.
+    # Mega-caps — every data provider covers these, Finnhub fundamentals
+    # fully populated, news volume high.
     if symbol in _MEGA_CAP_SET:
         return round(rng.uniform(88, 96), 1)
 
@@ -476,16 +476,16 @@ _MOM_WEAK = [
 ]
 
 _SMART_BUYING = [
-    "elite institutions adding (recent 13F filings)",
+    "insider net buying over the last 90 days (recent Form 4 filings)",
     "insider net buying over the last 90 days",
-    "smart-money flow positive — institutional + insider",
+    "smart-money flow positive — insiders + Congress",
     "Congressional buys disclosed in the last 30 days",
-    "institutional positioning bullish",
+    "insider positioning bullish",
 ]
 _SMART_SELLING = [
     "insider net selling over the last 90 days",
-    "smart-money flow negative — institutional positions trimmed",
-    "elite institutions reducing (recent 13F filings)",
+    "smart-money flow negative — insiders trimming positions",
+    "insider net selling accelerating (recent Form 4 filings)",
     "Congressional sells outnumber buys recently",
 ]
 

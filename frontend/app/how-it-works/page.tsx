@@ -41,7 +41,7 @@ const FACTORS = [
   { name: "Trend",               weight: 25, desc: "Slope of 20/50/200-day moving averages, MACD direction, distance from 200DMA." },
   { name: "Relative strength",   weight: 20, desc: "Price performance vs SPY and sector ETF over 3M, 6M, 1Y." },
   { name: "Fundamentals",        weight: 15, desc: "Revenue growth, margin trend, P/E, debt/equity, ROE, EPS surprises." },
-  { name: "Smart money",         weight: 15, desc: "Insider net buying, institutional holdings change, Congressional activity." },
+  { name: "Smart money",         weight: 15, desc: "Insider net buying (SEC Form 4), Congressional disclosures." },
   { name: "Macro",               weight: 15, desc: "Current market regime, sector rotation, rate direction, VIX level." },
   { name: "Momentum",            weight: 10, desc: "RSI, Bollinger Band width percentile, volume expansion, breakout proximity." },
 ];

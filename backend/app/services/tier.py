@@ -49,7 +49,7 @@ FEATURES: dict[str, Tier] = {
     "congress.feed": Tier.PREMIUM,
     "alerts.telegram": Tier.PREMIUM,
     "api.access": Tier.PREMIUM,
-    "holdings.elite": Tier.PREMIUM,   # Quiver elite-fund 13F holdings
+    "holdings.elite": Tier.PREMIUM,   # Recent insider buys feed (SEC Form 4 via Finnhub)
     "ratings.analyst": Tier.PREMIUM,  # Finnhub analyst consensus widget
     "insider.form4": Tier.PREMIUM,    # Per-ticker SEC Form 4 insider transactions
     # Removed 2026-05-04: alerts.discord (low usage, webhook setup friction

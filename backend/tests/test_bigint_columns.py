@@ -8,16 +8,11 @@ which also flooded Sentry. These columns must stay BigInteger.
 from sqlalchemy import BigInteger
 
 from app.models.calendar_events import IPOEvent
-from app.models.holdings import InstitutionalHolding
 from app.models.ticker import Ticker
 
 
 def test_ticker_volume_is_bigint():
     assert isinstance(Ticker.__table__.c.volume.type, BigInteger)
-
-
-def test_holdings_shares_is_bigint():
-    assert isinstance(InstitutionalHolding.__table__.c.shares.type, BigInteger)
 
 
 def test_ipo_shares_offered_is_bigint():
