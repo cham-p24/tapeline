@@ -76,6 +76,12 @@ type Props = {
   faq: FeatureFAQ[];
   /** Premium feature? Drives the CTA copy. */
   tier: "free" | "pro" | "premium";
+  /** Message-match slug appended to the /signup CTA as ?from=<slug>. The
+      signup page restates the matching promise in its H1 (see signup
+      FROM_COPY) so ad → landing → signup copy stays consistent. Constrained
+      to the slugs the signup page actually handles; scanner/screener-style
+      feature pages should pass "screener". Defaults to "compare". */
+  signupFrom?: "finviz" | "screener" | "scorecard" | "compare";
 };
 
 export function SeoFeaturePage({
@@ -87,6 +93,7 @@ export function SeoFeaturePage({
   methodology,
   faq,
   tier,
+  signupFrom = "compare",
 }: Props) {
   const url = `https://tapeline.io/${slug}`;
   const breadcrumbs = breadcrumbJsonLd([
@@ -211,7 +218,7 @@ export function SeoFeaturePage({
           </h2>
           <p className="mt-3 text-sm text-muted">{tierCopy}</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup" className="btn-primary">
+            <Link href={`/signup?from=${signupFrom}`} className="btn-primary">
               Try Premium free &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost">

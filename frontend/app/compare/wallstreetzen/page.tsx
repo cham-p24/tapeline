@@ -231,7 +231,7 @@ export default function VsWallStreetZenPage() {
           Free tier is narrower on purpose (live scores, top-10 scanner, 5 look-ups/day) — free forever. Start the trial to see the full real-time universe. No card.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup" className="btn-primary">Try Premium free →</Link>
+          <Link href="/signup?from=compare" className="btn-primary">Try Premium free →</Link>
           <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">
