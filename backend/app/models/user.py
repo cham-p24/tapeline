@@ -190,6 +190,30 @@ class User(Base):
     signup_utm_term: Mapped[str | None] = mapped_column(String(120), nullable=True)
     signup_utm_content: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
+    # Google Ads click IDs captured at signup (Growth Playbook §3.7,
+    # "subscriber-quality unlock"). `gclid` is the Search/Display click ID;
+    # `gbraid` / `wbraid` are the iOS-privacy app/web variants. Same capture
+    # mechanism as signup_utm_* (frontend lib/utm.ts persists on landing,
+    # forwards on signup POST; written once, never updated). Stored so the
+    # founder-gated offline-conversion upload to Google (value-based bidding)
+    # can tie a converted subscriber back to its paid click. Stay nullable —
+    # only paid Google traffic carries these. Wider than UTM cols because
+    # gclids are long opaque tokens.
+    signup_gclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    signup_gbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    signup_wbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # Activation milestone (Growth Playbook §4.2). Stamped the FIRST time the
+    # user adds a watchlist ticker — the codebase already treats "first
+    # watchlist ticker added" as activation milestone #1 (see
+    # services/email.run_activation_drip / the act_wl drip). Set once, never
+    # overwritten, so it marks time-to-activation, not last activity. Null =
+    # not yet activated. Surfaced as activation_rate in the admin revenue
+    # dashboard.
+    activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

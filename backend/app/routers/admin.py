@@ -319,6 +319,21 @@ async def revenue_dashboard(
         select(func.count()).select_from(User).where(User.stripe_customer_id.isnot(None))
     )).scalar() or 0
 
+    # ── Activation (Growth Playbook §4.2) — % of signups who hit milestone #1
+    # (first watchlist ticker added → User.activated_at stamped). The
+    # complementary leak metric to signup->paid: a low activation rate means
+    # the funnel is leaking BEFORE the trial→paid decision. ──
+    activated_users = (await session.execute(
+        select(func.count()).select_from(User).where(User.activated_at.isnot(None))
+    )).scalar() or 0
+
+    # ── gclid capture (Growth Playbook §3.7) — signups arriving with a Google
+    # Ads click ID stored. This is the population the founder-gated offline-
+    # conversion upload (value-based bidding) will later be able to act on. ──
+    gclid_capture_count = (await session.execute(
+        select(func.count()).select_from(User).where(User.signup_gclid.isnot(None))
+    )).scalar() or 0
+
     # ── Churn / cancellation ──────────────────────────────────────────────
     cancellations_scheduled = (await session.execute(
         select(func.count()).select_from(Subscription).where(
@@ -394,6 +409,13 @@ async def revenue_dashboard(
         "trials_active": trials_active,
         "paid_customers": paid_customers,
         "signup_to_paid_pct": round(paid_customers / users_total * 100, 1) if users_total else 0.0,
+        # Activation funnel (§4.2): share of signups who added a first
+        # watchlist ticker. The raw count rides alongside so the % has context.
+        "activated_users": activated_users,
+        "activation_rate": round(activated_users / users_total * 100, 1) if users_total else 0.0,
+        # gclid capture (§3.7): signups whose Google Ads click ID is stored and
+        # therefore available for the (founder-gated) offline-conversion upload.
+        "gclid_capture_count": gclid_capture_count,
         "cancellations_scheduled": cancellations_scheduled,
         "cancellation_reasons": cancellation_reasons,
         "save_offers_redeemed": save_offers_redeemed,

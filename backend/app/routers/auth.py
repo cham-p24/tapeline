@@ -59,6 +59,14 @@ class SignupBody(BaseModel):
     utm_campaign: str | None = Field(None, max_length=120)
     utm_term: str | None = Field(None, max_length=120)
     utm_content: str | None = Field(None, max_length=120)
+    # Google Ads click IDs captured by lib/utm.ts on the landing visit and
+    # forwarded here (same mechanism as utm_*). Written once at signup to the
+    # signup_gclid/gbraid/wbraid columns, never updated. Stored so the
+    # founder-gated offline-conversion upload to Google has the click ID
+    # available. Only paid Google traffic carries these.
+    gclid: str | None = Field(None, max_length=200)
+    gbraid: str | None = Field(None, max_length=200)
+    wbraid: str | None = Field(None, max_length=200)
 
 
 class SigninBody(BaseModel):
@@ -218,6 +226,12 @@ async def signup(
         signup_utm_campaign=(body.utm_campaign or None),
         signup_utm_term=(body.utm_term or None),
         signup_utm_content=(body.utm_content or None),
+        # Google Ads click IDs — same write-once-at-signup contract as the
+        # UTMs above. Available for the founder-gated offline-conversion
+        # upload to Google (value-based bidding). See models/user.py.
+        signup_gclid=(body.gclid or None),
+        signup_gbraid=(body.gbraid or None),
+        signup_wbraid=(body.wbraid or None),
     )
     session.add(user)
     # Credit the referrer too. Doing this in the same transaction guarantees

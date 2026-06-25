@@ -57,6 +57,14 @@ type SignupExtras = {
   utm_campaign?: string;
   utm_term?: string;
   utm_content?: string;
+  // Google Ads click IDs — read from localStorage on submit via
+  // lib/utm.ts:getStoredGclid(). Backend writes them once to the User
+  // row's signup_gclid/gbraid/wbraid columns so the (founder-gated)
+  // offline-conversion upload to Google has the click ID available.
+  // Optional — only paid Google clicks carry these.
+  gclid?: string;
+  gbraid?: string;
+  wbraid?: string;
 };
 
 // Signin can resolve two ways: a normal success (session cookie set, user

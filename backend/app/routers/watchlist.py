@@ -1,6 +1,8 @@
 """/api/watchlist — user-owned saved tickers with smart alerts."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import asc, desc, func, select
@@ -182,6 +184,14 @@ async def add_to_watchlist(
         alert_threshold_delta=body.alert_threshold_delta,
     )
     session.add(item)
+    # Activation milestone (Growth Playbook §4.2): the first watchlist ticker
+    # added is activation milestone #1 (consistent with the act_wl activation
+    # drip in services/email.run_activation_drip). Stamp activated_at once and
+    # never overwrite it, so it measures time-to-activation rather than last
+    # activity. Idempotent: guarded on the current value being NULL, so a
+    # user's second+ add leaves the original timestamp untouched.
+    if user.activated_at is None:
+        user.activated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(item)
     return {

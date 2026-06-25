@@ -8,7 +8,7 @@ import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { safeNext } from "@/lib/safeNext";
-import { getStoredUtm } from "@/lib/utm";
+import { getStoredGclid, getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -175,12 +175,17 @@ function SignUpForm() {
       // the User row carries the channel that originally brought them in
       // (not whatever URL they happened to be on at submit time).
       const utm = getStoredUtm();
+      // Google Ads click IDs captured on landing (gclid/gbraid/wbraid).
+      // Stored on the User row so the founder-gated offline-conversion
+      // upload to Google can later tie this subscriber back to the click.
+      const gclid = getStoredGclid();
       await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: token || undefined,
         device_fingerprint: device_fp || undefined,
         ref: refCode || undefined,
         ...utm,
+        ...gclid,
       });
       // Funnel events: signup landed cleanly. Trial auto-starts on signup
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
