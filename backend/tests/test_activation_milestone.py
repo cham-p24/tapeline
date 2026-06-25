@@ -66,13 +66,20 @@ async def test_first_watchlist_add_stamps_activated_at(client):
         # Ensure dev_user exists (first authed call creates it), then reset.
         await _wipe_dev_user_watchlist(client)
         await _reset_dev_user_activation()
-        assert await _get_activated_at() is None
+        try:
+            assert await _get_activated_at() is None
 
-        r = await client.post("/api/watchlist", json={"symbol": "AAPL"}, headers=HEADERS)
-        assert r.status_code == 200, r.text
+            r = await client.post("/api/watchlist", json={"symbol": "AAPL"}, headers=HEADERS)
+            assert r.status_code == 200, r.text
 
-        stamped = await _get_activated_at()
-        assert stamped is not None
+            stamped = await _get_activated_at()
+            assert stamped is not None
+        finally:
+            # Leave the shared dev_user clean (empty watchlist + null activation)
+            # so later suites (e.g. test_watchlists) don't trip the
+            # (user_id, symbol) UNIQUE constraint on this no-cleanup CI SQLite.
+            await _wipe_dev_user_watchlist(client)
+            await _reset_dev_user_activation()
 
 
 @pytest.mark.asyncio
@@ -80,15 +87,18 @@ async def test_second_watchlist_add_does_not_overwrite_activated_at(client):
     async with client:
         await _wipe_dev_user_watchlist(client)
         await _reset_dev_user_activation()
+        try:
+            # First add → stamps activated_at.
+            r = await client.post("/api/watchlist", json={"symbol": "MSFT"}, headers=HEADERS)
+            assert r.status_code == 200, r.text
+            first = await _get_activated_at()
+            assert first is not None
 
-        # First add → stamps activated_at.
-        r = await client.post("/api/watchlist", json={"symbol": "MSFT"}, headers=HEADERS)
-        assert r.status_code == 200, r.text
-        first = await _get_activated_at()
-        assert first is not None
-
-        # Second add (different symbol) → must NOT change the timestamp.
-        r = await client.post("/api/watchlist", json={"symbol": "NVDA"}, headers=HEADERS)
-        assert r.status_code == 200, r.text
-        second = await _get_activated_at()
-        assert second == first, "activated_at must not be overwritten on later adds"
+            # Second add (different symbol) → must NOT change the timestamp.
+            r = await client.post("/api/watchlist", json={"symbol": "NVDA"}, headers=HEADERS)
+            assert r.status_code == 200, r.text
+            second = await _get_activated_at()
+            assert second == first, "activated_at must not be overwritten on later adds"
+        finally:
+            await _wipe_dev_user_watchlist(client)
+            await _reset_dev_user_activation()
