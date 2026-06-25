@@ -446,6 +446,23 @@ export default function BillingPage() {
             />
           </div>
 
+          {/* Payment-security trust badge — directly under the upgrade buttons,
+              the highest-value placement (signup takes no card; the first card
+              entry happens at Stripe Checkout from here). Card details are never
+              handled by Tapeline. Descriptive only, no security claims of our own. */}
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-subtle">
+            <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M8 1.5l5 1.8v3.4c0 3.2-2.1 5.3-5 6.3-2.9-1-5-3.1-5-6.3V3.3L8 1.5z"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinejoin="round"
+              />
+              <path d="M5.8 8l1.6 1.6L10.4 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>Payments secured by <span className="text-muted font-medium">Stripe</span></span>
+          </div>
+
           <div>
             <details className="group rounded-xl border border-border bg-panel/40">
               <summary className="flex cursor-pointer items-center justify-between gap-3 p-5 list-none">

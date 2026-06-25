@@ -195,6 +195,22 @@ export function PricingTable() {
         <span>Cancel in one click</span>
       </div>
 
+      {/* Payment-security trust badge — sits under the plan CTAs at the
+          decision point. Card details are never handled by Tapeline; checkout
+          runs on Stripe. Descriptive only, no security claims of our own. */}
+      <div className="mx-auto mt-5 flex items-center justify-center gap-1.5 text-[11px] text-subtle">
+        <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M8 1.5l5 1.8v3.4c0 3.2-2.1 5.3-5 6.3-2.9-1-5-3.1-5-6.3V3.3L8 1.5z"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinejoin="round"
+          />
+          <path d="M5.8 8l1.6 1.6L10.4 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>Payments secured by <span className="text-muted font-medium">Stripe</span></span>
+      </div>
+
       {/* B2B / lifetime nudge — one line, no third row of cards.
           Curious enterprise buyers can email; everyone else stays focused
           on the three main tiers above. */}

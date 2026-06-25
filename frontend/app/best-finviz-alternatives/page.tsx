@@ -618,7 +618,7 @@ export default function BestFinvizAlternativesPage() {
             <li>
               <strong>Best overall Finviz alternative:</strong> Tapeline — public 6-factor
               formula, per-pick scorecard, plain-English Why. $24.99/mo annual,{" "}
-              <Link href="/signup" className="text-accent hover:underline">14-day Premium trial, no card</Link>.
+              <Link href="/signup?from=finviz" className="text-accent hover:underline">14-day Premium trial, no card</Link>.
             </li>
             <li>
               <strong>Best for charting:</strong> TradingView — best-in-class charts and a 60M-strong community.
@@ -928,7 +928,7 @@ export default function BestFinvizAlternativesPage() {
             Finviz subscription if you want — they solve different problems.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup" className="btn-primary">
+            <Link href="/signup?from=finviz" className="btn-primary">
               Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">

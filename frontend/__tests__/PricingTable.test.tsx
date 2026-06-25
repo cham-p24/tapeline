@@ -26,4 +26,12 @@ describe("PricingTable", () => {
     render(<PricingTable />);
     expect(screen.getByText(/14-day Premium trial/i)).toBeInTheDocument();
   });
+
+  it("shows the Stripe payment-security trust badge near the CTAs", () => {
+    // Trust badge at the decision point (Part 2 / trust badges). Text is
+    // split across spans ("Payments secured by" + "Stripe").
+    render(<PricingTable />);
+    expect(screen.getByText(/Payments secured by/i)).toBeInTheDocument();
+    expect(screen.getByText("Stripe")).toBeInTheDocument();
+  });
 });

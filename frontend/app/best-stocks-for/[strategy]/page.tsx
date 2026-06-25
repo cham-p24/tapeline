@@ -316,7 +316,7 @@ export default async function BestStocksForStrategyPage({
             every sort/filter combination, watchlist + alerts.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup" className="btn-primary">
+            <Link href="/signup?from=screener" className="btn-primary">
               Try Premium free →
             </Link>
             <Link href="/scorecard" className="btn-ghost">

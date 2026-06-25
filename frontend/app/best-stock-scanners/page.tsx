@@ -212,7 +212,7 @@ export default function BestStockScannersPage() {
         {/* Above-the-fold CTA — paid traffic lands here; the in-body trial CTA
             is otherwise only at the very bottom of a long article. */}
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/signup" className="btn-primary">
+          <Link href="/signup?from=screener" className="btn-primary">
             Try Premium free &mdash; 14 days, no card &rarr;
           </Link>
           <Link href="/scorecard" className="btn-ghost">
