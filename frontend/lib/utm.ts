@@ -150,3 +150,123 @@ export function clearStoredUtm(): void {
     /* ignore */
   }
 }
+
+/**
+ * Google click-ID capture + persistence — same mechanism as the UTM block
+ * above, kept here so both attribution captures share one storage helper.
+ *
+ * Why this exists (Growth Playbook §3.7 "subscriber-quality unlock"): Google
+ * Ads stamps every paid click with a click identifier — `gclid` for Search/
+ * Display, `gbraid` / `wbraid` for the iOS-privacy app/web variants. Uploading
+ * that identifier back to Google with the eventual conversion (the offline
+ * conversion import / value-based-bidding loop) is what lets Smart Bidding
+ * optimise toward *subscribers* rather than raw signups. The upload itself is
+ * founder-gated (needs Ads API credentials), so this file's only job is to
+ * CAPTURE + STORE the click ID at landing so it's AVAILABLE on the User row
+ * when the upload pipeline is later turned on.
+ *
+ * Same persistence contract as UTM: capture on landing, localStorage with a
+ * 30-day TTL, first-touch wins, forward on the signup POST. No PII — these are
+ * opaque Google-issued click tokens.
+ */
+
+const GCLID_STORAGE_KEY = "tapeline_gclid_v1";
+
+export type GclidPayload = {
+  gclid?: string;
+  gbraid?: string;
+  wbraid?: string;
+};
+
+type StoredGclid = GclidPayload & { captured_at: number };
+
+const GCLID_KEYS: (keyof GclidPayload)[] = ["gclid", "gbraid", "wbraid"];
+
+/**
+ * Read the persisted Google click IDs. Returns {} if nothing's stored, the
+ * stored value is malformed, the TTL has expired, or storage is unavailable.
+ * Safe to call from SSR — returns {} on the server.
+ */
+export function getStoredGclid(): GclidPayload {
+  if (!isStorageAvailable()) return {};
+  try {
+    const raw = window.localStorage.getItem(GCLID_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as StoredGclid;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    if (
+      typeof parsed.captured_at !== "number" ||
+      Date.now() - parsed.captured_at > TTL_MS
+    ) {
+      // Expired — clear so we don't return stale data on later visits.
+      window.localStorage.removeItem(GCLID_STORAGE_KEY);
+      return {};
+    }
+    const out: GclidPayload = {};
+    for (const k of GCLID_KEYS) {
+      const v = parsed[k];
+      if (typeof v === "string" && v.length > 0) {
+        out[k] = v;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * If the current URL has a gclid/gbraid/wbraid param, capture it to
+ * localStorage. First-touch wins: if a fresh capture already exists, this is a
+ * no-op so the original paid click keeps credit over a later direct refresh.
+ *
+ * Returns the captured (or already-stored) payload for convenience.
+ */
+export function captureGclidFromLocation(): GclidPayload {
+  if (typeof window === "undefined") return {};
+  if (!isStorageAvailable()) return {};
+
+  // First-touch: don't overwrite an existing fresh capture.
+  const existing = getStoredGclid();
+  if (Object.keys(existing).length > 0) return existing;
+
+  let url: URL;
+  try {
+    url = new URL(window.location.href);
+  } catch {
+    return {};
+  }
+
+  const captured: GclidPayload = {};
+  for (const k of GCLID_KEYS) {
+    const v = url.searchParams.get(k);
+    if (v && v.length > 0) {
+      // Cap defensively — backend cols are 200 chars (gclids are long).
+      captured[k] = v.slice(0, 200);
+    }
+  }
+
+  if (Object.keys(captured).length === 0) return {};
+
+  try {
+    const toStore: StoredGclid = { ...captured, captured_at: Date.now() };
+    window.localStorage.setItem(GCLID_STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // Best-effort — return the captured payload anyway so the caller can
+    // still forward it to the backend in-flight.
+  }
+  return captured;
+}
+
+/**
+ * Reset the captured Google click IDs. Called after a successful signup so a
+ * later signup on the same device starts a fresh attribution chain.
+ */
+export function clearStoredGclid(): void {
+  if (!isStorageAvailable()) return;
+  try {
+    window.localStorage.removeItem(GCLID_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}

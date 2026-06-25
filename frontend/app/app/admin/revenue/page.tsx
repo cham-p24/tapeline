@@ -17,6 +17,9 @@ type Revenue = {
   trials_active: number;
   paid_customers: number;
   signup_to_paid_pct: number;
+  activated_users: number;
+  activation_rate: number;
+  gclid_capture_count: number;
   cancellations_scheduled: number;
   cancellation_reasons: Record<string, number>;
   save_offers_redeemed: number;
@@ -110,6 +113,22 @@ export default function RevenuePage() {
         <Stat label="In dunning" value={String(data.in_dunning)} tone={data.in_dunning > 0 ? "warn" : undefined} />
         <Stat label="Checkouts in-flight" value={String(data.checkouts_in_flight)} tone={data.checkouts_in_flight > 0 ? "accent" : undefined} />
       </div>
+
+      {/* Measurement — activation (§4.2) + gclid capture (§3.7) */}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          label="Activation rate"
+          value={`${data.activation_rate}%`}
+          tone="accent"
+        />
+        <Stat label="Activated users" value={String(data.activated_users)} />
+        <Stat label="gclid captured" value={String(data.gclid_capture_count)} />
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Activation = signup that added a first watchlist ticker. gclid captured =
+        signups arriving with a Google Ads click ID stored (available for the
+        offline-conversion upload once Ads API access is enabled).
+      </p>
 
       {/* Subscription book */}
       <h2 className="mt-10 text-xl font-semibold">Subscription book</h2>
