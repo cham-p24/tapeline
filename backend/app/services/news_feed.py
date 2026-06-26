@@ -176,14 +176,54 @@ async def fetch_news_for_ticker(symbol: str, limit: int = 10) -> list[dict[str, 
 
 
 async def fetch_latest_news(limit: int = 30) -> list[dict[str, Any]]:
-    """Get recent news across the universe."""
+    """Get recent news across the universe.
+
+    Parallel-merges Massive (reference/news) + Finnhub (general market news) so
+    universe-level freshness doesn't hinge on a single source: Massive's feed
+    lags, and the old real-time wire (Benzinga) was removed 2026-06-24, which
+    froze the freshest-headline timestamp. Mirrors the parallel-merge +
+    dedupe-by-id pattern of fetch_news_for_ticker; freshest wins regardless of
+    source. Mock only when NO vendor is configured (dev).
+    """
+    import asyncio
+
+    massive_task = None
+    fh_task = None
+
     if _vendor_key():
-        try:
-            rows = await _fetch_from_polygon(None, limit)
-            if rows:
-                return rows
-        except Exception:
-            logger.exception("news.latest_fetch_failed")
+        massive_task = _fetch_from_polygon(None, limit)
+
+    try:
+        from app.services import finnhub_feed as fh
+        if fh.configured():
+            fh_task = fh.fetch_market_news(limit)
+    except Exception:
+        logger.exception("news.finnhub_market_setup_failed")
+
+    coros = [t for t in (massive_task, fh_task) if t is not None]
+    if coros:
+        results = await asyncio.gather(*coros, return_exceptions=True)
+        merged: list[dict[str, Any]] = []
+        for r in results:
+            if isinstance(r, Exception):
+                logger.warning("news.latest_source_failed err=%s", str(r)[:120])
+                continue
+            if isinstance(r, list):
+                merged.extend(r)
+        if merged:
+            # Dedupe by id (sources never share ids; this drops in-source repeats),
+            # then surface freshest-first regardless of which source produced it.
+            seen: set[str] = set()
+            unique: list[dict[str, Any]] = []
+            for a in merged:
+                aid = a.get("id")
+                if not aid or aid in seen:
+                    continue
+                seen.add(aid)
+                unique.append(a)
+            unique.sort(key=lambda a: a.get("published_at") or "", reverse=True)
+            return unique[:limit]
+
     # A vendor is configured but produced nothing this cycle — return empty
     # rather than synthesised headlines. Mock is a pure no-key dev fallback.
     if _any_vendor_configured():

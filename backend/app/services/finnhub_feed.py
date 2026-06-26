@@ -818,6 +818,63 @@ async def fetch_news_for_ticker(
     return rows
 
 
+async def fetch_market_news(limit: int = 40) -> list[dict[str, Any]]:
+    """Market-wide latest headlines from Finnhub /news?category=general.
+
+    Added as a parallel source to news_feed.fetch_latest_news so universe-level
+    freshness no longer depends solely on Massive's reference/news feed (which
+    lags); the old real-time wire (Benzinga) was removed 2026-06-24. Returns the
+    canonical news-row shape so callers don't care which source served it.
+
+    Deliberately NOT cached: freshness is the whole point here, and it's a single
+    cheap request per ~5-min worker refresh (well inside Finnhub's 60/min free
+    tier). Mirrors the row-building of fetch_news_for_ticker.
+    """
+    from datetime import datetime
+
+    if not configured():
+        return []
+
+    params = {"category": "general", "token": _api_key()}
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{BASE_URL}/news", params=params)
+            if r.status_code != 200:
+                return []
+            payload = r.json()
+            data = payload if isinstance(payload, list) else []
+    except Exception:
+        logger.exception("finnhub.market_news_fetch_failed")
+        return []
+
+    # Local import avoids a circular import at module load (news_feed imports
+    # this module lazily too).
+    from app.services.news_feed import clip_news_row
+
+    rows: list[dict[str, Any]] = []
+    for a in data[:limit]:
+        # Finnhub's `datetime` is a unix timestamp (seconds).
+        try:
+            ts = int(a.get("datetime") or 0)
+            published = datetime.fromtimestamp(ts, tz=UTC)
+        except Exception:
+            published = datetime.now(UTC)
+        rows.append(clip_news_row({
+            "id": f"fh-{a.get('id') or ts}",
+            "title": str(a.get("headline") or "").strip()[:300],
+            "publisher": (a.get("source") or "Finnhub").strip(),
+            "author": None,
+            "published_at": published,
+            "url": a.get("url") or "",
+            "description": (a.get("summary") or "").strip()[:300] or None,
+            # General news often carries a comma-separated `related` ticker list
+            # (frequently empty for macro headlines).
+            "tickers": (a.get("related") or "").strip(),
+            "sentiment": None,
+        }))
+    return rows
+
+
 async def fetch_analyst_recommendations(symbol: str) -> dict[str, Any] | None:
     """Aggregate analyst tally from Finnhub /stock/recommendation.
 
