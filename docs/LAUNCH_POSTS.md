@@ -1,312 +1,172 @@
-# Tapeline — Launch-day post drafts
+# Tapeline — Launch posts (compliant, ready to fire)
 
-First drafts of the launch posts you'll need to write anyway. **Edit them
-in your voice** — these are starting points, not final copy. Pick the
-ones that land for the audience you're hitting first.
+Corrected 2026-06-26 to the **locked positioning** (process + honesty + time-saving,
+**never performance**) and the **current product**. The prior version of this file was
+stale and non-compliant (it claimed "+0.4% above SPY", described the old 20-ticker/24h
+free tier, and pitched the removed Quiver/13F feature) — all removed.
 
-Each section gives 2-3 variants so you can A/B in real time based on
-what your gut says.
+## Hard rules (do not undo)
+- **No performance claims.** The public scorecard currently trails SPY (~42% hit-rate).
+  Any "beat the market / +X% vs SPY" line is false AND a Google/FTC/ASIC violation. The
+  hook is the honesty: *"Most scanners show you the wins. We show the whole record —
+  losses included."*
+- **Current facts:** ~2,500 US-listed tickers scored every minute · public 6-factor
+  formula · one-sentence "why" per ticker · public scorecard freezes each daily top-10 and
+  back-checks vs SPY, keeping the losing days · **Free forever:** live scores, top-10
+  scanner rows, 5 look-ups/day, 3-ticker watchlist, full public scorecard · 14-day Premium
+  trial, no card · **Pro** $29.99/mo ($24.99/mo annual) · **Premium** $49.99/mo
+  ($39.99/mo annual) adds Congressional-trades feed, recent insider buys (SEC Form 4),
+  unlimited Telegram + email alerts, public API. (No 13F/Quiver — removed.)
 
 ---
 
-## X / Twitter — main launch tweet
+## X / Twitter — launch tweet (pin it)
 
-Pin this to your profile after posting. The OG card from `tapeline.io`
-will render below the tweet automatically.
-
-### Variant A — Direct, product-led
+**Variant A — anti-hype:**
 ```
-I built tapeline.io because every other stock scanner gives you 500 filters and a blank stare.
+Most stock scanners show you a highlight reel.
 
-One score per ticker (0–100). One sentence why. The formula is public. Every call gets back-checked on a public scorecard the next day.
+Tapeline publishes the whole tape: one 0–100 score on every US stock from a public
+6-factor formula, and a scorecard that freezes every daily top-10 and grades it against
+the S&P — losing days kept on the page.
 
-14-day Premium trial, no card. tapeline.io
-```
-
-### Variant B — Personal / origin story
-```
-For 7 years I've signed up for stock scanners and cancelled them within a month. They all fail the same way: zero accountability for the calls they surface.
-
-So I built one with the receipts public from day one. tapeline.io
-
-Six factors, public weights, public scorecard. $24.99/mo annual.
+14-day trial, no card. tapeline.io
 ```
 
-### Variant C — Anti-incumbent
+**Variant B — origin:**
 ```
-Tipranks won't show you their formula.
-Zacks won't show you their cutoffs.
-Kavout calls it "AI" so you can't ask.
+For years I cancelled every stock scanner within a month — they all hide the formula and
+bury their losers.
 
-We publish the math. We publish the calls. Six factors, exact weights, every score back-checked the next day.
-
-tapeline.io · $24.99/mo
+So I built one that publishes both: the exact 6-factor math, and a public scorecard that
+keeps its losing days. Not tips. A transparent screen. tapeline.io
 ```
 
-**Reply-thread continuation** (post in reply 5 min later):
+**Reply 5 min later (the formula):**
 ```
-The formula:
+The formula, public on /how-it-works:
 
-score = 0.25·trend
-      + 0.20·relative_strength
-      + 0.15·fundamentals
-      + 0.15·smart_money
-      + 0.15·macro
-      + 0.10·momentum
+score = 0.25·trend + 0.20·relative_strength + 0.15·fundamentals
+      + 0.15·smart_money + 0.15·macro + 0.10·momentum
 
-Public on /how-it-works. The day it stops working, you should know to leave.
-```
-
-```
-The scorecard:
-
-Every top-10 we publish is back-checked against next-day prices. Mark Hulbert built a 30-year career being the only neutral grader of newsletters because everyone else hid the data.
-
-We do it automatically. tapeline.io/scorecard
-```
-
-```
-The pricing math:
-
-· Pro $29/mo or $24.99/mo annual ($299/yr · save $49)
-· Premium $49/mo or $39.99/mo annual ($479/yr · save $109)
-
-Free tier: 20 tickers, 24h delayed. Real product, narrower window.
+The day it stops working, you'll be able to see it and leave.
 ```
 
 ---
 
-## IndieHackers — `/launches/new`
-
-Post format: title + cover image (use the OG card from `tapeline.io/opengraph-image`)
-+ body. Aim 600-900 words.
-
-### Title options
-- "I built a stock scanner that publishes its own track record"
-- "Tapeline — one number, one sentence, every US ticker"
-- "After 7 years of stock scanners, I built one that shows its work"
-
-### Body draft
+## Show HN
+**Title:** Show HN: Tapeline – a stock scanner that publishes its formula and its losing days
 ```
-**TL;DR**: Tapeline is a quantitative market scanner for retail traders.
-One 0–100 score per US ticker, one plain-English sentence why, every score
-back-checked publicly the next day. tapeline.io · 14-day Premium trial,
-no card.
+I built Tapeline. It scores every US-listed stock (~2,500) every minute on one public
+6-factor formula (trend, relative strength, fundamentals, smart-money, macro, momentum —
+exact weights on /how-it-works) and writes a one-sentence plain-English "why" per ticker.
 
-**What's broken about every other scanner**
+The part I care about: it freezes each day's top-10 and back-checks them against SPY on a
+public scorecard that keeps the losing days. Honest status — the record currently trails
+SPY. I leave it up exactly as-is; the whole point is you can check my work instead of
+trusting a screenshot.
 
-I've signed up for almost every prosumer stock scanner since 2018: Finviz
-Elite, Trade Ideas, Benzinga Pro, Stock Rover, TC2000, Seeking Alpha
-Premium, Zacks, WallStreetZen. They all fail the same way:
+It is NOT a tip service — no buy/sell calls. It's a fast, transparent screen; you see how
+each score is built and decide for yourself.
 
-1. The "score" is a black box. Tipranks aggregates analyst consensus,
-   Zacks uses earnings revisions, Kavout uses ML — none publish the
-   weights. You can't tell when the model is wrong because you can't tell
-   what the model is doing.
-2. There's no track record. Newsletter shops have known for 30 years that
-   you should hide your losers. The Hulbert Financial Digest built a
-   career being the only neutral grader because everyone else hid the
-   data.
-3. The free tier is broken on purpose to upgrade-trap you, not to give
-   you a real preview.
-
-**What I built**
-
-- Six factors, public weights:
-  `score = 0.25·trend + 0.20·relative_strength + 0.15·fundamentals + 0.15·smart_money + 0.15·macro + 0.10·momentum`
-- One sentence per ticker explaining the score in plain English
-- Every top-10 we publish, back-checked against the next-day move,
-  visible at `/scorecard`
-- 14-day Premium trial, no credit card. After expiry the account drops
-  straight to Free (20 tickers, 24h delayed) — the same product, just
-  narrower
-
-**The price is in the middle of the prosumer pack**
-
-- Pro: $29/mo or $24.99/mo billed annually ($299/yr)
-- Premium: $49/mo or $39.99/mo billed annually ($479/yr) — adds Congress
-  trades, elite-fund 13F holdings, Telegram alerts, public API
-
-The math vs. competitors:
-- Bloomberg Terminal: $31,980/yr (98% cheaper)
-- Trade Ideas Premium: $2,136/yr (78% cheaper)
-- WhaleWisdom + Capitol Trades + Quiver standalone for the same data
-  spine: $300–$825/yr (Tapeline bundles them in Premium for $479/yr)
-
-**The stack**
-
-FastAPI + Postgres + Next.js. Massive (formerly Polygon.io) for prices,
-Finnhub for fundamentals + insider Form 4, FRED for macro, Quiver for
-13F holdings. SSE for live updates. Hosted on Fly.io + Vercel. Every
-data source in `/docs/DATA_SOURCES.md`.
-
-**What's coming**
-
-Public roadmap at `/roadmap`, voted on by Premium subscribers. Universe
-— currently scoring 1,000 most-liquid by $-volume, infrastructure in
-place to expand further. Mobile push notifications.
-Backtesting against the public scorecard.
-
-I'd love feedback — kick the tires at tapeline.io and tell me what's
-broken.
+Free tier is usable forever (live scores, top-10, 5 look-ups/day); 14-day Premium trial,
+no card. I'd love the methodology torn apart — what factor would you add or drop?
+tapeline.io
 ```
 
 ---
 
-## ProductHunt
+## Reddit (r/algotrading, r/stocks, r/investing, r/SecurityAnalysis)
+> Needs account karma/age or it's auto-removed. Comment helpfully for a few days first.
+> Lead with the idea; link low/in a comment. One sub, no same-day cross-posting.
 
-Schedule for a Tuesday, 12:01 AM PT. Ask 5–10 friends to upvote in the
-first hour (the algorithm strongly favors early velocity).
-
-### Tagline (60 chars max)
-- "One score per stock. Public formula. Public scorecard."
-- "Live stock scanner that shows its work."
-- "Quantitative scoring for retail traders, with receipts."
-
-### First comment (founder reply, post immediately after launch)
+**Title:** I built a stock scanner and made it publish its own losing days. Here's the record.
 ```
-Hey everyone — Christian here, founder.
+Almost no prosumer scanner publishes its scoring formula or its track record, for two
+honest reasons: publish the formula and users can audit it (and leave the day it stops
+working); publish the record and you eat your losers in public.
 
-The short version: I've been building a personal stock scanner for years
-and got fed up watching every commercial scanner hide their formula and
-their track record. Tapeline is the version I wish existed:
+I did both anyway. The formula:
+score = 0.25·trend + 0.20·rs + 0.15·fundamentals + 0.15·smart_money + 0.15·macro + 0.10·momentum
 
-· One 0–100 score per ticker, six factors, public weights
-· One sentence why on every row, in plain English
-· Every score back-checked against next-day prices, visible at /scorecard
+The scorecard freezes each day's top-10 and grades it against SPY — wins and losses both
+stay up. Honest status: it currently trails SPY. Small sample, and I'm leaving it public
+regardless — editing it would defeat the point.
 
-14-day Premium trial, no card. $24.99/mo billed annually after that.
+Not advice, no buy/sell calls — descriptive analytics you verify yourself. ~2,500 US names
+scored every minute. Free tier shows live scores with no card.
 
-Three things I'd love your feedback on:
-1. The /how-it-works page — is the formula explanation clear?
-2. The /t/[symbol] pages — would you share these on X if a ticker hit a
-   high score?
-3. The pricing — does the annual discount land?
-
-AMA in the thread.
-```
-
-### Suggested gallery shots (4-5 images, 1270×760)
-1. The scanner row with score + WHY column highlighted
-2. `/how-it-works` showing the formula
-3. `/scorecard` with 5+ days of receipts
-4. A `/t/NVDA` page (the public per-ticker share preview)
-5. The mobile billing page (proves it's responsive)
-
----
-
-## Reddit — r/SecurityAnalysis or r/algotrading
-
-Reddit hates promotional posts. Lead with an opinion or a finding, the
-product link goes at the bottom.
-
-### Post title
-- "I built a public scorecard for my stock scanner. 30 days of receipts so far."
-- "Why every prosumer scanner hides their formula (and what happens when one doesn't)"
-- "Six factors, public weights, public scorecard — would you trust it?"
-
-### Post body
-```
-I run a small SaaS quantitative scanner (Tapeline). I've been thinking
-about why almost no prosumer scanner publishes its scoring formula or
-its track record, and I think there are two answers and they're both
-honest:
-
-1. **If you publish the formula, smart users can audit it.** The day
-   it stops working, they leave. That's a feature not a bug — it forces
-   you to keep the formula working — but it's terrifying to ship.
-
-2. **If you publish the track record, you eat your losers in public.**
-   Newsletter shops have known for 30 years to hide them. Mark Hulbert
-   built a 30-year career being the only neutral grader because
-   everyone else cooked the books.
-
-I went with publishing both anyway. The formula:
-`score = 0.25·trend + 0.20·rs + 0.15·fundamentals + 0.15·smart_money + 0.15·macro + 0.10·momentum`
-
-The scorecard auto-publishes the top-10 each day with next-day price
-moves alongside SPY for an alpha column. 30 days in, the average
-1-day return on flagged names is +0.4% above SPY. Sample size is small
-and 30 days is nothing — but it's the data, public.
-
-If anyone wants to look: tapeline.io/scorecard for the receipts,
-tapeline.io/how-it-works for the math. Free tier shows 20 tickers
-24-hour delayed, no card needed.
-
-Curious what the sub thinks: would you trust a score more if you could
-read its formula, or do you think the obscurity is doing useful work?
-```
-
-### Comment-on-the-thread template (when someone asks "is this just X?")
-```
-Genuinely different from {Tipranks/Zacks/Kavout} on two axes:
-
-1. {Tipranks/Zacks/Kavout} {description of what they do} — formula
-   isn't published. Tapeline's is at /how-it-works, including the
-   exact weights.
-2. {Their tracker page or absence thereof}. Tapeline auto-publishes
-   every top-10 against next-day prices — every win AND every miss.
-
-The pricing is also different: {their tier} is ${X}/yr for {what};
-Tapeline Premium is $479/yr and includes Congress trades + elite 13F
-holdings + Telegram alerts.
-
-Try /t/NVDA without signing up to see what a per-ticker page looks like.
+Genuine question for the sub: would you trust a score more if you could read its formula,
+or is the obscurity doing useful work? (links in a comment)
 ```
 
 ---
 
-## Email — to existing supporters / waitlist
+## Product Hunt
+**Schedule:** Tuesday, 12:01 AM PT. Line up 5–10 friends to upvote in hour 1.
+**Tagline:** "Live stock scanner that shows its work — and keeps its receipts."
 
+**First comment (post immediately):**
+```
+Hey all — Christian, founder.
+
+I got tired of every commercial scanner hiding its formula and its track record, so
+Tapeline publishes both:
+· One 0–100 score per US ticker, 6 factors, public weights
+· One plain-English sentence why, on every row
+· A public scorecard that freezes each day's top-10 vs SPY — losing days kept
+
+Honest note: the record currently trails SPY, and it's all on the page. The product is the
+transparency and the time saved, not a promise of returns.
+
+Free forever tier (live scores, 5 look-ups/day); 14-day Premium trial, no card. AMA.
+Feedback I'd love: is /how-it-works clear, and would you share a /t/[ticker] page?
+```
+
+---
+
+## IndieHackers — /launches/new
+**Title:** "After years of stock scanners, I built one that shows its work"
+```
+TL;DR: Tapeline scores every US ticker (~2,500) with a public 6-factor formula, writes a
+one-line why, and publishes a scorecard that back-checks each day's top-10 vs SPY — losses
+kept. tapeline.io · free forever tier · 14-day Premium trial, no card.
+
+Every prosumer scanner I tried fails the same way: black-box score, no track record, and a
+free tier crippled to upgrade-trap you. So I built the opposite — public weights, a public
+scorecard that keeps its losing days (it currently trails SPY; that's the honest data, and
+it stays up), and a free tier that's a real, usable product.
+
+Pricing sits mid-pack: Pro $24.99/mo annual, Premium $39.99/mo annual (adds Congress
+trades, insider Form 4, unlimited alerts, API). Stack: FastAPI + Postgres + Next.js;
+Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro.
+
+It's descriptive research tooling, not advice — no buy/sell calls. Kick the tires and tell
+me what's broken.
+```
+
+---
+
+## Email — supporters / waitlist
 ```
 Subject: Tapeline is live (please beat it up)
 
-You signed up for the waitlist {OR: I told you I was building this} —
-Tapeline is live at tapeline.io.
+Tapeline is live at tapeline.io. The short version:
+· 6-factor score on every US ticker, one-sentence why per row
+· A public scorecard that keeps its losing days (honest: it currently trails SPY)
+· Free forever tier; 14-day Premium trial, no card
 
-Quick rundown:
-· Scanner with 6-factor scores on every US ticker
-· One sentence "why" per row, no jargon
-· Every score back-checked publicly at /scorecard
-· 14-day Premium trial, no card
+Two things I'd love feedback on:
+1. /how-it-works — is the formula clear to a non-technical trader?
+2. Set up a 3-ticker watchlist for 24h — are the alerts actually useful?
 
-Two specific things I'd love feedback on:
-1. The /how-it-works page — is the formula clear to a non-technical
-   trader? (I think it is, but I'm too close.)
-2. The watchlist alerts — set up 5 tickers, leave them for 24 hours,
-   tell me whether the alerts that fire are actually useful.
-
-Reply to this email with anything broken. I read every one.
-
-— Christian
+Reply with anything broken — I read every one. — Christian
 ```
 
 ---
 
-## Where to post (priority order)
-
-1. **Your own X account** — pin the launch tweet, RT 24h later from a
-   different angle
-2. **IndieHackers** `/launches/new` — peer-developer audience, polite,
-   high-signal
-3. **r/SecurityAnalysis** (Reddit) — financial pros, no promotional tone
-4. **HackerNews** "Show HN" — only if the launch tweet got real
-   engagement first; HN crowd is sceptical of cold launches
-5. **ProductHunt** — schedule for Tuesday 12:01 AM PT
-6. **r/algotrading** — quant-leaning audience, will care about the
-   formula
-7. **Twitter DMs to 10 specific traders you respect** — single best
-   conversion channel, also the most labor-intensive
-
-Don't post everywhere on the same day. One a day for a week is
-healthier than five on launch day.
-
----
-
-## What NOT to do
-
-- Don't post on /r/wallstreetbets — wrong audience, will not convert
-- Don't run paid ads in week one — you don't know your hooks yet
-- Don't email-blast a list — sends to spam, kills domain reputation
-- Don't @-tag big finance accounts asking for RTs — backfires
-- Don't claim returns — descriptive labels are descriptive for a reason
+## Posting order + what NOT to do
+**Order:** your X (pin) → IndieHackers → one Reddit sub → Show HN (only if the tweet got
+traction) → Product Hunt (Tue) → 10 warm DMs to traders you respect. One channel/day.
+**Never:** claim returns or "beats the market" · post to r/wallstreetbets · email-blast a
+cold list · run paid ads in week one. Descriptive labels only.
