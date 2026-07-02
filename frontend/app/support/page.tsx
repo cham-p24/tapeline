@@ -105,8 +105,8 @@ export default function SupportPage() {
             a={
               <>
                 <Link href="/app/billing" className="text-accent hover:underline">/app/billing</Link>{" "}
-                → "Manage payment in Stripe portal" → Cancel. One click. 7-day money back if you cancel
-                in the first week of any paid plan.
+                → "Manage payment in Stripe portal" → Cancel. One click. 30-day money back if you cancel
+                within the first 30 days of any paid plan.
               </>
             }
           />

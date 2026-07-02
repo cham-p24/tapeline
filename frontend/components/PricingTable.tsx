@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PRICING } from "@/lib/pricing";
+import { PRICING, annualSaving } from "@/lib/pricing";
 
 type Billing = "monthly" | "annual";
 
@@ -10,7 +10,7 @@ const PLANS = [
   {
     name: "Free",
     tagline: "Free forever — live scores",
-    prices: { monthly: 0, annual: 0 },
+    prices: { monthly: 0, annual: 0, annualPerMonth: 0 },
     highlights: [
       "Live scores — no delay",
       "5 ticker look-ups per day",
@@ -25,7 +25,11 @@ const PLANS = [
   {
     name: "Pro",
     tagline: "Live scanner. Daily edge.",
-    prices: { monthly: PRICING.pro.monthly, annual: PRICING.pro.annual },
+    prices: {
+      monthly: PRICING.pro.monthly,
+      annual: PRICING.pro.annual,
+      annualPerMonth: PRICING.pro.annualPerMonth,
+    },
     highlights: [
       "Unlimited ticker look-ups",
       "Real-time, full ~2,500-ticker scanner",
@@ -38,15 +42,25 @@ const PLANS = [
     ],
     cta: "Start free trial",
     ctaHref: "/signup?plan=pro",
-    highlight: false,
+    // Pro is the highlighted protagonist — the realistic first purchase.
+    // "Best value" is a factual framing (cheapest paid tier per feature),
+    // not manufactured social proof; with zero customers a "Most popular"
+    // badge would be fabricated. Matches the Pro badge on ComparisonTable.
+    highlight: true,
+    badge: "Best value",
   },
   {
     name: "Premium",
-    tagline: "For the serious operator.",
-    prices: { monthly: PRICING.premium.monthly, annual: PRICING.premium.annual },
+    tagline: "The full surface — for the serious operator.",
+    prices: {
+      monthly: PRICING.premium.monthly,
+      annual: PRICING.premium.annual,
+      annualPerMonth: PRICING.premium.annualPerMonth,
+    },
     // Premium-only additions on top of everything in Pro. Rendered in a
     // visually distinct block under the price so the upgrade reason is
     // obvious — not buried in a 7-bullet list that looks like Pro's.
+    // Styled as the power tier (darker, quieter) — no popularity badge.
     proPlus: true,
     highlights: [
       "Congressional trades feed (House + Senate)",
@@ -59,13 +73,14 @@ const PLANS = [
     ],
     cta: "Try Premium free",
     ctaHref: "/signup?plan=premium",
-    highlight: true,
-    badge: "Most popular",
+    highlight: false,
   },
 ];
 
 export function PricingTable() {
-  const [billing, setBilling] = useState<Billing>("annual");
+  // Monthly is the default — the smaller first yes. Annual stays one click
+  // away with its saving shown on the toggle badge.
+  const [billing, setBilling] = useState<Billing>("monthly");
 
   return (
     <div>
@@ -92,19 +107,18 @@ export function PricingTable() {
       </div>
       <p className="mt-3 text-center text-xs text-muted">All prices in USD</p>
       {billing === "annual" && (
-        <p className="mt-1 text-center text-xs text-up/90">Save 2 months · today's price, locked</p>
+        <p className="mt-1 text-center text-xs text-up/90">Save 2 months · your rate, locked in</p>
       )}
 
       {/* 3 main plans */}
       <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3 md:gap-6">
         {PLANS.map((p) => {
           const price = p.prices[billing];
-          // Charm-price the annual per-month display: round up to nearest .99
-          // ($299.99/yr → $24.99/mo; $479.99/yr → $39.99/mo). Monthly stays as-is.
-          const rawPerMonth = billing === "annual" ? price / 12 : price;
-          const perMonth = billing === "annual" && price > 0
-            ? Math.floor(rawPerMonth) + 0.99
-            : rawPerMonth;
+          // Annual advertises the exact per-month equivalent from
+          // lib/pricing.ts ($99/yr → $8.25/mo; $199/yr → $16.58/mo).
+          // Monthly stays as-is.
+          const perMonth = billing === "annual" ? p.prices.annualPerMonth : price;
+          const isPower = (p as { proPlus?: boolean }).proPlus === true;
           const ctaHref = p.ctaHref.includes("?")
             ? `${p.ctaHref}&billing=${billing}`
             : `${p.ctaHref}?billing=${billing}`;
@@ -114,6 +128,8 @@ export function PricingTable() {
               className={`relative rounded-2xl border p-6 sm:p-8 transition-all ${
                 p.highlight
                   ? "border-accent/60 bg-gradient-to-b from-accent/10 via-panel to-panel shadow-lg shadow-accent/20"
+                  : isPower
+                  ? "border-border2 bg-gradient-to-b from-panel2/60 via-panel to-panel"
                   : "border-border bg-panel"
               }`}
             >
@@ -132,25 +148,14 @@ export function PricingTable() {
                   <span className="text-muted">/ month</span>
                 </div>
                 {billing === "annual" && price > 0 && (
-                  <p className="mt-1.5 text-xs text-muted">Billed ${price.toFixed(2)}/yr · save ${Math.round((p.prices.monthly * 12) - p.prices.annual)}/yr</p>
+                  <p className="mt-1.5 text-xs text-muted">Billed ${price.toFixed(2)}/yr · save ${annualSaving(p.prices)}/yr</p>
                 )}
               </div>
-              {/* Premium card: price-anchor chip — Bloomberg Terminal as the
-                  universally-known "expensive professional terminal" cost.
-                  Makes $479.99/yr read as 98% off the same data spine. */}
-              {(p as { proPlus?: boolean }).proPlus && billing === "annual" && price > 0 && (
-                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-up/20 bg-up/5 px-2.5 py-1 text-[11px] text-up">
-                  <span aria-hidden="true">↘</span>
-                  <span className="text-fg">98% cheaper</span>
-                  <span className="text-muted">than Bloomberg Terminal</span>
-                  <span className="text-subtle line-through nums">$31,980/yr</span>
-                </div>
-              )}
 
               {/* Premium card: "Everything in Pro" anchor strip above the
                   bullets so the upgrade reason is the additions, not "look
                   here's a duplicate of the Pro list". */}
-              {(p as { proPlus?: boolean }).proPlus && (
+              {isPower && (
                 <div className="mt-6 flex items-center gap-2 rounded-md border border-border bg-panel2/40 px-3 py-2 text-xs text-muted">
                   <svg className="h-3.5 w-3.5 text-up flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -159,7 +164,7 @@ export function PricingTable() {
                   <span className="ml-auto text-accent font-medium">+ all of:</span>
                 </div>
               )}
-              <ul className={`${(p as { proPlus?: boolean }).proPlus ? "mt-3" : "mt-6"} space-y-2.5 text-sm`}>
+              <ul className={`${isPower ? "mt-3" : "mt-6"} space-y-2.5 text-sm`}>
                 {p.highlights.map((f) => (
                   <li key={f} className="flex gap-3">
                     <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" viewBox="0 0 16 16" fill="none">
@@ -188,9 +193,9 @@ export function PricingTable() {
       <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
         <span>14-day Premium trial · no card</span>
         <span className="text-subtle">·</span>
-        <span>7-day money back</span>
+        <span>30-day money back</span>
         <span className="text-subtle">·</span>
-        <span>Annual price locked forever</span>
+        <span>Founding pricing — locked in for early subscribers</span>
         <span className="text-subtle">·</span>
         <span>Cancel in one click</span>
       </div>
@@ -221,4 +226,3 @@ export function PricingTable() {
     </div>
   );
 }
-

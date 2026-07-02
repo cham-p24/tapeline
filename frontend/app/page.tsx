@@ -330,7 +330,7 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted">
-            No credit card &middot; Cancel in one click &middot; 7-day refund
+            No credit card &middot; Cancel in one click &middot; 30-day refund
             on monthly
           </p>
         </div>

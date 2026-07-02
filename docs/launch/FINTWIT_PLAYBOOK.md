@@ -118,8 +118,8 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > Real number: 80 visitors a week. Building anyway. /1
 
 > **15.**
-> Pricing test: Tapeline Pro is $24.99/mo annual ($299.99/yr).
-> Premium is $39.99/mo annual ($479.99/yr) and includes the full
+> Pricing test: Tapeline Pro is $8.25/mo annual ($99/yr).
+> Premium is $16.58/mo annual ($199/yr) and includes the full
 > live universe + Congressional trades + insider Form 4.
 > Both have a 14-day Premium trial. No card.
 > tapeline.io/pricing

@@ -61,7 +61,7 @@ What surprised me from two weeks of running this:
 
 3. Insider clusters (multiple Form 4 buys in the same window) are the single best leading signal. I underweighted Smart Money on launch; the data is pushing me to revisit.
 
-Free tier is still top 20 tickers, 24h delayed. Pro is $24.99/mo for the full ~2,500-ticker universe. 14-day Premium trial, no card needed.
+Free tier is still top 20 tickers, 24h delayed. Pro is $9.99/mo for the full ~2,500-ticker universe. 14-day Premium trial, no card needed.
 
 What signals or factors would you want me to add weight to? The formula is versioned in the changelog so factor changes ship with a written rationale.
 ```
@@ -154,7 +154,7 @@ The Tapeline scoring formula has a [factor] component weighted at [X]%. Here's w
 
 [1-2 sentences on what that delta means in practice for picks.]
 
-The full live read on every ticker is at /scorecard; the public formula is at /how-it-works. Pro tier is $24.99/mo for full live data, free is delayed-top-20.
+The full live read on every ticker is at /scorecard; the public formula is at /how-it-works. Pro tier is $9.99/mo for full live data, free is delayed-top-20.
 
 Curious which factor weighting you'd argue should change after [event].
 ```
@@ -255,7 +255,7 @@ So I'm publishing the observation but not the weight change. /how-it-works has t
 
 If you want to track the next factor-weight decision: subscribe to the scorecard RSS at /scorecard/rss.xml, or follow @tapeline_io. The methodology updates land there first.
 
-Free is still top-20 24h-delayed. Pro is $24.99/mo for live full universe.
+Free is still top-20 24h-delayed. Pro is $9.99/mo for live full universe.
 ```
 
 ---

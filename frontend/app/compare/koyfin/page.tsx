@@ -72,7 +72,7 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Cheapest paid tier",
-    tapeline: "$24.99/mo Pro (annual)",
+    tapeline: "$8.25/mo Pro (annual)",
     competitor: "~$39/mo Plus (annual)",
     note: "Tapeline is meaningfully cheaper at the entry tier and includes the score + scorecard layer Koyfin doesn't have. The two tools live in different parts of the workflow.",
   },
@@ -85,7 +85,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How do prices compare?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299/yr); Premium is $39.99/mo annual ($479/yr). Koyfin Plus is approximately $39/mo annual; Pro tier with watchlist alerts is higher. Tapeline is cheaper at the entry tier with the additional composite-score and public-scorecard layer.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo annual ($199/yr). Koyfin Plus is approximately $39/mo annual; Pro tier with watchlist alerts is higher. Tapeline is cheaper at the entry tier with the additional composite-score and public-scorecard layer.",
   },
   {
     q: "Does Koyfin publish a scoring formula?",

@@ -108,10 +108,10 @@ async def _drip_state(uid: str) -> str:
 
 def test_render_annual_renewal_reminder_email():
     html = render_annual_renewal_reminder_email(
-        "Alex", tier="premium", amount_label="$479.99", renew_date_label="June 8, 2026",
+        "Alex", tier="premium", amount_label="$199", renew_date_label="June 8, 2026",
     )
     assert "Premium" in html
-    assert "$479.99" in html
+    assert "$199" in html
     assert "June 8, 2026" in html
     assert "Manage billing" in html
 

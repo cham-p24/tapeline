@@ -74,12 +74,12 @@ Direct dashboard URLs, in the order you'll need them:
 
 | Product | Recurring | Amount | Lookup key (optional but handy) |
 |---|---|---|---|
-| Tapeline Pro | Monthly | $29.99 USD | `pro_monthly` |
-| Tapeline Pro | Yearly | $299.99 USD | `pro_annual` |
-| Tapeline Premium | Monthly | $49.99 USD | `premium_monthly` |
-| Tapeline Premium | Yearly | $479.99 USD | `premium_annual` |
+| Tapeline Pro | Monthly | $9.99 USD | `pro_monthly` |
+| Tapeline Pro | Yearly | $99 USD | `pro_annual` |
+| Tapeline Premium | Monthly | $19.99 USD | `premium_monthly` |
+| Tapeline Premium | Yearly | $199 USD | `premium_annual` |
 
-Annual rows are intentional "charm" prices — `$299.99/yr` displays in-app as `$24.99/mo billed annually` (saves $60 vs monthly), `$479.99/yr` displays as `$39.99/mo billed annually` (saves $120). The frontend pricing UI in `frontend/components/PricingTable.tsx` does that math; the Stripe-side amount stays the annual total.
+Annual rows are intentional "charm" prices — `$99/yr` displays in-app as `$8.25/mo billed annually` (saves $60 vs monthly), `$199/yr` displays as `$16.58/mo billed annually` (saves $120). The frontend pricing UI in `frontend/components/PricingTable.tsx` does that math; the Stripe-side amount stays the annual total.
 
 **Webhook endpoint**: `https://api.tapeline.io/api/webhooks/stripe` — subscribe to:
 - `checkout.session.completed` — links the Stripe customer_id back to the Tapeline user

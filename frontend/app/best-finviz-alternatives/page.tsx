@@ -71,7 +71,7 @@ const TOOLS: Tool[] = [
     rank: 1,
     name: "Tapeline",
     bestFor: "Multi-factor composite scoring with public formula + scorecard",
-    price: "Free · $24.99/mo Pro · $39.99/mo Premium (annual)",
+    price: "Free · $8.25/mo Pro · $16.58/mo Premium (annual)",
     rating: 5,
     capability: {
       composite: "yes",
@@ -382,7 +382,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want intraday speed without paying Trade Ideas pricing",
-    body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline runs sub-60-second during US market hours at $24.99/mo annual — the middle ground that most retail traders actually need.",
+    body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline runs sub-60-second during US market hours at $8.25/mo annual — the middle ground that most retail traders actually need.",
   },
   {
     title: "You want congressional trades + insider buys in one feed",
@@ -453,7 +453,7 @@ const FAQ = [
   },
   {
     q: "How much does Finviz Elite cost vs the alternatives in 2026?",
-    a: "Finviz Elite is $39.50/mo monthly or $24.96/mo billed annually ($299.52/yr). The alternatives at comparable or lower price: Tapeline Pro $24.99/mo annual, Stock Rover Essentials $7.99/mo annual, Stockanalysis.com Pro $24.50/mo annual, Simply Wall St Pro ~$10/mo annual. Higher: TradingView Premium $60/mo annual, Trade Ideas $120-240/mo. Pricing verified against vendor pages on " + LAST_UPDATED + ".",
+    a: "Finviz Elite is $39.50/mo monthly or $24.96/mo billed annually ($299.52/yr). The alternatives at comparable or lower price: Tapeline Pro $8.25/mo annual, Stock Rover Essentials $7.99/mo annual, Stockanalysis.com Pro $24.50/mo annual, Simply Wall St Pro ~$10/mo annual. Higher: TradingView Premium $60/mo annual, Trade Ideas $120-240/mo. Pricing verified against vendor pages on " + LAST_UPDATED + ".",
   },
   {
     q: "Can I use Tapeline + Finviz together?",
@@ -617,7 +617,7 @@ export default function BestFinvizAlternativesPage() {
           <ul className="mt-3 space-y-2 text-sm text-fg leading-relaxed">
             <li>
               <strong>Best overall Finviz alternative:</strong> Tapeline — public 6-factor
-              formula, per-pick scorecard, plain-English Why. $24.99/mo annual,{" "}
+              formula, per-pick scorecard, plain-English Why. $8.25/mo annual,{" "}
               <Link href="/signup?from=finviz" className="text-accent hover:underline">14-day Premium trial, no card</Link>.
             </li>
             <li>

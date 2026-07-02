@@ -1,7 +1,7 @@
 """
-Mint the founder-friends $20/mo-for-90-days Stripe promotion code.
+Mint the founder-friends 50%-off-for-90-days Stripe promotion code.
 
-The pricing model has Premium at $39.99/mo retail. For the first paying
+The pricing model has Premium at $19.99/mo retail (founding pricing). For the first paying
 beta cohort (friends, family, ex-colleagues, network contacts), we want
 a clean 50%-off code that lasts 3 months — long enough to feel like a
 real beta period, short enough that they convert to retail or churn
@@ -29,7 +29,7 @@ type, which is exactly what the personal-outreach flow needs.
 
 Mechanics:
 - Coupon: 50% off, repeating, 3 month duration (so it covers the 90-day
-  beta period and then auto-rolls to retail $39.99 unless cancelled)
+  beta period and then auto-rolls to retail $19.99 unless cancelled)
 - Promotion code: human-readable string `FOUNDERFRIENDS`, max 100 redemptions
   (capped so the code can't leak and burn down to zero margin)
 - Restricted to Premium monthly + Premium annual prices when those env
@@ -111,7 +111,7 @@ def main() -> int:
     logger.info("=" * 60)
     logger.info(f"Code:     {promo.code}")
     logger.info("Discount: 50% off Premium for 3 months")
-    logger.info("Then:     auto-rolls to retail $39.99/mo unless cancelled")
+    logger.info("Then:     auto-rolls to retail $19.99/mo unless cancelled")
     logger.info(f"Remaining redemptions: {MAX_REDEMPTIONS - promo.times_redeemed}")
     logger.info("")
     logger.info("How to use it:")

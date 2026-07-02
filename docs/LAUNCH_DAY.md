@@ -23,7 +23,7 @@ Every line below is verified live on `https://tapeline.io` / `https://api.tapeli
 | Reliability | Worker daily refreshes don't block ticks; SSE auto-reconnects with exponential backoff | Watch `LiveBadge` during a backend deploy — flips offline briefly, returns to live within ~2s |
 | Observability | Public `/status`, in-app stale-data banner, client-error endpoint logs to Fly | Visit `https://tapeline.io/status` |
 | Activation | Welcome email embeds 3 live ticker scores; onboarding tip on `/app/*` for new accounts; watchlist 1-click starter pack | Sign up with a fresh email, check inbox |
-| Conversion | Charm-priced annual ($24.99 Pro / $39.99 Premium); billing page with embedded comparison + Stripe portal link; Day-7 drip pushes annual | Visit `/app/billing` |
+| Conversion | Charm-priced annual ($8.25 Pro / $16.58 Premium); billing page with embedded comparison + Stripe portal link; Day-7 drip pushes annual | Visit `/app/billing` |
 | Tests | 14 backend + 17 frontend, all green | `cd backend && python -m pytest tests/ -q` |
 
 ---

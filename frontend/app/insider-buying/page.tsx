@@ -137,7 +137,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Recent insider buys is a Premium feature ($39.99/mo billed annually, or $49.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades and unlimited Telegram alerts on top of everything in Pro.",
+          a: "Recent insider buys is a Premium feature ($16.58/mo billed annually, or $19.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades and unlimited Telegram alerts on top of everything in Pro.",
         },
       ]}
       tier="premium"

@@ -61,7 +61,7 @@ async def test_tier_2_pricing_renders_canonical_reply():
         )
         assert result.tier == 2
         assert result.auto_reply_text is not None
-        assert "$24.99" in result.auto_reply_text or "$29.99" in result.auto_reply_text
+        assert "$8.25" in result.auto_reply_text or "$9.99" in result.auto_reply_text
         assert "Premium trial" in result.auto_reply_text
         assert result.message.status == "auto_replied"
 
@@ -171,7 +171,7 @@ async def test_mark_sent_updates_status():
 async def test_pricing_template_returns_string():
     result = await inbox_templates.render("pricing", "any body")
     assert isinstance(result, str)
-    assert "$24.99" in result or "$29.99" in result
+    assert "$8.25" in result or "$9.99" in result
 
 
 @pytest.mark.asyncio

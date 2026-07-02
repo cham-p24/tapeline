@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What does Tapeline cost compared to free Robinhood?",
-    a: "Robinhood is free; the trading account doesn't carry a subscription. Tapeline Pro is $24.99/mo billed annually. The fee buys you the published 6-factor formula, sub-60s composite refresh, public scorecard, and the alert / watchlist / squeeze tools. If you're happy with Robinhood's collections-style discovery, free works. If you want a research workflow with receipts, Tapeline.",
+    a: "Robinhood is free; the trading account doesn't carry a subscription. Tapeline Pro is $8.25/mo billed annually. The fee buys you the published 6-factor formula, sub-60s composite refresh, public scorecard, and the alert / watchlist / squeeze tools. If you're happy with Robinhood's collections-style discovery, free works. If you want a research workflow with receipts, Tapeline.",
   },
   {
     q: "How is this different from Robinhood Gold?",
@@ -72,7 +72,7 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Cost",
-    tapeline: "$24.99/mo (Pro, billed annually)",
+    tapeline: "$8.25/mo (Pro, billed annually)",
     competitor: "Free (Robinhood Gold optional at $5/mo)",
     note: "Robinhood is free. Tapeline is a paid research tool. The honest answer: if you're discovering stocks via collections and 'Top Movers', Robinhood works at $0. Tapeline starts to earn its $25/mo when you want a research workflow with a published methodology + receipts.",
   },

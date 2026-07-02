@@ -65,13 +65,14 @@ export function TrialEndedModal() {
           a day, a 3-ticker watchlist &mdash; no Telegram, no smart alerts.
         </p>
 
-        {/* Pricing anchor — anchor on annual ($39.99/mo) because that's the
-            tier we want them on. Monthly mentioned for completeness. */}
+        {/* Pricing anchor — both paid options, monthly first (smaller first
+            yes; annual's saving shown alongside). Founding pricing. */}
         <div className="mt-5 rounded-md border border-accent/30 bg-accent/5 p-3 text-xs text-muted">
           <div className="font-medium text-fg">Keep Premium</div>
           <p className="mt-1">
-            $39.99/mo billed annually ($479.99/yr &middot; save $120) or
-            $49.99/mo monthly. 7-day money back if you change your mind.
+            $19.99/mo monthly, or $16.58/mo billed annually ($199/yr &middot;
+            save $40). Founding pricing &mdash; your rate is locked in while
+            you stay subscribed. 30-day money back if you change your mind.
           </p>
         </div>
 

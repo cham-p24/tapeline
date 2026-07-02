@@ -7,7 +7,7 @@ Strategic doc. **Read before the Holley Nethercote consult** (already on launch-
 Three of the data sources powering Tapeline are licensed for personal use only.
 Continuing as-is = TOS breach on each. This is bigger than just Quiver.
 
-Tapeline → real customer at $24.99-49.99/mo → customer sees data on screen → that data came from a personal-use-only feed.
+Tapeline → real customer at $9.99-19.99/mo → customer sees data on screen → that data came from a personal-use-only feed.
 
 | API | Tier | Use in Tapeline | Commercial use allowed? |
 |---|---|---|---|

@@ -17,11 +17,11 @@ export const metadata = pageMeta({
 const COMPARE_FAQ = [
   {
     q: "Is Tapeline a Finviz alternative?",
-    a: "Yes. Tapeline is a 2026-built quantitative scanner that gives you one composite score per US ticker, a plain-English sentence explaining it, and a public scorecard back-checking every call vs SPY — at the same effective price as Finviz Elite ($24.99/mo annual vs $24.96/mo). Finviz remains the better pick if you want raw filters across 60+ technical and fundamental fields and don't want a synthesised answer.",
+    a: "Yes. Tapeline is a 2026-built quantitative scanner that gives you one composite score per US ticker, a plain-English sentence explaining it, and a public scorecard back-checking every call vs SPY — at a third of the price of Finviz Elite ($8.25/mo annual vs $24.96/mo). Finviz remains the better pick if you want raw filters across 60+ technical and fundamental fields and don't want a synthesised answer.",
   },
   {
     q: "How does Tapeline pricing compare to Finviz Elite?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr) or $29.99/mo monthly. Premium is $39.99/mo billed annually ($479.99/yr) or $49.99/mo monthly. Finviz Elite is $24.96/mo billed annually or $39.50/mo monthly. Effectively identical at the entry tier, with Tapeline including the score, sentence, and scorecard at the same price.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr) or $9.99/mo monthly. Premium is $16.58/mo billed annually ($199/yr) or $19.99/mo monthly. Finviz Elite is $24.96/mo billed annually or $39.50/mo monthly. Tapeline Pro runs at roughly a third of Finviz Elite, and includes the score, sentence, and scorecard.",
   },
   {
     q: "Does Finviz publish its scoring formula?",
@@ -109,7 +109,7 @@ const TRADEOFFS = [
   },
   {
     label: "Cheapest paid tier",
-    tapeline: "$24.99/mo (Pro, billed annually)",
+    tapeline: "$8.25/mo (Pro, billed annually)",
     competitor: "$24.96/mo (Elite, billed annually)",
     note: "Effectively identical. Tapeline includes the score + sentence + scorecard at the same price.",
   },

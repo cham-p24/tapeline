@@ -71,9 +71,9 @@ export default async function OG() {
             fontFamily: "JetBrains Mono, ui-monospace, monospace",
           }}
         >
+          <Entry tag="improvement" version="0.1.14" title="Founding pricing ($9.99 Pro / $19.99 Premium)" />
           <Entry tag="shipped" version="0.1.7" title="Public per-ticker share pages" />
           <Entry tag="shipped" version="0.1.6" title="System status page + /api/status" />
-          <Entry tag="improvement" version="0.1.5" title="Charm-priced annual ($24.99 / $39.99)" />
         </div>
       </div>
     ),

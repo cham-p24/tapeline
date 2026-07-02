@@ -140,7 +140,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Dividend Stocks — Quality Scored by the Six-Factor Composite",
     metaTitle: "Best Dividend Stocks 2026 — Top Scores Across Yield Sectors on Tapeline",
     metaDescription:
-      "Live ranking of US dividend-relevant sectors — Financials, Utilities, Real Estate, Consumer Defensive — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free tier; Pro at $24.99/mo annual.",
+      "Live ranking of US dividend-relevant sectors — Financials, Utilities, Real Estate, Consumer Defensive — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free tier; Pro at $8.25/mo annual.",
     lede:
       "Dividend investing fails when 'high yield' is the only filter — high yields are often the market pricing in dividend risk. The right filter is yield in the context of quality: are the fundamentals strong, is the trend confirming, is the sector regime supportive? The list below ranks US tickers in dividend-rich sectors (Financials, Utilities, Real Estate, Consumer Defensive) by Tapeline composite — the same six-factor formula that prices in trend, fundamentals, and macro alongside the yield. High score in a dividend sector means yield WITH durability.",
     apiParams: { sort: "score", order: "desc", min_score: "55", limit: "30" },

@@ -30,7 +30,7 @@ Self-skeptical tone matches the rest of the thread.
 ## Tweet 5 (~210 chars)
 
 ```
-Free tier: top 20 names, 24h delayed. Pro $24.99/mo billed annually = full live universe + smart alerts. Premium $39.99 adds Congress trades + SEC Form 4 + Telegram. 14-day Premium trial, no card. Built solo from Melbourne.
+Free tier: top 20 names, 24h delayed. Pro $8.25/mo billed annually = full live universe + smart alerts. Premium $19.99 adds Congress trades + SEC Form 4 + Telegram. 14-day Premium trial, no card. Built solo from Melbourne.
 ```
 
 **Why this works:** transparent pricing with the "no card" hook. "Built solo
@@ -74,7 +74,7 @@ Sums to 100. Doesn't change retroactively. Open for arguing about on /how-it-wor
 
 **Tweet 5:**
 ```
-Free tier shows the real product (top 20, 24h delayed). Pro $24.99/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $39.99/mo adds Congressional trades + SEC Form 4 insider feed + unlimited Telegram. 14-day trial, no card.
+Free tier shows the real product (top 20, 24h delayed). Pro $8.25/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $19.99/mo adds Congressional trades + SEC Form 4 insider feed + unlimited Telegram. 14-day trial, no card.
 ```
 
 **URL reply:** `https://tapeline.io`

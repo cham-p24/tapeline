@@ -232,7 +232,7 @@ async def platform_stats(
 
     # MRR — exact, off the canonical price map (services/tier.mrr_contribution)
     # now that Subscription.billing_period (migration 0031) distinguishes a
-    # $29.99 monthly Pro from a $24.99/mo annual Pro. Only "active" subs count:
+    # $9.99 monthly Pro from an $8.25/mo annual Pro. Only "active" subs count:
     #   - trialing (no card on file, will likely churn to free at trial end)
     #   - past_due / unpaid / canceled (also $0 in the bank)
     # are all excluded. Legacy rows with NULL billing_period fall back to the
@@ -584,7 +584,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "annual_renewal_reminder": (
             "Annual renewal reminder · T-7 (transactional)",
             lambda: render_annual_renewal_reminder_email(
-                "Alex", tier="premium", amount_label="$479.99",
+                "Alex", tier="premium", amount_label="$199",
                 renew_date_label="June 8, 2026",
             ),
         ),

@@ -88,7 +88,7 @@ export default function CongressionalTradesPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Congressional trades are a Premium feature ($39.99/mo billed annually, or $49.99/mo monthly). The 14-day Premium trial includes the full feed. Premium also adds recent insider buys (SEC Form 4), unlimited Telegram alerts, and the largest watchlist / saved-scan caps.",
+          a: "Congressional trades are a Premium feature ($16.58/mo billed annually, or $19.99/mo monthly). The 14-day Premium trial includes the full feed. Premium also adds recent insider buys (SEC Form 4), unlimited Telegram alerts, and the largest watchlist / saved-scan caps.",
         },
       ]}
       tier="premium"

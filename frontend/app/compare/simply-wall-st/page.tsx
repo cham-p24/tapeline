@@ -77,9 +77,9 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Pricing at top tier (annual)",
-    tapeline: "$39.99/mo (Premium)",
-    competitor: "~$33/mo (Unlimited) — slightly cheaper",
-    note: "Simply Wall St Unlimited at the annual price is a bit cheaper than Tapeline Premium. If price is the deciding factor and you don't need live updates or Congressional disclosures, Simply Wall St wins. Tapeline Premium adds the live multi-factor synthesis and the public scorecard for the extra ~$7/mo.",
+    tapeline: "$16.58/mo (Premium)",
+    competitor: "~$33/mo (Unlimited) — about 2× more",
+    note: "Tapeline Premium at the annual price is about half the cost of Simply Wall St Unlimited, and adds the live multi-factor synthesis, Congressional disclosures, and the public scorecard. If a weekly-cadence portfolio narrative is all you need, Simply Wall St remains a fine pick.",
   },
 ];
 
@@ -94,7 +94,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How do prices compare?",
-    a: "Tapeline Pro is $24.99/mo annual; Premium is $39.99/mo annual. Simply Wall St Premium is roughly $20/mo annual, Unlimited around $33/mo annual. Simply Wall St is meaningfully cheaper at the entry tier; Tapeline Premium at $39.99 vs SWS Unlimited at $33 adds live updates, congressional trades, insider Form 4 buys, and the public scorecard for the ~$7/mo difference.",
+    a: "Tapeline Pro is $8.25/mo annual; Premium is $16.58/mo annual. Simply Wall St Premium is roughly $20/mo annual, Unlimited around $33/mo annual. Tapeline is meaningfully cheaper at both tiers; Premium at $16.58 vs SWS Unlimited at $33 adds live updates, congressional trades, insider Form 4 buys, and the public scorecard at about half the price.",
   },
   {
     q: "Does Simply Wall St publish a per-pick track record?",

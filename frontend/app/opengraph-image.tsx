@@ -111,7 +111,7 @@ export default async function OG() {
               From
             </span>
             <span style={{ fontSize: "44px", fontWeight: 700, letterSpacing: "-0.02em", display: "flex" }}>
-              <span style={{ color: "#22c55e" }}>$24.99</span>
+              <span style={{ color: "#22c55e" }}>$8.25</span>
               <span style={{ color: "#a1a1aa", fontWeight: 500, fontSize: "28px", marginLeft: "10px", marginTop: "12px" }}>
                 USD / mo
               </span>

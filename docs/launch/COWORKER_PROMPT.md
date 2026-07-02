@@ -240,7 +240,7 @@ Three things still pending (founder-only):
       `fly secrets set STRIPE_WEBHOOK_SECRET=... -a tapeline-backend`.
       The agent CAN run the fly secrets set step once the founder
       gives them the value.
-  5c. $24.99 self-purchase smoke test — founder buys Pro on
+  5c. $9.99 self-purchase smoke test — founder buys Pro on
       tapeline.io/pricing with a real card, confirms webhook fires
       (check Fly logs for "stripe.webhook.checkout_session_completed"),
       then refunds themselves in Stripe dashboard. End-to-end
@@ -481,8 +481,8 @@ DO NOT DO
   the publisher-exemption legal posture.
 - Don't move the public scorecard behind a paywall. It's the
   trust mechanism that makes the scanner subscription work.
-- Don't change the three-tier price points ($29.99 Pro / $49.99
-  Premium monthly, $24.99/$39.99 annual) without conversion data.
+- Don't change the three-tier price points ($9.99 Pro / $19.99
+  Premium monthly, $8.25/$16.58 annual) without conversion data.
 - Don't re-enable Microsoft OAuth or Quiver QuantData. Both are
   documented as intentionally deferred in
   docs/launch/DEFERRED_CONFIRMED.md. The founder needs to

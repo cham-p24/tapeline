@@ -370,11 +370,11 @@ function SignUpForm() {
             <div className="font-medium text-fg">After your 14 days</div>
             <p className="mt-1.5">
               Stay on Free forever (live scores, top-10 scanner, 5 look-ups/day) — or upgrade to{" "}
-              <span className="text-fg">Pro from $24.99/mo</span> for the full
+              <span className="text-fg">Pro from $8.25/mo</span> for the full
               real-time universe with unlimited look-ups. No card on file means no surprise charge.
             </p>
             <p className="mt-2 text-[11px] text-subtle">
-              <span className="text-muted">7-day money back</span> if you change your mind ·
+              <span className="text-muted">30-day money back</span> if you change your mind ·
               Cancel in one click ·{" "}
               <Link href="/legal/refund" className="link">Full refund policy</Link>
             </p>

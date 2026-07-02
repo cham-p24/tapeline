@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Benzinga Pro (2026): Composite Score vs Real-Time News Squawk",
   description:
-    "Tapeline vs Benzinga Pro — one published 6-factor score per ticker with a per-pick public scorecard, vs Benzinga's audio squawk + real-time news terminal for intraday traders. Honest comparison at $24.99/mo Pro annual vs ~$37-$99/mo.",
+    "Tapeline vs Benzinga Pro — one published 6-factor score per ticker with a per-pick public scorecard, vs Benzinga's audio squawk + real-time news terminal for intraday traders. Honest comparison at $8.25/mo Pro annual vs ~$37-$99/mo.",
   path: "/compare/benzinga-pro",
 });
 
@@ -21,7 +21,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Pricing — entry tier",
-    tapeline: "✓ $24.99/mo Pro · $39.99/mo Premium (annual)",
+    tapeline: "✓ $8.25/mo Pro · $16.58/mo Premium (annual)",
     competitor: "Basic ~$37/mo · Essential ~$99/mo · Options Mentorship ~$457/mo",
   },
   {
@@ -80,7 +80,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Benzinga Pro?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). Benzinga Pro Basic is around $37/mo, Essential around $99/mo (when paid annually; monthly is higher), and Options Mentorship around $457/mo. Tapeline Premium ($39.99/mo annual) sits below Benzinga Pro Basic and includes Congressional trades + live SEC Form 4 — both of which require Benzinga's Essential tier or add-ons.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo billed annually ($199/yr). Benzinga Pro Basic is around $37/mo, Essential around $99/mo (when paid annually; monthly is higher), and Options Mentorship around $457/mo. Tapeline Premium ($16.58/mo annual) sits below Benzinga Pro Basic and includes Congressional trades + live SEC Form 4 — both of which require Benzinga's Essential tier or add-ons.",
   },
   {
     q: "What is the Tapeline Score vs Benzinga's coverage signal?",
@@ -105,7 +105,7 @@ export default function VsBenzingaProPage() {
       competitorAnnualNote="Basic ~$37/mo annual; Essential ~$99/mo annual; Options Mentorship ~$457/mo"
       slug="benzinga-pro"
       heading="Tapeline vs Benzinga Pro — composite score vs real-time news squawk."
-      lede="Benzinga Pro is a real-time news + audio squawk terminal for intraday traders who react to catalysts — the original retail squawk, still the fastest. Tapeline is a composite scanner — one 0-100 score per US ticker from a published 6-factor formula, refreshed sub-60s, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if your edge is identifying setups before the news. Pick Benzinga if your edge is reacting first when the news breaks. Many traders run both — Tapeline starts at $24.99/mo annual vs Benzinga's ~$37/mo entry."
+      lede="Benzinga Pro is a real-time news + audio squawk terminal for intraday traders who react to catalysts — the original retail squawk, still the fastest. Tapeline is a composite scanner — one 0-100 score per US ticker from a published 6-factor formula, refreshed sub-60s, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if your edge is identifying setups before the news. Pick Benzinga if your edge is reacting first when the news breaks. Many traders run both — Tapeline starts at $8.25/mo annual vs Benzinga's ~$37/mo entry."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

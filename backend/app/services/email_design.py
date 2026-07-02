@@ -264,7 +264,7 @@ def muted_paragraph(text: str) -> str:
 
 
 def footnote(text: str) -> str:
-    """Smallest tier — beneath a CTA, e.g. "7-day money back, cancel anytime"."""
+    """Smallest tier — beneath a CTA, e.g. "30-day money back, cancel anytime"."""
     return (
         f'<p class="tl-subtle" style="margin:16px 0 0;font-size:12px;line-height:1.5;'
         f'color:{LIGHT_SUBTLE};font-family:{FONT_SANS};">{text}</p>'

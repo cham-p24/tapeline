@@ -62,7 +62,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   | Founded | 2025 (engine), 2026 (public launch) |
   | Headquarters | Melbourne, Victoria, Australia |
   | Funding | Bootstrapped — no external investment |
-  | Pricing | Free · Pro from $24.99/mo (annual) · Premium from $39.99/mo (annual) |
+  | Pricing | Free · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
   | Free trial | 14-day Premium, no credit card required |
   | Universe | ~2,500 active US tickers (top by daily $-volume) · 5,757 tracked |
   | Update cadence | Sub-60 seconds during US market hours |
@@ -194,7 +194,7 @@ bottom of Part A.
 - **Tagline:** the **formal one sentence** above.
 - **Description:** paste the **canonical one paragraph**.
 - **Categories:** `Stock Analysis`, `Investment Management`, `Financial Analysis`
-- **Pricing model:** `Subscription` + `Free version` · starting price **$24.99/mo** (Pro, annual)
+- **Pricing model:** `Subscription` + `Free version` · starting price **$9.99/mo** (Pro, annual)
 - **Deployment:** `Web-based / Cloud`
 - **Tick only true features:** Watchlist, Alerts/Notifications, Technical Analysis,
   Fundamental Analysis, Performance Metrics, Customizable Reports/Export.

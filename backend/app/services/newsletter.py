@@ -441,7 +441,7 @@ def _render_daily_digest(
         composites crosses your threshold.
       </div>
       <a href="{pricing_url}" style="display:inline-block;background:#fb923c;color:#0a0a0a;padding:11px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:14px;font-size:14px;">Start 14-day Premium trial — no card →</a>
-      <div style="color:#6b7280;font-size:11px;margin-top:8px;">Free for 14 days · Cancel in one click · 7-day refund</div>
+      <div style="color:#6b7280;font-size:11px;margin-top:8px;">Free for 14 days · Cancel in one click · 30-day refund</div>
     </div>
 
     <p style="margin:28px 0 0;padding-top:16px;border-top:1px solid #1f1f23;color:#6b7280;font-size:11px;line-height:1.55;">

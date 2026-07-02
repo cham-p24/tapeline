@@ -36,7 +36,7 @@ const TOOLS: Tool[] = [
     rank: 1,
     name: "Tapeline",
     bestFor: "Multi-factor composite scoring + public scorecard",
-    price: "$24.99/mo Pro · $39.99/mo Premium (annual) · 14-day trial",
+    price: "$8.25/mo Pro · $16.58/mo Premium (annual) · 14-day trial",
     scoring: "Public formula",
     scorecard: "Per-pick public",
     tagline:

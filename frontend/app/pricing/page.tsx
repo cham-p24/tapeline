@@ -28,11 +28,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "Refund policy?",
-    a: "7-day money back on any paid plan. Email support@tapeline.io in your first week, we refund in full — no forms.",
+    a: "30-day money back on any paid plan. Email support@tapeline.io within your first 30 days, we refund in full — no forms.",
   },
   {
     q: "Will prices go up?",
-    a: "Possibly. When they do, annual subscribers are grandfathered at their current rate for as long as their subscription is active.",
+    a: "This is founding pricing, and it may rise as the product grows. If it does, existing subscribers keep their current rate for as long as their subscription stays active.",
   },
 ];
 
@@ -61,28 +61,25 @@ export default function PricingPage() {
           </h1>
           <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
             Every signup starts with a 14-day Premium trial &mdash; no credit
-            card, cancel in one click. Annual subscribers lock today&rsquo;s
-            price for as long as the subscription stays active.
+            card, cancel in one click. Subscribers keep their price for as
+            long as the subscription stays active.
           </p>
         </div>
 
-        {/* Founding-beta offer — surfaced honestly on the page rather than
-            gated behind a "DM for the code" pattern (that variant was
-            debated 2026-06 and rejected as a dark pattern). The code is
-            public; Stripe enforces the 100-redemption cap and the 3-month
-            window, so there's nothing to police client-side. This is the
-            landing surface every FOUNDERFRIENDS outreach DM points at. */}
+        {/* Founding-pricing note. The low sticker price IS the early-days
+            offer — no coupon stacked on top (the old FOUNDERFRIENDS 50%-off
+            block was retired 2026-07 when prices moved to founding levels;
+            the code still works in Stripe, we just don't advertise it).
+            Deliberately no countdown and no "N left" counter — the claim is
+            simply the truthful one: subscribe now, keep this rate. */}
         <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-accent/30 bg-accent/5 px-6 py-5 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-            Founding-beta cohort open
+            Founding pricing
           </p>
           <p className="mt-2 text-sm text-muted leading-relaxed">
-            Code{" "}
-            <span className="rounded bg-panel2 px-1.5 py-0.5 font-mono font-semibold text-fg">
-              FOUNDERFRIENDS
-            </span>{" "}
-            at checkout takes 50% off Premium for your first 3 months.
-            First 100 subscribers only &mdash; when it&rsquo;s gone, it&rsquo;s gone.
+            Tapeline is new, and the price says so. Subscribe now and this
+            rate is locked in for as long as your subscription stays active
+            &mdash; if prices rise later, yours doesn&rsquo;t.
           </p>
         </div>
 
@@ -123,11 +120,11 @@ export default function PricingPage() {
             />
             <Faq
               q="Refund policy?"
-              a="7-day money back on any paid plan. Email support@tapeline.io in your first week, we refund in full — no forms."
+              a="30-day money back on any paid plan. Email support@tapeline.io within your first 30 days, we refund in full — no forms."
             />
             <Faq
               q="Will prices go up?"
-              a="Possibly. When they do, annual subscribers are grandfathered at their current rate for as long as their subscription is active."
+              a="This is founding pricing, and it may rise as the product grows. If it does, existing subscribers keep their current rate for as long as their subscription stays active."
             />
           </div>
 

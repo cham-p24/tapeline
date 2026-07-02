@@ -15,7 +15,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What's the difference between Yahoo Finance Premium and Tapeline?",
-    a: "Yahoo Finance Plus / Premium is ~$24.95/mo and adds advanced charting, fair-value estimates, and a custom screener. Tapeline Pro is the same price tier ($24.99/mo annual) and adds a published 6-factor composite, sub-60s refresh, live regime classifier, squeeze setups, and a public next-day scorecard with every pick back-checked vs SPY.",
+    a: "Yahoo Finance Plus / Premium is ~$24.95/mo and adds advanced charting, fair-value estimates, and a custom screener. Tapeline Pro is roughly a third of that ($8.25/mo annual) and adds a published 6-factor composite, sub-60s refresh, live regime classifier, squeeze setups, and a public next-day scorecard with every pick back-checked vs SPY.",
   },
   {
     q: "Does Yahoo Finance publish a scoring formula?",

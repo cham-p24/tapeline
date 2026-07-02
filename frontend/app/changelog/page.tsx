@@ -24,6 +24,17 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-07-03",
+    version: "0.1.14",
+    tag: "improvement",
+    title: "Founding pricing: Pro $9.99/mo, Premium $19.99/mo · 30-day money back",
+    body: [
+      "New founding pricing across every plan: Pro is $9.99/mo or $99/yr ($8.25/mo effective), Premium is $19.99/mo or $199/yr ($16.58/mo effective). Tapeline is new and the price now says so — subscribers keep their rate for as long as the subscription stays active. No countdowns, no fake scarcity.",
+      "Money-back guarantee extended from 7 days to 30 days on every paid plan — email support@tapeline.io within your first 30 days for a full refund, no forms.",
+      "Feature gating unchanged: same tiers, same limits, same 14-day no-card Premium trial.",
+    ],
+  },
+  {
     date: "2026-05-17",
     version: "0.1.13",
     tag: "shipped",

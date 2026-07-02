@@ -3,8 +3,9 @@
 import { PRICING, usd, annualSaving } from "@/lib/pricing";
 
 /**
- * Three-column comparison: Free / Pro ($29.99/mo or $24.99/mo annual) /
- * Premium ($49.99/mo or $39.99/mo annual). Mirrors the gating in
+ * Three-column comparison: Free / Pro ($9.99/mo or $8.25/mo annual) /
+ * Premium ($19.99/mo or $16.58/mo annual). Prices render from lib/pricing.ts
+ * (single source of truth). Mirrors the gating in
  * backend/app/services/tier.py.
  *
  * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
@@ -23,7 +24,8 @@ import { PRICING, usd, annualSaving } from "@/lib/pricing";
  *    instead of per-cell text-accent — same emphasis, less noisy
  *  - Section headers use bg-panel2 + larger padding for stronger
  *    visual separation
- *  - "Most popular" pill on Pro since that's the conversion target
+ *  - "Best value" pill on Pro since that's the conversion target (factual
+ *    framing — never a popularity claim we can't back with customer counts)
  */
 
 type Row = { label: string; free: string; pro: string; premium: string };
@@ -138,7 +140,7 @@ export function ComparisonTable() {
         </table>
       </div>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
-        {`All prices in USD · Monthly billing $${(PRICING.pro.monthly - PRICING.pro.annualPerMonth).toFixed(0)} / $${(PRICING.premium.monthly - PRICING.premium.annualPerMonth).toFixed(0)} higher`}
+        {`All prices in USD · Monthly billing $${(PRICING.pro.monthly - PRICING.pro.annualPerMonth).toFixed(2)} / $${(PRICING.premium.monthly - PRICING.premium.annualPerMonth).toFixed(2)} higher`}
       </div>
     </div>
   );

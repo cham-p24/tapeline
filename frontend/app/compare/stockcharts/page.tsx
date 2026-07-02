@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs StockCharts (2026): Composite Score vs Pure Technical Charting",
   description:
-    "Tapeline vs StockCharts — one published 6-factor composite score per ticker with a per-pick public scorecard, vs StockCharts' SharpCharts + ChartLists technical-analysis platform. Honest comparison at $24.99/mo Pro annual vs $14.95-$39.95/mo.",
+    "Tapeline vs StockCharts — one published 6-factor composite score per ticker with a per-pick public scorecard, vs StockCharts' SharpCharts + ChartLists technical-analysis platform. Honest comparison at $8.25/mo Pro annual vs $14.95-$39.95/mo.",
   path: "/compare/stockcharts",
 });
 
@@ -36,7 +36,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Pricing — entry tier (annual)",
-    tapeline: "✓ $24.99/mo Pro · $39.99/mo Premium",
+    tapeline: "✓ $8.25/mo Pro · $16.58/mo Premium",
     competitor: "Basic ~$14.95/mo · Extra ~$24.95/mo · Pro ~$39.95/mo",
   },
   {
@@ -85,7 +85,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to StockCharts?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). StockCharts pricing: Basic ~$14.95/mo, Extra ~$24.95/mo, Pro ~$39.95/mo. StockCharts Basic undercuts Tapeline; Tapeline Premium and StockCharts Pro are at the same headline price ($39.99/mo vs $39.95/mo), but Tapeline Premium includes Congressional trades + live SEC Form 4 + a public per-pick scorecard, which StockCharts doesn't ship.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo billed annually ($199/yr). StockCharts pricing: Basic ~$14.95/mo, Extra ~$24.95/mo, Pro ~$39.95/mo. Tapeline now undercuts every StockCharts tier — Premium at $16.58/mo annual vs StockCharts Basic at ~$14.95/mo is the closest gap — and Tapeline Premium includes Congressional trades + live SEC Form 4 + a public per-pick scorecard, which StockCharts doesn't ship.",
   },
   {
     q: "What is the Tapeline Score vs a StockCharts SCTR ranking?",
@@ -110,7 +110,7 @@ export default function VsStockChartsPage() {
       competitorAnnualNote="Basic ~$14.95/mo; Extra ~$24.95/mo; Pro ~$39.95/mo"
       slug="stockcharts"
       heading="Tapeline vs StockCharts — composite score vs pure technical charting."
-      lede="StockCharts is a 26-year-old technical-analysis platform — SharpCharts, ChartLists, custom indicators, relative rotation graphs. It's where chart-driven traders live. Tapeline is a composite scanner — one 0-100 score per US ticker from a published 6-factor formula (technical + fundamental + macro + smart-money), sub-60s refresh, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if you want a multi-factor synthesis. Pick StockCharts if your edge is in reading charts deeply. Many traders run both — Tapeline starts at $24.99/mo annual."
+      lede="StockCharts is a 26-year-old technical-analysis platform — SharpCharts, ChartLists, custom indicators, relative rotation graphs. It's where chart-driven traders live. Tapeline is a composite scanner — one 0-100 score per US ticker from a published 6-factor formula (technical + fundamental + macro + smart-money), sub-60s refresh, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if you want a multi-factor synthesis. Pick StockCharts if your edge is in reading charts deeply. Many traders run both — Tapeline starts at $8.25/mo annual."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

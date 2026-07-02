@@ -321,7 +321,7 @@ export const POSTS: BlogPost[] = [
       <p>If you're not sure where to start, the
       <a href="/compare/finviz">Tapeline vs Finviz comparison</a> goes
       into the screener-vs-scanner question head-to-head with a real
-      $24.99/mo entry tier. Both products do useful work; they don't do
+      $8.25/mo entry tier. Both products do useful work; they don't do
       the same work.</p>
     `,
   },
@@ -1124,7 +1124,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li><strong>Zacks Premium</strong> — $20.83/mo annual ($24.95/mo
         monthly). Earnings + analyst-rating focus. The Zacks Rank is the
         core differentiator; everything else is supporting.</li>
-        <li><strong>Tapeline Pro</strong> — $24.99/mo annual ($29.99/mo
+        <li><strong>Tapeline Pro</strong> — $8.25/mo annual ($9.99/mo
         monthly). One 0-100 composite per ticker from a
         <a href="/how-it-works">public 6-factor formula</a>, with a
         public daily back-checked scorecard.</li>
@@ -1565,7 +1565,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       </ul>
 
       <p>Tapeline's policy: trial doesn't require a card, cancel from
-      /app/billing in one click, 7-day refund window on monthly
+      /app/billing in one click, 30-day refund window on monthly
       subscriptions. We'd rather lose subscribers cleanly than retain
       them via friction.</p>
 
@@ -1584,7 +1584,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Data freshness</td>
               <td>60s composite refresh on Pro+; live scores on Free too (gated on breadth, not freshness)</td></tr>
           <tr><td>Cancel friction</td>
-              <td>One-click cancel, 7-day refund, no card required for trial</td></tr>
+              <td>One-click cancel, 30-day refund, no card required for trial</td></tr>
         </tbody>
       </table>
 

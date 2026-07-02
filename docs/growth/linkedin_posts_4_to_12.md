@@ -171,7 +171,7 @@ Most SaaS free tiers cripple core functionality — fewer rows, no exports, no f
 
 Tapeline's free tier instead shows the top 20 tickers from yesterday's close, with the full 6-factor breakdown, the full reason sentence, and the full scorecard. The only difference vs Pro is the 24-hour delay.
 
-If you can act on day-old data, the free tier is the right tier. If you can't, the Pro tier ($24.99/month annual) gives you the same data live.
+If you can act on day-old data, the free tier is the right tier. If you can't, the Pro tier ($8.25/month annual) gives you the same data live.
 
 I'd rather a user understand what Tapeline does for free, decide it doesn't fit their workflow, and not pay, than have someone upgrade because the free tier was deliberately annoying and then churn in week two.
 

@@ -93,7 +93,7 @@ fly secrets set STRIPE_WEBHOOK_SECRET=<paste_value_here> -a tapeline-backend
 fly deploy -a tapeline-backend --remote-only
 ```
 
-Then founder does the $24.99 smoke test on tapeline.io/pricing with a
+Then founder does the $9.99 smoke test on tapeline.io/pricing with a
 real card, watches Fly logs for `stripe.webhook.checkout_session_completed`,
 and refunds themselves in the Stripe dashboard.
 
@@ -166,8 +166,8 @@ Fill placeholders with the result, post via X compose at 8 AM ET or
 - Descriptive (not prescriptive) signal labels (HIGH CONVICTION / STRONG
   SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK)
 - Public scorecard summary stats stay live for everyone (trust mechanism)
-- Three-tier price points ($29.99 Pro / $49.99 Premium monthly,
-  $24.99/$39.99 annual)
+- Three-tier price points ($9.99 Pro / $19.99 Premium monthly,
+  $8.25/$16.58 annual)
 - Don't re-enable Microsoft OAuth or Quiver QuantData (deferred per
   docs/launch/DEFERRED_CONFIRMED.md)
 - Don't echo founder's home address in chat or commit it

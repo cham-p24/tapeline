@@ -160,7 +160,7 @@ fly secrets set QUIVER_API_KEY=<paste from quiverquant.com> -a tapeline-backend
 (See yesterday's audit in chat — these are still user-only:
 Persona KYC, OpenAI top-up, Stripe identity doc upload, account
 signups [AlternativeTo / G2 / Capterra / Stocktwits / Crunchbase /
-Microsoft Entra / LinkedIn company page], $24.99 self-purchase test,
+Microsoft Entra / LinkedIn company page], $9.99 self-purchase test,
 Holley Nethercote lawyer call, X banner upload, LinkedIn photo upload,
 5 fintwit DMs, 4 manual outreach, Show HN submission.)
 

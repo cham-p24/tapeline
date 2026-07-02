@@ -241,7 +241,7 @@ Episode arc that I think works for your audience:
 
 — **The Bayesian prior on weight change.** My current rule is no weight change > 2 percentage points without 60 days of supporting data. That's arbitrary; would value a discussion of how Newfound, Two Sigma, etc. actually calibrate model-update cadence.
 
-— **The Stripe-pricing-vs-Sharpe trade-off.** Most quant tools target the institutional buyer (retainer + outcome share). Tapeline is $24.99/mo retail. The conversation: how does a retail-priced quant tool sustain methodology rigor when the unit economics don't support a research team?
+— **The Stripe-pricing-vs-Sharpe trade-off.** Most quant tools target the institutional buyer (retainer + outcome share). Tapeline is $9.99/mo retail. The conversation: how does a retail-priced quant tool sustain methodology rigor when the unit economics don't support a research team?
 
 Background: solo founder. Trading-system development before this. tapeline.io / tapeline.io/scorecard / tapeline.io/how-it-works.
 
@@ -306,7 +306,7 @@ The angle that's right for RR:
 
 — A specific worked example: take a name live, decompose the score, show where the composite agrees and disagrees with the underlying factor signals. The disagreements are usually more interesting than the agreements.
 
-— The evidence-based-software conversation, retail edition. Tapeline is $24.99/mo Pro, $39.99/mo Premium — competing against $500-$5,000/yr scoring tools that don't publish their methodology. What "evidence-based" means for retail-facing software, not just for portfolio construction.
+— The evidence-based-software conversation, retail edition. Tapeline is $9.99/mo Pro, $19.99/mo Premium — competing against $500-$5,000/yr scoring tools that don't publish their methodology. What "evidence-based" means for retail-facing software, not just for portfolio construction.
 
 Background: built Tapeline solo over the last six months. Trading-system developer for ~10 years before this. Melbourne-based, time-zone-flexible.
 
@@ -368,7 +368,7 @@ The angle that's right for The Long View:
 
 — A back-checked forward-test, not a back-test. The /scorecard freezes the top-10 daily picks at close and back-checks each against SPY the next session. Five months in. Misses stay on the page. Discussion of why publishing the wins-and-misses log changes the incentives versus a quarterly fund factsheet.
 
-— The retail-price conversation. Tapeline is $24.99/mo Pro, $39.99/mo Premium. The competitive set is $500-$5,000/yr scoring tools that don't publish their methodology. Why "evidence-based" software at retail price points is a structurally different conversation than evidence-based portfolio management.
+— The retail-price conversation. Tapeline is $9.99/mo Pro, $19.99/mo Premium. The competitive set is $500-$5,000/yr scoring tools that don't publish their methodology. Why "evidence-based" software at retail price points is a structurally different conversation than evidence-based portfolio management.
 
 — A specific worked example: take a name your audience knows, decompose the Tapeline score live, show what the 6-factor breakdown is communicating that the composite hides.
 

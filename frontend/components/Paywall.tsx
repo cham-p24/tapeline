@@ -23,7 +23,7 @@ export function Paywall({
   if (canUse(user, feature)) return <>{children}</>;
 
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49.99/mo (Premium)" : "$29.99/mo (Pro)";
+  const priceLine = requiredTier === "premium" ? "$19.99/mo (Premium)" : "$9.99/mo (Pro)";
   const signedIn = !!user;
 
   return (
@@ -88,7 +88,7 @@ export function PaywallModal({
 }) {
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
-  const priceLine = requiredTier === "premium" ? "$49.99/mo · Premium" : "$29.99/mo · Pro";
+  const priceLine = requiredTier === "premium" ? "$19.99/mo · Premium" : "$9.99/mo · Pro";
   const featureName = ({
     "scanner.full": "Full live scanner",
     "scanner.live": "Live scanner updates",
@@ -123,7 +123,7 @@ export function PaywallModal({
           <button onClick={onClose} className="btn-ghost text-sm">Not yet</button>
         </div>
         <p className="mt-4 text-xs text-muted text-center">
-          USD · 7-day money back · Price locked forever on annual plans
+          USD · 30-day money back · Founding pricing, locked in for early subscribers
         </p>
       </div>
     </div>

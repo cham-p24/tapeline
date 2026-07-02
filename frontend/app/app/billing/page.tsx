@@ -53,7 +53,10 @@ export default function BillingPage() {
   const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "info" | "ok" | "err"; text: string } | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
+  // Monthly is the default — the smaller first yes. Annual stays one click
+  // away with its saving flagged on the toggle. ?billing= intent from
+  // /pricing still overrides this below.
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [showPlans, setShowPlans] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [winbackOffer, setWinbackOffer] = useState(false);
@@ -421,8 +424,8 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted">
                 {billingPeriod === "annual"
-                  ? `Effective $${meta.annualMonthly}/mo · 7-day money back, cancel in one click.`
-                  : "Switch to annual to save ~14-19% and lock the price forever."}
+                  ? `Effective $${meta.annualMonthly}/mo · 30-day money back, cancel in one click.`
+                  : "Switch to annual to save ~17% — same plan, lower effective rate."}
               </p>
             </>
           )}
@@ -466,7 +469,7 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                7-day money back, no questions. Cancel in one click. Annual locks the price forever. All prices in USD.
+                30-day money back, no questions. Cancel in one click. Founding pricing — your rate is locked in while you stay subscribed. All prices in USD.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
@@ -587,8 +590,8 @@ export default function BillingPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Why people pay</h2>
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
-              title="Bloomberg-grade data"
-              body={`Same shape of inputs quant funds use — live market data, macro indicators, fundamentals, SEC filings. Bloomberg Terminal: $31,980/yr. You: ${usd(PRICING.premium.annual)}/yr.`}
+              title="One live data spine"
+              body="Live market data, macro indicators, fundamentals, SEC filings — the same shape of inputs quant desks work from, refreshed sub-60s during market hours."
             />
             <Selling
               title="Public scorecard, day 1"
