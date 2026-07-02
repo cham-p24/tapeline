@@ -735,7 +735,8 @@ def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None)
         + muted_paragraph(
             "If you change your mind, the trial benefits don't reset — re-activate "
             "any time and your watchlist + alerts come back. Otherwise, this is "
-            "the last email; no more drip after this."
+            "where the emails stop — we'll only write again if something material "
+            "changes, like pricing."
         )
         + button("Re-activate Premium", "https://tapeline.io/app/billing")
         + footnote(
@@ -743,6 +744,48 @@ def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None)
             f'<a href="https://tapeline.io/scorecard" style="color:{LIGHT_SUBTLE};text-decoration:underline;">Public scorecard stays free forever.</a>'
         ),
         preheader="Last note — what was missing? Reply and tell me.",
+    )
+
+
+def render_trial_lapse30_email(user_name: str) -> str:
+    """T+30 — one-shot win-back for lapsed NO-CARD trials.
+
+    Structural gap this closes: run_winback_drip keys off canceled_at, which
+    only ever gets set for users who SUBSCRIBED and then cancelled. A trial
+    user who never added a card exited the funnel forever after the T+3
+    "post3" note. This is the single scheduled touch after that.
+
+    Honesty contract: post3 now says "we'll only write again if something
+    material changes, like pricing" — so this email leads with exactly that:
+    where founding pricing stands today, stated as current fact (no fake
+    "price is going up" urgency, no discount theatre, no claims about tiers
+    that don't exist). One CTA, to /app/billing.
+    """
+    return shell(
+        h1("One note, a month on.")
+        + lead(
+            f"{user_name}, your Tapeline trial ended about a month ago and "
+            f"you never added a card — completely fair. This is the one "
+            f"follow-up we promised, and it's about pricing."
+        )
+        + paragraph(
+            "Founding pricing is now <strong>$9.99/mo for Pro</strong> (the "
+            "full scanner) and <strong>$19.99/mo for Premium</strong> "
+            "(scanner + smart alerts, Telegram, and the Congress feed) — "
+            "locked in for early subscribers for as long as they stay "
+            "subscribed."
+        )
+        + muted_paragraph(
+            "Your watchlist is still saved, exactly as you left it. "
+            "Re-activate and it comes back with your alert rules intact — "
+            "no re-setup."
+        )
+        + button("See plans", "https://tapeline.io/app/billing")
+        + footnote(
+            "30-day money back. One-click cancel. This is the last scheduled "
+            "note in the trial series. — Christian, founder."
+        ),
+        preheader="Founding pricing: $9.99/mo Pro · $19.99/mo Premium, locked for early subscribers.",
     )
 
 
@@ -1991,6 +2034,16 @@ async def run_daily_drip(session) -> dict[str, int]:
         - "expired" T+0  email — trial_ends_at in (now-1d, now)
         - "post3"   T+3  email — trial_ends_at in (now-4d, now-3d)
 
+      Lapsed-trial win-back (handled in its own block below, NOT the
+      shared windows loop — different pref bucket + tier filter):
+        - "lapse30" ~T+30 email — trial_ends_at in (now-32d, now-30d],
+          tier=free, no Stripe customer ever. Gated on RE_ENGAGEMENT
+          (marketing bucket — the trial is long over, so TRIAL_DRIP is
+          the wrong gate). Closes the structural funnel gap where no-card
+          trials exited email forever after post3, because
+          run_winback_drip requires canceled_at (i.e. a cancelled PAID
+          subscription) and these users never had one.
+
     The T+0 "expired" stage is the ONLY end-of-trial email. The hourly
     worker downgrade (signal_publisher._downgrade_expired_trials) used to
     also fire render_trial_ended_email on the same day — that send was
@@ -2009,7 +2062,8 @@ async def run_daily_drip(session) -> dict[str, int]:
     from app.models import User
 
     now = datetime.now(UTC)
-    counts = {"day3": 0, "day7": 0, "day11": 0, "day13": 0, "expired": 0, "post3": 0}
+    counts = {"day3": 0, "day7": 0, "day11": 0, "day13": 0, "expired": 0,
+              "post3": 0, "lapse30": 0}
 
     windows = [
         # Pre-expiry
@@ -2086,6 +2140,45 @@ async def run_daily_drip(session) -> dict[str, int]:
                     any_sent = True
             except Exception:
                 logger.exception("drip.send_failed user=%s stage=%s", user.id, label)
+
+    # ── "lapse30" — lapsed no-card trial win-back, ~T+30 ─────────────────────
+    # Deliberately outside the windows loop: it flips BOTH knobs the loop
+    # hardcodes (pref bucket → RE_ENGAGEMENT instead of TRIAL_DRIP, and it
+    # re-adds a tier filter post-expiry: tier must be "free" so anyone who
+    # subscribed — or was comped — is excluded on top of the no-Stripe-
+    # customer check). Window is two days wide (T+30 .. T+32) so a single
+    # missed worker day can't silently drop the one remaining touch; the
+    # "lapse30" drip_state token still guarantees at-most-once.
+    from app.services.email_prefs import EmailPref, wants
+
+    lapse_result = await session.execute(select(User).where(
+        User.trial_ends_at.isnot(None),
+        User.trial_ends_at >= now - timedelta(days=32),
+        User.trial_ends_at < now - timedelta(days=30),
+        User.stripe_customer_id.is_(None),
+        User.tier == "free",
+    ))
+    for user in lapse_result.scalars().all():
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if "lapse30" in sent_tokens:
+            continue
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
+            continue
+        try:
+            html = render_trial_lapse30_email(user.name or "trader")
+            res = await send_email(
+                user.email, "Tapeline — one note, a month on", html,
+                persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add("lapse30")
+                user.drip_state = ",".join(sorted(sent_tokens))
+                counts["lapse30"] += 1
+                any_sent = True
+        except Exception:
+            logger.exception("drip.send_failed user=%s stage=lapse30", user.id)
 
     if any_sent:
         await session.commit()

@@ -57,6 +57,7 @@ def _all_html_outputs() -> list[tuple[str, str]]:
         ("day13", e.render_trial_day13_email("Alex", None)),
         ("trial_expired", e.render_trial_expired_email("Alex", None)),
         ("trial_post_expiry", e.render_trial_post_expiry_email("Alex")),
+        ("trial_lapse30", e.render_trial_lapse30_email("Alex")),
         ("trial_ended", e.render_trial_ended_email("Alex")),
         ("payment_failed_first", e.render_payment_failed_email("Alex", "pro", 1)),
         ("payment_failed_third", e.render_payment_failed_email("Alex", "premium", 3)),
