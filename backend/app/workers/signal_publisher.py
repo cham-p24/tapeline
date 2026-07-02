@@ -261,7 +261,8 @@ async def tick() -> None:
         await _refresh_watchlisted_news()
         _last_watchlisted_news_refresh = started
 
-    # Daily trial-drip emails (day 3 / 7 / 13) + 14-day re-engagement for
+    # Daily trial-drip emails (day 3 / 7 / 13, plus the T+30 lapsed no-card
+    # trial win-back inside run_daily_drip) + 14-day re-engagement for
     # dormant non-trial users + 30/60/90-day post-cancellation win-back +
     # early-lifecycle activation nudges (first watchlist / first alert) +
     # post-conversion monthly→annual upgrade nudge + personal founder-touch to
@@ -291,7 +292,11 @@ async def tick() -> None:
                 ft_counts = await run_founder_touch_drip(drip_session)
                 refm_counts = await run_referral_milestone_drip(drip_session)
             if any(counts.values()):
-                logger.info("drip.sent day3=%d day7=%d day13=%d", counts["day3"], counts["day7"], counts["day13"])
+                logger.info(
+                    "drip.sent day3=%d day7=%d day13=%d lapse30=%d",
+                    counts["day3"], counts["day7"], counts["day13"],
+                    counts.get("lapse30", 0),
+                )
             if re_counts["re14"]:
                 logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
             if any(wb_counts.values()):

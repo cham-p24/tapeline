@@ -12,8 +12,26 @@ type Position = "top" | "bottom";
 export function OAuthButtons({
   position = "bottom",
   dividerLabel,
-}: { position?: Position; dividerLabel?: string } = {}) {
+  postAuthNext,
+}: {
+  position?: Position;
+  dividerLabel?: string;
+  /**
+   * Post-auth intent (same shape as the email flow's `postAuthNext` in
+   * signup/page.tsx — an internal path like "/app/billing?intent=premium").
+   * Appended to the /start URL as `?next=`; the backend validates it as a
+   * same-origin relative path (mirroring lib/safeNext.ts), stashes it in a
+   * short-lived cookie across the provider round-trip, and redirects there
+   * after auth. Without this, plan intent from /pricing died at the OAuth
+   * buttons while surviving the email form.
+   */
+  postAuthNext?: string;
+} = {}) {
   const [providers, setProviders] = useState<Providers | null>(null);
+
+  const startHref = (provider: "google" | "microsoft" | "apple") =>
+    `${API_BASE}/api/auth/oauth/${provider}/start` +
+    (postAuthNext ? `?next=${encodeURIComponent(postAuthNext)}` : "");
 
   useEffect(() => {
     fetch(`${API_BASE}/api/auth/oauth/providers`, { credentials: "include", cache: "no-store" })
@@ -41,7 +59,7 @@ export function OAuthButtons({
     <div className="grid gap-2">
       {providers.google && (
         <a
-          href={`${API_BASE}/api/auth/oauth/google/start`}
+          href={startHref("google")}
           className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
         >
           <GoogleGlyph /> Continue with Google
@@ -49,7 +67,7 @@ export function OAuthButtons({
       )}
       {providers.microsoft && (
         <a
-          href={`${API_BASE}/api/auth/oauth/microsoft/start`}
+          href={startHref("microsoft")}
           className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
         >
           <MicrosoftGlyph /> Continue with Microsoft
@@ -57,7 +75,7 @@ export function OAuthButtons({
       )}
       {providers.apple && (
         <a
-          href={`${API_BASE}/api/auth/oauth/apple/start`}
+          href={startHref("apple")}
           className="flex items-center justify-center gap-3 rounded-md border border-border bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/80"
         >
           <AppleGlyph /> Continue with Apple

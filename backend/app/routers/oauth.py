@@ -37,7 +37,7 @@ from urllib.parse import urlencode
 
 import httpx
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +60,34 @@ def _generate_referral_code() -> str:
     for ch in "0O1IL":
         alphabet = alphabet.replace(ch, "")
     return "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _safe_next(next_param: str | None, fallback: str = "/app/scanner") -> str:
+    """Server-side mirror of frontend lib/safeNext.ts — open-redirect guard
+    for the `?next=` post-auth redirect param.
+
+    Email signup already carries purchase/plan intent through the funnel via
+    `?next=` (signup/page.tsx postAuthNext); OAuth previously dropped it on
+    the floor. The `/start` endpoint now accepts `?next=`, stashes it in a
+    short-lived cookie, and the callback redirects there — but ONLY when it
+    is an internal same-origin path. Must start with a single "/", must not
+    be protocol-relative ("//" or "/\\"), must not smuggle a scheme, and —
+    stricter than the frontend, because this value round-trips through a
+    client-controlled cookie — must not contain backslashes or control
+    characters (header-injection / browser path-normalisation tricks).
+    Anything else falls back to the safe default.
+    """
+    if (
+        not next_param
+        or len(next_param) > 512
+        or not next_param.startswith("/")
+        or next_param.startswith("//")
+        or next_param.startswith("/\\")
+        or "\\" in next_param
+        or any(ord(c) < 0x20 or ord(c) == 0x7F for c in next_param)
+    ):
+        return fallback
+    return next_param
 
 
 PROVIDERS = {
@@ -147,7 +175,13 @@ async def list_providers() -> dict:
 
 
 @router.get("/{provider}/start")
-async def oauth_start(provider: str, response: Response) -> RedirectResponse:
+async def oauth_start(
+    provider: str,
+    response: Response,
+    # `alias="next"` keeps the wire name the funnel-wide convention
+    # (?next=…) while the Python name avoids shadowing builtins.
+    next_param: str | None = Query(None, alias="next"),
+) -> RedirectResponse:
     creds = _provider_creds(provider)
     if provider not in PROVIDERS or creds is None:
         # 404, not 503, because:
@@ -182,6 +216,15 @@ async def oauth_start(provider: str, response: Response) -> RedirectResponse:
     # Stash state in a short-lived cookie to defend against CSRF
     resp.set_cookie(f"oauth_state_{provider}", state, httponly=True, max_age=600, samesite="lax",
                     secure=settings.app_env != "development", path="/")
+    # Post-auth intent carry: the frontend appends ?next= (e.g. the
+    # /pricing → /signup?plan=… → /app/billing?intent=… purchase intent).
+    # OAuth is a full-page round-trip through the provider, so the ONLY
+    # place `next` survives is a cookie alongside oauth_state. Validated
+    # here AND re-validated in the callback (the cookie is client-writable).
+    # Invalid/absent → no cookie; the callback falls back to /app/scanner.
+    if next_param and _safe_next(next_param, fallback="") == next_param:
+        resp.set_cookie(f"oauth_next_{provider}", next_param, httponly=True, max_age=600,
+                        samesite="lax", secure=settings.app_env != "development", path="/")
     return resp
 
 
@@ -338,8 +381,12 @@ async def oauth_callback(
 
     # Issue session cookie + redirect to app. New OAuth signups pass through
     # /app/onboarding first (same flow as native signup). Existing users skip
-    # straight to the scanner.
+    # straight to wherever they were headed. The `?next=` intent stashed by
+    # /start (e.g. /app/billing?intent=premium from the pricing page) is
+    # honoured for BOTH — re-validated through _safe_next because the cookie
+    # is client-writable; tampered values fall back to /app/scanner.
     token = issue_session_token(user.id)
+    next_path = _safe_next(request.cookies.get(f"oauth_next_{provider}"))
     if is_new:
         # Real-time founder ping (same as native signup) so a new OAuth signup /
         # live trial never goes unnoticed. Self-guarding + never raises.
@@ -349,10 +396,14 @@ async def oauth_callback(
             email=user.email, tier=user.tier,
             trial_ends_at=user.trial_ends_at, source=provider,
         )
-        redirect_url = f"{settings.app_url}/app/onboarding?next=/app/scanner"
+        # oauth=1 marks a brand-new OAuth signup so the frontend can fire
+        # signup-funnel analytics events later (no frontend event work yet).
+        qs = urlencode({"next": next_path, "oauth": "1"})
+        redirect_url = f"{settings.app_url}/app/onboarding?{qs}"
     else:
-        redirect_url = f"{settings.app_url}/app/scanner"
+        redirect_url = f"{settings.app_url}{next_path}"
     resp = RedirectResponse(redirect_url)
     resp.set_cookie(value=token, **session_cookie_kwargs())
     resp.delete_cookie(f"oauth_state_{provider}", path="/")
+    resp.delete_cookie(f"oauth_next_{provider}", path="/")
     return resp
