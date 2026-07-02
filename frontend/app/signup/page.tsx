@@ -85,6 +85,22 @@ function SignUpForm() {
   // and the /signin?next=… link below, so guarding here covers every use.
   // Rejects open-redirect payloads (//evil.com, https://evil.com).
   const next = safeNext(qp.get("next"));
+  // Plan intent from the marketing /pricing page: its CTAs link to
+  // /signup?plan=pro|premium&billing=monthly|annual. Previously these params
+  // were silently discarded — a visitor who clicked "Upgrade to Premium —
+  // annual" on /pricing was dumped on the scanner post-signup with their
+  // purchase intent lost. When a valid plan is present (and no explicit
+  // ?next= overrides it), route them to /app/billing after onboarding with
+  // the intent restated so the billing page can pre-select it. Checkout is
+  // never auto-fired — the user still clicks.
+  const planRaw = (qp.get("plan") || "").toLowerCase();
+  const planIntent = planRaw === "pro" || planRaw === "premium" ? planRaw : null;
+  const billingRaw = (qp.get("billing") || "").toLowerCase();
+  const billingIntent = billingRaw === "monthly" || billingRaw === "annual" ? billingRaw : "annual";
+  const postAuthNext =
+    planIntent && !qp.get("next")
+      ? `/app/billing?intent=${planIntent}&billing=${billingIntent}`
+      : next;
   // Referral code from /signup?ref=ABCDEFGH. Backend grants both parties
   // 1 free month of Premium when this resolves to a valid existing user.
   const refCode = (qp.get("ref") || "").trim().toUpperCase();
@@ -199,9 +215,11 @@ function SignUpForm() {
       trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
       // Route through /app/onboarding first — captures investor profile +
       // attribution + marketing-opt-in before they hit the product. The
-      // onboarding page redirects to `next` after submit or skip. Existing
-      // users (signin) never pass through here.
-      router.push(`/app/onboarding?next=${encodeURIComponent(next)}`);
+      // onboarding page redirects to the post-auth destination after submit
+      // or skip: /app/billing (with plan intent restated) when the visitor
+      // arrived from a /pricing plan CTA, otherwise the default `next`.
+      // Existing users (signin) never pass through here.
+      router.push(`/app/onboarding?next=${encodeURIComponent(postAuthNext)}`);
       router.refresh();
     } catch (e: unknown) {
       setErr(errorMessage(e) || "Sign up failed");
@@ -362,9 +380,12 @@ function SignUpForm() {
             </p>
           </div>
 
+          {/* Carry the plan intent through the signin path too — an existing
+              user who clicked a /pricing plan CTA should land on the billing
+              page with their pick pre-selected, not on the scanner. */}
           <p className="mt-6 text-center text-sm text-muted">
             Already have an account?{" "}
-            <Link href={`/signin?next=${encodeURIComponent(next)}`} className="link">Sign in</Link>
+            <Link href={`/signin?next=${encodeURIComponent(postAuthNext)}`} className="link">Sign in</Link>
           </p>
         </div>
       </div>

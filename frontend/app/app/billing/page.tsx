@@ -52,11 +52,22 @@ type TierKey = keyof typeof TIER_META;
 export default function BillingPage() {
   const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<{ kind: "info" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ kind: "info" | "ok" | "err"; text: string } | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
   const [showPlans, setShowPlans] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [winbackOffer, setWinbackOffer] = useState(false);
+  // Whether a Stripe customer record exists behind this account. null =
+  // unknown (fetch in flight). Sourced from GET /api/billing/retention-options
+  // (`has_subscription` = bool(stripe_customer_id) server-side) because the
+  // session payload doesn't carry stripe_customer_id. Trial users have NO
+  // customer record — the Stripe portal 400s ("No billing account yet") for
+  // them, so portal/cancel actions are gated on this being true.
+  const [hasBilling, setHasBilling] = useState<boolean | null>(null);
+  // Plan intent carried over from /pricing via /signup?plan=…&billing=…
+  // (billing page reads it back as ?intent=…&billing=…). Pre-selects the
+  // toggle + highlights the intended card; never auto-fires checkout.
+  const [intentPlan, setIntentPlan] = useState<"pro" | "premium" | null>(null);
 
   const tier = (user?.tier || "free") as TierKey;
   const meta = TIER_META[tier] ?? TIER_META.free;
@@ -65,12 +76,48 @@ export default function BillingPage() {
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
     : 0;
   const isOnTrial = !!trialEndsAt && trialDaysLeft > 0;
+  // The no-card 14-day Premium trial every signup gets. These users hold
+  // tier="premium" but own nothing yet — the whole point of this page is to
+  // get a card from them, so the Premium card must stay CLICKABLE for them
+  // (the old `disabled={tier === "premium"}` dead-ended every trial user's
+  // conversion path). hasBilling === true flips this off for the rare user
+  // who already added a card mid-trial.
+  const isCardlessTrial = tier === "premium" && isOnTrial && hasBilling !== true;
 
-  // Free users see the upgrade picker by default. Paid users see a tucked
-  // "Change plan" button — they're not here to be sold to every visit.
+  // Free users AND cardless trial users see the upgrade picker by default —
+  // both groups arrive here to pick a plan (every conversion surface points
+  // at /app/billing). Paid users see a tucked "Change plan" button — they're
+  // not here to be sold to every visit.
   useEffect(() => {
-    if (tier === "free") setShowPlans(true);
-  }, [tier]);
+    if (tier === "free" || isOnTrial) setShowPlans(true);
+  }, [tier, isOnTrial]);
+
+  // Does a Stripe customer record exist? Only relevant for non-free tiers
+  // (free users have no portal/cancel UI). Failure leaves null → the
+  // portal/cancel buttons stay hidden, which can never 400.
+  useEffect(() => {
+    if (!user || tier === "free") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/billing/retention-options`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+        const body = await res.json();
+        if (!cancelled) {
+          // Sticky-true: the ?checkout=success handler below sets true
+          // optimistically; a racing fetch that beat the Stripe webhook
+          // must not flip it back to false.
+          setHasBilling((prev) => (prev === true ? true : !!body.has_subscription));
+        }
+      } catch {
+        // Network blip — leave unknown; portal/cancel simply stay hidden.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, tier]);
 
   // Funnel event: pricing-page impression. Pairs with `checkout_started`
   // (already wired in startCheckout below) to compute click-rate on the
@@ -109,6 +156,25 @@ export default function BillingPage() {
         billing_period: period,
         ...(value ? { value, currency: "USD" } : {}),
       });
+      // Visible confirmation — previously the redirect back from Stripe landed
+      // on a page that looked identical to before paying. Also refresh the
+      // session (tier may have already been bumped by the webhook) and flip
+      // hasBilling optimistically so trial-conversion UI ("add a card") and
+      // the hidden portal/cancel buttons update without waiting on a refetch.
+      setMsg({ kind: "ok", text: "Payment received — your plan is active." });
+      setHasBilling(true);
+      refresh();
+    }
+    // Plan intent from the marketing /pricing page, carried through
+    // /signup?plan=…&billing=… → onboarding → here. Open the picker,
+    // pre-select the billing toggle and highlight the intended plan.
+    // Deliberately does NOT auto-fire checkout — the user clicks.
+    const intent = (qp.get("intent") || "").toLowerCase();
+    if (intent === "pro" || intent === "premium") {
+      setIntentPlan(intent);
+      setShowPlans(true);
+      const period = (qp.get("billing") || "").toLowerCase();
+      if (period === "monthly" || period === "annual") setBillingPeriod(period);
     }
     // Win-back landing — the day-90 cancellation email links here with
     // ?winback=1. Surface the returning-customer banner + open the plan
@@ -183,6 +249,18 @@ export default function BillingPage() {
     }
   }
 
+  /** Open the plan picker and bring it into view (it renders below the fold). */
+  function openPlanPicker() {
+    setShowPlans(true);
+    // Wait a frame so the section exists before scrolling to it. Both calls
+    // are defensive-optional for jsdom (tests) and ancient browsers.
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        document.getElementById("plan-picker")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      });
+    }
+  }
+
   async function openPortal() {
     try {
       const res = await fetch(`${API_BASE}/api/billing/portal`, {
@@ -217,6 +295,8 @@ export default function BillingPage() {
         <div className={`rounded-lg border p-4 text-sm ${
           msg.kind === "err"
             ? "border-down/40 bg-down/5 text-down"
+            : msg.kind === "ok"
+            ? "border-up/30 bg-up/5 text-up"
             : "border-warn/30 bg-warn/5 text-warn"
         }`}>
           {msg.text}
@@ -251,7 +331,7 @@ export default function BillingPage() {
               <div className="text-[11px] uppercase tracking-wider text-muted">Current plan</div>
               <div className="mt-1 flex items-baseline gap-3">
                 <span className="text-3xl font-bold tracking-tight">{meta.name}</span>
-                {isOnTrial && (
+                {isCardlessTrial && (
                   <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-accent">
                     Trial · {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} left
                   </span>
@@ -267,28 +347,39 @@ export default function BillingPage() {
 
           {tier !== "free" && (
             <div className="mt-6 flex flex-wrap gap-2">
-              <button onClick={openPortal} className="btn-ghost text-xs">
-                Manage payment in Stripe portal →
-              </button>
+              {/* Portal + cancel need a Stripe customer record behind the
+                  account. Trial users don't have one — the portal endpoint
+                  400s ("No billing account yet") — so both stay hidden until
+                  /api/billing/retention-options confirms has_subscription. */}
+              {hasBilling === true && (
+                <button onClick={openPortal} className="btn-ghost text-xs">
+                  Manage payment in Stripe portal →
+                </button>
+              )}
               <button
                 onClick={() => setShowPlans((v) => !v)}
                 className="btn-ghost text-xs"
               >
                 {showPlans ? "Hide plans" : "Change plan"}
               </button>
-              <button
-                onClick={() => setShowCancel(true)}
-                className="btn-ghost text-xs text-muted hover:text-down"
-              >
-                Cancel subscription
-              </button>
+              {hasBilling === true && (
+                <button
+                  onClick={() => setShowCancel(true)}
+                  className="btn-ghost text-xs text-muted hover:text-down"
+                >
+                  Cancel subscription
+                </button>
+              )}
             </div>
           )}
           {tier === "free" && (
             <div className="mt-6">
-              <Link href="/signup" className="btn-accent text-sm">
-                Try Premium free for 14 days →
-              </Link>
+              {/* Authenticated free users already HAVE an account — the old
+                  <Link href="/signup"> dead-ended on a duplicate-signup
+                  rejection. Open the in-page plan picker instead. */}
+              <button onClick={openPlanPicker} className="btn-accent text-sm">
+                Re-activate Premium →
+              </button>
             </div>
           )}
         </div>
@@ -296,10 +387,10 @@ export default function BillingPage() {
         {/* Next charge / trial preview — spans 2 of 5 cols */}
         <div className="md:col-span-2 rounded-2xl border border-border bg-panel p-6">
           <div className="text-[11px] uppercase tracking-wider text-muted">
-            {isOnTrial ? "When the trial ends" : tier === "free" ? "What you get on Premium" : "Next charge"}
+            {isCardlessTrial ? "When the trial ends" : tier === "free" ? "What you get on Premium" : "Next charge"}
           </div>
 
-          {isOnTrial ? (
+          {isCardlessTrial ? (
             <>
               <div className="mt-2 text-2xl font-bold nums">
                 {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
@@ -308,7 +399,7 @@ export default function BillingPage() {
                 Add a card before then to lock in {meta.name} access. Otherwise your account moves to Free
                 forever — live scores, top-10 scanner, 5 look-ups/day, 3-ticker watchlist.
               </p>
-              <button onClick={() => setShowPlans(true)} className="mt-4 text-xs text-accent hover:underline">
+              <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
               </button>
             </>
@@ -342,9 +433,11 @@ export default function BillingPage() {
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Plan limits</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Caps mirror backend services/tier.py TIER_LIMITS — free is
+              watchlist 3 / top-10 scanner rows after the freemium retune. */}
           <UsageTile
             label="Watchlist tickers"
-            limit={tier === "free" ? 5 : tier === "pro" ? 50 : 200}
+            limit={tier === "free" ? 3 : tier === "pro" ? 50 : 200}
             unit="tickers"
           />
           <UsageTile
@@ -360,7 +453,7 @@ export default function BillingPage() {
           />
           <UsageTile
             label="Scanner rows"
-            limit={tier === "free" ? 20 : 2500}
+            limit={tier === "free" ? 10 : 2500}
             unit="rows"
           />
         </div>
@@ -368,7 +461,7 @@ export default function BillingPage() {
 
       {/* ── Plan picker (collapsible for paid users) ──────────────────────── */}
       {showPlans && (
-        <section className="space-y-6">
+        <section id="plan-picker" className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
@@ -421,6 +514,7 @@ export default function BillingPage() {
               ]}
               cta={tier === "premium" ? "Switch to Pro" : "Upgrade to Pro"}
               highlight={tier === "pro"}
+              intent={intentPlan === "pro" && tier !== "pro"}
               disabled={tier === "pro"}
               busy={busy === "pro"}
               onUpgrade={() => startCheckout("pro")}
@@ -438,9 +532,16 @@ export default function BillingPage() {
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
                 "Priority support · same-day reply",
               ]}
-              cta="Upgrade to Premium"
-              highlight={tier === "premium"}
-              disabled={tier === "premium"}
+              // THE P0 fix: trial users hold tier="premium" but own nothing —
+              // the old disabled={tier === "premium"} rendered a dead
+              // "Current plan" button for the entire 14-day trial, so no
+              // human could ever reach /api/billing/checkout. A cardless
+              // trial keeps the button live with an add-a-card CTA; only a
+              // genuinely-paid Premium sees the disabled Current state.
+              cta={isCardlessTrial ? "Keep Premium — add a card" : "Upgrade to Premium"}
+              highlight={tier === "premium" && !isCardlessTrial}
+              intent={intentPlan === "premium" && (tier !== "premium" || isCardlessTrial)}
+              disabled={tier === "premium" && !isCardlessTrial}
               busy={busy === "premium"}
               onUpgrade={() => startCheckout("premium")}
             />
@@ -872,17 +973,22 @@ function WebPushCard() {
 
 
 function Plan({
-  name, price, items, note, cta, highlight, disabled, busy, onUpgrade, proPlus,
+  name, price, items, note, cta, highlight, intent, disabled, busy, onUpgrade, proPlus,
 }: {
   name: string; price: string; items: string[]; note?: string;
-  cta?: string; highlight?: boolean; disabled?: boolean; busy?: boolean;
+  cta?: string; highlight?: boolean; intent?: boolean; disabled?: boolean; busy?: boolean;
   onUpgrade?: () => void; proPlus?: boolean;
 }) {
+  // `highlight` = the plan the user actually owns ("Current" badge).
+  // `intent` = the plan they arrived meaning to buy (?intent= from /pricing)
+  // — same visual emphasis, but labelled "Selected" so a trial/free user is
+  // never told they already own something they haven't paid for.
   return (
-    <div className={`card p-6 ${highlight ? "ring-2 ring-accent" : ""}`}>
+    <div className={`card p-6 ${highlight || intent ? "ring-2 ring-accent" : ""}`}>
       <div className="flex items-baseline justify-between">
         <h3 className="text-lg font-semibold">{name}</h3>
         {highlight && <span className="rounded-full bg-up/10 px-2 py-0.5 text-xs text-up">Current</span>}
+        {!highlight && intent && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">Selected</span>}
       </div>
       <div className="mt-2 flex items-baseline gap-1"><span className="text-3xl font-bold">{price}</span><span className="text-muted">/mo</span></div>
       {note && <p className="mt-1 text-xs text-muted">{note}</p>}
