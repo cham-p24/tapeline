@@ -8,13 +8,28 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
 from app.models import Subscription, TelegramLinkToken, User
 from app.services.auth import current_user_optional, current_user_required
+from app.services.sector import (
+    GICS_COMMS,
+    GICS_CONSUMER_DISC,
+    GICS_CONSUMER_STAP,
+    GICS_ENERGY,
+    GICS_FINANCIALS,
+    GICS_HEALTH_CARE,
+    GICS_INDUSTRIALS,
+    GICS_MATERIALS,
+    GICS_REAL_ESTATE,
+    GICS_TECHNOLOGY,
+    GICS_UTILITIES,
+    TAPE_COMMODITIES,
+    TAPE_ETF,
+)
 from app.services.tier import FEATURES, Tier, effective_limit, has_feature, is_on_trial, limit
 
 logger = logging.getLogger(__name__)
@@ -140,6 +155,126 @@ _ALLOWED_SECTORS = {
     "real_estate", "utilities", "commodities", "etfs",
 }
 
+# Onboarding sector slug → canonical Ticker.sector label (the strings written
+# by services/sector.canonical_sector() and filtered on by /api/scanner).
+# Lets the day-1 watchlist seeder translate "technology" into an actual
+# sector query. Keep in sync with _ALLOWED_SECTORS above and the frontend
+# SECTORS list in app/app/onboarding/page.tsx + the SECTOR_SLUG_TO_CANONICAL
+# map in components/TodaysTape.tsx.
+_SECTOR_SLUG_TO_CANONICAL: dict[str, str] = {
+    "technology": GICS_TECHNOLOGY,
+    "healthcare": GICS_HEALTH_CARE,
+    "financials": GICS_FINANCIALS,
+    "energy": GICS_ENERGY,
+    "communications": GICS_COMMS,
+    "consumer_discretionary": GICS_CONSUMER_DISC,
+    "consumer_staples": GICS_CONSUMER_STAP,
+    "industrials": GICS_INDUSTRIALS,
+    "materials": GICS_MATERIALS,
+    "real_estate": GICS_REAL_ESTATE,
+    "utilities": GICS_UTILITIES,
+    "commodities": TAPE_COMMODITIES,
+    "etfs": TAPE_ETF,
+}
+
+# How many tickers the day-1 seeder adds to an empty watchlist. Small on
+# purpose: enough to give the smart-alert evaluator and the EOD digest fuel
+# from day 1, few enough that the user's watchlist still feels like theirs.
+WATCHLIST_SEED_SIZE = 3
+
+
+async def _seed_watchlist_for_new_user(
+    session: AsyncSession, user: User, sector_slugs: list[str]
+) -> list[str]:
+    """Seed an EMPTY watchlist with the top currently-scored tickers.
+
+    Onboarding promises "we'll pre-tune your scanner" — this makes the promise
+    real on the alerts side too: without at least one watchlist row, the
+    smart-alert evaluator and the EOD digest have nothing to work with on
+    day 1, which is exactly when a new signup decides whether the product
+    does anything.
+
+    Selection: top-N (N=WATCHLIST_SEED_SIZE, capped by the tier's watchlist
+    limit) live-scored tickers from the user's FIRST chosen sector, topped up
+    from the overall top of the universe when the sector has fewer than N
+    live rows (or when no sector was chosen / onboarding was skipped). Uses
+    the same live_clauses() freshness + data-quality floor as the scanner and
+    /popular, so a stale ghost can never be a user's first impression.
+
+    Idempotent and never destructive: runs ONLY when the user has zero
+    watchlist items, so it never duplicates and never overwrites an existing
+    watchlist — re-submitting onboarding after the user has added (or kept)
+    tickers is a no-op. Deliberately does NOT stamp user.activated_at:
+    activation measures the user's own first add, not ours.
+
+    Returns the seeded symbols (empty when skipped or no live data). The
+    caller commits.
+    """
+    from app.models import Ticker, WatchlistItem
+    from app.routers.watchlist import _resolve_or_create_default_list
+    from app.services.ticker_freshness import live_clauses
+
+    existing = (
+        await session.execute(
+            select(func.count())
+            .select_from(WatchlistItem)
+            .where(WatchlistItem.user_id == user.id)
+        )
+    ).scalar() or 0
+    if existing > 0:
+        return []
+
+    # effective_limit may return the UNLIMITED sentinel (None) for uncapped
+    # keys — watchlist_tickers is always capped today, but guard anyway.
+    cap = effective_limit(user, "watchlist_tickers")
+    n = WATCHLIST_SEED_SIZE if cap is None else min(WATCHLIST_SEED_SIZE, cap)
+    if n <= 0:
+        return []
+
+    clauses = await live_clauses(session)
+
+    async def _top(
+        limit_n: int, sector_label: str | None, exclude: set[str]
+    ) -> list[Ticker]:
+        stmt = select(Ticker)
+        for clause in clauses:
+            stmt = stmt.where(clause)
+        if sector_label:
+            stmt = stmt.where(Ticker.sector == sector_label)
+        if exclude:
+            stmt = stmt.where(Ticker.symbol.notin_(exclude))
+        stmt = stmt.order_by(desc(Ticker.score)).limit(limit_n)
+        return list((await session.execute(stmt)).scalars().all())
+
+    canonical = (
+        _SECTOR_SLUG_TO_CANONICAL.get(sector_slugs[0]) if sector_slugs else None
+    )
+    picks: list[Ticker] = await _top(n, canonical, set()) if canonical else []
+    if len(picks) < n:
+        picks += await _top(n - len(picks), None, {t.symbol for t in picks})
+    if not picks:
+        return []
+
+    list_id = await _resolve_or_create_default_list(session, user.id)
+    for t in picks:
+        session.add(
+            WatchlistItem(
+                user_id=user.id,
+                symbol=t.symbol,
+                watchlist_id=list_id,
+                # Honest provenance — the user should know we added it, why,
+                # and that removing it is fine.
+                note=(
+                    "Starter pick — top-scored in your chosen sector at signup"
+                    if canonical and t.sector == canonical
+                    else "Starter pick — top-scored at signup"
+                ),
+                baseline_score=t.score,
+                alert_threshold_delta=10.0,
+            )
+        )
+    return [t.symbol for t in picks]
+
 
 class OnboardingBody(BaseModel):
     experience_level: ExperienceLevel | None = None
@@ -190,13 +325,29 @@ async def submit_onboarding(
     else:
         user.email_prefs = current & ~bit
     await session.commit()
+
+    # Day-1 watchlist seeding — see _seed_watchlist_for_new_user. Runs in its
+    # own transaction AFTER the profile commit so a seeding hiccup (empty
+    # universe, transient DB error) can never fail the onboarding submit.
+    seeded: list[str] = []
+    try:
+        seeded = await _seed_watchlist_for_new_user(session, user, sectors)
+        if seeded:
+            await session.commit()
+    except Exception:
+        await session.rollback()
+        logger.exception("me.onboarding_watchlist_seed_failed user=%s", user.id)
+
     logger.info(
-        "me.onboarding_submitted user=%s skipped=%s sectors=%d marketing_opt_in=%s",
-        user.id, body.skipped, len(sectors), user.marketing_opt_in,
+        "me.onboarding_submitted user=%s skipped=%s sectors=%d marketing_opt_in=%s seeded=%d",
+        user.id, body.skipped, len(sectors), user.marketing_opt_in, len(seeded),
     )
     return {
         "ok": True,
         "onboarding_completed_at": user.onboarding_completed_at.isoformat(),
+        # Symbols auto-added to an empty watchlist (empty list = none seeded,
+        # e.g. the user already had items or the universe had no live rows).
+        "watchlist_seeded": seeded,
     }
 
 

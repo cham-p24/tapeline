@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { api, type ScannerRow } from "@/lib/api";
+import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
@@ -93,6 +94,13 @@ const SAVED_SCANS_CAP_BY_TIER: Record<string, number> = {
   premium: 100,
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
+// Once the user dismisses (or manually overrides) the onboarding-driven
+// sector pre-tune, never auto-apply it again in this browser. Deliberately
+// non-sticky: dismissal is permanent, the tune itself is not.
+const TUNE_DISMISSED_KEY = "tapeline_scanner_sector_tune_dismissed";
+
 export default function ScannerPage() {
   const { user } = useUser();
   const [rows, setRows] = useState<ScannerRow[]>([]);
@@ -115,6 +123,74 @@ export default function ScannerPage() {
   // "reports in Nd" pill. Fetched once; non-fatal if it fails.
   const earningsBySymbol = useEarningsCalendar(14);
 
+  // Onboarding-driven sector pre-tune. Onboarding promises "we'll pre-tune
+  // your scanner filters" — this delivers it: on first visit the user's
+  // FIRST chosen sector (from /api/me profile.sectors_of_interest) is
+  // pre-selected in the sector filter, with a dismissible chip explaining
+  // why. `tunedSector` is the canonical label we auto-applied (null = no
+  // tune active / chip hidden). Dismissal persists via localStorage.
+  const [tunedSector, setTunedSector] = useState<string | null>(null);
+  // Latest sector / tunedSector values for the async pre-tune fetch and the
+  // stable changeSector callback — if the user touched the sector filter
+  // before /api/me resolved, we never override them.
+  const sectorRef = useRef(sector);
+  const tunedSectorRef = useRef(tunedSector);
+  useEffect(() => {
+    sectorRef.current = sector;
+    tunedSectorRef.current = tunedSector;
+  }, [sector, tunedSector]);
+
+  const dismissTune = useCallback((clearFilter: boolean) => {
+    setTunedSector(null);
+    try {
+      window.localStorage.setItem(TUNE_DISMISSED_KEY, "1");
+    } catch {
+      // storage unavailable — chip just won't stay dismissed across visits
+    }
+    if (clearFilter) setSector("");
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(TUNE_DISMISSED_KEY) === "1") return;
+    } catch {
+      return; // can't persist dismissal → don't auto-apply at all
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/me`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const me = await res.json();
+        const slug: string | undefined = me?.profile?.sectors_of_interest?.[0];
+        const canonical = slug ? SECTOR_SLUG_TO_CANONICAL[slug] : undefined;
+        // Only apply when the user hasn't already picked a sector themselves.
+        if (!canonical || cancelled || sectorRef.current) return;
+        setSector(canonical);
+        setTunedSector(canonical);
+      } catch {
+        // non-fatal — scanner just opens unfiltered as before
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Manual override (sector dropdown, preset apply, reset) while the tune is
+  // active counts as a dismissal: hide the chip and don't re-apply on the
+  // next visit — the user has told us what they want to look at. Every
+  // user-driven sector change routes through here; the pre-tune effect above
+  // is the only caller of the raw setSector. Reads the tune through a ref so
+  // the callback stays stable for applyPreset's memo.
+  const changeSector = useCallback((v: string) => {
+    if (tunedSectorRef.current && v !== tunedSectorRef.current) dismissTune(false);
+    setSector(v);
+  }, [dismissTune]);
+
   // Restore filter state from a saved preset blob. JSON-parsed by
   // PresetMenu before we get here; missing keys fall through to current
   // state, so a preset saved before some new filter dimension was added
@@ -124,11 +200,11 @@ export default function ScannerPage() {
     if (typeof f.maxScore === "number") setMaxScore(f.maxScore);
     if (f.sort) setSort(f.sort);
     if (f.order === "asc" || f.order === "desc") setOrder(f.order);
-    if (typeof f.sector === "string") setSector(f.sector);
+    if (typeof f.sector === "string") changeSector(f.sector);
     if (typeof f.signal === "string") setSignal(f.signal);
     if (typeof f.assetClass === "string") setAssetClass(f.assetClass as AssetBucket);
     if (typeof f.search === "string") setSearch(f.search);
-  }, []);
+  }, [changeSector]);
 
   const savedScansCap = SAVED_SCANS_CAP_BY_TIER[user?.tier ?? "free"] ?? 0;
   // Symbol search — debounced 250ms so typing "NVDA" fires one request not 4.
@@ -182,7 +258,7 @@ export default function ScannerPage() {
   const resetFilters = () => {
     setMinScore(0);
     setMaxScore("");
-    setSector("");
+    changeSector("");
     setSignal("");
     setAssetClass("");
     setSearch("");
@@ -254,7 +330,7 @@ export default function ScannerPage() {
          * backend/app/services/sector.py CANONICAL_ORDER. Same 14 buckets the
          * heatmap renders.
          */}
-        <SelectFilter label="Sector" value={sector} onChange={setSector} options={SECTOR_OPTIONS} />
+        <SelectFilter label="Sector" value={sector} onChange={changeSector} options={SECTOR_OPTIONS} />
         <SelectFilter label="Signal" value={signal} onChange={setSignal} options={SIGNAL_OPTIONS} />
         <SelectFilter
           label="Asset class"
@@ -298,6 +374,25 @@ export default function ScannerPage() {
         />
       </FilterBar>
 
+      {/* Onboarding pre-tune chip — explains WHY the sector filter arrived
+          pre-selected and offers a one-click Clear. Dismissal (or any manual
+          sector change) is remembered in localStorage so this never nags. */}
+      {tunedSector && (
+        <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-accent/30 bg-accent/5 px-3 py-1.5 text-xs">
+          <span className="text-muted">
+            Tuned to your sectors — showing{" "}
+            <strong className="text-fg">{tunedSector}</strong>.
+          </span>
+          <button
+            onClick={() => dismissTune(true)}
+            className="font-medium text-accent hover:underline"
+            aria-label="Clear sector tuning and show all sectors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Inline Free-tier cap hint. Keys off the server-reported tier + row
           cap so the copy can't claim a cap the backend isn't actually applying.
           Free scores are live now (the gating is breadth, not freshness), so the
@@ -319,6 +414,11 @@ export default function ScannerPage() {
           </Link>
         </div>
       )}
+
+      {/* First-week "Today's tape" strip — regime + top HIGH CONVICTION picks
+          + the latest honest scorecard day. Renders only for accounts younger
+          than 7 days; null for everyone else (see components/TodaysTape). */}
+      <TodaysTape />
 
       {/* Table */}
       <div className="card mt-4 overflow-x-auto">
