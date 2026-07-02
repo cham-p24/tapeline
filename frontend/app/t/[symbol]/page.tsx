@@ -808,6 +808,23 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           Read the full methodology on <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
         </p>
 
+        {/* Mid-page email capture — placed right after the factor breakdown,
+            the moment the visitor has just understood what the score means.
+            The bottom-of-page instance converts only readers who scroll the
+            full ~1000-line page; this one catches the majority who don't.
+            Copy is digest-accurate: subscribers get the daily Top 10 ranked
+            by this same formula, not a per-ticker feed. */}
+        <div className="mt-8 rounded-lg border border-border bg-panel/30 p-5 sm:p-6">
+          <div className="mx-auto max-w-md">
+            <NewsletterCapture
+              source="ticker"
+              variant="stacked"
+              heading={`Scores like ${data.symbol}'s, in your inbox`}
+              sub="Each US market morning: the 10 highest-scoring tickers from this same six-factor formula. No card, unsubscribe in one click."
+            />
+          </div>
+        </div>
+
         {/* Score history sparkline — sparse trace from the daily scorecard.
             Shows nothing for tickers that haven't hit top-10, and renders
             a friendly empty state explaining why. */}
@@ -1066,7 +1083,9 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             </p>
           </div>
           <div className="mx-auto max-w-md">
-            <NewsletterCapture source="blog" heading="" sub="" />
+            {/* source="ticker" (was "blog" — wrong attribution; these
+                subscribers come from ticker pages, not blog posts). */}
+            <NewsletterCapture source="ticker" heading="" sub="" />
           </div>
         </div>
       </section>

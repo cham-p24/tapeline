@@ -237,6 +237,14 @@ function UserChip() {
               Upgrade to Pro →
             </Link>
           )}
+          {/* Referral program — double-sided (+1 free month of Premium for
+              both parties, see /app/referrals). The page shipped fully built
+              but was linked from nowhere; the account menu is its home so
+              every signed-in user can find it. */}
+          <Link href="/app/referrals" className="block px-4 py-2 text-sm hover:bg-panel-hover">
+            Refer a friend
+            <span className="block text-xs text-muted">You both get a free month</span>
+          </Link>
           <button
             onClick={async () => { await signout(); window.location.href = "/"; }}
             className="block w-full px-4 py-2 text-left text-sm text-muted hover:text-down"
@@ -300,6 +308,9 @@ function MobileUserChip() {
     <>
       <div className="mt-2 pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
       <Link href="/app/billing" className="px-3 py-2 text-sm text-muted">Billing &amp; plan</Link>
+      <Link href="/app/referrals" className="px-3 py-2 text-sm text-muted">
+        Refer a friend — you both get a free month
+      </Link>
       <button onClick={async () => { await signout(); window.location.href = "/"; }} className="px-3 py-2 text-left text-sm text-down">
         Sign out
       </button>

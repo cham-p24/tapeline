@@ -31,8 +31,10 @@ type Props = {
    * 'signals' — the /signals public universe page
    * 'strategy' — /best-stocks-for/[strategy] listicle pages
    * 'compare' — /compare/* head-to-head pages
+   * 'ticker' — public /t/[symbol] score pages (the heaviest SEO entry
+   *            point; was mis-tagged 'blog' before 2026-07)
    */
-  source: "homepage" | "scorecard" | "pricing" | "blog" | "footer" | "feature" | "signals" | "strategy" | "compare";
+  source: "homepage" | "scorecard" | "pricing" | "blog" | "footer" | "feature" | "signals" | "strategy" | "compare" | "ticker";
   /** Optional headline override; defaults to "Get the daily Top 10 picks". */
   heading?: string;
   /** Optional sub-line override. */
