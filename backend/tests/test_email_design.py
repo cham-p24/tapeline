@@ -17,6 +17,8 @@ out from a customer.
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 from app.services import email as e
@@ -49,6 +51,9 @@ def _all_html_outputs() -> list[tuple[str, str]]:
             "scorecard_best": {"symbol": "PLTR", "as_of": "2026-05-10", "alpha": 3.4},
         })),
         ("day11", e.render_trial_day11_email("Alex", None)),
+        ("day11_with_deadline", e.render_trial_day11_email(
+            "Alex", None, trial_ends_at=datetime(2026, 7, 14, tzinfo=UTC),
+        )),
         ("day13", e.render_trial_day13_email("Alex", None)),
         ("trial_expired", e.render_trial_expired_email("Alex", None)),
         ("trial_post_expiry", e.render_trial_post_expiry_email("Alex")),

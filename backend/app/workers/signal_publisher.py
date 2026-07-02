@@ -21,7 +21,6 @@ from app.models import (
     RegimeState,
     SqueezeSetup,
     Ticker,
-    User,
 )
 
 # --- DATA-FEED IMPORTS ---
@@ -1064,24 +1063,12 @@ async def _downgrade_expired_trials() -> None:
     for user_id, email, prev_tier in candidates[:5]:
         logger.info("  trial.downgrade user=%s email=%s prev_tier=%s", user_id, email, prev_tier)
 
-    # Send the "trial ended" soft-reengagement email to each downgraded user.
-    # No-op if Resend isn't configured.
-    try:
-        from app.services.email import render_trial_ended_email, send_email
-        # Need user names — fetch in one round-trip
-        async with session_scope() as session2:
-            for user_id, email, _prev in candidates:
-                user_r = await session2.execute(select(User).where(User.id == user_id))
-                u = user_r.scalar_one_or_none()
-                name = (u.name if u else None) or "trader"
-                await send_email(
-                    email,
-                    "Tapeline — your trial just ended",
-                    render_trial_ended_email(name),
-                    persona="sales",  # win-back, fronted by Christian
-                )
-    except Exception:
-        logger.exception("trial.downgrade_email_failed")
+    # Deliberately NO email from this path. The daily drip's T+0 "expired"
+    # stage (email.run_daily_drip) owns the end-of-trial email — it dedupes
+    # via users.drip_state, respects the TRIAL_DRIP email preference, and
+    # carries the List-Unsubscribe headers. This function used to also send
+    # render_trial_ended_email here (no dedup, no unsubscribe header), which
+    # double-emailed every non-converting user within ~24h of expiry.
 
 
 async def _refresh_fundamentals_cache() -> None:
