@@ -2049,7 +2049,9 @@ async def run_daily_drip(session) -> dict[str, int]:
                     if token == "11":
                         # T-3 quotes the user's real deadline ("before
                         # Friday, July 10") instead of a hardcoded weekday.
-                        html = renderer(
+                        # Called directly (not via `renderer`) because the
+                        # keyword-only arg isn't part of the shared shape.
+                        html = render_trial_day11_email(
                             user.name or "trader", summary,
                             trial_ends_at=user.trial_ends_at,
                         )
