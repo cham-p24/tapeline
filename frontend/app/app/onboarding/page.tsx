@@ -204,7 +204,7 @@ function OnboardingForm() {
           />
         </Section>
 
-        <Section label="Which sectors are you most interested in?" hint="Pick any that apply — we'll pre-tune your scanner filters.">
+        <Section label="Which sectors are you most interested in?" hint="Pick any that apply — we'll pre-tune your scanner filters and start your watchlist with the top-scored names from your first pick (you can remove them anytime).">
           <div className="flex flex-wrap gap-2">
             {SECTORS.map((s) => {
               const on = sectors.includes(s.value);
