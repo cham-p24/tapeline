@@ -5,6 +5,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { LiveCounters } from "@/components/LiveCounters";
 import { FadeIn } from "@/components/FadeIn";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { POSTS } from "./blog/posts";
 
 export default function LandingPage() {
@@ -369,6 +370,13 @@ export default function LandingPage() {
       </section>
 
       <MarketingFooter />
+
+      {/* Last-chance email capture — fires once per session when the cursor
+          heads for the browser chrome. Self-gating (desktop-only, 5s grace,
+          sessionStorage), renders nothing until triggered. Source tag keeps
+          homepage exits distinguishable from pricing exits in
+          newsletter_subscribers.source. */}
+      <ExitIntentModal source="homepage" />
     </main>
   );
 }

@@ -4,6 +4,9 @@ import { ComparisonTable } from "@/components/ComparisonTable";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TrackPageView } from "@/components/TrackPageView";
+import { ExitIntentModal } from "@/components/ExitIntentModal";
+import { LiveCounters } from "@/components/LiveCounters";
+import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { PRICING, usd } from "@/lib/pricing";
@@ -103,6 +106,32 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* TRUST — the same live, verifiable numbers the homepage and signup
+          page already show, at the moment of purchase decision. Two parts:
+          the public-record proof block (days tracked + same-day, no-edit
+          discipline — pattern ported from /signup) and the LiveCounters
+          strip (tickers tracked, news indexed, tick cadence, regime from
+          /api/status). Descriptive only — no performance claims; the full
+          record, winners and losers, is one click away on /scorecard. */}
+      <section>
+        <div className="section py-10 sm:py-12">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+              Check the record before you pay.
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Every pick is logged same-day and never edited. These numbers are live.
+            </p>
+          </div>
+          <div className="mx-auto mt-8 max-w-2xl">
+            <PricingProof />
+          </div>
+          <div className="mx-auto mt-6 max-w-4xl">
+            <LiveCounters />
+          </div>
+        </div>
+      </section>
+
       {/* FAQ — trimmed to the 4 questions actually asked at sign-up time.
           Detailed support FAQ lives at /support. */}
       <section className="section py-10 sm:py-12">
@@ -143,6 +172,13 @@ export default function PricingPage() {
       </section>
 
       <MarketingFooter />
+
+      {/* Last-chance email capture — fires once per session when the cursor
+          heads for the browser chrome. Visitors on /pricing have shown
+          commercial intent; if they leave without converting, the newsletter
+          is the fallback funnel. Self-gating (desktop-only, 5s grace,
+          sessionStorage), renders nothing until triggered. */}
+      <ExitIntentModal source="pricing" />
     </main>
   );
 }
