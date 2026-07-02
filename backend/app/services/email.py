@@ -25,6 +25,7 @@ yet. See email_design.py for the design system rationale.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Literal
 
 import httpx
@@ -53,6 +54,17 @@ from app.services.email_design import (
     ticker_card,
     watchlist_table,
 )
+
+# Freemium caps quoted in email copy. Referencing the tier.py constants (the
+# single source of truth) instead of hardcoding numbers means a freemium
+# retune can never leave the drip emails selling against a Free tier that no
+# longer exists (which is exactly what happened after the 2026-06-20 retune).
+from app.services.tier import (
+    FREE_DAILY_LOOKUPS,
+    FREE_SCANNER_ROWS,
+    FREE_WATCHLIST_TICKERS,
+)
+from app.services.universe import ACTIVE_UNIVERSE_SIZE
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -574,8 +586,12 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
         + lead("Seven days left of full Premium access.")
         + _trial_summary_block(summary)
         + muted_paragraph(
-            "When the trial ends, your account drops to Free — top 20 tickers, "
-            "24-hour delayed, no alerts. To keep what you have, add a card."
+            f"When the trial ends, your account drops to Free — the scanner cuts "
+            f"from the full ~{ACTIVE_UNIVERSE_SIZE:,}-ticker universe to the top "
+            f"{FREE_SCANNER_ROWS} rows, ticker look-ups cap at "
+            f"{FREE_DAILY_LOOKUPS} a day, the watchlist caps at "
+            f"{FREE_WATCHLIST_TICKERS} tickers, and alerts, Telegram, and the "
+            f"Congress feed switch off. To keep what you have, add a card."
         )
         + _pricing_card(
             "Pro", "$29.99", "$24.99", "$299.99", "$60",
@@ -593,8 +609,26 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
     )
 
 
-def render_trial_day11_email(user_name: str, summary: dict | None = None) -> str:
-    """T-3 — 3 days remaining."""
+def render_trial_day11_email(
+    user_name: str,
+    summary: dict | None = None,
+    *,
+    trial_ends_at: datetime | None = None,
+) -> str:
+    """T-3 — 3 days remaining.
+
+    `trial_ends_at` personalises the deadline to the user's actual expiry
+    ("before Friday, July 10"); without it the copy falls back to the generic
+    "before your trial ends". Previously this hardcoded "before Friday",
+    which was wrong for anyone whose trial didn't end on a Friday.
+    """
+    # "%A, %B" + .day (not %-d / %#d — those are platform-dependent) gives
+    # "Friday, July 10".
+    deadline = (
+        f"{trial_ends_at:%A, %B} {trial_ends_at.day}"
+        if trial_ends_at is not None
+        else "your trial ends"
+    )
     return shell(
         h1("3 days left on your trial.")
         + lead(
@@ -603,11 +637,11 @@ def render_trial_day11_email(user_name: str, summary: dict | None = None) -> str
         )
         + _trial_summary_block(summary)
         + muted_paragraph(
-            "If you decide to keep Premium, add a card before Friday at the "
-            "standard price — $49.99/mo, or $39.99/mo billed annually. "
-            "Picking annual at checkout locks in the lower rate and saves you "
-            "$120 over the year. If you don't add a card, the account drops to "
-            "Free at expiry."
+            f"If you decide to keep Premium, add a card before {deadline} at "
+            f"the standard price — $49.99/mo, or $39.99/mo billed annually. "
+            f"Picking annual at checkout locks in the lower rate and saves you "
+            f"$120 over the year. If you don't add a card, the account drops "
+            f"to Free at expiry."
         )
         + button("Keep Premium", "https://tapeline.io/app/billing")
         + footnote("7-day money back. One-click cancel. No phone calls."),
@@ -626,9 +660,10 @@ def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str
         )
         + _trial_summary_block(summary)
         + muted_paragraph(
-            "If you don't add a card, your account drops to Free at expiry — "
-            "the scanner shows yesterday's data on 20 tickers, no alerts, "
-            "no Telegram, no Congress feed."
+            f"If you don't add a card, your account drops to Free at expiry — "
+            f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
+            f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts, Telegram, "
+            f"and the Congress feed switch off."
         )
         + button("Keep my account active", "https://tapeline.io/app/billing", variant="urgent")
         + footnote("7-day money back. One-click cancel. No phone calls."),
@@ -642,8 +677,10 @@ def render_trial_expired_email(user_name: str, summary: dict | None = None) -> s
         h1("Your Tapeline trial ended.")
         + lead(
             f"{user_name}, your 14-day Premium trial ended overnight. Your "
-            f"account is now on the Free tier — top 20 tickers, 24-hour "
-            f"delayed, no Telegram or smart alerts."
+            f"account is now on the Free tier — still live data, but capped "
+            f"at the top {FREE_SCANNER_ROWS} scanner rows and "
+            f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with no Telegram "
+            f"or smart alerts."
         )
         + _trial_summary_block(summary)
         + muted_paragraph(
@@ -651,7 +688,7 @@ def render_trial_expired_email(user_name: str, summary: dict | None = None) -> s
             f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
             '(every top-10 call back-checked vs SPY), the '
             f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring formula</a>, '
-            'and your watchlist (capped at 5 tickers on Free). One click '
+            f'and your watchlist (capped at {FREE_WATCHLIST_TICKERS} tickers on Free). One click '
             're-activates Premium at the same price — your watchlist + '
             'alerts come back intact.'
         )
@@ -698,8 +735,11 @@ def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None)
 
 
 def render_trial_ended_email(user_name: str) -> str:
-    """Sent on actual downgrade — soft re-engagement (separate code path
-    from the drip series; preserved for the legacy webhook hook)."""
+    """Soft "your trial just ended" note. NOT wired to any automated sender:
+    the hourly worker downgrade (signal_publisher._downgrade_expired_trials)
+    used to send this on top of the drip's T+0 "expired" email, double-mailing
+    every user on expiry day — the worker send was removed and run_daily_drip
+    now owns end-of-trial email. Kept for the admin email-preview gallery."""
     return shell(
         h1(f"Your trial just ended, {user_name}.")
         + lead(
@@ -1145,9 +1185,11 @@ def render_subscription_canceled_email(
             f"and you won't be charged again."
         )
         + muted_paragraph(
-            "After that your account moves to Free — top 20 tickers, 24-hour "
-            "delayed. Your watchlist, saved scans, and alert rules are kept on "
-            "file, so if you come back they're exactly where you left them."
+            f"After that your account moves to Free — still live data, but "
+            f"capped at the top {FREE_SCANNER_ROWS} scanner rows and "
+            f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with alerts switched "
+            f"off. Your watchlist, saved scans, and alert rules are kept on "
+            f"file, so if you come back they're exactly where you left them."
         )
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Changed your mind?</div>'
@@ -1937,6 +1979,11 @@ async def run_daily_drip(session) -> dict[str, int]:
         - "expired" T+0  email — trial_ends_at in (now-1d, now)
         - "post3"   T+3  email — trial_ends_at in (now-4d, now-3d)
 
+    The T+0 "expired" stage is the ONLY end-of-trial email. The hourly
+    worker downgrade (signal_publisher._downgrade_expired_trials) used to
+    also fire render_trial_ended_email on the same day — that send was
+    removed so expiry day produces exactly one email, dedup'd here.
+
     Tier filter: pre-expiry windows target users still on the trial
     (tier in pro/premium, no Stripe customer). Post-expiry windows drop
     the tier filter because auto-downgrade to Free may have already
@@ -1999,7 +2046,17 @@ async def run_daily_drip(session) -> dict[str, int]:
             try:
                 if personalise:
                     summary = await trial_summary_for_user(session, user)
-                    html = renderer(user.name or "trader", summary)
+                    if token == "11":
+                        # T-3 quotes the user's real deadline ("before
+                        # Friday, July 10") instead of a hardcoded weekday.
+                        # Called directly (not via `renderer`) because the
+                        # keyword-only arg isn't part of the shared shape.
+                        html = render_trial_day11_email(
+                            user.name or "trader", summary,
+                            trial_ends_at=user.trial_ends_at,
+                        )
+                    else:
+                        html = renderer(user.name or "trader", summary)
                 else:
                     html = renderer(user.name or "trader")
                 # Day 3 is soft activation — keep under the default
