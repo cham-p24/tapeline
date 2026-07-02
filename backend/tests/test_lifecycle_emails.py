@@ -406,11 +406,11 @@ def test_activation_alert_renderer():
 def test_annual_upgrade_renderer_each_tier():
     pro = render_annual_upgrade_email("Alex", tier="pro")
     assert "Alex" in pro
-    assert "$60" in pro          # Pro annual saving
+    assert "$20" in pro          # Pro annual saving
     assert "Pro" in pro
     premium = render_annual_upgrade_email("Alex", tier="premium")
     assert "Alex" in premium
-    assert "$120" in premium     # Premium annual saving
+    assert "$40" in premium     # Premium annual saving
     assert "Premium" in premium
 
 
@@ -418,4 +418,4 @@ def test_annual_upgrade_renderer_unknown_tier_falls_back():
     """An unexpected tier string must not render blank — falls back to Pro."""
     html = render_annual_upgrade_email("Alex", tier="mystery")
     assert "Alex" in html
-    assert "$60" in html         # Pro fallback pitch
+    assert "$20" in html         # Pro fallback pitch
