@@ -130,7 +130,7 @@ export default async function ShortSqueezeScannerPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Squeeze Watch is a Pro feature ($24.99/mo billed annually, or $29.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades, recent insider buys via SEC Form 4, and unlimited Telegram alerts on top of everything in Pro.",
+          a: "Squeeze Watch is a Pro feature ($8.25/mo billed annually, or $9.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades, recent insider buys via SEC Form 4, and unlimited Telegram alerts on top of everything in Pro.",
         },
       ]}
       tier="pro"

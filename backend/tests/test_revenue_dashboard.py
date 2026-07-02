@@ -3,7 +3,7 @@
 Covers the three moving parts of the lever:
 
   1. mrr_contribution — the pure price-map function. Exact per tier x period,
-     marketed rates (annual uses the advertised $24.99/$39.99 monthly-equiv,
+     marketed rates (annual uses the advertised $8.25/$16.58 monthly-equiv,
      not lump/12); unknown tier -> 0; null/unknown period -> monthly.
   2. GET /api/admin/revenue — admin-gated aggregate endpoint. Exact MRR/ARR off
      ACTIVE subs only, the subscription book sliced by tier/period/status, churn
@@ -123,15 +123,15 @@ def _d(after: dict, before: dict, key: str) -> int:
 # ════════════════════════════════════════════════════════════════════════════
 
 def test_mrr_contribution_matches_marketed_rates():
-    assert mrr_contribution("pro", "monthly") == 29.99
-    assert mrr_contribution("pro", "annual") == 24.99
-    assert mrr_contribution("premium", "monthly") == 49.99
-    assert mrr_contribution("premium", "annual") == 39.99
+    assert mrr_contribution("pro", "monthly") == 9.99
+    assert mrr_contribution("pro", "annual") == 8.25
+    assert mrr_contribution("premium", "monthly") == 19.99
+    assert mrr_contribution("premium", "annual") == 16.58
 
 
 def test_mrr_contribution_null_or_unknown_period_falls_back_to_monthly():
-    assert mrr_contribution("pro", None) == 29.99
-    assert mrr_contribution("premium", "weekly") == 49.99
+    assert mrr_contribution("pro", None) == 9.99
+    assert mrr_contribution("premium", "weekly") == 19.99
 
 
 def test_mrr_contribution_unknown_tier_is_zero():
@@ -175,7 +175,7 @@ async def test_revenue_mrr_is_exact_per_tier_and_period(client, monkeypatch):
 
         after = await _revenue(client, cookies)
 
-        expected_mrr = 29.99 + 24.99 + 49.99 + 39.99  # 144.96
+        expected_mrr = 9.99 + 8.25 + 19.99 + 16.58  # 54.81
         assert after["mrr_usd"] - before["mrr_usd"] == pytest.approx(expected_mrr, abs=0.01)
         assert after["arr_usd"] - before["arr_usd"] == pytest.approx(expected_mrr * 12, abs=0.01)
         assert after["active_subscriptions"] - before["active_subscriptions"] == 4
@@ -202,7 +202,7 @@ async def test_revenue_null_billing_period_counts_as_monthly(client, monkeypatch
         await _seed_sub(uid, tier="pro", billing_period=None)
 
         after = await _revenue(client, cookies)
-        assert after["mrr_usd"] - before["mrr_usd"] == pytest.approx(29.99, abs=0.01)
+        assert after["mrr_usd"] - before["mrr_usd"] == pytest.approx(9.99, abs=0.01)
         assert _d(after["subs_by_period"], before["subs_by_period"], "monthly") == 1
 
 

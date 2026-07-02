@@ -14,8 +14,8 @@ free tier, and pitched the removed Quiver/13F feature) — all removed.
   formula · one-sentence "why" per ticker · public scorecard freezes each daily top-10 and
   back-checks vs SPY, keeping the losing days · **Free forever:** live scores, top-10
   scanner rows, 5 look-ups/day, 3-ticker watchlist, full public scorecard · 14-day Premium
-  trial, no card · **Pro** $29.99/mo ($24.99/mo annual) · **Premium** $49.99/mo
-  ($39.99/mo annual) adds Congressional-trades feed, recent insider buys (SEC Form 4),
+  trial, no card · **Pro** $9.99/mo ($8.25/mo annual) · **Premium** $19.99/mo
+  ($16.58/mo annual, founding pricing — locked in for early subscribers) adds Congressional-trades feed, recent insider buys (SEC Form 4),
   unlimited Telegram + email alerts, public API. (No 13F/Quiver — removed.)
 
 ---
@@ -137,7 +137,7 @@ free tier crippled to upgrade-trap you. So I built the opposite — public weigh
 scorecard that keeps its losing days (it currently trails SPY; that's the honest data, and
 it stays up), and a free tier that's a real, usable product.
 
-Pricing sits mid-pack: Pro $24.99/mo annual, Premium $39.99/mo annual (adds Congress
+Founding pricing while it earns a track record: Pro $8.25/mo annual, Premium $16.58/mo annual (adds Congress
 trades, insider Form 4, unlimited alerts, API). Stack: FastAPI + Postgres + Next.js;
 Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro.
 

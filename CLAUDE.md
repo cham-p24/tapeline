@@ -31,10 +31,10 @@ FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 14 + TypeScript + 
 Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
-**Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03):
+**Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03, founding reprice 2026-07-03):
 - **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
-- **Pro** $29.99/mo OR **$24.99/mo billed annually** ($299.99/yr · save $60) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
-- **Premium** $49.99/mo OR **$39.99/mo billed annually** ($479.99/yr · save $120) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing is now surfaced: `ComparisonTable.tsx` + `PricingTable.tsx` both show the "Public API access · 1,000 requests/day" Premium line, and a public `/developers` landing page (2026-06-06) documents the live endpoints — added to the sitemap + footer, with a tailored OG card.)
+- **Pro** $9.99/mo OR **$8.25/mo billed annually** ($99/yr · save $20) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
+- **Premium** $19.99/mo OR **$16.58/mo billed annually** ($199/yr · save $40) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing is now surfaced: `ComparisonTable.tsx` + `PricingTable.tsx` both show the "Public API access · 1,000 requests/day" Premium line, and a public `/developers` landing page (2026-06-06) documents the live endpoints — added to the sitemap + footer, with a tailored OG card.)
 
 **Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
 
@@ -192,7 +192,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
   tracked) stay live for everyone so the JSON-LD Dataset markup and
   marketing trust signal don't degrade. Gate lives in
   `backend/app/routers/scorecard.py` (`_FREE_DELAY_DAYS`).
-- Three-tier price points ($29.99 Pro / $49.99 Premium) — only revisit with conversion data
+- Three-tier price points (founding pricing 2026-07: $9.99 Pro / $19.99 Premium, framed "locked in for early subscribers"; 30-day money back) — only revisit with conversion data
 - Free tier shows real product (delayed) — not a feature-stripped version
 - Owner login mechanism (only seeded via `seed_owner.py`, never via signup form)
 

@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Tipranks (2026): Published Weights vs Smart Score Black Box",
   description:
-    "Tapeline vs Tipranks — published six-factor weights with a per-pick public scorecard, vs Tipranks' Smart Score that aggregates eight factors at undisclosed weights. Honest comparison at $24.99/mo entry vs $30-76/mo.",
+    "Tapeline vs Tipranks — published six-factor weights with a per-pick public scorecard, vs Tipranks' Smart Score that aggregates eight factors at undisclosed weights. Honest comparison at $8.25/mo entry vs $30-76/mo.",
   path: "/compare/tipranks",
 });
 
@@ -31,13 +31,13 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Pricing — entry tier (annual)",
-    tapeline: "✓ $24.99/mo (Pro, billed annually)",
+    tapeline: "✓ $8.25/mo (Pro, billed annually)",
     competitor: "~$30/mo (Plus) or ~$43.93/mo (Premium)",
   },
   {
     label: "Pricing — top tier (annual)",
-    tapeline: "✓ $39.99/mo (Premium)",
-    competitor: "~$76/mo (Ultimate) — nearly 2× more",
+    tapeline: "✓ $16.58/mo (Premium)",
+    competitor: "~$76/mo (Ultimate) — over 4× more",
   },
   {
     label: "Try without a card",
@@ -94,7 +94,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Tipranks?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). Tipranks Plus is around $30/mo annual, Premium around $43.93/mo annual, Ultimate around $76/mo annual. Tapeline's top tier (Premium) is roughly half the price of Tipranks' top tier (Ultimate) — and Tapeline includes Congressional trades and a live insider activity feed (SEC Form 4) at that price.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo billed annually ($199/yr). Tipranks Plus is around $30/mo annual, Premium around $43.93/mo annual, Ultimate around $76/mo annual. Tapeline's top tier (Premium) is roughly a fifth of the price of Tipranks' top tier (Ultimate) — and Tapeline includes Congressional trades and a live insider activity feed (SEC Form 4) at that price.",
   },
   {
     q: "Does Tipranks publish a per-pick track record?",
@@ -115,7 +115,7 @@ export default function VsTipranksPage() {
       competitorAnnualNote="Plus ~$30/mo annual; Premium ~$43.93/mo; Ultimate ~$76/mo"
       slug="tipranks"
       heading="Tapeline vs Tipranks — published weights vs Smart Score black box."
-      lede="Tipranks built its name on a 1-10 Smart Score aggregating eight factors at undisclosed weights — analyst consensus, hedge fund moves, insider activity, blogger sentiment, news, fundamentals, technicals, individual investors. Tapeline publishes the exact 6-factor weighting in full, back-checks every top-10 daily pick on the public scorecard, and lands the entry tier at $24.99/mo annual. Pick Tapeline if methodology transparency and per-pick accountability matter. Pick Tipranks if you need 35,000+ ticker coverage or the analyst-tracking data."
+      lede="Tipranks built its name on a 1-10 Smart Score aggregating eight factors at undisclosed weights — analyst consensus, hedge fund moves, insider activity, blogger sentiment, news, fundamentals, technicals, individual investors. Tapeline publishes the exact 6-factor weighting in full, back-checks every top-10 daily pick on the public scorecard, and lands the entry tier at $8.25/mo annual. Pick Tapeline if methodology transparency and per-pick accountability matter. Pick Tipranks if you need 35,000+ ticker coverage or the analyst-tracking data."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

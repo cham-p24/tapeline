@@ -29,8 +29,8 @@ So Tapeline scores every US ticker with a single 0–100 composite — Trend 25%
 The thing I care most about: a public scorecard. Every day I log the top 10 names. Next day I compute their actual return vs SPY and the result goes on a public page anyone can audit. No cherry-picking, no "we removed 3 underperformers". Live at https://tapeline.io/scorecard — currently in its first 60 days of back-checking, so the win-rate column is still filling in.
 
 Free tier: top 20 tickers, 24-hour delay, 5-name watchlist.
-Pro $24.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
-Premium $39.99/mo: + Congress trades, insider Form 4 activity, Telegram alerts.
+Pro $9.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
+Premium $19.99/mo: + Congress trades, insider Form 4 activity, Telegram alerts.
 14-day Premium trial, no card required.
 
 Stack: Next.js 14 + FastAPI + Polygon (now Massive) + Finnhub + FRED. Deployed on Vercel + Fly.io.
@@ -101,12 +101,12 @@ What's free:
 - Public scorecard tracking every top-10 pick I make, back-checked against SPY the next day
 - 5-ticker watchlist
 
-What costs $24.99/mo (Pro):
+What costs $9.99/mo (Pro):
 - Full ~2,500 ticker live scan
 - Smart watchlist alerts when scores move
 - IPOs / earnings / news calendar
 
-What costs $39.99/mo (Premium):
+What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
 - + Elite 13F holdings (Buffett, Burry, Ackman, etc.)
 - + Unlimited Telegram alerts
@@ -136,7 +136,7 @@ Score is recomputed every ~30 sec during market hours from a live data feed (Pol
 
 Concrete example a SecurityAnalysis crowd might find useful: filter to `/sector/financials` and the score will give you a 0-100 read on every financial. Click any ticker → /t/$X → see the six-factor breakdown so you can drill into which factor is dragging or pulling.
 
-Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $24.99 unlocks the full universe. Premium $39.99 adds Congress / 13F / Telegram alerts.
+Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $9.99 unlocks the full universe. Premium $19.99 adds Congress / 13F / Telegram alerts.
 
 Happy to take fundamentals-specific critique. The Piotroski F-score implementation in particular — would love eyes on edge cases (financial vs non-financial scoring).
 ```
@@ -196,9 +196,9 @@ Currently in its first 60 days of back-checking. Win-rate column fills in real-t
 
 4/ Free tier: top 20 tickers, 24h delay, 5-name watchlist.
 
-Pro $24.99/mo: full ~2,500-ticker live scan + smart watchlist alerts + IPO/earnings calendar.
+Pro $9.99/mo: full ~2,500-ticker live scan + smart watchlist alerts + IPO/earnings calendar.
 
-Premium $39.99/mo: + Congress + 13F + unlimited Telegram alerts.
+Premium $19.99/mo: + Congress + 13F + unlimited Telegram alerts.
 
 14-day Premium trial, no card.
 
@@ -468,7 +468,7 @@ toggle "Mark as conversion" on the row.
 
 ### Pending your action
 - ⏳ Microsoft OAuth — 10 min in Entra portal, send me 2 strings
-- ⏳ Real-money smoke test ($24.99 self-purchase) — still untested
+- ⏳ Real-money smoke test ($9.99 self-purchase) — still untested
 - ⏳ Stripe webhook secret rotation
 - ⏳ Smart Money / `/app/holdings` decision (A/B/C path)
 - ⏳ Show HN actually posted — needs your HN account, your timing

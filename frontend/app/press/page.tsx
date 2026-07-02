@@ -32,7 +32,7 @@ const FACT_SHEET = [
   { label: "Founded",         value: "2025 (engine), 2026 (public launch)" },
   { label: "Headquarters",    value: "Melbourne, Victoria, Australia" },
   { label: "Funding",         value: "Bootstrapped — no external investment" },
-  { label: "Pricing",         value: "Free · Pro from $24.99/mo (annual) · Premium from $39.99/mo (annual)" },
+  { label: "Pricing",         value: "Free · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual)" },
   { label: "Free trial",      value: "14-day Premium, no credit card required" },
   { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume, from the full liquid US universe)" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },

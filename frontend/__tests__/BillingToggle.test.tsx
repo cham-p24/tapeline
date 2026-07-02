@@ -85,23 +85,24 @@ describe("BillingPage", () => {
     expect(screen.getByRole("heading", { name: "Premium" })).toBeInTheDocument();
   });
 
-  it("defaults to annual billing and shows charm-priced effective monthly", () => {
+  it("defaults to monthly billing and shows the headline monthly prices", () => {
     render(<BillingPage />);
-    // Annual is the default; charm pricing displays Pro at $24.99/mo
-    // ($299.99/yr) and Premium at $39.99/mo ($479.99/yr). Each appears twice —
-    // once in the plan card, once in the embedded ComparisonTable — so match
-    // all occurrences rather than asserting a single element.
-    expect(screen.getAllByText("$24.99").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("$39.99").length).toBeGreaterThan(0);
+    // Monthly is the default (smaller first yes) — founding prices Pro
+    // $9.99/mo and Premium $19.99/mo show without any toggle click.
+    expect(screen.getByText("$9.99")).toBeInTheDocument();
+    expect(screen.getByText("$19.99")).toBeInTheDocument();
   });
 
-  it("switches to monthly pricing when toggle is clicked", () => {
+  it("switches to annual effective-monthly pricing when toggle is clicked", () => {
     render(<BillingPage />);
-    const monthlyBtn = screen.getByRole("button", { name: /monthly/i });
-    fireEvent.click(monthlyBtn);
-    // After toggling, prices should be the headline monthly prices
-    expect(screen.getByText("$29.99")).toBeInTheDocument();
-    expect(screen.getByText("$49.99")).toBeInTheDocument();
+    const annualBtn = screen.getByRole("button", { name: /annual/i });
+    fireEvent.click(annualBtn);
+    // Annual displays the exact effective monthly rate: Pro $8.25/mo
+    // ($99/yr) and Premium $16.58/mo ($199/yr). Each can appear twice —
+    // once in the plan card, once in the embedded ComparisonTable — so match
+    // all occurrences rather than asserting a single element.
+    expect(screen.getAllByText("$8.25").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$16.58").length).toBeGreaterThan(0);
   });
 });
 
@@ -174,7 +175,7 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     window.history.replaceState({}, "", "/app/billing?intent=pro&billing=monthly");
     render(<BillingPage />);
     // Billing toggle flipped to monthly → headline monthly prices visible.
-    expect(await screen.findByText("$29.99")).toBeInTheDocument();
+    expect(await screen.findByText("$9.99")).toBeInTheDocument();
     // The intended plan is flagged "Selected" (never "Current" — they don't own it).
     expect(screen.getByText("Selected")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Current plan" })).not.toBeInTheDocument();

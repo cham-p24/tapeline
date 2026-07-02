@@ -126,8 +126,8 @@ TEMPLATES = {
     ),
     "pricing": lambda: (
         "Free tier covers the top 20 tickers (24h delayed) + the public scorecard + a 5-ticker watchlist. "
-        "Pro is $24.99/mo annual ($29.99 monthly) for the full ~2,500-ticker live scan + smart watchlist alerts. "
-        "Premium is $39.99/mo annual ($49.99 monthly) for everything in Pro + congressional trades + insider Form 4 buys + unlimited Telegram alerts. "
+        "Pro is $8.25/mo annual ($9.99 monthly) for the full ~2,500-ticker live scan + smart watchlist alerts. "
+        "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + congressional trades + insider Form 4 buys + unlimited Telegram alerts. "
         "Every signup gets a 14-day Premium trial, no card. tapeline.io/pricing has the full comparison."
     ),
     "trial": lambda: (
@@ -286,7 +286,7 @@ The bot is "shipped" when:
 2. **Founder's Telegram chat_id** — needed for `INBOX_FOUNDER_TELEGRAM_CHAT_ID`. The `/app/billing` Telegram setup card shows this in his account.
 3. **Reddit app credentials** — founder creates a script-tier app at https://www.reddit.com/prefs/apps (`name: tapeline-inbox-bot`, `type: script`, `redirect_uri: http://localhost`). Returns `client_id` and `client_secret`.
 4. **Resend inbound domain** — does `inbound@tapeline.io` already MX-route to Resend, or does the founder need to add MX records in Cloudflare? If MX records aren't set, this is a blocker for Phase B.
-5. **The Tier 2 templates use placeholder dollar amounts** ($24.99, $39.99). Confirm these are still canonical — `services/tier.py` is the source of truth.
+5. **The Tier 2 templates use placeholder dollar amounts** ($8.25, $16.58). Confirm these are still canonical — `services/tier.py` is the source of truth.
 
 If any of these are unanswered after a quick look at the codebase + memory files, leave a sensible default + a `TODO(founder): confirm X` comment and proceed. Don't block waiting for him.
 

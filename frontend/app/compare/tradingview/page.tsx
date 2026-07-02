@@ -72,9 +72,9 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Cheapest paid tier",
-    tapeline: "$24.99/mo Pro (annual)",
+    tapeline: "$8.25/mo Pro (annual)",
     competitor: "~$15/mo Essential (annual)",
-    note: "TradingView Essential is cheaper but doesn't include any composite scoring or public-scorecard layer — it's a charting subscription. The closer comparison is TradingView Premium (~$60/mo annual) for the multi-chart layouts plus our scoring layer at $24.99.",
+    note: "TradingView Essential is cheaper but doesn't include any composite scoring or public-scorecard layer — it's a charting subscription. The closer comparison is TradingView Premium (~$60/mo annual) for the multi-chart layouts plus our scoring layer at $8.25.",
   },
 ];
 
@@ -85,7 +85,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How do prices compare?",
-    a: "TradingView Essential is ~$15/mo annual, Plus ~$30/mo, Premium ~$60/mo. Tapeline Pro is $24.99/mo annual, Premium $39.99/mo annual. Side-by-side: TradingView Premium + Tapeline Premium runs ~$100/mo annual for the full charting + scoring + scorecard stack.",
+    a: "TradingView Essential is ~$15/mo annual, Plus ~$30/mo, Premium ~$60/mo. Tapeline Pro is $8.25/mo annual, Premium $16.58/mo annual. Side-by-side: TradingView Premium + Tapeline Premium runs ~$77/mo annual for the full charting + scoring + scorecard stack.",
   },
   {
     q: "Does Tapeline have charting like TradingView?",

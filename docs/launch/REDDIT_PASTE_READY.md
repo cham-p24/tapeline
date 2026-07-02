@@ -29,12 +29,12 @@ What's free:
 - Public scorecard tracking every top-10 pick I make, back-checked against SPY the next day
 - 5-ticker watchlist
 
-What costs $24.99/mo (Pro):
+What costs $9.99/mo (Pro):
 - Full ~2,500 ticker live scan
 - Smart watchlist alerts when scores move
 - IPOs / earnings / news calendar
 
-What costs $39.99/mo (Premium):
+What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
 - + Recent insider buys (SEC Form 4) across the active universe
 - + Unlimited Telegram alerts
@@ -110,7 +110,7 @@ Score is recomputed every ~30 sec during market hours from a live data feed (Pol
 
 Concrete example a SecurityAnalysis crowd might find useful: filter to /sector/financials and the score will give you a 0-100 read on every financial. Click any ticker → /t/$X → see the six-factor breakdown so you can drill into which factor is dragging or pulling.
 
-Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $24.99 unlocks the full universe. Premium $39.99 adds Congress / SEC Form 4 / Telegram alerts.
+Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $9.99 unlocks the full universe. Premium $19.99 adds Congress / SEC Form 4 / Telegram alerts.
 
 Happy to take fundamentals-specific critique. The Piotroski F-score implementation in particular — would love eyes on edge cases (financial vs non-financial scoring).
 ```

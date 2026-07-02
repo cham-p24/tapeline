@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs Bloomberg Terminal.",
     subtitle:
-      "98% cheaper for the retail-scoring slice. $479/yr Premium vs $31,980/yr per seat. Different tool, different price.",
+      "99% cheaper for the retail-scoring slice. $199/yr Premium vs $31,980/yr per seat. Different tool, different price.",
   });
 }

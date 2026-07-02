@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs MarketSmith.",
     subtitle:
-      "Published 6-factor formula at $24.99/mo annual vs IBD's proprietary CAN SLIM Composite Rating at $74.95/mo. Transparency vs pedigree.",
+      "Published 6-factor formula at $8.25/mo annual vs IBD's proprietary CAN SLIM Composite Rating at $74.95/mo. Transparency vs pedigree.",
   });
 }

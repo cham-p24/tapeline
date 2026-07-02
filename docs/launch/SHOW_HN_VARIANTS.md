@@ -28,8 +28,8 @@ The score itself is a public 6-factor composite — Trend 25%, Relative Strength
 The scorecard is the part I want HN to tear apart. It's the only thing I've ever seen in this space that's auditable from day one. Currently in its first week of forward-testing — early data on /scorecard shows median 1D alpha around -0.7% on 35 clean entries (4 vendor-data outliers excluded; the filter logic is in the public Python source). I expect those numbers to swing both directions as the sample grows. The transparency is the point, not the early hit rate.
 
 Free tier: top 20 tickers, 24h delay, 5-name watchlist.
-Pro $24.99/mo billed annually: full live universe + smart alerts.
-Premium $39.99/mo: + Congress trades + SEC Form 4 + Telegram.
+Pro $8.25/mo billed annually: full live universe + smart alerts.
+Premium $19.99/mo: + Congress trades + SEC Form 4 + Telegram.
 14-day Premium trial, no card.
 
 Built solo over the last few months from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and what factors I'm under-weighting.
@@ -69,7 +69,7 @@ Weights are version-controlled. /scorecard is uneditable history. /changelog log
 
 Stack: Next.js 16 + FastAPI + Polygon/Massive + Finnhub + FRED, deployed on Vercel + Fly.io. Source for the scoring formula and the scorecard back-check service is open on /how-it-works in pseudocode form (the production code is closed but mirror-able from the published spec).
 
-Free tier: top 20 tickers, 24h delay. Pro $24.99/mo annual. Premium $39.99/mo annual. 14-day trial, no card.
+Free tier: top 20 tickers, 24h delay. Pro $8.25/mo annual. Premium $16.58/mo annual. 14-day trial, no card.
 
 What I want HN to break: the methodology. The Smart Money sub-score in particular — I weight Form 4 over 13F because the lag math kills 13F-driven signals, but I'd love to be argued out of it.
 ```

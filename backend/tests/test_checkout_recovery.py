@@ -262,7 +262,7 @@ def test_checkout_abandoned_renderer_pro_monthly():
     html = render_checkout_abandoned_email("Alex", tier="pro", billing_period="monthly")
     assert "Alex" in html
     assert "Pro" in html
-    assert "$29.99/mo" in html
+    assert "$9.99/mo" in html
     # Resume link lands on /app/billing with the plan pre-selected.
     assert "/app/billing?resume=1" in html
     assert "tier=pro" in html
@@ -285,7 +285,7 @@ def test_checkout_abandoned_renderer_premium_annual():
     html = render_checkout_abandoned_email("Sam", tier="premium", billing_period="annual")
     assert "Sam" in html
     assert "Premium" in html
-    assert "$479.99/yr" in html
+    assert "$199/yr" in html
     assert "tier=premium" in html
     assert "billing_period=annual" in html
 
@@ -296,4 +296,4 @@ def test_checkout_abandoned_renderer_unknown_period_falls_back():
     html = render_checkout_abandoned_email("Alex", tier="pro", billing_period="weekly")
     assert "Alex" in html
     assert "billing_period=monthly" in html
-    assert "$29.99/mo" in html
+    assert "$9.99/mo" in html

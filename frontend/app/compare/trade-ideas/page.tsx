@@ -4,14 +4,14 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Trade Ideas (2026): Public Formula at $25/mo vs Holly AI at $120+/mo",
   description:
-    "Tapeline vs Trade Ideas — transparent 6-factor scoring at $24.99/mo annual vs Trade Ideas' Holly AI scanner at $120+/mo. Public scorecard, plain-English Why, no proprietary AI black box.",
+    "Tapeline vs Trade Ideas — transparent 6-factor scoring at $8.25/mo annual vs Trade Ideas' Holly AI scanner at $120+/mo. Public scorecard, plain-English Why, no proprietary AI black box.",
   path: "/compare/trade-ideas",
 });
 
 const WINS: CompareRow[] = [
   {
     label: "Pricing — entry tier",
-    tapeline: "✓ $24.99/mo Pro (annual)",
+    tapeline: "✓ $8.25/mo Pro (annual)",
     competitor: "~$120/mo Standard, $240/mo Premium",
   },
   {
@@ -79,7 +79,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Trade Ideas?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo annual ($479.99/yr). Trade Ideas Standard is approximately $120/mo, Premium $240/mo, with Holly AI auto-trading as an add-on. Tapeline is roughly 1/5 the entry price; Trade Ideas justifies the premium with intraday speed and the AI execution layer.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo annual ($199/yr). Trade Ideas Standard is approximately $120/mo, Premium $240/mo, with Holly AI auto-trading as an add-on. Tapeline is roughly 1/15 the entry price; Trade Ideas justifies the premium with intraday speed and the AI execution layer.",
   },
   {
     q: "Is Trade Ideas' Holly AI a black box?",
@@ -104,7 +104,7 @@ export default function VsTradeIdeasPage() {
       competitorAnnualNote="Standard ~$120/mo, Premium with Holly AI ~$240/mo"
       slug="trade-ideas"
       heading="Tapeline vs Trade Ideas — transparent score at 1/5 the price."
-      lede="Trade Ideas is a $120-240/mo intraday scanner with proprietary Holly AI signals and an auto-trading layer. Tapeline is a 2026-built quantitative scanner with one composite score per ticker at a published 6-factor formula, a plain-English Why on every row, and a public scorecard back-checking every call vs SPY — at $24.99-39.99/mo. Pick Tapeline if transparency and price matter; pick Trade Ideas if you need sub-second intraday signals or AI auto-execution."
+      lede="Trade Ideas is a $120-240/mo intraday scanner with proprietary Holly AI signals and an auto-trading layer. Tapeline is a 2026-built quantitative scanner with one composite score per ticker at a published 6-factor formula, a plain-English Why on every row, and a public scorecard back-checking every call vs SPY — at $8.25-16.58/mo. Pick Tapeline if transparency and price matter; pick Trade Ideas if you need sub-second intraday signals or AI auto-execution."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

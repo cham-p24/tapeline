@@ -594,17 +594,17 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
             f"Congress feed switch off. To keep what you have, add a card."
         )
         + _pricing_card(
-            "Pro", "$29.99", "$24.99", "$299.99", "$60",
+            "Pro", "$9.99", "$8.25", "$99", "$20",
             "Full live scanner, squeeze, regime, watchlist, email alerts, daily briefing.",
             accent=False,
         )
         + _pricing_card(
-            "Premium", "$49.99", "$39.99", "$479.99", "$120",
+            "Premium", "$19.99", "$16.58", "$199", "$40",
             "Everything in Pro + Congress + Telegram unlimited + insider Form 4 + analyst ratings.",
             accent=True,
         )
         + button("Add a card", "https://tapeline.io/app/billing")
-        + footnote("7-day money back, cancel anytime in one click."),
+        + footnote("Founding pricing — locked in for early subscribers. 30-day money back, cancel anytime in one click."),
         preheader="Seven days left on your trial — add a card to keep Premium.",
     )
 
@@ -638,13 +638,13 @@ def render_trial_day11_email(
         + _trial_summary_block(summary)
         + muted_paragraph(
             f"If you decide to keep Premium, add a card before {deadline} at "
-            f"the standard price — $49.99/mo, or $39.99/mo billed annually. "
-            f"Picking annual at checkout locks in the lower rate and saves you "
-            f"$120 over the year. If you don't add a card, the account drops "
-            f"to Free at expiry."
+            f"the founding price — $19.99/mo, or $16.58/mo billed annually "
+            f"($199/yr). Annual saves you $40 over the year, and either way "
+            f"your rate is locked in for as long as you stay subscribed. If "
+            f"you don't add a card, the account drops to Free at expiry."
         )
         + button("Keep Premium", "https://tapeline.io/app/billing")
-        + footnote("7-day money back. One-click cancel. No phone calls."),
+        + footnote("30-day money back. One-click cancel. No phone calls."),
         preheader="Three days left of Premium — add a card to keep it.",
     )
 
@@ -665,8 +665,15 @@ def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str
             f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts, Telegram, "
             f"and the Congress feed switch off."
         )
+        + muted_paragraph(
+            "Two ways to keep it: <strong>keep everything — Premium "
+            "$19.99/mo</strong> (or $16.58/mo billed annually), or "
+            "<strong>keep the scanner — Pro $9.99/mo</strong> (or $8.25/mo "
+            "billed annually). Founding pricing, locked in while you stay "
+            "subscribed."
+        )
         + button("Keep my account active", "https://tapeline.io/app/billing", variant="urgent")
-        + footnote("7-day money back. One-click cancel. No phone calls."),
+        + footnote("30-day money back. One-click cancel. No phone calls."),
         preheader="Your Premium trial expires in less than 24 hours.",
     )
 
@@ -688,9 +695,14 @@ def render_trial_expired_email(user_name: str, summary: dict | None = None) -> s
             f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
             '(every top-10 call back-checked vs SPY), the '
             f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring formula</a>, '
-            f'and your watchlist (capped at {FREE_WATCHLIST_TICKERS} tickers on Free). One click '
-            're-activates Premium at the same price — your watchlist + '
-            'alerts come back intact.'
+            f'and your watchlist (capped at {FREE_WATCHLIST_TICKERS} tickers on Free).'
+        )
+        + muted_paragraph(
+            "One click brings it all back, and your watchlist + alerts come "
+            "back intact: <strong>keep everything — Premium $19.99/mo</strong> "
+            "(or $16.58/mo billed annually), or <strong>keep the scanner — "
+            "Pro $9.99/mo</strong> (or $8.25/mo billed annually). Founding "
+            "pricing, locked in while you stay subscribed."
         )
         + button("Re-activate Premium", "https://tapeline.io/app/billing")
         + footnote("No more reminders unless you re-activate. One more note in 3 days then I'll stop emailing."),
@@ -958,7 +970,7 @@ def render_subscription_started_email(
       - Quietly celebratory ("you're in")
       - Two concrete next steps, not three (less overwhelming than the day-0
         welcome which is for trial users with no commitment yet)
-      - Acknowledges the 7-day refund window without leading with it
+      - Acknowledges the 30-day refund window without leading with it
 
     Arguments map directly to fields available on the Stripe subscription
     object in the webhook handler — see routers/webhooks.py.
@@ -972,10 +984,10 @@ def render_subscription_started_email(
         # Fallback to the canonical sticker prices if the webhook didn't carry
         # an amount (shouldn't happen but better than printing nothing).
         sticker = {
-            ("pro", "monthly"): "$29.99/mo",
-            ("pro", "annual"): "$299.99/yr",
-            ("premium", "monthly"): "$49.99/mo",
-            ("premium", "annual"): "$479.99/yr",
+            ("pro", "monthly"): "$9.99/mo",
+            ("pro", "annual"): "$99/yr",
+            ("premium", "monthly"): "$19.99/mo",
+            ("premium", "annual"): "$199/yr",
         }.get((tier.lower(), billing_period), "")
         price_line = sticker
     next_charge_line = ""
@@ -1020,7 +1032,7 @@ def render_subscription_started_email(
         )
         + footnote(
             "Changed your mind? <a href=\"https://tapeline.io/legal/refund\" "
-            f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">7-day money "
+            f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">30-day money "
             "back, no questions</a> — just reply to this email and we'll refund in full."
         ),
         preheader=f"Welcome to Tapeline {tier_label} — your full data feed is live.",
@@ -1119,10 +1131,10 @@ def render_checkout_abandoned_email(
     tier_label = (tier or "pro").capitalize()
     period = billing_period if billing_period in ("monthly", "annual") else "monthly"
     sticker = {
-        ("pro", "monthly"): "$29.99/mo",
-        ("pro", "annual"): "$299.99/yr",
-        ("premium", "monthly"): "$49.99/mo",
-        ("premium", "annual"): "$479.99/yr",
+        ("pro", "monthly"): "$9.99/mo",
+        ("pro", "annual"): "$99/yr",
+        ("premium", "monthly"): "$19.99/mo",
+        ("premium", "annual"): "$199/yr",
     }.get((tier.lower() if tier else "pro", period), "")
     price_line = f"Tapeline {tier_label} · {sticker}" if sticker else f"Tapeline {tier_label}"
     resume_url = (
@@ -1502,17 +1514,17 @@ def render_activation_alert_email(user_name: str) -> str:
 _ANNUAL_PITCH: dict[str, dict[str, str]] = {
     "pro": {
         "label": "Pro",
-        "monthly": "$29.99",
-        "annual_monthly": "$24.99",
-        "annual_yearly": "$299.99",
-        "savings": "$60",
+        "monthly": "$9.99",
+        "annual_monthly": "$8.25",
+        "annual_yearly": "$99",
+        "savings": "$20",
     },
     "premium": {
         "label": "Premium",
-        "monthly": "$49.99",
-        "annual_monthly": "$39.99",
-        "annual_yearly": "$479.99",
-        "savings": "$120",
+        "monthly": "$19.99",
+        "annual_monthly": "$16.58",
+        "annual_yearly": "$199",
+        "savings": "$40",
     },
 }
 

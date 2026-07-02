@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Stock Rover (2026): Composite Score vs 650-Metric Fundamental Screener",
   description:
-    "Tapeline vs Stock Rover — one published 6-factor composite score per ticker with sub-60s refresh, vs Stock Rover's 650+ raw fundamental metrics across 8,500 stocks. Honest comparison at $24.99/mo Pro annual vs $7.99-$27.99/mo annual.",
+    "Tapeline vs Stock Rover — one published 6-factor composite score per ticker with sub-60s refresh, vs Stock Rover's 650+ raw fundamental metrics across 8,500 stocks. Honest comparison at $8.25/mo Pro annual vs $7.99-$27.99/mo annual.",
   path: "/compare/stock-rover",
 });
 
@@ -85,7 +85,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Stock Rover?",
-    a: "Tapeline Pro is $24.99/mo billed annually; Premium is $39.99/mo billed annually. Stock Rover paid tiers (annual equivalents): Essentials ~$7.99/mo, Premium ~$17.99/mo, Premium Plus ~$27.99/mo. Stock Rover is cheaper on the entry tier; Tapeline includes Congressional trades + live SEC Form 4 insider activity at $39.99/mo, both of which would be add-on costs at Stock Rover (and Stock Rover doesn't offer Congressional trades at all).",
+    a: "Tapeline Pro is $8.25/mo billed annually; Premium is $16.58/mo billed annually. Stock Rover paid tiers (annual equivalents): Essentials ~$7.99/mo, Premium ~$17.99/mo, Premium Plus ~$27.99/mo. Stock Rover Essentials is marginally cheaper at entry ($7.99 vs $8.25); Tapeline includes Congressional trades + live SEC Form 4 insider activity at $16.58/mo, both of which would be add-on costs at Stock Rover (and Stock Rover doesn't offer Congressional trades at all).",
   },
   {
     q: "What is the Tapeline Score vs a Stock Rover screener result?",

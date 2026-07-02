@@ -96,9 +96,9 @@ async def render_pricing(_body: str) -> str:
     """Canonical pricing answer. Mirrors what /pricing shows."""
     return (
         "Free tier covers the top 20 tickers (24h delayed) + the public "
-        "scorecard + a 5-ticker watchlist. Pro is $24.99/mo annual "
-        "($29.99 monthly) for the full ~2,500-ticker live scan + smart "
-        "watchlist alerts. Premium is $39.99/mo annual ($49.99 monthly) "
+        "scorecard + a 5-ticker watchlist. Pro is $8.25/mo annual "
+        "($9.99 monthly) for the full ~2,500-ticker live scan + smart "
+        "watchlist alerts. Premium is $16.58/mo annual ($19.99 monthly) "
         "for everything in Pro + congressional trades + insider Form 4 "
         "buys + unlimited Telegram alerts. Every signup gets a 14-day "
         "Premium trial, no card. Full comparison at tapeline.io/pricing."

@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What does Tapeline cost compared to free Webull scanning?",
-    a: "Webull's scanner is included with the brokerage account at no cost. Tapeline Pro is $24.99/mo billed annually. The price difference is the scoring layer — published 6-factor formula, sub-60s composite, public scorecard. If you're happy assembling your own thesis from raw filters, Webull is fine. If you want the synthesised answer, Tapeline.",
+    a: "Webull's scanner is included with the brokerage account at no cost. Tapeline Pro is $8.25/mo billed annually. The price difference is the scoring layer — published 6-factor formula, sub-60s composite, public scorecard. If you're happy assembling your own thesis from raw filters, Webull is fine. If you want the synthesised answer, Tapeline.",
   },
   {
     q: "What's the 14-day Tapeline trial?",
@@ -72,7 +72,7 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Cost",
-    tapeline: "$24.99/mo (Pro, billed annually) or $29.99/mo monthly",
+    tapeline: "$8.25/mo (Pro, billed annually) or $9.99/mo monthly",
     competitor: "Free with Webull brokerage account",
     note: "Webull bundles the scanner with execution at $0. Tapeline is paid because the scoring engine, the daily back-check, and the public scorecard are the product — not an add-on to make a brokerage stickier. If you only want filter-based discovery and you're already a Webull user, free is hard to argue with.",
   },

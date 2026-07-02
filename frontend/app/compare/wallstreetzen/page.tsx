@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How do prices compare?",
-    a: "Tapeline Pro is $24.99/mo billed annually; Premium is $39.99/mo billed annually. WallStreetZen Premium is approximately $24.50/mo billed annually. Effectively identical entry pricing, with Tapeline including the public scorecard, plain-English Why on every row, and Congressional + insider activity feeds (Premium tier).",
+    a: "Tapeline Pro is $8.25/mo billed annually; Premium is $16.58/mo billed annually. WallStreetZen Premium is approximately $24.50/mo billed annually. Tapeline Pro runs at roughly a third of that, with Tapeline including the public scorecard, plain-English Why on every row, and Congressional + insider activity feeds (Premium tier).",
   },
   {
     q: "Does WallStreetZen publish a per-pick track record?",
@@ -102,7 +102,7 @@ const TRADEOFFS = [
   },
   {
     label: "Cheapest paid tier",
-    tapeline: "$24.99/mo (Pro, billed annually)",
+    tapeline: "$8.25/mo (Pro, billed annually)",
     competitor: "$19.50/mo (Premium, billed annually)",
     note: "WallStreetZen is ~$5/mo cheaper. You're getting fewer features for the saving — Tapeline includes the live tick, scorecard, and squeeze module at the same price band.",
   },

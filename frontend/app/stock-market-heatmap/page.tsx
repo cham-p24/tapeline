@@ -137,7 +137,7 @@ export default async function StockMarketHeatmapPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Stock market heatmap is a Pro feature ($24.99/mo billed annually, or $29.99/mo monthly). The 14-day Premium trial includes everything in Pro. Premium adds Congressional trades, recent insider buys, and unlimited Telegram alerts.",
+          a: "Stock market heatmap is a Pro feature ($8.25/mo billed annually, or $9.99/mo monthly). The 14-day Premium trial includes everything in Pro. Premium adds Congressional trades, recent insider buys, and unlimited Telegram alerts.",
         },
       ]}
       tier="pro"

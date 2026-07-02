@@ -76,13 +76,13 @@ describe("trackEvent → Google Ads conversion forwarding", () => {
     trackEvent("subscribe", {
       tier: "pro",
       billing_period: "annual",
-      value: 299.99,
+      value: 99,
       currency: "USD",
     });
 
     expect(gtag).toHaveBeenCalledWith("event", "conversion", {
       send_to: "AW-123456789/subLABEL",
-      value: 299.99,
+      value: 99,
       currency: "USD",
     });
   });
@@ -98,13 +98,13 @@ describe("trackEvent → Google Ads conversion forwarding", () => {
     trackEvent("subscribe", {
       tier: "premium",
       billing_period: "monthly",
-      value: 49.99,
+      value: 19.99,
       currency: "USD",
     });
 
     expect(gtag).toHaveBeenCalledWith("event", "conversion", {
       send_to: "AW-18169833652/1GH_CIT50rkcELTRhthD",
-      value: 49.99,
+      value: 19.99,
       currency: "USD",
     });
   });

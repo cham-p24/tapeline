@@ -5,7 +5,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Tapeline pricing — $24.99/mo Pro · $39.99/mo Premium (USD)";
+export const alt = "Tapeline pricing — $8.25/mo Pro · $16.58/mo Premium (annual, USD)";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -83,14 +83,14 @@ export default async function OG() {
           />
           <Tile
             tier="Pro"
-            price="$24.99"
+            price="$8.25"
             sub="/mo annual"
             note="Full live scanner · alerts · CSV"
             outline
           />
           <Tile
             tier="Premium"
-            price="$39.99"
+            price="$16.58"
             sub="/mo annual"
             note="+ Congress · Insider · API · Telegram"
             highlight

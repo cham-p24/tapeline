@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Bloomberg Terminal (2026): Retail Pricing vs $31K/yr Institutional",
   description:
-    "Tapeline vs Bloomberg Terminal — published 6-factor composite at $24.99/mo annual, vs Bloomberg's institutional terminal at ~$2,665/mo ($31,980/yr). Honest comparison for retail traders.",
+    "Tapeline vs Bloomberg Terminal — published 6-factor composite at $8.25/mo annual, vs Bloomberg's institutional terminal at ~$2,665/mo ($31,980/yr). Honest comparison for retail traders.",
   path: "/compare/bloomberg-terminal",
 });
 
@@ -19,7 +19,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How does the pricing compare?",
-    a: "Bloomberg Terminal is approximately $2,665/month per seat ($31,980/year). Tapeline Premium is $39.99/mo billed annually ($479/yr). That's roughly 98% cheaper. Bloomberg's pricing is justified for the asset-class coverage, real-time global market data, news desk, and chat — none of which Tapeline tries to replicate.",
+    a: "Bloomberg Terminal is approximately $2,665/month per seat ($31,980/year). Tapeline Premium is $16.58/mo billed annually ($199/yr). That is roughly 99% cheaper. Bloomberg's pricing is justified for the asset-class coverage, real-time global market data, news desk, and chat — none of which Tapeline tries to replicate.",
   },
   {
     q: "What does Bloomberg do that Tapeline doesn't?",
@@ -34,7 +34,7 @@ const COMPARE_FAQ = [
 const WINS = [
   {
     label: "Annual cost",
-    tapeline: "$299/yr (Pro) · $479/yr (Premium)",
+    tapeline: "$99/yr (Pro) · $199/yr (Premium)",
     competitor: "$31,980/yr per seat",
   },
   {
@@ -98,8 +98,8 @@ export default function VsBloombergTerminalPage() {
       competitorPriceMonthly={2665}
       competitorAnnualNote="Bloomberg Terminal ~$2,665/mo per seat ($31,980/yr). Institutional product; annual contract."
       slug="bloomberg-terminal"
-      heading="Tapeline vs Bloomberg Terminal — 98% cheaper for the retail-scoring slice."
-      lede="Bloomberg Terminal is the institutional gold standard — every asset class, every function, every venue, at ~$32,000/year per seat. Tapeline solves a tiny slice of what Bloomberg solves: 'which US equities are setting up right now, why, and what's the public track record'. For that specific slice, Tapeline is 98% cheaper and ships a published 6-factor formula Bloomberg doesn't bundle out of the box."
+      heading="Tapeline vs Bloomberg Terminal — 99% cheaper for the retail-scoring slice."
+      lede="Bloomberg Terminal is the institutional gold standard — every asset class, every function, every venue, at ~$32,000/year per seat. Tapeline solves a tiny slice of what Bloomberg solves: 'which US equities are setting up right now, why, and what's the public track record'. For that specific slice, Tapeline is 99% cheaper and ships a published 6-factor formula Bloomberg doesn't bundle out of the box."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={COMPARE_FAQ}

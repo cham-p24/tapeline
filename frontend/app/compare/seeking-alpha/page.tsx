@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Seeking Alpha (2026): Deterministic Score vs 31K-Contributor Editorial",
   description:
-    "Tapeline vs Seeking Alpha — one published 6-factor score per ticker with a per-pick public scorecard, vs Seeking Alpha's 31,000-contributor editorial library with Quant Ratings. Honest comparison at $24.99/mo Pro annual vs ~$239/yr Premium.",
+    "Tapeline vs Seeking Alpha — one published 6-factor score per ticker with a per-pick public scorecard, vs Seeking Alpha's 31,000-contributor editorial library with Quant Ratings. Honest comparison at $8.25/mo Pro annual vs ~$239/yr Premium.",
   path: "/compare/seeking-alpha",
 });
 
@@ -31,12 +31,12 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Pricing — entry tier (annual)",
-    tapeline: "✓ $24.99/mo Pro · $39.99/mo Premium",
+    tapeline: "✓ $8.25/mo Pro · $16.58/mo Premium",
     competitor: "~$239/yr Premium (~$19.92/mo equivalent)",
   },
   {
     label: "Pricing — top tier",
-    tapeline: "✓ $479.99/yr Premium (annual)",
+    tapeline: "✓ $199/yr Premium (annual)",
     competitor: "~$2,400/yr Pro · Alpha Picks adds another ~$499/yr",
   },
   {
@@ -90,7 +90,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How does Tapeline pricing compare to Seeking Alpha?",
-    a: "Tapeline Pro is $24.99/mo billed annually ($299.99/yr); Premium is $39.99/mo billed annually ($479.99/yr). Seeking Alpha Premium is around $239/yr (~$19.92/mo equivalent), Pro is around $2,400/yr, and Alpha Picks adds roughly $499/yr on top. Tapeline Premium ($479.99/yr) sits between SA Premium and SA Pro, while including Congressional trades and live SEC Form 4 insider activity — both of which would be add-on costs at SA.",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo billed annually ($199/yr). Seeking Alpha Premium is around $239/yr (~$19.92/mo equivalent), Pro is around $2,400/yr, and Alpha Picks adds roughly $499/yr on top. Tapeline Premium ($199/yr) undercuts SA Premium, while including Congressional trades and live SEC Form 4 insider activity — both of which would be add-on costs at SA.",
   },
   {
     q: "What is the Tapeline Score vs the SA Quant Rating?",

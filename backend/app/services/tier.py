@@ -2,10 +2,10 @@
 Tier gating — three-tier model (Free / Pro / Premium).
 
 - Free: preview only (top 20 tickers, 24-hour delayed)
-- Pro $29.99/mo: live scanner, full universe, squeeze + regime + heatmap,
-  watchlist with smart alerts, email alerts, CSV export
-- Premium $49.99/mo: everything in Pro + Congressional trades, unlimited
-  Telegram alerts, unlimited email alerts, public API (1,000/day),
+- Pro $9.99/mo ($99/yr): live scanner, full universe, squeeze + regime +
+  heatmap, watchlist with smart alerts, email alerts, CSV export
+- Premium $19.99/mo ($199/yr): everything in Pro + Congressional trades,
+  unlimited Telegram alerts, unlimited email alerts, public API (1,000/day),
   priority support
 
 Team / Enterprise / Lifetime sales map to 'premium' in the DB; per-account
@@ -162,24 +162,24 @@ def limit(user_tier: Tier | str, key: str) -> int | None:
 # check, so change all three together.
 #
 # TIER_PRICES = the amount actually charged per billing cycle (what hits the
-# card): ("pro","monthly") bills $29.99/mo; ("pro","annual") bills $299.99 once
-# a year.
+# card): ("pro","monthly") bills $9.99/mo; ("pro","annual") bills $99 once
+# a year. Founding pricing since 2026-07 (Stripe price IDs swapped in env).
 TIER_PRICES: dict[tuple[str, str], float] = {
-    ("pro", "monthly"): 29.99,
-    ("pro", "annual"): 299.99,
-    ("premium", "monthly"): 49.99,
-    ("premium", "annual"): 479.99,
+    ("pro", "monthly"): 9.99,
+    ("pro", "annual"): 99.0,
+    ("premium", "monthly"): 19.99,
+    ("premium", "annual"): 199.0,
 }
 
 # Per-recognized-month revenue (what an accountant books each month). Annual
 # uses the advertised monthly-equivalent rate we show on the pricing toggle
-# ($24.99 / $39.99), NOT lump/12 ($24.999.. / $39.999..) — this keeps the
+# ($8.25 / $16.58), NOT the unrounded lump/12 ($16.5833..) — this keeps the
 # dashboard's MRR aligned with the pricing page with zero rounding drift.
 _MRR_CONTRIBUTION: dict[tuple[str, str], float] = {
-    ("pro", "monthly"): 29.99,
-    ("pro", "annual"): 24.99,
-    ("premium", "monthly"): 49.99,
-    ("premium", "annual"): 39.99,
+    ("pro", "monthly"): 9.99,
+    ("pro", "annual"): 8.25,
+    ("premium", "monthly"): 19.99,
+    ("premium", "annual"): 16.58,
 }
 
 

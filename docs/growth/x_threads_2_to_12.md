@@ -196,7 +196,7 @@ The ONLY difference vs Pro is the 24-hour delay on data.
 ```
 If you can act on day-old data, the free tier IS the right tier. Stay there forever — that's fine.
 
-If you need live data, Pro is $24.99/mo billed annually. Same scoring engine, same scorecard, no data delay, plus smart watchlist alerts.
+If you need live data, Pro is $8.25/mo billed annually. Same scoring engine, same scorecard, no data delay, plus smart watchlist alerts.
 
 That's the entire upgrade decision.
 ```

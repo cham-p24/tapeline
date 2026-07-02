@@ -280,10 +280,10 @@ pending"*. **Until this is fixed, no money can change hands.**
    - Verify business identity (ABN, bank account for AUD payouts)
    - Test mode keys work immediately; live mode requires ~24h KYC
 2. **Create 4 products** in Stripe Dashboard → Products → New
-   - Pro Monthly: $29.00 USD recurring monthly
-   - Pro Annual: $299.00 USD recurring yearly (displays as $24.99/mo)
-   - Premium Monthly: $49.00 USD recurring monthly
-   - Premium Annual: $479.00 USD recurring yearly (displays as $39.99/mo)
+   - Pro Monthly: $9.99 USD recurring monthly
+   - Pro Annual: $99.00 USD recurring yearly (displays as $8.25/mo)
+   - Premium Monthly: $19.99 USD recurring monthly
+   - Premium Annual: $199.00 USD recurring yearly (displays as $16.58/mo)
    - Copy each Price ID (`price_…`)
 3. **Create webhook endpoint**
    - URL: `https://api.tapeline.io/api/webhooks/stripe`

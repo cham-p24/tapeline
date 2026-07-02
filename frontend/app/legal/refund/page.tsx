@@ -5,7 +5,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 export const metadata = {
   title: "Refund & Cancellation Policy — Tapeline",
   description:
-    "Cancel anytime. Full refund within 7 days of paid-plan start, no questions asked. " +
+    "Cancel anytime. Full refund within 30 days of paid-plan start on monthly plans, no questions asked. " +
     "Annual plans: prorated refund minus first month if cancelled within 30 days.",
 };
 
@@ -33,21 +33,22 @@ export default function RefundPolicyPage() {
             full access until then. No retention call, no &ldquo;are you sure?&rdquo; loops.
           </p>
 
-          <h2 className="mt-6 text-lg font-semibold text-fg">2. Monthly plans &mdash; 7-day full refund</h2>
+          <h2 className="mt-6 text-lg font-semibold text-fg">2. Monthly plans &mdash; 30-day full refund</h2>
           <p>
-            If you cancel within <strong className="text-fg">7 days</strong> of your first paid charge on a
+            If you cancel within <strong className="text-fg">30 days</strong> of your first paid charge on a
             monthly plan, we issue a full refund, no questions asked. Email{" "}
             <a href="mailto:support@tapeline.io" className="text-accent">support@tapeline.io</a>
             {" "}from the address on your account and we&rsquo;ll process the refund within 3 business days
-            (most arrive within 24 hours).
+            (most arrive within 24 hours). This covers your first charge &mdash; effectively a 30-day
+            money-back guarantee on trying Tapeline paid.
           </p>
 
           <h2 className="mt-6 text-lg font-semibold text-fg">3. Annual plans &mdash; 30-day prorated refund</h2>
           <p>
             Annual plans get a <strong className="text-fg">30-day prorated refund</strong>: the equivalent
             of one month&rsquo;s use of the monthly price is retained, the remainder is refunded. Example:
-            Pro Annual is $299.99 ($24.99/mo × 12). If you cancel on day 14, we retain $29.99
-            (one month at the monthly price of $29.99) and refund $270.00.
+            Pro Annual is $99 ($8.25/mo × 12). If you cancel on day 14, we retain $9.99
+            (one month at the monthly price of $9.99) and refund $89.01.
           </p>
           <p>
             After 30 days an annual plan converts to standard month-by-month cancellation: you keep access
@@ -108,7 +109,7 @@ export default function RefundPolicyPage() {
           <p className="font-semibold text-fg">TL;DR</p>
           <ul className="mt-2 list-disc pl-5 text-muted">
             <li>Cancel any time from your billing page; access continues until the end of the period.</li>
-            <li>Monthly: 100% refund within 7 days, no questions.</li>
+            <li>Monthly: 100% refund within 30 days, no questions.</li>
             <li>Annual: prorated refund within 30 days (we retain one month).</li>
             <li>Trial: no card needed, nothing to refund.</li>
             <li>Refunds go back to the original card/wallet, usually within a week.</li>

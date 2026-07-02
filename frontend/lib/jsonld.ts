@@ -8,6 +8,16 @@
  * when you stuff <script> tags into the layout's <head>).
  */
 
+import { PRICING } from "@/lib/pricing";
+
+// Schema.org wants prices as strings with up to 2 decimals. Derived from the
+// single source of truth in lib/pricing.ts so the rich-result price can never
+// drift from the visible page / checkout price again.
+const PRO_MONTHLY = PRICING.pro.monthly.toFixed(2); // "9.99"
+const PRO_ANNUAL = PRICING.pro.annual.toFixed(2); // "99.00"
+const PREMIUM_MONTHLY = PRICING.premium.monthly.toFixed(2); // "19.99"
+const PREMIUM_ANNUAL = PRICING.premium.annual.toFixed(2); // "199.00"
+
 /**
  * Founder Person schema — gated by env vars so disclosure is a one-touch
  * deployment switch in Vercel, not a code change.
@@ -328,11 +338,11 @@ export function softwareApplicationJsonLd() {
       {
         "@type": "Offer",
         name: "Pro · monthly",
-        price: "29.99",
+        price: PRO_MONTHLY,
         priceCurrency: "USD",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
-          price: "29.99",
+          price: PRO_MONTHLY,
           priceCurrency: "USD",
           unitText: "MONTH",
         },
@@ -341,11 +351,11 @@ export function softwareApplicationJsonLd() {
       {
         "@type": "Offer",
         name: "Pro · annual",
-        price: "299.99",
+        price: PRO_ANNUAL,
         priceCurrency: "USD",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
-          price: "299.99",
+          price: PRO_ANNUAL,
           priceCurrency: "USD",
           unitText: "ANN",
         },
@@ -354,11 +364,11 @@ export function softwareApplicationJsonLd() {
       {
         "@type": "Offer",
         name: "Premium · monthly",
-        price: "49.99",
+        price: PREMIUM_MONTHLY,
         priceCurrency: "USD",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
-          price: "49.99",
+          price: PREMIUM_MONTHLY,
           priceCurrency: "USD",
           unitText: "MONTH",
         },
@@ -367,11 +377,11 @@ export function softwareApplicationJsonLd() {
       {
         "@type": "Offer",
         name: "Premium · annual",
-        price: "479.99",
+        price: PREMIUM_ANNUAL,
         priceCurrency: "USD",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
-          price: "479.99",
+          price: PREMIUM_ANNUAL,
           priceCurrency: "USD",
           unitText: "ANN",
         },
@@ -778,10 +788,10 @@ export function compareJsonLd(a: CompareArgs) {
       description:
         "Live transparent six-factor scanner with published weights and a public daily scorecard back-checked vs SPY.",
       offers: [
-        { "@type": "Offer", name: "Pro · monthly", price: "29.99", priceCurrency: "USD", url: "https://tapeline.io/pricing" },
-        { "@type": "Offer", name: "Pro · annual", price: "299.99", priceCurrency: "USD", url: "https://tapeline.io/pricing" },
-        { "@type": "Offer", name: "Premium · monthly", price: "49.99", priceCurrency: "USD", url: "https://tapeline.io/pricing" },
-        { "@type": "Offer", name: "Premium · annual", price: "479", priceCurrency: "USD", url: "https://tapeline.io/pricing" },
+        { "@type": "Offer", name: "Pro · monthly", price: PRO_MONTHLY, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
+        { "@type": "Offer", name: "Pro · annual", price: PRO_ANNUAL, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
+        { "@type": "Offer", name: "Premium · monthly", price: PREMIUM_MONTHLY, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
+        { "@type": "Offer", name: "Premium · annual", price: PREMIUM_ANNUAL, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
       ],
       featureList: [
         "Six published-weight factors (Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%)",

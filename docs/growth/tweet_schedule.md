@@ -256,7 +256,7 @@ Every other stock scanner gives you 47 filters and a blank stare.
 
 Tapeline gives you one number, one plain-English why, and a public track record you can audit before you pay.
 
-Free tier covers top 20 tickers (24h delayed). Pro is full live for $24.99/mo. 14-day Premium trial, no card.
+Free tier covers top 20 tickers (24h delayed). Pro is full live for $9.99/mo. 14-day Premium trial, no card.
 
 https://tapeline.io
 ```
