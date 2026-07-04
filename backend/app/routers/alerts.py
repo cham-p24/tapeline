@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import AlertEvent, AlertRule, User
 from app.services.auth import current_user_required
-from app.services.tier import Tier, has_feature
+from app.services.tier import Tier, effective_limit, has_feature
 
 router = APIRouter()
 
@@ -40,7 +40,8 @@ async def create_rule(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    # Feature gate: Telegram = Premium-only, web_push = Pro+, email = default Pro.
+    # Feature gate: Telegram = Premium-only, email = Pro+, web_push = Free+
+    # (the free "alert taste" channel — see tier.FREE_WEB_PUSH_ALERTS).
     # Discord + SMS channels were retired 2026-05-04.
     feature = (
         "alerts.telegram" if body.channel == "telegram"
@@ -52,6 +53,30 @@ async def create_rule(
             403,
             f"{feature} requires a higher tier. Upgrade at /app/billing",
         )
+
+    # Web-push count cap. Web push is the one channel a FREE user may create
+    # rules on (the activation "taste"), but only up to a SMALL allowance —
+    # tier.web_push_alerts (Free=FREE_WEB_PUSH_ALERTS=2, paid=effectively
+    # unlimited). Enforced server-side because a forked/old client can't be
+    # trusted. effective_limit keeps this correct under trial-state Premium
+    # too (which sits at the paid cap). email/telegram are already fully
+    # gated by has_feature above, so this cap only needs to guard web_push.
+    if body.channel == "web_push":
+        cap = effective_limit(user, "web_push_alerts")
+        existing_q = await session.execute(
+            select(func.count())
+            .select_from(AlertRule)
+            .where(AlertRule.user_id == user.id, AlertRule.channel == "web_push")
+        )
+        current = existing_q.scalar() or 0
+        if cap is not None and current >= cap:
+            tier = Tier(user.tier).value
+            raise HTTPException(
+                403,
+                f"Free web-push alert limit reached ({cap} on {tier}). "
+                f"Upgrade for 10 alerts/day plus Telegram at /app/billing.",
+            )
+
     rule = AlertRule(
         user_id=user.id,
         name=body.name,

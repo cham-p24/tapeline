@@ -43,8 +43,15 @@ FEATURES: dict[str, Tier] = {
     "alerts.email": Tier.PRO,
     "briefing.daily": Tier.PRO,
     "export.csv": Tier.PRO,
-    # Pro-tier alert channels (free to deliver, low friction)
-    "alerts.web_push": Tier.PRO,      # Browser push notifications (free, one click)
+    # Web push is the ONE alert channel free users get a taste of — see the
+    # FREE_WEB_PUSH_ALERTS cap + the activation rationale in the "Free-tier
+    # alert taste" block below. It's free-to-deliver (no per-send cost like
+    # email/Telegram) and one-click to enable, so it's the natural channel to
+    # let a free user actually FEEL an alert fire. The binary feature gate is
+    # therefore Tier.FREE (any logged-in user may create/subscribe); the
+    # SMALL free allowance is enforced as a COUNT cap (web_push_alerts) at
+    # rule-creation time in routers/alerts.py, not here.
+    "alerts.web_push": Tier.FREE,     # Browser push notifications (free-to-deliver; capped for free tier)
     # Premium-only features
     "congress.feed": Tier.PREMIUM,
     "alerts.telegram": Tier.PREMIUM,
@@ -90,6 +97,22 @@ FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)
 FREE_WATCHLIST_TICKERS = 3       # 3 saved tickers (was 5)
 FREE_DAILY_LOOKUPS = 5           # 5 ticker-detail (/api/ticker/{symbol}) views per UTC day
 
+# ── REVERSIBLE STRATEGIC BET (2026-07-04): free-tier "alert taste" ───────────
+#
+# Research finding: alerts are the #1 thing traders PAY for, but historically
+# ZERO free users ever experienced one firing — so nobody felt the gap the paid
+# tier fills. This constant gives the FREE tier a SMALL push-alert allowance:
+# they can create up to N web-push alert rules on their watchlist tickers and
+# actually feel one land in the browser. Email/Telegram/SMS stay fully paid.
+#
+# This is a deliberate, REVERSIBLE config bet. To UNDO it completely:
+#   1. set FREE_WEB_PUSH_ALERTS = 0   (free users can create zero → hard wall),
+#      OR revert "alerts.web_push" in FEATURES above back to Tier.PRO to also
+#      re-gate the browser-subscription + rule-creation binary check.
+# Pro/Premium web-push caps below are effectively unlimited and must NOT change
+# when tuning this lever — only the FREE number is the experiment.
+FREE_WEB_PUSH_ALERTS = 2         # free users may create up to 2 web-push alert rules (the taste)
+
 # ANONYMOUS (no account at all): a small taste before sign-up is required.
 ANON_DAILY_LOOKUPS = 2           # 2 ticker-detail views per UTC day, per IP
 
@@ -110,6 +133,11 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "watchlists": 1,
         "email_alerts_per_day": 0,
         "telegram_alerts_per_day": 0,
+        # web_push_alerts: max number of web-push alert RULES a user may create
+        # (a total count, not a per-day rate). This is the free "alert taste"
+        # lever — see FREE_WEB_PUSH_ALERTS above. Enforced at rule creation in
+        # routers/alerts.py. Free=2, paid tiers effectively unlimited.
+        "web_push_alerts": FREE_WEB_PUSH_ALERTS,
         "api_requests_per_day": 0,
         "saved_scans": 0,
         # Single-ticker detailed-score views per UTC day (GET /api/ticker/{sym}).
@@ -123,6 +151,7 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "watchlists": 5,
         "email_alerts_per_day": 10,
         "telegram_alerts_per_day": 0,
+        "web_push_alerts": 10_000,   # effectively unlimited for paid tiers
         "api_requests_per_day": 0,
         "saved_scans": 10,
         "daily_lookups": UNLIMITED,   # no metering for paid tiers
@@ -134,6 +163,7 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "watchlists": 20,
         "email_alerts_per_day": 10_000,    # effectively unlimited
         "telegram_alerts_per_day": 10_000, # effectively unlimited
+        "web_push_alerts": 10_000,         # effectively unlimited
         "api_requests_per_day": 1_000,
         "saved_scans": 100,
         "daily_lookups": UNLIMITED,   # no metering for paid tiers
