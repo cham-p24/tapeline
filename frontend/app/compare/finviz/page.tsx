@@ -2,6 +2,8 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
+import { LandingCta } from "@/components/LandingCta";
+import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -154,16 +156,12 @@ export default function VsFinvizPage() {
           its work.
         </p>
 
-        {/* Above-the-fold CTA — paid traffic lands here; the in-body trial CTA
-            is otherwise only at the very bottom of the comparison. */}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/signup?from=finviz" className="btn-primary">
-            Try Premium free &mdash; 14 days, no card &rarr;
-          </Link>
-          <Link href="/scorecard" className="btn-ghost">
-            See the public scorecard
-          </Link>
-        </div>
+        {/* Above-the-fold conversion block — paid + organic traffic lands here;
+            the in-body CTA is otherwise only at the very bottom of the
+            comparison. from="finviz" message-matches the signup H1 for
+            Finviz-intent visitors. showPreview off: the comparison table below
+            is the proof on this page. */}
+        <LandingCta from="finviz" showPreview={false} />
         {/* Hype pill removed 2026-05 — counting categories Tapeline "wins
             outright" reads as marketing not honesty. The table below speaks
             for itself; the tradeoffs section names the places Finviz wins. */}
@@ -243,10 +241,15 @@ export default function VsFinvizPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
-        <p className="mt-3 text-muted">No credit card. Cancel in one click.</p>
+        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
+        <p className="mt-3 text-muted">
+          Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+          ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=finviz" className="btn-primary">Try Premium free →</Link>
+          <Link href="/signup?from=finviz" className="btn-primary">
+            Try the live scanner free — no card →
+          </Link>
           <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">

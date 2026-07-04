@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { LandingCta } from "@/components/LandingCta";
+import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -205,20 +208,19 @@ export default function BestStockScannersPage() {
         <p className="mt-4 text-lg text-muted">
           A hand-tested ranking of the 10 stock scanners actually worth your subscription dollars
           in 2026 — ranked by transparency of methodology, evidence of past performance, and
-          honest value at the entry price. We rank Tapeline #1 because we built it. We're upfront
-          about which competitor wins for which workflow.
+          honest value at the entry price. Our pick, Tapeline, is a stock scanner that shows its
+          work: one score per stock, a plain-English reason, and every top pick logged in public.
+          Try it free below, then read the full ranking — we're upfront about which competitor
+          wins for which workflow.
         </p>
 
-        {/* Above-the-fold CTA — paid traffic lands here; the in-body trial CTA
-            is otherwise only at the very bottom of a long article. */}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/signup?from=screener" className="btn-primary">
-            Try Premium free &mdash; 14 days, no card &rarr;
-          </Link>
-          <Link href="/scorecard" className="btn-ghost">
-            See the public scorecard
-          </Link>
-        </div>
+        {/* Above-the-fold conversion block. This page is ~50% of all site
+            traffic (GA4) and converted nothing — the only CTA used to sit at
+            the bottom of a long article. LandingCta puts the offer, the live
+            scanner preview (the product proof), and the founding price up top
+            where the visitor already is. from="screener" message-matches the
+            signup H1 ("the scanner that shows its receipts"). */}
+        <LandingCta from="screener" />
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance</h2>
@@ -301,6 +303,13 @@ export default function BestStockScannersPage() {
           </p>
         </section>
 
+        {/* Mid-page email capture — lower-commitment step for a visitor who's
+            read the ranking but isn't ready to start an account. Same
+            conversion bucket as signup in GA4 via method='newsletter'. */}
+        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="blog" heading="" sub="" />
+        </section>
+
         <section className="mt-12">
           <h2 className="text-2xl font-semibold tracking-tight">Frequently asked</h2>
           <div className="mt-6 divide-y divide-border/60">
@@ -317,13 +326,14 @@ export default function BestStockScannersPage() {
         </section>
 
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick free for 14 days.</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner, free.</h2>
           <p className="mt-3 text-sm text-muted">
-            Tapeline Premium trial. No credit card. Cancel in one click.
+            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">
-              Try Premium free →
+              Try the live scanner free — no card →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

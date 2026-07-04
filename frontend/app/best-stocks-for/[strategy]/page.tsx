@@ -15,6 +15,8 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { LandingCta } from "@/components/LandingCta";
+import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
@@ -140,6 +142,13 @@ export default async function BestStocksForStrategyPage({
           {s.h1}
         </h1>
         <p className="mt-4 text-lg text-muted leading-relaxed">{s.lede}</p>
+
+        {/* Above-the-fold conversion block — this list page previously only
+            had a CTA at the very bottom, past the table + methodology + FAQ.
+            The live ranking table right below is the product proof, so
+            showPreview is off here. from="screener" message-matches the
+            signup H1 for scanner-intent visitors. */}
+        <LandingCta from="screener" showPreview={false} />
 
         <section className="mt-10">
           {rows.length === 0 ? (
@@ -312,12 +321,13 @@ export default async function BestStocksForStrategyPage({
             Run this scan live + every other strategy.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            14-day Premium trial, no credit card. Full ~2,500-ticker live universe,
-            every sort/filter combination, watchlist + alerts.
+            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Full
+            ~2,500-ticker live universe, every sort/filter combination, watchlist + alerts.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">
-              Try Premium free →
+              Try the live scanner free — no card →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

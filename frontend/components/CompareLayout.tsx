@@ -2,7 +2,9 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { LandingCta } from "@/components/LandingCta";
 import { CompareIndex } from "@/components/CompareIndex";
+import { PRICING, usd } from "@/lib/pricing";
 import {
   breadcrumbJsonLd,
   compareJsonLd,
@@ -158,6 +160,18 @@ export function CompareLayout({
             outright" reads as marketing, not honesty (matches the finviz
             reference page). The table below speaks for itself and the
             tradeoffs section names where the competitor wins. */}
+
+        {/* Above-the-fold conversion block. Previously the only signup CTA on
+            a compare page sat below the FAQ, so a comparison-shopper who
+            skimmed the table and left never saw the offer. showPreview is off
+            here because the "Where Tapeline wins" table immediately below is
+            the product proof for these pages; the CTA + offer strip is what's
+            missing up top. from="compare" message-matches the signup H1. */}
+        <LandingCta
+          from="compare"
+          showPreview={false}
+          secondaryLabel="See the scorecard first"
+        />
       </section>
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
@@ -234,10 +248,15 @@ export function CompareLayout({
       </section>
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Try Tapeline free for 14 days.</h2>
-        <p className="mt-3 text-muted">No credit card. Cancel in one click.</p>
+        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
+        <p className="mt-3 text-muted">
+          Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+          ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=compare" className="btn-primary">Try Premium free →</Link>
+          <Link href="/signup?from=compare" className="btn-primary">
+            Try the live scanner free — no card →
+          </Link>
           <Link href={ctaSecondaryHref} className="btn-ghost">See the scorecard first</Link>
         </div>
         <p className="mt-4 text-xs text-subtle">
