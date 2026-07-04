@@ -101,6 +101,16 @@ export default function AlertsPage() {
 
   const isPremium = user?.tier === "premium";
   const isPro = user?.tier === "pro" || isPremium;
+  const isFree = !!user && !isPro;
+
+  // Free "alert taste": free users get a SMALL web-push allowance so they can
+  // actually feel an alert fire (activation lever). Kept in sync with the
+  // backend single source of truth, tier.FREE_WEB_PUSH_ALERTS — if you tune
+  // that constant, mirror it here. web_push is the ONLY channel free users can
+  // create; email/telegram stay paid, so their (Pro)/(Premium) tags remain.
+  const FREE_WEB_PUSH_ALERTS = 2;
+  const webPushRulesUsed = rules.filter((r) => r.channel === "web_push").length;
+  const freeWebPushRemaining = Math.max(0, FREE_WEB_PUSH_ALERTS - webPushRulesUsed);
 
   return (
     <div>
@@ -108,11 +118,30 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Alert rules</h1>
           <p className="mt-1 text-sm text-muted">
-            Get notified when scores, setups, or regimes change. Email + Web push on Pro;
-            Telegram on Premium.
+            Get notified when scores, setups, or regimes change.{" "}
+            {isFree
+              ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro; Telegram on Premium.`
+              : "Email + Web push on Pro; Telegram on Premium."}
           </p>
         </div>
       </div>
+
+      {/* Free "alert taste" hint — free users get a couple of real web-push
+          alerts so they feel one fire, then a soft upgrade wall. Only shown to
+          free users; never nags paid tiers. */}
+      {isFree && (
+        <div className="mt-4 rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 text-sm">
+          <span className="font-medium text-fg">
+            {freeWebPushRemaining > 0
+              ? `${freeWebPushRemaining} of ${FREE_WEB_PUSH_ALERTS} free web-push alerts left`
+              : `You've used all ${FREE_WEB_PUSH_ALERTS} free web-push alerts`}
+          </span>{" "}
+          <span className="text-muted">
+            — upgrade for 10 alerts/day plus Telegram.{" "}
+            <Link href="/app/billing" className="link">See plans →</Link>
+          </span>
+        </div>
+      )}
 
       {/* Create form — p-4 to match the watchlist "add ticker" form's
           compactness. Both are top-of-page input blocks of the same
@@ -144,7 +173,10 @@ export default function AlertsPage() {
               className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm"
             >
               <option value="email">Email {isPro ? "" : "(Pro)"}</option>
-              <option value="web_push">Web push {isPro ? "" : "(Pro)"}</option>
+              {/* web_push is now the free "taste" channel — free users can
+                  create up to FREE_WEB_PUSH_ALERTS of these, so it carries a
+                  "(free)" tag for them rather than "(Pro)". */}
+              <option value="web_push">Web push {isFree ? "(free)" : ""}</option>
               <option value="telegram">Telegram {isPremium ? "" : "(Premium)"}</option>
             </select>
           </div>

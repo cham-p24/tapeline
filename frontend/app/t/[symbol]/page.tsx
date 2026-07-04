@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { AnonSignupNudge } from "@/components/AnonSignupNudge";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 import {
@@ -903,6 +904,14 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             </a>
           </div>
         </div>
+
+        {/* Gentle anonymous sign-up nudge. Client-only island: renders NOTHING
+            on the server, so the crawler-visible HTML and the HTTP status of
+            this SEO page are untouched (a prior server-side gate here caused an
+            outage). It appears inline, below the fold, only after a signed-out
+            visitor has browsed several distinct tickers — and never blocks or
+            hides any page content. Signed-in users never see it. */}
+        <AnonSignupNudge symbol={data.symbol} />
 
         {/* Recent ticker-specific headlines — the second content-uplift
             pass for Google indexing. The page now reads "AAPL filed today
