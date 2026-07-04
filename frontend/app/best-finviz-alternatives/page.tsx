@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { LandingCta } from "@/components/LandingCta";
+import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -638,6 +641,14 @@ export default function BestFinvizAlternativesPage() {
           </ul>
         </section>
 
+        {/* Above-the-fold conversion block — right after the TL;DR synthesis,
+            before the long review. This page targets a high-commercial-intent
+            "finviz alternative" cluster but previously had no button CTA up
+            top (only an inline text link inside the TL;DR). from="finviz"
+            message-matches the signup H1 for Finviz-switchers; the live
+            scanner preview lets a switcher SEE the alternative immediately. */}
+        <LandingCta from="finviz" />
+
         {/* Quick-pick by intent — decision tree. Targets specific user intents
             like "best finviz alternative for [X]" long-tail. */}
         <section className="mt-12">
@@ -920,16 +931,24 @@ export default function BestFinvizAlternativesPage() {
           </div>
         </section>
 
+        {/* Mid/late email capture — a switcher who read the whole review but
+            isn't ready to open an account will still take a daily digest.
+            Same conversion bucket as signup in GA4 via method='newsletter'. */}
+        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+          <NewsletterCapture source="blog" heading="" sub="" />
+        </section>
+
         {/* CTA */}
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick free for 14 days.</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner, free.</h2>
           <p className="mt-3 text-sm text-muted">
-            Tapeline Premium trial. No credit card. Cancel in one click. Keep your existing
-            Finviz subscription if you want — they solve different problems.
+            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Keep your
+            existing Finviz subscription if you want — they solve different problems.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=finviz" className="btn-primary">
-              Try Premium free →
+              Try the live scanner free — no card →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard
