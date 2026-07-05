@@ -8,11 +8,14 @@ type Providers = { google: boolean; microsoft: boolean; apple: boolean };
 const NONE: Providers = { google: false, microsoft: false, apple: false };
 
 type Position = "top" | "bottom";
+type Variant = "primary" | "secondary";
 
 export function OAuthButtons({
   position = "bottom",
   dividerLabel,
   postAuthNext,
+  variant = "secondary",
+  onProviderClick,
 }: {
   position?: Position;
   dividerLabel?: string;
@@ -26,6 +29,26 @@ export function OAuthButtons({
    * buttons while surviving the email form.
    */
   postAuthNext?: string;
+  /**
+   * Visual weight of the provider buttons.
+   *  - "secondary" (default): bordered, panel-background — used below the
+   *    email form (signin's original layout), where email is the primary path.
+   *  - "primary": the Google-first signup lever. The first (Google) button is
+   *    rendered full-width, tall, and high-contrast (accent gradient) so it
+   *    reads as THE call to action above the fold; any additional providers
+   *    stay secondary underneath it. This is the conversion flip — most
+   *    visitors are already logged into Google, so a one-click path dwarfs
+   *    the email form for completion rate.
+   */
+  variant?: Variant;
+  /**
+   * Fired when a provider button is clicked (before the full-page nav to the
+   * provider's /start endpoint). Lets the host page emit a funnel event —
+   * e.g. sign_up_started with method:"google" — so OAuth intent is measurable
+   * alongside the email path in GA4. Navigation is a plain <a href>, so this
+   * is best-effort fire-and-forget; it must not block or preventDefault.
+   */
+  onProviderClick?: (provider: "google" | "microsoft" | "apple") => void;
 } = {}) {
   const [providers, setProviders] = useState<Providers | null>(null);
 
@@ -55,12 +78,21 @@ export function OAuthButtons({
     </div>
   );
 
+  // Prominent (primary) Google button: full-width, tall, high-contrast so it
+  // is unmistakably the primary above-the-fold CTA. Only the Google button is
+  // promoted — Microsoft/Apple, if ever enabled, stay secondary beneath it.
+  const googlePrimary = variant === "primary";
+  const googleClass = googlePrimary
+    ? "flex h-11 w-full items-center justify-center gap-3 rounded-md border border-border bg-white px-4 text-sm font-semibold text-black shadow-sm transition-colors hover:bg-white/90"
+    : "flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover";
+
   const buttons = (
     <div className="grid gap-2">
       {providers.google && (
         <a
           href={startHref("google")}
-          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
+          onClick={() => onProviderClick?.("google")}
+          className={googleClass}
         >
           <GoogleGlyph /> Continue with Google
         </a>
@@ -68,6 +100,7 @@ export function OAuthButtons({
       {providers.microsoft && (
         <a
           href={startHref("microsoft")}
+          onClick={() => onProviderClick?.("microsoft")}
           className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
         >
           <MicrosoftGlyph /> Continue with Microsoft
@@ -76,7 +109,8 @@ export function OAuthButtons({
       {providers.apple && (
         <a
           href={startHref("apple")}
-          className="flex items-center justify-center gap-3 rounded-md border border-border bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/80"
+          onClick={() => onProviderClick?.("apple")}
+          className="flex items-center justify-center gap-3 rounded-md border border-black bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/80"
         >
           <AppleGlyph /> Continue with Apple
         </a>

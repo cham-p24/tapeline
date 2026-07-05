@@ -165,7 +165,25 @@ function SignInForm() {
               <h1 className="mt-10 text-3xl font-bold tracking-tight">Welcome back</h1>
               <p className="mt-2 text-sm text-muted">Sign in to your Tapeline account.</p>
 
-              <form onSubmit={submit} className="mt-8 space-y-4">
+              {/* PRIMARY sign-in path: Google-first, above the email form — the
+                  same prominence flip as /signup. Most returning visitors are
+                  already logged into Google, so one click beats retyping a
+                  password. OAuthButtons feature-detects providers and renders
+                  nothing when none are enabled; when that happens this block
+                  collapses and the email form below becomes primary with no
+                  orphaned divider. next carries the post-auth destination so a
+                  visitor mid-flow (e.g. from a /pricing plan CTA) keeps context
+                  through Google sign-in. */}
+              <div className="mt-6">
+                <OAuthButtons
+                  position="top"
+                  variant="primary"
+                  dividerLabel="or sign in with email"
+                  postAuthNext={next}
+                />
+              </div>
+
+              <form onSubmit={submit} className="mt-6 space-y-4">
                 <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
                 <Field label="Password" type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
 
@@ -189,8 +207,6 @@ function SignInForm() {
                   {busy ? "Signing in…" : "Sign in"}
                 </button>
               </form>
-
-              <OAuthButtons />
 
               <p className="mt-8 text-center text-sm text-muted">
                 Don&rsquo;t have an account?{" "}

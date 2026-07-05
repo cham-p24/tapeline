@@ -242,6 +242,38 @@ function SignUpForm() {
           <h1 className="mt-10 text-3xl font-bold tracking-tight">{headline.h1}</h1>
           <p className="mt-2 text-sm text-muted">{headline.sub}</p>
 
+          {/* Value strip at the decision point — coherent with what the landing
+              pages now promise (free-forever + 30-day money-back), not just the
+              14-day trial the page used to over-emphasise. Descriptive only. */}
+          <p className="mt-4 text-xs text-muted">
+            Free forever &middot; No credit card &middot; 14-day Premium trial &middot; 30-day money-back on paid plans
+          </p>
+
+          {/* PRIMARY signup path: Google-first, above the fold, first thing the
+              visitor sees. Most visitors are already logged into Google, so a
+              one-click path converts far better than a forced email/password
+              form. OAuthButtons feature-detects via /api/auth/oauth/providers
+              and renders nothing when no provider is enabled — when that
+              happens this whole block collapses and the email form below
+              becomes the (fully usable) primary path, so the page is never
+              broken. postAuthNext carries the same plan/next intent the email
+              path carries (see postAuthNext above), so a visitor from /pricing
+              keeps their context through Google signup. */}
+          <div className="mt-6">
+            <OAuthButtons
+              position="top"
+              variant="primary"
+              postAuthNext={postAuthNext}
+              onProviderClick={(provider) => {
+                // Mirror the email path's funnel start so OAuth conversion is
+                // measurable alongside it. sign_up (completed) fires backend-
+                // side on the OAuth callback; here we only mark intent.
+                track("signup_started", { next, method: provider });
+                trackEvent("sign_up_started", { next, method: provider });
+              }}
+            />
+          </div>
+
           {/* Public-record proof — leads with the SIZE + DISCIPLINE of the
               track record (true, on-brand, decision-safe) rather than the
               short-sample hit-rate/alpha headline. The "winners and losers"
@@ -294,15 +326,12 @@ function SignUpForm() {
             </div>
           )}
 
-          {/* OAuth above the email form. One-click signup is the highest-leverage
-              conversion lever on this page; we used to bury it below. The
-              OAuthButtons component renders nothing if no provider is configured
-              so the layout collapses cleanly in environments without OAuth. */}
-          <div className="mt-8">
-            <OAuthButtons position="top" />
-          </div>
-
-          <form onSubmit={submit} className="space-y-4">
+          {/* Secondary email path. Some visitors prefer email; it stays fully
+              usable. When OAuth is enabled, the "or sign up with email" divider
+              rendered by OAuthButtons (position="top") already sits above this
+              form; when OAuth is disabled, OAuthButtons renders nothing and
+              this becomes the primary path with no orphaned divider. */}
+          <form onSubmit={submit} className="mt-6 space-y-4">
             {/* Honeypot field — offscreen, hidden from real users (and screen readers).
                 Bots that auto-fill every input will populate it; if non-empty, the
                 backend silently rejects the signup. */}
@@ -317,9 +346,13 @@ function SignUpForm() {
               className="absolute left-[-9999px] top-[-9999px] h-0 w-0 opacity-0"
             />
 
-            <Field label="Name" type="text" autoComplete="name" value={name} onChange={setName} />
+            {/* Name is optional backend-side (SignupBody.name: str | None), so
+                we keep it — some users want it — but label it optional and put
+                it last so email + password (the only required fields) come
+                first. Fewer required fields = higher completion. */}
             <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
             <Field label="Password" type="password" autoComplete="new-password" value={password} onChange={setPassword} required minLength={8} hint="At least 8 characters" />
+            <Field label="Name (optional)" type="text" autoComplete="name" value={name} onChange={setName} />
 
             {/* Cloudflare Turnstile widget — auto-rendered by the script tag in
                 root layout. data-callback names a window function that receives

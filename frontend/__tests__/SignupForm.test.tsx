@@ -44,9 +44,28 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
+// URL-aware fetch mock. The signup page fetches two endpoints on mount:
+//   - /api/auth/oauth/providers  (OAuthButtons feature-detection)
+//   - /api/scorecard             (the proof block)
+// `oauthProviders` lets a test flip which providers are "enabled" so we can
+// assert the Google-first layout with providers present AND the graceful
+// email-only fallback when providers come back empty.
+let oauthProviders = { google: true, microsoft: false, apple: false };
 beforeEach(() => {
   nav.search = new URLSearchParams();
   routerSpies.push.mockClear();
+  oauthProviders = { google: true, microsoft: false, apple: false };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/auth/oauth/providers")) {
+        return Promise.resolve({ ok: true, json: async () => oauthProviders });
+      }
+      // scorecard + anything else: benign empty payload (proof block no-ops).
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }),
+  );
 });
 
 /** Fill the minimum valid form and submit it. */
@@ -75,6 +94,72 @@ describe("SignUpPage", () => {
     expect(honeypot?.getAttribute("aria-hidden")).toBe("true");
     expect(honeypot?.getAttribute("tabindex")).toBe("-1");
     expect(honeypot?.getAttribute("autocomplete")).toBe("off");
+  });
+
+  // ── Google-first layout (the friction-reduction flip) ────────────────────
+  // The highest-leverage lever on this page: most visitors are already logged
+  // into Google, so a one-click "Continue with Google" above the email form
+  // converts far better than a forced email/password account creation.
+
+  it("renders the Continue with Google button ABOVE the email form when providers include google", async () => {
+    const { container } = render(<SignUpPage />);
+    const google = await screen.findByRole("link", { name: /Continue with Google/i });
+    const emailInput = screen.getByLabelText(/email/i);
+    // DOCUMENT_POSITION_FOLLOWING === 4: emailInput follows the Google button
+    // in document order, i.e. Google is above the email form.
+    expect(
+      google.compareDocumentPosition(emailInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // And it carries the intent (?next=) so /pricing context survives Google.
+    expect(google.getAttribute("href")).toContain("/api/auth/oauth/google/start");
+    expect(container.querySelector("form")).not.toBeNull();
+  });
+
+  it("carries plan intent into the Google start link (?next=)", async () => {
+    nav.search = new URLSearchParams("plan=premium&billing=annual");
+    render(<SignUpPage />);
+    const google = await screen.findByRole("link", { name: /Continue with Google/i });
+    expect(google.getAttribute("href")).toContain(
+      `?next=${encodeURIComponent("/app/billing?intent=premium&billing=annual")}`,
+    );
+  });
+
+  it("renders the coherent value strip (free forever + money-back, not just the trial)", () => {
+    render(<SignUpPage />);
+    expect(
+      screen.getByText(/Free forever.*No credit card.*14-day Premium trial.*30-day money-back/i),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to an email-first, unbroken page when no providers are enabled", async () => {
+    oauthProviders = { google: false, microsoft: false, apple: false };
+    const { container } = render(<SignUpPage />);
+    // Give the providers fetch a tick to resolve; the OAuth block should stay empty.
+    await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: /Continue with Google/i })).toBeNull();
+    // The email form is still fully present and usable.
+    expect(container.querySelector("form")).not.toBeNull();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+  });
+
+  it("keeps the email path working: submit still creates an account and routes on", async () => {
+    const { authApi } = await import("@/lib/auth");
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+    await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
+    expect(routerSpies.push).toHaveBeenCalledWith(
+      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+    );
+  });
+
+  it("makes the Name field optional (email + password are the only required inputs)", () => {
+    render(<SignUpPage />);
+    const name = screen.getByLabelText(/name/i) as HTMLInputElement;
+    expect(name.required).toBe(false);
+    expect((screen.getByLabelText(/email/i) as HTMLInputElement).required).toBe(true);
+    expect((screen.getByLabelText(/password/i) as HTMLInputElement).required).toBe(true);
   });
 
   it("shows the 14-day trial commitment", () => {

@@ -53,3 +53,34 @@ describe("OAuthButtons intent carry", () => {
     expect(href).not.toContain("?next=");
   });
 });
+
+describe("OAuthButtons prominence + tracking", () => {
+  it("renders the Google button full-width when variant=primary (the signup flip)", async () => {
+    render(<OAuthButtons variant="primary" />);
+    const google = await screen.findByRole("link", { name: /Continue with Google/ });
+    // The primary variant makes Google the full-width above-the-fold CTA.
+    expect(google.className).toContain("w-full");
+  });
+
+  it("fires onProviderClick with the provider when a button is clicked", async () => {
+    const onProviderClick = vi.fn();
+    render(<OAuthButtons variant="primary" onProviderClick={onProviderClick} />);
+    const google = await screen.findByRole("link", { name: /Continue with Google/ });
+    google.click();
+    expect(onProviderClick).toHaveBeenCalledWith("google");
+  });
+
+  it("renders nothing when no providers are enabled (graceful email-first fallback)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ google: false, microsoft: false, apple: false }),
+      }),
+    );
+    const { container } = render(<OAuthButtons variant="primary" />);
+    // Nothing should render — the host page's email form becomes primary.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.querySelector("a")).toBeNull();
+  });
+});
