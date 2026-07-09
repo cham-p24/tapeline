@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import desc, select, text
+from sqlalchemy import desc, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, is_sqlite
@@ -23,6 +23,17 @@ router = APIRouter()
 # statement_timeout) means a pathological filter combo is cancelled and 500s
 # fast instead of wedging the pool. Mirrors routers/ticker.py's news-scan guard.
 SCANNER_QUERY_TIMEOUT_MS = 8000
+
+# Default liquidity floor for the ranked scanner view. A high Tapeline Score on
+# a near-untradeable instrument (e.g. a bond/strategy ETF trading a few hundred
+# dollars a day — BBBL at ~$800/day, AETH at ~$21k) was floating to the TOP of
+# the list, a first-impression killer on the core product surface. We drop rows
+# whose dollar-volume (price*volume) is KNOWN and below this floor; rows missing
+# price or volume are KEPT, so the filter can only ever remove obvious junk,
+# never hide a name we simply lack a volume read for. Conservative on purpose so
+# the price-anchored listicle pages (penny stocks / under-$5) keep their long
+# tail. Pass min_dollar_volume=0 to disable.
+SCANNER_MIN_DOLLAR_VOLUME = 50_000.0
 
 # Module-level cache for /popular — recomputed every hour. The query is cheap
 # but we'd rather not run it on every empty-state render in /app/watchlist.
@@ -96,6 +107,14 @@ async def list_scanner(
     # Optional; when both None the filter is a no-op.
     min_price: float | None = Query(None, ge=0, description="Lower price bound, inclusive"),
     max_price: float | None = Query(None, ge=0, description="Upper price bound, inclusive"),
+    # Liquidity floor — see SCANNER_MIN_DOLLAR_VOLUME. Removes near-untradeable
+    # names (known dollar-volume below the floor) from the ranked view. Pass 0
+    # to disable, e.g. a deliberately liquidity-agnostic search.
+    min_dollar_volume: float = Query(
+        SCANNER_MIN_DOLLAR_VOLUME,
+        ge=0,
+        description="Minimum daily dollar-volume (price*volume); rows with a known value below this are excluded",
+    ),
     signal: str | None = None,
     sector: str | None = None,
     q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
@@ -138,6 +157,18 @@ async def list_scanner(
     # 6-factor composite. See app.services.ticker_freshness.
     for clause in await live_clauses(session):
         stmt = stmt.where(clause)
+
+    # Liquidity floor — keep rows with an unknown (null) price/volume, but drop
+    # any whose KNOWN dollar-volume is below the floor so a high score on a
+    # near-untradeable ETF can't top the ranked list. See SCANNER_MIN_DOLLAR_VOLUME.
+    if min_dollar_volume > 0:
+        stmt = stmt.where(
+            or_(
+                Ticker.price.is_(None),
+                Ticker.volume.is_(None),
+                Ticker.price * Ticker.volume >= min_dollar_volume,
+            )
+        )
 
     col = getattr(Ticker, sort)
     stmt = stmt.order_by(desc(col) if order == "desc" else col)
