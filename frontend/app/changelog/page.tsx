@@ -24,6 +24,17 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-07-10",
+    version: "0.1.15",
+    tag: "improvement",
+    title: "Rankings + scorecard now filter out untradeable names",
+    body: [
+      "The scanner and the public scorecard now apply a liquidity floor. High-scoring names that barely trade — a bond or single-strategy ETF changing hands a few hundred dollars a day — no longer top the ranked list or get frozen onto the scorecard. A score you can't realistically act on isn't useful, so the tradeable names come first now.",
+      "Methodology note, in keeping with our published practice: this only changes which names qualify going forward. No past scorecard day is touched — every historical pick, winner or loser, stays exactly as it was recorded. We don't rewrite the record.",
+      "Names with no volume reading are left in, so the filter only ever removes rows that are genuinely untradeable. On the scanner you can still turn the liquidity floor off to browse the entire scored universe.",
+    ],
+  },
+  {
     date: "2026-07-03",
     version: "0.1.14",
     tag: "improvement",

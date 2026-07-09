@@ -25,7 +25,8 @@ from app.workers.signal_publisher import (
 
 
 def _make_ticker(symbol: str, score: float, sector: str = "Tech",
-                 sub_macro: float | None = 60.0, price: float = 100.0) -> Ticker:
+                 sub_macro: float | None = 60.0, price: float = 100.0,
+                 volume: float | None = None) -> Ticker:
     # sub_trend + sub_rs populated alongside sub_macro so the row reads as a
     # real composite: the candidate pool in signal_publisher applies the
     # data-quality floor (app.services.ticker_freshness), which drops rows with
@@ -37,6 +38,7 @@ def _make_ticker(symbol: str, score: float, sector: str = "Tech",
         score=score,
         signal="STRONG SETUP",
         price=price,
+        volume=volume,
         sector=sector,
         sub_trend=score,
         sub_rs=score,
@@ -122,6 +124,62 @@ async def test_sector_cap_enforced():
             )
     finally:
         # Cleanup: remove seeded tickers and scorecard rows
+        async with session_scope() as s:
+            for sym in symbols_to_clean:
+                tq = await s.execute(select(Ticker).where(Ticker.symbol == sym))
+                for t in tq.scalars().all():
+                    await s.delete(t)
+            existing = await s.execute(
+                select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+            )
+            for e in existing.scalars().all():
+                await s.delete(e)
+            await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_illiquid_picks_skipped():
+    """A high-scoring but near-untradeable name (known dollar-volume below the
+    floor) must NOT be frozen onto the public scorecard, even though its score
+    is the highest. Liquid names fill the top-10 instead. Names with an unknown
+    (null) volume are unaffected — the gate only removes KNOWN-untradeable rows.
+    """
+    today = _next_monday(dt.date.today() + dt.timedelta(days=28))  # distinct day
+
+    async with session_scope() as s:
+        existing = await s.execute(
+            select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+        )
+        for e in existing.scalars().all():
+            await s.delete(e)
+
+        symbols_to_clean = []
+        # Highest score, but dollar-volume 1.0 * 100 = $100 — far below the
+        # $250k floor → must be skipped from the freeze.
+        s.add(_make_ticker("ILLIQ", score=99.0, sector="Energy",
+                            price=1.0, volume=100))
+        symbols_to_clean.append("ILLIQ")
+        # 12 liquid names ($50M dollar-volume) across sectors fill the top-10.
+        for i in range(12):
+            sym = f"LIQ{i:02d}"
+            s.add(_make_ticker(sym, score=80.0 - i * 0.5, sector=f"S{i % 5}",
+                               price=50.0, volume=1_000_000))
+            symbols_to_clean.append(sym)
+        await s.commit()
+
+    try:
+        await _ensure_daily_scorecard(today)
+
+        async with session_scope() as s:
+            rows_q = await s.execute(
+                select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+            )
+            symbols = {r.symbol for r in rows_q.scalars().all()}
+            assert "ILLIQ" not in symbols, (
+                "sub-floor dollar-volume pick should have been skipped"
+            )
+            assert len(symbols) == 10
+    finally:
         async with session_scope() as s:
             for sym in symbols_to_clean:
                 tq = await s.execute(select(Ticker).where(Ticker.symbol == sym))

@@ -659,6 +659,16 @@ governs which picks make the public scorecard, where a hostile-macro
 pick almost certainly fights the next-day tape regardless of how strong
 its other factors look."""
 
+_MIN_DOLLAR_VOLUME_FOR_SCORECARD = 250_000.0
+"""Liquidity floor for the public scorecard freeze. A high Tapeline Score on a
+near-untradeable instrument (a bond/strategy ETF trading a few hundred dollars a
+day) is not a pick anyone could act on, and its noisy next-day move drags the
+back-check's alpha around for no real reason. Skip a candidate when its
+dollar-volume (price*volume) is KNOWN and below this floor; a null volume is
+kept (no read = no penalty), so the gate only ever removes genuinely
+untradeable names. Forward-only — historical scorecard rows are never touched.
+Mirrors routers/scanner.SCANNER_MIN_DOLLAR_VOLUME. Set 0 to disable."""
+
 
 def _macro_gate_active() -> bool:
     """The macro gate only applies when Ticker.sub_macro is the Tapeline
@@ -770,8 +780,9 @@ async def _ensure_daily_scorecard(today: date) -> None:
         if existing.scalar_one_or_none() is not None:
             return
 
-        # Pull a wider candidate pool (50) so the concentration filter has
-        # room to skip clustered picks without running out before reaching 10.
+        # Pull a wider candidate pool (80) so the concentration + liquidity
+        # filters have room to skip clustered/untradeable picks without running
+        # out before reaching 10.
         # Freshness + data-quality floor — never freeze a stale ghost row OR a
         # corrupt (score>100 / emoji-symbol / <2-factor) row into the permanent
         # public scorecard record. (score IS NOT NULL is part of the floor.)
@@ -781,13 +792,14 @@ async def _ensure_daily_scorecard(today: date) -> None:
         for _clause in await live_clauses(session):
             _cand_stmt = _cand_stmt.where(_clause)
         candidates = await session.execute(
-            _cand_stmt.order_by(desc(Ticker.score)).limit(50)
+            _cand_stmt.order_by(desc(Ticker.score)).limit(80)
         )
 
         sector_counts: dict[str, int] = {}
         skipped_zero_price = 0
         skipped_macro_hostile = 0
         skipped_sector_cap = 0
+        skipped_illiquid = 0
         rank = 0
 
         for t in candidates.scalars().all():
@@ -798,6 +810,22 @@ async def _ensure_daily_scorecard(today: date) -> None:
                 # Don't poison the public record with $0-price entries — these
                 # come from tier-restricted snapshot fields or partial fetches.
                 skipped_zero_price += 1
+                continue
+
+            # Liquidity floor: don't freeze a near-untradeable name onto the
+            # permanent public record. A high score on a bond/strategy ETF
+            # trading a few hundred dollars a day isn't a pick anyone could act
+            # on, and its noisy next-day move drags the back-check's alpha for
+            # no real reason. Skip when dollar-volume is KNOWN and below the
+            # floor; a null volume is kept (no read = no penalty). Same pick is
+            # still on /scanner — this only governs the public scorecard.
+            if (
+                _MIN_DOLLAR_VOLUME_FOR_SCORECARD > 0
+                and t.volume is not None
+                and t.price is not None
+                and t.price * t.volume < _MIN_DOLLAR_VOLUME_FOR_SCORECARD
+            ):
+                skipped_illiquid += 1
                 continue
 
             # Macro gate: skip picks in a clearly hostile regime. sub_macro
@@ -847,9 +875,9 @@ async def _ensure_daily_scorecard(today: date) -> None:
         logger.info(
             "scorecard.snapshot saved for %s rows=%d "
             "skipped_zero_price=%d skipped_macro_hostile=%d skipped_sector_cap=%d "
-            "sector_mix=%s",
+            "skipped_illiquid=%d sector_mix=%s",
             today, rank, skipped_zero_price, skipped_macro_hostile,
-            skipped_sector_cap, sector_counts,
+            skipped_sector_cap, skipped_illiquid, sector_counts,
         )
 
 
