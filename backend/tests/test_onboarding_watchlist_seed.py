@@ -287,3 +287,43 @@ async def test_watchlist_items_survive_seed_ticker_cleanup(client, monkeypatch):
             assert len(remaining) == 2
     finally:
         await _delete_seed_tickers()
+
+
+@pytest.mark.asyncio
+async def test_onboarding_seeds_from_fallback_when_universe_is_stale(client, monkeypatch):
+    """Outside US market hours the freshness floor can reject the ENTIRE
+    universe. The seeder must still seed 3 (top-by-score, freshness relaxed)
+    rather than leaving an empty watchlist — the day-1 "product looks dead"
+    failure that bounced early signups. Regression for the fresh=False path.
+    """
+    _patch_signup_gates(monkeypatch)
+    await _insert_seed_tickers()
+
+    # Simulate a fully stale universe: force the freshness clause to match zero
+    # rows so both fresh passes come back empty and the fallback must carry it.
+    from app.services import ticker_freshness
+
+    async def _no_fresh(_session):
+        return [Ticker.symbol == "__NONE__"]
+
+    monkeypatch.setattr(ticker_freshness, "live_clauses", _no_fresh)
+    try:
+        async with client:
+            cookies, _user_id = await _signup(client)
+            r = await client.post(
+                "/api/me/onboarding",
+                json={"sectors_of_interest": ["energy"]},
+                cookies=cookies,
+            )
+            assert r.status_code == 200, r.text
+            # Fresh passes match nothing → the fallback still seeds a full 3.
+            assert len(r.json()["watchlist_seeded"]) == 3
+
+            r_wl = await client.get("/api/watchlist", cookies=cookies)
+            assert r_wl.json()["count"] == 3
+            # Provenance + baseline still intact on fallback-seeded rows.
+            items = r_wl.json()["items"]
+            assert all(i["baseline_score"] is not None for i in items)
+            assert all("Starter pick" in (i["note"] or "") for i in items)
+    finally:
+        await _delete_seed_tickers()
