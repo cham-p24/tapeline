@@ -234,11 +234,19 @@ async def _seed_watchlist_for_new_user(
     clauses = await live_clauses(session)
 
     async def _top(
-        limit_n: int, sector_label: str | None, exclude: set[str]
+        limit_n: int,
+        sector_label: str | None,
+        exclude: set[str],
+        fresh: bool = True,
     ) -> list[Ticker]:
         stmt = select(Ticker)
-        for clause in clauses:
-            stmt = stmt.where(clause)
+        if fresh:
+            for clause in clauses:
+                stmt = stmt.where(clause)
+        else:
+            # Fallback path: drop the freshness floor but still require a real
+            # score so baseline_score is never NULL.
+            stmt = stmt.where(Ticker.score.isnot(None))
         if sector_label:
             stmt = stmt.where(Ticker.sector == sector_label)
         if exclude:
@@ -252,6 +260,14 @@ async def _seed_watchlist_for_new_user(
     picks: list[Ticker] = await _top(n, canonical, set()) if canonical else []
     if len(picks) < n:
         picks += await _top(n - len(picks), None, {t.symbol for t in picks})
+    # Fallback: outside US market hours the freshness floor can reject the
+    # entire universe, which left early signups with an EMPTY watchlist — the
+    # product looks dead exactly when a new user is deciding whether to return.
+    # A slightly-stale starter pick beats nothing, so relax to top-by-score.
+    if len(picks) < n:
+        picks += await _top(
+            n - len(picks), None, {t.symbol for t in picks}, fresh=False
+        )
     if not picks:
         return []
 
