@@ -614,6 +614,7 @@ def render_trial_day11_email(
     summary: dict | None = None,
     *,
     trial_ends_at: datetime | None = None,
+    checkout_urls: dict[str, str] | None = None,
 ) -> str:
     """T-3 — 3 days remaining.
 
@@ -621,7 +622,13 @@ def render_trial_day11_email(
     ("before Friday, July 10"); without it the copy falls back to the generic
     "before your trial ends". Previously this hardcoded "before Friday",
     which was wrong for anyone whose trial didn't end on a Friday.
+
+    `checkout_urls` (services/email_checkout) makes the CTA a one-click signed
+    Stripe-checkout link — no login wall between the decision and the payment
+    page. Falls back to /app/billing when the signing secret isn't configured.
     """
+    cu = checkout_urls or {}
+    premium_url = cu.get("premium_monthly", "https://tapeline.io/app/billing")
     # "%A, %B" + .day (not %-d / %#d — those are platform-dependent) gives
     # "Friday, July 10".
     deadline = (
@@ -643,7 +650,15 @@ def render_trial_day11_email(
             f"your rate is locked in for as long as you stay subscribed. If "
             f"you don't add a card, the account drops to Free at expiry."
         )
-        + button("Keep Premium", "https://tapeline.io/app/billing")
+        + button("Keep Premium", premium_url)
+        + (
+            muted_paragraph(
+                "One click, no password — the button opens secure Stripe "
+                "checkout for your account. Apple Pay, Google Pay, or card."
+            )
+            if cu
+            else ""
+        )
         + footnote("30-day money back. One-click cancel. No phone calls."),
         preheader="Three days left of Premium — add a card to keep it.",
     )
@@ -2180,13 +2195,14 @@ async def run_daily_drip(session) -> dict[str, int]:
                 continue
             try:
                 # One-click signed Stripe-checkout links for the conversion
-                # stages (day-13 / expired / post3). Minted fresh per user at
-                # send time; None when the signing secret isn't configured, in
-                # which case the renderers fall back to the /app/billing URL.
+                # stages (day-11 / day-13 / expired / post3). Minted fresh per
+                # user at send time; None when the signing secret isn't
+                # configured, in which case the renderers fall back to the
+                # /app/billing URL.
                 from app.services.email_checkout import email_checkout_urls
                 cu = (
                     email_checkout_urls(user.id)
-                    if token in ("13", "expired", "post3")
+                    if token in ("11", "13", "expired", "post3")
                     else None
                 )
                 if personalise:
@@ -2195,10 +2211,11 @@ async def run_daily_drip(session) -> dict[str, int]:
                         # T-3 quotes the user's real deadline ("before
                         # Friday, July 10") instead of a hardcoded weekday.
                         # Called directly (not via `renderer`) because the
-                        # keyword-only arg isn't part of the shared shape.
+                        # keyword-only args aren't part of the shared shape.
                         html = render_trial_day11_email(
                             user.name or "trader", summary,
                             trial_ends_at=user.trial_ends_at,
+                            checkout_urls=cu,
                         )
                     elif token == "13":
                         # Direct calls (not via `renderer`) for the same

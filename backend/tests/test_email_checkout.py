@@ -325,6 +325,12 @@ def test_conversion_emails_embed_one_click_urls():
     html = e.render_trial_post_expiry_email("Alex", checkout_urls=urls)
     assert urls["premium_monthly"] in html
 
+    # day-11 (T-3) — one-click on the primary CTA (premium button); its copy
+    # has no separate pro link, so only the premium URL is asserted.
+    html = e.render_trial_day11_email("Alex", None, checkout_urls=urls)
+    assert urls["premium_monthly"] in html
+    assert "No password" in html or "no password" in html
+
 
 def test_conversion_emails_fall_back_to_billing_page():
     """Without checkout_urls (signing secret missing) every CTA still points
@@ -332,6 +338,7 @@ def test_conversion_emails_fall_back_to_billing_page():
     from app.services import email as e
 
     for html in (
+        e.render_trial_day11_email("Alex", None),
         e.render_trial_day13_email("Alex", None),
         e.render_trial_expired_email("Alex", None),
         e.render_trial_post_expiry_email("Alex"),

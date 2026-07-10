@@ -504,6 +504,17 @@ async def version() -> dict[str, str]:
     }
 
 
+# Short-TTL cache for /api/status. Every homepage visitor's LiveCounters strip
+# polls this every 60s, and each call runs 5 DB queries — so a traffic spike
+# (a launch on HN/Reddit) would multiply straight onto Neon. The payload is a
+# "~5min refresh" status band, so a 30s server cache is invisible to users and
+# collapses N concurrent polls into one DB hit per window. Only healthy
+# responses are cached; a hard DB error bypasses the cache so uptime monitors
+# still see the 503 immediately.
+_STATUS_CACHE: dict[str, object] = {"ts": 0.0, "payload": None}
+_STATUS_TTL_SECONDS = 30.0
+
+
 @app.get("/api/status")
 async def status() -> dict[str, object]:
     """Richer status check — for the public /status page and external uptime
@@ -511,12 +522,23 @@ async def status() -> dict[str, object]:
     last worker tick). Wraps each probe in try/except so a single broken
     feature doesn't take the whole status response down.
     """
+    import time as _time
     from datetime import UTC, datetime
 
     from sqlalchemy import func, select
 
     from app.db import session_scope
     from app.models import NewsItem, RegimeState, Ticker
+
+    _now_ts = _time.time()
+    _cached = _STATUS_CACHE.get("payload")
+    _cts = _STATUS_CACHE.get("ts", 0.0)
+    if (
+        _cached is not None
+        and isinstance(_cts, (int, float))
+        and (_now_ts - _cts) < _STATUS_TTL_SECONDS
+    ):
+        return _cached  # type: ignore[return-value]
 
     out: dict[str, object] = {
         "status": "ok",
@@ -628,10 +650,14 @@ async def status() -> dict[str, object]:
         "resend": bool(settings.resend_api_key),
     }
 
-    # If any required check is hard-failing, expose 503 so uptime monitors notice.
+    # If any required check is hard-failing, expose 503 so uptime monitors
+    # notice. NOT cached — a hard error must stay visible on the very next poll.
     if checks.get("database", {}).get("status") == "error":
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=503, content=out)
+    # Healthy response — cache it so the next 30s of polls skip the 5 DB queries.
+    _STATUS_CACHE["payload"] = out
+    _STATUS_CACHE["ts"] = _now_ts
     return out
 
 
