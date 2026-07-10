@@ -649,10 +649,23 @@ def render_trial_day11_email(
     )
 
 
-def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str:
+def render_trial_day13_email(
+    user_name: str,
+    summary: dict | None = None,
+    *,
+    checkout_urls: dict[str, str] | None = None,
+) -> str:
     """T-1 — final urgency. Trial ends tomorrow.
 
-    Uses the urgent button variant (amber) — the only place we do."""
+    Uses the urgent button variant (amber) — the only place we do.
+
+    `checkout_urls` (services/email_checkout.email_checkout_urls) makes the
+    CTA a one-click signed Stripe-checkout link — no login wall between the
+    decision moment and the payment page. Falls back to /app/billing when the
+    signing secret isn't configured."""
+    cu = checkout_urls or {}
+    premium_url = cu.get("premium_monthly", "https://tapeline.io/app/billing")
+    pro_url = cu.get("pro_monthly", "https://tapeline.io/app/billing")
     return shell(
         h1("Trial ends tomorrow.")
         + lead(
@@ -668,18 +681,37 @@ def render_trial_day13_email(user_name: str, summary: dict | None = None) -> str
         + muted_paragraph(
             "Two ways to keep it: <strong>keep everything — Premium "
             "$19.99/mo</strong> (or $16.58/mo billed annually), or "
-            "<strong>keep the scanner — Pro $9.99/mo</strong> (or $8.25/mo "
-            "billed annually). Founding pricing, locked in while you stay "
-            "subscribed."
+            f'<strong><a href="{pro_url}" style="color:{ACCENT};">keep the '
+            "scanner — Pro $9.99/mo</a></strong> (or $8.25/mo billed "
+            "annually). Founding pricing, locked in while you stay subscribed."
         )
-        + button("Keep my account active", "https://tapeline.io/app/billing", variant="urgent")
+        + button("Keep my account active", premium_url, variant="urgent")
+        + (
+            muted_paragraph(
+                "One click, no password — the button opens secure Stripe "
+                "checkout for your account. Apple Pay, Google Pay, or card."
+            )
+            if cu
+            else ""
+        )
         + footnote("30-day money back. One-click cancel. No phone calls."),
         preheader="Your Premium trial expires in less than 24 hours.",
     )
 
 
-def render_trial_expired_email(user_name: str, summary: dict | None = None) -> str:
-    """T+0 — trial ended within the last 24 hours."""
+def render_trial_expired_email(
+    user_name: str,
+    summary: dict | None = None,
+    *,
+    checkout_urls: dict[str, str] | None = None,
+) -> str:
+    """T+0 — trial ended within the last 24 hours.
+
+    `checkout_urls` → one-click signed Stripe-checkout CTA (no login wall);
+    falls back to /app/billing when unavailable."""
+    cu = checkout_urls or {}
+    premium_url = cu.get("premium_monthly", "https://tapeline.io/app/billing")
+    pro_url = cu.get("pro_monthly", "https://tapeline.io/app/billing")
     return shell(
         h1("Your Tapeline trial ended.")
         + lead(
@@ -700,23 +732,42 @@ def render_trial_expired_email(user_name: str, summary: dict | None = None) -> s
         + muted_paragraph(
             "One click brings it all back, and your watchlist + alerts come "
             "back intact: <strong>keep everything — Premium $19.99/mo</strong> "
-            "(or $16.58/mo billed annually), or <strong>keep the scanner — "
-            "Pro $9.99/mo</strong> (or $8.25/mo billed annually). Founding "
-            "pricing, locked in while you stay subscribed."
+            "(or $16.58/mo billed annually), or "
+            f'<strong><a href="{pro_url}" style="color:{ACCENT};">keep the '
+            "scanner — Pro $9.99/mo</a></strong> (or $8.25/mo billed "
+            "annually). Founding pricing, locked in while you stay subscribed."
         )
-        + button("Re-activate Premium", "https://tapeline.io/app/billing")
+        + button("Re-activate Premium", premium_url)
+        + (
+            muted_paragraph(
+                "No password needed — the button opens secure Stripe checkout "
+                "for your account. Apple Pay, Google Pay, or card."
+            )
+            if cu
+            else ""
+        )
         + footnote("No more reminders unless you re-activate. One more note in 3 days then I'll stop emailing."),
         preheader="Trial ended — re-activate to bring your watchlist + alerts back.",
     )
 
 
-def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None) -> str:
+def render_trial_post_expiry_email(
+    user_name: str,
+    _summary: dict | None = None,
+    *,
+    checkout_urls: dict[str, str] | None = None,
+) -> str:
     """T+3 — 3 days after trial expiry. Final touch.
 
     No discount theatre. One direct ask + the reactivation link + a polite
     goodbye. Honest framing is the differentiator — most SaaS would offer
     50% off and an extended trial, both of which read as desperate.
+
+    `checkout_urls` → one-click signed Stripe-checkout CTA (no login wall).
     """
+    premium_url = (checkout_urls or {}).get(
+        "premium_monthly", "https://tapeline.io/app/billing"
+    )
     return shell(
         h1("Last note from Tapeline.")
         + lead(
@@ -738,7 +789,7 @@ def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None)
             "where the emails stop — we'll only write again if something material "
             "changes, like pricing."
         )
-        + button("Re-activate Premium", "https://tapeline.io/app/billing")
+        + button("Re-activate Premium", premium_url)
         + footnote(
             '— Christian, founder. '
             f'<a href="https://tapeline.io/scorecard" style="color:{LIGHT_SUBTLE};text-decoration:underline;">Public scorecard stays free forever.</a>'
@@ -747,7 +798,11 @@ def render_trial_post_expiry_email(user_name: str, _summary: dict | None = None)
     )
 
 
-def render_trial_lapse30_email(user_name: str) -> str:
+def render_trial_lapse30_email(
+    user_name: str,
+    *,
+    checkout_urls: dict[str, str] | None = None,
+) -> str:
     """T+30 — one-shot win-back for lapsed NO-CARD trials.
 
     Structural gap this closes: run_winback_drip keys off canceled_at, which
@@ -759,8 +814,12 @@ def render_trial_lapse30_email(user_name: str) -> str:
     material changes, like pricing" — so this email leads with exactly that:
     where founding pricing stands today, stated as current fact (no fake
     "price is going up" urgency, no discount theatre, no claims about tiers
-    that don't exist). One CTA, to /app/billing.
+    that don't exist). One CTA; `checkout_urls` makes it a one-click signed
+    Stripe-checkout link (no login wall), falling back to /app/billing.
     """
+    cu = checkout_urls or {}
+    premium_url = cu.get("premium_monthly", "https://tapeline.io/app/billing")
+    pro_url = cu.get("pro_monthly", "https://tapeline.io/app/billing")
     return shell(
         h1("One note, a month on.")
         + lead(
@@ -769,18 +828,28 @@ def render_trial_lapse30_email(user_name: str) -> str:
             f"follow-up we promised, and it's about pricing."
         )
         + paragraph(
-            "Founding pricing is now <strong>$9.99/mo for Pro</strong> (the "
-            "full scanner) and <strong>$19.99/mo for Premium</strong> "
-            "(scanner + smart alerts, Telegram, and the Congress feed) — "
-            "locked in for early subscribers for as long as they stay "
-            "subscribed."
+            "Founding pricing is now "
+            f'<strong><a href="{pro_url}" style="color:{ACCENT};">$9.99/mo '
+            "for Pro</a></strong> (the full scanner) and "
+            f'<strong><a href="{premium_url}" style="color:{ACCENT};">'
+            "$19.99/mo for Premium</a></strong> (scanner + smart alerts, "
+            "Telegram, and the Congress feed) — locked in for early "
+            "subscribers for as long as they stay subscribed."
         )
         + muted_paragraph(
             "Your watchlist is still saved, exactly as you left it. "
             "Re-activate and it comes back with your alert rules intact — "
             "no re-setup."
         )
-        + button("See plans", "https://tapeline.io/app/billing")
+        + button("Re-activate Premium", premium_url)
+        + (
+            muted_paragraph(
+                "No password needed — the links open secure Stripe checkout "
+                "for your account. Apple Pay, Google Pay, or card."
+            )
+            if cu
+            else ""
+        )
         + footnote(
             "30-day money back. One-click cancel. This is the last scheduled "
             "note in the trial series. — Christian, founder."
@@ -2110,6 +2179,16 @@ async def run_daily_drip(session) -> dict[str, int]:
             if not wants(user, EmailPref.TRIAL_DRIP):
                 continue
             try:
+                # One-click signed Stripe-checkout links for the conversion
+                # stages (day-13 / expired / post3). Minted fresh per user at
+                # send time; None when the signing secret isn't configured, in
+                # which case the renderers fall back to the /app/billing URL.
+                from app.services.email_checkout import email_checkout_urls
+                cu = (
+                    email_checkout_urls(user.id)
+                    if token in ("13", "expired", "post3")
+                    else None
+                )
                 if personalise:
                     summary = await trial_summary_for_user(session, user)
                     if token == "11":
@@ -2121,8 +2200,14 @@ async def run_daily_drip(session) -> dict[str, int]:
                             user.name or "trader", summary,
                             trial_ends_at=user.trial_ends_at,
                         )
+                    elif token in ("13", "expired"):
+                        html = renderer(
+                            user.name or "trader", summary, checkout_urls=cu,
+                        )
                     else:
                         html = renderer(user.name or "trader", summary)
+                elif token == "post3":
+                    html = renderer(user.name or "trader", checkout_urls=cu)
                 else:
                     html = renderer(user.name or "trader")
                 # Day 3 is soft activation — keep under the default
@@ -2165,7 +2250,11 @@ async def run_daily_drip(session) -> dict[str, int]:
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
         try:
-            html = render_trial_lapse30_email(user.name or "trader")
+            from app.services.email_checkout import email_checkout_urls
+            html = render_trial_lapse30_email(
+                user.name or "trader",
+                checkout_urls=email_checkout_urls(user.id),
+            )
             res = await send_email(
                 user.email, "Tapeline — one note, a month on", html,
                 persona="sales",
