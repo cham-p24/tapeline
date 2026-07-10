@@ -2200,14 +2200,23 @@ async def run_daily_drip(session) -> dict[str, int]:
                             user.name or "trader", summary,
                             trial_ends_at=user.trial_ends_at,
                         )
-                    elif token in ("13", "expired"):
-                        html = renderer(
+                    elif token == "13":
+                        # Direct calls (not via `renderer`) for the same
+                        # reason as day-11: the keyword-only checkout_urls
+                        # arg isn't part of the shared renderer shape.
+                        html = render_trial_day13_email(
+                            user.name or "trader", summary, checkout_urls=cu,
+                        )
+                    elif token == "expired":
+                        html = render_trial_expired_email(
                             user.name or "trader", summary, checkout_urls=cu,
                         )
                     else:
                         html = renderer(user.name or "trader", summary)
                 elif token == "post3":
-                    html = renderer(user.name or "trader", checkout_urls=cu)
+                    html = render_trial_post_expiry_email(
+                        user.name or "trader", checkout_urls=cu,
+                    )
                 else:
                     html = renderer(user.name or "trader")
                 # Day 3 is soft activation — keep under the default
