@@ -97,6 +97,11 @@ def verify_checkout_token(token: str, _now: float | None = None) -> str | None:
         return None
     if (_now if _now is not None else time.time()) > expires:
         return None
+    # compare_digest raises TypeError on non-ASCII strings; a crafted token
+    # can smuggle multibyte chars through the base64 decode, which would turn
+    # the documented "None on ANY failure" contract into a 500. Reject first.
+    if not provided_sig.isascii():
+        return None
     expected_sig = hmac.new(
         secret, f"{user_id}|{_PURPOSE}|{expires}".encode(), sha256
     ).hexdigest()

@@ -96,9 +96,13 @@ async def create_checkout(
 
 @router.get("/email-checkout", dependencies=[Depends(limit_strict)])
 async def email_checkout(
-    token: str,
-    tier: str = Query("premium", pattern="^(pro|premium)$"),
-    period: str = Query("monthly", pattern="^(monthly|annual)$"),
+    # Deliberately tolerant params: mail clients line-wrap and rewrite long
+    # URLs, and FastAPI validation failures return raw 422 JSON BEFORE the
+    # handler's graceful fallback can run. So no required params, no pattern
+    # constraints — bad values are coerced/redirected inside the handler.
+    token: str = Query(""),
+    tier: str = Query("premium"),
+    period: str = Query("monthly"),
     session: AsyncSession = Depends(get_session),
 ) -> RedirectResponse:
     """One-click checkout from a conversion email — no login required.
@@ -119,9 +123,15 @@ async def email_checkout(
     checking out" email at every send.
     """
     fallback = f"{settings.app_url}/pricing?src=email_link"
+    # Coerce (not reject) mangled tier/period — the token is what proves
+    # identity; a truncated tier param shouldn't cost the conversion.
+    if tier not in ("pro", "premium"):
+        tier = "premium"
+    if period not in ("monthly", "annual"):
+        period = "monthly"
     user_id = verify_checkout_token(token)
     if user_id is None:
-        # Expired/tampered link — send them somewhere they can still convert.
+        # Missing/expired/tampered link — somewhere they can still convert.
         return RedirectResponse(fallback, status_code=303)
 
     user = (
@@ -141,10 +151,23 @@ async def email_checkout(
             user_email=user.email,
             tier=tier,
             billing_period=period,
-            success_url=f"{settings.app_url}/app/billing?checkout=success&tier={tier}&billing_period={period}",
-            cancel_url=f"{settings.app_url}/app/billing?checkout=cancelled",
+            # PUBLIC success/cancel pages — this flow's whole premise is a
+            # user with no session (forgot password), and /app/* sits behind
+            # the login-wall middleware. Bouncing a PAYING customer to /signin
+            # (success) or dead-ending a hesitant one (cancel) recreates the
+            # exact friction this endpoint exists to remove. /checkout/success
+            # fires the trial_converted + subscribe analytics events that
+            # /app/billing fires for the authed flow.
+            success_url=f"{settings.app_url}/checkout/success?tier={tier}&billing_period={period}&src=email",
+            cancel_url=f"{settings.app_url}/pricing?src=email_checkout_cancelled",
             referral_credit_months=user.referral_credit_months or 0,
             winback=(user.tier == "free" and user.canceled_at is not None),
+            # Shrink the completable window from ~24h to Stripe's 30-min
+            # minimum: each email carries TWO tier links, and the double-
+            # subscribe guard above only runs at session-CREATE time — a
+            # long-lived second tab must not be able to complete a second
+            # subscription a day later.
+            expires_in_minutes=30,
         )
     except Exception:
         # Stripe hiccup — degrade to the pricing page, never a raw 500 from an

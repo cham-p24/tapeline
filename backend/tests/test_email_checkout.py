@@ -112,6 +112,34 @@ def test_token_rejects_tampering():
     assert verify_checkout_token("") is None
 
 
+def test_token_with_non_ascii_signature_returns_none_not_typeerror():
+    """hmac.compare_digest raises TypeError on non-ASCII strings — a crafted
+    pure-base64 token can smuggle multibyte chars into the signature slot and
+    would have turned the 'None on ANY failure' contract into a 500. Regression
+    for the adversarial-review finding (token decodes to sig 'sigé')."""
+    import base64
+
+    crafted = (
+        base64.urlsafe_b64encode(
+            "u_abc|email_checkout|9999999999|sigé".encode()
+        ).decode("ascii").rstrip("=")
+    )
+    assert verify_checkout_token(crafted) is None  # not TypeError
+
+
+def test_unsubscribe_token_with_non_ascii_signature_returns_none():
+    """Same latent bug existed in the unsubscribe twin — pinned here too."""
+    import base64
+
+    from app.services.unsubscribe import verify_token as verify_unsub
+
+    crafted = (
+        base64.urlsafe_b64encode("u_abc|all|sigé".encode())
+        .decode("ascii").rstrip("=")
+    )
+    assert verify_unsub(crafted) is None  # not TypeError
+
+
 def test_token_rejects_wrong_purpose():
     """An unsubscribe token (same secret, different payload shape) must not
     open a checkout."""
@@ -170,6 +198,13 @@ async def test_valid_token_303s_into_stripe_checkout(client, monkeypatch):
         assert captured["user_id"] == uid
         assert captured["tier"] == "premium"
         assert captured["billing_period"] == "monthly"
+        # The email flow's user has no session, so success/cancel must land on
+        # PUBLIC pages (not the login-walled /app/billing), and the session
+        # must be short-lived (each email carries two tier links — a stale
+        # second tab must not stay completable for Stripe's default ~24h).
+        assert "/checkout/success" in captured["success_url"]
+        assert "/pricing" in captured["cancel_url"]
+        assert captured["expires_in_minutes"] == 30
 
         # Side-effect-free: scanners prefetch GET links, so this path must not
         # arm the abandonment nudge the way POST /checkout does.
@@ -186,6 +221,45 @@ async def test_invalid_token_degrades_to_pricing(client):
         r = await client.get("/api/billing/email-checkout?token=not-a-real-token")
     assert r.status_code == 303
     assert "/pricing?src=email_link" in r.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_missing_token_degrades_to_pricing_not_422(client):
+    """Mail clients strip/mangle query params. FastAPI validation would 422
+    with raw JSON before the handler runs — params must be tolerant so every
+    failure is a 303 to a page that can still convert."""
+    async with client:
+        r = await client.get("/api/billing/email-checkout")
+    assert r.status_code == 303
+    assert "/pricing?src=email_link" in r.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_mangled_tier_is_coerced_not_422(client, monkeypatch):
+    """A truncated tier param (e.g. 'prem' after a mail-client line wrap) must
+    not cost the conversion — the token proves identity; coerce and proceed."""
+    captured: dict = {}
+
+    async def _fake_checkout(**kwargs):
+        captured.update(kwargs)
+        return "https://checkout.stripe.com/c/pay/test456"
+
+    monkeypatch.setattr(
+        "app.routers.billing.create_checkout_session", _fake_checkout
+    )
+    uid = await _seed_user()
+    try:
+        tok = make_checkout_token(uid)
+        async with client:
+            r = await client.get(
+                f"/api/billing/email-checkout?token={tok}&tier=prem&period=month"
+            )
+        assert r.status_code == 303
+        assert r.headers["location"] == "https://checkout.stripe.com/c/pay/test456"
+        assert captured["tier"] == "premium"
+        assert captured["billing_period"] == "monthly"
+    finally:
+        await _delete_user(uid)
 
 
 @pytest.mark.asyncio
@@ -265,3 +339,114 @@ def test_conversion_emails_fall_back_to_billing_page():
     ):
         assert "https://tapeline.io/app/billing" in html
         assert "email-checkout" not in html
+
+
+# ── Webhook hardening (duplicate conversions can't orphan a subscription) ────
+
+def _evt(evt_type: str, obj: dict) -> dict:
+    """A parsed-webhook stand-in with a unique id (dodges replay dedup)."""
+    return {"id": f"evt_{uuid.uuid4().hex}", "type": evt_type, "data": {"object": obj}}
+
+
+async def _fire(monkeypatch, event: dict) -> httpx.Response:
+    """POST a fake Stripe event through the real /api/webhooks/stripe handler
+    (same pattern as test_checkout_recovery/_dunning)."""
+    from app.routers import webhooks as webhooks_router
+
+    monkeypatch.setattr(webhooks_router.settings, "stripe_webhook_secret", "whsec_test")
+    monkeypatch.setattr(webhooks_router, "parse_webhook", lambda body, sig: event)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        return await c.post(
+            "/api/webhooks/stripe",
+            content=b"{}",
+            headers={"stripe-signature": "test-sig"},
+        )
+
+
+def _sub_obj(customer: str, user_id: str) -> dict:
+    import time as _t
+
+    return {
+        "id": f"sub_{uuid.uuid4().hex[:20]}",
+        "customer": customer,
+        "status": "active",
+        "current_period_end": int(_t.time()) + 30 * 86400,
+        "cancel_at_period_end": False,
+        "items": {"data": [{"price": {"id": "price_unknown_test", "recurring": {"interval": "month"}}}]},
+        "metadata": {"user_id": user_id},
+    }
+
+
+@pytest.mark.asyncio
+async def test_subscription_for_stale_customer_resolves_via_metadata(monkeypatch):
+    """Duplicate-conversion aftermath: the user's stripe_customer_id points at
+    the NEWER customer, but the FIRST subscription's events arrive under the
+    old customer id. The metadata user_id fallback must resolve the owner so
+    the subscription is recorded instead of silently dropped."""
+    from app.models import Subscription
+
+    uid = await _seed_user(stripe_customer_id="cus_newer_winner")
+    sub = _sub_obj("cus_older_orphaned", uid)
+    try:
+        r = await _fire(monkeypatch, _evt("customer.subscription.created", sub))
+        assert r.status_code == 200
+        async with session_scope() as s:
+            row = (
+                await s.execute(
+                    select(Subscription).where(Subscription.id == sub["id"])
+                )
+            ).scalar_one_or_none()
+            assert row is not None, "orphaned-customer subscription was dropped"
+            assert row.user_id == uid
+    finally:
+        async with session_scope() as s:
+            row = (
+                await s.execute(
+                    select(Subscription).where(Subscription.id == sub["id"])
+                )
+            ).scalar_one_or_none()
+            if row is not None:
+                await s.delete(row)
+        await _delete_user(uid)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_checkout_completion_pages_the_founder(monkeypatch):
+    """A second completed checkout for a user who already has a (different)
+    Stripe customer = a live double-subscription. The webhook must adopt the
+    newer customer AND page the founder on Telegram to unwind the loser —
+    never silently absorb a double-billing."""
+    from app.routers import webhooks as webhooks_router
+
+    alerts: list[str] = []
+
+    async def _capture_tg(chat_id, text, **_k):
+        alerts.append(text)
+        return 1
+
+    monkeypatch.setattr(
+        "app.services.telegram.send_message_with_id", _capture_tg
+    )
+    monkeypatch.setattr(
+        webhooks_router.settings, "inbox_founder_telegram_chat_id", "42"
+    )
+    monkeypatch.setattr(
+        webhooks_router.settings, "telegram_bot_token", "test-token"
+    )
+
+    uid = await _seed_user(stripe_customer_id="cus_first")
+    try:
+        r = await _fire(monkeypatch, _evt(
+            "checkout.session.completed",
+            {"client_reference_id": uid, "customer": "cus_second"},
+        ))
+        assert r.status_code == 200
+        async with session_scope() as s:
+            u = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+            assert u.stripe_customer_id == "cus_second"
+        assert len(alerts) == 1
+        assert "Duplicate Stripe subscription" in alerts[0]
+        assert "cus_first" in alerts[0] and "cus_second" in alerts[0]
+    finally:
+        await _delete_user(uid)
