@@ -92,6 +92,11 @@ def verify_token(token: str) -> tuple[str, str] | None:
     user_id, category, provided_sig = parts
     if category not in VALID_CATEGORIES:
         return None
+    # compare_digest raises TypeError on non-ASCII strings; a crafted token
+    # can smuggle multibyte chars through the base64 decode. Reject first so
+    # the documented "None on any failure" contract holds instead of 500ing.
+    if not provided_sig.isascii():
+        return None
     expected_sig = hmac.new(
         secret, f"{user_id}|{category}".encode(), sha256,
     ).hexdigest()

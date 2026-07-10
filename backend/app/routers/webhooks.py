@@ -104,6 +104,37 @@ async def stripe_webhook(
             result = await session.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
             if user:
+                if user.stripe_customer_id and user.stripe_customer_id != customer_id:
+                    # DUPLICATE CONVERSION: a second checkout completed while a
+                    # different Stripe customer is already linked (two checkout
+                    # tabs — each session mints its own Customer). The user is
+                    # now double-subscribed on live Stripe. We adopt the newer
+                    # customer (portal/cancel operate on it) — the older sub
+                    # keeps flowing via the metadata fallback below so nothing
+                    # is silently orphaned — and page the founder to refund/
+                    # cancel the loser in the Stripe dashboard. Deliberately
+                    # NOT auto-cancelling: unwinding a paid invoice is a
+                    # money-path judgement call, not webhook code.
+                    logger.error(
+                        "stripe.duplicate_checkout user=%s old_customer=%s new_customer=%s",
+                        user_id, user.stripe_customer_id, customer_id,
+                    )
+                    try:
+                        from app.services import telegram as tg
+                        chat_id = settings.inbox_founder_telegram_chat_id
+                        if chat_id and settings.telegram_bot_token:
+                            await tg.send_message_with_id(
+                                chat_id,
+                                "🚨 <b>Duplicate Stripe subscription</b>\n\n"
+                                f"User <code>{user_id}</code> ({user.email}) completed a "
+                                f"second checkout.\nOld customer: <code>{user.stripe_customer_id}</code>\n"
+                                f"New customer: <code>{customer_id}</code>\n\n"
+                                "Cancel + refund one of the two subscriptions in the "
+                                "Stripe dashboard.",
+                                parse_mode="HTML",
+                            )
+                    except Exception:  # alert must never fail the webhook
+                        logger.exception("stripe.duplicate_checkout_alert_failed")
                 user.stripe_customer_id = customer_id
                 # Checkout completed — clear the in-flight markers so the
                 # abandonment-recovery worker never nudges a customer who
@@ -121,6 +152,25 @@ async def stripe_webhook(
         customer_id = obj["customer"]
         result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
+        if not user:
+            # Fallback: resolve via the user_id we stamp into subscription
+            # metadata at checkout-session create. Covers the duplicate-
+            # conversion case where a second completed checkout overwrote
+            # user.stripe_customer_id — the first subscription's customer no
+            # longer maps to any user by column, but its metadata still names
+            # the owner. Without this, that subscription's events are silently
+            # dropped and it becomes unmanageable from our side.
+            meta_user_id = (obj.get("metadata") or {}).get("user_id")
+            if meta_user_id:
+                result = await session.execute(
+                    select(User).where(User.id == meta_user_id)
+                )
+                user = result.scalar_one_or_none()
+                if user:
+                    logger.warning(
+                        "stripe.subscription_resolved_via_metadata customer=%s user=%s",
+                        customer_id, meta_user_id,
+                    )
         if not user:
             logger.warning("stripe.subscription_without_user customer=%s", customer_id)
             return {"ok": True}

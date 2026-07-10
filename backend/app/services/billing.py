@@ -37,6 +37,7 @@ async def create_checkout_session(
     cancel_url: str,
     referral_credit_months: int = 0,
     winback: bool = False,
+    expires_in_minutes: int | None = None,
 ) -> str:
     """Create a Stripe Checkout session and return the URL.
 
@@ -50,6 +51,12 @@ async def create_checkout_session(
     one-shot 40%-off-for-3-months returning-customer coupon. The caller
     decides eligibility server-side (churned + dropped to free) so the
     `?winback=1` link in the day-90 email can't be farmed for a discount.
+
+    `expires_in_minutes` shortens the session's completable window from
+    Stripe's ~24h default. The one-click email path passes 30 (Stripe's
+    minimum) so a user who opens both tier links from one email can't come
+    back a day later and complete BOTH — the concurrent-completable window
+    shrinks from ~24h to minutes.
     """
     price_map = {
         ("pro", "monthly"):     settings.stripe_price_pro_monthly,
@@ -84,6 +91,10 @@ async def create_checkout_session(
             "success_url": success_url,
             "cancel_url": cancel_url,
         }
+        if expires_in_minutes is not None:
+            # Stripe clamps expires_at to [30 min, 24 h] from creation.
+            import time as _time
+            kwargs["expires_at"] = int(_time.time()) + max(expires_in_minutes, 30) * 60
 
         # Stripe rejects allow_promotion_codes + discounts in the same session,
         # so the three paths below are mutually exclusive. Precedence:
