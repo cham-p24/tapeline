@@ -428,7 +428,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const score = data.score?.toFixed(0) ?? "—";
   const signal = data.signal ?? "—";
   const why = data.reason ?? "Six-factor synthesis updated live.";
-  const title = `${sym} Stock Score ${score}/100 · ${signal} · Tapeline`;
+  const title = `${sym} Stock Score & 6-Factor Analysis · Tapeline`;
   // Long-tail-friendly description hits queries traders actually run:
   // "TICKER stock score", "TICKER analysis", "TICKER technical rating", etc.
   // The Finviz-alternative phrasing at the end is deliberate — GSC shows a
