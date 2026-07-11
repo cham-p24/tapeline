@@ -109,7 +109,7 @@ export default async function DailyPicksPage() {
   const hasPicks = picks.length > 0;
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden">
+    <main id="main" className="relative min-h-screen overflow-x-hidden">
       <MarketingNav />
 
       <section className="px-6 pt-12 pb-10 sm:pt-20 sm:pb-12">

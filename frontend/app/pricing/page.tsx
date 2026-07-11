@@ -41,7 +41,7 @@ const FAQ_ITEMS = [
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       {/* FAQPage schema — mirrors the on-page FAQ. */}
       <script {...jsonLdScript(faqJsonLd(FAQ_ITEMS))} />
       {/* Impression event — pairs with checkout_started for click-rate. */}

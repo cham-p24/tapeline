@@ -32,14 +32,19 @@
   --panel-hover: 0 0 0 / 0.07;       /* panel on hover                 */
   --fg:          10 10 10;           /* primary text                   */
   --muted:       113 113 122;        /* secondary text                 */
-  --subtle:      161 161 170;        /* tertiary text                  */
+  /* Tertiary text — darkened from iOS systemGray (#a1a1aa, ~2.5:1) to
+     ~6.6:1 on #ffffff so the compliance disclaimer (text-xs) clears WCAG AA. */
+  --subtle:      92 92 102;          /* zinc-600-ish, AA on white      */
   --border:      0 0 0 / 0.08;       /* hairline divider (rgba)        */
   --border2:     0 0 0 / 0.14;       /* emphasised divider (rgba)      */
   --accent:      0 122 255;          /* iOS systemBlue                 */
   --accent2:     88 86 214;          /* iOS systemIndigo — gradient end*/
   --accent-hover: 0 100 220;
-  --up:          52 199 89;          /* iOS systemGreen                */
-  --down:        255 59 48;          /* iOS systemRed                  */
+  /* iOS systemGreen/systemRed are too light as TEXT on white (~2.2:1 / ~3.5:1).
+     Darkened to green-700 / red-700 so score deltas clear WCAG AA (4.5:1) on
+     #ffffff. Used at low alpha as dot/bar/pill fills too, where darker is fine. */
+  --up:          26 127 55;          /* green-700, ~5.1:1 on white      */
+  --down:        193 18 31;          /* red-700, ~6.2:1 on white        */
   /* iOS systemYellow at darker shade for legible contrast on white. */
   --warn:        180 83 9;           /* amber-700                      */
   --shadow:      0 0 0 / 0.06;
@@ -202,6 +207,30 @@
 }
 
 @layer components {
+  /*
+   * `.skip-link` — WCAG 2.4.1 "Skip to main content" bypass. Visually
+   * hidden (clipped off-screen) until it receives keyboard focus, at which
+   * point it pins to the top-left as a solid accent pill so a keyboard /
+   * screen-reader user can jump straight past the nav to <main id="main">.
+   * First focusable element in the <body> (see layout.tsx). Pointer users
+   * never see it; it only surfaces on Tab.
+   */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 8px 0;
+    background-color: rgb(var(--accent));
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .skip-link:focus {
+    left: 0;
+  }
+
   /* `.section` — centred page section with the standard max-width and
      horizontal gutter. Used by /pricing and /how-it-works. Previously
      undefined (only the `py-*` padding utilities actually applied),

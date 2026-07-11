@@ -130,7 +130,7 @@ descriptive analytics — see /legal/risk for the full disclosure.
 
 export default function DataSourcesPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
 
       <section className="mx-auto max-w-4xl px-6 py-8">

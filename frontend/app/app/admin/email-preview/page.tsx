@@ -123,7 +123,7 @@ export default function EmailPreviewPage() {
       </aside>
 
       {/* Main pane — toolbar + iframe */}
-      <main className="flex flex-1 flex-col gap-3 overflow-hidden">
+      <main id="main" className="flex flex-1 flex-col gap-3 overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-panel px-3 py-2">
           <span className="text-xs font-medium text-muted">Theme</span>
           <Toggle

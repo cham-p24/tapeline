@@ -126,7 +126,7 @@ export default function PressPage() {
   ]);
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(FOUNDER_PERSON_JSON_LD)} />
       {pressContactPageJsonLd().map((g, i) => (

@@ -88,7 +88,7 @@ export default function GlobalError({
     )}`;
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6 py-12">
+    <main id="main" className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="w-full max-w-lg">
         <div className="rounded-2xl border border-down/30 bg-panel/40 p-8 sm:p-10">
           <div className="inline-block rounded-full bg-down/15 px-3 py-1 font-mono text-xs uppercase tracking-wider text-down">

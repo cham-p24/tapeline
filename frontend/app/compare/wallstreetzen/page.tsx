@@ -128,7 +128,7 @@ const VERIFIED_ON = "2026-05-04";
 
 export default function VsWallStreetZenPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(COMPARE_FAQ))} />
       <script
         {...jsonLdScript(

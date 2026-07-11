@@ -15,7 +15,7 @@ const VERIFIED_ON = "2026-05-04";
 
 export default function SecurityPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">

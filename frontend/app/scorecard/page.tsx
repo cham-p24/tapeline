@@ -63,7 +63,7 @@ export default function ScorecardPage() {
   // that search-engine + social-card crawlers were getting in SSR.
   if (!data) {
     return (
-      <main className="min-h-screen">
+      <main id="main" className="min-h-screen">
         {scorecardSchema}
         <MarketingNav />
         <div className="mx-auto max-w-5xl px-6 py-10">
@@ -89,7 +89,7 @@ export default function ScorecardPage() {
   const dates = Object.keys(data.days).sort().reverse();
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       {scorecardSchema}
       <MarketingNav />
       <div className="mx-auto max-w-5xl px-6 py-10">

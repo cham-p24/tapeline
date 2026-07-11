@@ -83,7 +83,7 @@ export default function AboutPage() {
   ]);
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(ABOUT_FAQ))} />
       <script {...jsonLdScript(aboutProfilePageJsonLd())} />

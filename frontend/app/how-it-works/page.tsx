@@ -57,7 +57,7 @@ const SIGNALS = [
 
 export default function HowItWorksPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       {/* FAQPage schema for the methodology questions below. */}
       <script {...jsonLdScript(faqJsonLd(HOW_FAQ))} />
       <MarketingNav />

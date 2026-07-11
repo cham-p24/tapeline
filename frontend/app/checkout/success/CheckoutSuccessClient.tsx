@@ -28,7 +28,7 @@ export function CheckoutSuccessClient() {
   }, []);
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden">
+    <main id="main" className="relative min-h-screen overflow-x-hidden">
       <MarketingNav />
       <section className="mx-auto max-w-xl px-6 py-20 text-center">
         <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-up/15 text-3xl">

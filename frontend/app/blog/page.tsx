@@ -36,7 +36,7 @@ export default function BlogIndex() {
   ]);
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       {blogGraph.map((g, i) => (
         <script key={`blogld-${i}`} {...jsonLdScript(g)} />
       ))}

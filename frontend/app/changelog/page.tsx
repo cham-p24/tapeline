@@ -202,7 +202,7 @@ const TAG_STYLE: Record<Entry["tag"], string> = {
 
 export default function ChangelogPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
 
       <section className="mx-auto max-w-3xl px-6 py-8">

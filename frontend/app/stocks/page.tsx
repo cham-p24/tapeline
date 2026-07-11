@@ -169,7 +169,7 @@ export default async function StocksDirectoryPage() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
       <script {...jsonLdScript(breadcrumb)} />
       <script {...jsonLdScript(collection)} />

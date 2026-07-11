@@ -110,7 +110,7 @@ export function SeoFeaturePage({
         : "Free tier — see the live universe today.";
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />
