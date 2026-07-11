@@ -143,6 +143,77 @@ export default async function BestStocksForStrategyPage({
         </h1>
         <p className="mt-4 text-lg text-muted leading-relaxed">{s.lede}</p>
 
+        {/* Dated, row-driven direct-answer block — depth + freshness signal
+            for the "right now" queries. Names the current top tickers
+            (unique per strategy per day, so no duplicate-content risk), the
+            live composite range (null-safe Math.min/max — never renders
+            backwards, skips null scores), and stays descriptive: no
+            "highest-scored" claim (some strategies sort by move, not score),
+            explicit "not a forecast", scorecard-trails-SPY honesty. */}
+        {rows.length > 0 && (() => {
+          const shown = rows.slice(0, 5);
+          const scores = rows
+            .map((r) => r.score)
+            .filter((v): v is number => v != null);
+          const lo = scores.length ? Math.min(...scores) : null;
+          const hi = scores.length ? Math.max(...scores) : null;
+          return (
+            <div className="mt-6 rounded-xl border border-border bg-panel/40 p-5 text-sm leading-relaxed text-muted">
+              <p>
+                <strong className="text-fg">
+                  Updated{" "}
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                  .
+                </strong>{" "}
+                {rows.length} stocks currently make today&apos;s {s.display} list
+                {s.apiParams.min_score ? (
+                  <>
+                    {" "}
+                    (composite {s.apiParams.min_score}+ on Tapeline&apos;s public
+                    6-factor formula)
+                  </>
+                ) : (
+                  <> on Tapeline&apos;s public 6-factor formula</>
+                )}
+                . At the top of the list right now:{" "}
+                {shown.map((r, i) => (
+                  <span key={r.symbol}>
+                    <Link
+                      href={`/t/${r.symbol}`}
+                      className="text-accent hover:underline font-mono"
+                    >
+                      {r.symbol}
+                    </Link>
+                    {i < shown.length - 1 ? ", " : ""}
+                  </span>
+                ))}
+                {lo != null && hi != null ? (
+                  <>
+                    {" "}
+                    — live composites across the list currently range from{" "}
+                    {lo.toFixed(0)} to {hi.toFixed(0)} out of 100.
+                  </>
+                ) : (
+                  "."
+                )}
+              </p>
+              <p className="mt-2 text-xs text-subtle">
+                Scores are a descriptive reading of six weighted factors, not a
+                forecast or a buy call. Every daily top-10 pick is published —
+                wins and losses — on the{" "}
+                <Link href="/scorecard" className="text-accent hover:underline">
+                  public scorecard
+                </Link>
+                , which currently trails SPY.
+              </p>
+            </div>
+          );
+        })()}
+
         {/* Above-the-fold conversion block — this list page previously only
             had a CTA at the very bottom, past the table + methodology + FAQ.
             The live ranking table right below is the product proof, so
@@ -214,6 +285,14 @@ export default async function BestStocksForStrategyPage({
           )}
         </section>
 
+        {rows.length > 0 && (
+          <p className="mt-3 text-xs text-subtle">
+            Signal key: HIGH CONVICTION 85–100 · STRONG SETUP 70–84 · CONSTRUCTIVE
+            55–69 · NEUTRAL 40–54 · CAUTION 25–39 · WEAK 0–24. Labels describe where
+            the six factors sit today — they are not buy or sell recommendations.
+          </p>
+        )}
+
         {/* Methodology context — what makes a "best stock for X" per the score */}
         <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
           <h2 className="text-lg font-semibold">How the {s.display} ranking works</h2>
@@ -233,6 +312,20 @@ export default async function BestStocksForStrategyPage({
             , or see how today's picks have performed historically on the{" "}
             <Link href="/scorecard" className="text-accent hover:underline">
               public scorecard
+            </Link>
+            .
+          </p>
+          <p className="mt-3 text-sm text-muted leading-relaxed">
+            Browse every scored US name in the{" "}
+            <Link href="/stocks" className="text-accent hover:underline">
+              full stock directory
+            </Link>
+            , or see how a scanner differs from a screener in{" "}
+            <Link
+              href="/blog/stock-screener-vs-stock-scanner"
+              className="text-accent hover:underline"
+            >
+              screener vs scanner
             </Link>
             .
           </p>
