@@ -49,7 +49,12 @@ export type TapelineEvent =
   // Engagement signals
   | "view_scorecard"       // Visit /scorecard
   | "view_ticker"          // Visit /t/[symbol]
-  | "open_scanner";        // Open /app/scanner
+  | "open_scanner"         // Open /app/scanner
+  // Activation signals — GA4-only (deliberately absent from
+  // ADS_CONVERSION_LABEL below so they do NOT forward to the Google Ads
+  // "Sign-up" conversion and pollute paid ROAS).
+  | "newsletter_signup"    // Email opt-in to the daily digest (NOT an account signup)
+  | "first_ticker_added";  // First watchlist add of the session
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
 // overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up

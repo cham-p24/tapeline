@@ -20,9 +20,10 @@ import { getStoredUtm } from "@/lib/utm";
  *     them.
  *
  * On success fires `newsletter_subscribed` to Vercel Analytics +
- * `sign_up` (with method='newsletter') to GA4 — same conversion bucket
- * as account signup so we can compare list-growth velocity in the same
- * GA4 funnel report.
+ * `newsletter_signup` (with method='newsletter') to GA4. This is a
+ * GA4-only engagement event — deliberately NOT the `sign_up` event, so an
+ * email opt-in is never miscounted as a Google Ads account-signup
+ * conversion (which would inflate paid-search ROAS).
  */
 type Props = {
   /** Where on the site this instance is rendered. Logged to the row's
@@ -89,11 +90,13 @@ export function NewsletterCapture({
         setStatus("already");
       } else {
         setStatus("success");
-        // Conversion events — only fire on a truly new signup so list
-        // growth in GA4 isn't inflated by re-submits. `method='newsletter'`
-        // lets us distinguish from the trial-signup `sign_up` event.
+        // Engagement events — only fire on a truly new signup so list
+        // growth in GA4 isn't inflated by re-submits. Uses the dedicated
+        // `newsletter_signup` event (GA4-only) rather than `sign_up`, so an
+        // email opt-in is NOT miscounted as a Google Ads account-signup
+        // conversion (which would pollute paid-search ROAS).
         track("newsletter_subscribed", { source });
-        trackEvent("sign_up", { method: "newsletter" });
+        trackEvent("newsletter_signup", { method: "newsletter" });
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Sign up failed";

@@ -17,12 +17,18 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
-import { handle401 } from "@/lib/api";
+import { api, handle401 } from "@/lib/api";
+import { trackEvent } from "@/lib/gtag";
+import { SECTOR_SLUG_TO_CANONICAL } from "@/components/TodaysTape";
 import { safeNext } from "@/lib/safeNext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
+// Dedupe key: the OAuth signup/trial conversion pair must fire at most once
+// per browser. New Google users land here at /app/onboarding?oauth=1.
+const OAUTH_CONVERSION_FIRED_KEY = "tapeline_oauth_conversion_fired";
 
 type Experience = "beginner" | "intermediate" | "advanced";
 type Style = "day" | "swing" | "longterm" | "mixed";
@@ -115,10 +121,86 @@ function OnboardingForm() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // OAuth signup conversion. The backend redirects NEW Google/OAuth users to
+  // /app/onboarding?oauth=1, but OAuth signups never touch the /signup form
+  // where `sign_up` / `start_trial` fire — so without this they're invisible
+  // to GA4/Ads. Fire both once, deduped per browser (localStorage) with a ref
+  // guard for the storage-unavailable case + React strict-mode double-mount.
+  const oauthFiredRef = useRef(false);
+  useEffect(() => {
+    if (qp.get("oauth") == null) return;
+    if (oauthFiredRef.current) return;
+    try {
+      if (
+        typeof window !== "undefined" &&
+        window.localStorage.getItem(OAUTH_CONVERSION_FIRED_KEY) === "1"
+      ) {
+        oauthFiredRef.current = true;
+        return;
+      }
+      window.localStorage.setItem(OAUTH_CONVERSION_FIRED_KEY, "1");
+    } catch {
+      // storage unavailable — the ref still dedupes within this mount.
+    }
+    oauthFiredRef.current = true;
+    // OAuth account creation === same conversion bucket as an email signup;
+    // the 14-day trial auto-starts, so start_trial fires alongside it (mirrors
+    // the email /signup flow).
+    trackEvent("sign_up", { method: "oauth" });
+    trackEvent("start_trial", { method: "oauth" });
+  }, [qp]);
+
   function toggleSector(slug: string) {
     setSectors((prev) =>
       prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug],
     );
+  }
+
+  // Best-effort watchlist seed from the user's selected sectors — this is the
+  // "start your watchlist with the top-scored names" promise the sector-picker
+  // copy makes. Fire-and-forget: never awaited by submit(), every failure is
+  // swallowed, so it can never block or break navigation. The scanner `sector`
+  // param takes a single canonical label, so we query per selected sector
+  // (bounded), merge + rank by score, and add the best few names via the SAME
+  // watchlist API the watchlist page uses (lands in the default list).
+  async function seedWatchlistFromSectors(slugs: string[]) {
+    const labels = slugs
+      .map((s) => SECTOR_SLUG_TO_CANONICAL[s])
+      .filter(Boolean)
+      .slice(0, 3);
+    if (labels.length === 0) return;
+    try {
+      const seen = new Set<string>();
+      const picks: { symbol: string; score: number }[] = [];
+      for (const label of labels) {
+        try {
+          const r = await api.scanner({
+            sector: label,
+            sort: "score",
+            order: "desc",
+            limit: 5,
+          });
+          for (const row of r.items) {
+            if (row.symbol && !seen.has(row.symbol)) {
+              seen.add(row.symbol);
+              picks.push({ symbol: row.symbol, score: row.score ?? 0 });
+            }
+          }
+        } catch {
+          // Skip this sector — a partial seed is still useful.
+        }
+      }
+      picks.sort((a, b) => b.score - a.score);
+      for (const p of picks.slice(0, 5)) {
+        try {
+          await api.watchlistAdd(p.symbol);
+        } catch {
+          // Already present / tier-capped / transient — ignore per-add.
+        }
+      }
+    } catch {
+      // Never let the seed break onboarding.
+    }
   }
 
   async function submit(skipped: boolean) {
@@ -150,6 +232,12 @@ function OnboardingForm() {
         sectors: sectors.length,
         marketing_opt_in: marketingOptIn,
       });
+      // Seed the watchlist from whatever sectors the user picked — even on
+      // Skip, since the picker copy promises it. Fire-and-forget (not awaited)
+      // so navigation is instant; the fetches finish after the route change.
+      if (sectors.length > 0) {
+        void seedWatchlistFromSectors(sectors);
+      }
       router.push(next);
       router.refresh();
     } catch (e: unknown) {
