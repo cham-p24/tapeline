@@ -211,10 +211,10 @@ function buildEditorialCommentary(d: TickerData): string {
   const sigInterp = ((): string => {
     const s = (signal || "").toUpperCase();
     if (s === "HIGH CONVICTION") {
-      return `When ${sym} hits HIGH CONVICTION (85+), all six factors line up positive — the kind of confluence that historically clusters near multi-week breakouts. The label is descriptive: it tells you the data says "everything is aligned right now", not whether to enter at this exact price.`;
+      return `When ${sym} hits HIGH CONVICTION (85+), all six factors read positive at the moment of scoring. The label is descriptive: it tells you the data says "everything is aligned right now", not whether to enter at this price or what happens next.`;
     }
     if (s === "STRONG SETUP") {
-      return `STRONG SETUP (70-84) means most factors — typically four or five of six — point favourably. This is the band where the textbook multi-day swing setup tends to live. Tradeoff: the bigger HIGH CONVICTION moves are rarer and usually already-priced-in by the time they appear.`;
+      return `STRONG SETUP (70-84) means most factors — typically four or five of six — read favourably at the moment of scoring. Tradeoff: HIGH CONVICTION confluence is rarer and is usually already reflected in price by the time it appears.`;
     }
     if (s === "CONSTRUCTIVE") {
       return `CONSTRUCTIVE (55-69) is the "watchlist tier" — net positive with meaningful tradeoffs. ${sym} is interesting but not bid up. For value or contrarian setups this is often the most actionable band — quality without the late-stage price-discovery overhead.`;
@@ -242,11 +242,11 @@ function buildEditorialCommentary(d: TickerData): string {
       case "trend":
         return `${sym}'s strongest factor is Trend at ${v.toFixed(0)}/100 — a ${tier} read on the multi-week technical structure. Trend incorporates position vs key moving averages, slope, and participation; a high reading means price is well above structural support with consistent breadth behind it.`;
       case "rs":
-        return `${sym}'s strongest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance vs the broader market over the trailing 1-3 months. High RS means ${sym} is meaningfully outperforming SPY and its sector, which historically clusters with continuation rather than reversion.`;
+        return `${sym}'s strongest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance vs the broader market over the trailing 1-3 months. High RS means ${sym} has been outperforming SPY and its sector over that window. It describes what has happened, not what happens next.`;
       case "fundamentals":
         return `${sym}'s strongest factor is Fundamentals at ${v.toFixed(0)}/100 — a ${tier} balance-sheet + earnings-quality + margin-trend read. High Fundamentals doesn't guarantee a near-term move, but it caps the downside in a way pure-technical setups can't.`;
       case "smart_money":
-        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on insider buying (SEC Form 4), Congressional disclosures, and ETF flows. High Smart Money means people with information edge are aligned with this name.`;
+        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on insider buying (SEC Form 4), Congressional disclosures, and ETF flows. High Smart Money means those disclosed signals currently lean positive on this name — a descriptive read of public filings, not a signal to follow.`;
       case "macro":
         return `${sym}'s strongest factor is Macro at ${v.toFixed(0)}/100 — meaning the broader regime (rates, VIX, dollar, breadth) is ${tier} supportive for this kind of setup. Macro doesn't move stocks directly but it sets the tempo for everything underneath.`;
       case "momentum":
@@ -261,7 +261,7 @@ function buildEditorialCommentary(d: TickerData): string {
     const tier = v <= 25 ? "well below average" : v <= 40 ? "below average" : v <= 55 ? "middling" : "decent";
     switch (weakest.key) {
       case "trend":
-        return `The weakest factor is Trend at ${v.toFixed(0)}/100 — a ${tier} technical read. If the rest of the picture is constructive, that's often a re-test buying opportunity rather than a structural concern.`;
+        return `The weakest factor is Trend at ${v.toFixed(0)}/100 — a ${tier} technical read. If the rest of the picture is constructive, a soft Trend factor often reflects a re-test of support rather than structural breakdown — descriptively, not as a call to act.`;
       case "rs":
         return `The weakest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance vs SPY and the sector. ${sym} is participating in any rally less than its peers.`;
       case "fundamentals":
