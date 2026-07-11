@@ -36,7 +36,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
   if (!post) notFound();
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       {/* Article schema — gives Google an explicit headline, datePublished
           and author for rich-result eligibility. BreadcrumbList helps Google
           render the site-hierarchy path under the SERP result.

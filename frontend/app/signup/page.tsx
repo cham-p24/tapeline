@@ -229,7 +229,7 @@ function SignUpForm() {
   }
 
   return (
-    <main className="relative min-h-screen">
+    <main id="main" className="relative min-h-screen">
       <div className="pointer-events-none absolute inset-0 bg-hero opacity-60" />
 
       <div className="relative flex min-h-screen items-center justify-center px-6 py-10">

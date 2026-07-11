@@ -130,7 +130,7 @@ export default async function BestStocksForStrategyPage({
     : null;
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(s.faq))} />
       {itemList ? <script {...jsonLdScript(itemList)} /> : null}

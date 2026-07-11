@@ -132,7 +132,7 @@ function trackChip(v: Scanner["trackRecord"]) {
 
 export default function FreeStockScannerNoCreditCardPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(ITEM_LIST_JSON_LD)} />
       <script {...jsonLdScript(faqJsonLd(FAQ))} />
       <MarketingNav />

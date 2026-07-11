@@ -12,7 +12,7 @@ export const metadata = pageMeta({
 
 export default function RiskPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
       <div className="mx-auto max-w-3xl px-6 py-10">
       <h1 className="text-4xl font-bold tracking-tight">Risk Disclosure</h1>

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-6">
+    <main id="main" className="relative flex min-h-screen items-center justify-center px-6">
       <div className="pointer-events-none absolute inset-0 bg-hero opacity-40" />
       <div className="relative max-w-md text-center">
         <div className="font-mono text-sm text-subtle">404</div>

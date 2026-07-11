@@ -658,7 +658,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
   });
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(dataset)} />
       <script {...jsonLdScript(faqJsonLd(faqItems))} />

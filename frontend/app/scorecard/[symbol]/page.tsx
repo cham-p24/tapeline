@@ -37,7 +37,7 @@ export default function TickerScorecardPage() {
   if (error?.includes("Invalid symbol")) notFound();
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
       <div className="mx-auto max-w-5xl px-6 py-10">
         <div className="text-sm text-muted">

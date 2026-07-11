@@ -156,6 +156,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        {/* Skip-to-content link (WCAG 2.4.1). First focusable element in the
+            body so keyboard / screen-reader users can bypass the nav straight
+            to <main id="main">. Visually hidden until focused (.skip-link in
+            globals.css). */}
+        <a href="#main" className="skip-link">
+          Skip to main content
+        </a>
         {/* SEO structured data — Google + LinkedIn parse this for rich
             results. Three graphs, built in lib/jsonld.ts and rendered as
             plain <script> tags so the JSON-LD ships in the SSR HTML (fully

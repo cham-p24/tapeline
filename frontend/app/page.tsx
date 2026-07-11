@@ -15,7 +15,7 @@ export default function LandingPage() {
     // without per-page wiring. <main> here just needs the structural
     // container styles. `overflow-x-hidden` clips any wide blob halos
     // from the hero section so they can't create a horizontal scrollbar.
-    <main className="relative min-h-screen overflow-x-hidden">
+    <main id="main" className="relative min-h-screen overflow-x-hidden">
       <MarketingNav />
 
       {/* HERO — single-purpose fold.

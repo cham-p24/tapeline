@@ -171,7 +171,7 @@ export default function StatusPage() {
       : { label: "All systems operational", tone: "border-up/40 bg-up/10 text-up", state: "operational" };
 
   return (
-    <main className="min-h-screen px-6 py-10">
+    <main id="main" className="min-h-screen px-6 py-10">
       <div className="mx-auto max-w-3xl">
         <div className="text-xs uppercase tracking-wider text-subtle">Tapeline</div>
         <h1 className="mt-2 text-4xl font-bold tracking-tight">System status</h1>

@@ -143,7 +143,7 @@ export function CompareLayout({
     url: pageUrl,
   };
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(reviewSchema)} />

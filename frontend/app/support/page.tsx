@@ -12,7 +12,7 @@ export const metadata = pageMeta({
 
 export default function SupportPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <MarketingNav />
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-10">

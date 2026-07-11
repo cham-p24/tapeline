@@ -136,7 +136,7 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
             : "text-down";
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />

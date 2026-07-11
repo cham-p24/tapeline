@@ -127,7 +127,7 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
 
 export default function DevelopersPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(faqJsonLd(FAQ))} />
       <MarketingNav />
 

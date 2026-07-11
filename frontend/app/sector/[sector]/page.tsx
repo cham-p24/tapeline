@@ -125,7 +125,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
   ]);
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />

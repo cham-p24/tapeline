@@ -414,7 +414,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
   ]);
 
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(article)} />
       <script {...jsonLdScript(breadcrumbs)} />
       <script {...jsonLdScript(faq)} />

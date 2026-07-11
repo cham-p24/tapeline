@@ -582,7 +582,7 @@ function cap(v: "yes" | "limited" | "no") {
 
 export default function BestFinvizAlternativesPage() {
   return (
-    <main className="min-h-screen">
+    <main id="main" className="min-h-screen">
       <script {...jsonLdScript(ITEM_LIST_JSON_LD)} />
       <script {...jsonLdScript(faqJsonLd(FAQ))} />
       <script {...jsonLdScript(REVIEW_JSON_LD)} />

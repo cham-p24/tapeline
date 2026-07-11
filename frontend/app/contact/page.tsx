@@ -33,7 +33,7 @@ export default function ContactPage() {
     <div className="bg-bg text-fg min-h-screen">
       <MarketingNav />
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main id="main" className="mx-auto max-w-3xl px-6 py-10">
         <header className="mb-10">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Contact</div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Talk to a human.</h1>
