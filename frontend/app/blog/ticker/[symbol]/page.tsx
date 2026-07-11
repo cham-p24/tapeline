@@ -20,7 +20,7 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
-import { pageMeta } from "@/lib/seo";
+import { pageMeta, SITE_URL } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { TICKERS, findTicker, type TickerPost } from "../tickers";
 
@@ -283,7 +283,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
       path: `/blog/ticker/${symbol}`,
     });
   }
-  return pageMeta({
+  const meta = pageMeta({
     title: `Is ${t.symbol} a Buy in 2026? The Tapeline Score Breakdown`,
     description:
       `Live Tapeline 6-factor score on ${t.symbol} (${t.name}) — composite, ` +
@@ -294,6 +294,14 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
     ogType: "article",
     publishedTime: "2026-05-14",
   });
+  // Canonicalise to the authoritative interactive surface at /t/{symbol}.
+  // /blog/ticker/{symbol} and /t/{symbol} index the same large-cap universe
+  // (same live data, different framing) — the canonical points crawlers at
+  // the /t universe to avoid the two routes cannibalising each other. Not a
+  // noindex: this page still renders and is crawlable; the canonical just
+  // consolidates ranking signals onto /t/{symbol}.
+  meta.alternates = { ...meta.alternates, canonical: `${SITE_URL}/t/${t.symbol}` };
+  return meta;
 }
 
 const SIGNAL_COLOR: Record<string, string> = {

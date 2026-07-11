@@ -144,12 +144,12 @@ export const STRATEGIES: StrategyConfig[] = [
     slug: "dividend",
     display: "Dividend Investors",
     h1: "Best Dividend Stocks — Quality Scored by the Six-Factor Composite",
-    metaTitle: "Best Dividend Stocks 2026 — Top Scores Across Yield Sectors on Tapeline",
+    metaTitle: "Best Dividend Stocks 2026 — Utilities Ranked by Tapeline Score",
     metaDescription:
-      "Live ranking of US dividend-relevant sectors — Financials, Utilities, Real Estate, Consumer Defensive — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free tier; Pro at $8.25/mo annual.",
+      "Live ranking of US Utilities-sector dividend names — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free tier; Pro at $8.25/mo annual.",
     lede:
-      "Dividend investing fails when 'high yield' is the only filter — high yields are often the market pricing in dividend risk. The right filter is yield in the context of quality: are the fundamentals strong, is the trend confirming, is the sector regime supportive? The list below ranks US tickers in dividend-rich sectors (Financials, Utilities, Real Estate, Consumer Defensive) by Tapeline composite — the same six-factor formula that prices in trend, fundamentals, and macro alongside the yield. High score in a dividend sector means yield WITH durability.",
-    apiParams: { sort: "score", order: "desc", min_score: "55", limit: "30" },
+      "Dividend investing fails when 'high yield' is the only filter — high yields are often the market pricing in dividend risk. The right filter is yield in the context of quality: are the fundamentals strong, is the trend confirming, is the sector regime supportive? The list below ranks US tickers in the Utilities sector — the classic income-oriented, dividend-rich corner of the market — by Tapeline composite, the same six-factor formula that prices in trend, fundamentals, and macro alongside the yield. High score in a dividend sector means yield WITH durability.",
+    apiParams: { sort: "score", order: "desc", min_score: "55", sector: "Utilities", limit: "30" },
     factorEmphasis: "fundamentals + trend",
     faq: [
       {
@@ -157,8 +157,8 @@ export const STRATEGIES: StrategyConfig[] = [
         a: "High-yield-first lists surface dividend traps — stocks where the yield is high because the price collapsed and the dividend is at risk of being cut. The composite score blends fundamentals (earnings quality, balance-sheet health), trend (is the stock holding up?), and macro (is the regime supportive of yield names?). High composite in a dividend-rich sector means yield with the underlying strength to defend it.",
       },
       {
-        q: "Which sectors does this list focus on?",
-        a: "Financials, Utilities, Real Estate, and Consumer Defensive — the four sectors that historically house the highest-conviction dividend names. Filter by any one of them on /app/scanner if you want a single-sector view (e.g. /sector/real-estate or /sector/utilities).",
+        q: "Which sector does this list focus on?",
+        a: "Utilities — historically the most income-oriented, dividend-rich sector, and the single cleanest bucket for a 'dividend' screen. Other sectors house dividend payers too: for a wider income view, browse /sector/financials, /sector/real-estate, or /sector/consumer-staples, or set any single-sector filter on /app/scanner.",
       },
       {
         q: "How does Tapeline read dividend safety?",
@@ -232,10 +232,6 @@ export const STRATEGIES: StrategyConfig[] = [
       {
         q: "Do you cover OTC stocks?",
         a: "No. Tapeline's universe is NYSE/Nasdaq-listed US equities and ETFs. OTC-listed names (the venue most retail traders associate with 'penny stocks') aren't in the database. The under-$5 names here are all real exchange-listed companies; that already filters out a lot of the worst-of-the-worst.",
-      },
-      {
-        q: "How is this different from /best-stocks-for/under-5?",
-        a: "Same filter, different framing. /under-5 is the price-anchored search-intent version; /penny-stocks is the strategy-anchored version. They surface the same names — duplicate listings exist because the search queries are different and ranking-wise we want to cover both.",
       },
     ],
   },
