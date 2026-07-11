@@ -97,37 +97,41 @@ const SL_COPY: KpiCopy = {
   hint: () => "Watch for a shift — the rotation often precedes the headline regime by 1-3 weeks.",
 };
 
+// Descriptive characterisation of how the score distribution behaves in each
+// regime. Tapeline never issues buy/sell/position-sizing directives — the
+// regime is a multiplier on the composite, so these bullets describe what the
+// scores do, not what a reader should do with capital.
 const REGIME_PLAYBOOK: Record<string, { headline: string; bullets: string[] }> = {
   BULL: {
-    headline: "Long bias works. Most setups follow through.",
+    headline: "Broad participation. The regime multiplier lifts scores across the universe.",
     bullets: [
-      "Buy strength on minor pullbacks — moving-average tests usually hold.",
-      "Position size up to your normal max — drawdowns tend to be shallow.",
-      "Trailing stops can be wide (1.5-2 × ATR). Cutting too tight throws away winners.",
+      "A larger share of the universe sits in the STRONG SETUP and HIGH CONVICTION bands — factor confluence is common when breadth is wide.",
+      "The Trend and Relative Strength factors stay elevated for more names.",
+      "A given factor profile scores higher in BULL than the same profile would in CAUTIOUS or BEAR.",
     ],
   },
   NEUTRAL: {
-    headline: "Stock selection dominates index direction.",
+    headline: "Index direction is muted; scores separate on company-specific factors.",
     bullets: [
-      "Individual setups matter more than beta — find names with idiosyncratic catalysts.",
-      "Default position size 60-80% of your normal max. Avoid leveraged exposure.",
-      "Take partial profits at 1R-1.5R; the back half of moves often fails in NEUTRAL.",
+      "The regime multiplier is roughly neutral, so a name's score reflects its own factor confluence rather than a market tailwind.",
+      "Fewer names cluster at the top than in BULL — the HIGH CONVICTION count typically compresses.",
+      "Idiosyncratic factors (Trend, Fundamentals, Smart Money) drive the spread between names more than macro does.",
     ],
   },
   CAUTIOUS: {
-    headline: "Lighten size. Take partial profits sooner. Avoid marginal setups.",
+    headline: "Breadth is narrowing; the regime multiplier marks scores down.",
     bullets: [
-      "Half your normal position size. Tight stops (~1 × ATR) on anything new.",
-      "Don't add to losers — at this regime, weak names get weaker.",
-      "Watch for breadth divergences — index up but advancers shrinking is a CAUTIOUS-to-BEAR tell.",
+      "Weak-factor names score lower here — the composite weights drag more heavily than in BULL.",
+      "The top bands thin out: fewer names reach STRONG SETUP, and HIGH CONVICTION becomes rarer.",
+      "Breadth divergence — the index up while advancers shrink — is the classic CAUTIOUS-to-BEAR signal the regime tracks.",
     ],
   },
   BEAR: {
-    headline: "Capital preservation. Cash is a position.",
+    headline: "Capital-preservation regime; the multiplier marks most scores down hard.",
     bullets: [
-      "No new longs unless the chart is exceptional (defensive sector + Smart Money inflows + base breakout).",
-      "Quarter normal position size. Mental stop at the first sign of being wrong.",
-      "Use the time to build a watchlist — bear markets end with the names that lead the next bull.",
+      "Very few names hold a high composite — typically only defensive sectors with intact base structure and positive Smart Money flows.",
+      "HIGH CONVICTION counts compress to the low tens as factor confluence becomes rare.",
+      "Descriptively, the names that go on to lead the next BULL are often the ones that hold up structurally through BEAR — the watchlist tier is where the regime surfaces them.",
     ],
   },
 };

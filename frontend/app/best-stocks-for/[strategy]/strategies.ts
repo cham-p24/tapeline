@@ -132,11 +132,11 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How long do momentum setups typically run?",
-        a: "Tapeline's scorecard back-checks against next-day return. Most momentum-driven HIGH CONVICTION picks see meaningful continuation in the first 1-3 sessions, then mean-revert toward sector beta. The scorecard at /scorecard records exactly that pattern in the public record.",
+        a: "Tapeline's scorecard back-checks each daily top-10 pick against next-day return and keeps the full record — winners and losers — public at /scorecard. It's an unedited track record versus SPY, which it currently trails; it is not a claim about how long any setup runs or how it will perform.",
       },
       {
         q: "Should I trade pure momentum or wait for confluence?",
-        a: "Confluence. Pure-momentum scans (e.g. 'top 10 by 5-day return') have a poor hit rate because most of the move is already priced in by the time the screen surfaces it. Filtering to score 60+ means you're picking names where the momentum is confirmed by trend + RS + macro — much higher base rate of continuation.",
+        a: "Confluence. Pure-momentum scans (e.g. 'top 10 by 5-day return') surface names where much of the move is already priced in by the time the screen catches it. Filtering to score 60+ surfaces names where momentum is corroborated by trend + RS + macro rather than momentum alone — a descriptive confluence read, not a hit-rate or continuation claim.",
       },
     ],
   },
@@ -385,7 +385,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the scorecard performance of HIGH CONVICTION picks?",
-        a: "Every daily top-10 pick is back-checked against next-day SPY return. The full record (winners and losers) is at /scorecard — including the days the model called HIGH CONVICTION on names that proceeded to underperform. We don't edit the record. The composite over time aims to beat SPY by a meaningful alpha but no single signal is guaranteed.",
+        a: "Every daily top-10 pick is back-checked against next-day SPY return. The full record — winners and losers — is at /scorecard, including the days the model called HIGH CONVICTION on names that then underperformed. We don't edit the record, and it currently trails SPY. The scorecard is a descriptive track record, not a performance target or a forecast.",
       },
       {
         q: "Is HIGH CONVICTION a buy recommendation?",
