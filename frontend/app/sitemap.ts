@@ -163,6 +163,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/best-free-stock-screener`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/free-stock-scanner-no-credit-card`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Feature landing pages — public surfaces for the gated /app/* tools.
     // High-intent keyword clusters: short squeeze, congress trades, insider
     // buying, market heatmap, market regime. Each ranks for the cluster +
