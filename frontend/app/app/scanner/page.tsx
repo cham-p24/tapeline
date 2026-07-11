@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
-import { api, type ScannerRow } from "@/lib/api";
+import { api, type ScannerRow, errorMessage } from "@/lib/api";
+import { trackEvent } from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -101,6 +102,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 // non-sticky: dismissal is permanent, the tune itself is not.
 const TUNE_DISMISSED_KEY = "tapeline_scanner_sector_tune_dismissed";
 
+// Dedupe key for the once-per-browser `first_ticker_added` activation event.
+// The watchlist add itself is idempotent server-side; this only gates the
+// analytics event so activation isn't over-counted on repeat adds.
+const FIRST_TICKER_ADDED_KEY = "tapeline_first_ticker_added";
+
 export default function ScannerPage() {
   const { user } = useUser();
   const [rows, setRows] = useState<ScannerRow[]>([]);
@@ -119,6 +125,11 @@ export default function ScannerPage() {
   // belong in the server query and never triggers a refetch.
   const [assetClass, setAssetClass] = useState<AssetBucket>("");
   const [loading, setLoading] = useState(true);
+  // Symbols the user has added to their watchlist in this session — drives
+  // the per-row star's added/checked state. Optimistic: a symbol lands here
+  // the instant the button is clicked and is reverted only on a hard failure
+  // (a 409 "already in watchlist" keeps it, since it IS in the list).
+  const [added, setAdded] = useState<Set<string>>(new Set());
   // Upcoming-earnings lookup (symbol → next report date) for the row-level
   // "reports in Nd" pill. Fetched once; non-fatal if it fails.
   const earningsBySymbol = useEarningsCalendar(14);
@@ -280,6 +291,50 @@ export default function ScannerPage() {
     }
   }, []);
 
+  // GA4 engagement event: the scanner was opened. Declared in lib/gtag.ts but
+  // was never actually fired anywhere — this wires it up. Fires once per mount
+  // (fire-and-forget; no-op if GA4 hasn't loaded).
+  useEffect(() => {
+    trackEvent("open_scanner");
+  }, []);
+
+  // One-click "add to watchlist" from a scanner row. Optimistic, idempotent,
+  // and uses the SAME api the watchlist page's add() uses so it lands in the
+  // user's default list. On the FIRST successful add of the session (deduped
+  // per browser via localStorage) it fires the `first_ticker_added`
+  // activation event.
+  const addToWatchlist = useCallback(async (symbol: string) => {
+    // Optimistically show the checked state immediately.
+    setAdded((prev) => (prev.has(symbol) ? prev : new Set(prev).add(symbol)));
+    try {
+      await api.watchlistAdd(symbol);
+      try {
+        if (
+          typeof window !== "undefined" &&
+          window.localStorage.getItem(FIRST_TICKER_ADDED_KEY) !== "1"
+        ) {
+          window.localStorage.setItem(FIRST_TICKER_ADDED_KEY, "1");
+          trackEvent("first_ticker_added", { symbol });
+        }
+      } catch {
+        // localStorage unavailable — skip the dedupe flag; the add still stuck.
+      }
+    } catch (e: unknown) {
+      const m = errorMessage(e);
+      // 409 = already in the watchlist → keep the checked state (it IS there).
+      if (m.includes("409")) return;
+      // Any other failure: revert the optimistic state.
+      setAdded((prev) => {
+        const n = new Set(prev);
+        n.delete(symbol);
+        return n;
+      });
+      if (m.includes("401")) {
+        window.location.href = `/signin?next=${encodeURIComponent("/app/scanner")}`;
+      }
+    }
+  }, []);
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -425,6 +480,9 @@ export default function ScannerPage() {
         <table className="w-full text-sm nums">
           <thead className="text-xs uppercase text-muted">
             <tr>
+              <th className="px-2 sm:px-4 py-2 text-left w-10">
+                <span className="sr-only">Add to watchlist</span>
+              </th>
               <th className="px-2 sm:px-4 py-2 text-left">Ticker</th>
               <th className="px-2 sm:px-4 py-2 text-left">Sector</th>
               <th className="px-2 sm:px-4 py-2 text-right">Score</th>
@@ -442,9 +500,9 @@ export default function ScannerPage() {
           </thead>
           <tbody>
             {loading && visibleRows.length === 0 ? (
-              <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
+              <tr><td colSpan={12}><TableSkeleton cols={12} rows={8} /></td></tr>
             ) : visibleRows.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center">
+              <tr><td colSpan={12} className="px-4 py-12 text-center">
                 {filtersActive ? (
                   <div className="text-muted">
                     <p>No tickers match these filters.</p>
@@ -464,6 +522,28 @@ export default function ScannerPage() {
               </td></tr>
             ) : visibleRows.map((r) => (
               <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
+                <td className="px-2 sm:px-4 py-2">
+                  {/* One-click watchlist add. Optimistic; checked (★) once the
+                      symbol is on the list. Tap target is 40x40px. */}
+                  <button
+                    type="button"
+                    onClick={() => addToWatchlist(r.symbol)}
+                    disabled={added.has(r.symbol)}
+                    aria-label={
+                      added.has(r.symbol)
+                        ? `${r.symbol} is in your watchlist`
+                        : `Add ${r.symbol} to watchlist`
+                    }
+                    title={added.has(r.symbol) ? "In your watchlist" : "Add to watchlist"}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-md text-base leading-none transition-colors ${
+                      added.has(r.symbol)
+                        ? "text-up"
+                        : "text-muted hover:bg-panel hover:text-accent"
+                    }`}
+                  >
+                    {added.has(r.symbol) ? "★" : "☆"}
+                  </button>
+                </td>
                 <td className="px-4 py-2 font-medium">
                   <div className="flex flex-col gap-0.5">
                     <div className="flex flex-wrap items-center gap-1.5">
