@@ -182,9 +182,14 @@ export const POSTS: BlogPost[] = [
   },
   {
     slug: "stock-screener-vs-stock-scanner",
-    title: "Stock screener vs stock scanner: the difference matters in 2026.",
+    // 2026-07-11: retitled to exact-match the definitional query (GSC: 318
+    // impressions incl. "finviz alternative" 136, pos ~23). Question form,
+    // <60 chars, no trailing period. Deliberately omits "Finviz" from the
+    // title so it doesn't cannibalize /best-finviz-alternatives; the excerpt
+    // keeps "Finviz" for the leaked finviz-alternative impressions.
+    title: "Stock Screener vs Stock Scanner: What's the Difference?",
     excerpt:
-      "Everyone uses 'screener' and 'scanner' interchangeably. They're not the same thing — and the difference predicts whether your tool will earn its slot in your daily workflow or get cancelled in three months.",
+      "'Screener' and 'scanner' aren't synonyms — one gives filters, the other a verdict. Which you need, and where Finviz fits, decides which tool you keep.",
     publishedAt: "2026-05-13",
     author: "Tapeline",
     body: `
