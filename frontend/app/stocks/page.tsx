@@ -33,12 +33,14 @@ import { SECTORS } from "@/app/sector/sectors";
 // matches the sitemap's cadence and keeps crawler-driven DB load near zero.
 export const revalidate = 3600;
 
+// 2026-07-11: retitled against GSC — /stocks had 1,261 impressions / 0 clicks
+// at pos ~23. Front-loads the words searchers actually type ("Free", "Stock
+// Screener List", "Every US Stock") over the internal "Stock Directory" jargon.
 export const metadata = pageMeta({
-  title: "Stock Directory — Every Ticker Tapeline Scores, by Sector",
+  title: "Free Stock Screener List — Every US Stock, by Sector",
   description:
-    "Browse the full Tapeline coverage universe — every US stock we score, " +
-    "grouped by GICS sector. Each ticker links to its live 6-factor score, " +
-    "plain-English breakdown, and FAQ.",
+    "Browse every US stock we score on a public 6-factor formula, grouped " +
+    "by sector. Each links to its live 0–100 score and breakdown. Free, no signup.",
   path: "/stocks",
 });
 
@@ -186,17 +188,18 @@ export default async function StocksDirectoryPage() {
 
         <p className="eyebrow mt-4">Coverage directory</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
-          Every stock Tapeline scores
+          Every US stock we score — by sector
         </h1>
         <p className="mt-4 max-w-3xl text-lg text-muted">
-          The complete map of our coverage universe
-          {total > 0 ? <> — <span className="font-semibold text-fg">{total.toLocaleString()}</span> actively-scored US tickers</> : null}, grouped by
-          GICS sector. Every name links to its per-ticker page with the live
+          A free, complete index of every US stock we actively score
+          {total > 0 ? <> — <span className="font-semibold text-fg">{total.toLocaleString()}</span> tickers today</> : null}, grouped by
+          GICS sector. No login, no paywall. Every name links to its live
           0–100{" "}
-          <Link href="/how-it-works" className="link">6-factor score</Link>,
-          factor breakdown, and FAQ. The same published formula runs on every
-          row — see how today&rsquo;s picks have held up on the{" "}
-          <Link href="/scorecard" className="link">public scorecard</Link>.
+          <Link href="/how-it-works" className="link">6-factor score</Link> and
+          factor breakdown — the same published formula runs on every row. See
+          how current scores have held up on the{" "}
+          <Link href="/scorecard" className="link">public scorecard</Link>{" "}
+          (which today trails the S&amp;P 500 — we publish it anyway).
         </p>
 
         {groups.length === 0 ? (
@@ -283,6 +286,53 @@ export default async function StocksDirectoryPage() {
           </>
         )}
 
+        {/* Free-screener FAQ — descriptive answers to the actual search intent
+            (free screener / how scored / how often). Genuine depth, no
+            performance/returns claims. */}
+        <section className="mt-14 border-t border-border pt-8">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Using this as a free stock screener
+          </h2>
+          <div className="mt-6 divide-y divide-border/60">
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">Is this a free stock screener?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted leading-relaxed">
+                Yes. This directory lists every US stock in our coverage universe,
+                and each ticker links to its full score page — no account, no
+                paywall. To filter and sort the same universe live, use the{" "}
+                <Link href="/signals" className="text-accent hover:underline">signals view</Link>.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">How are the stocks scored?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted leading-relaxed">
+                Every stock runs through the same public 6-factor formula for a
+                0–100 composite score. The formula is published on{" "}
+                <Link href="/how-it-works" className="text-accent hover:underline">how it works</Link>;
+                the score is a descriptive snapshot of the six factors, not a buy
+                signal or a forecast.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 list-none">
+                <h3 className="text-sm font-medium">How often does the list update?</h3>
+                <span className="text-muted transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-sm text-muted leading-relaxed">
+                The list of covered tickers rebuilds hourly as the universe
+                changes. Individual scores refresh in under 60 seconds during US
+                market hours on each ticker&rsquo;s page.
+              </p>
+            </details>
+          </div>
+        </section>
+
         {/* Cross-links to the sibling discovery surfaces — keeps the directory
             wired into the rest of the crawl graph rather than a dead end. */}
         <nav
@@ -291,6 +341,18 @@ export default async function StocksDirectoryPage() {
         >
           <Link href="/signals" className="hover:text-fg underline-offset-4 hover:underline">
             Live signals universe
+          </Link>
+          <Link href="/best-stocks-for/swing-traders" className="hover:text-fg underline-offset-4 hover:underline">
+            Swing-trade candidates
+          </Link>
+          <Link href="/best-stocks-for/momentum" className="hover:text-fg underline-offset-4 hover:underline">
+            Momentum candidates
+          </Link>
+          <Link href="/best-stocks-for/growth-stocks" className="hover:text-fg underline-offset-4 hover:underline">
+            Growth candidates
+          </Link>
+          <Link href="/blog/stock-screener-vs-stock-scanner" className="hover:text-fg underline-offset-4 hover:underline">
+            Screener vs scanner
           </Link>
           <Link href="/sectors" className="hover:text-fg underline-offset-4 hover:underline">
             Sector rankings
