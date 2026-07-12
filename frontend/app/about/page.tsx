@@ -27,7 +27,7 @@ import {
 export const metadata = pageMeta({
   title: "About Tapeline — The Public-Formula Stock Scanner",
   description:
-    "Who's behind Tapeline, why we publish the formula and the scorecard, what we believe about transparency in retail finance tooling, and how to reach us.",
+    "Who's behind Tapeline, why we publish our methodology and the scorecard, what we believe about transparency in retail finance tooling, and how to reach us.",
   path: "/about",
 });
 
@@ -55,8 +55,8 @@ const ABOUT_FAQ = [
     a: "Tapeline is built by a solo founder with a decade of trading and software engineering experience. The same scoring engine that powers Tapeline runs the founder's personal trading bot — public scorecard included.",
   },
   {
-    q: "Why publish the formula?",
-    a: "Two reasons. First, trust compounds when you can audit — if you spot a ticker scoring 90 on a clearly broken setup, you can call it out. Second, the moat isn't the formula (anyone can copy it); the moat is the data spine plus the public scorecard back-checking every call. We'd rather compete on accountability than IP.",
+    q: "Why publish the methodology?",
+    a: "Two reasons. First, trust compounds when you can audit — if you spot a ticker scoring 90 on a clearly broken setup, you can call it out. Second, the moat isn't a secret list of factors (anyone can name six factors); the moat is the data spine plus the public scorecard back-checking every call. We'd rather compete on accountability than IP.",
   },
   {
     q: "Why publish the scorecard?",
@@ -98,13 +98,13 @@ export default function AboutPage() {
       <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <p className="eyebrow">About</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
-          The public-formula stock scanner.
+          The transparent stock scanner.
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Tapeline is a quantitative stock scanner that publishes its 6-factor
-          scoring formula and back-checks every top-10 daily pick against the
-          next-day SPY-relative move. The point isn't the formula — anyone can
-          copy a weighted equation. The point is that you can{" "}
+          Tapeline is a quantitative stock scanner that names the six factors
+          behind its score and back-checks every top-10 daily pick against the
+          next-day SPY-relative move. The point isn't a secret formula — anyone can
+          blend a few factors. The point is that you can{" "}
           <em>audit</em> it.
         </p>
 
@@ -122,9 +122,9 @@ export default function AboutPage() {
           <p className="mt-4 text-base text-muted leading-relaxed">
             Tapeline solves both: the{" "}
             <Link href="/how-it-works" className="text-accent hover:underline">
-              full 6-factor formula
+              six named factors
             </Link>{" "}
-            with exact weights is on the methodology page, and every top-10
+            and how they&apos;re weighted are on the methodology page, and every top-10
             daily pick auto-publishes to{" "}
             <Link href="/scorecard" className="text-accent hover:underline">
               the public scorecard
@@ -166,9 +166,9 @@ export default function AboutPage() {
             <li>
               <div className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-accent bg-background" />
               <time className="text-xs uppercase tracking-wider text-subtle">2026</time>
-              <h3 className="mt-1 font-semibold">Public formula + public scorecard from day one</h3>
+              <h3 className="mt-1 font-semibold">Public methodology + public scorecard from day one</h3>
               <p className="mt-1 text-sm text-muted">
-                Tapeline launches with the 6-factor weighted equation published in full and
+                Tapeline launches with all six scoring factors named and
                 every top-10 pick auto-back-checked vs SPY the following day.
               </p>
             </li>

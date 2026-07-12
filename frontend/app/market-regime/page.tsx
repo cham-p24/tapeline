@@ -87,10 +87,11 @@ export default async function MarketRegimePage() {
         body: (
           <>
             <p>
-              Four inputs, each weighted into a composite Fear &amp; Greed score:
-              VIX (35%, lower = greed), breadth (30%, more % above 200DMA = greed),
-              regime label (20%, BULL/NEUTRAL/CAUTIOUS/BEAR), and 5-day SPY
-              momentum (15%, positive = greed). The composite maps to{" "}
+              Four inputs blended into a composite Fear &amp; Greed score, leaning
+              most on the volatility and breadth readings:
+              VIX (lower = greed), breadth (more % above 200DMA = greed),
+              regime label (BULL/NEUTRAL/CAUTIOUS/BEAR), and 5-day SPY
+              momentum (positive = greed). The composite maps to{" "}
               <strong>0&ndash;24 Extreme Fear</strong>, <strong>25&ndash;44 Fear</strong>,{" "}
               <strong>45&ndash;54 Neutral</strong>, <strong>55&ndash;74 Greed</strong>,{" "}
               <strong>75&ndash;100 Extreme Greed</strong> &mdash; matches the labels
@@ -135,7 +136,7 @@ export default async function MarketRegimePage() {
         },
         {
           q: "Does the regime change scoring weights?",
-          a: "No — Tapeline's 6-factor weights (Trend 25% / RS 20% / Fund 15% / SM 15% / Macro 15% / Mom 10%) are fixed and public. The regime classifier is a separate macro context indicator. What changes per regime isn't the formula, it's which scores you might pay more attention to: high-momentum names in Risk On, high-quality fundamentals + low-beta names in Risk Off.",
+          a: "No — Tapeline's six factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) and how they're weighted are fixed and public. The regime classifier is a separate macro context indicator. What changes per regime isn't the scoring, it's which scores you might pay more attention to: high-momentum names in Risk On, high-quality fundamentals + low-beta names in Risk Off.",
         },
         {
           q: "What's 'breadth' here exactly?",
@@ -183,7 +184,7 @@ export default async function MarketRegimePage() {
             </span>
           </div>
           <p className="mt-3 text-xs text-muted leading-relaxed">
-            VIX 35% · Breadth 30% · Regime 20% · SPY 5d 15%. The composite maps
+            Blended from VIX, breadth, regime, and 5-day SPY momentum. The composite maps
             to 0–24 Extreme Fear, 25–44 Fear, 45–54 Neutral, 55–74 Greed, 75–100
             Extreme Greed.
           </p>

@@ -27,7 +27,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Does Finviz publish its scoring formula?",
-    a: "Finviz does not publish a single composite score per ticker. It provides ~60 raw screener fields (P/E, RSI, EMA distance, insider ownership, etc.) and lets you filter against them. Tapeline publishes its 6-factor weighted formula and the exact percentages on /how-it-works.",
+    a: "Finviz does not publish a single composite score per ticker. It provides ~60 raw screener fields (P/E, RSI, EMA distance, insider ownership, etc.) and lets you filter against them. Tapeline names all six factors behind its composite and shows how they're weighted on /how-it-works.",
   },
   {
     q: "Does Tapeline cover penny stocks like Finviz?",
@@ -49,7 +49,7 @@ const COMPARE_FAQ = [
 const WINS = [
   {
     label: "One composite score per ticker",
-    tapeline: "✓ Six factors, public weights",
+    tapeline: "✓ Six named factors, public methodology",
     competitor: "Not available — no synthesis at all",
   },
   {

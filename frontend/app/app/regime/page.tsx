@@ -269,12 +269,12 @@ export default function RegimePage() {
           <div className="card mt-8 p-6 text-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Where this regime score comes from</h2>
             <p className="mt-3 text-muted leading-relaxed">
-              The regime classifier weights four inputs: VIX percentile vs its
-              trailing 1-year distribution (30%), breadth above 200DMA (30%),
-              10-year yield direction (20%), and sector-leader rotation (20%).
-              Bands: composite &gt; 70 = BULL, 50-70 = NEUTRAL, 30-50 =
-              CAUTIOUS, &lt; 30 = BEAR. The thresholds and weights are fixed
-              and visible — any change ships with a changelog entry.
+              The regime classifier blends four inputs — VIX percentile vs its
+              trailing 1-year distribution, breadth above 200DMA, 10-year yield
+              direction, and sector-leader rotation — leaning most on the
+              volatility and breadth readings. Bands: composite &gt; 70 = BULL,
+              50-70 = NEUTRAL, 30-50 = CAUTIOUS, &lt; 30 = BEAR. The thresholds
+              are fixed and visible — any change ships with a changelog entry.
             </p>
           </div>
         </>

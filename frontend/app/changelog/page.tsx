@@ -186,7 +186,7 @@ const ENTRIES: Entry[] = [
     tag: "shipped",
     title: "Tapeline launches",
     body: [
-      "Six-factor scoring formula live with exact weights published on /how-it-works.",
+      "Six-factor scoring methodology live with all six factors published on /how-it-works.",
       "Scanner with one composite score and one plain-English Why on every US-listed ticker.",
       "Watchlist with smart score-change alerts.",
       "14-day Premium trial available with no credit card.",

@@ -17,11 +17,11 @@ export const metadata = pageMeta({
 const COMPARE_FAQ = [
   {
     q: "Is Tapeline a WallStreetZen alternative?",
-    a: "Yes. Both score US stocks, but Tapeline publishes the exact 6-factor formula and weights, recomputes the score sub-60s, and back-checks every top-10 pick publicly vs SPY the next day. WallStreetZen's Zen Ratings combine 115 factors at undisclosed weights and update less frequently.",
+    a: "Yes. Both score US stocks, but Tapeline names all six factors and how they're weighted, shows each factor's contribution per ticker, recomputes the score sub-60s, and back-checks every top-10 pick publicly vs SPY the next day. WallStreetZen's Zen Ratings combine 115 factors at undisclosed weights and update less frequently.",
   },
   {
     q: "How is the Tapeline Score different from WallStreetZen Zen Ratings?",
-    a: "Zen Ratings is a multi-factor proprietary score across 115 inputs, with the underlying weighting derived from documentation rather than published. Tapeline publishes the exact 6 factors and percentages: Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Fewer factors, fully transparent weights.",
+    a: "Zen Ratings is a multi-factor proprietary score across 115 inputs, with the underlying weighting derived from documentation rather than published. Tapeline names all six of its factors and publishes how they're ordered: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, least toward Momentum, with each factor's contribution shown per ticker. Fewer factors, clearer methodology.",
   },
   {
     q: "How do prices compare?",
@@ -40,7 +40,7 @@ const COMPARE_FAQ = [
 const WINS = [
   {
     label: "Factor weights — fully public",
-    tapeline: "✓ Six factors, exact percentages on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "115 factors, weights derived from docs (not published)",
   },
   {
@@ -157,8 +157,8 @@ export default function VsWallStreetZenPage() {
         </h1>
         <p className="mt-4 text-lg text-muted">
           WallStreetZen built a strong long-term-investor product around their 115-factor
-          Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline publishes the
-          exact 6-factor weights, recomputes the score sub-60s, and pairs every top-10
+          Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline names all six
+          factors and how they're weighted, recomputes the score sub-60s, and pairs every top-10
           with a per-pick public scorecard. If you trade on a sub-week timescale,
           Tapeline is built for you. If you buy-and-hold for 5+ years and the strong
           free tier is enough, WallStreetZen is the right choice.

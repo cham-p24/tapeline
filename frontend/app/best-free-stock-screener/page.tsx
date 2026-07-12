@@ -14,7 +14,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Best Free Stock Screener 2026 — 5 Tools Compared | Tapeline",
   description:
-    "Compare 2026's best free stock screeners — Finviz, TradingView, StockAnalysis and Tapeline's free tier. Only Tapeline shows its formula and scorecard.",
+    "Compare 2026's best free stock screeners — Finviz, TradingView, StockAnalysis and Tapeline's free tier. Only Tapeline names its scoring factors and keeps a public scorecard.",
   path: "/best-free-stock-screener",
 });
 
@@ -22,7 +22,7 @@ type FreeScreener = {
   name: string;
   // The genuinely-free path each tool offers, described honestly.
   freePlan: string;
-  // Does the tool publish the exact formula behind any score it shows? Raw
+  // Does the tool publish the methodology behind any score it shows? Raw
   // filter screeners have no score, so this reads "No score" for them.
   publicFormula: "Yes" | "No score";
   // Feature-only, never performance. "Public scorecard" or "None".
@@ -41,7 +41,7 @@ const SCREENERS: FreeScreener[] = [
     trackRecord: "Public scorecard",
     noCard: "Yes",
     summary:
-      "The only US scanner that publishes its full 6-factor formula AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. The free tier gives you the composite score and the plain-English Why on the top rows; no card, no trial clock.",
+      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. The free tier gives you the composite score and the plain-English Why on the top rows; no card, no trial clock.",
   },
   {
     name: "Finviz (free)",
@@ -80,7 +80,7 @@ const SCREENERS: FreeScreener[] = [
 const FAQ = [
   {
     q: "What's the best free stock screener in 2026?",
-    a: "It depends on the job. For a synthesised composite score per ticker with a published formula, Tapeline's free tier — the only one that also keeps a public scorecard. For raw filter density across a broad universe, the free Finviz screener. For charting plus a free screener, TradingView. For clean fundamental tables with no login wall, StockAnalysis.io. Each is honest about what its free tier includes and what it doesn't.",
+    a: "It depends on the job. For a synthesised composite score per ticker with a published methodology, Tapeline's free tier — the only one that also keeps a public scorecard. For raw filter density across a broad universe, the free Finviz screener. For charting plus a free screener, TradingView. For clean fundamental tables with no login wall, StockAnalysis.io. Each is honest about what its free tier includes and what it doesn't.",
   },
   {
     q: "Are free stock screeners actually any good, or just trials?",
@@ -88,7 +88,7 @@ const FAQ = [
   },
   {
     q: "Which free screener publishes how it actually scores stocks?",
-    a: "Tapeline is the only one here that publishes the exact 6-factor formula behind its score, with the factor weights written out (Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%). The others are raw filter screeners — they don't produce a composite score at all, so there's no formula to publish. That's a fair design choice, just a different one.",
+    a: "Tapeline is the only one here that names all six factors behind its score (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength, least toward Momentum) and shows each factor's contribution on every ticker. The others are raw filter screeners — they don't produce a composite score at all, so there's no methodology to publish. That's a fair design choice, just a different one.",
   },
   {
     q: "Does any free screener show a real track record?",
@@ -96,7 +96,7 @@ const FAQ = [
   },
   {
     q: "How did you compare these free screeners?",
-    a: "On features only, never on returns: does it have a genuinely free tier, does it publish the formula behind any score, does it keep a public track record, and does it work with no credit card. We don't rank tools by claimed performance — that's not something an honest scanner should advertise. The right free screener for you depends on whether you want a synthesised score (Tapeline) or a raw filter box (Finviz, TradingView, StockAnalysis.io).",
+    a: "On features only, never on returns: does it have a genuinely free tier, does it publish the methodology behind any score, does it keep a public track record, and does it work with no credit card. We don't rank tools by claimed performance — that's not something an honest scanner should advertise. The right free screener for you depends on whether you want a synthesised score (Tapeline) or a raw filter box (Finviz, TradingView, StockAnalysis.io).",
   },
 ];
 
@@ -105,7 +105,7 @@ const ITEM_LIST_JSON_LD = {
   "@type": "ItemList",
   name: "Best Free Stock Screeners 2026",
   description:
-    "Feature comparison of the best genuinely-free stock screeners in 2026, compared on free-tier depth, formula transparency, public track record, and no-card access.",
+    "Feature comparison of the best genuinely-free stock screeners in 2026, compared on free-tier depth, methodology transparency, public track record, and no-card access.",
   numberOfItems: SCREENERS.length,
   itemListElement: SCREENERS.map((s, i) => ({
     "@type": "ListItem",
@@ -138,7 +138,7 @@ export default function BestFreeStockScreenerPage() {
           Best Free Stock Screener in 2026
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Tapeline is the only US scanner that publishes its full 6-factor formula
+          Tapeline is the only US scanner that names all six of its scoring factors
           <em> and</em> keeps every losing day on a public scorecard. That scorecard currently
           trails SPY — and we leave it up unedited, because a record you can audit beats a
           marketing number you can&apos;t. Below is an honest, feature-only comparison of the
@@ -155,7 +155,7 @@ export default function BestFreeStockScreenerPage() {
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance — free tiers compared</h2>
           <p className="mt-2 text-sm text-muted">
-            Features only. We compare free-tier depth, formula transparency, and track record —
+            Features only. We compare free-tier depth, methodology transparency, and track record —
             never claimed returns.
           </p>
           <div className="mt-4 card overflow-x-auto">
@@ -164,7 +164,7 @@ export default function BestFreeStockScreenerPage() {
                 <tr>
                   <th className="px-3 py-3 text-left">Screener</th>
                   <th className="px-3 py-3 text-left">Free tier</th>
-                  <th className="px-3 py-3 text-center">Public formula</th>
+                  <th className="px-3 py-3 text-center">Public methodology</th>
                   <th className="px-3 py-3 text-center">Track record</th>
                   <th className="px-3 py-3 text-center">No card</th>
                 </tr>
@@ -206,7 +206,7 @@ export default function BestFreeStockScreenerPage() {
             <p className="mt-3 text-sm text-fg leading-relaxed">{s.summary}</p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
               <span className={formulaChip(s.publicFormula)}>
-                Public formula: {s.publicFormula}
+                Public methodology: {s.publicFormula}
               </span>
               <span className={trackChip(s.trackRecord)}>Track record: {s.trackRecord}</span>
               <span className={cardChip(s.noCard)}>No card: {s.noCard}</span>
@@ -226,13 +226,13 @@ export default function BestFreeStockScreenerPage() {
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Four feature criteria, no performance criteria: is there a{" "}
             <strong>genuinely free tier</strong> (not a disguised trial);
-            does the tool <strong>publish the formula</strong> behind any score it shows;
+            does the tool <strong>publish the methodology</strong> behind any score it shows;
             does it keep a <strong>public track record</strong>; and does it work with{" "}
             <strong>no credit card</strong>. We deliberately do not rank screeners by claimed
             returns — descriptive analytics only.
           </p>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Tapeline is the only tool here that answers &quot;yes&quot; to both the public-formula
+            Tapeline is the only tool here that answers &quot;yes&quot; to both the public-methodology
             and public-scorecard columns. The scorecard trailing SPY is stated plainly on the{" "}
             <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link>{" "}
             itself — it&apos;s the trust hook, not a footnote. The raw filter screeners

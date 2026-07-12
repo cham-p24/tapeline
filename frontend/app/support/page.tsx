@@ -115,8 +115,8 @@ export default function SupportPage() {
             a={
               <>
                 <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>{" "}
-                — six factors, the exact weights, the public scorecard explanation. The whole thing
-                fits on one page.
+                — the six named factors, how they&apos;re weighted, and the public scorecard
+                explanation. The whole thing fits on one page.
               </>
             }
           />

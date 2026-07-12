@@ -106,7 +106,7 @@ const FAQ = [
   },
   {
     q: "Is the scoring formula documented?",
-    a: "Yes — the exact 6-factor weighted formula is public at /how-it-works. Scores are descriptive (a measurement), never prescriptive (not buy/sell advice).",
+    a: "Yes — the six named factors and how they're weighted are public at /how-it-works, with each factor's contribution shown per ticker. Scores are descriptive (a measurement), never prescriptive (not buy/sell advice).",
   },
   {
     q: "Is there a free tier for the API?",

@@ -11,7 +11,7 @@ export const metadata = pageMeta({
 const WINS: CompareRow[] = [
   {
     label: "Factor weights — fully published",
-    tapeline: "✓ Six factors, exact percentages on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Quant Ratings published as letter grades; underlying weighting not disclosed",
   },
   {
@@ -86,7 +86,7 @@ const TRADEOFFS: CompareTradeoff[] = [
 const FAQ: CompareFaq[] = [
   {
     q: "Is Tapeline a Seeking Alpha alternative?",
-    a: "Partially. Both surface per-ticker signals from multiple data streams. The difference: Seeking Alpha is fundamentally an editorial platform with a Quant Ratings overlay — 31,000+ contributors write articles, and a separate quant system computes letter grades. Tapeline is a deterministic scanner — one 0-100 score per ticker from a published 6-factor formula, refreshed sub-60s, with every top-10 pick back-checked publicly. If you mostly read SA for the articles, Tapeline doesn't replace that. If you mostly use SA for the Quant Ratings, Tapeline is the upgrade — published weights, live refresh, per-pick scorecard.",
+    a: "Partially. Both surface per-ticker signals from multiple data streams. The difference: Seeking Alpha is fundamentally an editorial platform with a Quant Ratings overlay — 31,000+ contributors write articles, and a separate quant system computes letter grades. Tapeline is a deterministic scanner — one 0-100 score per ticker from six named factors, refreshed sub-60s, with every top-10 pick back-checked publicly. If you mostly read SA for the articles, Tapeline doesn't replace that. If you mostly use SA for the Quant Ratings, Tapeline is the upgrade — named factors, live refresh, per-pick scorecard.",
   },
   {
     q: "How does Tapeline pricing compare to Seeking Alpha?",
@@ -94,7 +94,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "What is the Tapeline Score vs the SA Quant Rating?",
-    a: "The Tapeline Score is a single 0-100 number from six published-weight factors: Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Each sub-score is visible per ticker. The SA Quant Rating is one of five letter grades (Quant, Valuation, Growth, Profitability, Momentum, Revisions); the underlying calculation is not published in the same detail and the five grades are not synthesised into a single number. Tapeline is more decisive (one number); SA's grades are more granular.",
+    a: "The Tapeline Score is a single 0-100 number from six named factors: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, least toward Momentum. Each sub-score is visible per ticker. The SA Quant Rating is one of five letter grades (Quant, Valuation, Growth, Profitability, Momentum, Revisions); the underlying calculation is not published in the same detail and the five grades are not synthesised into a single number. Tapeline is more decisive (one number); SA's grades are more granular.",
   },
   {
     q: "Does Seeking Alpha back-check Quant Rating picks daily?",

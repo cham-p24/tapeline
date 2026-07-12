@@ -437,7 +437,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   // Finviz alternative" in the description lets every per-ticker page
   // compete for "${sym} finviz" without keyword stuffing the title.
   // Keeps copy honest (no return claims, descriptive not prescriptive).
-  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. A free Finviz alternative for ${sym} — public formula, back-checked scorecard, live updates.`;
+  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. A free Finviz alternative for ${sym} — public methodology, back-checked scorecard, live updates.`;
   // Keyword set for crawlers — narrow, ticker-specific, no spam stuffing.
   // Finviz keywords added 2026-05-19: GSC shows ~half a dozen "{ticker}
   // finviz" queries per 90 days where we already accidentally rank but
@@ -512,7 +512,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `How is ${sym}'s score calculated?`,
-      a: `The Tapeline Score is a transparent weighted sum: 25% Trend, 20% Relative Strength, 15% Fundamentals, 15% Smart Money, 15% Macro, 10% Momentum. Each sub-score is normalised to 0-100 and the exact formula is published on /how-it-works.`,
+      a: `The Tapeline Score is a transparent weighted blend of six named factors: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, and least toward Momentum. Each sub-score is normalised to 0-100 and the methodology is published on /how-it-works.`,
     },
     {
       q: `Is ${sym} a buy?`,
@@ -532,7 +532,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Is ${sym} better for swing trading or day trading?`,
-      a: `The Tapeline composite is calibrated for multi-day setups — the heaviest weights (Trend 25%, RS 20%, Fundamentals 15%) reward stability over a horizon of days-to-weeks. For pure day trading, the 1-day move + sub-momentum factor is more relevant. Use /best-stocks-for/day-traders for the day-trader-sorted view and /best-stocks-for/swing-traders for the multi-day setup view.`,
+      a: `The Tapeline composite is calibrated for multi-day setups — the heaviest-weighted factors (Trend, Relative Strength, and Fundamentals) reward stability over a horizon of days-to-weeks. For pure day trading, the 1-day move + sub-momentum factor is more relevant. Use /best-stocks-for/day-traders for the day-trader-sorted view and /best-stocks-for/swing-traders for the multi-day setup view.`,
     },
     {
       q: `Where does ${sym} rank in ${sectorPhrase}?`,
@@ -540,7 +540,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Does Tapeline have insider buying data for ${sym}?`,
-      a: `${sym}'s Smart Money sub-score (15% of the composite) blends SEC Form 4 insider transactions, Congressional disclosures where applicable, and ETF/institutional flow signals. Detailed Form 4 history per ticker is a Premium feature; the aggregate Smart Money sub-score is shown on this page for free.`,
+      a: `${sym}'s Smart Money sub-score blends SEC Form 4 insider transactions, Congressional disclosures where applicable, and ETF/institutional flow signals. Detailed Form 4 history per ticker is a Premium feature; the aggregate Smart Money sub-score is shown on this page for free.`,
     },
     {
       q: `Why does ${sym}'s score change between visits?`,
@@ -613,13 +613,15 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
     score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-warn" : "text-down";
 
   const b = data.breakdown ?? {};
-  const factors: { label: string; value: number | null | undefined; weight: number }[] = [
-    { label: "Trend",              value: b.trend?.value,        weight: 25 },
-    { label: "Relative strength",  value: b.rs?.value,           weight: 20 },
-    { label: "Fundamentals",       value: b.fundamentals?.value, weight: 15 },
-    { label: "Smart money",        value: b.smart_money?.value,  weight: 15 },
-    { label: "Macro",              value: b.macro?.value,        weight: 15 },
-    { label: "Momentum",           value: b.momentum?.value,     weight: 10 },
+  // Listed in descending weight order. We show the qualitative emphasis
+  // (which factors carry the most weight) rather than exact percentages.
+  const factors: { label: string; value: number | null | undefined; emphasis: string }[] = [
+    { label: "Trend",              value: b.trend?.value,        emphasis: "Weighted most" },
+    { label: "Relative strength",  value: b.rs?.value,           emphasis: "High" },
+    { label: "Fundamentals",       value: b.fundamentals?.value, emphasis: "Core" },
+    { label: "Smart money",        value: b.smart_money?.value,  emphasis: "Core" },
+    { label: "Macro",              value: b.macro?.value,        emphasis: "Core" },
+    { label: "Momentum",           value: b.momentum?.value,     emphasis: "Weighted least" },
   ];
 
   // Structured data — three graphs inlined in the body. Google parses
@@ -782,14 +784,14 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
 
         {/* 6-factor breakdown */}
         <h2 className="mt-10 sm:mt-12 text-sm font-semibold uppercase tracking-wider text-muted">
-          Score breakdown · public formula
+          Score breakdown · six named factors
         </h2>
         <div className="mt-4 space-y-2">
           {factors.map((f) => (
             <div key={f.label} className="flex items-center gap-3 sm:gap-4 rounded-lg border border-border bg-panel/40 px-3 sm:px-4 py-3">
               <div className="w-28 sm:w-44 flex-shrink-0">
                 <div className="text-xs sm:text-sm font-medium truncate">{f.label}</div>
-                <div className="text-[10px] uppercase tracking-wider text-subtle">{f.weight}% weight</div>
+                <div className="text-[10px] uppercase tracking-wider text-subtle">{f.emphasis}</div>
               </div>
               <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-background">
                 <div
@@ -805,7 +807,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         </div>
 
         <p className="mt-4 text-xs text-muted">
-          Weights are public and never change without a changelog entry.
+          The six factors are public and never change without a changelog entry.
           Read the full methodology on <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
         </p>
 

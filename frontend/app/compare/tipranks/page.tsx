@@ -11,7 +11,7 @@ export const metadata = pageMeta({
 const WINS: CompareRow[] = [
   {
     label: "Factor weights — fully public",
-    tapeline: "✓ Six factors, exact percentages on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Eight factors aggregated, weights NOT published",
   },
   {
@@ -46,7 +46,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Macro-regime factor in the score",
-    tapeline: "✓ 15% weight explicitly — regime context baked in",
+    tapeline: "✓ Explicit named factor — regime context baked in",
     competitor: "No explicit macro factor in Smart Score",
   },
   {
@@ -90,7 +90,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How is the Tapeline Score different from Tipranks Smart Score?",
-    a: "Smart Score is a 1-10 rating aggregating analyst consensus, hedge fund sentiment, insider activity, blogger sentiment, news sentiment, fundamentals, technicals, and individual-investor sentiment. The weights are not published. The Tapeline Score is a 0-100 composite from six published-weight factors: Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Each sub-score is visible per ticker.",
+    a: "Smart Score is a 1-10 rating aggregating analyst consensus, hedge fund sentiment, insider activity, blogger sentiment, news sentiment, fundamentals, technicals, and individual-investor sentiment. The weights are not published. The Tapeline Score is a 0-100 composite from six named factors: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, least toward Momentum. Each sub-score is visible per ticker.",
   },
   {
     q: "How does Tapeline pricing compare to Tipranks?",
@@ -114,8 +114,8 @@ export default function VsTipranksPage() {
       competitorPriceMonthly={30}
       competitorAnnualNote="Plus ~$30/mo annual; Premium ~$43.93/mo; Ultimate ~$76/mo"
       slug="tipranks"
-      heading="Tapeline vs Tipranks — published weights vs Smart Score black box."
-      lede="Tipranks built its name on a 1-10 Smart Score aggregating eight factors at undisclosed weights — analyst consensus, hedge fund moves, insider activity, blogger sentiment, news, fundamentals, technicals, individual investors. Tapeline publishes the exact 6-factor weighting in full, back-checks every top-10 daily pick on the public scorecard, and lands the entry tier at $8.25/mo annual. Pick Tapeline if methodology transparency and per-pick accountability matter. Pick Tipranks if you need 35,000+ ticker coverage or the analyst-tracking data."
+      heading="Tapeline vs Tipranks — six named factors vs Smart Score black box."
+      lede="Tipranks built its name on a 1-10 Smart Score aggregating eight factors at undisclosed weights — analyst consensus, hedge fund moves, insider activity, blogger sentiment, news, fundamentals, technicals, individual investors. Tapeline names all six factors, shows each one's contribution per ticker, back-checks every top-10 daily pick on the public scorecard, and lands the entry tier at $8.25/mo annual. Pick Tapeline if methodology transparency and per-pick accountability matter. Pick Tipranks if you need 35,000+ ticker coverage or the analyst-tracking data."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

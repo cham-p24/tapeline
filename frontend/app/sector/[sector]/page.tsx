@@ -96,7 +96,7 @@ function sectorFaq(display: string) {
     },
     {
       q: `How are ${display} stocks scored?`,
-      a: `The same 6-factor formula applies across every sector: 25% Trend, 20% Relative Strength, 15% Fundamentals, 15% Smart Money, 15% Macro, 10% Momentum. Sector-specific peer comparisons feed Relative Strength; macro factor weights sector-rotation signals.`,
+      a: `The same six named factors apply across every sector: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, and least toward Momentum. Sector-specific peer comparisons feed Relative Strength; the Macro factor weighs sector-rotation signals.`,
     },
     {
       q: `What's the difference between sector ranking and the public scorecard?`,
@@ -225,10 +225,11 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
         <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
           <h2 className="text-lg font-semibold">How the {sector.display} ranking works</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            The Tapeline Score is a transparent weighted sum of six sub-scores:{" "}
-            <strong>Trend (25%)</strong>, <strong>Relative Strength (20%)</strong>,{" "}
-            <strong>Fundamentals (15%)</strong>, <strong>Smart Money (15%)</strong>,{" "}
-            <strong>Macro (15%)</strong>, and <strong>Momentum (10%)</strong>. Within the{" "}
+            The Tapeline Score is a transparent weighted blend of six named sub-scores:{" "}
+            <strong>Trend</strong>, <strong>Relative Strength</strong>,{" "}
+            <strong>Fundamentals</strong>, <strong>Smart Money</strong>,{" "}
+            <strong>Macro</strong>, and <strong>Momentum</strong> — weighted most toward Trend and
+            Relative Strength, least toward Momentum. Within the{" "}
             {sector.display} sector, Relative Strength compares each ticker to its{" "}
             sector-ETF peer; the Macro factor reflects current sector-rotation positioning.
           </p>

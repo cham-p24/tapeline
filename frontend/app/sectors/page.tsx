@@ -103,7 +103,7 @@ const FAQ = [
   },
   {
     q: "How is a sector's average score calculated?",
-    a: "Each stock gets a 0–100 Tapeline Score from the same 6-factor formula (25% Trend, 20% Relative Strength, 15% Fundamentals, 15% Smart Money, 15% Macro, 10% Momentum). A sector's average is the mean of those scores across every scored ticker mapped to that GICS sector. It's an equal-weight average, not market-cap weighted.",
+    a: "Each stock gets a 0–100 Tapeline Score from the same six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength, least toward Momentum). A sector's average is the mean of those scores across every scored ticker mapped to that GICS sector. It's an equal-weight average, not market-cap weighted.",
   },
   {
     q: "What can I do on each sector page?",
@@ -208,10 +208,11 @@ export default async function SectorsIndexPage() {
         <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
           <h2 className="text-lg font-semibold">How sector ranking works</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Every stock Tapeline tracks gets a transparent 0–100 score from a weighted sum of
-            six sub-scores: <strong>Trend (25%)</strong>, <strong>Relative Strength (20%)</strong>,{" "}
-            <strong>Fundamentals (15%)</strong>, <strong>Smart Money (15%)</strong>,{" "}
-            <strong>Macro (15%)</strong>, and <strong>Momentum (10%)</strong>. A sector&apos;s
+            Every stock Tapeline tracks gets a transparent 0–100 score from a weighted blend of
+            six named sub-scores: <strong>Trend</strong>, <strong>Relative Strength</strong>,{" "}
+            <strong>Fundamentals</strong>, <strong>Smart Money</strong>,{" "}
+            <strong>Macro</strong>, and <strong>Momentum</strong> — weighted most toward Trend and
+            Relative Strength, least toward Momentum. A sector&apos;s
             position on this page is the equal-weight average of those scores across all of its
             scored stocks — a fast read on where strength is currently concentrated.
           </p>

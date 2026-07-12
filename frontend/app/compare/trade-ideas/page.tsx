@@ -16,7 +16,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Public scoring formula",
-    tapeline: "✓ Six factors, exact published weights",
+    tapeline: "✓ Six named factors, published methodology",
     competitor: "—  Holly AI is a proprietary ML black box",
   },
   {
@@ -60,7 +60,7 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "AI auto-trading bot",
-    tapeline: "Manual signals with public formula",
+    tapeline: "Manual signals with public methodology",
     competitor: "Holly AI Trader can route paper or live trades via integrated brokerages",
     note: "Trade Ideas' Holly Trader auto-execution is genuinely unique — if you want an opaque AI signal that places trades for you, that's the product. Tapeline is descriptive, not prescriptive: we publish the score, you make the call.",
   },
@@ -83,7 +83,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Is Trade Ideas' Holly AI a black box?",
-    a: "Holly AI is a proprietary ML scanner — Trade Ideas does not publish the specific factors, weights, or training data. Performance is reported aggregate. Tapeline publishes the exact 6-factor weighted equation and back-checks every individual top-10 pick publicly the next day.",
+    a: "Holly AI is a proprietary ML scanner — Trade Ideas does not publish the specific factors, weights, or training data. Performance is reported aggregate. Tapeline names all six factors, shows each one's contribution per ticker, and back-checks every individual top-10 pick publicly the next day.",
   },
   {
     q: "Can I trial Tapeline before paying?",

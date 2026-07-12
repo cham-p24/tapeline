@@ -21,13 +21,15 @@ export function ScoreBreakdown({
   reason?: string | null;
   compact?: boolean;
 }) {
+  // Listed in descending weight order. We show the qualitative emphasis
+  // (which factors carry the most weight) rather than exact percentages.
   const rows = [
-    { label: "Trend", value: trend, weight: 25 },
-    { label: "Relative strength", value: rs, weight: 20 },
-    { label: "Fundamentals", value: fundamentals, weight: 15 },
-    { label: "Smart money", value: smart_money, weight: 15 },
-    { label: "Macro", value: macro, weight: 15 },
-    { label: "Momentum", value: momentum, weight: 10 },
+    { label: "Trend", value: trend, emphasis: "most" },
+    { label: "Relative strength", value: rs, emphasis: "high" },
+    { label: "Fundamentals", value: fundamentals, emphasis: "core" },
+    { label: "Smart money", value: smart_money, emphasis: "core" },
+    { label: "Macro", value: macro, emphasis: "core" },
+    { label: "Momentum", value: momentum, emphasis: "least" },
   ];
   return (
     <div className={compact ? "w-64 p-3" : "p-4"}>
@@ -45,7 +47,7 @@ export function ScoreBreakdown({
           return (
             <div key={r.label} className="text-xs">
               <div className="flex justify-between">
-                <span className="text-muted">{r.label} <span className="opacity-50">({r.weight}%)</span></span>
+                <span className="text-muted">{r.label} <span className="opacity-50">({r.emphasis})</span></span>
                 <span className="nums font-medium">{v.toFixed(0)}</span>
               </div>
               <div className="mt-1 h-1.5 w-full rounded-full bg-panel">

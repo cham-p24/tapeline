@@ -46,7 +46,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Score formula is public + auditable",
-    tapeline: "✓ Six factors at exact published weights on /how-it-works",
+    tapeline: "✓ Six named factors, published methodology on /how-it-works",
     competitor: "Each screener / metric defined, but no Stock Rover-published composite score with disclosed weights",
   },
 ];
@@ -54,7 +54,7 @@ const WINS: CompareRow[] = [
 const TRADEOFFS: CompareTradeoff[] = [
   {
     label: "Fundamental metric depth",
-    tapeline: "Score includes a Fundamentals factor (15% weight); raw metrics available on ticker pages but not 650+",
+    tapeline: "Score includes a Fundamentals factor; raw metrics available on ticker pages but not 650+",
     competitor: "650+ fundamental metrics across 8,500+ stocks, 10-year histories, custom-formula creation",
     note: "If you're a buy-and-hold fundamental investor running multi-screen DCF / quality factor / dividend-growth strategies, Stock Rover's metric depth is the right tool. Tapeline's Fundamentals factor synthesises the most predictive subset (P/E, growth, ROE, margins, debt) into a single sub-score — it's narrower by design but enough to drive a daily scanner ranking.",
   },
@@ -89,7 +89,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "What is the Tapeline Score vs a Stock Rover screener result?",
-    a: "Tapeline produces one 0-100 number per ticker, derived from six published-weight factors (Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%). A Stock Rover screener result is a row in a custom filter table — pass/fail or sorted by whatever metric you chose. The two are different units: Tapeline gives a decisive headline number; Stock Rover gives the raw data for you to synthesise.",
+    a: "Tapeline produces one 0-100 number per ticker, derived from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength, least toward Momentum). A Stock Rover screener result is a row in a custom filter table — pass/fail or sorted by whatever metric you chose. The two are different units: Tapeline gives a decisive headline number; Stock Rover gives the raw data for you to synthesise.",
   },
   {
     q: "Does Stock Rover refresh intraday?",

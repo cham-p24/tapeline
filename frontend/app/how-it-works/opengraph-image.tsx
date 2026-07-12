@@ -5,7 +5,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Tapeline scoring formula — 6 factors, public weights";
+export const alt = "Tapeline scoring methodology — 6 named factors, public methodology";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -53,10 +53,10 @@ export default async function OG() {
               display: "flex",
             }}
           >
-            The formula. Public.
+            The methodology. Public.
           </div>
           <div style={{ fontSize: "26px", color: "#a1a1aa", lineHeight: 1.4, display: "flex", maxWidth: "900px" }}>
-            Six factors. Public weights. One score. TipRanks, Zacks, Kavout all hide theirs. We don&rsquo;t.
+            Six named factors. One score. TipRanks, Zacks, Kavout all hide theirs. We don&rsquo;t.
           </div>
         </div>
 
@@ -79,34 +79,24 @@ export default async function OG() {
         >
           <span style={{ display: "flex" }}>
             <span style={{ color: "#22c55e" }}>score</span>
-            <span style={{ color: "#71717a" }}>{` = `}</span>
-            <span style={{ color: "#fbbf24" }}>0.25</span>
-            <span style={{ color: "#71717a" }}>{`*`}</span>
-            <span>trend</span>
-            <span style={{ color: "#71717a" }}>{` + `}</span>
-            <span style={{ color: "#fbbf24" }}>0.20</span>
-            <span style={{ color: "#71717a" }}>{`*`}</span>
-            <span>relative_strength</span>
+            <span style={{ color: "#71717a" }}>{` = weighted blend of 6 named factors`}</span>
           </span>
           <span style={{ display: "flex", paddingLeft: "112px" }}>
-            <span style={{ color: "#71717a" }}>{`+ `}</span>
-            <span style={{ color: "#fbbf24" }}>0.15</span>
-            <span style={{ color: "#71717a" }}>{`*`}</span>
+            <span style={{ color: "#fbbf24" }}>trend</span>
+            <span style={{ color: "#71717a" }}>{`, `}</span>
+            <span style={{ color: "#fbbf24" }}>relative_strength</span>
+            <span style={{ color: "#71717a" }}>{`  (weighted most)`}</span>
+          </span>
+          <span style={{ display: "flex", paddingLeft: "112px" }}>
             <span>fundamentals</span>
-            <span style={{ color: "#71717a" }}>{` + `}</span>
-            <span style={{ color: "#fbbf24" }}>0.15</span>
-            <span style={{ color: "#71717a" }}>{`*`}</span>
+            <span style={{ color: "#71717a" }}>{`, `}</span>
             <span>smart_money</span>
+            <span style={{ color: "#71717a" }}>{`, `}</span>
+            <span>macro</span>
           </span>
           <span style={{ display: "flex", paddingLeft: "112px" }}>
-            <span style={{ color: "#71717a" }}>{`+ `}</span>
-            <span style={{ color: "#fbbf24" }}>0.15</span>
-            <span style={{ color: "#71717a" }}>{`*`}</span>
-            <span>macro</span>
-            <span style={{ color: "#71717a" }}>{` + `}</span>
-            <span style={{ color: "#fbbf24" }}>0.10</span>
-            <span style={{ color: "#71717a" }}>{`*`}</span>
-            <span>momentum</span>
+            <span style={{ color: "#fbbf24" }}>momentum</span>
+            <span style={{ color: "#71717a" }}>{`  (weighted least)`}</span>
           </span>
         </div>
 

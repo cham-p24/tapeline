@@ -17,11 +17,11 @@ export const metadata = pageMeta({
 const COMPARE_FAQ = [
   {
     q: "Is Tapeline a Zacks alternative?",
-    a: "Yes. Both score US equities, but Tapeline publishes the exact 6-factor formula and weights, updates scores sub-60s during market hours, and back-checks every top-10 call publicly vs SPY. Zacks Rank is updated daily, the underlying earnings-revision model is proprietary, and there's no public per-pick scorecard.",
+    a: "Yes. Both score US equities, but Tapeline names all six factors and how they're weighted, shows each factor's contribution per ticker, updates scores sub-60s during market hours, and back-checks every top-10 call publicly vs SPY. Zacks Rank is updated daily, the underlying earnings-revision model is proprietary, and there's no public per-pick scorecard.",
   },
   {
     q: "How is the Tapeline score different from Zacks Rank?",
-    a: "Zacks Rank #1-#5 is driven primarily by analyst earnings estimate revisions over multiple time windows. The Tapeline Score blends six factors at published weights: Trend (25%), Relative Strength (20%), Fundamentals (15%, includes earnings), Smart Money (15%), Macro (15%), Momentum (10%). You see each contribution per ticker.",
+    a: "Zacks Rank #1-#5 is driven primarily by analyst earnings estimate revisions over multiple time windows. The Tapeline Score blends six named factors: Trend, Relative Strength, Fundamentals (includes earnings), Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, least toward Momentum. You see each contribution per ticker.",
   },
   {
     q: "How does Tapeline pricing compare to Zacks Premium?",
@@ -42,7 +42,7 @@ const COMPARE_FAQ = [
 const WINS = [
   {
     label: "Public scoring formula",
-    tapeline: "✓ Six factors, exact weights on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Factors named, weights opaque",
   },
   {
@@ -151,7 +151,7 @@ export default function VsZacksPage() {
         <p className="mt-4 text-lg text-muted">
           Zacks built a 37-year reputation on the Zacks Rank — a proprietary,
           opaque-weighted, daily-rebuilt #1–#5 grade that emails you the picks. Tapeline
-          publishes the exact 6-factor weights, recomputes the score sub-60s on every
+          names all six factors and how they're weighted, recomputes the score sub-60s on every
           ticker, and back-checks every top-10 against the next-day price publicly. Pick
           Tapeline if you want transparency + speed; pick Zacks if 37 years of brand
           history outweighs everything else.

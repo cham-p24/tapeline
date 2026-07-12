@@ -222,7 +222,7 @@ export default function ScorecardPage() {
             <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
               <div className="flex gap-2">
                 <dt className="whitespace-nowrap font-medium text-fg">Score</dt>
-                <dd className="text-muted">0&ndash;100 composite at flag time. Six factors at <Link href="/how-it-works" className="text-accent hover:underline">published weights</Link>.</dd>
+                <dd className="text-muted">0&ndash;100 composite at flag time. Six named factors, <Link href="/how-it-works" className="text-accent hover:underline">published methodology</Link>.</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="whitespace-nowrap font-medium text-fg">Price at flag</dt>
