@@ -332,8 +332,8 @@ export default async function EmbedScorePage({
         }}
       >
         <span>
-          Powered by <span style={{ color: accent, fontWeight: 600 }}>tapeline.io</span> · 6-factor
-          public formula
+          Powered by <span style={{ color: accent, fontWeight: 600 }}>tapeline.io</span> · 6 named
+          factors
         </span>
         <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>Live</span>
       </div>

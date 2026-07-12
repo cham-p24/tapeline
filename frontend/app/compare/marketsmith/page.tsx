@@ -11,11 +11,11 @@ export const metadata = pageMeta({
 const COMPARE_FAQ = [
   {
     q: "Is Tapeline a MarketSmith alternative?",
-    a: "Yes. Both are dedicated scoring tools (not broker-bundled scanners) targeting retail traders who want a synthesised answer. Tapeline publishes its exact 6-factor weights; MarketSmith's CAN SLIM-based ranks are proprietary. Tapeline is $8.25/mo annual; MarketSmith is ~$74.95/mo. Most users who've run both report the methodology transparency + the public scorecard as the deciding factor.",
+    a: "Yes. Both are dedicated scoring tools (not broker-bundled scanners) targeting retail traders who want a synthesised answer. Tapeline names all six factors and shows each one's contribution per ticker; MarketSmith's CAN SLIM-based ranks are proprietary. Tapeline is $8.25/mo annual; MarketSmith is ~$74.95/mo. Most users who've run both report the methodology transparency + the public scorecard as the deciding factor.",
   },
   {
     q: "How is the Tapeline score different from MarketSmith's RS Rating or Composite Rating?",
-    a: "MarketSmith's Composite Rating blends multiple sub-ratings (EPS, RS, Industry, Sales+Margins+ROE, Accumulation/Distribution) into a 0–99 score using a proprietary weighting. Tapeline's composite is 0–100 with explicit published weights: Trend 25%, RS 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%. Same shape of output; different weighting transparency.",
+    a: "MarketSmith's Composite Rating blends multiple sub-ratings (EPS, RS, Industry, Sales+Margins+ROE, Accumulation/Distribution) into a 0–99 score using a proprietary weighting. Tapeline's composite is 0–100 with all six factors named and their weighting ordered publicly: Trend and Relative Strength weighted most, Momentum least, with Fundamentals, Smart Money, and Macro in between. Same shape of output; different weighting transparency.",
   },
   {
     q: "How does the pricing compare?",
@@ -34,7 +34,7 @@ const COMPARE_FAQ = [
 const WINS = [
   {
     label: "Published scoring formula",
-    tapeline: "✓ Six factors, exact weights on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Not published — Composite Rating weighting is proprietary",
   },
   {

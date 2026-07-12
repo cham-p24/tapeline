@@ -11,7 +11,7 @@ export const metadata = pageMeta({
 const WINS: CompareRow[] = [
   {
     label: "One composite score per ticker",
-    tapeline: "✓ Six factors, public weights, sub-60s",
+    tapeline: "✓ Six named factors, public methodology, sub-60s",
     competitor: "—  (build your own from indicators)",
   },
   {
@@ -93,7 +93,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Does TradingView publish a scoring formula?",
-    a: "TradingView's Technicals widget gives a Buy/Neutral/Sell rating derived from a fixed set of moving-average and oscillator signals — that's documented but not a composite score across fundamentals, smart money, macro, and momentum. Tapeline's score blends all six factor families at published weights.",
+    a: "TradingView's Technicals widget gives a Buy/Neutral/Sell rating derived from a fixed set of moving-average and oscillator signals — that's documented but not a composite score across fundamentals, smart money, macro, and momentum. Tapeline's score blends all six named factor families, weighted most toward Trend and Relative Strength and least toward Momentum.",
   },
   {
     q: "Should I use both?",

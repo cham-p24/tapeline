@@ -323,11 +323,10 @@ function fmtFactor(v: number | null | undefined): string {
 
 function FactorRow({ label, factor, why }: { label: string; factor: FactorEntry | undefined; why: string }) {
   const v = factor?.value;
-  const weight = factor?.weight ?? 0;
   return (
     <div className="py-4">
       <div className="flex items-baseline justify-between gap-4">
-        <div className="text-base font-medium">{label} <span className="text-xs text-muted">· {weight}% weight</span></div>
+        <div className="text-base font-medium">{label}</div>
         <div className="font-mono text-xl font-bold nums">{fmtFactor(v)}</div>
       </div>
       <p className="mt-1 text-sm text-muted leading-relaxed">{why}</p>
@@ -388,7 +387,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     {
       q: `How is the ${t.symbol} score calculated?`,
       a:
-        `Tapeline uses one fixed formula for every ticker: 25% trend + 20% relative strength + 15% fundamentals + 15% smart money + 15% macro + 10% momentum. The weights are public, versioned, and don't change without a changelog entry.`,
+        `Tapeline uses one fixed weighting for every ticker, blending six named factors: trend, relative strength, fundamentals, smart money, macro, and momentum — weighted most toward trend and relative strength, and least toward momentum. The factor set is public, versioned, and doesn't change without a changelog entry.`,
     },
     {
       q: `Is the ${t.symbol} Tapeline score a buy recommendation?`,
@@ -412,7 +411,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     {
       q: `Does Tapeline factor ${t.sector ?? "sector"} dynamics into the ${t.symbol} score?`,
       a:
-        `Yes — the Relative Strength factor (20% weight) explicitly compares ${t.symbol}'s performance against both SPY and its sector peers (Mansfield RS calculation). The Macro factor (15%) adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.`,
+        `Yes — the Relative Strength factor explicitly compares ${t.symbol}'s performance against both SPY and its sector peers. The Macro factor adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.`,
     },
     {
       q: `How often does the ${t.symbol} Tapeline score update?`,
@@ -478,46 +477,38 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
         <section className="mt-12">
           <h2 className="text-2xl font-semibold tracking-tight">What's Driving {t.symbol}'s Score</h2>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            Tapeline's composite is a fixed weighted equation, published on <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>:
+            Tapeline's composite is a fixed weighted blend of six named factors, published on <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>. It leans most heavily on Trend and Relative Strength, then Fundamentals, Smart Money, and Macro, and least on Momentum — and every factor's contribution to {t.symbol}'s score is shown below.
           </p>
-          <pre className="mt-4 overflow-x-auto rounded-xl border border-border bg-panel/40 p-5 font-mono text-xs leading-relaxed">
-{`score = 0.25 × trend
-      + 0.20 × relative_strength
-      + 0.15 × fundamentals
-      + 0.15 × smart_money
-      + 0.15 × macro
-      + 0.10 × momentum`}
-          </pre>
           <div className="mt-6">
             <FactorRow
               label="Trend"
               factor={data?.breakdown?.trend}
-              why="20/50/200-day moving-average stack, slope, and time above the 50DMA. Highest weight (25%) because primary-trend alignment dominates 1-day-to-3-week outcomes."
+              why="Direction and quality of the price trend across short-, medium-, and long-term timeframes. The heaviest-weighted factor, because primary-trend alignment dominates 1-day-to-3-week outcomes."
             />
             <FactorRow
               label="Relative Strength"
               factor={data?.breakdown?.rs}
-              why="Mansfield RS vs SPY, sector RS, and 12-1 momentum. Captures whether the name is leading or lagging the broader tape on a multi-week basis."
+              why="How the name is performing against the broad market and its sector over multiple horizons. Captures whether it's leading or lagging the broader tape on a multi-week basis."
             />
             <FactorRow
               label="Fundamentals"
               factor={data?.breakdown?.fundamentals}
-              why="Revenue growth, operating-margin trend, ROE vs sector median, and Piotroski F-score. The quality filter — confirms the name isn't fundamentally broken."
+              why="Earnings quality, growth, profitability, and balance-sheet health. The quality filter — confirms the name isn't fundamentally broken."
             />
             <FactorRow
               label="Smart Money"
               factor={data?.breakdown?.smart_money}
-              why="SEC Form 4 insider transactions (net 90-day) and Congressional disclosures. Confirmation factor — most useful in confluence with leading factors."
+              why="Insider net buying (SEC Form 4) and, where applicable, Congressional disclosures and institutional flow. Confirmation factor — most useful in confluence with leading factors."
             />
             <FactorRow
               label="Macro"
               factor={data?.breakdown?.macro}
-              why="VIX percentile, market breadth, 10Y yield direction, and regime score. Scales the read — same factor configuration in a hostile regime gets a different verdict."
+              why="The prevailing market regime, sector rotation, and rate / volatility backdrop. Scales the read — the same factor configuration in a hostile regime gets a different verdict."
             />
             <FactorRow
               label="Momentum"
               factor={data?.breakdown?.momentum}
-              why="20-day rate-of-change, RSI position, and accumulation/distribution. Lowest weight (10%) because it already overlaps with Trend and RS."
+              why="Short-horizon price acceleration and breakout posture. The lightest-weighted factor, because it already overlaps with Trend and RS."
             />
           </div>
         </section>
@@ -614,7 +605,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
               <p className="mt-2 text-sm text-muted leading-relaxed">
-                Yes — the Relative Strength factor (20% weight) explicitly compares {t.symbol}'s performance against both SPY and its sector peers (Mansfield RS calculation). The Macro factor (15%) adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.
+                Yes — the Relative Strength factor explicitly compares {t.symbol}'s performance against both SPY and its sector peers. The Macro factor adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.
               </p>
             </details>
             <details className="group py-4">

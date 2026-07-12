@@ -289,7 +289,7 @@ export default function StatusPage() {
         <section className="mt-12 rounded-xl border border-border bg-panel/40 px-5 py-5">
           <h2 className="text-sm font-semibold">Why a public status page</h2>
           <p className="mt-2 text-sm text-muted leading-relaxed">
-            Tapeline publishes its record — the exact formula, the data feeds behind every
+            Tapeline publishes its record — the six named factors, the data feeds behind every
             score, and a back-checked{" "}
             <Link href="/scorecard" className="text-accent hover:underline">
               scorecard

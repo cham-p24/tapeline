@@ -74,10 +74,11 @@ export default function RiskPage() {
         <section>
           <h2 className="text-lg font-semibold text-fg">5. Factors and weights are not magic</h2>
           <p>
-            Our composite score is a transparent weighted sum of six factors (Trend 25%,
-            Relative strength 20%, Fundamentals 15%, Smart money 15%, Macro 15%, Momentum 10%).
-            The weights are our subjective choice based on our own trading experience. They
-            have no predictive guarantee. We may change them over time with notice.
+            Our composite score is a transparent weighted blend of six named factors (Trend,
+            Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward
+            Trend and Relative Strength and least toward Momentum. The weighting is our subjective
+            choice based on our own trading experience. It has no predictive guarantee. We may
+            change it over time with notice.
           </p>
         </section>
 

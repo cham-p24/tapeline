@@ -26,7 +26,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Methodology transparency",
-    tapeline: "✓ Six factors at exact published weights on /how-it-works",
+    tapeline: "✓ Six named factors, published methodology on /how-it-works",
     competitor: "Curated news + scanner filters; no quantitative score with disclosed methodology",
   },
   {
@@ -84,7 +84,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "What is the Tapeline Score vs Benzinga's coverage signal?",
-    a: "Tapeline produces one 0-100 number per ticker derived from six published-weight factors (Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%). Benzinga Pro doesn't ship a composite score; its core signal is fast curated news + analyst-rating headlines + scanner filters. The two pieces of information are complementary: a Benzinga news alert tells you something just happened on a ticker; the Tapeline Score tells you where that ticker sat in the multi-factor picture going into the news.",
+    a: "Tapeline produces one 0-100 number per ticker derived from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum. Benzinga Pro doesn't ship a composite score; its core signal is fast curated news + analyst-rating headlines + scanner filters. The two pieces of information are complementary: a Benzinga news alert tells you something just happened on a ticker; the Tapeline Score tells you where that ticker sat in the multi-factor picture going into the news.",
   },
   {
     q: "Does Tapeline have an audio squawk?",

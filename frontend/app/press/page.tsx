@@ -42,15 +42,15 @@ const FACT_SHEET = [
 ];
 
 const ONE_LINER =
-  "Tapeline is a quantitative stock scanner that publishes its 6-factor scoring formula and back-checks every top-10 daily pick against the next-day SPY-relative move.";
+  "Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks every top-10 daily pick against the next-day SPY-relative move.";
 
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the formula and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six published factors — Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%) — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $25-40/mo price point.`;
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $25-40/mo price point.`;
 
 const PULL_QUOTES = [
   {
     quote:
-      "The formula is public. Anyone can copy it. The moat is the data spine plus the public scorecard back-checking every call we make.",
-    attribution: "Tapeline founder, on the public-formula moat",
+      "We name the six factors and publish a per-pick scorecard — it's not a mystery black box. The moat is the data spine plus that public scorecard back-checking every call we make.",
+    attribution: "Tapeline founder, on the transparency moat",
   },
   {
     quote:
@@ -77,7 +77,7 @@ const SCREENSHOTS = [
   },
   {
     label: "Methodology",
-    desc: "The published 6-factor formula with exact weights and signal-label definitions.",
+    desc: "The six named scoring factors, how they're weighted, and signal-label definitions.",
     href: "/how-it-works",
   },
   {
@@ -338,11 +338,12 @@ export default function PressPage() {
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Not an AI black box.</strong> The
-              composite score uses a published 6-factor formula with exact
-              weights at <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
-              Weights are versioned in the public changelog and never edited
+              composite score uses six named factors documented
+              at <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>,
+              with each factor&apos;s contribution shown on every ticker.
+              The factor set is versioned in the public changelog and never edited
               retroactively. No proprietary ML rerank step is applied
-              between the formula and the displayed number.
+              between the composite and the displayed number.
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Not crypto, not options, not futures.</strong>{" "}

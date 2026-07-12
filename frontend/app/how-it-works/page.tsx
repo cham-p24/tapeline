@@ -6,9 +6,9 @@ import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "How Tapeline Works: 6-Factor Stock Scoring Formula (Public Weights)",
+  title: "How Tapeline Works: Our 6-Factor Stock Scoring Methodology",
   description:
-    "How the Tapeline Score is calculated: a weighted blend of Trend 25%, RS 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%. No black box.",
+    "How the Tapeline Score is calculated: a weighted blend of six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum. No black box; every pick logged to a public scorecard.",
   path: "/how-it-works",
 });
 
@@ -17,7 +17,7 @@ export const metadata = pageMeta({
 const HOW_FAQ = [
   {
     q: "How is the Tapeline Score calculated?",
-    a: "Each ticker gets six sub-scores (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), each normalised to 0-100. The composite is a weighted sum: 25% Trend + 20% Relative Strength + 15% Fundamentals + 15% Smart Money + 15% Macro + 10% Momentum. Weights are fixed and public; any change ships through the public changelog.",
+    a: "Each ticker gets six sub-scores (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), each normalised to 0-100. The composite is a weighted blend of the six — weighted most heavily toward Trend and Relative Strength, and least toward Momentum. The factor set is fixed and public; any change ships through the public changelog.",
   },
   {
     q: "What do the signal labels mean?",
@@ -32,18 +32,21 @@ const HOW_FAQ = [
     a: "Confidence reflects how many of the underlying data feeds returned data for a given ticker — not every name has fundamentals coverage, recent insider filings, or analyst coverage. 95%+ means full data on every signal feature; under 40% means sparse data and the score should be deprioritised.",
   },
   {
-    q: "Is the formula really public?",
-    a: "Yes. The exact 6-factor weighted equation is published on this page and reproduced in our blog, with every weight change versioned in the public changelog. The moat is the data spine plus the public scorecard — anyone is welcome to copy the formula.",
+    q: "Is the methodology really public?",
+    a: "Yes. We name all six factors, show each factor's contribution on every ticker, and log every top-10 daily pick to a public scorecard that's back-checked against SPY the next session. Any change to the factor set ships through the public changelog. The moat is the data spine plus that public track record — not a secret list of factors.",
   },
 ];
 
+// Factors are listed in descending weight order. We publish the ordering
+// (which factors matter most) and each factor's contribution per ticker, but
+// not the exact numeric weights — those are applied consistently to every name.
 const FACTORS = [
-  { name: "Trend",               weight: 25, desc: "Slope of 20/50/200-day moving averages, MACD direction, distance from 200DMA." },
-  { name: "Relative strength",   weight: 20, desc: "Price performance vs SPY and sector ETF over 3M, 6M, 1Y." },
-  { name: "Fundamentals",        weight: 15, desc: "Revenue growth, margin trend, P/E, debt/equity, ROE, EPS surprises." },
-  { name: "Smart money",         weight: 15, desc: "Insider net buying (SEC Form 4), Congressional disclosures." },
-  { name: "Macro",               weight: 15, desc: "Current market regime, sector rotation, rate direction, VIX level." },
-  { name: "Momentum",            weight: 10, desc: "RSI, Bollinger Band width percentile, volume expansion, breakout proximity." },
+  { name: "Trend",               emphasis: "Weighted most", desc: "Direction and quality of the price trend across short-, medium-, and long-term timeframes." },
+  { name: "Relative strength",   emphasis: "High",          desc: "How the stock is performing against the broad market and its sector over multiple horizons." },
+  { name: "Fundamentals",        emphasis: "Core",          desc: "Earnings quality, growth, profitability, and balance-sheet health." },
+  { name: "Smart money",         emphasis: "Core",          desc: "Insider net buying (SEC Form 4) and, where applicable, Congressional disclosures and institutional flow." },
+  { name: "Macro",               emphasis: "Core",          desc: "The prevailing market regime, sector rotation, and rate / volatility backdrop." },
+  { name: "Momentum",            emphasis: "Weighted least", desc: "Short-horizon price acceleration and breakout posture." },
 ];
 
 const SIGNALS = [
@@ -67,10 +70,10 @@ export default function HowItWorksPage() {
         <div className="pointer-events-none absolute inset-0 bg-hero opacity-60" />
         <div className="relative mx-auto max-w-3xl text-center">
           <p className="eyebrow">Methodology</p>
-          <h1 className="mt-3 text-4xl font-bold sm:text-6xl">Six factors. Exact weights. Public record.</h1>
+          <h1 className="mt-3 text-4xl font-bold sm:text-6xl">Six factors. Named. Public record.</h1>
           <p className="mt-6 text-lg text-muted">
-            Every score is a transparent weighted blend of six published factors —
-            no black box, no mystery AI, no chat assistant required. You see each contribution on every ticker.
+            Every score is a weighted blend of six named factors —
+            no black box, no mystery AI, no chat assistant required. You see each factor&apos;s contribution on every ticker.
           </p>
         </div>
       </section>
@@ -79,12 +82,12 @@ export default function HowItWorksPage() {
       <section className="section py-8 sm:py-10">
         <div className="mx-auto max-w-4xl">
           <p className="eyebrow">The six factors</p>
-          <h2 className="mt-3 text-3xl font-semibold">Composite = weighted sum of 6 sub-scores</h2>
+          <h2 className="mt-3 text-3xl font-semibold">Composite = weighted blend of 6 sub-scores</h2>
 
           <div className="mt-12 space-y-3">
             {FACTORS.map((f) => (
               <div key={f.name} className="flex items-start gap-6 rounded-xl border border-border bg-panel p-6 transition-colors hover:border-border2">
-                <div className="font-mono text-xl font-semibold text-accent nums w-14">{f.weight}%</div>
+                <div className="font-mono text-[0.7rem] font-semibold uppercase tracking-wider text-accent w-24 pt-1">{f.emphasis}</div>
                 <div className="flex-1">
                   <h3 className="font-semibold">{f.name}</h3>
                   <p className="mt-1.5 text-sm text-muted leading-relaxed">{f.desc}</p>
@@ -94,19 +97,18 @@ export default function HowItWorksPage() {
           </div>
 
           <div className="mt-8 rounded-xl border border-border bg-panel p-6">
-            <p className="text-xs uppercase tracking-wider text-subtle">The formula</p>
-            <pre className="mt-3 overflow-x-auto text-sm text-muted nums leading-relaxed">
-{`score = 0.25 × trend
-      + 0.20 × relative_strength
-      + 0.15 × fundamentals
-      + 0.15 × smart_money
-      + 0.15 × macro
-      + 0.10 × momentum`}
-            </pre>
+            <p className="text-xs uppercase tracking-wider text-subtle">How the blend is weighted</p>
+            <p className="mt-3 text-sm text-muted leading-relaxed">
+              The composite leans most heavily on <strong>Trend</strong> and <strong>Relative
+              Strength</strong>, then <strong>Fundamentals</strong>, <strong>Smart Money</strong>,
+              and <strong>Macro</strong>, and least on <strong>Momentum</strong> — short-term
+              momentum on its own tends to mean-revert, so it&apos;s the smallest input. Each
+              sub-score is normalised to 0–100 and the same weighting is applied to every ticker.
+            </p>
             <p className="mt-4 text-xs text-subtle leading-relaxed">
-              Each sub-score is normalised to 0–100 using factor-specific rules. Weights are
-              fixed and visible. We publish changes before rolling them out, tracked on the{" "}
-              <Link href="/scorecard" className="link">public scorecard</Link>.
+              The factor set is fixed and visible, and each factor&apos;s contribution is shown on
+              every ticker. Any change to the factors ships through the{" "}
+              <Link href="/scorecard" className="link">public scorecard</Link> and changelog.
             </p>
           </div>
 

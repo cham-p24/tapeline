@@ -10,13 +10,14 @@
  * Pure SVG, no charting lib — keeps bundle small and lets the rendered
  * markup match the dark-mode design tokens exactly.
  *
- * Axis order matches the published formula on /how-it-works:
- *   12  Trend        (25%)
- *    2  Relative str (20%)
- *    4  Fundamentals (15%)
- *    6  Smart money  (15%)
- *    8  Macro        (15%)
- *   10  Momentum     (10%)
+ * Axis order matches the factor order on /how-it-works (descending weight,
+ * Trend heaviest through Momentum lightest):
+ *   12  Trend
+ *    2  Relative str
+ *    4  Fundamentals
+ *    6  Smart money
+ *    8  Macro
+ *   10  Momentum
  */
 type Sub = number | null | undefined;
 
@@ -36,13 +37,15 @@ type Props = {
   showLabels?: boolean;
 };
 
+// Descending weight order (Trend heaviest through Momentum lightest); exact
+// weights are intentionally not encoded here.
 const FACTORS = [
-  { key: "trend",        short: "Trend",  weight: 25 },
-  { key: "rs",           short: "RS",     weight: 20 },
-  { key: "fundamentals", short: "Fund",   weight: 15 },
-  { key: "smart_money",  short: "SM",     weight: 15 },
-  { key: "macro",        short: "Macro",  weight: 15 },
-  { key: "momentum",     short: "Mom",    weight: 10 },
+  { key: "trend",        short: "Trend" },
+  { key: "rs",           short: "RS" },
+  { key: "fundamentals", short: "Fund" },
+  { key: "smart_money",  short: "SM" },
+  { key: "macro",        short: "Macro" },
+  { key: "momentum",     short: "Mom" },
 ] as const;
 
 export function ScoreRadial({

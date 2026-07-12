@@ -11,12 +11,12 @@ export const metadata = pageMeta({
 const WINS: CompareRow[] = [
   {
     label: "Composite multi-factor score",
-    tapeline: "✓ One 0-100 number per ticker from six published-weight factors",
+    tapeline: "✓ One 0-100 number per ticker from six named factors",
     competitor: "Technical indicators on charts; no published composite score",
   },
   {
     label: "Built-in fundamentals + macro factors",
-    tapeline: "✓ Fundamentals (15%) + Macro (15%) folded into the score",
+    tapeline: "✓ Fundamentals + Macro folded into the score",
     competitor: "Charting is technical-only; fundamentals + macro live elsewhere",
   },
   {
@@ -62,7 +62,7 @@ const TRADEOFFS: CompareTradeoff[] = [
     label: "Custom-indicator scripting",
     tapeline: "Tapeline Score is the synthesis; no Pine-style scripting language",
     competitor: "ACP (Advanced Charting Platform) supports custom indicators and complex study chains",
-    note: "If you build custom indicator stacks (ATR-based stop systems, Wyckoff phase detectors, etc.), StockCharts and TradingView are the two retail tools that support that. Tapeline is the opposite philosophy — we publish the formula and the weights; you trust the synthesis instead of building your own.",
+    note: "If you build custom indicator stacks (ATR-based stop systems, Wyckoff phase detectors, etc.), StockCharts and TradingView are the two retail tools that support that. Tapeline is the opposite philosophy — we name the six factors and show each one's contribution; you trust the synthesis instead of building your own.",
   },
   {
     label: "Chart galleries / ChartLists",
@@ -89,7 +89,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "What is the Tapeline Score vs a StockCharts SCTR ranking?",
-    a: "StockCharts has its own ranking system called SCTR (StockCharts Technical Rank) — a 0-100 ranking based purely on technical indicators across multiple timeframes. The Tapeline Score is also 0-100 but multi-factor: 25% Trend, 20% Relative Strength, 15% Fundamentals, 15% Smart Money, 15% Macro, 10% Momentum. SCTR is technical-only; Tapeline blends technical with fundamentals + macro + smart-money flows. If you want purely technical ranking, SCTR is well-designed for that. If you want the fundamentals + macro + insider lens too, Tapeline is the broader synthesis.",
+    a: "StockCharts has its own ranking system called SCTR (StockCharts Technical Rank) — a 0-100 ranking based purely on technical indicators across multiple timeframes. The Tapeline Score is also 0-100 but multi-factor: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, least toward Momentum. SCTR is technical-only; Tapeline blends technical with fundamentals + macro + smart-money flows. If you want purely technical ranking, SCTR is well-designed for that. If you want the fundamentals + macro + insider lens too, Tapeline is the broader synthesis.",
   },
   {
     q: "Does StockCharts back-check its ChartSchool picks?",

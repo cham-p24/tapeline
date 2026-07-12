@@ -38,7 +38,7 @@ export const POSTS: BlogPost[] = [
     slug: "what-smart-money-actually-means",
     title: "What 'Smart Money' actually means in the Tapeline Score (and why it's not what you think).",
     excerpt:
-      "'Smart money' is the most misused phrase in retail finance. It's not influencer alpha, not the latest hedge-fund headline, not yesterday's CNBC clip. Here's what Tapeline's Smart Money factor — 15% of the composite — actually measures, what the data sources are, and where the lags lie.",
+      "'Smart money' is the most misused phrase in retail finance. It's not influencer alpha, not the latest hedge-fund headline, not yesterday's CNBC clip. Here's what Tapeline's Smart Money factor — one of the six — actually measures, what the data sources are, and where the lags lie.",
     publishedAt: "2026-05-13",
     author: "Tapeline",
     body: `
@@ -49,11 +49,11 @@ export const POSTS: BlogPost[] = [
       famous person on CNBC said in a clip yesterday." That's not smart
       money. That's TV.</p>
 
-      <p>Tapeline's Smart Money factor is 15% of the composite score
-      (<a href="/how-it-works">see the full formula</a>). It's a real
+      <p>Tapeline's Smart Money factor is one of the six named factors in the
+      composite score (<a href="/how-it-works">see the methodology</a>). It's a real
       number, sourced from real filings, with real lags. This post is
       the deep dive on what it actually measures and where the
-      limitations are — because a 15% weight in our scoring engine
+      limitations are — because a named factor in our scoring engine
       deserves a paragraph more than "trust us, we're tracking the
       smart money."</p>
 
@@ -102,9 +102,9 @@ export const POSTS: BlogPost[] = [
       can mean tax planning, diversification, or genuine signal — hard
       to disambiguate).</p>
 
-      <h2>Why Smart Money is 15% weight, not higher</h2>
+      <h2>Why Smart Money isn't one of the biggest factors</h2>
       <p>A natural retail-trader question: if Smart Money is so
-      signal-rich, why isn't it 30% of the composite or higher? Three
+      signal-rich, why isn't it the heaviest factor in the composite? Three
       reasons:</p>
 
       <p><strong>The lags compound.</strong> Insider Form 4 filings
@@ -140,7 +140,7 @@ export const POSTS: BlogPost[] = [
         <li>Combines Congressional STOCK Act disclosures and SEC Form 4
         insider transactions into a single 0-100 sub-score with
         published methodology.</li>
-        <li>Weights the sub-score at 15% of the composite — high enough
+        <li>Weights the sub-score as a mid-tier factor — high enough
         to matter, low enough not to drown out the leading factors when
         smart money is late or noisy.</li>
         <li>Surfaces the actual data feeds: the Premium tier exposes
@@ -362,18 +362,20 @@ export const POSTS: BlogPost[] = [
 
       <p>So we ignore the headline for a minute and look at the six factors.
       The Tapeline radar shows them as a hexagon — six axes, each one a
-      sub-score from 0–100, all weighted into the composite with the
-      <a href="/how-it-works">published weights</a>:</p>
+      sub-score from 0–100, all blended into the composite. The factors are
+      listed here in descending weight order (Trend heaviest through Momentum
+      lightest), the same ordering documented on
+      <a href="/how-it-works">/how-it-works</a>:</p>
 
       <pre style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:18px;overflow-x:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.5;">
 NVDA — composite 57.9 (CONSTRUCTIVE)
 
-  Trend                41   weight 25%
-  Relative Strength    32   weight 20%
-  Fundamentals         55   weight 15%
-  Smart Money          97   weight 15%
-  Macro                65   weight 15%
-  Momentum             87   weight 10%</pre>
+  Trend                41
+  Relative Strength    32
+  Fundamentals         55
+  Smart Money          97
+  Macro                65
+  Momentum             87</pre>
 
       <p>That's where the actual signal lives. Now we read it.</p>
 
@@ -491,12 +493,12 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <p>If you're shopping for a scanner, these five questions will save you
       the cycle:</p>
 
-      <h2>1. Can you see the formula?</h2>
+      <h2>1. Can you see the methodology?</h2>
       <p>If the answer is "we use a proprietary blend of signals" you're being
       sold magic. The two questions you can't answer about magic are "is this
       working?" and "will this still work next month?" Tipranks, Zacks,
-      Kavout, WallStreetZen all hide theirs. Tapeline publishes the exact
-      6-factor weighted equation on <a href="/how-it-works">/how-it-works</a>.</p>
+      Kavout, WallStreetZen all hide theirs. Tapeline names all six factors and
+      shows each one's contribution per ticker on <a href="/how-it-works">/how-it-works</a>.</p>
 
       <h2>2. Where's the public scorecard?</h2>
       <p>Newsletter shops have known for 30 years that you should hide your
@@ -647,9 +649,9 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
   },
   {
     slug: "the-formula-is-public",
-    title: "The formula is public. Here's why that matters.",
+    title: "Our methodology is public. Here's why that matters.",
     excerpt:
-      "Every other prosumer score-per-ticker tool hides their methodology as IP. We publish the six factors and the exact weights — because the day the formula stops working, you should know to leave.",
+      "Every other prosumer score-per-ticker tool hides its methodology as IP. We name all six factors and publish a per-pick scorecard — because the day the score stops working, you should know to leave.",
     publishedAt: "2026-05-02",
     author: "Tapeline",
     body: `
@@ -659,33 +661,30 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       is "earnings estimate revisions" but the cutoffs are proprietary. If you ask
       Kavout why their Kai Score moved, you get a black-box ML answer.</p>
 
-      <p>Tapeline gives you the literal expression. It's on
-      <a href="/how-it-works">/how-it-works</a> and reproduced here:</p>
+      <p>Tapeline names all six. The composite is a weighted blend of
+      <a href="/how-it-works">Trend, Relative Strength, Fundamentals, Smart
+      Money, Macro, and Momentum</a> — weighted most heavily toward Trend and
+      Relative Strength, and least toward Momentum, because short-term momentum
+      on its own tends to mean-revert. And on every ticker you can see exactly
+      how much each of those six factors contributed to the score in front of
+      you.</p>
 
-      <pre style="background:#0a0a0a;border:1px solid #1f1f23;border-radius:8px;padding:18px;overflow-x:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;line-height:1.5;">
-score = 0.25 × trend
-      + 0.20 × relative_strength
-      + 0.15 × fundamentals
-      + 0.15 × smart_money
-      + 0.15 × macro
-      + 0.10 × momentum</pre>
-
-      <p>Why publish it?</p>
+      <p>Why be this open?</p>
       <ul>
         <li><strong>Trust compounds when you can audit.</strong> If you find a
         ticker scoring 90 when its trend is clearly broken, you can call it out
         — and we'd rather you do that than churn silently.</li>
-        <li><strong>The moat isn't the formula, it's the data spine.</strong>
-        Plenty of competitors could copy the equation. None of them will
-        publish their public scorecard back-checking every call against
-        next-day prices the way we do.</li>
-        <li><strong>If the formula stops working, you should leave.</strong>
+        <li><strong>The moat isn't a secret list of factors, it's the data
+        spine and the record.</strong> Plenty of competitors could name six
+        factors too. None of them will publish a public scorecard back-checking
+        every call against next-day prices the way we do.</li>
+        <li><strong>If the score stops working, you should leave.</strong>
         We'd rather you make that call honestly than discover via a slow drip
         of bad picks.</li>
       </ul>
 
-      <p>The weights are versioned in our changelog. The day they change, you
-      see why. That's the whole product, in one paragraph.</p>
+      <p>Any change to the factor set is versioned in our changelog. The day it
+      changes, you see why. That's the whole product, in one paragraph.</p>
     `,
   },
   // ---- 2026-05-20: educational long-tail posts ----
@@ -758,14 +757,14 @@ RSI = 100 - (100 / (1 + RS))</pre>
       reliable filter.</p>
 
       <h2>How Tapeline uses RSI</h2>
-      <p>RSI feeds into the <strong>Momentum</strong> factor (10% weight in
-      the composite). Specifically, the Momentum factor looks at RSI
+      <p>RSI feeds into the <strong>Momentum</strong> factor — the
+      lightest-weighted of the six. Specifically, the Momentum factor looks at RSI
       position (where in the 0–100 range), the rate of change of RSI (is
       momentum accelerating or decelerating), and divergences between RSI
       and price (rare, but high-signal when they appear).</p>
 
-      <p>The reason Momentum is only 10% of the composite — and not, say,
-      30% — is exactly because pure-momentum signals like RSI mean-revert
+      <p>The reason Momentum is the lightest factor — rather than one of the
+      heavyweights — is exactly because pure-momentum signals like RSI mean-revert
       so reliably. The composite balances RSI against
       <a href="/how-it-works">Trend, Relative Strength, Fundamentals,
       Smart Money, and Macro</a> so you're not betting your account on a
@@ -908,11 +907,11 @@ RSI = 100 - (100 / (1 + RS))</pre>
       then filter that specific list.</p>
 
       <h2>How Tapeline filters momentum</h2>
-      <p>The Tapeline composite includes a Momentum factor (10% weight)
-      that captures price acceleration, RSI position, MACD posture, and
-      volume confirmation in a single 0–100 sub-score. But Momentum alone
-      isn't enough — the composite balances it against Trend (25%),
-      Relative Strength (20%), and Fundamentals (15%) precisely because
+      <p>The Tapeline composite includes a Momentum factor — the
+      lightest-weighted of the six — that captures price acceleration in a
+      single 0–100 sub-score. But Momentum alone
+      isn't enough — the composite leans far more on Trend,
+      Relative Strength, and Fundamentals precisely because
       pure-momentum signals mean-revert.</p>
 
       <p>The pre-filtered momentum lists are at
@@ -1201,11 +1200,11 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li><strong>Zacks</strong>: The Zacks Rank methodology is
         published at high level (earnings ESP + earnings surprise +
         broker rating changes) but the exact weights are proprietary.</li>
-        <li><strong>Tapeline</strong>: Full formula at
-        <a href="/how-it-works">/how-it-works</a> with exact weights
-        (Trend 25% / RS 20% / Fundamentals 15% / Smart Money 15% /
-        Macro 15% / Momentum 10%). Weight changes are announced in the
-        changelog before they ship.</li>
+        <li><strong>Tapeline</strong>: All six factors named at
+        <a href="/how-it-works">/how-it-works</a>, with the weighting ordered
+        publicly (most on Trend and Relative Strength, least on Momentum) and
+        each factor's contribution shown per ticker. Any change to the factor
+        set is announced in the changelog before it ships.</li>
       </ul>
 
       <h3>4. Does it beat SPY?</h3>
@@ -1521,12 +1520,13 @@ RSI = 100 - (100 / (1 + RS))</pre>
       all. "Proprietary algorithm developed over X years" is the
       standard formulation.</p>
 
-      <p>The right answer publishes the inputs, the weights, and any
-      transformations explicitly. Tapeline's example:
-      Trend 25% / Relative Strength 20% / Fundamentals 15% / Smart
-      Money 15% / Macro 15% / Momentum 10%, summed to a 0-100
-      composite. Each sub-score's input data sources and computation
-      steps are documented at <a href="/how-it-works">/how-it-works</a>.</p>
+      <p>The right answer names the inputs and is honest about how they're
+      weighted. Tapeline's example: six named factors — Trend, Relative
+      Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most
+      toward Trend and Relative Strength and least toward Momentum, blended into
+      a 0-100 composite, with each factor's contribution shown on every ticker.
+      The factors and data sources are documented at
+      <a href="/how-it-works">/how-it-works</a>.</p>
 
       <p>What this enables: if the product underperforms in a
       particular regime, you can look at the score breakdown and see
@@ -1584,8 +1584,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Public daily picks log with losers visible</td>
               <td>Yes — <a href="/scorecard">/scorecard</a></td></tr>
           <tr><td>Named benchmark</td><td>SPY, same-day-pick to next-trading-day-close</td></tr>
-          <tr><td>Public scoring formula with weights</td>
-              <td>Yes — <a href="/how-it-works">/how-it-works</a> with exact weights</td></tr>
+          <tr><td>Public scoring methodology</td>
+              <td>Yes — six named factors at <a href="/how-it-works">/how-it-works</a>, contribution shown per ticker</td></tr>
           <tr><td>Data freshness</td>
               <td>60s composite refresh on Pro+; live scores on Free too (gated on breadth, not freshness)</td></tr>
           <tr><td>Cancel friction</td>

@@ -4,14 +4,14 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Koyfin (2026): Stock-Picking Scanner vs Bloomberg-Style Terminal",
   description:
-    "Tapeline vs Koyfin — composite stock score with public formula and back-checked picks, vs Koyfin's Bloomberg-style data terminal with deep fundamentals dashboards. Honest comparison.",
+    "Tapeline vs Koyfin — composite stock score with public methodology and back-checked picks, vs Koyfin's Bloomberg-style data terminal with deep fundamentals dashboards. Honest comparison.",
   path: "/compare/koyfin",
 });
 
 const WINS: CompareRow[] = [
   {
     label: "One composite score per ticker",
-    tapeline: "✓ Six factors, public weights, sub-60s",
+    tapeline: "✓ Six named factors, public methodology, sub-60s",
     competitor: "—  (you build conviction from raw data)",
   },
   {
@@ -89,7 +89,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Does Koyfin publish a scoring formula?",
-    a: "Koyfin doesn't issue a composite score per ticker — it's a data and dashboards platform, not a scoring tool. You build conviction from the raw data Koyfin surfaces. Tapeline publishes the exact 6-factor formula and the synthesised score per ticker.",
+    a: "Koyfin doesn't issue a composite score per ticker — it's a data and dashboards platform, not a scoring tool. You build conviction from the raw data Koyfin surfaces. Tapeline names all six factors behind the synthesised score and shows each one's contribution per ticker.",
   },
   {
     q: "Does Koyfin have a track record on its picks?",

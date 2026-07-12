@@ -85,7 +85,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How are the picks chosen?",
-    a: "The 10 highest-scoring tickers from the Tapeline composite — a 0-100 blend of Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%). Same formula at /how-it-works, no hidden multipliers.",
+    a: "The 10 highest-scoring tickers from the Tapeline composite — a 0-100 blend of six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum. Same methodology at /how-it-works, no hidden factors.",
   },
   {
     q: "When does the email send?",

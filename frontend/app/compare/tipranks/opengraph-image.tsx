@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs Tipranks.",
     subtitle:
-      "Published 6-factor weights vs. Tipranks' proprietary Smart Score. Both score every ticker — only one shows the formula.",
+      "Six named factors vs. Tipranks' proprietary Smart Score. Both score every ticker — only one names its factors.",
   });
 }

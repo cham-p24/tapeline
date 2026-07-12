@@ -43,7 +43,7 @@ const TOOLS: Tool[] = [
     scoring: "Public formula",
     scorecard: "Per-pick public",
     tagline:
-      "The only scanner that publishes the exact 6-factor formula AND every top-10 pick back-checked next-day vs SPY.",
+      "The only scanner that names all six scoring factors AND back-checks every top-10 pick next-day vs SPY.",
     comparePath: "/compare/finviz",
   },
   {
@@ -159,7 +159,7 @@ const FAQ = [
   },
   {
     q: "Are AI stock scanners worth it?",
-    a: "Sometimes. Trade Ideas' Holly AI is the most established AI scanner and genuinely useful for intraday workflows — but you're paying $120-240/mo for a proprietary black-box model with no published formula. The transparency tradeoff is meaningful. Tapeline takes a different approach: publish the exact 6-factor weighted equation so you can reason about why a score is what it is, no AI mystery.",
+    a: "Sometimes. Trade Ideas' Holly AI is the most established AI scanner and genuinely useful for intraday workflows — but you're paying $120-240/mo for a proprietary black-box model with no published methodology. The transparency tradeoff is meaningful. Tapeline takes a different approach: name all six factors and show each one's contribution per ticker so you can reason about why a score is what it is, no AI mystery.",
   },
   {
     q: "How was this list ranked?",

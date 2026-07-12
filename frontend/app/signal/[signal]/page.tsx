@@ -238,9 +238,9 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
           <h2 className="text-lg font-semibold">How {signal.display} is determined</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Every US ticker in the active scanner universe is scored sub-60s using the public
-            6-factor weighted formula:{" "}
-            <strong>25% Trend + 20% Relative Strength + 15% Fundamentals + 15% Smart Money + 15%
-            Macro + 10% Momentum</strong>
+            six-factor composite:{" "}
+            <strong>Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum —
+            weighted most toward Trend and Relative Strength, least toward Momentum</strong>
             . Names whose composite score falls in the{" "}
             <span className={`font-mono ${tierColor}`}>{signal.range}</span> band get the{" "}
             <span className={`font-mono ${tierColor}`}>{signal.display}</span> label automatically.

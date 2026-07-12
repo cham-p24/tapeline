@@ -19,7 +19,7 @@ test.describe("Landing page", () => {
 
     // How it works section
     await expect(page.getByRole("heading", { name: /how it works/i })).toBeVisible();
-    await expect(page.getByText(/six factors, exact weights/i)).toBeVisible();
+    await expect(page.getByText(/six named factors/i)).toBeVisible();
 
     // ScannerPreview should render a sample row
     await expect(page.getByText("NVDA")).toBeVisible();

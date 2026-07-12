@@ -42,7 +42,7 @@ export default function LandingPage() {
             </h1>
             <p className="mt-6 text-lg text-muted leading-relaxed">
               The <span className="font-medium text-fg">Tapeline Score</span>{" "}
-              blends six factors at published weights into one read on every
+              blends six named factors into one read on every
               ticker. Every call goes on a permanent public record &mdash; same
               day, no edits.
             </p>
@@ -97,12 +97,13 @@ export default function LandingPage() {
           <FadeIn delayMs={0}>
             <Differentiator
               num="01"
-              label="Published weights"
+              label="Six named factors"
               body={
                 <>
-                  Trend 25% &middot; RS 20% &middot; Fund 15% &middot; SM 15%
-                  &middot; Macro 15% &middot; Mom 10%. No black box. No hidden
-                  multipliers. Every weight change is{" "}
+                  Trend &middot; Relative Strength &middot; Fundamentals &middot;
+                  Smart Money &middot; Macro &middot; Momentum &mdash; weighted most
+                  toward Trend and Relative Strength, least toward Momentum. No black
+                  box. No hidden factors. Every change is{" "}
                   <Link href="/changelog" className="link">
                     announced before it ships
                   </Link>
@@ -158,10 +159,11 @@ export default function LandingPage() {
 
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             <FadeIn delayMs={0}>
-              <Step n="1" title="Six factors, exact weights">
-                Trend 25% &middot; relative strength 20% &middot; fundamentals
-                15% &middot; smart money 15% &middot; macro 15% &middot;
-                momentum 10%. Same weights every tick.
+              <Step n="1" title="Six named factors">
+                Trend &middot; relative strength &middot; fundamentals &middot;
+                smart money &middot; macro &middot; momentum &mdash; weighted most
+                toward trend and relative strength, least toward momentum. Same
+                weighting every tick.
               </Step>
             </FadeIn>
             <FadeIn delayMs={80}>

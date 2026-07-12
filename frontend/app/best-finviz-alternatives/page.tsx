@@ -73,7 +73,7 @@ const TOOLS: Tool[] = [
   {
     rank: 1,
     name: "Tapeline",
-    bestFor: "Multi-factor composite scoring with public formula + scorecard",
+    bestFor: "Multi-factor composite scoring with public methodology + scorecard",
     price: "Free · $8.25/mo Pro · $16.58/mo Premium (annual)",
     rating: 5,
     capability: {
@@ -87,7 +87,7 @@ const TOOLS: Tool[] = [
       mobile: "yes",
     },
     pros: [
-      "Public 6-factor formula with exact weights — no black-box",
+      "Six named scoring factors, published methodology — no black-box",
       "Public scorecard back-checking every top-10 pick vs SPY",
       "Plain-English Why on every row, free tier included",
       "Congressional trades + recent insider buys on Premium",
@@ -222,7 +222,7 @@ const TOOLS: Tool[] = [
     cons: [
       "Fundamental-investor lean — sparse intraday signals",
       "UI feels dated next to 2026-built tools",
-      "No live composite scoring with public formula",
+      "No live composite scoring with public methodology",
     ],
     verdict:
       "Best Finviz alternative for buy-and-hold fundamental investors who want a portfolio analytics layer. Less suitable for active swing traders.",
@@ -389,7 +389,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want congressional trades + insider buys in one feed",
-    body: "Finviz surfaces insider trading reports but not Congressional disclosures. Tapeline Premium combines SEC Form 4 insider buys + Congressional trade filings + ETF flows in a single 'Smart Money' factor weighted at 15% of the composite. The factor IS visible (not hidden behind a paywall on the score) — Premium just gets the per-trade detail feeds.",
+    body: "Finviz surfaces insider trading reports but not Congressional disclosures. Tapeline Premium combines SEC Form 4 insider buys + Congressional trade filings + ETF flows in a single 'Smart Money' factor — one of the six named factors in the composite. The factor IS visible (not hidden behind a paywall on the score) — Premium just gets the per-trade detail feeds.",
   },
 ];
 
@@ -464,7 +464,7 @@ const FAQ = [
   },
   {
     q: "Which Finviz alternative is best for swing traders specifically?",
-    a: "Tapeline. The composite score is designed for the multi-day setup horizon — it weighs Trend (25%), Relative Strength (20%), and Fundamentals (15%) for stability over multiple sessions, with Momentum (10%) and Smart Money (15%) for entry timing. The /best-stocks-for/swing-traders page surfaces the top 30 names by composite score, filtered to 65+ (top third of the distribution). TradingView is the next-best fit if you'd rather build setups from charts than work from a ranked list.",
+    a: "Tapeline. The composite score is designed for the multi-day setup horizon — it leans most on Trend and Relative Strength, plus Fundamentals, for stability over multiple sessions, with Momentum and Smart Money contributing to entry timing. The /best-stocks-for/swing-traders page surfaces the top 30 names by composite score, filtered to 65+ (top third of the distribution). TradingView is the next-best fit if you'd rather build setups from charts than work from a ranked list.",
   },
   {
     q: "Which Finviz alternative is best for day traders specifically?",
@@ -472,7 +472,7 @@ const FAQ = [
   },
   {
     q: "What's the best Finviz alternative for fundamentals investors?",
-    a: "Stock Rover wins on pure fundamental breadth (650+ metrics). Koyfin wins on data-quality and dashboard depth. Simply Wall St wins on long-term DCF visualisation. Tapeline wins on putting fundamentals in context — the Fundamentals factor (15% weight) is one of six, balanced against trend and macro so you don't accidentally buy a value trap.",
+    a: "Stock Rover wins on pure fundamental breadth (650+ metrics). Koyfin wins on data-quality and dashboard depth. Simply Wall St wins on long-term DCF visualisation. Tapeline wins on putting fundamentals in context — the Fundamentals factor is one of six, balanced against trend and macro so you don't accidentally buy a value trap.",
   },
   {
     q: "Are there mobile-first Finviz alternatives?",

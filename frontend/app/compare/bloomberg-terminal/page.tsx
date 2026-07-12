@@ -15,7 +15,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What does the Tapeline composite cover that Bloomberg does?",
-    a: "Bloomberg's BQNT / EQS functions let you build custom composites from any underlying field — they have everything. Tapeline ships ONE composite that blends six factors (Trend 25%, RS 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%) with the weights published. Bloomberg gives you the kit to build your own; Tapeline gives you the synthesised answer out of the box.",
+    a: "Bloomberg's BQNT / EQS functions let you build custom composites from any underlying field — they have everything. Tapeline ships ONE composite that blends six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum. Bloomberg gives you the kit to build your own; Tapeline gives you the synthesised answer out of the box.",
   },
   {
     q: "How does the pricing compare?",
@@ -39,7 +39,7 @@ const WINS = [
   },
   {
     label: "Published scoring formula",
-    tapeline: "✓ Six factors, exact weights on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "BQNT lets you build custom composites; no shipped 'Bloomberg score' for retail consumption",
   },
   {

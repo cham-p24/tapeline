@@ -29,7 +29,7 @@ export function MarketingFooter() {
               <span className="font-semibold">Tapeline</span>
             </Link>
             <p className="mt-3 text-xs text-muted">
-              Read the tape — public formula, public scorecard.
+              Read the tape — public methodology, public scorecard.
             </p>
           </div>
 

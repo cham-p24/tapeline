@@ -26,12 +26,12 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Smart-money factor (institutional + insider + Congressional)",
-    tapeline: "✓ 15% weight, blended with public weight disclosure",
+    tapeline: "✓ Named factor in the composite, contribution shown per ticker",
     competitor: "Some insider transaction visibility; no Congressional disclosures",
   },
   {
     label: "Macro-regime overlay",
-    tapeline: "✓ 15% weight, explicit factor in the score",
+    tapeline: "✓ Explicit named factor in the score",
     competitor: "Not a Snowflake dimension — analysis is bottom-up per-ticker",
   },
   {
@@ -59,7 +59,7 @@ const WINS: CompareRow[] = [
 const TRADEOFFS: CompareTradeoff[] = [
   {
     label: "Per-ticker fundamental depth",
-    tapeline: "Fundamentals factor is 15% of the composite; per-ticker breakdown via the score row",
+    tapeline: "Fundamentals is one of the six named factors; per-ticker breakdown via the score row",
     competitor: "Snowflake breaks every stock into Value/Future/Past/Health/Dividends — extremely deep fundamental research",
     note: "Simply Wall St's killer feature is the Snowflake — a five-dimensional fundamental analysis with full DCF, intrinsic value estimates, dividend safety, and a narrative summary. If you trade on multi-quarter to multi-year horizons and want a single-screen fundamental snapshot, Simply Wall St wins. Tapeline's fundamental signal is one of six factors, not the centrepiece.",
   },
@@ -90,7 +90,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "How is the Tapeline Score different from the Simply Wall St Snowflake?",
-    a: "Tapeline produces a 0-100 composite from six factors (Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%) updated sub-60s. The Snowflake is a visual five-dimensional fundamental analysis (Value, Future, Past, Health, Dividends) updated daily — not a single composite, not designed for ranking. Different shapes for different decisions.",
+    a: "Tapeline produces a 0-100 composite from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength, least toward Momentum) updated sub-60s. The Snowflake is a visual five-dimensional fundamental analysis (Value, Future, Past, Health, Dividends) updated daily — not a single composite, not designed for ranking. Different shapes for different decisions.",
   },
   {
     q: "How do prices compare?",

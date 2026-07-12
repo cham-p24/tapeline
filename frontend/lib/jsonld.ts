@@ -245,7 +245,7 @@ export function organizationJsonLd() {
     alternateName: "Tapeline.io",
     slogan: "Read the tape",
     description:
-      "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from a publicly-documented six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
+      "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
     url: "https://tapeline.io",
     logo: "https://tapeline.io/favicon.svg",
     foundingDate: "2026",
@@ -495,14 +495,14 @@ export function scorecardDatasetJsonLd() {
       "stock picking accountability",
     ],
     variableMeasured: [
-      { "@type": "PropertyValue", name: "Tapeline Score", description: "Composite 0–100 score from six published-weight factors", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Tapeline Score", description: "Composite 0–100 score from six named factors", minValue: 0, maxValue: 100 },
       { "@type": "PropertyValue", name: "Signal label", description: "HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK" },
-      { "@type": "PropertyValue", name: "Trend factor (25%)", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Relative Strength factor (20%)", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Fundamentals factor (15%)", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Smart Money factor (15%)", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Macro factor (15%)", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Momentum factor (10%)", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Trend factor", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Relative Strength factor", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Fundamentals factor", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Smart Money factor", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Macro factor", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Momentum factor", minValue: 0, maxValue: 100 },
       { "@type": "PropertyValue", name: "Realised 1-day return vs SPY", description: "Pick performance one trading session forward, benchmarked against SPY", unitText: "percent" },
     ],
     distribution: [
@@ -649,7 +649,7 @@ export function aboutProfilePageJsonLd() {
     url: "https://tapeline.io/about",
     name: founder ? `About ${founder.name} — Tapeline` : "About Tapeline",
     description:
-      "Who's behind Tapeline, why we publish the formula and the scorecard, what we believe about transparency in retail finance tooling, and how to reach us.",
+      "Who's behind Tapeline, why we publish our methodology and the scorecard, what we believe about transparency in retail finance tooling, and how to reach us.",
     isPartOf: { "@type": "WebSite", url: "https://tapeline.io", name: "Tapeline" },
     mainEntity: founder ?? {
       "@type": "Organization",
@@ -658,7 +658,7 @@ export function aboutProfilePageJsonLd() {
       url: "https://tapeline.io",
       logo: "https://tapeline.io/favicon.svg",
       description:
-        "Tapeline is a quantitative stock scanner that publishes its 6-factor scoring formula and back-checks every top-10 daily pick against the next-day SPY-relative move.",
+        "Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks every top-10 daily pick against the next-day SPY-relative move.",
       knowsAbout: [
         "Quantitative equity scoring",
         "Multi-factor models",
@@ -786,7 +786,7 @@ export function compareJsonLd(a: CompareArgs) {
       operatingSystem: "Web",
       url: "https://tapeline.io",
       description:
-        "Live transparent six-factor scanner with published weights and a public daily scorecard back-checked vs SPY.",
+        "Live transparent six-factor scanner with named factors, a published methodology, and a public daily scorecard back-checked vs SPY.",
       offers: [
         { "@type": "Offer", name: "Pro · monthly", price: PRO_MONTHLY, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
         { "@type": "Offer", name: "Pro · annual", price: PRO_ANNUAL, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
@@ -794,7 +794,7 @@ export function compareJsonLd(a: CompareArgs) {
         { "@type": "Offer", name: "Premium · annual", price: PREMIUM_ANNUAL, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
       ],
       featureList: [
-        "Six published-weight factors (Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%)",
+        "Six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum",
         "Public scorecard — every top-10 daily pick back-checked vs SPY next session",
         "Sub-60-second refresh during market hours",
         "Plain-English reasoning per ticker (free tier included)",

@@ -297,10 +297,11 @@ export default async function BestStocksForStrategyPage({
         <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
           <h2 className="text-lg font-semibold">How the {s.display} ranking works</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            The Tapeline composite is a transparent weighted sum of six factors:{" "}
-            <strong>Trend (25%)</strong>, <strong>Relative Strength (20%)</strong>,{" "}
-            <strong>Fundamentals (15%)</strong>, <strong>Smart Money (15%)</strong>,{" "}
-            <strong>Macro (15%)</strong>, and <strong>Momentum (10%)</strong>. For the{" "}
+            The Tapeline composite is a transparent weighted blend of six named factors:{" "}
+            <strong>Trend</strong>, <strong>Relative Strength</strong>,{" "}
+            <strong>Fundamentals</strong>, <strong>Smart Money</strong>,{" "}
+            <strong>Macro</strong>, and <strong>Momentum</strong> — weighted most toward Trend and
+            Relative Strength, and least toward Momentum. For the{" "}
             {s.display.toLowerCase()} view, the emphasis is on <strong>{s.factorEmphasis}</strong>{" "}
             — but the composite is the better summary signal than any single factor in isolation.
           </p>

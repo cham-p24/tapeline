@@ -49,7 +49,7 @@ const WINS = [
   },
   {
     label: "Published scoring formula",
-    tapeline: "✓ Six factors, exact weights on /how-it-works",
+    tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Not available — Collections are editorial, no methodology disclosed",
   },
   {

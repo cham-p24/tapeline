@@ -19,7 +19,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Does Yahoo Finance publish a scoring formula?",
-    a: "Yahoo Finance Plus surfaces analyst rating distributions and Argus fair-value estimates, but those are third-party feeds rather than a unified composite. Tapeline publishes its exact 6-factor formula with weights on /how-it-works; no proprietary black box, no hidden multipliers.",
+    a: "Yahoo Finance Plus surfaces analyst rating distributions and Argus fair-value estimates, but those are third-party feeds rather than a unified composite. Tapeline names all six factors behind its composite and shows how they're weighted on /how-it-works; no proprietary black box, no hidden factors.",
   },
   {
     q: "Is Yahoo Finance's free tier good enough for stock picking?",

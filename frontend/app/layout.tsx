@@ -73,7 +73,7 @@ export const metadata: Metadata = {
     // (the old "Live quantitative stock scanner" suffix wasn't winning brand
     // CTR — 11 imp / 0 clicks on "tapeline" over 3mo per GSC). Reads cleanly
     // in the 60-char SERP truncation window.
-    default: "Tapeline — Read the tape · Stock scanner with public formula",
+    default: "Tapeline — Read the tape · Stock scanner with public methodology",
     template: "%s",
   },
   description:

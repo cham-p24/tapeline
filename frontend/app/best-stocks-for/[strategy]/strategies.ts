@@ -128,7 +128,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the Tapeline 'Momentum' factor specifically?",
-        a: "Momentum (10% of the composite weight) captures short-horizon price acceleration: rate of change, RSI position, MACD posture, volume confirmation, and recent breakout structure. It's deliberately a smaller factor weight than Trend (25%) and Relative Strength (20%) — because pure momentum without longer-timeframe trend tends to mean-revert. The composite balances all six.",
+        a: "Momentum captures short-horizon price acceleration and breakout posture. It's deliberately the smallest of the six factors — weighted well below Trend and Relative Strength — because pure momentum without longer-timeframe trend tends to mean-revert. The composite balances all six.",
       },
       {
         q: "How long do momentum setups typically run?",
@@ -162,7 +162,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How does Tapeline read dividend safety?",
-        a: "Dividend safety isn't an explicit factor in the score, but it's heavily implied by the Fundamentals factor (15% weight). Strong fundamentals — earnings quality, low debt, healthy free cash flow — is the structural backstop for a defensible payout. If the Fundamentals sub-score is below 40 on a high-yield name, that's the red flag the composite is asking you to weigh.",
+        a: "Dividend safety isn't an explicit factor in the score, but it's heavily implied by the Fundamentals factor. Strong fundamentals — earnings quality, low debt, healthy free cash flow — is the structural backstop for a defensible payout. If the Fundamentals sub-score is below 40 on a high-yield name, that's the red flag the composite is asking you to weigh.",
       },
       {
         q: "Should I cross-check with another tool?",
@@ -188,7 +188,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the Fundamentals factor specifically?",
-        a: "Fundamentals (15% weight) blends earnings quality, margin trend, balance-sheet health, revenue growth, ROE, and free-cash-flow stability. Sourced from a third-party data feed's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
+        a: "Fundamentals blends earnings quality, growth, profitability, and balance-sheet health. Sourced from a third-party data feed's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
       },
       {
         q: "How is this different from Simply Wall St's value screen?",
@@ -283,7 +283,7 @@ export const STRATEGIES: StrategyConfig[] = [
     faq: [
       {
         q: "What's the difference between growth and momentum?",
-        a: "Momentum is short-window (1-5 day) price acceleration. Growth is multi-month sustained advance — usually backed by improving fundamentals, expanding margins, or revenue acceleration. Tapeline doesn't have a 'Growth' factor explicitly; the composite picks up growth stocks via the combination of high Trend (25% weight), high Fundamentals (15%), and rising relative strength (20%). Sorting by 1-month change gives you the momentum-adjacent version of growth.",
+        a: "Momentum is short-window (1-5 day) price acceleration. Growth is multi-month sustained advance — usually backed by improving fundamentals, expanding margins, or revenue acceleration. Tapeline doesn't have a 'Growth' factor explicitly; the composite picks up growth stocks via the combination of high Trend, high Fundamentals, and rising relative strength — the factors it leans on most. Sorting by 1-month change gives you the momentum-adjacent version of growth.",
       },
       {
         q: "Why a min_score of 65 instead of 85+?",
@@ -295,7 +295,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What about valuation? Won't these be expensive?",
-        a: "Tapeline doesn't have a P/E ratio cutoff — the Fundamentals factor (15% weight) weighs earnings quality, margins, and balance-sheet health, but not 'cheap multiple'. Growth stocks tend to trade at premium multiples by definition; the question this list answers is 'which growth names are confirmed by trend + RS', not 'which growth names are also cheap'. For value-oriented growth, see /best-stocks-for/value.",
+        a: "Tapeline doesn't have a P/E ratio cutoff — the Fundamentals factor weighs earnings quality, margins, and balance-sheet health, but not 'cheap multiple'. Growth stocks tend to trade at premium multiples by definition; the question this list answers is 'which growth names are confirmed by trend + RS', not 'which growth names are also cheap'. For value-oriented growth, see /best-stocks-for/value.",
       },
     ],
   },
