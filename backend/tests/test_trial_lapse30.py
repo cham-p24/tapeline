@@ -39,7 +39,9 @@ from app.services.email_prefs import DEFAULT_PREFS, EmailPref
 
 # Claims describing the pre-2026-06-20 Free tier (same guard list as
 # test_trial_drip.py) — none may appear in customer-facing copy again.
-_DEAD_TIER_CLAIMS = ("top 20 tickers", "24-hour", "capped at 5 tickers")
+# "capped at 5 tickers" was dropped 2026-07-12: the Free watchlist cap was
+# raised back to 5 (deadlock fix), so that phrase is the TRUE current cap again.
+_DEAD_TIER_CLAIMS = ("top 20 tickers", "24-hour")
 
 
 # ── Seed helper ──────────────────────────────────────────────────────────────

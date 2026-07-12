@@ -43,11 +43,12 @@ def test_nudge_free_carries_tier_caps():
     assert nudge["watchlist_cap"] == limit(Tier.FREE, "watchlist_tickers")
     # Sanity-check the actual canonical Free values. Post-freemium-retune
     # (2026-06-20): Free is LIVE (delayed_hours 0, was 24), scanner top-10
-    # (was 20), watchlist 3 (was 5). Conversion now comes from the row cap +
-    # the daily ticker-lookup meter, not a stale-data cliff.
+    # (was 20). Watchlist raised to 5 (2026-07-12) to break the day-1 seed
+    # deadlock. Conversion now comes from the row cap + the daily
+    # ticker-lookup meter, not a stale-data cliff.
     assert nudge["scanner_cap"] == 10
     assert nudge["delayed_hours"] == 0
-    assert nudge["watchlist_cap"] == 3
+    assert nudge["watchlist_cap"] == 5
 
 
 @pytest.mark.parametrize("tier", ["pro", "premium"])
@@ -93,7 +94,7 @@ async def test_me_nudge_present_for_free_user():
             # Post-freemium-retune canonical Free caps (see tier.py).
             assert body["nudge"]["scanner_cap"] == 10
             assert body["nudge"]["delayed_hours"] == 0
-            assert body["nudge"]["watchlist_cap"] == 3
+            assert body["nudge"]["watchlist_cap"] == 5
             # Free users carry no billing.past_due (only paid tiers can).
             assert body["billing"]["past_due"] is False
         finally:

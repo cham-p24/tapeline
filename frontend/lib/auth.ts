@@ -108,7 +108,12 @@ export function hasMinTier(user: SessionUser | null, minTier: SessionUser["tier"
 export const FEATURE_TIERS = {
   "scanner.full":       "pro" as const,
   "scanner.live":       "pro" as const,
-  "watchlist":          "pro" as const,
+  // Watchlist is a FREE feature — it's the #1 activation on-ramp, so the
+  // "★ Add to watchlist" control must never be hidden from Free users. The
+  // real gate is the count cap (Free=5), enforced server-side at add-time.
+  // Smart ALERTS on watchlist items remain paid (see alerts.* below).
+  // Mirrors backend tier.FEATURES["watchlist"] = Tier.FREE.
+  "watchlist":          "free" as const,
   "squeeze":            "pro" as const,
   "regime.full":        "pro" as const,
   "heatmap":            "pro" as const,

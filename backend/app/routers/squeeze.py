@@ -16,6 +16,52 @@ from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
+# How many squeeze setups the FREE "taste" endpoint returns. Small on purpose:
+# enough for a free user to find ONE name worth adding to their watchlist (the
+# activation on-ramp), not enough to replace the paid Squeeze Watch feed.
+FREE_SQUEEZE_PREVIEW_LIMIT = 3
+
+
+@router.get("/preview")
+async def squeeze_preview(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_user_required),
+) -> dict:
+    """Read-only top-3 squeeze setups — a FREE discovery taste.
+
+    Rationale (activation): Tapeline's #1 problem is that free users never add
+    their OWN ticker. A hard 403 on every discovery tool leaves them with
+    nothing to act on. This gives ANY logged-in user (Free included) a tiny,
+    read-only slice of Squeeze Watch so they can find a name worth adding
+    instead of bouncing. The full feed (GET /api/squeeze) stays Pro-gated.
+
+    Requires login (not anonymous) so it never re-opens the anonymous scrape
+    surface the main feed was locked down to close — the free taste is a
+    logged-in activation nudge, not a public endpoint.
+    """
+    stmt = (
+        select(SqueezeSetup)
+        .order_by(desc(SqueezeSetup.spike_score))
+        .limit(FREE_SQUEEZE_PREVIEW_LIMIT)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return {
+        "count": len(rows),
+        "preview": True,
+        "limit": FREE_SQUEEZE_PREVIEW_LIMIT,
+        "items": [
+            {
+                "symbol": r.symbol,
+                "spike_score": r.spike_score,
+                "squeeze_days": r.squeeze_days,
+                "breakout_type": r.breakout_type,
+                "reason": r.reason,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ],
+    }
+
 
 @router.get("")
 async def list_squeezes(

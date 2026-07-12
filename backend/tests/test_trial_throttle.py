@@ -77,5 +77,6 @@ def test_effective_limit_unaffected_keys_unchanged_during_trial():
 def test_effective_limit_free_user_unchanged():
     user = _user("free", None, None)
     assert effective_limit(user, "api_requests_per_day") == 0
-    # Post-freemium-retune (2026-06-20): Free watchlist cap is 3 (was 5).
-    assert effective_limit(user, "watchlist_tickers") == 3
+    # Free watchlist cap raised to 5 (2026-07-12) to break the day-1 seed
+    # deadlock — the seeder now leaves >= 1 free slot for the user's own add.
+    assert effective_limit(user, "watchlist_tickers") == 5
