@@ -61,11 +61,58 @@ const nextConfig = {
   },
 
   // Production-grade security headers — same set Vercel + Linear ship.
-  // CSP is intentionally NOT set yet because TradingView's embed + Cloudflare
-  // Turnstile + the API rewrite all need an audit before we can pin hashes.
-  // The headers below are safe to ship today and close the easy attack vectors.
+  //
+  // Content-Security-Policy — PHASE 1: REPORT-ONLY (non-enforcing).
+  // Shipped as `Content-Security-Policy-Report-Only`, so the browser only
+  // *logs* would-be violations (to the console / any report endpoint) and
+  // NEVER blocks a resource. It therefore cannot break the site. The goal of
+  // this phase is to surface any EXTERNAL origin we forgot to allow before we
+  // flip to enforcement.
+  //
+  // Deliberately permissive on inline/eval for now: Next.js injects inline
+  // scripts (theme-boot in <head>, the gtag config snippet, three JSON-LD
+  // blocks) and inline styles, and posthog-js/analyzers use eval-family APIs.
+  // Including 'unsafe-inline' + 'unsafe-eval' keeps the report free of
+  // framework noise so real missing origins stand out.
+  //
+  // Allowlist is derived from what the app actually loads:
+  //   - Google tag / GA4 + Google Ads  → www.googletagmanager.com (script),
+  //     *.google-analytics.com + region1 + www.google-analytics.com (connect)
+  //   - Vercel Analytics + Speed Insights → va.vercel-scripts.com (script),
+  //     *.vercel-insights.com (script+connect)   [env-gated on NEXT_PUBLIC_VERCEL]
+  //   - PostHog → us-assets.i.posthog.com + *.posthog.com (script),
+  //     us.i.posthog.com + *.posthog.com (connect)   [env-gated on POSTHOG_KEY]
+  //   - Cloudflare Turnstile → challenges.cloudflare.com (script + frame)
+  //   - TradingView chart embed → s.tradingview.com (frame; iframe on
+  //     /app/ticker/[symbol])
+  //   - Plausible → plausible.io (script + connect)   [env-gated on
+  //     NEXT_PUBLIC_PLAUSIBLE_DOMAIN; included defensively so flipping the env
+  //     var on doesn't start generating report noise]
+  //   - Backend API → api.tapeline.io (connect; direct calls, though most
+  //     client traffic goes same-origin via the /api/* rewrite)
+  // Fonts are self-hosted by next/font (no fonts.gstatic.com needed).
+  //
+  // FLIP-TO-ENFORCE PLAN: after ~1 week of clean reports, tighten (drop
+  // 'unsafe-eval', move inline scripts to nonces/hashes, drop 'unsafe-inline')
+  // and rename the header to `Content-Security-Policy` to enforce.
   async headers() {
+    const cspReportOnly = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "img-src 'self' data: https:",
+      "font-src 'self' data:",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://va.vercel-scripts.com https://*.vercel-insights.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "connect-src 'self' https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://*.vercel-insights.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "frame-src https://challenges.cloudflare.com https://s.tradingview.com",
+    ].join("; ");
     const securityHeaders = [
+      // Phase-1 CSP: report-only, so it can only log — never block. See the
+      // block comment above for the allowlist rationale + flip-to-enforce plan.
+      { key: "Content-Security-Policy-Report-Only", value: cspReportOnly },
       // Force HTTPS for 2 years; opt browsers in to the HSTS preload list.
       { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
       // Block clickjacking — no third party can iframe Tapeline.
