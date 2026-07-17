@@ -38,6 +38,7 @@ async def create_checkout_session(
     referral_credit_months: int = 0,
     winback: bool = False,
     expires_in_minutes: int | None = None,
+    trial_end: datetime | None = None,
 ) -> str:
     """Create a Stripe Checkout session and return the URL.
 
@@ -57,6 +58,13 @@ async def create_checkout_session(
     minimum) so a user who opens both tier links from one email can't come
     back a day later and complete BOTH — the concurrent-completable window
     shrinks from ~24h to minutes.
+
+    `trial_end` preserves the remainder of an in-app no-card trial: the
+    caller passes the user's trial_ends_at and we forward it as
+    subscription_data.trial_end so a mid-trial "add a card" checkout starts
+    billing when the trial was always going to end, instead of charging
+    immediately and silently forfeiting the remaining free days. Skipped
+    when under 48h remains (Stripe's documented minimum for trial_end).
     """
     price_map = {
         ("pro", "monthly"):     settings.stripe_price_pro_monthly,
@@ -126,7 +134,19 @@ async def create_checkout_session(
         else:
             kwargs["allow_promotion_codes"] = True
 
-        kwargs["subscription_data"] = {"metadata": sub_metadata}
+        subscription_data: dict[str, Any] = {"metadata": sub_metadata}
+        if trial_end is not None:
+            # Older rows can carry naive datetimes — stored values are UTC.
+            if trial_end.tzinfo is None:
+                trial_end = trial_end.replace(tzinfo=UTC)
+            if trial_end >= datetime.now(UTC) + timedelta(hours=48):
+                subscription_data["trial_end"] = int(trial_end.timestamp())
+            # else: Stripe rejects subscription_data.trial_end closer than
+            # 48h out (its documented minimum), so a nearly-finished trial
+            # falls back to a normal charge-now checkout rather than 400ing
+            # the whole purchase — the user gives up <48h of trial instead
+            # of losing the checkout entirely.
+        kwargs["subscription_data"] = subscription_data
         session = await asyncio.to_thread(stripe.checkout.Session.create, **kwargs)
         return session.url  # type: ignore[return-value]
     except stripe.error.StripeError as exc:

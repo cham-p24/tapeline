@@ -23,6 +23,7 @@ from app.services.billing import (
 )
 from app.services.email_checkout import verify_checkout_token
 from app.services.rate_limit import limit_strict
+from app.services.tier import is_on_trial
 
 router = APIRouter()
 settings = get_settings()
@@ -57,6 +58,20 @@ async def create_checkout(
         raise HTTPException(400, "tier must be 'pro' or 'premium'")
     if body.billing_period not in ("monthly", "annual"):
         raise HTTPException(400, "billing_period must be 'monthly' or 'annual'")
+    # Double-billing guard (mirrors the email-checkout guard below): a user
+    # whose paid tier is live on Stripe already has a subscription — Checkout
+    # always mints a NEW Stripe Customer + subscription, so letting a
+    # subscriber through here double-bills them and the webhook can only page
+    # the founder to refund it after the money moved. Keyed on paid tier AND
+    # linked customer, NOT bare stripe_customer_id: churned users keep their
+    # customer id (tier already dropped to "free") and must still be able to
+    # check out again — the win-back path below depends on it. Trial users
+    # have no stripe_customer_id, so they pass through untouched.
+    if user.stripe_customer_id and user.tier in ("pro", "premium"):
+        raise HTTPException(
+            409,
+            "You already have an active subscription — contact support to switch plans.",
+        )
     url = await create_checkout_session(
         user_id=user.id,
         user_email=user.email,
@@ -76,6 +91,14 @@ async def create_checkout(
         # it mirrors exactly who receives the wb90 email. Referral credit, if
         # any, takes precedence inside create_checkout_session.
         winback=(user.tier == "free" and user.canceled_at is not None),
+        # Mid-trial card-add: forward the user's remaining trial so Stripe
+        # starts billing when the trial was always going to end, instead of
+        # charging today and silently forfeiting the free days the "Keep
+        # Premium — add a card" emails promised. The service drops it when
+        # under Stripe's 48h trial_end minimum.
+        trial_end=user.trial_ends_at
+        if is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
+        else None,
     )
     # Mark the checkout as in-flight for abandonment recovery. If the user
     # never completes, the hourly worker (run_checkout_abandonment_recovery)
@@ -162,6 +185,12 @@ async def email_checkout(
             cancel_url=f"{settings.app_url}/pricing?src=email_checkout_cancelled",
             referral_credit_months=user.referral_credit_months or 0,
             winback=(user.tier == "free" and user.canceled_at is not None),
+            # Same mid-trial preservation as POST /checkout — this endpoint
+            # IS the "Keep Premium — add a card" email CTA, so it's the path
+            # a day-3 trial user most likely arrives through.
+            trial_end=user.trial_ends_at
+            if is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
+            else None,
             # Shrink the completable window from ~24h to Stripe's 30-min
             # minimum: each email carries TWO tier links, and the double-
             # subscribe guard above only runs at session-CREATE time — a

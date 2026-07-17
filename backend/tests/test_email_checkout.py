@@ -216,6 +216,75 @@ async def test_valid_token_303s_into_stripe_checkout(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_email_checkout_preserves_remaining_trial(client, monkeypatch):
+    """This endpoint IS the 'Keep Premium — add a card' email CTA: a mid-trial
+    user's unexpired trial_ends_at must be forwarded as trial_end so adding a
+    card doesn't charge immediately and forfeit the remaining free days."""
+    from datetime import UTC, datetime, timedelta
+
+    captured: dict = {}
+
+    async def _fake_checkout(**kwargs):
+        captured.update(kwargs)
+        return "https://checkout.stripe.com/c/pay/test789"
+
+    monkeypatch.setattr(
+        "app.routers.billing.create_checkout_session", _fake_checkout
+    )
+
+    trial_ends = datetime.now(UTC) + timedelta(days=9)
+    uid = await _seed_user(trial_ends_at=trial_ends)  # tier defaults premium
+    try:
+        tok = make_checkout_token(uid)
+        async with client:
+            r = await client.get(
+                f"/api/billing/email-checkout?token={tok}&tier=premium&period=monthly"
+            )
+        assert r.status_code == 303
+        forwarded = captured["trial_end"]
+        assert forwarded is not None
+        # SQLite round-trips DateTime(timezone=True) as naive UTC — normalise
+        # before comparing instants.
+        if forwarded.tzinfo is None:
+            forwarded = forwarded.replace(tzinfo=UTC)
+        assert abs((forwarded - trial_ends).total_seconds()) < 5
+    finally:
+        await _delete_user(uid)
+
+
+@pytest.mark.asyncio
+async def test_email_checkout_expired_trial_gets_no_trial_end(client, monkeypatch):
+    """Post-expiry conversion emails (expired/post3/lapse30) hit this same
+    endpoint — an already-expired trial must not smuggle in a trial_end."""
+    from datetime import UTC, datetime, timedelta
+
+    captured: dict = {}
+
+    async def _fake_checkout(**kwargs):
+        captured.update(kwargs)
+        return "https://checkout.stripe.com/c/pay/test790"
+
+    monkeypatch.setattr(
+        "app.routers.billing.create_checkout_session", _fake_checkout
+    )
+
+    uid = await _seed_user(
+        tier="free",
+        trial_ends_at=datetime.now(UTC) - timedelta(days=3),
+    )
+    try:
+        tok = make_checkout_token(uid)
+        async with client:
+            r = await client.get(
+                f"/api/billing/email-checkout?token={tok}&tier=premium&period=monthly"
+            )
+        assert r.status_code == 303
+        assert captured["trial_end"] is None
+    finally:
+        await _delete_user(uid)
+
+
+@pytest.mark.asyncio
 async def test_invalid_token_degrades_to_pricing(client):
     async with client:
         r = await client.get("/api/billing/email-checkout?token=not-a-real-token")
