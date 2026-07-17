@@ -57,9 +57,10 @@ def test_re_engagement_falls_back_to_trader_label():
 
 @pytest.mark.asyncio
 async def test_drip_targets_only_dormant_users_in_window():
-    """run_re_engagement_drip filters on last_seen_at in [now-15d, now-14d).
-    A user just outside that window (too recent or too dormant already)
-    must not receive the email."""
+    """run_re_engagement_drip filters on last_seen_at in [now-16d, now-14d)
+    — 48h wide so one missed worker day can't skip the touch. A user
+    outside that window (too recent or too dormant already) must not
+    receive the email."""
     now = datetime.now(UTC)
 
     async with session_scope() as s:
@@ -130,6 +131,49 @@ async def test_drip_skips_active_trial_users():
         row = await s.execute(select(User).where(User.id == u.id))
         user = row.scalar_one()
         assert "re14" not in (user.drip_state or "")
+
+        await s.delete(user)
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_re14_still_fires_after_missed_day(monkeypatch):
+    """48h window recovery: last_seen_at 15.5d ago sits a day past the old
+    [now-15d, now-14d) window — a single failed/missed drip run used to age
+    the user out forever. The widened [now-16d, now-14d) window still
+    catches them, exactly once (re14 token dedupes the second run)."""
+    import uuid
+
+    import app.services.email as email_module
+
+    sends: list[str] = []
+
+    async def _track(to, *_a, **_k):
+        sends.append(to)
+        return {"id": "ok"}
+
+    monkeypatch.setattr(email_module, "send_email", _track)
+
+    now = datetime.now(UTC)
+    uid = f"re_missed_{uuid.uuid4().hex}"
+    email = f"{uid}@example.com"
+    async with session_scope() as s:
+        u = User(
+            id=uid, email=email, name="Missed", tier="free",
+            last_seen_at=now - timedelta(days=15, hours=12),
+        )
+        s.add(u)
+        await s.commit()
+
+        await run_re_engagement_drip(s)
+        await run_re_engagement_drip(s)  # same-day re-run — token must dedupe
+
+        row = await s.execute(select(User).where(User.id == uid))
+        user = row.scalar_one()
+        assert "re14" in (user.drip_state or "").split(",")
+        assert sends.count(email) == 1, (
+            f"expected exactly one re14 email, got {sends.count(email)}"
+        )
 
         await s.delete(user)
         await s.commit()

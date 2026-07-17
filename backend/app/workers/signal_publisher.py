@@ -48,7 +48,8 @@ _last_backcheck: datetime | None = None
 _last_telegram_digest: datetime | None = None
 _last_calendar_seed: datetime | None = None
 _last_trial_check: datetime | None = None
-_last_drip_check: datetime | None = None
+_last_drip_check: datetime | None = None  # set ONLY after a fully successful drip run
+_last_drip_failed_at: datetime | None = None  # last failed drip attempt (1h retry backoff)
 _last_universe_refresh: datetime | None = None
 _last_sheet_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
@@ -268,52 +269,12 @@ async def tick() -> None:
     # post-conversion monthly→annual upgrade nudge + personal founder-touch to
     # high-value engaged signups + referral-milestone celebrations (3/5/10/25).
     # Worker-restart-safe — User.drip_state / winback_state / founder_touch_sent_at
-    # track per-user per-stage delivery so no email fires twice.
-    global _last_drip_check
-    if _last_drip_check is None or (started - _last_drip_check).total_seconds() >= 86400:
-        try:
-            from app.services.email import (
-                run_activation_drip,
-                run_annual_nudge_drip,
-                run_annual_renewal_reminder_drip,
-                run_daily_drip,
-                run_founder_touch_drip,
-                run_re_engagement_drip,
-                run_referral_milestone_drip,
-                run_winback_drip,
-            )
-            async with session_scope() as drip_session:
-                counts = await run_daily_drip(drip_session)
-                re_counts = await run_re_engagement_drip(drip_session)
-                wb_counts = await run_winback_drip(drip_session)
-                act_counts = await run_activation_drip(drip_session)
-                annual_counts = await run_annual_nudge_drip(drip_session)
-                renewal_counts = await run_annual_renewal_reminder_drip(drip_session)
-                ft_counts = await run_founder_touch_drip(drip_session)
-                refm_counts = await run_referral_milestone_drip(drip_session)
-            if any(counts.values()):
-                logger.info(
-                    "drip.sent day3=%d day7=%d day13=%d lapse30=%d",
-                    counts["day3"], counts["day7"], counts["day13"],
-                    counts.get("lapse30", 0),
-                )
-            if re_counts["re14"]:
-                logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
-            if any(wb_counts.values()):
-                logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
-            if any(act_counts.values()):
-                logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
-            if annual_counts["annual_p"]:
-                logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
-            if renewal_counts["renewal_reminder"]:
-                logger.info("drip.renewal_reminder_sent renewal_reminder=%d", renewal_counts["renewal_reminder"])
-            if ft_counts["founder_touch"]:
-                logger.info("drip.founder_touch_sent founder_touch=%d", ft_counts["founder_touch"])
-            if any(refm_counts.values()):
-                logger.info("drip.referral_milestone_sent %s", refm_counts)
-        except Exception:
-            logger.exception("drip.run_failed")
-        _last_drip_check = started
+    # track per-user per-stage delivery so no email fires twice. The gate +
+    # latch live in _maybe_run_daily_drips: the 24h latch is set ONLY after a
+    # fully successful run, so a transient failure (Neon cold-start, DB blip)
+    # retries after a short backoff instead of silently skipping a whole day
+    # of stage windows.
+    await _maybe_run_daily_drips(started)
 
     # Checkout abandonment recovery — HOURLY (not daily like the drips above):
     # the targeting window is a tight 1-24h after a user mints a Stripe Checkout
@@ -1045,6 +1006,89 @@ async def _run_telegram_digest() -> None:
             await run_hourly_digest(session)
         except Exception:
             logger.exception("telegram.hourly_digest_failed")
+
+
+async def _maybe_run_daily_drips(started: datetime) -> None:
+    """Daily lifecycle-email suite, gated + latched.
+
+    LATCH-ON-SUCCESS (2026-07-18): `_last_drip_check` used to be set even
+    when the run RAISED, so a single transient failure (e.g. a documented
+    Neon cold-start) silently skipped the next 24h of drip processing.
+    Every user inside a stage window during the failed run aged out and was
+    permanently skipped — including the day-11 / day-13 / expired stages
+    that carry the one-click signed Stripe checkout links. Now:
+
+      - the 24h latch is set ONLY after every runner completed;
+      - a failed run leaves the latch untouched and retries on the next
+        tick once a 1h backoff (`_last_drip_failed_at`) has elapsed — the
+        backoff keeps a persistent outage from hammering the DB/email
+        provider every ~60s tick while still recovering within the hour;
+      - retries are safe: every stage dedupes per-user via drip_state /
+        winback_state / founder_touch_sent_at, so nothing double-sends.
+
+    The stage windows themselves are 48h wide (see email.run_daily_drip),
+    so even a full missed day can't age a user out of their stage.
+    """
+    global _last_drip_check, _last_drip_failed_at
+    due = (
+        _last_drip_check is None
+        or (started - _last_drip_check).total_seconds() >= 86400
+    )
+    backoff_elapsed = (
+        _last_drip_failed_at is None
+        or (started - _last_drip_failed_at).total_seconds() >= 3600
+    )
+    if not (due and backoff_elapsed):
+        return
+
+    try:
+        from app.services.email import (
+            run_activation_drip,
+            run_annual_nudge_drip,
+            run_annual_renewal_reminder_drip,
+            run_daily_drip,
+            run_founder_touch_drip,
+            run_re_engagement_drip,
+            run_referral_milestone_drip,
+            run_winback_drip,
+        )
+        async with session_scope() as drip_session:
+            counts = await run_daily_drip(drip_session)
+            re_counts = await run_re_engagement_drip(drip_session)
+            wb_counts = await run_winback_drip(drip_session)
+            act_counts = await run_activation_drip(drip_session)
+            annual_counts = await run_annual_nudge_drip(drip_session)
+            renewal_counts = await run_annual_renewal_reminder_drip(drip_session)
+            ft_counts = await run_founder_touch_drip(drip_session)
+            refm_counts = await run_referral_milestone_drip(drip_session)
+        if any(counts.values()):
+            logger.info(
+                "drip.sent day3=%d day7=%d day13=%d lapse30=%d",
+                counts["day3"], counts["day7"], counts["day13"],
+                counts.get("lapse30", 0),
+            )
+        if re_counts["re14"]:
+            logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
+        if any(wb_counts.values()):
+            logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
+        if any(act_counts.values()):
+            logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
+        if annual_counts["annual_p"]:
+            logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
+        if renewal_counts["renewal_reminder"]:
+            logger.info("drip.renewal_reminder_sent renewal_reminder=%d", renewal_counts["renewal_reminder"])
+        if ft_counts["founder_touch"]:
+            logger.info("drip.founder_touch_sent founder_touch=%d", ft_counts["founder_touch"])
+        if any(refm_counts.values()):
+            logger.info("drip.referral_milestone_sent %s", refm_counts)
+    except Exception:
+        # Do NOT latch — a failed run must retry, not burn the day.
+        logger.exception("drip.run_failed")
+        _last_drip_failed_at = started
+        return
+
+    _last_drip_check = started
+    _last_drip_failed_at = None
 
 
 async def _downgrade_expired_trials() -> None:

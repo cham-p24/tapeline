@@ -1,4 +1,5 @@
-"""Trial-drip truthfulness + expiry-day single-send guarantee.
+"""Trial-drip truthfulness + expiry-day single-send guarantee + drip-run
+reliability (latch-on-success, 48h stage windows).
 
 Pins two bugs found in the 2026-07 email audit:
 
@@ -22,6 +23,14 @@ Pins two bugs found in the 2026-07 email audit:
 Also covers the day-11 deadline personalisation: the T-3 email hardcoded
 "add a card before Friday", which was wrong for ~6/7ths of users; it now
 formats the user's actual trial_ends_at.
+
+And the 2026-07-18 reliability fix: the worker used to latch
+_last_drip_check even when the drip run RAISED, so one transient failure
+(e.g. a Neon cold-start) skipped the next 24h of drip processing — and
+with the stage windows exactly 24h wide, every in-window user aged out
+permanently. Now the latch is set only after a successful run (failures
+retry after a 1h backoff) and the windows are 48h wide, so a missed day
+still delivers each stage exactly once (drip_state tokens dedupe).
 
 Assertion strategy mirrors test_lifecycle_emails.py: assert on the SPECIFIC
 seeded user's row / captured sends, never on aggregate counts — the test DB
@@ -53,6 +62,7 @@ from app.services.tier import (
     FREE_SCANNER_ROWS,
     FREE_WATCHLIST_TICKERS,
 )
+from app.workers import signal_publisher
 from app.workers.signal_publisher import _downgrade_expired_trials
 
 # Claims that describe the pre-2026-06-20 Free tier. None of these may ever
@@ -250,5 +260,130 @@ async def test_expiry_day_sends_exactly_one_email(monkeypatch):
 
     mine = [(to, subj) for (to, subj) in sends if to == email]
     assert len(mine) == 1, f"expected exactly one expiry email, got {mine}"
+    assert mine[0][1] == "Your Tapeline trial ended"
+    assert "expired" in (await _user_row(uid)).drip_state.split(",")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Drip-run reliability — a failed run must not burn the daily latch, and the
+# 48h stage windows must give a missed day back (exactly once, via drip_state)
+# ════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_raising_drip_run_does_not_advance_latch(monkeypatch):
+    """A drip run that RAISES must leave _last_drip_check unset so the suite
+    retries (after the 1h backoff) instead of going dark for 24h. Before this
+    fix the latch was set unconditionally — one Neon cold-start silently
+    skipped a whole day of conversion emails."""
+    from collections import defaultdict
+
+    monkeypatch.setattr(signal_publisher, "_last_drip_check", None)
+    monkeypatch.setattr(signal_publisher, "_last_drip_failed_at", None)
+
+    calls = {"n": 0}
+
+    async def _boom(_session):
+        calls["n"] += 1
+        raise RuntimeError("transient DB failure (simulated Neon cold-start)")
+
+    monkeypatch.setattr(email_module, "run_daily_drip", _boom)
+
+    t0 = datetime.now(UTC)
+    await signal_publisher._maybe_run_daily_drips(t0)
+    assert calls["n"] == 1
+    assert signal_publisher._last_drip_check is None, (
+        "failed run latched _last_drip_check — the next 24h of drip "
+        "processing would be silently skipped"
+    )
+    assert signal_publisher._last_drip_failed_at == t0
+
+    # Inside the 1h failure backoff: no re-attempt (don't hammer a down DB
+    # on every ~60s tick).
+    await signal_publisher._maybe_run_daily_drips(t0 + timedelta(minutes=5))
+    assert calls["n"] == 1
+
+    # Past the backoff the suite retries; a now-healthy run latches.
+    async def _zero(_session):
+        return defaultdict(int)
+
+    for runner in (
+        "run_daily_drip", "run_re_engagement_drip", "run_winback_drip",
+        "run_activation_drip", "run_annual_nudge_drip",
+        "run_annual_renewal_reminder_drip", "run_founder_touch_drip",
+        "run_referral_milestone_drip",
+    ):
+        monkeypatch.setattr(email_module, runner, _zero)
+
+    t1 = t0 + timedelta(hours=1, minutes=1)
+    await signal_publisher._maybe_run_daily_drips(t1)
+    assert signal_publisher._last_drip_check == t1, "successful run must latch"
+    assert signal_publisher._last_drip_failed_at is None
+
+    # Latched: the next tick inside the 24h window is a no-op.
+    async def _explode(_session):
+        raise AssertionError("drip ran again inside the 24h latch")
+
+    monkeypatch.setattr(email_module, "run_daily_drip", _explode)
+    await signal_publisher._maybe_run_daily_drips(t1 + timedelta(hours=1))
+
+
+@pytest.mark.asyncio
+async def test_day7_still_fires_after_missed_day(monkeypatch):
+    """48h window recovery: a user the failed run left on their day-7 send
+    day (trial_ends_at 6-7d out) is 5-6d out by the next day's successful
+    run — previously aged out of the 24h window, now still inside the
+    widened (now+5d, now+7d) window. Exactly one email, token-stamped."""
+    sends: list[tuple[str, str, str]] = []
+
+    async def _track(to, subject, html, *_a, **_k):
+        sends.append((to, subject, html))
+        return {"id": "ok"}
+
+    monkeypatch.setattr(email_module, "send_email", _track)
+
+    uid, email = await _seed_trial_user(
+        ends_at=datetime.now(UTC) + timedelta(days=5, hours=12),
+    )
+
+    async with session_scope() as s:
+        await run_daily_drip(s)
+    async with session_scope() as s:  # next run — drip_state token must dedupe
+        await run_daily_drip(s)
+
+    mine = [(subj, h) for (to, subj, h) in sends if to == email]
+    assert len(mine) == 1, (
+        f"expected exactly one day-7 email, got {[s for s, _ in mine]}"
+    )
+    assert mine[0][0] == "Tapeline — halfway through your trial"
+    assert "7" in (await _user_row(uid)).drip_state.split(",")
+
+
+@pytest.mark.asyncio
+async def test_expired_still_fires_after_missed_day(monkeypatch):
+    """The T+0 'expired' email carries the one-click checkout links — a
+    failed run on expiry day must not eat it. At T+1.5d (past the old 24h
+    window) the widened (now-2d, now) window still catches the user,
+    exactly once. tier='free' because the hourly worker downgrade has
+    already fired by then."""
+    sends: list[tuple[str, str]] = []
+
+    async def _track(to, subject, *_a, **_k):
+        sends.append((to, subject))
+        return {"id": "ok"}
+
+    monkeypatch.setattr(email_module, "send_email", _track)
+
+    uid, email = await _seed_trial_user(
+        ends_at=datetime.now(UTC) - timedelta(days=1, hours=12),
+        tier="free",
+    )
+
+    async with session_scope() as s:
+        await run_daily_drip(s)
+    async with session_scope() as s:  # next run — drip_state token must dedupe
+        await run_daily_drip(s)
+
+    mine = [(to, subj) for (to, subj) in sends if to == email]
+    assert len(mine) == 1, f"expected exactly one expired email, got {mine}"
     assert mine[0][1] == "Your Tapeline trial ended"
     assert "expired" in (await _user_row(uid)).drip_state.split(",")
