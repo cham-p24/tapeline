@@ -29,7 +29,7 @@ const FREE_NUDGE = {
   id: "free_upgrade",
   scanner_cap: 10,
   delayed_hours: 0,
-  watchlist_cap: 3,
+  watchlist_cap: 5,
 };
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ describe("UpgradeNudge", () => {
     // Caps come from /api/me.nudge, not a hardcoded string.
     expect(await screen.findByText(/top 10 tickers/i)).toBeInTheDocument();
     expect(screen.getByText(/live scores/i)).toBeInTheDocument();
-    expect(screen.getByText(/3-ticker watchlist/i)).toBeInTheDocument();
+    expect(screen.getByText(/5-ticker watchlist/i)).toBeInTheDocument();
     // Free is live now — no "Nh delayed" clause should render.
     expect(screen.queryByText(/delayed/i)).not.toBeInTheDocument();
     expect(

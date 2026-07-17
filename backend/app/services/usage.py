@@ -5,7 +5,10 @@ which powers the public /t/{symbol} page and the in-app ticker page. The
 freemium model caps how many of these a non-paying caller gets per UTC day:
 
   - PRO / PREMIUM / active-14-day-trial users : UNLIMITED (never metered).
-  - FREE (logged-in) users                    : tier.FREE_DAILY_LOOKUPS / day,
+  - Brand-new accounts (< tier.FREE_FIRST_SESSION_GRACE_HOURS old) : UNLIMITED
+    for their first session, so a new user's first exploratory visit is never
+    walled before they've found a ticker worth saving.
+  - FREE (logged-in) users past the grace window : tier.FREE_DAILY_LOOKUPS / day,
     counted durably on the users table (lookups_today / lookups_reset_on).
   - ANONYMOUS (no account)                     : tier.ANON_DAILY_LOOKUPS / day,
     counted in-memory per source IP (mirrors services/trial_abuse +
@@ -22,13 +25,14 @@ durable in Postgres and is therefore correct across restarts and machines.
 """
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
 from app.services.tier import (
     ANON_DAILY_LOOKUPS,
+    FREE_FIRST_SESSION_GRACE_HOURS,
     Tier,
     is_on_trial,
     limit,
@@ -39,18 +43,39 @@ def _utc_today() -> date:
     return datetime.now(UTC).date()
 
 
-def _is_unmetered(user: User) -> bool:
-    """True for callers who are never metered: any paid tier (Pro/Premium) and
-    users currently inside their no-card 14-day Premium trial.
+def _within_first_session_grace(user: User) -> bool:
+    """True while a brand-new account is inside its first-session grace window
+    (tier.FREE_FIRST_SESSION_GRACE_HOURS from created_at).
 
-    Free users — including a lapsed trial that dropped back to FREE — are
-    metered. Active-trial users present as tier=premium with a future
-    trial_ends_at and no Stripe customer; is_on_trial captures exactly that.
+    This is what makes a new user's FIRST exploratory session wall-free: they
+    can click through as many ticker pages as they like on day one before any
+    look-up metering kicks in. created_at is timezone-aware (server_default
+    now()); older rows that are somehow naive are treated as UTC.
+    """
+    created = getattr(user, "created_at", None)
+    if created is None:
+        return False
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    return datetime.now(UTC) - created < timedelta(hours=FREE_FIRST_SESSION_GRACE_HOURS)
+
+
+def _is_unmetered(user: User) -> bool:
+    """True for callers who are never metered: any paid tier (Pro/Premium),
+    users currently inside their no-card 14-day Premium trial, AND any account
+    still inside its first-session grace window (see _within_first_session_grace).
+
+    Free users past the grace window — including a lapsed trial that dropped
+    back to FREE — are metered. Active-trial users present as tier=premium with
+    a future trial_ends_at and no Stripe customer; is_on_trial captures that.
     """
     tier = Tier(user.tier)
     if tier in (Tier.PRO, Tier.PREMIUM):
         # Paid Pro/Premium and active-trial Premium are all uncapped. (A
         # tier=premium row IS either paid or on trial — either way, unmetered.)
+        return True
+    # First-session grace: a new signup's first day is never walled.
+    if _within_first_session_grace(user):
         return True
     # Defensive: if a free-tier row somehow carries trial state, honour it.
     return is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)

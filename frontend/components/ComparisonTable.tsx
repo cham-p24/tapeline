@@ -61,7 +61,7 @@ const SECTIONS: Section[] = [
   {
     name: "Watchlist & alerts",
     rows: [
-      { label: "Watchlist", free: "3 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+      { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
       { label: "Browser push", free: "—", pro: "✓", premium: "✓" },

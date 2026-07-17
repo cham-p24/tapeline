@@ -78,9 +78,20 @@ async def _set_tier(user_id: str, tier: str, *, paying: bool = True) -> None:
 
 
 async def _free(client, monkeypatch) -> tuple[dict, str]:
-    """A logged-in FREE user (signup auto-starts a Premium trial, so drop it)."""
+    """A logged-in FREE user PAST the first-session grace window.
+
+    Signup auto-starts a Premium trial, so drop to free. Then age created_at
+    beyond tier.FREE_FIRST_SESSION_GRACE_HOURS so the daily look-up meter
+    actually applies — a brand-new account is unmetered for its first session
+    (see test_free_user_within_grace_window_is_unmetered), which would
+    otherwise mask the cap the metering tests assert on.
+    """
     cookies, uid = await _signup(client, monkeypatch)
     await _set_tier(uid, "free", paying=False)
+    async with session_scope() as s:
+        u = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        u.created_at = datetime.now(UTC) - timedelta(days=2)
+        await s.commit()
     return cookies, uid
 
 
@@ -129,6 +140,27 @@ async def test_free_user_gets_cap_then_402(client, monkeypatch):
         assert detail["tier"] == "free"
         assert detail["limit"] == FREE_DAILY_LOOKUPS
         assert detail["used"] == FREE_DAILY_LOOKUPS
+
+
+@pytest.mark.asyncio
+async def test_free_user_within_grace_window_is_unmetered(client, monkeypatch):
+    """First-session wall-free: a brand-new FREE account (created_at ~now, i.e.
+    inside tier.FREE_FIRST_SESSION_GRACE_HOURS) is NEVER metered, even well past
+    the daily cap, and the durable counter never advances. This is the
+    activation guarantee — a new user's first exploratory session can't hit the
+    look-up wall before they've found a ticker worth saving."""
+    async with client:
+        await _seed_ticker()
+        cookies, uid = await _signup(client, monkeypatch)
+        # Drop to free but leave created_at fresh → inside the grace window.
+        await _set_tier(uid, "free", paying=False)
+
+        for _ in range(FREE_DAILY_LOOKUPS + 5):
+            r = await client.get(f"/api/ticker/{SEEDED}", cookies=cookies)
+            assert r.status_code == 200, r.text
+
+        used, _reset = await _get_lookups_today(uid)
+        assert used == 0, "a grace-window free user must not be metered"
 
 
 @pytest.mark.asyncio

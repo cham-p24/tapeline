@@ -15,7 +15,7 @@
  *   - ?intent=<plan>&billing=<period> from /pricing pre-selects the picker
  *     without auto-firing checkout
  *   - free-tier usage tiles show the current caps from services/tier.py
- *     (watchlist 3, top-10 scanner rows)
+ *     (watchlist 5, top-10 scanner rows)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -184,14 +184,15 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     expect(calls.some((u) => u.includes("/api/billing/checkout"))).toBe(false);
   });
 
-  it("shows the current free-tier caps (watchlist 3, top-10 scanner rows)", () => {
+  it("shows the current free-tier caps (watchlist 5, top-10 scanner rows)", () => {
     render(<BillingPage />); // default ctx.user = free
     // Scope to the "Plan limits" tiles — the ComparisonTable inside the
     // auto-opened plan picker repeats some of these labels.
     const section = screen.getByText("Plan limits").parentElement!;
     const watchlist = within(section).getByText("Watchlist tickers").parentElement!;
-    expect(watchlist.textContent).toContain("3");
-    expect(watchlist.textContent).not.toContain("5");
+    // Free watchlist cap raised to 5 (2026-07-12) to break the seed deadlock.
+    expect(watchlist.textContent).toContain("5");
+    expect(watchlist.textContent).not.toContain("3");
     const rows = within(section).getByText("Scanner rows").parentElement!;
     expect(rows.textContent).toContain("10");
     expect(rows.textContent).not.toContain("20");

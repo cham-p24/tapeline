@@ -56,8 +56,11 @@ from app.services.tier import (
 from app.workers.signal_publisher import _downgrade_expired_trials
 
 # Claims that describe the pre-2026-06-20 Free tier. None of these may ever
-# appear in customer-facing email copy again.
-_DEAD_TIER_CLAIMS = ("top 20 tickers", "24-hour", "capped at 5 tickers")
+# appear in customer-facing email copy again. NOTE: "capped at 5 tickers" is
+# NOT in this list — the Free watchlist cap was raised back to 5 on 2026-07-12
+# (deadlock fix), so that phrase is once again the TRUE current cap and the
+# renderers legitimately quote it (see test_expired_quotes_current_free_caps).
+_DEAD_TIER_CLAIMS = ("top 20 tickers", "24-hour")
 
 
 # ── Seed helper ──────────────────────────────────────────────────────────────

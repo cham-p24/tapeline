@@ -308,7 +308,7 @@ function SignUpForm() {
           <ul className="mt-6 space-y-2 text-sm text-muted">
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span><span className="text-fg">Full universe, live scores</span> — not the 20-ticker, 24-hour-delayed free view</span>
+              <span><span className="text-fg">Full universe, live scores</span> — not the top-10-row free view</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
@@ -402,7 +402,7 @@ function SignUpForm() {
           <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
             <div className="font-medium text-fg">After your 14 days</div>
             <p className="mt-1.5">
-              Stay on Free forever (live scores, top-10 scanner, 5 look-ups/day) — or upgrade to{" "}
+              Stay on Free forever (live scores, top-10 scanner, 12 look-ups/day) — or upgrade to{" "}
               <span className="text-fg">Pro from $8.25/mo</span> for the full
               real-time universe with unlimited look-ups. No card on file means no surprise charge.
             </p>

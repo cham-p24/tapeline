@@ -191,7 +191,13 @@ function OnboardingForm() {
         }
       }
       picks.sort((a, b) => b.score - a.score);
-      for (const p of picks.slice(0, 5)) {
+      // Leave AT LEAST ONE free watchlist slot so the user's own first add —
+      // the activation action — never hits the cap. The Free watchlist cap is
+      // 5 (backend tier.FREE_WATCHLIST_TICKERS), so seed at most 4 here. The
+      // server also enforces the cap with a 403, but capping the seed keeps a
+      // slot open instead of relying on the user to delete a starter pick.
+      const SECTOR_SEED_MAX = 4; // = FREE_WATCHLIST_TICKERS (5) - 1
+      for (const p of picks.slice(0, SECTOR_SEED_MAX)) {
         try {
           await api.watchlistAdd(p.symbol);
         } catch {

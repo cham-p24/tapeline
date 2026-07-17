@@ -1,7 +1,9 @@
 """
 Tier gating — three-tier model (Free / Pro / Premium).
 
-- Free: preview only (top 20 tickers, 24-hour delayed)
+- Free: LIVE but limited — top-10 scanner rows (live, no delay), a small
+  daily ticker-lookup budget, and a small saved watchlist. Conversion
+  pressure comes from breadth + the lookup meter, NOT stale data.
 - Pro $9.99/mo ($99/yr): live scanner, full universe, squeeze + regime +
   heatmap, watchlist with smart alerts, email alerts, CSV export
 - Premium $19.99/mo ($199/yr): everything in Pro + Congressional trades,
@@ -34,7 +36,14 @@ FEATURES: dict[str, Tier] = {
     "scanner.live_updates": Tier.PRO,
     "regime.full": Tier.PRO,
     "squeeze.full": Tier.PRO,
-    "watchlist": Tier.PRO,
+    # Watchlist is available to FREE as the #1 activation on-ramp: a free user
+    # MUST be able to see + use "★ Add to watchlist" so they take their own
+    # first action (adding their OWN ticker). The real gate is the COUNT cap
+    # (watchlist_tickers, Free=5) enforced at add-time in routers/watchlist.py,
+    # NOT a binary feature flag. Smart alerts on watchlist items stay paid
+    # (email/telegram caps are 0 for Free). Was Tier.PRO, which made /api/me
+    # report features.watchlist=false and risked the UI hiding the add control.
+    "watchlist": Tier.FREE,
     "ticker.full_detail": Tier.PRO,
     "news.full": Tier.PRO,
     "ipos.full": Tier.PRO,
@@ -94,8 +103,18 @@ UNLIMITED: Final[None] = None
 # FREE tier (forever; the tier trial users lapse to). LIVE data — no 24h cliff.
 FREE_DATA_DELAY_MINUTES = 0      # live (was 1440 = 24h before the freemium retune)
 FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)
-FREE_WATCHLIST_TICKERS = 3       # 3 saved tickers (was 5)
-FREE_DAILY_LOOKUPS = 5           # 5 ticker-detail (/api/ticker/{symbol}) views per UTC day
+# 5 saved tickers (raised from 3 on 2026-07-12). The 3-cap created an
+# activation DEADLOCK: the day-1 seeder filled the watchlist to its full 3/3,
+# so a new Free user's own FIRST "add a ticker" 403'd — killing the exact
+# activation action. Raising to 5 + seeding to <= cap-1 leaves them a free slot.
+FREE_WATCHLIST_TICKERS = 5
+FREE_DAILY_LOOKUPS = 12          # 12 ticker-detail (/api/ticker/{symbol}) views per UTC day (raised from 5)
+
+# First-session grace: a brand-new FREE account (created within this window) is
+# NEVER metered on ticker look-ups, so a new user's first exploratory session
+# can't hit the look-up wall before they've had a chance to find a ticker worth
+# adding. Enforced in app/services/usage._is_unmetered. Tunable lever.
+FREE_FIRST_SESSION_GRACE_HOURS = 24
 
 # ── REVERSIBLE STRATEGIC BET (2026-07-04): free-tier "alert taste" ───────────
 #

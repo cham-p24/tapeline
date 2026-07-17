@@ -128,6 +128,15 @@ async def list_scanner(
     row_cap = tier_limit(tier, "scanner_rows")  # free=10, pro/elite=1000
     if limit > row_cap:
         limit = row_cap
+    # Offset scrape guard: only Pro/Premium may paginate. Without this, a Free
+    # or anonymous client could page the entire ~2,500-row scored universe
+    # row_cap rows at a time by walking `offset` (the `limit` clamp above alone
+    # doesn't stop that). For non-paying callers, pin them to the first page so
+    # the total they can ever see equals their row_cap. Full pagination stays
+    # intact for Pro/Premium.
+    is_paginating_tier = tier in (Tier.PRO, Tier.PREMIUM)
+    if not is_paginating_tier:
+        offset = 0
     # Ticker.score IS NOT NULL is enforced by live_clauses() below.
     stmt = select(Ticker).where(
         Ticker.score >= min_score,

@@ -44,7 +44,7 @@ def _upgrade_nudge(user: User) -> dict[str, str | int] | None:
     as incoherent; the TrialBanner owns that conversion moment instead.
 
     For genuine Free users it returns a stable `id` plus the Free-tier caps
-    the frontend folds into copy, so the numbers (top-20, 24h delay,
+    the frontend folds into copy, so the numbers (top-10 rows, live/no delay,
     5-ticker watchlist) come straight from tier.py and never drift from a
     hardcoded string. Dismissal + frequency are handled client-side; the
     server only decides eligibility, which keeps that decision in one place
@@ -227,7 +227,11 @@ async def _seed_watchlist_for_new_user(
     # effective_limit may return the UNLIMITED sentinel (None) for uncapped
     # keys — watchlist_tickers is always capped today, but guard anyway.
     cap = effective_limit(user, "watchlist_tickers")
-    n = WATCHLIST_SEED_SIZE if cap is None else min(WATCHLIST_SEED_SIZE, cap)
+    # Leave AT LEAST ONE free slot so the user's own first "add a ticker" —
+    # the #1 activation action — never 403s on a watchlist we pre-filled to the
+    # cap. Seed count = min(seed_size, cap - 1). This is the fix for the
+    # activation deadlock the freemium audit found (seed 3/3 → own add blocked).
+    n = WATCHLIST_SEED_SIZE if cap is None else min(WATCHLIST_SEED_SIZE, cap - 1)
     if n <= 0:
         return []
 

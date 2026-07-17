@@ -400,7 +400,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
                 Add a card before then to lock in {meta.name} access. Otherwise your account moves to Free
-                forever — live scores, top-10 scanner, 5 look-ups/day, 3-ticker watchlist.
+                forever — live scores, top-10 scanner, 12 look-ups/day, 5-ticker watchlist.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
@@ -437,10 +437,10 @@ export default function BillingPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Plan limits</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {/* Caps mirror backend services/tier.py TIER_LIMITS — free is
-              watchlist 3 / top-10 scanner rows after the freemium retune. */}
+              watchlist 5 / top-10 scanner rows after the freemium retune. */}
           <UsageTile
             label="Watchlist tickers"
-            limit={tier === "free" ? 3 : tier === "pro" ? 50 : 200}
+            limit={tier === "free" ? 5 : tier === "pro" ? 50 : 200}
             unit="tickers"
           />
           <UsageTile
@@ -496,9 +496,9 @@ export default function BillingPage() {
               price="$0"
               note="Forever free"
               items={[
-                "Live scores, top-10 scanner, 5 look-ups/day",
+                "Live scores, top-10 scanner, 12 look-ups/day",
                 "Public scorecard + basic regime",
-                "Watchlist of 3, no alerts",
+                "Watchlist of 5, no alerts",
               ]}
               highlight={tier === "free"}
             />
