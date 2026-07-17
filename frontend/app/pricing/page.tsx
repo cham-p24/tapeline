@@ -9,29 +9,34 @@ import { LiveCounters } from "@/components/LiveCounters";
 import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
-import { PRICING, usd } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
 
 export const metadata = pageMeta({
   title: `Tapeline Pricing: Pro ${usd(PRICING.pro.annualPerMonth)}/mo · Premium ${usd(PRICING.premium.annualPerMonth)}/mo · 14-Day Free Trial`,
   description:
-    `Tapeline pricing: Free forever (live scores, 5 look-ups/day, top-10 scanner), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo (unlimited look-ups, real-time full-universe scanner), Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (Congress + insider Form 4). 14-day Premium trial, no card.`,
+    `Tapeline pricing: Free forever (live scores, ${FREE_LIMITS.dailyLookups} look-ups/day, top-${FREE_LIMITS.scannerRows} scanner), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo (unlimited look-ups, real-time full-universe scanner), Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (Congress + insider Form 4). 14-day Premium trial, no card.`,
   path: "/pricing",
 });
 
-// FAQs already on the page — mirror them in JSON-LD so Google can show
-// the rich-result accordion under our SERP listing for "tapeline pricing".
+// FAQs — the visible accordion AND the FAQPage JSON-LD both render from this
+// one array, so what Google shows can never drift from what the page says.
+// Free-tier numbers and the refund guarantee derive from FREE_LIMITS / REFUND
+// in lib/pricing.ts (which mirror backend tier.py and /legal/refund).
 const FAQ_ITEMS = [
   {
     q: "What happens when my trial ends?",
-    a: "Your account moves to Free forever — live scores, 5 ticker look-ups a day, the top-10 scanner, and a 3-ticker watchlist. Watchlists and settings stay intact. Add a card any time to keep Premium.",
+    a: `Your account moves to Free forever — live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, the top-${FREE_LIMITS.squeezePreviewRows} squeeze preview, and ${FREE_LIMITS.webPushAlerts} browser push alerts. Watchlists and settings stay intact. Add a card any time to keep Premium.`,
   },
   {
     q: "Can I switch plans later?",
-    a: "Yes — any time, prorated automatically. Upgrade takes effect immediately. Downgrade at the end of your billing period.",
+    // No self-serve plan-change flow exists yet — until the change-plan
+    // endpoint ships, support handles switches. Do NOT claim automatic
+    // proration here; that flow doesn't exist.
+    a: "Yes — email support@tapeline.io to switch plans and we'll sort it within a day. Downgrades take effect at the end of your billing period.",
   },
   {
     q: "Refund policy?",
-    a: "30-day money back on any paid plan. Email support@tapeline.io within your first 30 days, we refund in full — no forms.",
+    a: `A ${REFUND.monthly}, no questions asked; a ${REFUND.annual}. Email support@tapeline.io — no forms. Full details at tapeline.io${REFUND.policyPath}.`,
   },
   {
     q: "Will prices go up?",
@@ -139,22 +144,9 @@ export default function PricingPage() {
           <h2 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Common questions</h2>
 
           <div className="mt-8 divide-y divide-border/60">
-            <Faq
-              q="What happens when my trial ends?"
-              a="Your account moves to Free forever — live scores, 5 ticker look-ups a day, the top-10 scanner, and a 3-ticker watchlist. Watchlists and settings stay intact. Add a card any time to keep Premium."
-            />
-            <Faq
-              q="Can I switch plans later?"
-              a="Yes — any time, prorated automatically. Upgrade takes effect immediately. Downgrade at the end of your billing period."
-            />
-            <Faq
-              q="Refund policy?"
-              a="30-day money back on any paid plan. Email support@tapeline.io within your first 30 days, we refund in full — no forms."
-            />
-            <Faq
-              q="Will prices go up?"
-              a="This is founding pricing, and it may rise as the product grows. If it does, existing subscribers keep their current rate for as long as their subscription stays active."
-            />
+            {FAQ_ITEMS.map((item) => (
+              <Faq key={item.q} q={item.q} a={item.a} />
+            ))}
           </div>
 
           <div className="mt-10 text-center">

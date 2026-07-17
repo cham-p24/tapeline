@@ -16,7 +16,7 @@ import {
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { PRICING, usd, annualSaving } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving } from "@/lib/pricing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -29,7 +29,7 @@ const TIER_META = {
     monthly: 0,
     annual: 0,
     annualMonthly: 0,
-    blurb: "Live scores, top-10 scanner, 5 look-ups/day",
+    blurb: `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
   },
   pro: {
     name: "Pro",
@@ -400,7 +400,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
                 Add a card before then to lock in {meta.name} access. Otherwise your account moves to Free
-                forever — live scores, top-10 scanner, 12 look-ups/day, 5-ticker watchlist.
+                forever — live scores, top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
@@ -424,7 +424,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted">
                 {billingPeriod === "annual"
-                  ? `Effective $${meta.annualMonthly}/mo · 30-day money back, cancel in one click.`
+                  ? `Effective $${meta.annualMonthly}/mo · ${REFUND.windowDays}-day prorated refund, cancel in one click.`
                   : "Switch to annual to save ~17% — same plan, lower effective rate."}
               </p>
             </>
@@ -436,11 +436,11 @@ export default function BillingPage() {
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Plan limits</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Caps mirror backend services/tier.py TIER_LIMITS — free is
-              watchlist 5 / top-10 scanner rows after the freemium retune. */}
+          {/* Caps mirror backend services/tier.py TIER_LIMITS — free caps
+              derive from FREE_LIMITS (lib/pricing.ts). */}
           <UsageTile
             label="Watchlist tickers"
-            limit={tier === "free" ? 5 : tier === "pro" ? 50 : 200}
+            limit={tier === "free" ? FREE_LIMITS.watchlistTickers : tier === "pro" ? 50 : 200}
             unit="tickers"
           />
           <UsageTile
@@ -456,7 +456,7 @@ export default function BillingPage() {
           />
           <UsageTile
             label="Scanner rows"
-            limit={tier === "free" ? 10 : 2500}
+            limit={tier === "free" ? FREE_LIMITS.scannerRows : 2500}
             unit="rows"
           />
         </div>
@@ -469,7 +469,7 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                30-day money back, no questions. Cancel in one click. Founding pricing — your rate is locked in while you stay subscribed. All prices in USD.
+                {REFUND.short}, no questions — full on monthly, prorated on annual. Cancel in one click. Founding pricing — your rate is locked in while you stay subscribed. All prices in USD.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
@@ -496,9 +496,9 @@ export default function BillingPage() {
               price="$0"
               note="Forever free"
               items={[
-                "Live scores, top-10 scanner, 12 look-ups/day",
+                `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
                 "Public scorecard + basic regime",
-                "Watchlist of 5, no alerts",
+                `Watchlist of ${FREE_LIMITS.watchlistTickers} · ${FREE_LIMITS.webPushAlerts} browser push alerts`,
               ]}
               highlight={tier === "free"}
             />

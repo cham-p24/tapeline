@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ScannerPreview } from "@/components/ScannerPreview";
-import { PRICING, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 
 /**
  * Shared above-the-fold conversion block for the high-traffic marketing
@@ -88,7 +88,7 @@ export function LandingCta({
           <Check /> Pro from {usd(PRICING.pro.monthly)}/mo · {usd(PRICING.pro.annual)}/yr
         </li>
         <li className="flex items-center gap-1.5">
-          <Check /> 30-day money-back guarantee
+          <Check /> {REFUND.windowDays}-day money-back guarantee
         </li>
       </ul>
 

@@ -3,7 +3,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
 import { LandingCta } from "@/components/LandingCta";
-import { PRICING, usd } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -35,7 +35,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Can I try Tapeline before paying?",
-    a: "Yes — 14-day Premium trial, no credit card required, cancel in one click. Free tier (live scores for the top 10 scanner rows, 5 look-ups/day) is free forever.",
+    a: `Yes — 14-day Premium trial, no credit card required, cancel in one click. Free tier (live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day) is free forever.`,
   },
 ];
 
@@ -244,7 +244,7 @@ export default function VsFinvizPage() {
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
           Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
-          ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
+          ({usd(PRICING.pro.annual)}/yr), with a {REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/signup?from=finviz" className="btn-primary">

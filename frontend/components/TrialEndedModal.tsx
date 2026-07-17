@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { track } from "@vercel/analytics";
+import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd } from "@/lib/pricing";
 
 /**
  * One-time blocking modal that fires the first time a user lands on /app
@@ -59,10 +60,15 @@ export function TrialEndedModal() {
         <h2 className="mt-2 text-2xl font-bold tracking-tight">
           Your 14-day Premium trial has ended.
         </h2>
+        {/* Downgrade description derives from FREE_LIMITS (mirrors backend
+            tier.py) — describe the real Free tier, never overstate the drop. */}
         <p className="mt-3 text-sm text-muted">
           Your watchlist + saved scans + alert rules are all intact. You&rsquo;re
-          now on Free forever: live scores for the top 10 scanner rows, 5 look-ups
-          a day, a 3-ticker watchlist &mdash; no Telegram, no smart alerts.
+          now on Free forever: live scores for the top {FREE_LIMITS.scannerRows}{" "}
+          scanner rows, {FREE_LIMITS.dailyLookups} look-ups a day, a{" "}
+          {FREE_LIMITS.watchlistTickers}-ticker watchlist,{" "}
+          {FREE_LIMITS.webPushAlerts} browser push alerts &mdash; no Telegram, no
+          email alerts.
         </p>
 
         {/* Pricing anchor — both paid options, monthly first (smaller first
@@ -70,9 +76,12 @@ export function TrialEndedModal() {
         <div className="mt-5 rounded-md border border-accent/30 bg-accent/5 p-3 text-xs text-muted">
           <div className="font-medium text-fg">Keep Premium</div>
           <p className="mt-1">
-            $19.99/mo monthly, or $16.58/mo billed annually ($199/yr &middot;
-            save $40). Founding pricing &mdash; your rate is locked in while
-            you stay subscribed. 30-day money back if you change your mind.
+            {usd(PRICING.premium.monthly)}/mo monthly, or{" "}
+            {usd(PRICING.premium.annualPerMonth)}/mo billed annually (
+            {usd(PRICING.premium.annual)}/yr &middot; save $
+            {annualSaving(PRICING.premium)}). Founding pricing &mdash; your rate
+            is locked in while you stay subscribed. {REFUND.short} if you change
+            your mind.
           </p>
         </div>
 

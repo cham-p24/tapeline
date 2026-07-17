@@ -36,6 +36,57 @@ export const PRICING = {
 export const PRICE_LOW_PER_MONTH = PRICING.pro.annualPerMonth; // 8.25
 export const PRICE_HIGH_PER_MONTH = PRICING.premium.monthly; // 19.99
 
+/**
+ * Free-tier limits as actually enforced by the deployed backend. MUST mirror
+ * backend/app/services/tier.py (FREE_DAILY_LOOKUPS, FREE_FIRST_SESSION_GRACE_HOURS,
+ * FREE_WATCHLIST_TICKERS, FREE_SCANNER_ROWS, FREE_WEB_PUSH_ALERTS) and
+ * backend/app/routers/squeeze.py (FREE_SQUEEZE_PREVIEW_LIMIT).
+ *
+ * Every marketing/billing surface that describes the Free tier (pricing cards,
+ * comparison table, FAQ + its JSON-LD, trial-ended + cancel modals, compare
+ * pages, support copy) derives its numbers from this object. Before it existed
+ * the post-#343 retune (5→12 look-ups, 3→5 watchlist, squeeze preview, push
+ * taste) shipped in the backend while every surface still sold the old tier —
+ * under a literal "No asterisks." banner.
+ */
+export const FREE_LIMITS = {
+  /** Ticker-detail look-ups per UTC day. */
+  dailyLookups: 12,
+  /** Brand-new accounts are never metered on look-ups for this many hours. */
+  firstSessionGraceHours: 24,
+  /** Saved watchlist tickers. */
+  watchlistTickers: 5,
+  /** Live scanner rows visible (top-N, no delay). */
+  scannerRows: 10,
+  /** Read-only Squeeze Watch preview rows (GET /api/squeeze/preview). */
+  squeezePreviewRows: 3,
+  /** Web-push alert rules a free user may create. */
+  webPushAlerts: 2,
+} as const;
+
+/**
+ * The refund guarantee, single-sourced from the legal ground truth at
+ * /legal/refund: monthly plans get a FULL refund within 30 days of the first
+ * paid charge; annual plans get a PRORATED refund within 30 days (one month at
+ * the monthly rate is retained). Every surface that mentions refunds — chips,
+ * FAQs (visible + JSON-LD), Terms of Service, support copy, modals — derives
+ * its wording from here so the guarantee can never be stated four different
+ * ways again (it was: 7-day, 30-day, and "in full on any plan", all at once).
+ */
+const REFUND_WINDOW_DAYS = 30;
+export const REFUND = {
+  /** Days after the first paid charge in which the guarantee applies. */
+  windowDays: REFUND_WINDOW_DAYS,
+  /** Short chip copy, e.g. "30-day money back". */
+  short: `${REFUND_WINDOW_DAYS}-day money back`,
+  /** Monthly-plan clause. */
+  monthly: `full refund within ${REFUND_WINDOW_DAYS} days on monthly plans`,
+  /** Annual-plan clause. */
+  annual: `prorated refund within ${REFUND_WINDOW_DAYS} days on annual plans (one month at the monthly rate retained)`,
+  /** Where the complete policy lives. */
+  policyPath: "/legal/refund",
+} as const;
+
 /** Format a number as a 2-decimal USD string, e.g. usd(8.25) -> "$8.25". */
 export const usd = (n: number): string => `$${n.toFixed(2)}`;
 
