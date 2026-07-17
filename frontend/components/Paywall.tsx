@@ -25,6 +25,13 @@ export function Paywall({
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$19.99/mo (Premium)" : "$9.99/mo (Pro)";
   const signedIn = !!user;
+  // Risk-reversal line must be TRUE for the viewer. The 14-day no-card trial
+  // is granted once at signup; a signed-in user's checkout charges
+  // immediately (their trial is consumed or unavailable), so promising a
+  // trial there would be false. They get the real guarantee instead.
+  const riskLine = signedIn
+    ? "30-day money-back guarantee · cancel anytime."
+    : "14-day trial, no card required.";
 
   return (
     <div className="card relative overflow-hidden p-0">
@@ -38,7 +45,7 @@ export function Paywall({
           </div>
           <h2 className="mt-4 text-2xl font-bold tracking-tight">{title || "Upgrade to unlock"}</h2>
           <p className="mt-2 text-sm text-muted">
-            This feature is part of the {priceLine} plan (USD). 14-day trial, no card required.
+            This feature is part of the {priceLine} plan (USD). {riskLine}
           </p>
           <div className="mt-6 flex justify-center gap-3">
             {signedIn ? (
@@ -78,14 +85,25 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
 /**
  * Modal variant — pops when a free user tries to cross a feature boundary.
  * Usage: <PaywallModal open onClose={...} feature="squeeze" />
+ *
+ * `heading` / `description` override the default "<Feature> is on <Tier>"
+ * copy for COUNT-cap moments (watchlist full, web-push allowance used up)
+ * where the user HAS the feature but hit its limit — pass the backend's
+ * real cap message as `description` so the numbers shown are always the
+ * server-enforced truth.
  */
 export function PaywallModal({
-  open, onClose, feature,
+  open, onClose, feature, heading, description,
 }: {
   open: boolean;
   onClose: () => void;
   feature: keyof typeof FEATURE_TIERS;
+  heading?: string;
+  description?: string;
 }) {
+  // Hook must run before the early return (rules-of-hooks) — used to pick a
+  // truthful risk-reversal line, same logic as the inline Paywall above.
+  const { user } = useUser();
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$19.99/mo · Premium" : "$9.99/mo · Pro";
@@ -114,16 +132,26 @@ export function PaywallModal({
           <div className="h-2 w-6 rounded-full bg-accent" />
           <span className="text-sm font-semibold">Tapeline</span>
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight">{featureName} is on {requiredTier === "premium" ? "Premium" : "Pro"}</h2>
+        <h2 className="mt-4 text-2xl font-bold tracking-tight">
+          {heading || `${featureName} is on ${requiredTier === "premium" ? "Premium" : "Pro"}`}
+        </h2>
+        {description && <p className="mt-2 text-sm text-muted">{description}</p>}
         <p className="mt-2 text-sm text-muted">
-          Upgrade to {priceLine} to unlock. 14-day trial, no card required. Cancel in one click.
+          Upgrade to {priceLine} to unlock.{" "}
+          {user
+            ? "30-day money-back guarantee · cancel anytime."
+            : "14-day trial, no card required. Cancel in one click."}
         </p>
         <div className="mt-6 flex gap-3">
           <Link href="/app/billing" className="btn-primary flex-1 text-center text-sm">Upgrade now</Link>
           <button onClick={onClose} className="btn-ghost text-sm">Not yet</button>
         </div>
         <p className="mt-4 text-xs text-muted text-center">
-          USD · 30-day money back · Founding pricing, locked in for early subscribers
+          {/* Signed-in users already see the money-back line above — don't
+              repeat it. */}
+          {user
+            ? "USD · Founding pricing, locked in for early subscribers"
+            : "USD · 30-day money back · Founding pricing, locked in for early subscribers"}
         </p>
       </div>
     </div>

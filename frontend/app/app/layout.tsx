@@ -44,6 +44,11 @@ const tabs = [
   { href: "/app/scanner", label: "Scanner" },
   { href: "/app/heatmap", label: "Heatmap" },
   { href: "/app/watchlist", label: "Watchlist" },
+  // Alerts is the #1 pay-driver — it belongs in the main nav (desktop AND
+  // mobile, which both render this array), not buried in the account
+  // dropdown. Sits next to Watchlist since watchlist → alert is the
+  // natural flow.
+  { href: "/app/alerts", label: "Alerts" },
   { href: "/app/squeeze", label: "Squeeze" },
   { href: "/app/regime", label: "Regime" },
   { href: "/app/congress", label: "Congress" },

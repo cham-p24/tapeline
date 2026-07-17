@@ -10,7 +10,7 @@ import { recordTickerVisit } from "@/components/RecentTickers";
 import { AnalystRatings } from "@/components/AnalystRatings";
 import { FinancialsTab } from "@/components/FinancialsTab";
 import { InsiderTab } from "@/components/InsiderTab";
-import { Paywall } from "@/components/Paywall";
+import { Paywall, PaywallModal } from "@/components/Paywall";
 import { LookupWall } from "@/components/LookupWall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
@@ -32,6 +32,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const [lookupLimit, setLookupLimit] = useState<LookupLimitError | null>(null);
   const [adding, setAdding] = useState(false);
   const [addMsg, setAddMsg] = useState<string | null>(null);
+  // Server's watchlist-cap message when the add 403s. Non-null opens the
+  // upgrade modal — same treatment as the scanner star.
+  const [capMsg, setCapMsg] = useState<string | null>(null);
   const [newsAlerting, setNewsAlerting] = useState(false);
   const [newsAlertMsg, setNewsAlertMsg] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("financials");
@@ -78,6 +81,13 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       await api.watchlistAdd(symbol);
       setAddMsg(`${symbol} added to watchlist`);
     } catch (e: unknown) {
+      // 403 = server-enforced watchlist cap. Open the upgrade modal with the
+      // backend's real cap message instead of a terse failure line.
+      if (e instanceof TierGateError) {
+        setCapMsg(e.message);
+        setAdding(false);
+        return;
+      }
       const m = errorMessage(e);
       if (m.includes("401")) {
         window.location.href = `/signin?next=${encodeURIComponent(`/app/ticker/${symbol}`)}`;
@@ -409,6 +419,17 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           ))}
         </ul>
       </div>
+
+      {/* Watchlist-cap upgrade moment — opens when the server 403s the
+          "★ Add to watchlist" action. Backend message carries the real
+          cap numbers. */}
+      <PaywallModal
+        open={capMsg != null}
+        onClose={() => setCapMsg(null)}
+        feature="watchlist"
+        heading="Your watchlist is full"
+        description={capMsg ?? undefined}
+      />
     </div>
   );
 }
