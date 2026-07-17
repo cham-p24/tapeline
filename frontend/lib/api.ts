@@ -338,6 +338,15 @@ export type SqueezeRow = {
   updated_at: string | null;
 };
 
+// Slim row shape returned by GET /api/squeeze/preview — the free top-3
+// taste. The backend deliberately omits the Pro-only analytics columns
+// (volume_multiple, obv_trend, suggested_window), so the preview can't be
+// stitched into a substitute for the paid feed.
+export type SqueezePreviewRow = Pick<
+  SqueezeRow,
+  "symbol" | "spike_score" | "squeeze_days" | "breakout_type" | "reason" | "updated_at"
+>;
+
 export type Regime = {
   regime: string;
   vix: number;
@@ -559,6 +568,17 @@ export const api = {
     }>(`/api/scanner?${qs}`);
   },
   squeeze: () => get<{ count: number; items: SqueezeRow[] }>("/api/squeeze"),
+  // Free top-3 taste of Squeeze Watch — any logged-in tier (Free included).
+  // `total_setups` is the size of the FULL current feed so the locked
+  // section can state the real held-back count.
+  squeezePreview: () =>
+    get<{
+      count: number;
+      preview: boolean;
+      limit: number;
+      total_setups: number;
+      items: SqueezePreviewRow[];
+    }>("/api/squeeze/preview"),
   regime: () => get<Regime>("/api/regime"),
   congress: () => get<{ count: number; items: CongressTrade[] }>("/api/congress"),
   ticker: (symbol: string) => get<TickerDetail>(`/api/ticker/${symbol}`),

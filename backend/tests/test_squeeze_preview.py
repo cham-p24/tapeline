@@ -11,6 +11,9 @@ name worth adding. Contract pinned here:
      public/scrapeable surface (the full feed was locked down to close exactly
      that hole).
   3. The full feed (GET /api/squeeze) stays Pro-gated: a Free user still 403s.
+  4. `total_setups` reports the size of the FULL feed (all rows, not just the
+     top-3), so the frontend's locked section can state the real held-back
+     count.
 """
 from __future__ import annotations
 
@@ -104,6 +107,11 @@ async def test_free_user_gets_top3_preview(client, monkeypatch):
             assert len(body["items"]) <= 3
             # Highest spike_score comes first (SQZ00 = 90.0).
             assert body["items"][0]["symbol"] == "SQZ00"
+            # total_setups counts the WHOLE table, not the top-3 slice. We
+            # inserted 5 rows; the shared test DB may hold others, so pin a
+            # lower bound rather than an exact count.
+            assert body["total_setups"] >= 5
+            assert body["total_setups"] >= len(body["items"])
     finally:
         await _delete_setups()
 

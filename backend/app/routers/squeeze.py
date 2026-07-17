@@ -6,7 +6,7 @@ services/tier.FEATURES["squeeze.full"].
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -45,10 +45,17 @@ async def squeeze_preview(
         .limit(FREE_SQUEEZE_PREVIEW_LIMIT)
     )
     rows = (await session.execute(stmt)).scalars().all()
+    # Size of the FULL current feed, so the frontend's locked section can
+    # state the real count it's holding back ("Top 3 of N") — a real number,
+    # not marketing copy. Costs one COUNT(*) on a small worker-refreshed table.
+    total_setups = (
+        await session.execute(select(func.count()).select_from(SqueezeSetup))
+    ).scalar_one()
     return {
         "count": len(rows),
         "preview": True,
         "limit": FREE_SQUEEZE_PREVIEW_LIMIT,
+        "total_setups": total_setups,
         "items": [
             {
                 "symbol": r.symbol,
