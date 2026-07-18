@@ -67,5 +67,10 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      # Runs the vitest suite. This step was missing until 2026-07-18: the job
+      # typechecked and built but never executed a single test, so the whole
+      # frontend suite could go red without CI noticing.
+      - name: Test
+        run: npm test
       - name: Build
         run: npm run build
