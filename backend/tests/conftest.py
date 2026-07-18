@@ -76,7 +76,7 @@ def _reset_rate_limiter() -> None:
     behaviour is exercised by test_zz_rate_limit_kicks_in; the trial-
     abuse caps by tests in test_trial_throttle.py.
     """
-    from app.services import trial_abuse, usage
+    from app.services import lifecycle, trial_abuse, usage
     from app.services.rate_limit import limiter
 
     limiter._buckets.clear()
@@ -88,3 +88,9 @@ def _reset_rate_limiter() -> None:
     #    on the users table, scoped to a freshly-created user per test, so it
     #    needs no reset here.)
     usage._anon_lookups.clear()
+    # 5. `lifecycle._GLOBAL_LEDGER` — the process-global email send ledger
+    #    behind the frequency governor. Only the worker binds to it (direct
+    #    callers get a fresh per-governor ledger), but a test that DOES use
+    #    worker_governor() would otherwise leave a recorded send behind and
+    #    silently throttle the next test's first email.
+    lifecycle.reset_send_ledger()

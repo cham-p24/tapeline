@@ -49,6 +49,7 @@ from app.services.email_design import (
     muted_paragraph,
     paragraph,
     score_color,
+    secondary_link,
     shell,
     stat_row,
     ticker_card,
@@ -66,6 +67,13 @@ from app.services.tier import (
     FREE_WEB_PUSH_ALERTS,
 )
 from app.services.universe import ACTIVE_UNIVERSE_SIZE
+
+# The global frequency governor. Every non-transactional send in this module
+# routes through it so no user can receive colliding messages from two flows
+# that don't know about each other. Safe to import at module scope: lifecycle
+# imports nothing from here (its only app import is a TYPE_CHECKING-guarded
+# models reference), so there's no cycle.
+from app.services.lifecycle import FrequencyGovernor, SendClass
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -1730,9 +1738,14 @@ def render_activation_watchlist_email(user_name: str) -> str:
             "one step that turns Tapeline from a scanner into your scanner."
         )
         + paragraph(
+            # Rule 7: "a digest of what moved" was ambiguous — the EOD digest
+            # reports SCORE changes (a factor value, which Rule 7 permits), but
+            # the wording reads as price movement, which it does not permit.
+            # Say which number changes and the ambiguity disappears.
             "Pick three or four names you already follow. From then on you get "
-            "their live score, a flag when conviction shifts, and an end-of-day "
-            "digest of what moved — without re-running a single filter."
+            "their current score, a flag when that score shifts, and an "
+            "end-of-day digest of the score changes — without re-running a "
+            "single filter."
         )
         + button(
             "Add my first tickers",
@@ -1756,9 +1769,13 @@ def render_activation_alert_email(user_name: str) -> str:
             f"the shoulder instead."
         )
         + paragraph(
+            # Rule 7: the earlier wording here ended "no missed setups", which
+            # is a performance claim wearing a workflow costume — a setup is
+            # only worth missing because of the return it implies. Replaced
+            # with a description of what the rule actually does.
             "A rule takes one line: name a score threshold, a squeeze trigger, "
-            "or a regime flip, and Tapeline emails you the moment it fires. No "
-            "dashboard-watching, no missed setups."
+            "or a regime flip, and Tapeline emails you when the condition is "
+            "met. No dashboard-watching required."
         )
         + button(
             "Set up an alert",
@@ -1766,6 +1783,155 @@ def render_activation_alert_email(user_name: str) -> str:
         )
         + footnote("One rule is enough to feel the difference. — Christian, founder."),
         preheader="Set one alert and let the scanner watch the tape for you.",
+    )
+
+
+# ── Behaviour-triggered activation series ───────────────────────────────────
+#
+# ⚠️  RULE 7 — READ BEFORE EDITING ANY TEMPLATE IN THIS SECTION  ⚠️
+#
+# These messages are 1:1 emails to a NAMED person about securities that person
+# SELF-SELECTED. That is the single worst fact pattern for the personal-advice
+# test under the ASIC / FTC framing in our legal review: a message that tells
+# an identified individual how their chosen holdings did is, on its face,
+# personal financial advice — and Tapeline is not licensed to give it.
+#
+# So the content of every message in this series is restricted to ACTIVITY —
+# things the user did or did not do inside the product:
+#
+#     PERMITTED                         PROHIBITED
+#     ─────────────────────────────     ──────────────────────────────────────
+#     scans run (count)                 how any ticker MOVED or performed
+#     tickers added to a watchlist      "AAPL is up 6% since you added it"
+#     exports taken                     "your watchlist gained 3% this week"
+#     factor VALUES that changed        "the setups you'd have caught"
+#     ("RSI on your saved scan is 71")  "here's what you missed"
+#     inclusion in the ALREADY-         "your best performer was …"
+#     PUBLISHED daily list              any P&L, return, or alpha figure
+#                                       any implied "you would have made money"
+#
+# The FOMO framings on the right are the ones a growth edit reaches for, which
+# is exactly why they are named here. "What you missed" is not a softer version
+# of a performance claim — it IS a performance claim, because the only thing
+# that makes a missed setup regrettable is the return it implies.
+#
+# Describe the MECHANISM and stop. A disclaimer does not cure a non-compliant
+# message (Rule 9) — the content itself has to be clean.
+#
+# Rule 6 also binds here: no countdowns, no scarcity, no deadline framing. A
+# factual mention of the user's OWN real trial end date is permitted, styled
+# calmly, and must never be described as a billing event — the trial takes no
+# card, so nothing is charged when it ends.
+#
+# Enforced mechanically by scripts/lint-copy-compliance.mjs (rules
+# `personalised-performance` and `urgency-scarcity`) and by
+# tests/test_lifecycle_governor.py, which asserts on the RENDERED output.
+
+def _calm_trial_note(trial_ends_at: datetime | None) -> str:
+    """A factual, non-urgent note about the user's own trial end date.
+
+    Rule 6 permits exactly this one time statement. Rendered as a muted
+    footnote — no colour, no countdown, no ticking clock — and deliberately
+    worded so it cannot read as a billing event: the trial takes no card, so
+    nothing is charged and nothing lapses into a payment.
+
+    Returns "" when the user has no trial, which is the common case for the
+    6h nudge (free signups) and keeps the template branch-free.
+    """
+    if trial_ends_at is None:
+        return ""
+    return footnote(
+        "For reference, your Premium trial runs to "
+        f"{trial_ends_at.strftime('%d %b %Y')}. There's no card on file, so "
+        "nothing is charged either way — the account simply stays on Free "
+        "afterwards."
+    )
+
+
+def render_activation_first_scan_email(
+    user_name: str, *, trial_ends_at: datetime | None = None,
+) -> str:
+    """Message #2 of the activation series — ~6h after signup, zero activity.
+
+    Triggered by the ABSENCE of a recorded action, not by the calendar. Points
+    at ONE concrete first step (run a scan) and describes what the scanner
+    measures. No securities are named, so there is nothing here that could
+    read as a recommendation.
+    """
+    return shell(
+        h1(f"Run one scan, {user_name}.")
+        + lead(
+            "Your account is ready, and nothing has been scanned on it yet. "
+            "One scan is the whole first step."
+        )
+        + paragraph(
+            "The scanner ranks US equities on six measured factors — momentum, "
+            "trend, relative volume, short interest, insider and institutional "
+            "flow. You set the thresholds; it returns every name that currently "
+            "meets them, with the underlying numbers shown next to each row so "
+            "you can see why it matched."
+        )
+        + button(
+            "Run my first scan",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=activation_first_scan&utm_medium=transactional",
+        )
+        + paragraph(
+            "The default thresholds are a reasonable starting point if you'd "
+            "rather not configure anything — hit run and adjust from what comes "
+            "back."
+        )
+        + _calm_trial_note(trial_ends_at)
+        + footnote(
+            "Tapeline reports what the factors measure. It doesn't tell you "
+            "what to buy. — Christian, founder."
+        ),
+        preheader="One scan is the first step — here's what the scanner measures.",
+    )
+
+
+def render_activation_ask_email(
+    user_name: str, *, trial_ends_at: datetime | None = None,
+) -> str:
+    """Message #3 (final unprompted nudge) — ~48h after signup, still zero
+    activity.
+
+    A genuine question, not a pitch: the founder wants replies, because at this
+    stage the useful thing is finding out what the product failed to make
+    obvious. Deliberately asks about the PRODUCT experience, never about the
+    reader's capital, holdings, goals, risk tolerance or experience — Rule 8
+    forbids collecting any of that, and a reply-to-me email is still a
+    collection surface.
+
+    This is the LAST message in the series. Nothing follows it. See
+    run_activation_nudge_drip for the enforcement.
+    """
+    return shell(
+        h1("Can I ask what got in the way?")
+        + lead(
+            f"{user_name}, you signed up a couple of days ago and haven't run a "
+            f"scan yet. That's genuinely useful information for me — it usually "
+            f"means something in the product didn't land."
+        )
+        + paragraph(
+            "So, honestly: what stopped you? Was the scanner screen confusing, "
+            "did it not do the thing you assumed it did, or was it just a busy "
+            "week? Any of those is a fair answer."
+        )
+        + paragraph(
+            "Hit reply and tell me in one line. It comes straight to me and I "
+            "read every one. If something's broken or unclear, that's the "
+            "fastest way it gets fixed."
+        )
+        + secondary_link(
+            "Or open the scanner",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=activation_ask&utm_medium=transactional",
+        )
+        + _calm_trial_note(trial_ends_at)
+        + footnote(
+            "This is the last note you'll get about getting started — I won't "
+            "keep nudging. — Christian, founder."
+        ),
+        preheader="One question: what got in the way? Hit reply, it comes to me.",
     )
 
 
@@ -2176,7 +2342,9 @@ async def trial_summary_for_user(session, user) -> dict | None:
         return None
 
 
-async def run_eod_watchlist_digest(session) -> int:
+async def run_eod_watchlist_digest(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> int:
     """Send EOD watchlist email to every Pro+ user with watchlist items.
 
     Worker should call this once per day shortly after market close (4:05pm ET = 21:05 UTC).
@@ -2195,6 +2363,11 @@ async def run_eod_watchlist_digest(session) -> int:
     for user in users:
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.DAILY_DIGEST):
+            continue
+        # SCHEDULED: the user asked for this digest, so the governor never
+        # blocks it — but it IS recorded below, so a lifecycle nudge later
+        # today sees it and stays off this user.
+        if governor is not None and not governor.allows(user, SendClass.SCHEDULED):
             continue
         wl_r = await session.execute(
             select(WatchlistItem, Ticker)
@@ -2231,6 +2404,8 @@ async def run_eod_watchlist_digest(session) -> int:
             )
             if not res.get("skipped", False):
                 sent += 1
+                if governor is not None:
+                    governor.record(user, SendClass.SCHEDULED)
         except Exception:
             logger.exception("eod_digest.send_failed user=%s", user.id)
 
@@ -2238,7 +2413,9 @@ async def run_eod_watchlist_digest(session) -> int:
     return sent
 
 
-async def run_daily_drip(session) -> dict[str, int]:
+async def run_daily_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Send the full trial-drip series. Returns per-stage counts.
 
     Stages, all dedup'd via `User.drip_state` (comma-separated tokens):
@@ -2341,6 +2518,10 @@ async def run_daily_drip(session) -> dict[str, int]:
             from app.services.email_prefs import EmailPref, wants
             if not wants(user, EmailPref.TRIAL_DRIP):
                 continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=token,
+            ):
+                continue
             try:
                 # One-click signed Stripe-checkout links for the conversion
                 # stages (day-11 / day-13 / expired / post3). Minted fresh per
@@ -2397,6 +2578,8 @@ async def run_daily_drip(session) -> dict[str, int]:
                     user.drip_state = ",".join(sorted(sent_tokens))
                     counts[label] += 1
                     any_sent = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
             except Exception:
                 logger.exception("drip.send_failed user=%s stage=%s", user.id, label)
 
@@ -2423,6 +2606,10 @@ async def run_daily_drip(session) -> dict[str, int]:
             continue
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token="lapse30",
+        ):
+            continue
         try:
             from app.services.email_checkout import email_checkout_urls
             html = render_trial_lapse30_email(
@@ -2440,6 +2627,8 @@ async def run_daily_drip(session) -> dict[str, int]:
                 user.drip_state = ",".join(sorted(sent_tokens))
                 counts["lapse30"] += 1
                 any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
         except Exception:
             logger.exception("drip.send_failed user=%s stage=lapse30", user.id)
 
@@ -2706,7 +2895,9 @@ async def _build_newsletter_payload(session) -> dict:
     return out
 
 
-async def run_weekly_newsletter(session, *, now=None) -> int:
+async def run_weekly_newsletter(
+    session, *, now=None, governor: FrequencyGovernor | None = None,
+) -> int:
     """Send the Monday market digest to every eligible user.
 
     Eligibility = both gates pass:
@@ -2748,6 +2939,11 @@ async def run_weekly_newsletter(session, *, now=None) -> int:
         sent_tokens = set((user.drip_state or "").split(",")) - {""}
         if token in sent_tokens:
             continue
+        # SCHEDULED: explicit marketing opt-in + the weekly bit. Never
+        # blocked, but recorded so a lifecycle nudge does not land on the
+        # same day as the newsletter.
+        if governor is not None and not governor.allows(user, SendClass.SCHEDULED):
+            continue
         try:
             html = render_weekly_market_digest(
                 user.name or "trader",
@@ -2770,6 +2966,8 @@ async def run_weekly_newsletter(session, *, now=None) -> int:
                 user.drip_state = ",".join(sorted(sent_tokens))
                 sent += 1
                 any_changes = True
+                if governor is not None:
+                    governor.record(user, SendClass.SCHEDULED)
         except Exception:
             logger.exception("weekly_newsletter.send_failed user=%s", user.id)
 
@@ -2779,7 +2977,9 @@ async def run_weekly_newsletter(session, *, now=None) -> int:
     return sent
 
 
-async def run_re_engagement_drip(session) -> dict[str, int]:
+async def run_re_engagement_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Send the re-engagement email to users dormant for ~14 days.
 
     Window: last_seen_at in [now-16d, now-14d) — 48h wide (nominal day-14
@@ -2822,6 +3022,10 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token="re14",
+        ):
+            continue
         try:
             html = render_re_engagement_email(user.name or "trader")
             res = await send_email(
@@ -2835,6 +3039,8 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
                 user.drip_state = ",".join(sorted(sent_tokens))
                 counts["re14"] += 1
                 any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
         except Exception:
             logger.exception("re_engagement.send_failed user=%s", user.id)
 
@@ -2843,7 +3049,9 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_winback_drip(session) -> dict[str, int]:
+async def run_winback_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Graduated post-cancellation win-back at ~30 / 60 / 90 days.
 
     Population: users who cancelled (canceled_at set) AND have already
@@ -2928,6 +3136,10 @@ async def run_winback_drip(session) -> dict[str, int]:
             continue
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token=stage,
+        ):
+            continue
         try:
             html = render_winback_email(
                 user.name or "trader", stage=stage, scorecard=scorecard,
@@ -2943,6 +3155,8 @@ async def run_winback_drip(session) -> dict[str, int]:
                 user.winback_state = ",".join(sorted(sent_tokens))
                 counts[stage] += 1
                 any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
         except Exception:
             logger.exception("winback.send_failed user=%s stage=%s", user.id, stage)
 
@@ -2951,7 +3165,9 @@ async def run_winback_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_activation_drip(session) -> dict[str, int]:
+async def run_activation_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Early-lifecycle activation nudges. Returns per-stage counts.
 
     Two one-shot prompts, both dedup'd via User.drip_state tokens and gated
@@ -3028,6 +3244,10 @@ async def run_activation_drip(session) -> dict[str, int]:
                 continue
             if not wants(user, EmailPref.TRIAL_DRIP):
                 continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=token,
+            ):
+                continue
             try:
                 html = renderer(user.name or "trader")
                 res = await send_email(
@@ -3041,6 +3261,8 @@ async def run_activation_drip(session) -> dict[str, int]:
                     user.drip_state = ",".join(sorted(sent_tokens))
                     counts[token] += 1
                     any_sent = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
             except Exception:
                 logger.exception(
                     "activation.send_failed user=%s stage=%s", user.id, token,
@@ -3051,7 +3273,142 @@ async def run_activation_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_annual_nudge_drip(session) -> dict[str, int]:
+async def run_activation_nudge_drip(
+    session, *, governor: FrequencyGovernor | None = None, now=None,
+) -> dict[str, int]:
+    """Behaviour-triggered activation nudge for users who did NOTHING.
+
+    The diagnosed leak is day-1 bounce: people sign up, look once, and never
+    return. The two milestone drips above (act_wl / act_alert) fire at 24-72h
+    and 3-5d, which is far too late to catch that — by then the person has
+    forgotten they signed up.
+
+    So this runs HOURLY (from the worker's hourly block, not the daily drip
+    block) and fires on the absence of a recorded action:
+
+      "act_scan6h"  ~6h after signup, zero recorded activity of any kind.
+                    One short nudge pointing at one concrete first step.
+
+      "act_ask48h"  ~48h after signup, STILL zero recorded activity. One
+                    low-friction question inviting a reply.
+
+    Then it stops. There is no third message, and that is enforced in three
+    independent places so no single edit can reintroduce one: there are only
+    two stages here, each carries a one-shot drip_state token, and the
+    governor's MAX_ACTIVATION_SERIES_MESSAGES ceiling counts every activation
+    token (including act_wl / act_alert and the day-0 welcome) against a cap
+    of four.
+
+    "Zero activity" is `lifecycle.has_recorded_activity`, which fails SAFE:
+    any hint of use — a lookup consumed, a watchlist item, an alert rule, a
+    saved scan, an activation stamp, or simply having come back to the site
+    after signup — counts as active and suppresses the nudge. Telling someone
+    who has used the product that they haven't is the worse error, so the
+    ambiguous case is always "don't send".
+
+    Windows are bounded on BOTH ends (6-24h, 48-96h) so a worker that was down
+    for a week doesn't wake up and email a month of stale signups at once.
+
+    Gated on EmailPref.TRIAL_DRIP, unsubscribe-aware via the governor, and a
+    no-op without RESEND_API_KEY (send_email returns skipped:True, so no token
+    is stamped and the user is retried on the next tick).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import exists, select
+
+    from app.models import AlertRule, ScannerPreset, User, WatchlistItem
+    from app.services.email_prefs import EmailPref, wants
+    from app.services.lifecycle import ActivitySnapshot, has_recorded_activity
+
+    now = now or datetime.now(UTC)
+    counts = {"act_scan6h": 0, "act_ask48h": 0}
+
+    # Cheap durable-artefact filters pushed into SQL. The Python-side
+    # has_recorded_activity() re-checks these AND the last_seen_at return
+    # signal, so this is a pre-filter for volume, not the decision.
+    no_artefacts = [
+        User.activated_at.is_(None),
+        User.lookups_reset_on.is_(None),
+        ~exists().where(WatchlistItem.user_id == User.id),
+        ~exists().where(AlertRule.user_id == User.id),
+        ~exists().where(ScannerPreset.user_id == User.id),
+    ]
+
+    stages = [
+        (
+            "act_scan6h",
+            now - timedelta(hours=24), now - timedelta(hours=6),
+            render_activation_first_scan_email,
+            "Your first Tapeline scan",
+        ),
+        (
+            "act_ask48h",
+            now - timedelta(hours=96), now - timedelta(hours=48),
+            render_activation_ask_email,
+            "What got in the way?",
+        ),
+    ]
+
+    any_sent = False
+    for token, lower, upper, renderer, subject in stages:
+        users = (
+            await session.execute(
+                select(User).where(
+                    User.created_at >= lower,
+                    User.created_at < upper,
+                    *no_artefacts,
+                )
+            )
+        ).scalars().all()
+
+        for user in users:
+            if not user.email:
+                continue
+            sent_tokens = set((user.drip_state or "").split(",")) - {""}
+            if token in sent_tokens:
+                continue
+            if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
+            # Fail-safe activity re-check, including the last_seen_at return
+            # signal that SQL above can't express.
+            if has_recorded_activity(user, ActivitySnapshot()):
+                continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=token,
+            ):
+                continue
+            try:
+                html = renderer(
+                    user.name or "trader", trial_ends_at=user.trial_ends_at,
+                )
+                res = await send_email(
+                    user.email, subject, html,
+                    persona="default",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="trial_drip",
+                )
+                if not res.get("skipped", False):
+                    sent_tokens.add(token)
+                    user.drip_state = ",".join(sorted(sent_tokens))
+                    counts[token] += 1
+                    any_sent = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
+            except Exception:
+                logger.exception(
+                    "activation_nudge.send_failed user=%s stage=%s",
+                    user.id, token,
+                )
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_annual_nudge_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Post-conversion nudge: monthly subscribers ~30 days in → switch to annual.
 
     Population: paid users (stripe_customer_id set, tier pro/premium) whose
@@ -3118,6 +3475,10 @@ async def run_annual_nudge_drip(session) -> dict[str, int]:
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             handled.add(user.id)
             continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token="annual_p",
+        ):
+            continue
         try:
             html = render_annual_upgrade_email(user.name or "trader", tier=user.tier)
             res = await send_email(
@@ -3134,6 +3495,8 @@ async def run_annual_nudge_drip(session) -> dict[str, int]:
                 counts["annual_p"] += 1
                 any_sent = True
                 handled.add(user.id)
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
         except Exception:
             logger.exception("annual_nudge.send_failed user=%s", user.id)
 
@@ -3142,7 +3505,9 @@ async def run_annual_nudge_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
+async def run_annual_renewal_reminder_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Courtesy heads-up ~7 days before an ANNUAL plan auto-renews.
 
     Population: active annual subscriptions whose current_period_end falls in
@@ -3198,6 +3563,10 @@ async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
         amount_label = f"${price:,.2f}" if price else "your annual rate"
         # Portable day-without-leading-zero (Windows strftime lacks %-d).
         renew_date_label = f"{cpe.strftime('%B')} {cpe.day}, {cpe.year}"
+        # SCHEDULED: a billing notice about a real, imminent charge. Never
+        # suppressed — but recorded, so a nurture email does not land beside it.
+        if governor is not None and not governor.allows(user, SendClass.SCHEDULED):
+            continue
         try:
             html = render_annual_renewal_reminder_email(
                 user.name or "trader",
@@ -3217,6 +3586,8 @@ async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
                 counts["renewal_reminder"] += 1
                 any_sent = True
                 handled.add(user.id)
+                if governor is not None:
+                    governor.record(user, SendClass.SCHEDULED)
         except Exception:
             logger.exception("renewal_reminder.send_failed user=%s", user.id)
 
@@ -3225,7 +3596,9 @@ async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_founder_touch_drip(session) -> dict[str, int]:
+async def run_founder_touch_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Personal founder hello to high-value, engaged early users (lever #4).
 
     Population: signed up 5-7 days ago, still inside an active Premium trial OR
@@ -3276,6 +3649,10 @@ async def run_founder_touch_drip(session) -> dict[str, int]:
             continue
         if not wants(user, EmailPref.RE_ENGAGEMENT):
             continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token="founder_touch",
+        ):
+            continue
         try:
             html = render_founder_touch_email(user.name or "there")
             res = await send_email(
@@ -3290,6 +3667,8 @@ async def run_founder_touch_drip(session) -> dict[str, int]:
                 user.founder_touch_sent_at = now
                 counts["founder_touch"] += 1
                 any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
         except Exception:
             logger.exception("founder_touch.send_failed user=%s", user.id)
 
@@ -3298,7 +3677,9 @@ async def run_founder_touch_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_referral_milestone_drip(session) -> dict[str, int]:
+async def run_referral_milestone_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Celebrate referral momentum at 3 / 5 / 10 / 25 confirmed signups (#5).
 
     Counts how many accounts list each user as `referred_by` (the referrer's
@@ -3351,6 +3732,10 @@ async def run_referral_milestone_drip(session) -> dict[str, int]:
         sent_tokens = set((user.drip_state or "").split(",")) - {""}
         if token in sent_tokens:
             continue
+        # SCHEDULED: a real account event the user earned (credits accrued),
+        # not something we initiated to move them along.
+        if governor is not None and not governor.allows(user, SendClass.SCHEDULED):
+            continue
         try:
             html = render_referral_milestone_email(
                 user.name or "trader", milestone=target, total_signups=n,
@@ -3366,6 +3751,8 @@ async def run_referral_milestone_drip(session) -> dict[str, int]:
                 user.drip_state = ",".join(sorted(sent_tokens))
                 counts[token] += 1
                 any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.SCHEDULED)
         except Exception:
             logger.exception("referral_milestone.send_failed user=%s", user.id)
 
@@ -3374,7 +3761,9 @@ async def run_referral_milestone_drip(session) -> dict[str, int]:
     return counts
 
 
-async def run_checkout_abandonment_recovery(session) -> dict[str, int]:
+async def run_checkout_abandonment_recovery(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
     """Recover started-but-incomplete Stripe checkouts. Returns {"abandon1": n}.
 
     Population: users whose checkout_started_at sits in the 1-24h window —
@@ -3435,6 +3824,11 @@ async def run_checkout_abandonment_recovery(session) -> dict[str, int]:
             continue
         tier = user.checkout_tier or "pro"
         period = user.checkout_billing_period or "monthly"
+        # SCHEDULED: the user initiated a payment minutes-to-hours ago. This is
+        # the highest-intent message we send and suppressing it would cost a
+        # real conversion — recorded, never blocked.
+        if governor is not None and not governor.allows(user, SendClass.SCHEDULED):
+            continue
         try:
             html = render_checkout_abandoned_email(
                 user.name or "trader", tier=tier, billing_period=period,
@@ -3452,6 +3846,8 @@ async def run_checkout_abandonment_recovery(session) -> dict[str, int]:
                 user.drip_state = ",".join(sorted(sent_tokens))
                 counts["abandon1"] += 1
                 any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.SCHEDULED)
         except Exception:
             logger.exception("checkout_recovery.send_failed user=%s", user.id)
 

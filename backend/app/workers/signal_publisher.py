@@ -67,6 +67,7 @@ _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
 _last_inbox_tick: datetime | None = None
 _last_checkout_recovery: datetime | None = None
+_last_activation_nudge: datetime | None = None
 
 
 async def seed_universe() -> None:
@@ -286,13 +287,46 @@ async def tick() -> None:
     if _last_checkout_recovery is None or (started - _last_checkout_recovery).total_seconds() >= 3600:
         try:
             from app.services.email import run_checkout_abandonment_recovery
+            from app.services.lifecycle import worker_governor
             async with session_scope() as recovery_session:
-                rec_counts = await run_checkout_abandonment_recovery(recovery_session)
+                rec_counts = await run_checkout_abandonment_recovery(
+                    recovery_session, governor=worker_governor(),
+                )
             if rec_counts["abandon1"]:
                 logger.info("drip.checkout_recovery_sent abandon1=%d", rec_counts["abandon1"])
         except Exception:
             logger.exception("checkout_recovery.run_failed")
         _last_checkout_recovery = started
+
+    # Activation nudge — HOURLY, for the same reason as checkout recovery: the
+    # first stage fires ~6h after signup and a daily cadence would land it
+    # anywhere from 6 to 30 hours late, which is the wrong side of the day-1
+    # bounce this exists to catch.
+    #
+    # Shares the process-global send ledger with the daily drip block above
+    # (worker_governor() returns a governor bound to it), so a user who got a
+    # trial-drip email this morning will NOT also get an activation nudge this
+    # afternoon — the cross-flow gap is enforced even though the two run on
+    # different schedules. No-op without RESEND_API_KEY.
+    global _last_activation_nudge
+    if _last_activation_nudge is None or (started - _last_activation_nudge).total_seconds() >= 3600:
+        try:
+            from app.services.email import run_activation_nudge_drip
+            from app.services.lifecycle import worker_governor
+
+            nudge_governor = worker_governor()
+            async with session_scope() as nudge_session:
+                nudge_counts = await run_activation_nudge_drip(
+                    nudge_session, governor=nudge_governor, now=started,
+                )
+            if any(nudge_counts.values()):
+                logger.info(
+                    "activation_nudge.sent scan6h=%d ask48h=%d",
+                    nudge_counts["act_scan6h"], nudge_counts["act_ask48h"],
+                )
+        except Exception:
+            logger.exception("activation_nudge.run_failed")
+        _last_activation_nudge = started
 
     # Signal-system Google Sheet refresh — pulls ALL SIGNALS + the Phase 2
     # intelligence tabs (SPIKE / MARKET / SMART MONEY / ETF) and upserts to
@@ -447,8 +481,11 @@ async def tick() -> None:
     if started.hour >= 21 and _last_eod_digest_date != today_str:
         try:
             from app.services.email import run_eod_watchlist_digest
+            from app.services.lifecycle import worker_governor
             async with session_scope() as eod_session:
-                count = await run_eod_watchlist_digest(eod_session)
+                count = await run_eod_watchlist_digest(
+                    eod_session, governor=worker_governor(),
+                )
             if count:
                 logger.info("eod_digest.sent count=%d", count)
         except Exception:
@@ -470,8 +507,11 @@ async def tick() -> None:
     ):
         try:
             from app.services.email import run_weekly_newsletter
+            from app.services.lifecycle import worker_governor
             async with session_scope() as nl_session:
-                count = await run_weekly_newsletter(nl_session, now=started)
+                count = await run_weekly_newsletter(
+                    nl_session, now=started, governor=worker_governor(),
+                )
             logger.info("weekly_newsletter.sent count=%d token=%s", count, weekly_token)
         except Exception:
             logger.exception("weekly_newsletter.run_failed")
@@ -1052,15 +1092,31 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             run_referral_milestone_drip,
             run_winback_drip,
         )
+        from app.services.lifecycle import worker_governor
+
+        # ONE governor for the whole tick, bound to the process-global send
+        # ledger. Eight orchestrators run back-to-back against the same
+        # session below, and before this existed nothing stopped a single
+        # user matching three of those populations and receiving three emails
+        # inside the same minute. Threading one governor through them all is
+        # what makes the frequency cap hold ACROSS flows, not just within one.
+        # Because the ledger is process-global, it also holds across ticks —
+        # which is how the hourly activation nudge knows about a drip email
+        # this block sent six hours ago.
+        governor = worker_governor()
         async with session_scope() as drip_session:
-            counts = await run_daily_drip(drip_session)
-            re_counts = await run_re_engagement_drip(drip_session)
-            wb_counts = await run_winback_drip(drip_session)
-            act_counts = await run_activation_drip(drip_session)
-            annual_counts = await run_annual_nudge_drip(drip_session)
-            renewal_counts = await run_annual_renewal_reminder_drip(drip_session)
-            ft_counts = await run_founder_touch_drip(drip_session)
-            refm_counts = await run_referral_milestone_drip(drip_session)
+            counts = await run_daily_drip(drip_session, governor=governor)
+            re_counts = await run_re_engagement_drip(drip_session, governor=governor)
+            wb_counts = await run_winback_drip(drip_session, governor=governor)
+            act_counts = await run_activation_drip(drip_session, governor=governor)
+            annual_counts = await run_annual_nudge_drip(drip_session, governor=governor)
+            renewal_counts = await run_annual_renewal_reminder_drip(
+                drip_session, governor=governor,
+            )
+            ft_counts = await run_founder_touch_drip(drip_session, governor=governor)
+            refm_counts = await run_referral_milestone_drip(
+                drip_session, governor=governor,
+            )
         if any(counts.values()):
             logger.info(
                 "drip.sent day3=%d day7=%d day13=%d lapse30=%d",
@@ -1081,6 +1137,10 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             logger.info("drip.founder_touch_sent founder_touch=%d", ft_counts["founder_touch"])
         if any(refm_counts.values()):
             logger.info("drip.referral_milestone_sent %s", refm_counts)
+        if governor.blocked:
+            logger.info(
+                "drip.governor sent=%d blocked=%d", governor.sent, governor.blocked,
+            )
     except Exception:
         # Do NOT latch — a failed run must retry, not burn the day.
         logger.exception("drip.run_failed")
