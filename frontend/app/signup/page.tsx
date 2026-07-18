@@ -11,6 +11,14 @@ import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
 import { getStoredGclid, getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
+import {
+  FormAlert,
+  FormField,
+  MIN_PASSWORD_LENGTH,
+  validateEmail,
+  validateNewPassword,
+  type FieldError,
+} from "@/components/FormField";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
@@ -126,6 +134,14 @@ function SignUpForm() {
   const [busy, setBusy] = useState(false);
   const turnstileRef = useRef<HTMLDivElement | null>(null);
 
+  // Per-field validation errors, keyed by input id. Populated on BLUR (the
+  // user has finished with the field) and on a failed submit — never while
+  // they are still typing. `onChange` only ever clears an error that is
+  // already on screen, so nobody gets corrected mid-word.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, FieldError>>({});
+  const setFieldError = (id: string, msg: FieldError) =>
+    setFieldErrors((prev) => ({ ...prev, [id]: msg }));
+
   // Live scorecard proof block — fetched once on mount. We surface the one
   // thing that is unambiguously true and on-brand at the moment of decision:
   // the SIZE and DISCIPLINE of the public record (days tracked, same-day, no
@@ -173,7 +189,29 @@ function SignUpForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (password.length < 8) { setErr("Password must be at least 8 characters."); return; }
+
+    // Re-run every validator on submit — a user can reach the button without
+    // ever blurring a field (autofill, Enter from the email input), so blur
+    // validation alone is not a complete gate. The form is `noValidate` so
+    // these messages are what the user sees, not the browser's generic
+    // "Please fill out this field".
+    // Nothing here clears any input: on a failed submit the user keeps
+    // everything they typed, including the consent checkboxes.
+    const nextErrors: Record<string, FieldError> = {
+      "signup-email": validateEmail(email),
+      "signup-password": validateNewPassword(password),
+    };
+    setFieldErrors(nextErrors);
+    const invalid = Object.keys(nextErrors).filter((id) => nextErrors[id]);
+    if (invalid.length > 0) {
+      setErr(
+        invalid.length === 1
+          ? "One field needs fixing before we can create your account — the details are next to it below."
+          : `${invalid.length} fields need fixing before we can create your account — the details are next to each one below.`,
+      );
+      document.getElementById(invalid[0])?.focus();
+      return;
+    }
     // Race: Cloudflare Turnstile can auto-solve BEFORE the useEffect above
     // registers `window.onTapelineTurnstile`. When that happens, React state
     // `turnstileToken` stays empty even though the widget rendered "Success"
@@ -226,8 +264,12 @@ function SignUpForm() {
       track("trial_started", { tier: "premium", days: 14, method: "email" });
       trackEvent("sign_up", { method: "email" });
       trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
-      // Route through /app/onboarding first — captures investor profile +
-      // attribution + marketing-opt-in before they hit the product. The
+      // Route through /app/onboarding first — captures use-case + attribution
+      // + marketing-opt-in before they hit the product. It does NOT capture
+      // suitability data (experience, portfolio size, capital, risk tolerance,
+      // holdings, goals): those questions were removed 2026-07-18 under
+      // compliance Rule 8, and this signup form has never collected any of
+      // them. Do not reintroduce them here or there. The
       // onboarding page redirects to the post-auth destination after submit
       // or skip: /app/billing (with plan intent restated) when the visitor
       // arrived from a /pricing plan CTA, otherwise the default `next`.
@@ -344,7 +386,12 @@ function SignUpForm() {
               rendered by OAuthButtons (position="top") already sits above this
               form; when OAuth is disabled, OAuthButtons renders nothing and
               this becomes the primary path with no orphaned divider. */}
-          <form onSubmit={submit} className="mt-6 space-y-4">
+          {/* noValidate: we own the messages. Native constraint validation
+              would otherwise preempt them with the browser's generic
+              "Please fill out this field", which says nothing about how to
+              fix it. `required`/`minLength` stay on the inputs for semantics
+              and assistive tech. */}
+          <form onSubmit={submit} noValidate className="mt-6 space-y-4">
             {/* Honeypot field — offscreen, hidden from real users (and screen readers).
                 Bots that auto-fill every input will populate it; if non-empty, the
                 backend silently rejects the signup. */}
@@ -363,9 +410,41 @@ function SignUpForm() {
                 we keep it — some users want it — but label it optional and put
                 it last so email + password (the only required fields) come
                 first. Fewer required fields = higher completion. */}
-            <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
-            <Field label="Password" type="password" autoComplete="new-password" value={password} onChange={setPassword} required minLength={8} hint="At least 8 characters" />
-            <Field label="Name (optional)" type="text" autoComplete="name" value={name} onChange={setName} />
+            <FormField
+              id="signup-email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(v) => { setEmail(v); setFieldError("signup-email", null); }}
+              onBlur={() => setFieldError("signup-email", validateEmail(email))}
+              error={fieldErrors["signup-email"]}
+              required
+            />
+            <FormField
+              id="signup-password"
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(v) => { setPassword(v); setFieldError("signup-password", null); }}
+              onBlur={() => setFieldError("signup-password", validateNewPassword(password))}
+              error={fieldErrors["signup-password"]}
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            />
+            {/* Name is optional, so it has no validator — an optional field
+                that can still fail validation is just a required field with
+                extra steps. */}
+            <FormField
+              id="signup-name"
+              label="Name (optional)"
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={setName}
+            />
 
             {/* Email consent — descriptive labels, UNCHECKED by default, and
                 signup never depends on them (pure opt-in, no dark patterns).
@@ -398,11 +477,7 @@ function SignUpForm() {
               />
             )}
 
-            {err && (
-              <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
-                {err}
-              </div>
-            )}
+            <FormAlert message={err} />
 
             <button
               type="submit"
@@ -479,29 +554,6 @@ function ConsentCheckbox({
         {label}{" "}
         <span className="text-xs text-muted">{hint}</span>
       </span>
-    </label>
-  );
-}
-
-function Field({
-  label, type, value, onChange, autoComplete, required, minLength, hint,
-}: {
-  label: string; type: string; value: string; onChange: (v: string) => void;
-  autoComplete?: string; required?: boolean; minLength?: number; hint?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-muted">{label}</span>
-      <input
-        type={type}
-        autoComplete={autoComplete}
-        required={required}
-        minLength={minLength}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block h-11 w-full rounded-md border border-border bg-panel px-3 text-base transition-colors focus:border-accent focus:outline-none"
-      />
-      {hint && <span className="mt-1 block text-xs text-subtle">{hint}</span>}
     </label>
   );
 }
