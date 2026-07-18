@@ -63,6 +63,7 @@ from app.services.tier import (
     FREE_DAILY_LOOKUPS,
     FREE_SCANNER_ROWS,
     FREE_WATCHLIST_TICKERS,
+    FREE_WEB_PUSH_ALERTS,
 )
 from app.services.universe import ACTIVE_UNIVERSE_SIZE
 
@@ -1449,6 +1450,140 @@ def render_re_engagement_email(user_name: str) -> str:
             f'<a href="https://tapeline.io/how-it-works" style="color:{LIGHT_SUBTLE};text-decoration:underline;">The formula is still public.</a>'
         ),
         preheader="Two weeks since you last opened the scanner — the scorecard kept running.",
+    )
+
+
+# ── One-time free-tier changelog (manual admin re-contact) ──────────────────
+#
+# NOT wired to any scheduled worker. Sent only via the admin endpoint
+# POST /api/admin/recontact/free-tier-changelog, and only when the founder
+# passes confirm=true. See routers/admin.py for the gating rationale.
+#
+# Copy contract: this is a factual changelog of what the FREE plan includes
+# today. No offer, no discount, no urgency, no performance or returns claim.
+# It exists because the trial-series final email promises "we'll only write
+# again if something material changes" — the free tier materially changed,
+# so this note is the promise being kept, once.
+
+RECONTACT_FREE_TIER_TOKEN = "rc_free1"
+RECONTACT_FREE_TIER_SUBJECT = "What's on the Tapeline free plan now"
+
+_RECONTACT_UTM = (
+    "utm_source=email&utm_campaign=free_tier_changelog&utm_medium=transactional"
+)
+
+
+def _free_squeeze_preview_limit() -> int:
+    """How many squeeze setups a free account can see.
+
+    Lazy import: the constant's home is the squeeze router, and a service
+    module importing a router at module scope risks an import cycle. Falls
+    back to the shipped value if the import ever moves.
+    """
+    try:
+        from app.routers.squeeze import FREE_SQUEEZE_PREVIEW_LIMIT
+
+        return int(FREE_SQUEEZE_PREVIEW_LIMIT)
+    except Exception:  # pragma: no cover - defensive
+        return 3
+
+
+def _free_tier_changelog_lines() -> list[str]:
+    """The changelog rows, as plain sentences.
+
+    Sourced from the tier.py constants (+ the squeeze router's preview cap)
+    so the copy can never quote a cap the product no longer enforces. Shared
+    by the HTML and plain-text renderers so the two can't drift.
+    """
+    return [
+        f"A watchlist on the free plan, with up to {FREE_WATCHLIST_TICKERS} saved tickers.",
+        f"{FREE_DAILY_LOOKUPS} full ticker look-ups a day.",
+        f"{FREE_SCANNER_ROWS} live scanner rows (live data, not delayed).",
+        f"The squeeze radar's top {_free_squeeze_preview_limit()} setups.",
+        f"{FREE_WEB_PUSH_ALERTS} browser alerts you can set on your own tickers.",
+    ]
+
+
+def render_free_tier_changelog_email(user_name: str) -> str:
+    """One-time re-contact for people who signed up before the free tier grew.
+
+    Purely descriptive: it states what the free plan includes today and
+    links to the public scorecard. There is deliberately no pricing block,
+    no discount, no deadline, and no claim about outcomes.
+    """
+    rows = "".join(
+        f'<li style="margin:0 0 8px;font-size:15px;line-height:1.55;'
+        f'color:{LIGHT_FG};font-family:{FONT_SANS};">{line}</li>'
+        for line in _free_tier_changelog_lines()
+    )
+    return shell(
+        h1("What's on the free plan now.")
+        + lead(
+            f"Hi {user_name} — you made a Tapeline account a while back. When "
+            f"the emails stopped, we said we'd only write again if something "
+            f"material changed. The free plan changed, so here's the one note "
+            f"about it."
+        )
+        + paragraph("What a free account includes today:")
+        + card(
+            f'<ul style="margin:0;padding:0 0 0 20px;">{rows}</ul>',
+            accent=True,
+        )
+        + muted_paragraph(
+            "All of that is on the free plan — no card, no trial clock. Your "
+            "existing account already has it; there's nothing to switch on."
+        )
+        + paragraph(
+            'The public '
+            f'<a href="https://tapeline.io/scorecard?{_RECONTACT_UTM}" style="color:{ACCENT};">scorecard</a> '
+            'is unchanged and still free to everyone: every daily top-10 pick '
+            'we published, back-checked against SPY the next session, with '
+            'every miss still on the page.'
+        )
+        + button(
+            "Open the scorecard",
+            f"https://tapeline.io/scorecard?{_RECONTACT_UTM}",
+        )
+        + footnote(
+            "This is a one-off note, not a new series — there's no follow-up "
+            "to this one. If Tapeline isn't for you, the unsubscribe link "
+            "below stops everything."
+            "<br><br>— Christian, founder."
+        ),
+        preheader=(
+            f"The free plan now includes a {FREE_WATCHLIST_TICKERS}-ticker "
+            f"watchlist, {FREE_DAILY_LOOKUPS} look-ups a day, and "
+            f"{FREE_WEB_PUSH_ALERTS} browser alerts."
+        ),
+    )
+
+
+def render_free_tier_changelog_text(user_name: str) -> str:
+    """Plain-text alternative for the same email.
+
+    Sent as the `text` part so the message isn't HTML-only — HTML-only
+    marketing mail is a spam-filter signal, and this one has to land.
+    """
+    bullets = "\n".join(f"  - {line}" for line in _free_tier_changelog_lines())
+    return (
+        f"Hi {user_name},\n\n"
+        "You made a Tapeline account a while back. When the emails stopped, "
+        "we said we'd only write again if something material changed. The "
+        "free plan changed, so here's the one note about it.\n\n"
+        "What a free account includes today:\n"
+        f"{bullets}\n\n"
+        "All of that is on the free plan - no card, no trial clock. Your "
+        "existing account already has it; there's nothing to switch on.\n\n"
+        "The public scorecard is unchanged and still free to everyone: every "
+        "daily top-10 pick we published, back-checked against SPY the next "
+        "session, with every miss still on the page.\n\n"
+        f"  https://tapeline.io/scorecard?{_RECONTACT_UTM}\n\n"
+        "This is a one-off note, not a new series - there's no follow-up to "
+        "this one. If Tapeline isn't for you, use the unsubscribe link in "
+        "this email and everything stops.\n\n"
+        "- Christian, founder\n\n"
+        "Not investment advice. Tapeline is informational software - every "
+        "score, signal, and headline is a data point, not a recommendation.\n"
     )
 
 

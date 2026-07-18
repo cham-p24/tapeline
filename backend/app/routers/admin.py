@@ -454,6 +454,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         render_email_verification_email,
         render_eod_watchlist_digest,
         render_founder_touch_email,
+        render_free_tier_changelog_email,
         render_gdpr_confirmation_email,
         render_password_reset_email,
         render_payment_failed_email,
@@ -622,6 +623,10 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "re_engagement": (
             "14-day dormant re-engagement",
             lambda: render_re_engagement_email("Alex"),
+        ),
+        "re_engagement_free_tier_changelog": (
+            "One-time re-contact · free-tier changelog (manual send only)",
+            lambda: render_free_tier_changelog_email("Alex"),
         ),
         # Activation nudges (early lifecycle)
         "activation_watchlist": (
@@ -890,6 +895,184 @@ async def send_email_preview_to_admin(
         return {"status": "skipped", "reason": "no_api_key"}
     logger.info("email_preview.sent name=%s to=%s persona=%s", name, admin.email, persona)
     return {"status": "sent", "to": admin.email, "persona": persona}
+
+
+# ── One-time re-contact: lapsed no-card trials ──────────────────────────────
+#
+# Why this exists: every automated lifecycle window is one-shot and
+# forward-looking, and the retention orchestrators only shipped after the
+# earliest signups had already aged out of every window. run_winback_drip
+# can't reach them either — it keys off `canceled_at`, which is only ever
+# set for someone who actually subscribed and then cancelled. So the
+# earliest cohort is structurally unreachable by any scheduled job, and
+# the free tier has materially changed since they left.
+#
+# This endpoint is the manual, audited way to send them ONE note. It is:
+#   * admin-gated (same `require_admin` dependency as /email-preview),
+#   * DRY-RUN BY DEFAULT — `confirm=true` is required to deliver anything,
+#   * one-shot per user via a drip_state token, so a double-click or a
+#     retry can never mail the same person twice,
+#   * gated on EmailPref.RE_ENGAGEMENT and carries List-Unsubscribe,
+#     exactly like every other marketing send.
+
+async def _recontact_candidates(session: AsyncSession) -> list[User]:
+    """Lapsed no-card trial users: free tier, trial already ended, never
+    reached Stripe.
+
+    Extra guards beyond the headline criteria: `is_lifetime` users are
+    comped-paid (not lapsed), and a null/blank email has nowhere to go.
+    """
+    now = datetime.now(UTC)
+    result = await session.execute(
+        select(User)
+        .where(
+            User.tier == "free",
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at < now,
+            User.stripe_customer_id.is_(None),
+            User.is_lifetime.is_(False),
+            User.email.isnot(None),
+        )
+        .order_by(User.created_at)
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/recontact/free-tier-changelog")
+async def recontact_free_tier_changelog(
+    _: User | None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+    confirm: bool = Query(
+        False,
+        description=(
+            "MUST be explicitly true to actually deliver mail. Default false "
+            "= dry run: nothing is sent, the rendered copy is returned for "
+            "review."
+        ),
+    ),
+) -> dict:
+    """One-time descriptive re-contact for lapsed no-card trial users.
+
+    **Dry run is the default.** With `confirm` unset or false this sends
+    NOTHING — it resolves the audience, renders the email, and returns both
+    so the copy can be read before anyone receives it. Only `confirm=true`
+    delivers.
+
+    Response (dry run):
+      - `recipient_count` / `recipients` — who would be mailed
+      - `criteria` — the resolved audience definition, in words
+      - `excluded` — counts dropped by opt-out / already-contacted
+      - `subject`, `html`, `text` — the exact rendered message
+
+    Response (confirm=true):
+      - `sent`, `skipped`, `failed` counts. Each successful send stamps the
+        dedupe token into `User.drip_state`, so re-running is a no-op for
+        anyone already contacted.
+    """
+    from app.services.email import (
+        RECONTACT_FREE_TIER_SUBJECT,
+        RECONTACT_FREE_TIER_TOKEN,
+        render_free_tier_changelog_email,
+        render_free_tier_changelog_text,
+    )
+    from app.services.email_prefs import EmailPref, wants
+
+    criteria = {
+        "tier": "free",
+        "trial_ends_at": "in the past (trial lapsed)",
+        "stripe_customer_id": "null (never reached checkout)",
+        "is_lifetime": False,
+        "email_pref_required": "RE_ENGAGEMENT",
+        "dedupe_token": RECONTACT_FREE_TIER_TOKEN,
+    }
+
+    candidates = await _recontact_candidates(session)
+
+    eligible: list[User] = []
+    excluded = {"already_contacted": 0, "opted_out": 0}
+    for user in candidates:
+        if RECONTACT_FREE_TIER_TOKEN in (
+            set((user.drip_state or "").split(",")) - {""}
+        ):
+            excluded["already_contacted"] += 1
+            continue
+        if not wants(user, EmailPref.RE_ENGAGEMENT):
+            excluded["opted_out"] += 1
+            continue
+        eligible.append(user)
+
+    if not confirm:
+        # DRY RUN — no send path is reachable from here.
+        logger.info(
+            "recontact.dry_run candidates=%d eligible=%d",
+            len(candidates), len(eligible),
+        )
+        return {
+            "mode": "dry_run",
+            "sent": 0,
+            "note": (
+                "Nothing was sent. Re-POST with ?confirm=true to deliver."
+            ),
+            "recipient_count": len(eligible),
+            "criteria": criteria,
+            "excluded": excluded,
+            "recipients": [
+                {
+                    "id": u.id,
+                    "email": u.email,
+                    "name": u.name,
+                    "trial_ends_at": (
+                        u.trial_ends_at.isoformat() if u.trial_ends_at else None
+                    ),
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
+                }
+                for u in eligible
+            ],
+            "subject": RECONTACT_FREE_TIER_SUBJECT,
+            "html": render_free_tier_changelog_email("trader"),
+            "text": render_free_tier_changelog_text("trader"),
+        }
+
+    from app.services.email import send_email
+
+    counts = {"sent": 0, "skipped": 0, "failed": 0}
+    any_sent = False
+    for user in eligible:
+        try:
+            html = render_free_tier_changelog_email(user.name or "trader")
+            text = render_free_tier_changelog_text(user.name or "trader")
+            res = await send_email(
+                user.email,
+                RECONTACT_FREE_TIER_SUBJECT,
+                html,
+                text,
+                persona="sales",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="re_engagement",
+            )
+            if res.get("skipped", False):
+                counts["skipped"] += 1
+                continue
+            tokens = set((user.drip_state or "").split(",")) - {""}
+            tokens.add(RECONTACT_FREE_TIER_TOKEN)
+            user.drip_state = ",".join(sorted(tokens))
+            counts["sent"] += 1
+            any_sent = True
+        except Exception:
+            logger.exception("recontact.send_failed user=%s", user.id)
+            counts["failed"] += 1
+
+    if any_sent:
+        await session.commit()
+
+    logger.info("recontact.confirmed_run %s", counts)
+    return {
+        "mode": "sent",
+        "criteria": criteria,
+        "excluded": excluded,
+        "recipient_count": len(eligible),
+        **counts,
+    }
 
 
 # ---------------------------------------------------------------------------
