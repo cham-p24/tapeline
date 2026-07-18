@@ -18,6 +18,7 @@ import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
+import { trackEvent, trackFirstTickerAdded } from "@/lib/gtag";
 
 type DetailTab = "financials" | "insider";
 
@@ -64,6 +65,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   useEffect(() => { load(); }, [load]);
   // Track this visit so it appears in the "Recent" pill row across the app.
   useEffect(() => { recordTickerVisit(symbol); }, [symbol]);
+  // GA4 engagement event — declared in lib/gtag.ts but never fired until now,
+  // so ticker-detail depth was invisible in the funnel. Re-fires per symbol
+  // (each is a distinct view), fire-and-forget.
+  useEffect(() => { trackEvent("view_ticker", { symbol }); }, [symbol]);
   const { status, lastUpdate } = useLiveStream(load);
   // Score count-up — called unconditionally here, before the loading/error
   // early-returns below, so the hook count never changes between renders
@@ -79,6 +84,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     setAddMsg(null);
     try {
       await api.watchlistAdd(symbol);
+      // Activation signal, shared with the scanner rows + watchlist page so
+      // the first add counts exactly once per browser regardless of surface.
+      trackFirstTickerAdded(symbol, "ticker");
       setAddMsg(`${symbol} added to watchlist`);
     } catch (e: unknown) {
       // 403 = server-enforced watchlist cap. Open the upgrade modal with the

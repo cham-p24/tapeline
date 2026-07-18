@@ -27,7 +27,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { api, handle401 } from "@/lib/api";
-import { trackEvent } from "@/lib/gtag";
+import { trackEvent, trackEventOnce } from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL } from "@/components/TodaysTape";
 import { safeNext } from "@/lib/safeNext";
 
@@ -162,29 +162,27 @@ function OnboardingForm() {
   // /app/onboarding?oauth=1, but OAuth signups never touch the /signup form
   // where `sign_up` / `start_trial` fire — so without this they're invisible
   // to GA4/Ads. Fire both once, deduped per browser (localStorage) with a ref
-  // guard for the storage-unavailable case + React strict-mode double-mount.
+  // guard for React strict-mode double-mount.
+  //
+  // The localStorage flag is now written by trackEventOnce AFTER a confirmed
+  // dispatch, never before. The old order set the flag first and then called
+  // trackEvent, which silently no-opped whenever gtag.js hadn't finished
+  // loading — and since gtag loads afterInteractive while this effect runs at
+  // mount, that race permanently lost the OAuth signup conversion on this
+  // browser. trackEvent also queues-and-retries now, so a slow load delays
+  // the event instead of dropping it.
   const oauthFiredRef = useRef(false);
   useEffect(() => {
     if (qp.get("oauth") == null) return;
     if (oauthFiredRef.current) return;
-    try {
-      if (
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(OAUTH_CONVERSION_FIRED_KEY) === "1"
-      ) {
-        oauthFiredRef.current = true;
-        return;
-      }
-      window.localStorage.setItem(OAUTH_CONVERSION_FIRED_KEY, "1");
-    } catch {
-      // storage unavailable — the ref still dedupes within this mount.
-    }
     oauthFiredRef.current = true;
     // OAuth account creation === same conversion bucket as an email signup;
     // the 14-day trial auto-starts, so start_trial fires alongside it (mirrors
-    // the email /signup flow).
-    trackEvent("sign_up", { method: "oauth" });
-    trackEvent("start_trial", { method: "oauth" });
+    // the email /signup flow). Both share one dedupe key: they are two halves
+    // of the same moment, so they must never fire independently of each other.
+    if (trackEventOnce(OAUTH_CONVERSION_FIRED_KEY, "sign_up", { method: "oauth" })) {
+      trackEvent("start_trial", { method: "oauth" });
+    }
   }, [qp]);
 
   function toggleSector(slug: string) {

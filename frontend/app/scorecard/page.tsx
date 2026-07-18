@@ -15,6 +15,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { userLocale } from "@/lib/datetime";
+import { trackEvent } from "@/lib/gtag";
 import { useCountUp } from "@/lib/useCountUp";
 import {
   breadcrumbJsonLd,
@@ -31,6 +32,12 @@ export default function ScorecardPage() {
   } | null>(null);
 
   useEffect(() => { api.scorecard(30).then(setData).catch(console.error); }, []);
+
+  // GA4 engagement event. `view_scorecard` was declared in lib/gtag.ts but
+  // never actually fired anywhere, which made the core acquisition question —
+  // do visitors who see the public scorecard sign up at a different rate? —
+  // impossible to answer. Fires once per mount, fire-and-forget.
+  useEffect(() => { trackEvent("view_scorecard"); }, []);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();

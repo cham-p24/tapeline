@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { track } from "@vercel/analytics";
-import { trackEvent } from "@/lib/gtag";
+import { trackEvent, trackEventOnce } from "@/lib/gtag";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
 import { ComparisonTable } from "@/components/ComparisonTable";
@@ -147,7 +147,12 @@ export default function BillingPage() {
     if (qp.get("checkout") === "success") {
       const paidTier = qp.get("tier") || tier;
       const period = qp.get("billing_period") || "annual";
-      track("trial_converted", { tier: paidTier, billing_period: period });
+      // Stripe's checkout session id, injected by the success_url template in
+      // backend/app/routers/billing.py. Doubles as the GA4/Ads transaction_id
+      // AND the dedupe key: without it, every reload/bookmark of this success
+      // URL re-fired `subscribe`, inflating GA4 revenue and feeding Smart
+      // Bidding conversions that never happened.
+      const sessionId = qp.get("session_id") || "";
       // GA4 + Google Ads "Subscribe" (revenue) conversion. Stripe's success_url
       // brings the customer back here right after the first charge, so this is
       // the correct client-side moment to fire it. Value = the tier's
@@ -156,11 +161,37 @@ export default function BillingPage() {
       // the paid-search campaign toward paying customers, not just signups.
       const meta = TIER_META[paidTier as keyof typeof TIER_META];
       const value = meta ? (period === "annual" ? meta.annual : meta.monthly) : undefined;
-      trackEvent("subscribe", {
+      const subscribeParams = {
         tier: paidTier,
         billing_period: period,
         ...(value ? { value, currency: "USD" } : {}),
-      });
+        ...(sessionId ? { transaction_id: sessionId } : {}),
+      };
+      if (sessionId) {
+        if (
+          trackEventOnce(
+            `tapeline_subscribe_fired_${sessionId}`,
+            "subscribe",
+            subscribeParams,
+          )
+        ) {
+          track("trial_converted", { tier: paidTier, billing_period: period });
+        }
+        // Drop session_id from the address bar now the event is settled, so a
+        // shared or bookmarked link carries no payment identifier.
+        qp.delete("session_id");
+        const qs = qp.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+        );
+      } else {
+        // No session id (legacy link / Stripe didn't substitute) — fall back to
+        // the previous un-deduped behaviour rather than losing the conversion.
+        track("trial_converted", { tier: paidTier, billing_period: period });
+        trackEvent("subscribe", subscribeParams);
+      }
       // Visible confirmation — previously the redirect back from Stripe landed
       // on a page that looked identical to before paying. Also refresh the
       // session (tier may have already been bumped by the webhook) and flip
@@ -224,6 +255,26 @@ export default function BillingPage() {
     setMsg(null);
     // Funnel event: user clicked Upgrade. Fired before the fetch so we capture
     // intent even if the network round-trip or Stripe redirect fails.
+    //
+    // GA4 first. The Vercel `checkout_started` call below is a DEAD SINK in
+    // production — <Analytics /> only mounts when NEXT_PUBLIC_VERCEL === "1"
+    // (see app/layout.tsx) and Fly never sets it, so track() silently no-ops.
+    // That left GA4 and Google Ads seeing sign_up and subscribe with NOTHING
+    // in between — precisely the step where the funnel leaks. `begin_checkout`
+    // is the GA4 standard name for this moment; value is the price the user is
+    // about to be charged (Stripe bills USD), so GA4's funnel exploration can
+    // weight checkout intent by plan.
+    const targetMeta = TIER_META[target];
+    trackEvent("begin_checkout", {
+      tier: target,
+      billing_period: billingPeriod,
+      current_tier: tier,
+      on_trial: isOnTrial,
+      value: billingPeriod === "annual" ? targetMeta.annual : targetMeta.monthly,
+      currency: "USD",
+    });
+    // Kept only as a no-cost extra sink for any future Vercel-hosted deploy;
+    // it is no longer the only place this moment is recorded.
     track("checkout_started", {
       target_tier: target,
       billing_period: billingPeriod,
