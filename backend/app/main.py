@@ -20,6 +20,7 @@ from app.routers import (
     calendar_routes,
     congress,
     contact,
+    export,
     heatmap,
     holdings,
     inbox,
@@ -103,6 +104,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
     allow_headers=["*"],
+    # Content-Disposition carries the server-chosen CSV filename
+    # (tapeline-scanner-<date>.csv). Without exposing it, the cross-origin
+    # frontend (tapeline.io → api.tapeline.io) can't read the header and
+    # falls back to a generic client-side filename.
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -678,6 +684,9 @@ app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"]
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(newsletter.router, prefix="/api/newsletter", tags=["newsletter"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
+# Pro CSV export (scanner result set + watchlist) — the feature every pricing
+# surface sells; tier-gated inside the router via FEATURES["export.csv"].
+app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(inbox.router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
 app.include_router(contact.router, prefix="/api/contact", tags=["contact"])

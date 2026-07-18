@@ -537,6 +537,39 @@ async function patch<T>(path: string, body: unknown, token?: string): Promise<T>
   return res.json();
 }
 
+/**
+ * Fetch a CSV endpoint and trigger a browser download of the response.
+ *
+ * Pro-gated server-side: a Free user's request 403s and this throws
+ * TierGateError (via throwForStatus) so the calling page can open the
+ * PaywallModal — the export buttons are shown-locked, never hidden.
+ * Prefers the server's Content-Disposition filename (carries the real
+ * export date; exposed via CORS expose_headers); falls back to
+ * `fallbackName` when the header isn't readable.
+ */
+async function downloadCsv(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    handle401(res.status);
+    await throwForStatus(res);
+  }
+  const blob = await res.blob();
+  const dispo = res.headers.get("Content-Disposition") || "";
+  const match = dispo.match(/filename="([^"]+)"/);
+  const filename = match?.[1] || fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function getAuth<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
@@ -827,6 +860,22 @@ export const api = {
   alertEvents: (limit = 50) => getAuth<{ count: number; items: AlertEvent[] }>(
     `/api/alerts/events?limit=${limit}`, DEV_TOKEN,
   ),
+
+  // --- CSV export (Pro+) — /api/export/*, see backend/app/routers/export.py.
+  // `params` mirrors the scanner's filter params so the download matches the
+  // rows on screen. Throws TierGateError on 403 (Free tier) — callers open
+  // the PaywallModal; server caps rows at 2,500.
+  exportScannerCsv: (params: Record<string, string | number> = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
+    );
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return downloadCsv(`/api/export/scanner.csv${suffix}`, "tapeline-scanner.csv");
+  },
+  exportWatchlistCsv: (list_id?: number | null) => {
+    const suffix = list_id != null ? `?list_id=${list_id}` : "";
+    return downloadCsv(`/api/export/watchlist.csv${suffix}`, "tapeline-watchlist.csv");
+  },
 
   // --- Two-factor auth (TOTP) — all tiers, /app/settings/security ----------
   twoFAStatus: () => get<{ enabled: boolean }>("/api/me/2fa"),
