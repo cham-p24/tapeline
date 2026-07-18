@@ -8,6 +8,14 @@ import { errorMessage } from "@/lib/api";
 import { safeNext } from "@/lib/safeNext";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { useUser } from "@/components/UserContext";
+import {
+  FormAlert,
+  FormField,
+  validateAuthCode,
+  validateCurrentPassword,
+  validateEmail,
+  type FieldError,
+} from "@/components/FormField";
 
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
 export default function SignInPage() {
@@ -48,6 +56,12 @@ function SignInForm() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Per-field errors keyed by input id — set on BLUR and on a failed submit,
+  // cleared (never raised) while the user types. See components/FormField.tsx.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, FieldError>>({});
+  const setFieldError = (id: string, msg: FieldError) =>
+    setFieldErrors((prev) => ({ ...prev, [id]: msg }));
+
   // 2FA second step. When the account has TOTP enabled, the password submit
   // returns an mfa_token instead of a session; we then show the code prompt.
   const [mfaToken, setMfaToken] = useState<string | null>(null);
@@ -65,6 +79,27 @@ function SignInForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+
+    // Catch the empty/malformed cases here rather than spending a round-trip
+    // to have the backend answer "incorrect email or password" — which would
+    // wrongly imply the credentials were wrong when the email was simply
+    // mistyped. Neither branch clears the inputs.
+    const nextErrors: Record<string, FieldError> = {
+      "signin-email": validateEmail(email),
+      "signin-password": validateCurrentPassword(password),
+    };
+    setFieldErrors(nextErrors);
+    const invalid = Object.keys(nextErrors).filter((id) => nextErrors[id]);
+    if (invalid.length > 0) {
+      setErr(
+        invalid.length === 1
+          ? "One field needs fixing before we can sign you in — the details are next to it below."
+          : `${invalid.length} fields need fixing before we can sign you in — the details are next to each one below.`,
+      );
+      document.getElementById(invalid[0])?.focus();
+      return;
+    }
+
     setBusy(true);
     try {
       const res = await authApi.signin(email, password);
@@ -86,6 +121,12 @@ function SignInForm() {
     e.preventDefault();
     if (!mfaToken) return;
     setErr(null);
+    const codeErr = validateAuthCode(mfaCode);
+    if (codeErr) {
+      setFieldError("signin-mfa-code", codeErr);
+      document.getElementById("signin-mfa-code")?.focus();
+      return;
+    }
     setBusy(true);
     try {
       await authApi.signin2fa(mfaToken, mfaCode.trim());
@@ -101,6 +142,7 @@ function SignInForm() {
     setMfaToken(null);
     setMfaCode("");
     setErr(null);
+    setFieldErrors({});
   }
 
   return (
@@ -121,27 +163,24 @@ function SignInForm() {
                 Enter the 6-digit code from your authenticator app — or a recovery code.
               </p>
 
-              <form onSubmit={submitCode} className="mt-8 space-y-4">
-                <label className="block">
-                  <span className="text-xs font-medium text-muted">Authentication code</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    autoFocus
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value)}
-                    placeholder="123456"
-                    required
-                    className="mt-1.5 block h-11 w-full rounded-md border border-border bg-panel px-3 text-center text-lg tracking-[0.4em] nums transition-colors focus:border-accent focus:outline-none"
-                  />
-                </label>
+              <form onSubmit={submitCode} noValidate className="mt-8 space-y-4">
+                <FormField
+                  id="signin-mfa-code"
+                  label="Authentication code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={mfaCode}
+                  onChange={(v) => { setMfaCode(v); setFieldError("signin-mfa-code", null); }}
+                  onBlur={() => setFieldError("signin-mfa-code", validateAuthCode(mfaCode))}
+                  error={fieldErrors["signin-mfa-code"]}
+                  placeholder="123456"
+                  required
+                  inputClassName="text-center text-lg tracking-[0.4em] nums"
+                />
 
-                {err && (
-                  <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
-                    {err}
-                  </div>
-                )}
+                <FormAlert message={err} />
 
                 <button
                   type="submit"
@@ -183,9 +222,32 @@ function SignInForm() {
                 />
               </div>
 
-              <form onSubmit={submit} className="mt-6 space-y-4">
-                <Field label="Email" type="email" autoComplete="email" value={email} onChange={setEmail} required />
-                <Field label="Password" type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
+              {/* noValidate — see the same note on /signup: we own the
+                  messages, so the browser's generic constraint bubbles must
+                  not preempt them. */}
+              <form onSubmit={submit} noValidate className="mt-6 space-y-4">
+                <FormField
+                  id="signin-email"
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(v) => { setEmail(v); setFieldError("signin-email", null); }}
+                  onBlur={() => setFieldError("signin-email", validateEmail(email))}
+                  error={fieldErrors["signin-email"]}
+                  required
+                />
+                <FormField
+                  id="signin-password"
+                  label="Password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(v) => { setPassword(v); setFieldError("signin-password", null); }}
+                  onBlur={() => setFieldError("signin-password", validateCurrentPassword(password))}
+                  error={fieldErrors["signin-password"]}
+                  required
+                />
 
                 <div className="flex justify-end">
                   <Link href="/forgot-password" className="text-xs text-muted underline-offset-4 hover:text-fg hover:underline">
@@ -193,11 +255,7 @@ function SignInForm() {
                   </Link>
                 </div>
 
-                {err && (
-                  <div className="rounded-md border border-down/30 bg-down/5 p-3 text-sm text-down">
-                    {err}
-                  </div>
-                )}
+                <FormAlert message={err} />
 
                 <button
                   type="submit"
@@ -217,27 +275,5 @@ function SignInForm() {
         </div>
       </div>
     </main>
-  );
-}
-
-function Field({
-  label, type, value, onChange, autoComplete, required, minLength,
-}: {
-  label: string; type: string; value: string; onChange: (v: string) => void;
-  autoComplete?: string; required?: boolean; minLength?: number;
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-muted">{label}</span>
-      <input
-        type={type}
-        autoComplete={autoComplete}
-        required={required}
-        minLength={minLength}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block h-11 w-full rounded-md border border-border bg-panel px-3 text-base transition-colors focus:border-accent focus:outline-none"
-      />
-    </label>
   );
 }

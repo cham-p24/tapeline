@@ -65,11 +65,17 @@ export function LandingCta({
 }: Props) {
   return (
     <div className={className}>
+      {/* Both CTAs carry the same pill weight — the secondary is outlined,
+          not muted `btn-ghost`, so the "inspect the record before committing"
+          path reads as a real option rather than a footnote. */}
       <div className="flex flex-wrap gap-3">
         <Link href={`/signup?from=${from}`} className="btn-primary">
           {primaryLabel} &rarr;
         </Link>
-        <Link href={secondaryHref} className="btn-ghost">
+        <Link
+          href={secondaryHref}
+          className="btn border border-border bg-panel text-fg transition-colors hover:border-accent/50 hover:bg-panel/70"
+        >
           {secondaryLabel}
         </Link>
       </div>
@@ -83,6 +89,13 @@ export function LandingCta({
       >
         <li className="flex items-center gap-1.5">
           <Check /> Free forever tier — no card
+        </li>
+        {/* The trial was previously unnamed here: the strip advertised the
+            free tier and the paid price, so the 14-day Premium trial — the
+            actual thing the primary CTA starts — was invisible until the
+            signup page. Stated as fact, no deadline framing (R6). */}
+        <li className="flex items-center gap-1.5">
+          <Check /> 14-day Premium trial — no card, nothing charged
         </li>
         <li className="flex items-center gap-1.5">
           <Check /> Pro from {usd(PRICING.pro.monthly)}/mo · {usd(PRICING.pro.annual)}/yr
