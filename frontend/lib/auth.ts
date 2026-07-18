@@ -121,7 +121,14 @@ export const FEATURE_TIERS = {
   "ticker.full":        "pro" as const,
   "congress":           "premium" as const,
   "alerts.telegram":    "premium" as const,
-  "alerts.web_push":    "pro" as const,
+  // Web push is the FREE "alert taste" channel. Mirrors backend
+  // tier.FEATURES["alerts.web_push"] = Tier.FREE (deliberate activation bet,
+  // 2026-07-04): free users may create up to FREE_WEB_PUSH_ALERTS web-push
+  // rules AND subscribe this browser. The small allowance is a COUNT cap
+  // enforced server-side in routers/alerts.py, not a binary gate here.
+  // Was "pro", which paywalled the browser-subscribe UI on /app/billing so
+  // free users' web-push rules could never actually deliver.
+  "alerts.web_push":    "free" as const,
   "briefing":           "premium" as const,
   "api":                "premium" as const,
   "holdings.elite":     "premium" as const,

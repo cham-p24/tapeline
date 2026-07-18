@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
-import { api, type ScannerRow, errorMessage } from "@/lib/api";
+import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
 import { trackEvent } from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
@@ -15,6 +15,7 @@ import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { PresetMenu } from "@/components/PresetMenu";
 import { RegimeLabel } from "@/components/RegimeLabel";
+import { PaywallModal } from "@/components/Paywall";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { useUser } from "@/components/UserContext";
@@ -130,6 +131,10 @@ export default function ScannerPage() {
   // the instant the button is clicked and is reverted only on a hard failure
   // (a 409 "already in watchlist" keeps it, since it IS in the list).
   const [added, setAdded] = useState<Set<string>>(new Set());
+  // Server's watchlist-cap message when an add 403s (e.g. "Watchlist limit
+  // reached (5 tickers on free)…"). Non-null opens the upgrade modal — this
+  // is the single highest-intent moment, so it must never fail silently.
+  const [watchlistCapMsg, setWatchlistCapMsg] = useState<string | null>(null);
   // Upcoming-earnings lookup (symbol → next report date) for the row-level
   // "reports in Nd" pill. Fetched once; non-fatal if it fails.
   const earningsBySymbol = useEarningsCalendar(14);
@@ -329,6 +334,13 @@ export default function ScannerPage() {
         n.delete(symbol);
         return n;
       });
+      // 403 = server-enforced watchlist cap. Open the upgrade modal with the
+      // backend's real cap message instead of letting the star silently
+      // un-fill with zero feedback.
+      if (e instanceof TierGateError) {
+        setWatchlistCapMsg(e.message);
+        return;
+      }
       if (m.includes("401")) {
         window.location.href = `/signin?next=${encodeURIComponent("/app/scanner")}`;
       }
@@ -598,6 +610,16 @@ export default function ScannerPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Watchlist-cap upgrade moment — opens when the server 403s a star
+          click. Backend message carries the real cap numbers. */}
+      <PaywallModal
+        open={watchlistCapMsg != null}
+        onClose={() => setWatchlistCapMsg(null)}
+        feature="watchlist"
+        heading="Your watchlist is full"
+        description={watchlistCapMsg ?? undefined}
+      />
     </div>
   );
 }

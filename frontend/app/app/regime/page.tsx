@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type Regime } from "@/lib/api";
+import { api, type Regime, TierGateError } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { CardSkeleton } from "@/components/Skeleton";
 import { FearGreedDial } from "@/components/FearGreedDial";
+import { Paywall } from "@/components/Paywall";
 
 /**
  * Market Regime page.
@@ -144,6 +145,13 @@ export default function RegimePage() {
       setR(await api.regime());
       setLoadError(null);
     } catch (e) {
+      // 403 (Free tier) → the <Paywall> wrapper below owns the presentation.
+      // Rendering the error card here was a dead end: "Try again" can never
+      // succeed for the tier, and the copy never mentioned upgrading.
+      if (e instanceof TierGateError) {
+        setLoadError(null);
+        return;
+      }
       console.error(e);
       setLoadError(e instanceof Error ? e.message : "Failed to load regime");
     }
@@ -184,6 +192,10 @@ export default function RegimePage() {
         </div>
       </details>
 
+      {/* Pro gate — same pattern as the sibling gated pages (heatmap,
+          holdings): Free users see the upgrade card over a blurred skeleton
+          instead of a dead-end error + eternally failing "Try again". */}
+      <Paywall feature="regime.full" title="Market Regime dashboard">
       {loadError && (
         <div className="card mt-5 border border-down/30 p-4 text-sm">
           <p className="text-down">Couldn&apos;t load the regime feed.</p>
@@ -279,6 +291,7 @@ export default function RegimePage() {
           </div>
         </>
       ) : null}
+      </Paywall>
     </div>
   );
 }

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type WatchlistItem, type WatchlistRow, errorMessage } from "@/lib/api";
+import { api, type WatchlistItem, type WatchlistRow, TierGateError, errorMessage } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { WatchlistTabs } from "@/components/WatchlistTabs";
+import { PaywallModal } from "@/components/Paywall";
 import { useUser } from "@/components/UserContext";
 import { SearchBox, useDebounced } from "@/components/FilterBar";
 import { matchesQuery } from "@/lib/filters";
@@ -45,6 +46,9 @@ export default function WatchlistPage() {
   // that extends GET /api/watchlist with `?list_id=X`.
   const [lists, setLists] = useState<WatchlistRow[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
+  // Server's watchlist-cap message when an add 403s. Non-null opens the
+  // upgrade modal (replaces the old native alert() at this moment).
+  const [capMsg, setCapMsg] = useState<string | null>(null);
 
   // Refresh the starter pack from the API on mount. Falls back to the
   // hardcoded mega-cap list if the call fails for any reason.
@@ -101,6 +105,12 @@ export default function WatchlistPage() {
       load();
       loadLists();  // refresh list counts shown in the tab strip
     } catch (e: unknown) {
+      // 403 = server-enforced watchlist cap. Open the upgrade modal with the
+      // backend's real cap message — the old native alert() was a dead end.
+      if (e instanceof TierGateError) {
+        setCapMsg(e.message);
+        return;
+      }
       const m = errorMessage(e);
       if (m.includes("401")) {
         // Session probably expired. Send them through signin and come back here.
@@ -330,6 +340,16 @@ export default function WatchlistPage() {
         </table>
       </div>
       )}
+
+      {/* Watchlist-cap upgrade moment — opens when the server 403s an add.
+          Backend message carries the real cap numbers. */}
+      <PaywallModal
+        open={capMsg != null}
+        onClose={() => setCapMsg(null)}
+        feature="watchlist"
+        heading="Your watchlist is full"
+        description={capMsg ?? undefined}
+      />
     </div>
   );
 }

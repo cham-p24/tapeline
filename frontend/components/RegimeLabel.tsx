@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, TierGateError } from "@/lib/api";
 
 /**
  * Market-regime context label.
@@ -37,6 +37,11 @@ const TONE: Record<string, string> = {
 
 export function RegimeLabel({ className = "" }: { className?: string }) {
   const [regime, setRegime] = useState<string | null>(null);
+  // 403 = viewer's tier doesn't include the regime feed (Pro feature). We
+  // still render a pill — a locked one linking to /app/regime, where the
+  // Paywall explains the upgrade. Silently rendering nothing hid the
+  // feature's existence from the exact users who could pay for it.
+  const [gated, setGated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,13 +50,26 @@ export function RegimeLabel({ className = "" }: { className?: string }) {
       .then((r) => {
         if (!cancelled) setRegime(r.regime || null);
       })
-      .catch(() => {
-        /* non-fatal — pill just doesn't render */
+      .catch((e: unknown) => {
+        if (!cancelled && e instanceof TierGateError) setGated(true);
+        /* other failures are non-fatal — pill just doesn't render */
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  if (gated)
+    return (
+      <Link
+        href="/app/regime"
+        title="Market regime is part of the Pro plan — it acts as a multiplier on every Tapeline score. See what it includes."
+        className={`inline-flex items-center gap-1.5 rounded-full bg-muted/15 px-2.5 py-1 text-xs font-medium text-muted transition hover:opacity-80 ${className}`}
+      >
+        <span className="opacity-70">Regime:</span>
+        <span className="font-semibold">Pro feature →</span>
+      </Link>
+    );
 
   if (!regime) return null;
   const tone = TONE[regime.toUpperCase()] ?? "bg-muted/20 text-muted";
