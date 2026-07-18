@@ -10,6 +10,7 @@ import { RecentTickers } from "@/components/RecentTickers";
 import { WatchlistTabs } from "@/components/WatchlistTabs";
 import { PaywallModal } from "@/components/Paywall";
 import { useUser } from "@/components/UserContext";
+import { canUse } from "@/lib/auth";
 import { SearchBox, useDebounced } from "@/components/FilterBar";
 import { matchesQuery } from "@/lib/filters";
 
@@ -49,6 +50,10 @@ export default function WatchlistPage() {
   // Server's watchlist-cap message when an add 403s. Non-null opens the
   // upgrade modal (replaces the old native alert() at this moment).
   const [capMsg, setCapMsg] = useState<string | null>(null);
+  // CSV export (Pro). Button is shown-locked for Free — clicking opens the
+  // paywall instead of downloading. `exporting` guards double-clicks.
+  const [csvPaywallOpen, setCsvPaywallOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Refresh the starter pack from the API on mount. Falls back to the
   // hardcoded mega-cap list if the call fails for any reason.
@@ -141,6 +146,31 @@ export default function WatchlistPage() {
     }
   }
 
+  const canExportCsv = canUse(user, "csv_export");
+
+  // Export the watchlist (narrowed to the active tab when one is selected)
+  // as CSV. Free tier: shown-locked — the click opens the paywall, never a
+  // hidden control. The client tier check is a UX shortcut; the server's
+  // 403 is authoritative and routes to the same paywall.
+  async function exportCsv() {
+    if (!canExportCsv) {
+      setCsvPaywallOpen(true);
+      return;
+    }
+    setExporting(true);
+    try {
+      await api.exportWatchlistCsv(activeId);
+    } catch (e: unknown) {
+      if (e instanceof TierGateError) {
+        setCsvPaywallOpen(true);
+        return;
+      }
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function seedStarter() {
     setSeeding(true);
     try {
@@ -167,7 +197,26 @@ export default function WatchlistPage() {
           <h1 className="text-2xl font-bold tracking-tight">Watchlist</h1>
           <p className="text-sm text-muted">Track tickers you care about. Smart alerts fire when scores drift meaningfully.</p>
         </div>
-        <LiveBadge status={status} lastUpdate={lastUpdate} />
+        <div className="flex items-center gap-3">
+          {/* CSV export — downloads this watchlist with current scores (Pro+).
+              Shown-locked for Free: visible, labelled with the required tier,
+              opens the paywall on click. Never hidden — it's a sold feature. */}
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={exporting}
+            className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              canExportCsv
+                ? "Download your watchlist as CSV"
+                : "CSV export is a Pro feature"
+            }
+            aria-label={canExportCsv ? "Export CSV" : "Export CSV (Pro feature)"}
+          >
+            {exporting ? "Exporting…" : canExportCsv ? "Export CSV" : "Export CSV · Pro"}
+          </button>
+          <LiveBadge status={status} lastUpdate={lastUpdate} />
+        </div>
       </div>
 
       <div className="mt-4">
@@ -349,6 +398,14 @@ export default function WatchlistPage() {
         feature="watchlist"
         heading="Your watchlist is full"
         description={capMsg ?? undefined}
+      />
+
+      {/* CSV-export upgrade moment — a Free click on the shown-locked
+          Export CSV button (or a server 403) lands here. */}
+      <PaywallModal
+        open={csvPaywallOpen}
+        onClose={() => setCsvPaywallOpen(false)}
+        feature="csv_export"
       />
     </div>
   );

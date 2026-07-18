@@ -19,6 +19,7 @@ import { PaywallModal } from "@/components/Paywall";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { useUser } from "@/components/UserContext";
+import { canUse } from "@/lib/auth";
 import {
   FilterBar,
   SearchBox,
@@ -135,6 +136,11 @@ export default function ScannerPage() {
   // reached (5 tickers on free)…"). Non-null opens the upgrade modal — this
   // is the single highest-intent moment, so it must never fail silently.
   const [watchlistCapMsg, setWatchlistCapMsg] = useState<string | null>(null);
+  // CSV export (Pro). The button is shown-locked for Free — clicking it opens
+  // this paywall instead of downloading. `exporting` guards double-clicks
+  // while the download request is in flight.
+  const [csvPaywallOpen, setCsvPaywallOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   // Upcoming-earnings lookup (symbol → next report date) for the row-level
   // "reports in Nd" pill. Fetched once; non-fatal if it fails.
   const earningsBySymbol = useEarningsCalendar(14);
@@ -257,6 +263,41 @@ export default function ScannerPage() {
 
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
+
+  const canExportCsv = canUse(user, "csv_export");
+
+  // Export the CURRENT result set (same filter params as `load`) as CSV.
+  // Free tier: the button stays visible (shown-locked feature — it's sold on
+  // every pricing surface) but opens the paywall instead of downloading. The
+  // client-side tier check is a UX shortcut only; the server 403 is the
+  // authoritative gate, and a stale-tier 403 opens the same paywall.
+  const exportCsv = useCallback(async () => {
+    if (!canExportCsv) {
+      setCsvPaywallOpen(true);
+      return;
+    }
+    setExporting(true);
+    try {
+      const params: Record<string, string | number> = {
+        min_score: minScore === "" ? 0 : minScore,
+        max_score: maxScore === "" ? 100 : maxScore,
+        sort,
+        order,
+      };
+      if (sector) params.sector = sector;
+      if (signal) params.signal = signal;
+      if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
+      await api.exportScannerCsv(params);
+    } catch (e: unknown) {
+      if (e instanceof TierGateError) {
+        setCsvPaywallOpen(true);
+        return;
+      }
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
+  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
 
   // Asset-class is the only client-side filter on this page (no backend
   // param). Everything else is already applied server-side, so we only
@@ -439,6 +480,23 @@ export default function ScannerPage() {
           }}
           onApply={applyPreset}
         />
+        {/* CSV export — downloads the current filtered result set (Pro+).
+            Shown-locked for Free: visible, labelled with the required tier,
+            opens the paywall on click. Never hidden — it's a sold feature. */}
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={exporting}
+          className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          title={
+            canExportCsv
+              ? "Download the current result set as CSV"
+              : "CSV export is a Pro feature"
+          }
+          aria-label={canExportCsv ? "Export CSV" : "Export CSV (Pro feature)"}
+        >
+          {exporting ? "Exporting…" : canExportCsv ? "Export CSV" : "Export CSV · Pro"}
+        </button>
       </FilterBar>
 
       {/* Onboarding pre-tune chip — explains WHY the sector filter arrived
@@ -619,6 +677,14 @@ export default function ScannerPage() {
         feature="watchlist"
         heading="Your watchlist is full"
         description={watchlistCapMsg ?? undefined}
+      />
+
+      {/* CSV-export upgrade moment — a Free click on the shown-locked
+          Export CSV button (or a server 403) lands here. */}
+      <PaywallModal
+        open={csvPaywallOpen}
+        onClose={() => setCsvPaywallOpen(false)}
+        feature="csv_export"
       />
     </div>
   );
