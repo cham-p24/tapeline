@@ -186,9 +186,7 @@ async def test_onboarding_opt_in_sets_weekly_newsletter_bit(client, monkeypatch)
         r2 = await client.post(
             "/api/me/onboarding",
             json={
-                "experience_level": "intermediate",
                 "trading_style": "swing",
-                "portfolio_band": "10_50k",
                 "referral_source": "twitter_x",
                 "marketing_opt_in": True,
                 "sectors_of_interest": ["technology"],

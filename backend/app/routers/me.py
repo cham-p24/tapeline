@@ -118,9 +118,9 @@ async def me(
             if user.onboarding_completed_at else None
         ),
         "profile": {
-            "experience_level": user.experience_level,
+            # experience_level / portfolio_band are NO LONGER collected or
+            # exposed (removed 2026-07-18) — see OnboardingBody below.
             "trading_style": user.trading_style,
-            "portfolio_band": user.portfolio_band,
             "referral_source": user.referral_source,
             "marketing_opt_in": user.marketing_opt_in,
             "sectors_of_interest": (
@@ -136,11 +136,10 @@ async def me(
 # answers) or an empty body (user clicked Skip). Either path stamps
 # `onboarding_completed_at` so the user is only prompted once.
 
-ExperienceLevel = Literal["beginner", "intermediate", "advanced"]
+# NOTE: ExperienceLevel and PortfolioBand were deleted 2026-07-18 along with
+# the onboarding questions that fed them — collecting experience level or
+# portfolio/capital size is suitability data (Rule 8). Do not re-add them.
 TradingStyle = Literal["day", "swing", "longterm", "mixed"]
-PortfolioBand = Literal[
-    "under_10k", "10_50k", "50_250k", "250k_plus", "prefer_not_to_say",
-]
 ReferralSource = Literal[
     "twitter_x", "reddit", "youtube", "podcast", "friend", "search",
     "hacker_news", "other",
@@ -297,9 +296,15 @@ async def _seed_watchlist_for_new_user(
 
 
 class OnboardingBody(BaseModel):
-    experience_level: ExperienceLevel | None = None
+    # SUITABILITY DATA IS NOT COLLECTED. experience_level and portfolio_band
+    # were removed 2026-07-18: experience level and capital/portfolio size are
+    # inputs to the personal-advice test, and collecting them is what turns
+    # general information into personal financial advice. Do not reintroduce
+    # them, and do not add risk tolerance, holdings, or investment goals.
+    # Use-case fields below (how you trade, where you heard of us) are fine
+    # ONLY while they never change which securities or factor weightings a
+    # user is shown. See docs/COMPLIANCE_COPY_RULES.md (Rule 8).
     trading_style: TradingStyle | None = None
-    portfolio_band: PortfolioBand | None = None
     referral_source: ReferralSource | None = None
     # None (or omitted) = "no answer" — the handler leaves the stored consent
     # UNTOUCHED. The onboarding page sends null on Skip and when the user
@@ -329,9 +334,7 @@ async def submit_onboarding(
     sectors = [s.strip().lower() for s in body.sectors_of_interest if s]
     sectors = [s for s in sectors if s in _ALLOWED_SECTORS]
 
-    user.experience_level = body.experience_level
     user.trading_style = body.trading_style
-    user.portfolio_band = body.portfolio_band
     user.referral_source = body.referral_source
     user.sectors_of_interest = ",".join(sectors) if sectors else None
     user.onboarding_completed_at = datetime.now(UTC)

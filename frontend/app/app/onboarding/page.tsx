@@ -37,14 +37,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 // per browser. New Google users land here at /app/onboarding?oauth=1.
 const OAUTH_CONVERSION_FIRED_KEY = "tapeline_oauth_conversion_fired";
 
-type Experience = "beginner" | "intermediate" | "advanced";
 type Style = "day" | "swing" | "longterm" | "mixed";
-type Band =
-  | "under_10k"
-  | "10_50k"
-  | "50_250k"
-  | "250k_plus"
-  | "prefer_not_to_say";
 type Source =
   | "twitter_x"
   | "reddit"
@@ -55,25 +48,11 @@ type Source =
   | "hacker_news"
   | "other";
 
-const EXPERIENCE: { value: Experience; label: string; hint: string }[] = [
-  { value: "beginner", label: "Beginner", hint: "< 1 year, learning the ropes" },
-  { value: "intermediate", label: "Intermediate", hint: "1–5 years, comfortable" },
-  { value: "advanced", label: "Advanced", hint: "5+ years, set in your process" },
-];
-
 const STYLES: { value: Style; label: string; hint: string }[] = [
   { value: "day", label: "Day trader", hint: "Intraday, flat by close" },
   { value: "swing", label: "Swing trader", hint: "Hold days to weeks" },
   { value: "longterm", label: "Long-term", hint: "Months to years" },
   { value: "mixed", label: "Mixed", hint: "Different bucket for different setups" },
-];
-
-const BANDS: { value: Band; label: string }[] = [
-  { value: "under_10k", label: "Under $10k" },
-  { value: "10_50k", label: "$10k – $50k" },
-  { value: "50_250k", label: "$50k – $250k" },
-  { value: "250k_plus", label: "$250k+" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
 ];
 
 const SOURCES: { value: Source; label: string }[] = [
@@ -119,9 +98,7 @@ function OnboardingForm() {
   // (//evil.com, https://evil.com) forwarded from /signup?next=…
   const next = safeNext(qp.get("next"));
 
-  const [experience, setExperience] = useState<Experience | "">("");
   const [style, setStyle] = useState<Style | "">("");
-  const [band, setBand] = useState<Band | "">("");
   const [source, setSource] = useState<Source | "">("");
   const [sectors, setSectors] = useState<string[]>([]);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
@@ -249,9 +226,7 @@ function OnboardingForm() {
     setErr(null);
     try {
       const body = {
-        experience_level: skipped ? null : experience || null,
         trading_style: skipped ? null : style || null,
-        portfolio_band: skipped ? null : band || null,
         referral_source: skipped ? null : source || null,
         // null = "no answer" — the backend leaves stored consent untouched.
         // Sent on Skip AND when the checkbox was never touched, so neither
@@ -306,17 +281,15 @@ function OnboardingForm() {
       </p>
 
       <div className="mt-8 space-y-8">
-        <Section label="What's your investing experience?">
-          <ButtonRow
-            options={EXPERIENCE.map((o) => ({
-              value: o.value,
-              label: o.label,
-              hint: o.hint,
-            }))}
-            value={experience}
-            onChange={(v) => setExperience(v as Experience)}
-          />
-        </Section>
+        {/* Investing-experience and portfolio-size questions were REMOVED
+            2026-07-18. Collecting experience level or capital/portfolio size
+            is suitability data: under the personal-advice test it is one of
+            the inputs that turns general information into personal financial
+            advice. Do not reintroduce them, and do not add risk tolerance,
+            holdings, or investment goals. Use-case questions (how you trade,
+            which sectors interest you) are fine — they must never change
+            which securities or factor weightings a user is shown.
+            See docs/COMPLIANCE_COPY_RULES.md (Rule 8). */}
 
         <Section label="How do you typically trade?">
           <ButtonRow
@@ -327,14 +300,6 @@ function OnboardingForm() {
             }))}
             value={style}
             onChange={(v) => setStyle(v as Style)}
-          />
-        </Section>
-
-        <Section label="Roughly what size portfolio do you run?">
-          <ButtonRow
-            options={BANDS.map((o) => ({ value: o.value, label: o.label }))}
-            value={band}
-            onChange={(v) => setBand(v as Band)}
           />
         </Section>
 
