@@ -17,10 +17,6 @@ from app.db import get_session
 from app.models import AlertEvent, User, WatchlistItem
 from app.services.auth import current_user_required
 from app.services.tier import TIER_LIMITS, Tier, effective_limit, is_on_trial, limit
-# Same-package import of the metering authority. _is_unmetered is the ONE place
-# that decides who the daily look-up cap applies to (paid tier OR active no-card
-# trial OR first-session grace window); re-deriving that here would drift the
-# moment one of those levers moves.
 from app.services.usage import _is_unmetered as lookups_unmetered
 
 router = APIRouter()
@@ -69,9 +65,13 @@ async def my_usage(
     # so /app/usage couldn't render it and the cap arrived unannounced.
     #
     # cap = None is the UNLIMITED sentinel (paid tier / active trial / first-
-    # session grace). `used` is scoped to today: a counter still stamped with a
-    # previous UTC date has already logically rolled over, so it reads 0 here
-    # exactly as the next look-up would reset it.
+    # session grace). services.usage._is_unmetered (imported as
+    # lookups_unmetered) is the ONE place that decides who the cap applies to;
+    # re-deriving those three levers here would drift the moment one moves.
+    #
+    # `used` is scoped to today: a counter still stamped with a previous UTC
+    # date has already logically rolled over, so it reads 0 here exactly as the
+    # next look-up would reset it.
     lookup_cap = None if lookups_unmetered(user) else limit(user.tier, "daily_lookups")
     today = datetime.now(UTC).date()
     lookups_used = (user.lookups_today or 0) if user.lookups_reset_on == today else 0
