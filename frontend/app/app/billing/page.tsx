@@ -16,7 +16,8 @@ import {
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving, DEFAULT_BILLING_PERIOD } from "@/lib/pricing";
+import { BillingPeriodProvider } from "@/components/BillingToggle";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -53,10 +54,11 @@ export default function BillingPage() {
   const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "info" | "ok" | "err"; text: string } | null>(null);
-  // Monthly is the default — the smaller first yes. Annual stays one click
-  // away with its saving flagged on the toggle. ?billing= intent from
-  // /pricing still overrides this below.
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  // ANNUAL is the default (founder decision 2026-07-18) — monthly stays one
+  // click away, and every annual per-month figure carries its billed-annually
+  // total on the card note. ?billing= intent from /pricing still overrides
+  // this below.
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">(DEFAULT_BILLING_PERIOD);
   const [showPlans, setShowPlans] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [winbackOffer, setWinbackOffer] = useState(false);
@@ -577,7 +579,12 @@ export default function BillingPage() {
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
               <div className="p-5 pt-2">
-                <ComparisonTable />
+                {/* The embedded comparison header follows THIS page's toggle
+                    so the plan cards above and this table can never show
+                    different billing periods on one screen. */}
+                <BillingPeriodProvider value={billingPeriod}>
+                  <ComparisonTable />
+                </BillingPeriodProvider>
               </div>
             </details>
           </div>

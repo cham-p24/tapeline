@@ -27,6 +27,17 @@ export const PRICING = {
   premium: { monthly: 19.99, annual: 199, annualPerMonth: 16.58 },
 } as const;
 
+export type BillingPeriod = "monthly" | "annual";
+
+/**
+ * Sitewide default billing period for pricing displays. FOUNDER DECISION
+ * (2026-07-18): default to ANNUAL everywhere, with the annual total always
+ * explicit next to the per-month rate ("$8.25/mo · billed annually ($99/yr)");
+ * monthly stays one click away. Every toggle that isn't overridden by explicit
+ * user intent (e.g. ?billing=monthly) seeds from this constant.
+ */
+export const DEFAULT_BILLING_PERIOD: BillingPeriod = "annual";
+
 /**
  * Advertised price range, per month. low = cheapest real per-month price
  * (Pro billed annually), high = priciest (Premium month-to-month). Drives the
@@ -89,6 +100,27 @@ export const REFUND = {
 
 /** Format a number as a 2-decimal USD string, e.g. usd(8.25) -> "$8.25". */
 export const usd = (n: number): string => `$${n.toFixed(2)}`;
+
+/**
+ * Format USD dropping the cents when the amount is a whole-dollar figure,
+ * e.g. usdCompact(99) -> "$99", usdCompact(8.25) -> "$8.25". Used for annual
+ * totals ("$99/yr") where ".00" is noise.
+ */
+export const usdCompact = (n: number): string =>
+  Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+
+/**
+ * The mandatory qualifier for any advertised annual per-month rate:
+ * "billed annually ($99/yr)". An annual per-month figure must NEVER render
+ * without this qualifier (or an equivalent stating the real total) directly
+ * attached — a bare "$8.25/mo" reads as a monthly plan price, which it isn't.
+ */
+export const billedAnnuallyNote = (p: { annual: number }): string =>
+  `billed annually (${usdCompact(p.annual)}/yr)`;
+
+/** Full annual rate label, e.g. "$8.25/mo · billed annually ($99/yr)". */
+export const annualRateLabel = (p: { annual: number; annualPerMonth: number }): string =>
+  `${usd(p.annualPerMonth)}/mo · ${billedAnnuallyNote(p)}`;
 
 /**
  * Annual saving vs paying month-to-month for a full year, floored to a whole

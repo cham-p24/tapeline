@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { PRICING, FREE_LIMITS, REFUND, annualSaving } from "@/lib/pricing";
-
-type Billing = "monthly" | "annual";
+import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
+import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 
 const PLANS = [
   {
@@ -82,32 +80,17 @@ const PLANS = [
 ];
 
 export function PricingTable() {
-  // Monthly is the default — the smaller first yes. Annual stays one click
-  // away with its saving shown on the toggle badge.
-  const [billing, setBilling] = useState<Billing>("monthly");
+  // ANNUAL is the default (founder decision 2026-07-18) — monthly stays one
+  // click away. State lives in the shared BillingPeriod context so the
+  // ComparisonTable header on the same page can never disagree with these
+  // cards; standalone renders fall back to the same annual default.
+  const { billing, setBilling } = useBillingPeriod();
 
   return (
     <div>
-      {/* Billing toggle */}
+      {/* Billing toggle — drives the page-wide shared billing period */}
       <div className="flex justify-center">
-        <div className="inline-flex rounded-full border border-border bg-panel p-1">
-          {(["monthly", "annual"] as const).map((b) => (
-            <button
-              key={b}
-              onClick={() => setBilling(b)}
-              className={`relative rounded-full px-5 py-1.5 text-sm font-medium transition-all ${
-                billing === b ? "bg-fg text-background" : "text-muted hover:text-fg"
-              }`}
-            >
-              {b === "annual" ? "Annual" : "Monthly"}
-              {b === "annual" && billing !== "annual" && (
-                <span className="absolute -right-2 -top-2 rounded-full bg-up px-1.5 py-0.5 text-[10px] font-bold text-background">
-                  −17%
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <BillingToggle billing={billing} setBilling={setBilling} />
       </div>
       <p className="mt-3 text-center text-xs text-muted">All prices in USD</p>
       {billing === "annual" && (
@@ -151,8 +134,15 @@ export function PricingTable() {
                   </span>
                   <span className="text-muted">/ month</span>
                 </div>
+                {/* An annual per-month figure never renders without the
+                    explicit billed-annually qualifier + the real total. */}
                 {billing === "annual" && price > 0 && (
-                  <p className="mt-1.5 text-xs text-muted">Billed ${price.toFixed(2)}/yr · save ${annualSaving(p.prices)}/yr</p>
+                  <p className="mt-1.5 text-xs text-muted">
+                    {billedAnnuallyNote(p.prices)} · save ${annualSaving(p.prices)}/yr
+                  </p>
+                )}
+                {billing === "monthly" && price > 0 && (
+                  <p className="mt-1.5 text-xs text-muted">billed monthly</p>
                 )}
               </div>
 
