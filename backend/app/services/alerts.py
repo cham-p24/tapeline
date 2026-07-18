@@ -181,10 +181,9 @@ async def evaluate_score_rules(session: AsyncSession) -> int:
     for rule, user in rules:
         if _debounced(rule, now):
             continue
-        candidates = (
-            [tickers[rule.symbol]] if rule.symbol and rule.symbol in tickers
-            else list(tickers.values())
-        )
+        candidates = _candidates(rule, tickers)
+        if candidates is None:
+            continue  # targeted symbol has no scored row this tick
         for t in candidates:
             if t.score is None or rule.threshold is None:
                 continue
@@ -213,10 +212,9 @@ async def evaluate_squeeze_rules(session: AsyncSession) -> int:
     for rule, user in rules:
         if _debounced(rule, now):
             continue
-        candidates = (
-            [squeezes[rule.symbol]] if rule.symbol and rule.symbol in squeezes
-            else list(squeezes.values())
-        )
+        candidates = _candidates(rule, squeezes)
+        if candidates is None:
+            continue  # targeted symbol has no squeeze setup this tick
         threshold = rule.threshold if rule.threshold is not None else 70.0
         for s in candidates:
             if s.spike_score >= threshold:
@@ -387,6 +385,28 @@ async def evaluate_congress_rules(session: AsyncSession) -> int:
 
 # ---- Internals -----------------------------------------------------------
 
+def _candidates[T](rule: AlertRule, by_symbol: dict[str, T]) -> list[T] | None:
+    """Rows a symbol-scoped rule should evaluate against.
+
+    Three distinct outcomes — the middle one used to be collapsed into the
+    third, which made a targeted rule silently scan the WHOLE universe and
+    fire on an unrelated ticker:
+
+      - rule.symbol is None  -> every row ("any ticker" mode)
+      - rule.symbol is set but absent from this tick's data -> None, meaning
+        "evaluate nothing". Routine for squeeze rules, since the worker
+        deletes + repopulates SqueezeSetup every tick.
+      - rule.symbol is set and present -> just that row.
+
+    Symbols are compared uppercased to match how they're stored (and how
+    evaluate_news_rules / evaluate_congress_rules already compare).
+    """
+    if not rule.symbol:
+        return list(by_symbol.values())
+    row = by_symbol.get(rule.symbol.strip().upper())
+    return None if row is None else [row]
+
+
 async def _enabled_rules(session: AsyncSession, rule_type: str) -> list[tuple[AlertRule, User]]:
     result = await session.execute(
         select(AlertRule, User).join(User, AlertRule.user_id == User.id)
@@ -397,6 +417,36 @@ async def _enabled_rules(session: AsyncSession, rule_type: str) -> list[tuple[Al
 
 def _debounced(rule: AlertRule, now: datetime) -> bool:
     return bool(rule.last_fired_at and (now - rule.last_fired_at) < MIN_FIRE_INTERVAL)
+
+
+# Delivery channel -> the tier feature that entitles a user to it. Mirrors the
+# create-time gate in routers/alerts.py:create_rule.
+_CHANNEL_FEATURE: dict[str, str] = {
+    "email": "alerts.email",
+    "telegram": "alerts.telegram",
+    "web_push": "alerts.web_push",
+}
+
+
+def _channel_entitled(user: User, channel: str) -> bool:
+    """Re-check the user's CURRENT tier against the rule's channel.
+
+    Rule rows outlive the entitlement that created them: a trial user authors
+    a Telegram rule on Premium, the trial lapses to free via
+    `_downgrade_expired_trials`, and the rule kept delivering a Premium
+    channel forever. The rule row is deliberately left untouched so delivery
+    resumes automatically if they upgrade again.
+    """
+    from app.services.tier import Tier, has_feature
+
+    feature = _CHANNEL_FEATURE.get(channel)
+    if feature is None:
+        return True  # retired/unknown channel — no dispatch arm to gate anyway
+    try:
+        tier = Tier(user.tier)
+    except ValueError:
+        return False
+    return has_feature(tier, feature)
 
 
 async def _fire(
@@ -418,6 +468,18 @@ async def _fire(
     )
     session.add(event)
     rule.last_fired_at = datetime.now(UTC)
+
+    # Tier re-check at SEND time, not just at rule-creation time. Record the
+    # event either way so the user can see in /app/alerts/history that the rule
+    # DID fire — the channel just isn't on their current plan.
+    if not _channel_entitled(user, rule.channel):
+        event.delivered = False
+        event.message = f"[suppressed: {rule.channel} requires a higher tier] {message}"
+        logger.info(
+            "alert.suppressed_tier user=%s rule=%s tier=%s channel=%s",
+            user.id, rule.id, user.tier, rule.channel,
+        )
+        return
 
     if rule.channel == "email":
         # Respect per-user email-prefs — alert emails are opt-out-able.

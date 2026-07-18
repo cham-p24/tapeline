@@ -30,6 +30,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from svix.webhooks import Webhook
 
 from app.config import get_settings
 from app.db import get_session
@@ -51,10 +52,30 @@ settings = get_settings()
 router = APIRouter()
 
 
-def _verify_resend_signature(body: bytes, header_signature: str | None) -> bool:
-    """Resend signs inbound webhooks with an HMAC-SHA256 over the raw
-    body using `RESEND_INBOUND_SECRET`. Constant-time compare so a
-    leaky signature can't be timing-attacked.
+def _verify_resend_signature(
+    body: bytes,
+    header_signature: str | None,
+    svix_id: str | None = None,
+    svix_timestamp: str | None = None,
+) -> bool:
+    """Verify an inbound Resend webhook against `RESEND_INBOUND_SECRET`.
+
+    Two signing schemes exist, and each is verified with the scheme that
+    actually matches the header it arrived in:
+
+      * **Svix** (`svix-signature: v1,<base64> [v2,<base64> ...]`) — the
+        current Resend scheme. Signed content is
+        `<svix-id>.<svix-timestamp>.<body>`, digest base64-encoded, and
+        the timestamp carries a replay window. Delegated to the `svix`
+        library, same as the Resend deliverability webhook in
+        `routers/webhooks.py`.
+      * **Legacy** (`resend-signature: sha256=<hex>`) — plain
+        HMAC-SHA256 over the raw body, hex-encoded. Constant-time
+        compared so a leaky signature can't be timing-attacked.
+
+    The hex digest is never compared against the svix header: their
+    encodings differ (`v1,<base64>` vs bare hex), so that comparison
+    could never match.
 
     Fails CLOSED in production: when the secret isn't configured the
     request is REJECTED, so an attacker who guesses the URL can't inject
@@ -76,10 +97,26 @@ def _verify_resend_signature(body: bytes, header_signature: str | None) -> bool:
         return True
     if not header_signature:
         return False
+    # Svix headers are a space-separated list of `<version>,<base64>`
+    # entries. Anything else is treated as the legacy hex form.
+    if any(part.startswith("v1,") for part in header_signature.split()):
+        try:
+            Webhook(secret).verify(
+                body,
+                {
+                    "svix-id": svix_id or "",
+                    "svix-timestamp": svix_timestamp or "",
+                    "svix-signature": header_signature,
+                },
+            )
+        except Exception as exc:  # malformed secret raises here too
+            logger.warning("inbox.resend_signature.svix_invalid — %s", exc)
+            return False
+        return True
     expected = hmac.new(
         secret.encode("utf-8"), body, hashlib.sha256,
     ).hexdigest()
-    # Resend signature header is typically `sha256=<hex>` — accept either form
+    # Legacy header is typically `sha256=<hex>` — accept either form
     sig = header_signature.removeprefix("sha256=").strip()
     return hmac.compare_digest(expected, sig)
 
@@ -89,6 +126,8 @@ async def email_inbound(
     request: Request,
     svix_signature: str | None = Header(None, alias="svix-signature"),
     resend_signature: str | None = Header(None, alias="resend-signature"),
+    svix_id: str | None = Header(None, alias="svix-id"),
+    svix_timestamp: str | None = Header(None, alias="svix-timestamp"),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Resend inbound webhook handler.
@@ -108,10 +147,13 @@ async def email_inbound(
         }
     """
     raw_body = await request.body()
-    # Resend may use either `svix-signature` (modern) or `resend-
-    # signature` (older). Accept either.
+    # Resend may use either `svix-signature` (modern, `v1,<base64>` over
+    # id.timestamp.body) or `resend-signature` (older, raw-body hex).
+    # Accept either — the verifier picks the matching scheme.
     signature = svix_signature or resend_signature
-    if not _verify_resend_signature(raw_body, signature):
+    if not _verify_resend_signature(
+        raw_body, signature, svix_id, svix_timestamp
+    ):
         raise HTTPException(401, "Invalid webhook signature")
 
     payload = await request.json()
