@@ -1,5 +1,6 @@
 import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
+import { FREE_LIMITS } from "@/lib/pricing";
 
 export const metadata = pageMeta({
   title: "Tapeline vs Yahoo Finance (2026): Curated Score vs Free DIY Browsing",
@@ -23,7 +24,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Is Yahoo Finance's free tier good enough for stock picking?",
-    a: "For headlines, news, and basic charting — absolutely. For 'which of these 30 watchlist names should I look at first today', the answer is: not really. Tapeline's free tier (live scores for the top 10 scanner rows, 5 look-ups a day) is the same shape — it's a real-product preview, not a feature-stripped demo.",
+    a: `For headlines, news, and basic charting — absolutely. For 'which of these 30 watchlist names should I look at first today', the answer is: not really. Tapeline's free tier (live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day) is the same shape — it's a real-product preview, not a feature-stripped demo.`,
   },
   {
     q: "Should I use both?",
@@ -72,7 +73,7 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Free price tier",
-    tapeline: "Free forever (live scores, top-10 scanner, 5 look-ups/day)",
+    tapeline: `Free forever (live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day)`,
     competitor: "Free (full quote / news access, 15-min delay)",
     note: "Yahoo's free tier has more raw data access than Tapeline's free tier. Tapeline's free is a real-product preview (same scoring engine, narrower window); Yahoo's free is a full browsing tool without the synthesis layer. Different value proposition: 'see less of more' vs 'see everything but compute it yourself'.",
   },

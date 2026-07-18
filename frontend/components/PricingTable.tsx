@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PRICING, annualSaving } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, annualSaving } from "@/lib/pricing";
 
 type Billing = "monthly" | "annual";
 
@@ -11,11 +11,15 @@ const PLANS = [
     name: "Free",
     tagline: "Free forever — live scores",
     prices: { monthly: 0, annual: 0, annualPerMonth: 0 },
+    // Free-tier numbers derive from FREE_LIMITS (mirrors backend tier.py) so
+    // this card always sells the tier the backend actually enforces.
     highlights: [
       "Live scores — no delay",
-      "5 ticker look-ups per day",
-      "Top-10 scanner rows",
-      "Watchlist (3 tickers)",
+      `${FREE_LIMITS.dailyLookups} ticker look-ups per day — unmetered your first ${FREE_LIMITS.firstSessionGraceHours}h`,
+      `Top-${FREE_LIMITS.scannerRows} scanner rows`,
+      `Watchlist (${FREE_LIMITS.watchlistTickers} tickers)`,
+      `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
+      `${FREE_LIMITS.webPushAlerts} browser push alerts`,
       "Public scorecard, fully open",
     ],
     cta: "Start free",
@@ -193,7 +197,7 @@ export function PricingTable() {
       <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
         <span>14-day Premium trial · no card</span>
         <span className="text-subtle">·</span>
-        <span>30-day money back</span>
+        <span>{REFUND.short}</span>
         <span className="text-subtle">·</span>
         <span>Founding pricing — locked in for early subscribers</span>
         <span className="text-subtle">·</span>

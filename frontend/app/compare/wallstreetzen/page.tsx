@@ -3,7 +3,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
 import { LandingCta } from "@/components/LandingCta";
-import { PRICING, usd } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -98,7 +98,7 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Free tier strength",
-    tapeline: "Live scores, top-10 scanner, 3-ticker watchlist, 5 look-ups/day",
+    tapeline: `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.dailyLookups} look-ups/day`,
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
     note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is narrower on purpose but free forever — same product, smaller window.",
   },
@@ -236,9 +236,9 @@ export default function VsWallStreetZenPage() {
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier (live scores, top-10 scanner, 5 look-ups/day) — no card.
+          Free forever tier (live scores, top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day) — no card.
           Pro from {usd(PRICING.pro.monthly)}/mo ({usd(PRICING.pro.annual)}/yr), with a
-          30-day money-back guarantee.
+          {" "}{REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/signup?from=compare" className="btn-primary">

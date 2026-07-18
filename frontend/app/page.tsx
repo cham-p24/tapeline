@@ -7,6 +7,7 @@ import { FadeIn } from "@/components/FadeIn";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { POSTS } from "./blog/posts";
+import { REFUND } from "@/lib/pricing";
 
 export default function LandingPage() {
   return (
@@ -292,8 +293,12 @@ export default function LandingPage() {
           </Faq>
           <Faq q="What if I cancel?">
             Cancel anytime, one click in billing settings. Monthly plans get a
-            7-day full refund &mdash; if it doesn&rsquo;t click, you owe us
-            nothing.
+            full refund within {REFUND.windowDays} days; annual plans a
+            prorated refund within {REFUND.windowDays} days. See the{" "}
+            <Link href={REFUND.policyPath} className="link">
+              refund policy
+            </Link>
+            .
           </Faq>
           <Faq q="What data do you use?">
             US equities and commodity ETFs from live market data feeds, plus
@@ -333,8 +338,8 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted">
-            No credit card &middot; Cancel in one click &middot; 30-day refund
-            on monthly
+            No credit card &middot; Cancel in one click &middot;{" "}
+            {REFUND.windowDays}-day refund on monthly
           </p>
         </div>
       </section>

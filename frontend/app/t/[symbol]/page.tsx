@@ -27,6 +27,7 @@ import {
   tickerDatasetJsonLd,
 } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
+import { FREE_LIMITS } from "@/lib/pricing";
 
 // ISR: regenerate at most hourly. This route has ~8,400 ticker pages and is
 // the site's biggest crawl surface; without a page-level revalidate it
@@ -548,7 +549,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Telegram unlimited and Congressional-trade alerts. The free tier shows live scores for the top 10 scanner rows plus 5 look-ups a day; ${sym} score alerts specifically require Pro or Premium.`,
+      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Telegram unlimited and Congressional-trade alerts. The free tier shows live scores for the top ${FREE_LIMITS.scannerRows} scanner rows plus ${FREE_LIMITS.dailyLookups} look-ups a day, with ${FREE_LIMITS.webPushAlerts} browser push alerts; ${sym} email or Telegram alerts specifically require Pro or Premium.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,
@@ -867,7 +868,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         <div className="mt-10 sm:mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-5 sm:p-8">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Free signup gives you live scores for the top 10 scanner rows, a 3-ticker watchlist, and 5 look-ups a day — free forever, no card.
+            Free signup gives you live scores for the top {FREE_LIMITS.scannerRows} scanner rows, a {FREE_LIMITS.watchlistTickers}-ticker watchlist, and {FREE_LIMITS.dailyLookups} look-ups a day — free forever, no card.
             Pro unlocks the full ~2,500-ticker real-time scanner with unlimited look-ups and smart alerts; Premium adds congressional trades and recent insider buys (SEC Form 4).
           </p>
           <div className="mt-6 flex flex-wrap gap-3">

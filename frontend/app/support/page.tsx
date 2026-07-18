@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
+import { FREE_LIMITS, REFUND } from "@/lib/pricing";
 
 export const metadata = pageMeta({
   title: "Tapeline Support — Help, Contact, Common Issues, Billing",
@@ -70,10 +71,10 @@ export default function SupportPage() {
             q="My scanner only shows 10 tickers."
             a={
               <>
-                Your account is on Free tier. Free shows live scores for the top 10 scanner rows
+                Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows} scanner rows
                 by design — it's the same product, just narrower. Sign up gets you a 14-day Premium trial
                 automatically (no card). At trial end, no card on file = back to Free forever (live scores,
-                top-10 scanner, 5 look-ups/day, 3-ticker watchlist).{" "}
+                top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist).{" "}
                 <Link href="/app/billing" className="text-accent hover:underline">Add a card →</Link>
               </>
             }
@@ -105,8 +106,9 @@ export default function SupportPage() {
             a={
               <>
                 <Link href="/app/billing" className="text-accent hover:underline">/app/billing</Link>{" "}
-                → "Manage payment in Stripe portal" → Cancel. One click. 30-day money back if you cancel
-                within the first 30 days of any paid plan.
+                → "Manage payment in Stripe portal" → Cancel. One click. A {REFUND.monthly}; a{" "}
+                {REFUND.annual}. Full policy at{" "}
+                <Link href={REFUND.policyPath} className="text-accent hover:underline">{REFUND.policyPath}</Link>.
               </>
             }
           />

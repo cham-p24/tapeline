@@ -1,6 +1,6 @@
 "use client";
 
-import { PRICING, usd, annualSaving } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, usd, annualSaving } from "@/lib/pricing";
 
 /**
  * Three-column comparison: Free / Pro ($9.99/mo or $8.25/mo annual) /
@@ -35,16 +35,16 @@ const SECTIONS: Section[] = [
   {
     name: "Data & coverage",
     rows: [
-      { label: "Scanner rows", free: "Top 10", pro: "Full ~2,500-ticker universe", premium: "Full ~2,500-ticker universe" },
+      { label: "Scanner rows", free: `Top ${FREE_LIMITS.scannerRows}`, pro: "Full ~2,500-ticker universe", premium: "Full ~2,500-ticker universe" },
       { label: "Data freshness", free: "Live — no delay", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
-      { label: "Ticker look-ups per day", free: "5", pro: "Unlimited", premium: "Unlimited" },
+      { label: "Ticker look-ups per day", free: `${FREE_LIMITS.dailyLookups} · unmetered first ${FREE_LIMITS.firstSessionGraceHours}h`, pro: "Unlimited", premium: "Unlimited" },
       { label: "News feed", free: "Headlines only", pro: "Real-time news + sentiment", premium: "Real-time news + sentiment" },
     ],
   },
   {
     name: "Scoring & analysis",
     rows: [
-      { label: "6-factor score breakdown", free: "5 look-ups/day", pro: "Every ticker, every row", premium: "Every ticker, every row" },
+      { label: "6-factor score breakdown", free: `${FREE_LIMITS.dailyLookups} look-ups/day`, pro: "Every ticker, every row", premium: "Every ticker, every row" },
       { label: "Plain-English Why column", free: "On look-ups", pro: "✓", premium: "✓" },
       { label: "TradingView charts", free: "—", pro: "On every ticker page", premium: "On every ticker page" },
     ],
@@ -52,7 +52,7 @@ const SECTIONS: Section[] = [
   {
     name: "Discovery tools",
     rows: [
-      { label: "Squeeze Watch", free: "—", pro: "✓", premium: "✓" },
+      { label: "Squeeze Watch", free: `Top-${FREE_LIMITS.squeezePreviewRows} preview`, pro: "✓", premium: "✓" },
       { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },
       { label: "IPO + Earnings calendars", free: "—", pro: "✓", premium: "✓" },
       { label: "Saved scans", free: "—", pro: "10", premium: "100" },
@@ -61,10 +61,10 @@ const SECTIONS: Section[] = [
   {
     name: "Watchlist & alerts",
     rows: [
-      { label: "Watchlist", free: "5 tickers · no alerts", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+      { label: "Watchlist", free: `${FREE_LIMITS.watchlistTickers} tickers`, pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
-      { label: "Browser push", free: "—", pro: "✓", premium: "✓" },
+      { label: "Browser push", free: `${FREE_LIMITS.webPushAlerts} alert rules`, pro: "✓", premium: "✓" },
       { label: "Telegram alerts", free: "—", pro: "—", premium: "Unlimited · hourly digest" },
     ],
   },
