@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type SqueezeRow } from "@/lib/api";
+import { api, errorMessage, type SqueezeRow, type SqueezePreviewRow } from "@/lib/api";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
+import { useUser } from "@/components/UserContext";
+import { canUse } from "@/lib/auth";
 import { FilterBar, SearchBox, SelectFilter, NumberFilter, useDebounced } from "@/components/FilterBar";
 import { matchesQuery, matchesSelect, inRange } from "@/lib/filters";
 
@@ -16,17 +19,57 @@ const OBV_OPTIONS = [
   { value: "FLAT", label: "Flat" },
 ];
 
+// Mirrors backend routers/squeeze.FREE_SQUEEZE_PREVIEW_LIMIT — how many rows
+// the free /api/squeeze/preview taste returns.
+const FREE_PREVIEW_LIMIT = 3;
+
+// The table renders both feed shapes: the full Pro feed (SqueezeRow) and the
+// free preview (SqueezePreviewRow), which lacks the Pro-only analytics
+// columns — those cells fall back to an em-dash.
+type Row = SqueezePreviewRow &
+  Partial<Pick<SqueezeRow, "volume_multiple" | "obv_trend" | "suggested_window">>;
+
 export default function SqueezePage() {
-  const [rows, setRows] = useState<SqueezeRow[]>([]);
+  // Tier decides which endpoint this page is allowed to poll. Free users used
+  // to hit the Pro-gated /api/squeeze with no catch — every load (and every
+  // SSE re-fire) 403'd silently and the page showed a false "No squeeze
+  // setups" empty state. Now Free polls ONLY /api/squeeze/preview (top-3
+  // taste, succeeds for any logged-in tier) and sees a locked section with
+  // the real remaining count instead.
+  const { user, loading: userLoading } = useUser();
+  const hasFullFeed = canUse(user, "squeeze");
+
+  const [rows, setRows] = useState<Row[]>([]);
+  // Size of the FULL feed, reported by the preview endpoint — drives the
+  // "Top 3 of N" locked-section copy. Null on the full feed (not needed).
+  const [totalSetups, setTotalSetups] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search);
   const [minScore, setMinScore] = useState<number | "">("");
   const [obv, setObv] = useState("");
 
   const load = useCallback(async () => {
-    const r = await api.squeeze();
-    setRows(r.items);
-  }, []);
+    // Don't fire until the session resolves — the tier decides the endpoint,
+    // and guessing wrong just produces a 403.
+    if (userLoading) return;
+    try {
+      if (hasFullFeed) {
+        const r = await api.squeeze();
+        setRows(r.items);
+        setTotalSetups(null);
+      } else {
+        const r = await api.squeezePreview();
+        setRows(r.items);
+        setTotalSetups(r.total_setups);
+      }
+      setLoadError(null);
+    } catch (e) {
+      // A failed load must never masquerade as the "No squeeze setups right
+      // now" empty state — keep whatever rows we have and surface the error.
+      setLoadError(errorMessage(e));
+    }
+  }, [hasFullFeed, userLoading]);
   useEffect(() => { load(); }, [load]);
   const { status, lastUpdate } = useLiveStream(load);
 
@@ -39,6 +82,8 @@ export default function SqueezePage() {
 
   const filtersActive = !!search.trim() || minScore !== "" || !!obv;
   const resetFilters = () => { setSearch(""); setMinScore(""); setObv(""); };
+
+  const isPreview = !userLoading && !hasFullFeed;
 
   return (
     <div>
@@ -78,7 +123,9 @@ export default function SqueezePage() {
       </details>
 
       {/* Filters — all client-side over the fetched rows (no /api/squeeze
-          filter params). */}
+          filter params). The OBV dropdown is hidden on the free preview:
+          preview rows don't carry obv_trend, so the filter could only ever
+          empty the table. */}
       <FilterBar
         trailing={<>Showing <strong className="text-fg">{visibleRows.length}</strong> of {rows.length}</>}
       >
@@ -90,7 +137,9 @@ export default function SqueezePage() {
           maxLength={20}
         />
         <NumberFilter label="Min score" value={minScore} onChange={setMinScore} min={0} max={100} placeholder="0" />
-        <SelectFilter label="OBV" value={obv} onChange={setObv} options={OBV_OPTIONS} />
+        {!isPreview && (
+          <SelectFilter label="OBV" value={obv} onChange={setObv} options={OBV_OPTIONS} />
+        )}
         {filtersActive && (
           <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
         )}
@@ -113,7 +162,19 @@ export default function SqueezePage() {
           <tbody>
             {visibleRows.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-10 text-center text-muted">
-                {filtersActive ? (
+                {loadError ? (
+                  <>
+                    <p className="text-down">Couldn&apos;t load squeeze setups.</p>
+                    <p className="mt-2 text-xs">{loadError}</p>
+                    <button
+                      type="button"
+                      onClick={() => { load(); }}
+                      className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs hover:border-accent hover:text-accent"
+                    >
+                      Try again
+                    </button>
+                  </>
+                ) : filtersActive ? (
                   <>
                     <p>No squeezes match these filters.</p>
                     <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
@@ -130,15 +191,41 @@ export default function SqueezePage() {
                 </td>
                 <td className="px-4 py-2 text-right">{r.squeeze_days}d</td>
                 <td className="px-4 py-2 text-right">{r.volume_multiple != null ? `${r.volume_multiple.toFixed(2)}x` : "—"}</td>
-                <td className="px-4 py-2 text-muted">{r.obv_trend}</td>
+                <td className="px-4 py-2 text-muted">{r.obv_trend ?? "—"}</td>
                 <td className="px-4 py-2 text-muted">{r.breakout_type}</td>
-                <td className="px-4 py-2">{r.suggested_window}</td>
+                <td className="px-4 py-2">{r.suggested_window ?? "—"}</td>
                 <td className="px-4 py-2 text-muted">{r.reason}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Free-tier locked section — the 3 rows above are REAL data; this
+          states the real remaining count (from the backend, not invented)
+          and where the rest lives. Descriptive only: no urgency, no
+          performance claims. */}
+      {isPreview && !loadError && (
+        <div className="card mt-4 p-6 text-center">
+          <div className="inline-block rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+            Pro feature
+          </div>
+          <h2 className="mt-3 text-lg font-bold tracking-tight">
+            {totalSetups != null && totalSetups > rows.length
+              ? `Top ${rows.length} of ${totalSetups} current squeeze setups shown on Free`
+              : `Free shows up to the top ${FREE_PREVIEW_LIMIT} squeeze setups`}
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            The full Squeeze Watch feed — every current setup, plus the volume,
+            OBV and timing-window columns — is part of the $9.99/mo (Pro) plan
+            (USD). 14-day trial, no card required.
+          </p>
+          <div className="mt-5 flex justify-center gap-3">
+            <Link href="/app/billing?intent=pro" className="btn-primary">Upgrade to Pro &rarr;</Link>
+            <Link href="/pricing" className="btn-ghost">See all plans</Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
