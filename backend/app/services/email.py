@@ -2109,14 +2109,20 @@ async def run_daily_drip(session) -> dict[str, int]:
     Stages, all dedup'd via `User.drip_state` (comma-separated tokens):
 
       Pre-expiry (trial_ends_at in the FUTURE — user is still on trial):
-        - "3"   day-3  email   — trial_ends_at in (now+10d, now+11d)
-        - "7"   day-7  email   — trial_ends_at in (now+6d,  now+7d )
-        - "11"  T-3    email   — trial_ends_at in (now+2d,  now+3d )
-        - "13"  T-1    email   — trial_ends_at in (now+0d,  now+1d )
+        - "3"   day-3  email   — trial_ends_at in (now+9d,  now+11d)
+        - "7"   day-7  email   — trial_ends_at in (now+5d,  now+7d )
+        - "11"  T-3    email   — trial_ends_at in (now+1d,  now+3d )
+        - "13"  T-1    email   — trial_ends_at in (now-1d,  now+1d )
 
       Post-expiry (trial_ends_at in the PAST — user didn't convert):
-        - "expired" T+0  email — trial_ends_at in (now-1d, now)
-        - "post3"   T+3  email — trial_ends_at in (now-4d, now-3d)
+        - "expired" T+0  email — trial_ends_at in (now-2d, now)
+        - "post3"   T+3  email — trial_ends_at in (now-5d, now-3d)
+
+      Every window is 48h wide — the nominal fire day plus one grace day,
+      mirroring the lapse30 pattern below. The windows used to be exactly
+      24h, so one failed/missed daily run silently aged every in-window
+      user out of their stage forever. The per-user drip_state token keeps
+      each stage at-most-once, so the extra day can't double-send.
 
       Lapsed-trial win-back (handled in its own block below, NOT the
       shared windows loop — different pref bucket + tier filter):
@@ -2149,25 +2155,32 @@ async def run_daily_drip(session) -> dict[str, int]:
     counts = {"day3": 0, "day7": 0, "day11": 0, "day13": 0, "expired": 0,
               "post3": 0, "lapse30": 0}
 
+    # 48h windows: each stage's nominal day plus one grace day on the trailing
+    # edge (the direction users age in), so a failed/missed daily run can't
+    # silently drop a cohort — the next successful run still catches them, and
+    # the drip_state tokens keep each stage at-most-once. (day13's grace half
+    # sits below `now`, but the pre-expiry tier filter plus the hourly worker
+    # downgrade mean an already-expired user is normally on Free by drip time
+    # and falls through to the "expired" stage's honest copy instead.)
     windows = [
         # Pre-expiry
-        ("3",   "day3",   now + timedelta(days=10), now + timedelta(days=11),
+        ("3",   "day3",   now + timedelta(days=9),  now + timedelta(days=11),
          render_trial_day3_email,         "Tapeline — three days in",
          False, False),
-        ("7",   "day7",   now + timedelta(days=6),  now + timedelta(days=7),
+        ("7",   "day7",   now + timedelta(days=5),  now + timedelta(days=7),
          render_trial_day7_email,         "Tapeline — halfway through your trial",
          True, False),
-        ("11",  "day11",  now + timedelta(days=2),  now + timedelta(days=3),
+        ("11",  "day11",  now + timedelta(days=1),  now + timedelta(days=3),
          render_trial_day11_email,        "Tapeline — 3 days left on your trial",
          True, False),
-        ("13",  "day13",  now,                      now + timedelta(days=1),
+        ("13",  "day13",  now - timedelta(days=1),  now + timedelta(days=1),
          render_trial_day13_email,        "Tapeline — your trial ends tomorrow",
          True, False),
         # Post-expiry
-        ("expired", "expired", now - timedelta(days=1), now,
+        ("expired", "expired", now - timedelta(days=2), now,
          render_trial_expired_email,      "Your Tapeline trial ended",
          True, True),
-        ("post3",   "post3",   now - timedelta(days=4), now - timedelta(days=3),
+        ("post3",   "post3",   now - timedelta(days=5), now - timedelta(days=3),
          render_trial_post_expiry_email,  "Last note from Tapeline",
          False, True),
     ]
@@ -2634,9 +2647,12 @@ async def run_weekly_newsletter(session, *, now=None) -> int:
 async def run_re_engagement_drip(session) -> dict[str, int]:
     """Send the re-engagement email to users dormant for ~14 days.
 
-    Window: last_seen_at in [now-15d, now-14d). One-shot, deduplicated via
-    the "re14" token in User.drip_state — so a user only ever receives
-    this email once even if they fall back into dormancy later.
+    Window: last_seen_at in [now-16d, now-14d) — 48h wide (nominal day-14
+    plus one grace day), same missed-run protection as the trial-drip
+    windows, so one failed/skipped daily run can't silently drop the touch.
+    One-shot, deduplicated via the "re14" token in User.drip_state — so a
+    user only ever receives this email once even if they fall back into
+    dormancy later.
 
     Trial users are EXCLUDED — the trial drip is the right re-engagement
     channel for them.
@@ -2650,7 +2666,7 @@ async def run_re_engagement_drip(session) -> dict[str, int]:
     now = datetime.now(UTC)
     counts = {"re14": 0}
 
-    lower = now - timedelta(days=15)
+    lower = now - timedelta(days=16)
     upper = now - timedelta(days=14)
 
     filters = [
