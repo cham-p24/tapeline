@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { getStoredGclid, getStoredUtm } from "@/lib/utm";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Providers = { google: boolean; microsoft: boolean; apple: boolean };
@@ -51,16 +53,46 @@ export function OAuthButtons({
   onProviderClick?: (provider: "google" | "microsoft" | "apple") => void;
 } = {}) {
   const [providers, setProviders] = useState<Providers | null>(null);
+  /**
+   * Marketing attribution (UTMs + Google click IDs) captured on the landing
+   * visit by lib/utm.ts and held in localStorage for 30 days. The EMAIL
+   * signup path forwards these in its POST body, so the User row gets
+   * signup_utm_* / signup_gclid populated. OAuth — the primary signup path —
+   * dropped them entirely, which made channel ROI uncomputable for most
+   * signups. Appending them to the /start URL lets the backend stash them in
+   * the same short-lived cookie it already uses for `?next=` and write them
+   * onto the User row in the callback.
+   *
+   * Read in an effect rather than during render: localStorage doesn't exist
+   * on the server, and computing the href inline would make the prerendered
+   * markup disagree with the first client render.
+   */
+  const [attribution, setAttribution] = useState<string>("");
 
-  const startHref = (provider: "google" | "microsoft" | "apple") =>
-    `${API_BASE}/api/auth/oauth/${provider}/start` +
-    (postAuthNext ? `?next=${encodeURIComponent(postAuthNext)}` : "");
+  const startHref = (provider: "google" | "microsoft" | "apple") => {
+    const qs = new URLSearchParams(attribution);
+    if (postAuthNext) qs.set("next", postAuthNext);
+    const query = qs.toString();
+    return `${API_BASE}/api/auth/oauth/${provider}/start${query ? `?${query}` : ""}`;
+  };
 
   useEffect(() => {
     fetch(`${API_BASE}/api/auth/oauth/providers`, { credentials: "include", cache: "no-store" })
       .then((r) => r.ok ? r.json() : NONE)
       .then((p) => setProviders({ google: !!p.google, microsoft: !!p.microsoft, apple: !!p.apple }))
       .catch(() => setProviders(NONE));
+  }, []);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries({ ...getStoredUtm(), ...getStoredGclid() })) {
+        if (typeof v === "string" && v.length > 0) params.set(k, v);
+      }
+      setAttribution(params.toString());
+    } catch {
+      // Attribution is nice-to-have — never block the signup buttons.
+    }
   }, []);
 
   if (!providers) return null;

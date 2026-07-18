@@ -68,6 +68,90 @@ async def clerk_webhook(
     return {"ok": True}
 
 
+async def _send_purchase_conversion(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    obj: dict,
+    tier: str | None = None,
+    billing_period: str | None = None,
+) -> None:
+    """Fire the server-side GA4 `purchase` event for a completed checkout.
+
+    Once per SUBSCRIPTION, not once per event. The event-id dedup at the top
+    of the webhook already blocks Stripe redelivering the *same* event, but a
+    subscription can legitimately produce more than one
+    `checkout.session.completed` (e.g. the duplicate-tab case handled above),
+    and a conversion must not be counted twice. The latch is a synthetic row
+    in `stripe_webhook_events` keyed `ga4_purchase:{subscription_id}` — the
+    insert is the claim, so two concurrent deliveries can't both win. Reusing
+    that table keeps this schema-free; the id column is String(80) and Stripe
+    subscription ids are ~28 chars.
+
+    `transaction_id` is the Stripe **checkout session** id — the identifier of
+    this purchase, and the one a client-side beacon would carry via Stripe's
+    `{CHECKOUT_SESSION_ID}` success_url template. GA4 de-duplicates purchase
+    events sharing a transaction_id, so server and client can both report the
+    same sale without double-counting.
+
+    Entirely best-effort: never raises, and a no-op unless GA4_MEASUREMENT_ID
+    + GA4_API_SECRET are set.
+    """
+    try:
+        from app.services.analytics import is_configured, track_purchase
+
+        if not is_configured():
+            return
+
+        checkout_session_id = obj.get("id")
+        if not checkout_session_id:
+            return
+        # `subscription` is an id string on the raw event, but an expanded
+        # object if the API version/expansion ever changes — handle both.
+        sub_raw = obj.get("subscription")
+        if isinstance(sub_raw, dict):
+            sub_raw = sub_raw.get("id")
+        subscription_id = sub_raw or checkout_session_id
+
+        # Claim the conversion. If the row already exists this subscription
+        # has already been reported — bail without sending.
+        latch_id = f"ga4_purchase:{subscription_id}"[:80]
+        claimed = await session.execute(
+            select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
+        )
+        if claimed.scalar_one_or_none() is not None:
+            logger.info("stripe.ga4_purchase_already_sent sub=%s", subscription_id)
+            return
+        try:
+            session.add(StripeWebhookEvent(id=latch_id, event_type="ga4_purchase"))
+            await session.commit()
+        except Exception:
+            # Concurrent delivery claimed it first — it will do the send.
+            await session.rollback()
+            logger.info("stripe.ga4_purchase_claim_lost sub=%s", subscription_id)
+            return
+
+        # amount_total is in the currency's minor unit (cents for USD).
+        amount_total = obj.get("amount_total")
+        value = (
+            round(amount_total / 100, 2)
+            if isinstance(amount_total, (int, float)) and not isinstance(amount_total, bool)
+            else None
+        )
+        currency = str(obj.get("currency") or "usd").upper()
+        await track_purchase(
+            user_id=user_id,
+            transaction_id=str(checkout_session_id),
+            value=value,
+            currency=currency,
+            tier=tier,
+            billing_period=billing_period,
+        )
+    except Exception:
+        # Analytics must never fail a money-path webhook.
+        logger.exception("stripe.ga4_purchase_failed user=%s", user_id)
+
+
 @router.post("/stripe")
 async def stripe_webhook(
     request: Request,
@@ -136,6 +220,12 @@ async def stripe_webhook(
                     except Exception:  # alert must never fail the webhook
                         logger.exception("stripe.duplicate_checkout_alert_failed")
                 user.stripe_customer_id = customer_id
+                # Snapshot the in-flight checkout intent before it's cleared
+                # below — it's the only place the session object carries the
+                # tier/period (Stripe puts those in subscription_data.metadata,
+                # which is NOT echoed on checkout.session.completed).
+                bought_tier = user.checkout_tier
+                bought_period = user.checkout_billing_period
                 # Checkout completed — clear the in-flight markers so the
                 # abandonment-recovery worker never nudges a customer who
                 # actually converted. (drip_state's "abandon1" token is left
@@ -145,6 +235,18 @@ async def stripe_webhook(
                 user.checkout_billing_period = None
                 await session.commit()
                 logger.info("stripe.customer_linked user=%s customer=%s", user_id, customer_id)
+
+                # Server-side `purchase` conversion (GA4 Measurement Protocol).
+                # The client-side beacon on /app/billing?checkout=success only
+                # fires if that redirect-return page actually executes — a
+                # closed tab, a failed redirect or an ad-blocker (high
+                # prevalence in a trader audience) silently loses the
+                # conversion. The webhook, by contrast, sees every charge.
+                # Fire-and-forget and fully env-gated; see services/analytics.
+                await _send_purchase_conversion(
+                    session, user_id=user_id, obj=obj,
+                    tier=bought_tier, billing_period=bought_period,
+                )
 
     elif evt_type in ("customer.subscription.created", "customer.subscription.updated"):
         p = subscription_payload(obj)
