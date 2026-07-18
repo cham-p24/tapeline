@@ -5,11 +5,98 @@ import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline Changelog — Every Shipped Release, Dated",
+  title: "Tapeline Changelog — Methodology Changes, Corrections, Releases",
   description:
-    "Public, immutable Tapeline changelog. New features, bug fixes, methodology updates and weight changes — every shipped release with the date it landed. No marketing spin.",
+    "Public, append-only Tapeline log: methodology changes, data errors, scorecard corrections and disclosure changes, each with the date it landed — plus every shipped release. No marketing spin.",
   path: "/changelog",
 });
+
+/**
+ * ── METHODOLOGY & CORRECTIONS LOG ────────────────────────────────────────
+ * Separate from the release notes below on purpose. A release note says what
+ * got better; this log says what CHANGED ABOUT THE MEASUREMENT, what we got
+ * wrong, and what we corrected — including the entries that are unflattering.
+ * It is the artefact a sceptical reader checks before trusting a number.
+ *
+ * ── RULES FOR ADDING AN ENTRY ────────────────────────────────────────────
+ * 1. APPEND ONLY. Never edit or delete a past entry. If an entry was itself
+ *    wrong, add a NEW dated entry correcting it.
+ * 2. REAL, VERIFIABLE DATES ONLY. Every `date` below is the merge date of the
+ *    referenced PR in cham-p24/tapeline. If you cannot verify a date against
+ *    the repository history, do not invent one — leave the entry out.
+ * 3. DESCRIPTIVE ONLY. Describe the change to the method. Never characterise
+ *    the effect on returns, and never restate a scorecard figure here.
+ * 4. If a factor's implementation changes, its /how-it-works/{factor} page
+ *    changes in the same PR and gets an entry here.
+ */
+type LogKind = "methodology" | "correction" | "disclosure" | "scope";
+
+type LogEntry = {
+  date: string;
+  kind: LogKind;
+  title: string;
+  body: string;
+  /** PR number in cham-p24/tapeline — the verifiable source for the date. */
+  ref: string;
+};
+
+const METHODOLOGY_LOG: LogEntry[] = [
+  {
+    date: "2026-07-18",
+    kind: "scope",
+    title: "Stopped collecting investing experience and portfolio size",
+    body:
+      "Onboarding previously asked for investing experience level and portfolio size. Both questions were removed and are no longer collected anywhere on the site. Tapeline does not ask for capital, holdings, risk tolerance, experience or investment goals, which is what keeps its output general information rather than something tailored to an individual.",
+    ref: "#360",
+  },
+  {
+    date: "2026-07-18",
+    kind: "scope",
+    title: "Free tier restated to match what the product actually enforces",
+    body:
+      "Pricing and comparison surfaces were corrected to describe the free tier as it is enforced in the backend: 12 ticker look-ups per day, a 5-slot watchlist, the top 10 live scanner rows, a top-3 squeeze preview, 2 web-push alert rules, and the full public scorecard. Several pages had been describing older, tighter limits that no longer applied. The enforcement itself was widened the previous day, on 2026-07-17.",
+    ref: "#345, #348, #349",
+  },
+  {
+    date: "2026-07-12",
+    kind: "disclosure",
+    title: "Exact factor weights, the scoring equation and indicator lists removed from the site",
+    body:
+      "The public site previously published the numeric weight of each factor, the composite equation, and per-factor indicator and parameter lists. Those were removed. What is still published: the six factor names, the relative ordering of the weights, each factor's contribution on every ticker, and the full public scorecard. The reason is competitive, not evasive — the numeric recipe was the part a competitor could copy directly. The scoring behaviour itself did not change on this date; only what the site discloses about it.",
+    ref: "#342",
+  },
+  {
+    date: "2026-07-11",
+    kind: "correction",
+    title: "Prescriptive advice and performance claims removed from live pages",
+    body:
+      "A review found copy on live pages that told readers what to do with a score, and copy that implied the product produces returns. Both were removed. Signal labels describe the state of the factor data; they do not prescribe an action. A follow-up on 2026-07-18 added an automated check that fails the build if that language reappears.",
+    ref: "#337, #359",
+  },
+  {
+    date: "2026-07-09",
+    kind: "methodology",
+    title: "Liquidity floor applied to the ranked scanner and the scorecard",
+    body:
+      "High-scoring names that barely trade could top the ranked list and be frozen onto the scorecard. A liquidity floor now filters them out of both. This changed which names QUALIFY going forward only — no historical scorecard day was altered, and every past entry stands as recorded. Names with no volume reading are left in, and the floor can be switched off on the scanner to browse the full scored universe.",
+    ref: "#329, #330",
+  },
+  {
+    date: "2026-05-17",
+    kind: "correction",
+    title: "Smart Money was described as 13F holdings; it reads SEC Form 4",
+    body:
+      "Marketing copy across pricing, comparison and per-ticker pages described the Smart Money factor as using 'elite 13F holdings'. That was wrong. The factor reads corporate-insider transactions disclosed on SEC Form 4, which is what the underlying code had been doing all along. The copy was corrected to match the implementation rather than the other way round.",
+    ref: "v0.1.12",
+  },
+];
+
+const LOG_KIND_STYLE: Record<LogKind, string> = {
+  methodology: "bg-accent/15 text-accent border-accent/30",
+  correction:  "bg-warn/15 text-warn border-warn/30",
+  disclosure:  "bg-panel text-muted border-border",
+  scope:       "bg-panel text-muted border-border",
+};
 
 type Entry = {
   date: string;
@@ -207,14 +294,67 @@ export default function ChangelogPage() {
 
       <section className="mx-auto max-w-3xl px-6 py-8">
         <p className="eyebrow">Changelog</p>
-        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What we shipped, when.</h1>
+        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What changed, and when.</h1>
         <p className="mt-4 text-lg text-muted">
-          Every release, ordered newest first. Past entries are never edited.
-          For every signal call we&rsquo;ve made, see the <Link href="/scorecard" className="link">public scorecard</Link>.
+          Two logs, both ordered newest first, both append-only. First the changes
+          to the measurement itself &mdash; methodology, corrections and data
+          errors. Then every shipped release. Past entries are never edited.
+          For every signal call we&rsquo;ve made, see the{" "}
+          <Link href="/scorecard" className="link">public scorecard</Link>.
+        </p>
+      </section>
+
+      {/* Methodology & corrections — deliberately ABOVE the release notes.
+          This is the log a sceptical reader actually wants. */}
+      <section className="mx-auto max-w-3xl px-6 pb-4">
+        <p className="eyebrow">Methodology &amp; corrections</p>
+        <h2 className="mt-3 text-2xl sm:text-3xl font-semibold">
+          Changes to the measurement, and things we got wrong
+        </h2>
+        <p className="mt-3 text-sm text-muted leading-relaxed">
+          Every entry below is dated to the day the change merged, and every date
+          is verifiable against the public repository history. Corrections stay on
+          the page permanently, including the ones that are embarrassing. If a
+          factor&rsquo;s implementation changes, its{" "}
+          <Link href="/how-it-works" className="link">methodology page</Link>{" "}
+          changes with it and the change is logged here.
+        </p>
+
+        <ol className="mt-8 space-y-6">
+          {METHODOLOGY_LOG.map((e) => (
+            <li
+              key={`${e.date}-${e.title}`}
+              className="rounded-xl border border-border bg-panel p-5 sm:p-6"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="nums font-mono text-xs text-muted">{e.date}</span>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${LOG_KIND_STYLE[e.kind]}`}
+                >
+                  {e.kind}
+                </span>
+                <span className="nums font-mono text-[10px] text-subtle">{e.ref}</span>
+              </div>
+              <h3 className="mt-3 text-base font-semibold sm:text-lg">{e.title}</h3>
+              <p className="mt-2 text-sm text-muted leading-relaxed">{e.body}</p>
+            </li>
+          ))}
+        </ol>
+
+        <p className="mt-6 text-sm text-muted">
+          What each factor measures and where it falls short is on the{" "}
+          <Link href="/how-it-works" className="link">methodology pages</Link>. What the
+          product as a whole is weak at is on{" "}
+          <Link href="/limitations" className="link">limitations</Link>. Found something
+          wrong? Email{" "}
+          <a href="mailto:support@tapeline.io" className="link">support@tapeline.io</a>{" "}
+          and the correction gets logged here with a date.
         </p>
       </section>
 
       <section className="mx-auto max-w-3xl px-6 pb-24">
+        <p className="eyebrow">Releases</p>
+        <h2 className="mt-3 mb-10 text-2xl sm:text-3xl font-semibold">What we shipped, when</h2>
         <ol className="space-y-10 border-l border-border pl-8">
           {ENTRIES.map((e) => (
             <li key={e.version} className="relative">
