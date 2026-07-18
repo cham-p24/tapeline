@@ -26,6 +26,20 @@ import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd } from "@/lib/pricing";
  * the tab without clicking either button still doesn't get re-prompted on
  * their next visit. Once is enough — the post-expiry email keeps chasing.
  */
+/**
+ * What a Free account genuinely retains after the trial. Post-#343 this is a
+ * real product, not a stub, so the modal states it in full rather than
+ * implying the user has lost everything. Numbers come from FREE_LIMITS.
+ */
+const FREE_TIER_KEEPS = [
+  `${FREE_LIMITS.dailyLookups} ticker look-ups a day`,
+  `A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`,
+  `The top ${FREE_LIMITS.scannerRows} scanner rows, live — no delay`,
+  `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
+  `${FREE_LIMITS.webPushAlerts} browser push alerts`,
+  "The full public scorecard",
+];
+
 export function TrialEndedModal() {
   const { user } = useUser();
   const [open, setOpen] = useState(false);
@@ -60,16 +74,40 @@ export function TrialEndedModal() {
         <h2 className="mt-2 text-2xl font-bold tracking-tight">
           Your 14-day Premium trial has ended.
         </h2>
-        {/* Downgrade description derives from FREE_LIMITS (mirrors backend
-            tier.py) — describe the real Free tier, never overstate the drop. */}
         <p className="mt-3 text-sm text-muted">
-          Your watchlist + saved scans + alert rules are all intact. You&rsquo;re
-          now on Free forever: live scores for the top {FREE_LIMITS.scannerRows}{" "}
-          scanner rows, {FREE_LIMITS.dailyLookups} look-ups a day, a{" "}
-          {FREE_LIMITS.watchlistTickers}-ticker watchlist,{" "}
-          {FREE_LIMITS.webPushAlerts} browser push alerts &mdash; no Telegram, no
-          email alerts.
+          Nothing was charged &mdash; the trial never took a card. Your
+          watchlist, saved scans and alert rules are all intact, and you&rsquo;re
+          now on Free forever.
         </p>
+
+        {/* Honest downgrade preview. Every number derives from FREE_LIMITS
+            (which mirrors backend tier.py), so this can never sell a Free tier
+            the backend doesn't actually enforce.
+
+            COMPLIANCE — Rules 6 and 7. State the capability difference plainly
+            and stop. No loss-aversion framing about market opportunities: never
+            "the setups you'd have caught", never "what you missed", and never
+            anything about how any ticker moved or performed. */}
+        <div className="mt-4 rounded-md border border-border bg-background/40 p-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted">
+            What your Free account keeps
+          </div>
+          <ul className="mt-2 space-y-1 text-sm text-muted">
+            {FREE_TIER_KEEPS.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span aria-hidden="true" className="text-muted">
+                  &middot;
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted">
+            Premium adds unlimited look-ups, the full ~2,500-ticker scanner,
+            Telegram and email alerts, the congressional-trades and insider
+            feeds, CSV export and API access.
+          </p>
+        </div>
 
         {/* Pricing anchor — both paid options, monthly first (smaller first
             yes; annual's saving shown alongside). Founding pricing. */}
