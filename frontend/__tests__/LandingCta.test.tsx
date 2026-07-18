@@ -15,10 +15,20 @@
  *   3. The live scanner preview (product proof) renders by default and can be
  *      suppressed on pages that already show a data table above the fold.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { LandingCta } from "@/components/LandingCta";
 import { PRICING, usd } from "@/lib/pricing";
+
+// ScannerPreview is an async server component (it fetches the real anonymous
+// top-10 on the server). RTL/jsdom can't render async components inline, so
+// stub it — its own contract (real data, truthful labels, sample fallback)
+// is covered in ScannerPreview.test.tsx. Here we only verify LandingCta's
+// show/hide wiring.
+vi.mock("@/components/ScannerPreview", () => ({
+  ScannerPreview: () =>
+    require("react").createElement("div", { "data-testid": "scanner-preview" }),
+}));
 
 describe("LandingCta", () => {
   it("renders a primary signup CTA with the scanner-forward, no-card copy", () => {
@@ -61,16 +71,15 @@ describe("LandingCta", () => {
     ).toHaveAttribute("href", "/scorecard");
   });
 
-  it("shows the live scanner preview (product proof) by default", () => {
+  it("shows the scanner preview (product proof) by default", () => {
     render(<LandingCta from="screener" />);
-    // ScannerPreview renders descriptive signal pills; a stable token to assert on.
-    expect(screen.getAllByText("HIGH CONVICTION").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("scanner-preview")).toBeInTheDocument();
     expect(screen.getByText(/a live preview of the tapeline scanner/i)).toBeInTheDocument();
   });
 
   it("suppresses the preview when showPreview is false", () => {
     render(<LandingCta from="compare" showPreview={false} />);
-    expect(screen.queryByText("HIGH CONVICTION")).toBeNull();
+    expect(screen.queryByTestId("scanner-preview")).toBeNull();
     // The CTA + offer strip still render.
     expect(
       screen.getByRole("link", { name: /try the live scanner free/i }),

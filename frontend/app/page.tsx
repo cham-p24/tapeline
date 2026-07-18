@@ -9,6 +9,11 @@ import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { POSTS } from "./blog/posts";
 import { REFUND } from "@/lib/pricing";
 
+// ScannerPreview server-fetches the real anonymous top-scored rows; 30-min
+// ISR (same budget as /daily-picks) keeps the homepage static-fast while the
+// hero table stays a truthful snapshot of today's list.
+export const revalidate = 1800;
+
 export default function LandingPage() {
   return (
     // The page-wide blue atmospheric gradient now lives on `body::before`
@@ -21,9 +26,11 @@ export default function LandingPage() {
 
       {/* HERO — single-purpose fold.
           Left: one sentence value prop + one primary CTA + one ghost CTA.
-          Right: live mock table (ScannerPreview). Nothing else competes.
-          The TickerSearch previously sat under the preview, doing the same
-          job twice; removed so the eye lands on one demo, not two. */}
+          Right: the REAL anonymous top-scored table (ScannerPreview, server-
+          fetched, 30-min ISR) with a zero-signup link to the full Top 10.
+          Nothing else competes. The TickerSearch previously sat under the
+          preview, doing the same job twice; removed so the eye lands on one
+          demo, not two. */}
       <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
         {/* Decorative gradient blobs removed 2026-05-22 — too many ambient
             overlays were competing with the actual content + colliding with
@@ -32,8 +39,10 @@ export default function LandingPage() {
             for hierarchy rather than blurred colour halos. */}
         <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
           <div className="lg:col-span-2 lg:pt-6">
+            {/* Static dot on purpose — the hero table refreshes on a 30-min
+                ISR cadence, so nothing here should pulse like a stream. */}
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
+              <span className="h-1.5 w-1.5 rounded-full bg-up" />
               Live market scanning
             </div>
             <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">
@@ -63,9 +72,15 @@ export default function LandingPage() {
 
           <div className="lg:col-span-3">
             <ScannerPreview />
+            {/* Fold-visible zero-signup path: the table above shows the top
+                slice; /daily-picks has the full Top 10, no account needed. */}
             <p className="mt-3 text-center text-xs text-muted">
-              Live mock &middot; hover any score in the app for the full
-              6-factor breakdown
+              <Link
+                href="/daily-picks"
+                className="text-accent underline-offset-2 hover:underline"
+              >
+                See today&rsquo;s full Top 10 &mdash; no signup &rarr;
+              </Link>
             </p>
           </div>
         </div>
