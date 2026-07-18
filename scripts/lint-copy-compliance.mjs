@@ -575,8 +575,15 @@ export function loadAllowlist(file = ALLOW_FILE) {
   };
 }
 
-function isAllowed(finding, allow) {
-  return allow.some((entry) => {
+/**
+ * Index of the first entry matching this finding, or -1.
+ *
+ * Returning the INDEX rather than a boolean is what makes stale-entry
+ * detection possible: the caller can record which ledger entries actually
+ * fired and report the ones that never did.
+ */
+export function matchingEntryIndex(finding, list) {
+  return list.findIndex((entry) => {
     if (entry.file && !globMatch(entry.file, finding.file)) return false;
     if (entry.rule && entry.rule !== "*" && entry.rule !== finding.rule) return false;
     if (entry.phrase && !finding.match.toLowerCase().includes(entry.phrase.toLowerCase())) {
@@ -584,6 +591,10 @@ function isAllowed(finding, allow) {
     }
     return true;
   });
+}
+
+function isAllowed(finding, allow) {
+  return matchingEntryIndex(finding, allow) !== -1;
 }
 
 /**
@@ -657,7 +668,9 @@ export function scanSource(text, filePath = "<input>", options = {}) {
     if (isAllowed(finding, allow)) return;
     // Pre-existing violations are reported as warnings rather than dropped,
     // so the debt stays visible instead of quietly becoming the new baseline.
-    finding.known = isAllowed(finding, known);
+    const knownIndex = matchingEntryIndex(finding, known);
+    finding.known = knownIndex !== -1;
+    if (finding.known) finding.knownIndex = knownIndex;
     findings.push(finding);
   };
 
@@ -775,11 +788,42 @@ function main(argv) {
   const blocking = findings.filter((f) => !f.known);
   const carried = findings.filter((f) => f.known);
 
+  /* ---------------------------------------------------------------- *
+   * Stale ledger entries.
+   *
+   * An entry that no longer matches anything is not dead weight — it is a
+   * live hole. knownViolations DOWNGRADES a match from blocking to warning,
+   * so a stale entry silently re-arms: if someone reintroduces the copy that
+   * was cleaned up, the ledger catches it and the build stays green. That is
+   * precisely the regression this linter exists to stop.
+   *
+   * So a fixed violation must be pruned in the same PR that fixes it, and
+   * that requirement is enforced here rather than left to a README.
+   * Scoped to a full-repo run: an explicit-file run only scans a subset, so
+   * an unmatched entry there means nothing.
+   * ---------------------------------------------------------------- */
+  const fullRun = explicit.length === 0;
+  const used = new Set(carried.map((f) => f.knownIndex));
+  const stale = fullRun
+    ? (config.knownViolations || [])
+        .map((entry, idx) => ({ entry, idx }))
+        .filter(({ idx }) => !used.has(idx))
+    : [];
+
   if (asJson) {
     console.log(
-      JSON.stringify({ scanned: files.length, blocking, knownViolations: carried }, null, 2),
+      JSON.stringify(
+        {
+          scanned: files.length,
+          blocking,
+          knownViolations: carried,
+          staleKnownViolations: stale.map(({ entry }) => entry),
+        },
+        null,
+        2,
+      ),
     );
-    return blocking.length ? 1 : 0;
+    return blocking.length || stale.length ? 1 : 0;
   }
 
   const report = (stream, list) => {
@@ -810,13 +854,32 @@ function main(argv) {
     report((s) => console.log(s), carried);
   }
 
-  if (!blocking.length) {
+  if (stale.length) {
+    console.error(
+      `copy-compliance: ${stale.length} stale known-violation entr(y/ies) in ` +
+        `scripts/copy-compliance.allow.json.\n` +
+        `These no longer match any finding — the copy was fixed. Delete them.\n` +
+        `A stale entry is not harmless: it would downgrade the SAME violation from\n` +
+        `blocking to a warning if the copy were ever reintroduced.\n`,
+    );
+    for (const { entry, idx } of stale) {
+      console.error(
+        `   knownViolations[${idx}] — ${entry.file || "(any file)"} · ` +
+          `${entry.rule || "(any rule)"}${entry.phrase ? ` · "${entry.phrase}"` : ""}`,
+      );
+    }
+    console.error("");
+  }
+
+  if (!blocking.length && !stale.length) {
     console.log(
       `copy-compliance: OK — ${files.length} user-facing source files scanned, ` +
         `0 blocking findings.`,
     );
     return 0;
   }
+
+  if (!blocking.length) return 1;
 
   console.error(
     `copy-compliance: ${blocking.length} blocking finding(s) across ${files.length} scanned file(s).\n`,

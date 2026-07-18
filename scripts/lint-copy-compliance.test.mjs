@@ -370,6 +370,52 @@ test("globMatch handles ** and * segments", () => {
   assert.ok(globMatch("backend/app/services/email*.py", "backend/app/services/email_design.py"));
 });
 
+/* ============================================================ *
+ * Known-violations ledger — carried findings, and stale entries.
+ *
+ * The ledger downgrades a finding from blocking to warning. That makes a
+ * STALE entry a live hole rather than clutter: it re-arms the moment the
+ * fixed copy is reintroduced, and the build stays green on the exact
+ * regression this linter exists to catch.
+ * ============================================================ */
+
+test("a known violation is carried as a warning, not dropped", () => {
+  const src = `<p>Guaranteed returns for every subscriber.</p>`;
+  const knownViolations = [
+    { file: "frontend/app/demo/**", rule: "performance-claim", reason: "test fixture" },
+  ];
+  const [finding] = scanSource(src, "frontend/app/demo/page.tsx", { knownViolations });
+  assert.ok(finding, "a known violation must still be reported");
+  assert.equal(finding.known, true, "it must be flagged as known, so it does not block");
+  assert.equal(finding.knownIndex, 0, "it must record WHICH entry matched, for stale detection");
+});
+
+test("a ledger entry that matches nothing is detectable as stale", () => {
+  const knownViolations = [
+    { file: "frontend/app/demo/**", rule: "performance-claim", reason: "fires" },
+    { file: "frontend/app/gone/**", rule: "performance-claim", reason: "stale — copy was fixed" },
+  ];
+  const findings = scanSource(`<p>Guaranteed returns.</p>`, "frontend/app/demo/page.tsx", {
+    knownViolations,
+  });
+  const used = new Set(findings.filter((f) => f.known).map((f) => f.knownIndex));
+  assert.ok(used.has(0), "the live entry must be marked used");
+  assert.ok(!used.has(1), "the entry matching nothing must be reported as stale");
+});
+
+test("the shipped ledger has no stale entries", () => {
+  // Guards the invariant the CLI enforces: every carried entry still matches a
+  // real finding. If this fails, copy was fixed without pruning its entry.
+  const config = loadAllowlist();
+  for (const entry of config.knownViolations) {
+    assert.ok(
+      entry.file && entry.rule,
+      `knownViolations entry ${JSON.stringify(entry.reason).slice(0, 40)} must be pinned ` +
+        `by at least file+rule so it cannot mute more than it documents`,
+    );
+  }
+});
+
 test("findings report file, line, matched phrase and rule", () => {
   const [finding] = scanSource(`\n<p>Guaranteed returns for every subscriber.</p>`, "frontend/app/x/page.tsx");
   assert.equal(finding.file, "frontend/app/x/page.tsx");

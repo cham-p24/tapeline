@@ -40,13 +40,28 @@ const HOW_FAQ = [
 // Factors are listed in descending weight order. We publish the ordering
 // (which factors matter most) and each factor's contribution per ticker, but
 // not the exact numeric weights — those are applied consistently to every name.
+// Each factor now has its own un-gated page at /how-it-works/{slug} explaining
+// what it measures, how the reading is derived, what feeds it, and where it is
+// weak. Content for those pages lives in ./factors.ts.
+//
+// 2026-07-18 accuracy fix: the Smart money line previously read "Insider net
+// buying (SEC Form 4) and, where applicable, Congressional disclosures and
+// institutional flow." Only the Form 4 half is true — the sub-score reads
+// disclosed insider transactions and nothing else. Congressional disclosure
+// data is ingested and published as its own feed in the product, but it is not
+// an input to this factor, and there is no institutional-flow input at all.
+// Corrected here rather than left to contradict the factor page it links to.
+//
+// Same fix on Relative strength: the line claimed a sector comparison. sub_rs
+// in backend/app/services/score.py measures the ticker's change minus the
+// broad-market benchmark's over 3M/6M/1Y and is not sector-adjusted at all.
 const FACTORS = [
-  { name: "Trend",               emphasis: "Weighted most", desc: "Direction and quality of the price trend across short-, medium-, and long-term timeframes." },
-  { name: "Relative strength",   emphasis: "High",          desc: "How the stock is performing against the broad market and its sector over multiple horizons." },
-  { name: "Fundamentals",        emphasis: "Core",          desc: "Earnings quality, growth, profitability, and balance-sheet health." },
-  { name: "Smart money",         emphasis: "Core",          desc: "Insider net buying (SEC Form 4) and, where applicable, Congressional disclosures and institutional flow." },
-  { name: "Macro",               emphasis: "Core",          desc: "The prevailing market regime, sector rotation, and rate / volatility backdrop." },
-  { name: "Momentum",            emphasis: "Weighted least", desc: "Short-horizon price acceleration and breakout posture." },
+  { name: "Trend",               slug: "trend",             emphasis: "Weighted most", desc: "Direction and quality of the price trend across short-, medium-, and long-term timeframes." },
+  { name: "Relative strength",   slug: "relative-strength", emphasis: "High",          desc: "The stock's price change minus the broad-market benchmark's, over three horizons. Not sector-adjusted." },
+  { name: "Fundamentals",        slug: "fundamentals",      emphasis: "Core",          desc: "Earnings quality, growth, profitability, and balance-sheet health." },
+  { name: "Smart money",         slug: "smart-money",       emphasis: "Core",          desc: "Net direction of insider transactions disclosed to the SEC on Form 4." },
+  { name: "Macro",               slug: "macro",             emphasis: "Core",          desc: "The prevailing market regime, applied identically to every ticker on a given tick." },
+  { name: "Momentum",            slug: "momentum",          emphasis: "Weighted least", desc: "Short-horizon price acceleration and breakout posture." },
 ];
 
 const SIGNALS = [
@@ -86,15 +101,29 @@ export default function HowItWorksPage() {
 
           <div className="mt-12 space-y-3">
             {FACTORS.map((f) => (
-              <div key={f.name} className="flex items-start gap-6 rounded-xl border border-border bg-panel p-6 transition-colors hover:border-border2">
+              <Link
+                key={f.name}
+                href={`/how-it-works/${f.slug}`}
+                className="group flex items-start gap-6 rounded-xl border border-border bg-panel p-6 transition-colors hover:border-accent/40"
+              >
                 <div className="font-mono text-[0.7rem] font-semibold uppercase tracking-wider text-accent w-24 pt-1">{f.emphasis}</div>
                 <div className="flex-1">
-                  <h3 className="font-semibold">{f.name}</h3>
+                  <h3 className="font-semibold transition-colors group-hover:text-accent">
+                    {f.name}
+                    <span aria-hidden="true" className="ml-2 text-xs text-subtle">&rarr;</span>
+                  </h3>
                   <p className="mt-1.5 text-sm text-muted leading-relaxed">{f.desc}</p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
+
+          <p className="mt-4 text-xs text-subtle leading-relaxed">
+            Each factor has its own page: what it measures, how the reading is
+            derived, which data feeds it, and where it is weak. The honest limits
+            are stated on each factor&rsquo;s own page rather than collected out
+            of sight.
+          </p>
 
           <div className="mt-8 rounded-xl border border-border bg-panel p-6">
             <p className="text-xs uppercase tracking-wider text-subtle">How the blend is weighted</p>
@@ -192,6 +221,52 @@ export default function HowItWorksPage() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Trust surfaces — un-gated, no signup. /limitations is listed FIRST and
+          described plainly, because burying the weaknesses page under the CTA
+          would defeat the point of having written it. */}
+      <section className="section py-8 sm:py-10">
+        <div className="mx-auto max-w-3xl">
+          <p className="eyebrow">Before you trust any of this</p>
+          <h2 className="mt-3 text-3xl font-semibold">Read the parts that argue against us.</h2>
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <Link
+              href="/limitations"
+              className="lift group rounded-xl border border-border bg-panel p-5 hover:border-accent/40"
+            >
+              <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Limitations</h3>
+              <p className="mt-1.5 text-xs text-muted leading-relaxed">
+                What Tapeline is not good at: a small public sample, a blunt
+                six-factor screen, and data that can be late or wrong.
+              </p>
+            </Link>
+            <Link
+              href="/scorecard"
+              className="lift group rounded-xl border border-border bg-panel p-5 hover:border-accent/40"
+            >
+              <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Public scorecard</h3>
+              <p className="mt-1.5 text-xs text-muted leading-relaxed">
+                Every daily top-10, back-checked against the next session, with
+                the sample size shown and losing days left in.
+              </p>
+            </Link>
+            <Link
+              href="/why"
+              className="lift group rounded-xl border border-border bg-panel p-5 hover:border-accent/40"
+            >
+              <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Why it works this way</h3>
+              <p className="mt-1.5 text-xs text-muted leading-relaxed">
+                A note from the founder on publishing the method and the record,
+                including the days the picks went nowhere.
+              </p>
+            </Link>
+          </div>
+          <p className="mt-6 text-sm text-muted">
+            Methodology changes, data errors and corrections are dated in the{" "}
+            <Link href="/changelog" className="link">changelog</Link>.
+          </p>
         </div>
       </section>
 

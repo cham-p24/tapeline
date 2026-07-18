@@ -56,17 +56,45 @@ export default function LandingPage() {
               ticker. Every call goes on a permanent public record &mdash; same
               day, no edits.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            {/* PAIRED ENTRY POINTS — two first-class doors, not one button
+                plus a ghost link.
+                The fold used to offer a single real path (/signup) with the
+                scorecard demoted to `btn-ghost` — borderless, muted, reading
+                as a footnote. That buried the two things a cold visitor
+                actually wants: (1) start the no-card trial, or (2) look at the
+                product without handing over anything at all.
+                Both CTAs now share the same pill size and weight; the second
+                is outlined rather than muted so neither reads as the
+                afterthought. Grid (not flex-wrap) so they stay equal width on
+                mobile instead of one stretching and the other shrinking.
+                R6: states the trial's terms as fact — no countdown, no
+                deadline, no scarcity. */}
+            <div className="mt-8 grid gap-3 sm:max-w-md sm:grid-cols-2">
               <Link href="/signup" className="btn-primary text-base">
-                Try Premium free for 14 days &rarr;
+                Start the 14-day trial &rarr;
               </Link>
-              <Link href="/scorecard" className="btn-ghost text-base">
-                See the record
+              <Link
+                href="/daily-picks"
+                className="btn border border-border bg-panel text-base text-fg transition-colors hover:border-accent/50 hover:bg-panel/70"
+              >
+                Browse without an account
               </Link>
             </div>
-            <p className="mt-3 text-xs text-muted">
-              14-day Premium trial &middot; no credit card &middot; cancel in
-              one click
+            {/* Plain description of what each door leads to. The trial takes no
+                card, so there is nothing to cancel and no charge to avoid —
+                say that rather than implying a billing cliff. */}
+            <p className="mt-3 text-xs text-muted leading-relaxed">
+              The trial is 14 days of Premium. No credit card, no payment
+              details, nothing charged &mdash; it simply ends and your account
+              stays on the Free tier. Browsing needs no account at all.
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              <Link
+                href="/scorecard"
+                className="text-accent underline-offset-2 hover:underline"
+              >
+                Or read the public record first &rarr;
+              </Link>
             </p>
           </div>
 

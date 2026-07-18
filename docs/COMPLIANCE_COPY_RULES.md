@@ -185,6 +185,14 @@ every run and do not fail the build.
 They are **not** exemptions. The ledger is meant to shrink to zero. Adding a new
 entry to turn a build green is an abuse of the mechanism — fix the copy.
 
+**When you fix the copy, delete the entry in the same PR.** The linter enforces
+this: a ledger entry matching nothing fails the build as *stale*. This is not
+tidiness. The ledger downgrades a match from blocking to a warning, so an entry
+left behind after a fix re-arms silently — reintroduce the copy it described and
+the build stays green, which is exactly the regression this linter exists to
+catch. Entries with no `phrase` are the widest: they mute a whole rule for a
+whole file.
+
 ---
 
 ## When in doubt

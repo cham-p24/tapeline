@@ -11,6 +11,16 @@ type UsageData = {
   metrics: {
     watchlist: { used: number; cap: number; pct: number };
     email_alerts_today: { used: number; cap: number; pct: number };
+    // Daily ticker look-up meter. `cap: null` is the UNLIMITED sentinel (paid
+    // tier / active trial / first-session grace). Optional so the page still
+    // renders against an API build that predates the field.
+    ticker_lookups_today?: {
+      used: number;
+      cap: number | null;
+      pct: number;
+      remaining: number | null;
+      resets_at: string | null;
+    };
     data_delay_minutes: number;
     api_requests_per_day: { used: number; cap: number };
   };
@@ -54,6 +64,30 @@ export default function UsagePage() {
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {/* Daily ticker look-ups. Rendered `neutral` on purpose: the shared
+            colour ramp turns red past 90%, and per COMPLIANCE_COPY_RULES R6 a
+            factual statement of the user's own usage must not be styled as an
+            alarm. Descriptive note only (R1) — what the plan meters, not what
+            a plan would do for the user's results. */}
+        {data.metrics.ticker_lookups_today && (
+          <UsageCard
+            title="Ticker look-ups today"
+            used={data.metrics.ticker_lookups_today.used}
+            cap={data.metrics.ticker_lookups_today.cap ?? 0}
+            pct={data.metrics.ticker_lookups_today.pct}
+            unit={
+              data.metrics.ticker_lookups_today.cap == null
+                ? "look-ups · not metered on your plan"
+                : "look-ups"
+            }
+            note={
+              data.metrics.ticker_lookups_today.cap == null
+                ? "A look-up is one detailed ticker score view."
+                : "A look-up is one detailed ticker score view. The count resets tomorrow; paid plans are not metered."
+            }
+            neutral
+          />
+        )}
         <UsageCard
           title="Watchlist"
           used={data.metrics.watchlist.used}
@@ -98,11 +132,20 @@ function tierName(t: string) {
 }
 
 function UsageCard({
-  title, used, cap, pct, unit, inverse,
+  title, used, cap, pct, unit, inverse, neutral, note,
 }: {
-  title: string; used: number; cap: number; pct: number; unit: string; inverse?: boolean;
+  title: string; used: number; cap: number; pct: number; unit: string;
+  inverse?: boolean;
+  /** Opt out of the green→yellow→red ramp and use a single neutral accent bar.
+   *  Required for meters where a full bar is simply a fact about the user's own
+   *  usage and must not read as an alarm (COMPLIANCE_COPY_RULES R6). */
+  neutral?: boolean;
+  /** Optional plain-language line explaining what the metric counts. */
+  note?: string;
 }) {
-  const color = inverse
+  const color = neutral
+    ? "bg-accent"
+    : inverse
     ? (used === 0 ? "bg-up" : used > 0 ? "bg-yellow-500" : "bg-accent")
     : pct >= 90 ? "bg-down"
     : pct >= 70 ? "bg-yellow-500"
@@ -122,6 +165,7 @@ function UsageCard({
         </div>
       )}
       {cap > 0 && <p className="mt-1 text-xs text-muted">{pct.toFixed(0)}% used</p>}
+      {note && <p className="mt-2 text-xs text-subtle">{note}</p>}
     </div>
   );
 }

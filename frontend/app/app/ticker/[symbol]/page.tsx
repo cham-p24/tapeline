@@ -22,6 +22,81 @@ import { trackEvent, trackFirstTickerAdded } from "@/lib/gtag";
 
 type DetailTab = "financials" | "insider";
 
+/**
+ * Freemium daily look-up meter, returned by GET /api/ticker/{symbol} alongside
+ * the ticker payload.
+ *
+ * `null` for anonymous callers (not metered on that endpoint). `limit: null`
+ * is the UNLIMITED sentinel — paid tier, active no-card trial, or a brand-new
+ * account inside its first-session grace window.
+ *
+ * Read structurally off the response rather than from the shared TickerDetail
+ * type: lib/api.ts is outside this change's file lane. Folding `lookups` into
+ * TickerDetail is the follow-up.
+ */
+export type LookupMeter = {
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  resets_at: string | null;
+};
+
+/**
+ * Show the meter once this few look-ups remain. Chosen so a 12/day free user
+ * sees it on look-ups 9-12 — enough runway to understand the limit and decide,
+ * rather than meeting it for the first time as a 402 wall.
+ */
+export const LOOKUP_METER_REMAINING_THRESHOLD = 3;
+
+/**
+ * Calm, factual statement of the user's OWN look-up usage.
+ *
+ * Compliance (docs/COMPLIANCE_COPY_RULES.md R6): this is permitted because it
+ * reports a real, first-party count — but it must never be dressed as
+ * pressure. Deliberately: muted/border-only styling with NO red, warn or down
+ * tones, no progress bar filling toward a threat, no countdown, no "only N
+ * left" / "running out" phrasing, no exclamation. It states the count, states
+ * what the plans do (R1: describes the product, never a market outcome), and
+ * stops.
+ *
+ * Renders nothing when the caller is unmetered or still has runway, so the
+ * page is unchanged for everyone except a free user approaching the cap.
+ */
+export function LookupMeterPill({
+  used,
+  limit,
+  remaining,
+}: {
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+}) {
+  // Unmetered caller (paid / trial / first-session grace) — nothing to report.
+  if (limit == null || remaining == null) return null;
+  if (remaining > LOOKUP_METER_REMAINING_THRESHOLD) return null;
+
+  return (
+    <div
+      role="status"
+      data-testid="lookup-meter"
+      aria-label="Your daily look-up count"
+      className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border bg-panel px-3 py-2 text-xs text-muted"
+    >
+      <span className="nums font-medium text-fg">
+        Look-up {used} of {limit} today
+      </span>
+      <span aria-hidden="true">·</span>
+      <span>
+        The free plan includes {limit} detailed look-ups a day, and the count
+        resets tomorrow. Paid plans are not metered.
+      </span>
+      <Link href="/pricing" className="text-accent hover:underline">
+        Compare plans
+      </Link>
+    </div>
+  );
+}
+
 export default function TickerPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol: rawSymbol } = use(params);
   const symbol = rawSymbol.toUpperCase();
@@ -179,6 +254,11 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const displayScore =
     animatedScoreX10 != null ? (animatedScoreX10 / 10).toFixed(1) : "—";
 
+  // Freemium look-up meter for this caller. Absent on older API builds and for
+  // anonymous callers, so treat it as optional and default to "nothing to show".
+  const lookups =
+    (data as TickerDetail & { lookups?: LookupMeter | null }).lookups ?? null;
+
   return (
     <div>
       {/* Header */}
@@ -227,6 +307,17 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           </a>
         </div>
       </div>
+
+      {/* Daily look-up meter — self-hiding unless a metered (free) caller is
+          within LOOKUP_METER_REMAINING_THRESHOLD of the cap. Sits above the
+          fold so the count is seen BEFORE the wall, never as a surprise. */}
+      {lookups && (
+        <LookupMeterPill
+          used={lookups.used}
+          limit={lookups.limit}
+          remaining={lookups.remaining}
+        />
+      )}
 
       {/* Top row: score + signal + actions */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">

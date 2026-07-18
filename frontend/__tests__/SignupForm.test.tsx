@@ -333,4 +333,176 @@ describe("SignUpPage", () => {
       screen.getByText(new RegExp(`${REFUND.windowDays}-day money-back on paid plans`)),
     ).toBeInTheDocument();
   });
+
+  // ── Inline validation, blur timing, and the aria wiring ──────────────────
+  // Errors must appear when the user LEAVES a field (not on every keystroke,
+  // and not only after a wasted submit round-trip), render next to the field
+  // that caused them, and be wired to assistive tech.
+
+  it("does NOT show an error while the user is still typing the email", () => {
+    render(<SignUpPage />);
+    const email = screen.getByLabelText(/^email$/i);
+    fireEvent.change(email, { target: { value: "trader@" } });
+    expect(email).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows an adjacent, actionable email error ON BLUR", () => {
+    render(<SignUpPage />);
+    const email = screen.getByLabelText(/^email$/i);
+    fireEvent.change(email, { target: { value: "trader-at-example.com" } });
+    fireEvent.blur(email);
+
+    const error = screen.getByRole("alert");
+    // Says what went wrong AND how to fix it — never a bare "Invalid input".
+    expect(error.textContent).toMatch(/missing an @/i);
+    expect(error.textContent).toMatch(/you@example\.com/i);
+    expect(error.textContent).not.toMatch(/^invalid/i);
+    // Adjacent to the offending field, not parked at the foot of the form.
+    expect(email.parentElement).toContainElement(error);
+  });
+
+  it("wires aria-invalid + aria-describedby from the input to its error", () => {
+    render(<SignUpPage />);
+    const email = screen.getByLabelText(/^email$/i);
+    fireEvent.change(email, { target: { value: "nope" } });
+    fireEvent.blur(email);
+
+    expect(email).toHaveAttribute("aria-invalid", "true");
+    const describedBy = email.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    // Every id referenced must actually exist — a dangling describedby
+    // target silently announces nothing.
+    for (const id of describedBy!.split(" ")) {
+      expect(document.getElementById(id)).not.toBeNull();
+    }
+    expect(document.getElementById("signup-email-error")!.textContent).toMatch(
+      /email address/i,
+    );
+  });
+
+  it("keeps the password hint described alongside the error, not replaced by it", () => {
+    render(<SignUpPage />);
+    const password = screen.getByLabelText(/password/i);
+    fireEvent.change(password, { target: { value: "short" } });
+    fireEvent.blur(password);
+
+    const describedBy = password.getAttribute("aria-describedby")!.split(" ");
+    expect(describedBy).toContain("signup-password-error");
+    expect(describedBy).toContain("signup-password-hint");
+    // The message counts the shortfall rather than restating the rule.
+    expect(document.getElementById("signup-password-error")!.textContent).toMatch(
+      /5 characters.*add 3 more/i,
+    );
+  });
+
+  it("clears a shown error as the user starts fixing the field", () => {
+    render(<SignUpPage />);
+    const email = screen.getByLabelText(/^email$/i);
+    fireEvent.change(email, { target: { value: "nope" } });
+    fireEvent.blur(email);
+    expect(email).toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.change(email, { target: { value: "nope@example.com" } });
+    expect(email).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("blocks submit on an invalid email and never calls the API", async () => {
+    const { authApi } = await import("@/lib/auth");
+    // The module-level mock accumulates across tests in this file; only the
+    // calls made by THIS test are meaningful here.
+    (authApi.signup as ReturnType<typeof vi.fn>).mockClear();
+    const { container } = render(<SignUpPage />);
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "not-an-email" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "longenough-pass" },
+    });
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^email$/i)).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(authApi.signup).not.toHaveBeenCalled();
+  });
+
+  it("PRESERVES everything the user typed when submit fails validation", async () => {
+    const { container } = render(<SignUpPage />);
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "trader@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "tiny" } , // too short → submit fails
+    });
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "Ada Lovelace" },
+    });
+    fireEvent.click(screen.getByLabelText(/Daily Top 10/i));
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/password/i)).toHaveAttribute("aria-invalid", "true"),
+    );
+    // Nothing was wiped — including the consent checkbox.
+    expect((screen.getByLabelText(/^email$/i) as HTMLInputElement).value).toBe(
+      "trader@example.com",
+    );
+    expect((screen.getByLabelText(/password/i) as HTMLInputElement).value).toBe("tiny");
+    expect((screen.getByLabelText(/name/i) as HTMLInputElement).value).toBe(
+      "Ada Lovelace",
+    );
+    expect(
+      (screen.getByLabelText(/Daily Top 10/i) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  it("announces the form-level error from an always-mounted live region", async () => {
+    const { container } = render(<SignUpPage />);
+    // The live region must exist BEFORE the error arrives, or assistive tech
+    // has nothing to observe when the message is inserted.
+    const region = container.querySelector('[aria-live="assertive"]');
+    expect(region).not.toBeNull();
+    expect(region!.textContent).toBe("");
+
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "bad" },
+    });
+    fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(region!.textContent).toMatch(/needs? fixing/i));
+  });
+
+  it("submits normally once the fields are valid (validation is not a wall)", async () => {
+    const { authApi } = await import("@/lib/auth");
+    const { container } = render(<SignUpPage />);
+    const email = screen.getByLabelText(/^email$/i);
+    fireEvent.change(email, { target: { value: "trader@example.com" } });
+    fireEvent.blur(email);
+    const password = screen.getByLabelText(/password/i);
+    fireEvent.change(password, { target: { value: "longenough-pass" } });
+    fireEvent.blur(password);
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+  });
+
+  // ── Compliance Rule 8: no suitability data at the account-creation step ───
+  it("collects NO suitability data (experience, capital, risk tolerance, goals)", () => {
+    const { container } = render(<SignUpPage />);
+    const inputs = Array.from(
+      container.querySelectorAll("input, select, textarea"),
+    );
+    const banned =
+      /experience|portfolio|capital|net worth|risk toleran|investment goal|holdings|how much/i;
+    for (const el of inputs) {
+      expect(el.getAttribute("name") ?? "").not.toMatch(banned);
+      expect(el.getAttribute("id") ?? "").not.toMatch(banned);
+    }
+    // And nothing on the page asks for it in prose either.
+    expect(container.textContent ?? "").not.toMatch(
+      /how much (do you|capital)|portfolio size|risk tolerance|investing experience/i,
+    );
+  });
 });
