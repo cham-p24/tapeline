@@ -7,10 +7,22 @@ import { track } from "@vercel/analytics";
 
 /**
  * Non-blocking dismissable sheet that fires for trial users with 5-9 days
- * left. Soft-conversion moment: catches the committed early cohort before
- * the trial hits the urgent phase. Sits bottom-right on desktop, hidden on
- * mobile (TrialBanner already does the heavy lifting there — adding a
- * second floating card on a small viewport is hostile).
+ * left. Sits bottom-right on desktop, hidden on mobile (TrialBanner already
+ * does the heavy lifting there — adding a second floating card on a small
+ * viewport is hostile).
+ *
+ * COMPLIANCE (Rule 6 — see docs/COMPLIANCE_COPY_RULES.md): stating the days
+ * remaining on the user's OWN trial is permitted, because it is a factual
+ * statement about their account. What is NOT permitted is attaching that
+ * countdown to a price or offer deadline. This component previously read
+ * "Lock in your trial price — N days left", which invented a deadline that
+ * does not exist (founding pricing is permanent, not time-limited) and is
+ * exactly the manufactured-scarcity pattern the rule prohibits. Keep the
+ * copy descriptive: say what happens, and what does not.
+ *
+ * There is deliberately no "urgent phase" — TrialBanner holds one calm,
+ * constant treatment from day 14 to day 1 (see #362). Do not reintroduce
+ * escalating styling or language here.
  *
  * Conditions to render, all required:
  *   - user.tier === "premium"
@@ -68,12 +80,14 @@ export function TrialEarlyCapture() {
           <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
           <div className="flex-1">
             <div className="text-sm font-semibold text-fg">
-              Lock in your trial price &mdash; {daysLeft} days left
+              Your Premium trial has {daysLeft} {daysLeft === 1 ? "day" : "days"} left
             </div>
             <p className="mt-1 text-xs text-muted">
-              Add a card now and we won&rsquo;t charge a thing unless you
-              decide to stay past day 14. One less thing to remember when
-              the trial ends.
+              Adding a card now doesn&rsquo;t charge you and doesn&rsquo;t
+              shorten the trial &mdash; your remaining days stay, and the first
+              charge would only happen when the trial ends. If you&rsquo;d
+              rather not, the account moves to Free on its own. Nothing to
+              cancel either way.
             </p>
             <div className="mt-3 flex items-center gap-3">
               <Link
