@@ -1,7 +1,13 @@
-"""/api/usage — show user where they stand against their tier caps."""
+"""/api/usage — show user where they stand against their tier caps.
+
+Includes the daily ticker look-up meter (`metrics.ticker_lookups_today`). That
+counter is written by services.usage on every metered /api/ticker call and was
+previously enforced but never readable, which left /app/usage unable to show it
+and made the cap land as an unannounced 402.
+"""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -10,7 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import AlertEvent, User, WatchlistItem
 from app.services.auth import current_user_required
-from app.services.tier import TIER_LIMITS, Tier, effective_limit, is_on_trial
+from app.services.tier import TIER_LIMITS, Tier, effective_limit, is_on_trial, limit
+# Same-package import of the metering authority. _is_unmetered is the ONE place
+# that decides who the daily look-up cap applies to (paid tier OR active no-card
+# trial OR first-session grace window); re-deriving that here would drift the
+# moment one of those levers moves.
+from app.services.usage import _is_unmetered as lookups_unmetered
 
 router = APIRouter()
 
@@ -48,6 +59,23 @@ async def my_usage(
                AlertEvent.delivered.is_(True))
     )).scalar() or 0
 
+    # ── Daily ticker look-ups ────────────────────────────────────────────────
+    # Read-only view of the SAME durable counter services.usage writes on every
+    # metered GET /api/ticker/{symbol}. This never consumes a look-up — the page
+    # showing you your usage must not cost you any.
+    #
+    # This block was the missing half of the meter: the count existed on the
+    # users table and was enforced at the wall, but no read surface exposed it,
+    # so /app/usage couldn't render it and the cap arrived unannounced.
+    #
+    # cap = None is the UNLIMITED sentinel (paid tier / active trial / first-
+    # session grace). `used` is scoped to today: a counter still stamped with a
+    # previous UTC date has already logically rolled over, so it reads 0 here
+    # exactly as the next look-up would reset it.
+    lookup_cap = None if lookups_unmetered(user) else limit(user.tier, "daily_lookups")
+    today = datetime.now(UTC).date()
+    lookups_used = (user.lookups_today or 0) if user.lookups_reset_on == today else 0
+
     def pct(used: int, cap: int) -> float:
         return round(100 * used / cap, 1) if cap > 0 else 0.0
 
@@ -64,6 +92,21 @@ async def my_usage(
                 "used": alerts_today,
                 "cap": caps["email_alerts_per_day"],
                 "pct": pct(alerts_today, caps["email_alerts_per_day"]),
+            },
+            "ticker_lookups_today": {
+                "used": lookups_used,
+                "cap": lookup_cap,
+                "pct": pct(lookups_used, lookup_cap) if lookup_cap else 0.0,
+                "remaining": (
+                    None if lookup_cap is None else max(0, lookup_cap - lookups_used)
+                ),
+                # The counter is keyed on the UTC date, so it rolls over at the
+                # next UTC midnight — exact, not an estimate.
+                "resets_at": (
+                    None
+                    if lookup_cap is None
+                    else (today_start + timedelta(days=1)).isoformat()
+                ),
             },
             "data_delay_minutes": caps["data_delay_minutes"],
             "api_requests_per_day": {
