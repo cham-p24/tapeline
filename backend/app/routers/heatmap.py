@@ -16,6 +16,16 @@ Search (2026-05-16): optional `q` query param filters tiles to symbols
 matching the (case-insensitive, substring) query. Empty sectors are
 dropped from the response so the UI doesn't render headers with zero
 tiles underneath. The frontend uses this for the heatmap search box.
+
+FREE PREVIEW (2026-07-18): this endpoint stays Pro-gated. Free/anon
+visitors to /app/heatmap are served the SECTOR-LEVEL aggregate from the
+pre-existing GET /api/public/heatmap (app/main.py) instead — real,
+volume-weighted 1D moves per canonical sector with a real per-sector
+ticker count. No new endpoint was added: the public one already returns
+exactly the aggregate shape the teaser needs, and per-ticker drill-down
+(this route) remains the upgrade reason. Previously the page 403'd
+before render, so the upgrade card floated over an empty grid reading
+"Showing 0 tickers across 0 sectors" — a paywall over nothing.
 """
 from __future__ import annotations
 

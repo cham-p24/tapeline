@@ -38,6 +38,41 @@ from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
+# How many Form 4 rows the FREE preview returns, and over what window. Small on
+# purpose: enough to show the feed is real and populated (the paywalled page
+# previously blurred an EMPTY table, so a Free user saw zero evidence the
+# feature had any content), nowhere near enough to replace the Premium feed.
+FREE_INSIDER_PREVIEW_LIMIT = 3
+FREE_INSIDER_PREVIEW_DAYS = 30
+
+
+@router.get("/preview")
+async def insider_preview(
+    user: User = Depends(current_user_required),
+) -> dict:
+    """Read-only 3 most-recent Form 4 filings — a FREE taste of the feed.
+
+    Requires login, matching the free-taste pattern in routers/squeeze.py —
+    this is a logged-in activation nudge, not a public/scrapeable surface.
+
+    `feed_size` is the real total row count of the DB-backed feed so the
+    frontend's locked section can state the true held-back number instead of
+    inventing one. Zero when the worker hasn't backfilled yet; the UI omits
+    the number in that case rather than printing "of 0".
+    """
+    items = await get_recent_insider_transactions_db(
+        days=FREE_INSIDER_PREVIEW_DAYS,
+        limit=FREE_INSIDER_PREVIEW_LIMIT,
+    )
+    return {
+        "count": len(items),
+        "preview": True,
+        "limit": FREE_INSIDER_PREVIEW_LIMIT,
+        "days": FREE_INSIDER_PREVIEW_DAYS,
+        "feed_size": await insider_feed_size_db(),
+        "items": items,
+    }
+
 
 @router.get("")
 async def list_insider_buys(
