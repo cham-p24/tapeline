@@ -77,7 +77,13 @@
     "copy instead.",
     "",
     "Entries are pinned by file+rule+phrase so that new violations of the same",
-    "rule in the same file still fail the build."
+    "rule in the same file still fail the build.",
+    "",
+    "PRUNE STALE ENTRIES. When the underlying copy is fixed, DELETE the entry in",
+    "the same PR. A ledger entry that no longer matches anything is not harmless:",
+    "it silently downgrades a REINTRODUCED violation from blocking to a warning,",
+    "so the regression this linter exists to catch would ship green. Entries with",
+    "no 'phrase' are the widest — they mute an entire rule for a whole file."
   ],
 
   "knownViolations": [
@@ -86,11 +92,6 @@
       "rule": "performance-claim",
       "phrase": "best pick",
       "reason": "PRIORITY. Trial-summary and recap emails render 'Best pick this trial: <SYM> · alpha vs SPY +N%'. This is a superlative evaluative label on a specific security inside a 1:1 templated email, and it reports how a security performed — Rules 1, 2 and 7. Needs a copy fix by the email owner (suggested: drop the superlative and report activity, e.g. 'N picks logged during your trial'). Not fixed here to avoid colliding with concurrent email work."
-    },
-    {
-      "file": "frontend/app/app/onboarding/page.tsx",
-      "rule": "prohibited-data-collection",
-      "reason": "PRIORITY. Onboarding asks 'What's your investing experience?' and 'Roughly what size portfolio do you run?' with capital bands. Rule 8 prohibits collecting experience level and portfolio size outright — this is the finding most likely to be treated as building a suitability profile. Requires a product decision (remove the questions and the stored fields), not a copy tweak, so it is escalated in the PR rather than patched here."
     },
     {
       "file": "frontend/app/scorecard/page.tsx",
