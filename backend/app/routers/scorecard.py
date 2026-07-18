@@ -12,18 +12,29 @@ Tiering posture:
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, timedelta
+from collections.abc import AsyncIterator
+from datetime import UTC, date, datetime, timedelta
 from statistics import median
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, select
+from fastapi.responses import StreamingResponse
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.db import SessionLocal, get_session
 from app.models import DailyScorecardEntry, Ticker, User
+from app.services import scorecard_export
 from app.services.auth import current_user_optional
 
 router = APIRouter()
+
+# NOTE: the two public dataset exports below (export_scorecard_csv /
+# export_scorecard_json) are deliberately NOT decorated here. Their paths —
+# /api/scorecard.csv and /api/scorecard.json — are siblings of this router's
+# "/api/scorecard" prefix, not children of it, so they cannot be expressed as
+# sub-paths (a ".csv" suffix fails Starlette's "routed paths must start with
+# '/'" rule and silently never mounts). They are bound directly onto the app
+# in app/main.py via add_api_route. Keep them plain functions.
 
 # Free + anonymous viewers see scorecard picks delayed by this many days.
 # Pro and Premium see live. The summary stats stay live for everyone.
@@ -169,6 +180,178 @@ async def get_scorecard(
 def _parse_iso_date(s: str):
     """Parse a YYYY-MM-DD scorecard date string back to a date object."""
     return datetime.fromisoformat(s).date() if "T" in s else datetime.strptime(s, "%Y-%m-%d").date()
+
+
+# ---------------------------------------------------------------------------
+# Public dataset export — GET /api/scorecard.csv and /api/scorecard.json
+#
+# The scorecard's whole claim is that it is checkable. That is only true if
+# the data can leave the site: an outsider should be able to pull the raw
+# rows, re-run the arithmetic against their own price source, and either
+# confirm it or catch us out. These two endpoints are that.
+#
+# Route paths are ".csv" / ".json" rather than "/…" because this router is
+# mounted at prefix "/api/scorecard", so the concatenation yields the
+# extension-style URLs `/api/scorecard.csv` and `/api/scorecard.json`. Keeping
+# them on this router means the dataset lives next to the endpoint that serves
+# the same data to the page. `test_scorecard_dataset.py` asserts both paths are
+# actually registered on the app, so a routing regression fails CI rather than
+# 404ing in production.
+#
+# Unauthenticated by design — a track record behind a login is not a public
+# track record.
+# ---------------------------------------------------------------------------
+
+# Rows are read in batches so the response streams instead of materialising
+# the whole archive. LIMIT/OFFSET rather than a keyset cursor: the archive is
+# in the low thousands of rows and grows by ~10 a trading day, so the offset
+# scan is irrelevant next to the readability win.
+_EXPORT_BATCH = 1000
+
+
+def _export_cutoff() -> date:
+    """Newest session date included in the public export.
+
+    The export applies the same publication delay as the anonymous web view
+    (`_FREE_DELAY_DAYS`) — but unlike the web view it is the COMPLETE archive
+    since inception up to that cutoff, not a trailing window. The cutoff is
+    stated in the artefact's metadata rather than silently applied.
+    """
+    return datetime.now(UTC).date() - timedelta(days=_FREE_DELAY_DAYS)
+
+
+async def _export_meta(session: AsyncSession, cutoff) -> dict:
+    """Counts + date range for the artefact header.
+
+    Sample size is a property of the dataset (how many observations exist),
+    not a statistic derived from the observations, so disclosing it is
+    required rather than prohibited.
+    """
+    row_count = (await session.execute(
+        select(func.count()).select_from(DailyScorecardEntry)
+        .where(DailyScorecardEntry.as_of <= cutoff)
+    )).scalar_one()
+    session_count = (await session.execute(
+        select(func.count(func.distinct(DailyScorecardEntry.as_of)))
+        .where(DailyScorecardEntry.as_of <= cutoff)
+    )).scalar_one()
+    bounds = (await session.execute(
+        select(func.min(DailyScorecardEntry.as_of), func.max(DailyScorecardEntry.as_of))
+        .where(DailyScorecardEntry.as_of <= cutoff)
+    )).one()
+    return scorecard_export.dataset_meta(
+        row_count=row_count or 0,
+        session_count=session_count or 0,
+        delay_days=_FREE_DELAY_DAYS,
+        first_date=bounds[0],
+        last_date=bounds[1],
+        cutoff=cutoff,
+    )
+
+
+async def _iter_export_entries(
+    session: AsyncSession, cutoff, since
+) -> AsyncIterator[DailyScorecardEntry]:
+    """Yield every frozen entry up to `cutoff`, oldest session first."""
+    offset = 0
+    while True:
+        stmt = (
+            select(DailyScorecardEntry)
+            .where(DailyScorecardEntry.as_of <= cutoff)
+            .order_by(
+                DailyScorecardEntry.as_of,
+                DailyScorecardEntry.rank,
+                DailyScorecardEntry.id,
+            )
+            .offset(offset)
+            .limit(_EXPORT_BATCH)
+        )
+        if since is not None:
+            stmt = stmt.where(DailyScorecardEntry.as_of >= since)
+        rows = (await session.execute(stmt)).scalars().all()
+        if not rows:
+            return
+        for row in rows:
+            yield row
+        if len(rows) < _EXPORT_BATCH:
+            return
+        offset += _EXPORT_BATCH
+
+
+def _parse_since(since: str | None):
+    """Validate the optional `?since=YYYY-MM-DD` incremental-pull filter."""
+    if not since:
+        return None
+    try:
+        return datetime.strptime(since.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "since must be an ISO date (YYYY-MM-DD)") from None
+
+
+async def _stream_export(fmt: str, since) -> AsyncIterator[str]:
+    """Open a dedicated session and stream the artefact.
+
+    Deliberately NOT using the `get_session` request dependency: FastAPI exits
+    `yield` dependencies before the response body is streamed, so the injected
+    session would already be closed by the time the generator ran.
+    """
+    async with SessionLocal() as session:
+        cutoff = _export_cutoff()
+        meta = await _export_meta(session, cutoff)
+        entries = _iter_export_entries(session, cutoff, since)
+        render = scorecard_export.iter_csv if fmt == "csv" else scorecard_export.iter_json
+        async for chunk in render(meta, entries):
+            yield chunk
+
+
+def _export_filename(ext: str) -> str:
+    return f"tapeline-scorecard-{datetime.now(UTC).strftime('%Y-%m-%d')}.{ext}"
+
+
+# Registered in app/main.py via add_api_route (see the note there).
+async def export_scorecard_csv(since: str | None = None) -> StreamingResponse:
+    """The full append-only archive as CSV, with the context in the file.
+
+    Leading `#` comment lines carry the methodology URL, the append-only and
+    publication-delay explanation, the sample size, the general-information
+    statement and the past-performance statement — because a CSV gets opened
+    later, elsewhere, by someone who never saw this site.
+
+    Raw rows only. No annualised return, no risk-adjusted ratio, no cumulative
+    total, no backtest. See `app/services/scorecard_export.py`.
+    """
+    parsed = _parse_since(since)
+    return StreamingResponse(
+        _stream_export("csv", parsed),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_export_filename("csv")}"',
+            # Public, identical for every caller — safe to cache at the edge.
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+# Registered in app/main.py via add_api_route (see the note there).
+async def export_scorecard_json(since: str | None = None) -> StreamingResponse:
+    """The full append-only archive as JSON: `{"meta": {...}, "rows": [...]}`.
+
+    Same payload and same constraints as the CSV. `meta` is emitted before
+    `rows` so a streaming consumer reads the methodology, the delay and the
+    past-performance statement before the numbers.
+
+    Served `inline` rather than as an attachment — someone auditing the record
+    should be able to open the URL and read it.
+    """
+    parsed = _parse_since(since)
+    return StreamingResponse(
+        _stream_export("json", parsed),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'inline; filename="{_export_filename("json")}"',
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 @router.get("/symbol/{symbol}")
