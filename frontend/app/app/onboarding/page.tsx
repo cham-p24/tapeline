@@ -13,6 +13,13 @@
  * Conversion-protective by design: questions are clearly optional, the
  * Skip button is equally prominent, and the trial is already running so
  * there's no urgency to interrupt them.
+ *
+ * Marketing-consent semantics (weekly digest): consent can now also be
+ * granted on the /signup form, so this page must never destroy it.
+ * The checkbox prefills from the user's CURRENT consent (best-effort
+ * /api/me fetch), and the submit sends `marketing_opt_in: null` on Skip
+ * or when the checkbox was never touched — the backend leaves the stored
+ * value untouched for null. Only an explicit tick/untick changes consent.
  */
 
 import Link from "next/link";
@@ -118,8 +125,38 @@ function OnboardingForm() {
   const [source, setSource] = useState<Source | "">("");
   const [sectors, setSectors] = useState<string[]>([]);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  // True once the user has interacted with the consent checkbox. Only a
+  // touched checkbox submits a real true/false; untouched (and Skip) submit
+  // null so the backend leaves any previously-granted consent alone.
+  const marketingTouchedRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Prefill the consent checkbox from the user's CURRENT stored consent so
+  // the UI tells the truth for users who already opted in on the signup form
+  // (and so an explicit untick here is a real revocation). Best-effort: any
+  // failure just leaves the default unchecked box, and the untouched-→-null
+  // submit semantics mean we still can't destroy stored consent.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (
+          !cancelled &&
+          !marketingTouchedRef.current &&
+          d?.profile?.marketing_opt_in === true
+        ) {
+          setMarketingOptIn(true);
+        }
+      } catch {
+        // best-effort only — default unchecked stays.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // OAuth signup conversion. The backend redirects NEW Google/OAuth users to
   // /app/onboarding?oauth=1, but OAuth signups never touch the /signup form
@@ -218,7 +255,12 @@ function OnboardingForm() {
         trading_style: skipped ? null : style || null,
         portfolio_band: skipped ? null : band || null,
         referral_source: skipped ? null : source || null,
-        marketing_opt_in: skipped ? false : marketingOptIn,
+        // null = "no answer" — the backend leaves stored consent untouched.
+        // Sent on Skip AND when the checkbox was never touched, so neither
+        // path can destroy consent granted earlier (e.g. at signup). Only an
+        // explicit tick/untick transmits true/false.
+        marketing_opt_in:
+          skipped || !marketingTouchedRef.current ? null : marketingOptIn,
         sectors_of_interest: skipped ? [] : sectors,
         skipped,
       };
@@ -334,7 +376,10 @@ function OnboardingForm() {
             <input
               type="checkbox"
               checked={marketingOptIn}
-              onChange={(e) => setMarketingOptIn(e.target.checked)}
+              onChange={(e) => {
+                marketingTouchedRef.current = true;
+                setMarketingOptIn(e.target.checked);
+              }}
               className="mt-0.5 h-4 w-4 cursor-pointer accent-accent"
             />
             <span className="text-fg">
