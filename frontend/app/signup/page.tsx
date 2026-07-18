@@ -7,6 +7,7 @@ import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
+import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
 import { getStoredGclid, getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
@@ -114,6 +115,13 @@ function SignUpForm() {
   const [honeypot, setHoneypot] = useState("");
   // Turnstile token — populated by Cloudflare's widget callback. Empty until solved.
   const [turnstileToken, setTurnstileToken] = useState("");
+  // Email consent — BOTH unchecked by default (explicit opt-in only, never
+  // pre-ticked). This is the placement fix for the digest-reach problem: the
+  // only prior capture point for weekly-digest consent was an onboarding
+  // checkbox a day-1 bouncer never saw, and app signups were never offered
+  // the Daily Top 10 at all.
+  const [weeklyDigestOptIn, setWeeklyDigestOptIn] = useState(false);
+  const [dailyTop10OptIn, setDailyTop10OptIn] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const turnstileRef = useRef<HTMLDivElement | null>(null);
@@ -200,6 +208,11 @@ function SignUpForm() {
         turnstile_token: token || undefined,
         device_fingerprint: device_fp || undefined,
         ref: refCode || undefined,
+        // Explicit email consent from the two unchecked-by-default boxes
+        // above the submit button. false = the box was left untouched;
+        // the backend writes/enrols NOTHING in that case.
+        marketing_opt_in: weeklyDigestOptIn,
+        daily_top10_opt_in: dailyTop10OptIn,
         ...utm,
         ...gclid,
       });
@@ -246,7 +259,7 @@ function SignUpForm() {
               pages now promise (free-forever + 30-day money-back), not just the
               14-day trial the page used to over-emphasise. Descriptive only. */}
           <p className="mt-4 text-xs text-muted">
-            Free forever &middot; No credit card &middot; 14-day Premium trial &middot; 30-day money-back on paid plans
+            Free forever &middot; No credit card &middot; 14-day Premium trial &middot; {REFUND.windowDays}-day money-back on paid plans
           </p>
 
           {/* PRIMARY signup path: Google-first, above the fold, first thing the
@@ -354,6 +367,24 @@ function SignUpForm() {
             <Field label="Password" type="password" autoComplete="new-password" value={password} onChange={setPassword} required minLength={8} hint="At least 8 characters" />
             <Field label="Name (optional)" type="text" autoComplete="name" value={name} onChange={setName} />
 
+            {/* Email consent — descriptive labels, UNCHECKED by default, and
+                signup never depends on them (pure opt-in, no dark patterns).
+                Every send both boxes govern carries one-click unsubscribe. */}
+            <div className="space-y-2">
+              <ConsentCheckbox
+                checked={weeklyDigestOptIn}
+                onChange={setWeeklyDigestOptIn}
+                label="Email me the weekly market digest"
+                hint="One email every Monday — the week's top score movers, market regime, and scorecard update. Opt out anytime."
+              />
+              <ConsentCheckbox
+                checked={dailyTop10OptIn}
+                onChange={setDailyTop10OptIn}
+                label="Send me the Daily Top 10 email each trading morning"
+                hint="The 10 highest-scoring US tickers before the open. One-click unsubscribe in every email."
+              />
+            </div>
+
             {/* Cloudflare Turnstile widget — auto-rendered by the script tag in
                 root layout. data-callback names a window function that receives
                 the token. Hidden entirely if no site key is configured. */}
@@ -401,15 +432,20 @@ function SignUpForm() {
               path second, explicit no-charge guarantee third. */}
           <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
             <div className="font-medium text-fg">After your 14 days</div>
+            {/* Numbers derive from lib/pricing (PRICING / FREE_LIMITS / REFUND)
+                — the single source of truth checkout + every other surface
+                uses — so this prose can never drift from the real price or
+                the real Free-tier caps again (it previously hardcoded all
+                three and had already drifted once). */}
             <p className="mt-1.5">
-              Stay on Free forever (live scores, top-10 scanner, 12 look-ups/day) — or upgrade to{" "}
-              <span className="text-fg">Pro from $8.25/mo</span> for the full
+              Stay on Free forever (live scores, top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day) — or upgrade to{" "}
+              <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span> for the full
               real-time universe with unlimited look-ups. No card on file means no surprise charge.
             </p>
             <p className="mt-2 text-[11px] text-subtle">
-              <span className="text-muted">30-day money back</span> if you change your mind ·
+              <span className="text-muted">{REFUND.short}</span> if you change your mind ·
               Cancel in one click ·{" "}
-              <Link href="/legal/refund" className="link">Full refund policy</Link>
+              <Link href={REFUND.policyPath} className="link">Full refund policy</Link>
             </p>
           </div>
 
@@ -423,6 +459,27 @@ function SignUpForm() {
         </div>
       </div>
     </main>
+  );
+}
+
+function ConsentCheckbox({
+  checked, onChange, label, hint,
+}: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; hint: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent"
+      />
+      <span className="text-fg">
+        {label}{" "}
+        <span className="text-xs text-muted">{hint}</span>
+      </span>
+    </label>
   );
 }
 

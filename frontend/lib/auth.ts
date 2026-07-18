@@ -65,6 +65,13 @@ type SignupExtras = {
   gclid?: string;
   gbraid?: string;
   wbraid?: string;
+  // Signup-form consent boxes — both rendered UNCHECKED by default (explicit
+  // opt-in only). `marketing_opt_in` is the weekly-market-digest consent
+  // (users.marketing_opt_in); `daily_top10_opt_in` enrols the email in the
+  // Daily Top 10 morning digest via the same newsletter subscribe path the
+  // public footer capture box uses.
+  marketing_opt_in?: boolean;
+  daily_top10_opt_in?: boolean;
 };
 
 // Signin can resolve two ways: a normal success (session cookie set, user

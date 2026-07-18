@@ -301,7 +301,12 @@ class OnboardingBody(BaseModel):
     trading_style: TradingStyle | None = None
     portfolio_band: PortfolioBand | None = None
     referral_source: ReferralSource | None = None
-    marketing_opt_in: bool = False
+    # None (or omitted) = "no answer" — the handler leaves the stored consent
+    # UNTOUCHED. The onboarding page sends null on Skip and when the user
+    # never touched the checkbox, so skipping can no longer destroy consent
+    # granted earlier (e.g. the signup-form checkbox). Explicit true/false
+    # still grants/revokes exactly as before.
+    marketing_opt_in: bool | None = None
     sectors_of_interest: list[str] = Field(default_factory=list, max_length=20)
     # Optional explicit skip flag. Not strictly needed (an empty body has the
     # same effect) but lets the client signal intent for analytics.
@@ -328,22 +333,26 @@ async def submit_onboarding(
     user.trading_style = body.trading_style
     user.portfolio_band = body.portfolio_band
     user.referral_source = body.referral_source
-    user.marketing_opt_in = bool(body.marketing_opt_in)
     user.sectors_of_interest = ",".join(sectors) if sectors else None
     user.onboarding_completed_at = datetime.now(UTC)
-    # Keep the weekly-newsletter bit in sync with the marketing-opt-in
-    # checkbox: opting in turns it on, opting out turns it off. The bit
-    # alone never delivers — the orchestrator double-gates on
-    # marketing_opt_in too — but keeping them aligned at the consent
-    # moment means /app/settings/email shows the toggle in the state
-    # the user just chose.
-    from app.services.email_prefs import EmailPref
-    bit = int(EmailPref.WEEKLY_NEWSLETTER)
-    current = int(user.email_prefs or 0)
-    if user.marketing_opt_in:
-        user.email_prefs = current | bit
-    else:
-        user.email_prefs = current & ~bit
+    # Consent is only ever changed by an EXPLICIT answer. None means the user
+    # skipped (or never touched the checkbox) — leave the stored value alone,
+    # so a day-1 skip can't destroy consent granted on the signup form.
+    # Previously this assigned unconditionally, which forced False on every
+    # skip. When an answer IS present, keep the weekly-newsletter bit in sync
+    # with it: opting in turns it on, opting out turns it off. The bit alone
+    # never delivers — the orchestrator double-gates on marketing_opt_in too —
+    # but keeping them aligned at the consent moment means /app/settings/email
+    # shows the toggle in the state the user just chose.
+    if body.marketing_opt_in is not None:
+        user.marketing_opt_in = bool(body.marketing_opt_in)
+        from app.services.email_prefs import EmailPref
+        bit = int(EmailPref.WEEKLY_NEWSLETTER)
+        current = int(user.email_prefs or 0)
+        if user.marketing_opt_in:
+            user.email_prefs = current | bit
+        else:
+            user.email_prefs = current & ~bit
     await session.commit()
 
     # Day-1 watchlist seeding — see _seed_watchlist_for_new_user. Runs in its

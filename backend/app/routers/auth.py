@@ -67,6 +67,18 @@ class SignupBody(BaseModel):
     gclid: str | None = Field(None, max_length=200)
     gbraid: str | None = Field(None, max_length=200)
     wbraid: str | None = Field(None, max_length=200)
+    # Signup-form email consent — BOTH default False and the form renders
+    # both boxes unchecked (explicit opt-in only; never pre-ticked).
+    #   marketing_opt_in    → users.marketing_opt_in: consent for the weekly
+    #                         market digest. Previously capturable only via
+    #                         the onboarding checkbox, which a day-1 bouncer
+    #                         never saw — this is the placement fix.
+    #   daily_top10_opt_in  → enrols the email in the Daily Top 10 digest via
+    #                         the same newsletter subscribe() service the
+    #                         public footer box uses (dedupe, welcome email,
+    #                         one-click unsubscribe token all reused).
+    marketing_opt_in: bool = False
+    daily_top10_opt_in: bool = False
 
 
 class SigninBody(BaseModel):
@@ -232,6 +244,10 @@ async def signup(
         signup_gclid=(body.gclid or None),
         signup_gbraid=(body.gbraid or None),
         signup_wbraid=(body.wbraid or None),
+        # Weekly-digest consent from the signup form's unchecked-by-default
+        # checkbox. False (no tick) writes the column default — nothing is
+        # inferred from silence.
+        marketing_opt_in=bool(body.marketing_opt_in),
     )
     session.add(user)
     # Credit the referrer too. Doing this in the same transaction guarantees
@@ -242,11 +258,45 @@ async def signup(
     await session.commit()
     await session.refresh(user)
 
+    # Consent→bit sync, mirroring the onboarding submit (routers/me.py):
+    # weekly-digest consent also sets the WEEKLY_NEWSLETTER email_prefs bit so
+    # /app/settings/email shows the toggle in the state the user just chose.
+    # (Delivery double-gates on marketing_opt_in AND the bit — see
+    # services/email.run_weekly_newsletter.) Done after the refresh above so
+    # the column default has materialised and the OR can't clobber other bits.
+    if user.marketing_opt_in:
+        from app.services.email_prefs import EmailPref
+        user.email_prefs = int(user.email_prefs or 0) | int(EmailPref.WEEKLY_NEWSLETTER)
+        await session.commit()
+
     # Record the IP for the 24h sliding-window cap. Done AFTER the DB commit so
     # a failed signup (DB unavailable, transaction conflict) doesn't burn the
     # legitimate user's budget.
     record_signup(client_ip)
     record_fingerprint_signup(body.device_fingerprint)
+
+    # Daily Top 10 enrolment — the signup form's second consent box. Reuses
+    # the SAME subscribe() service the public footer capture box posts to, so
+    # dedupe (already-subscribed no-op), the resubscribe flip, the welcome
+    # email and the one-click unsubscribe token all come along for free.
+    # Best-effort: a newsletter hiccup must never fail account creation.
+    if body.daily_top10_opt_in:
+        try:
+            from app.services.newsletter import subscribe as newsletter_subscribe
+            await newsletter_subscribe(
+                session,
+                email=user.email,
+                source="signup",
+                utm_source=body.utm_source,
+                utm_medium=body.utm_medium,
+                utm_campaign=body.utm_campaign,
+                utm_term=body.utm_term,
+                utm_content=body.utm_content,
+            )
+        except Exception:
+            logger.exception(
+                "auth.signup_daily_top10_subscribe_failed user=%s", user.id
+            )
 
     # Real-time founder ping so a new signup / live trial never goes unnoticed.
     # Self-guarding + never raises (no-op if the Telegram channel isn't set).
