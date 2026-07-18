@@ -38,10 +38,24 @@ from app.services.mock_feed import (
 from app.services.news_feed import fetch_latest_news
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
-from app.services.scorecard_backcheck import backcheck_all_pending
+from app.services.scorecard_backcheck import backcheck_all_pending, is_trading_day
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Strong references to detached fire-and-forget tasks. asyncio only keeps a
+# weak reference to a running task, so without this a long-running background
+# job can be garbage-collected mid-flight. Same pattern as
+# routers/ticker.py:_news_bg_tasks.
+_bg_tasks: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> None:  # type: ignore[no-untyped-def]
+    """Fire-and-forget `coro` as a detached task, holding a strong reference."""
+    task = asyncio.create_task(coro)
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
+
 
 _last_news_refresh: datetime | None = None
 _last_backcheck: datetime | None = None
@@ -236,8 +250,14 @@ async def tick() -> None:
     # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
     global _last_calendar_seed
     if _last_calendar_seed is None or (started - _last_calendar_seed).total_seconds() >= 86400:
-        await _seed_calendar()
-        _last_calendar_seed = started
+        # Isolated: a calendar-feed failure must not abort the rest of the tick.
+        # Latch only on success so a transient failure retries next tick rather
+        # than burning the 24h window.
+        try:
+            await _seed_calendar()
+            _last_calendar_seed = started
+        except Exception:
+            logger.exception("calendar.seed_failed")
 
     # Hourly Telegram digest to premium users
     global _last_telegram_digest
@@ -249,19 +269,33 @@ async def tick() -> None:
     # Without this the trial converts to free Premium forever (zero conversion).
     global _last_trial_check
     if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
-        await _downgrade_expired_trials()
-        _last_trial_check = started
+        # Isolated + latch-on-success. The downgrade is idempotent, so a retry
+        # on the next tick after a transient DB failure is safe.
+        try:
+            await _downgrade_expired_trials()
+            _last_trial_check = started
+        except Exception:
+            logger.exception("trial.downgrade_failed")
 
     # Hourly per-watchlisted-ticker news refresh (Premium tier feature).
     # Broad sweep + Massive cover the loud names; this fan-out covers the
     # tickers users specifically care about — small-caps, UK ADRs (BUR
     # etc.), niche names where the broad sweep doesn't surface anything.
-    # Quota math: 1000 unique tickers × 1/hour = 24k calls/day across
+    # Quota math: 200 unique tickers × 1/hour = 4.8k calls/day across
     # Massive + Finnhub (60/min), comfortably within the rate limits.
     global _last_watchlisted_news_refresh
     if _last_watchlisted_news_refresh is None or (started - _last_watchlisted_news_refresh).total_seconds() >= 3600:
-        await _refresh_watchlisted_news()
+        # Latch BEFORE dispatch, then run detached — same pattern as the daily
+        # IndexNow / stale-audit jobs below. This fan-out makes 2 live HTTP
+        # calls per symbol across hundreds of symbols, so awaiting it inline
+        # WEDGED the worker: it blew the 60s tick watchdog, and wait_for
+        # cancels tick() with CancelledError (a BaseException, so none of the
+        # `except Exception` handlers here caught it) BEFORE the latch was set.
+        # Every subsequent tick then re-entered and died the same way, so every
+        # stage below this line (sheet refresh, universe refresh, digests,
+        # newsletters, inbox) stopped running permanently.
         _last_watchlisted_news_refresh = started
+        _spawn(_refresh_watchlisted_news())
 
     # Daily trial-drip emails (day 3 / 7 / 13, plus the T+30 lapsed no-card
     # trial win-back inside run_daily_drip) + 14-day re-engagement for
@@ -394,7 +428,12 @@ async def tick() -> None:
     # operate on the Tapeline composite's sub_macro / sector values, not
     # the polygon_feed mock values that fetch_snapshots wrote earlier in
     # this tick. Idempotent: returns early when today's row already exists.
-    await _ensure_daily_scorecard(started.date())
+    # Isolated so a freeze failure can't abort every stage below it; the
+    # once-per-day semantics are enforced in-DB, so a retry next tick is safe.
+    try:
+        await _ensure_daily_scorecard(started.date())
+    except Exception:
+        logger.exception("scorecard.snapshot_failed")
 
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
@@ -404,8 +443,13 @@ async def tick() -> None:
         _last_universe_refresh is None
         or (started - _last_universe_refresh).total_seconds() >= 604800
     ):
-        await _refresh_universe()
-        _last_universe_refresh = started
+        # Isolated + latch-on-success — a failed discovery must not burn the
+        # 7-day window (or abort the stages below).
+        try:
+            await _refresh_universe()
+            _last_universe_refresh = started
+        except Exception:
+            logger.exception("universe.refresh_failed")
 
     # Hourly active-scoring-universe refresh (top-N by daily $-volume from
     # the DB-tracked 5,757). Cheap query — keeps the cache that
@@ -476,9 +520,16 @@ async def tick() -> None:
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
     # process memory to avoid double-fires within the same day. Worker restart
     # mid-day will re-fire — acceptable since users would rather get two than zero.
+    # Trading days only — on Sat/Sun/market holidays there's no fresh close to
+    # report, so a digest is pure noise (and shows stale prices). Reuses the
+    # same market calendar the scorecard freeze + back-check run on.
     global _last_eod_digest_date
     today_str = started.strftime("%Y-%m-%d")
-    if started.hour >= 21 and _last_eod_digest_date != today_str:
+    if (
+        started.hour >= 21
+        and is_trading_day(started.date())
+        and _last_eod_digest_date != today_str
+    ):
         try:
             from app.services.email import run_eod_watchlist_digest
             from app.services.lifecycle import worker_governor
@@ -488,9 +539,11 @@ async def tick() -> None:
                 )
             if count:
                 logger.info("eod_digest.sent count=%d", count)
+            # Latch only on success — a transient failure must retry on the
+            # next tick, not silently skip the whole day.
+            _last_eod_digest_date = today_str
         except Exception:
             logger.exception("eod_digest.run_failed")
-        _last_eod_digest_date = today_str
 
     # Weekly market digest (newsletter). Fires Monday at/after 13:00 UTC
     # (~9am ET pre-open / ~11pm Sydney post-Monday-close). Per-week dedupe
@@ -513,9 +566,12 @@ async def tick() -> None:
                     nl_session, now=started, governor=worker_governor(),
                 )
             logger.info("weekly_newsletter.sent count=%d token=%s", count, weekly_token)
+            # Latch only on success — otherwise one transient failure skips the
+            # whole week. Per-user dedupe in run_weekly_newsletter makes the
+            # retry safe.
+            _last_weekly_newsletter_token = weekly_token
         except Exception:
             logger.exception("weekly_newsletter.run_failed")
-        _last_weekly_newsletter_token = weekly_token
 
     # Daily Top 10 digest to newsletter_subscribers. Fires once per UTC day
     # at/after 13:00 UTC — ~9am ET pre-market open. Process-level token +
@@ -533,9 +589,11 @@ async def tick() -> None:
             async with session_scope() as ndl_session:
                 count = await run_daily_digest(ndl_session, now=started)
             logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
+            # Latch only on success — the DB-side last_sent_at still dedupes,
+            # so retrying on the next tick can't double-send.
+            _last_daily_newsletter_date = today_str
         except Exception:
             logger.exception("newsletter_daily.run_failed")
-        _last_daily_newsletter_date = today_str
 
     # IndexNow batch submit — daily, fires once per UTC day at/after
     # 06:00 UTC (Sydney evening, so any new pages shipped today are
@@ -588,9 +646,11 @@ async def tick() -> None:
             async with session_scope() as seo_session:
                 sent = await run_weekly_digest(seo_session)
             logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
+            # Latch only on success — a failed run retries on the next tick
+            # instead of skipping the week. Telegram-side dedupe covers repeats.
+            _last_seo_digest_token = seo_digest_token
         except Exception:
             logger.exception("seo_digest.weekly.failed")
-        _last_seo_digest_token = seo_digest_token
 
     # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
     # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.
@@ -616,9 +676,11 @@ async def tick() -> None:
                 result.get("fintwit_candidates_count", 0),
                 result.get("skipped", False),
             )
+            # Latch only on success so a transient failure retries on the next
+            # tick rather than skipping the day's growth package entirely.
+            _last_growth_tick_date = today_str
         except Exception:
             logger.exception("growth_bot.tick_failed")
-        _last_growth_tick_date = today_str
 
     # Inbox auto-handler tick: poll Reddit (the only channel that needs
     # polling — email is webhook-driven via /api/inbox/email; Telegram
@@ -944,6 +1006,22 @@ async def _refresh_news() -> None:
     )
 
 
+_WATCHLISTED_NEWS_MAX_SYMBOLS = 200
+"""Unique tickers per hourly watchlisted-news cycle. Was 1000, which at two
+live HTTP calls + a DB round-trip per symbol could not finish inside the
+hourly cadence (let alone the 60s tick watchdog it used to run under). 200 at
+~0.5s pacing is a ~2-5 min run, comfortably inside the hour."""
+
+_WATCHLISTED_NEWS_BUDGET_SECONDS = 15 * 60
+"""Hard wall-clock ceiling for one cycle, checked between symbols. Guarantees
+a cycle always ends well before the next hourly dispatch even if the vendor is
+crawling; the unprocessed tail is simply picked up next hour."""
+
+_WATCHLISTED_NEWS_PACING_SECONDS = 0.5
+"""Sleep between symbols. Keeps this fan-out inside the shared Finnhub 60/min
+free-tier budget alongside the fundamentals / insider / sector refreshes."""
+
+
 async def _refresh_watchlisted_news() -> None:
     """Hourly per-watchlisted-ticker news refresh — Premium-tier feature.
 
@@ -953,14 +1031,25 @@ async def _refresh_watchlisted_news() -> None:
     fan-out fetches per-ticker news for every symbol on every Premium-
     tier user's watchlist, using the Massive + Finnhub parallel merge.
 
-    Cap at 1000 unique tickers per cycle to bound work. Inserts use the
-    same per-article isolation pattern as `_refresh_news` so one bad row
-    can't poison the rest. Logs `inserted` / `duplicate` / `failed`
-    counts for the same observability reasons.
+    Runs DETACHED from tick() (see the dispatch site) because it is far
+    slower than the 60s tick watchdog. Bounded three ways so an hourly
+    cadence can always finish before the next one is due:
+      - at most _WATCHLISTED_NEWS_MAX_SYMBOLS unique tickers per cycle;
+      - a hard _WATCHLISTED_NEWS_BUDGET_SECONDS wall-clock budget, checked
+        between symbols (a slow vendor can't make a cycle run for hours);
+      - _WATCHLISTED_NEWS_PACING_SECONDS between symbols so the fan-out
+        stays inside the Finnhub 60/min free-tier budget shared with the
+        other refreshes.
+
+    Inserts use the same per-article isolation pattern as `_refresh_news`
+    so one bad row can't poison the rest. Logs `inserted` / `duplicate` /
+    `failed` counts for the same observability reasons.
     """
     from app.models import User
     from app.models.watchlist import WatchlistItem
     from app.services.news_feed import fetch_news_for_ticker
+
+    run_started = datetime.now(UTC)
 
     try:
         async with session_scope() as session:
@@ -973,7 +1062,7 @@ async def _refresh_watchlisted_news() -> None:
                 .join(User, User.id == WatchlistItem.user_id)
                 .where(User.tier == "premium")
                 .distinct()
-                .limit(1000)
+                .limit(_WATCHLISTED_NEWS_MAX_SYMBOLS)
             )
             symbols = [s[0] for s in rows.all() if s[0]]
     except Exception:
@@ -987,7 +1076,21 @@ async def _refresh_watchlisted_news() -> None:
     inserted = 0
     skipped_dup = 0
     failed = 0
+    processed = 0
+    budget_hit = False
     for sym in symbols:
+        if (datetime.now(UTC) - run_started).total_seconds() >= _WATCHLISTED_NEWS_BUDGET_SECONDS:
+            budget_hit = True
+            logger.warning(
+                "watchlisted_news.budget_exhausted processed=%d of=%d budget=%ds",
+                processed, len(symbols), _WATCHLISTED_NEWS_BUDGET_SECONDS,
+            )
+            break
+        processed += 1
+        # Pace the fan-out — this shares the Finnhub 60/min free-tier budget
+        # with the fundamentals / insider / sector refreshes.
+        if processed > 1:
+            await asyncio.sleep(_WATCHLISTED_NEWS_PACING_SECONDS)
         try:
             articles = await fetch_news_for_ticker(sym, limit=5)
         except Exception:
@@ -1014,8 +1117,10 @@ async def _refresh_watchlisted_news() -> None:
                     sym, it.get("id"),
                 )
     logger.info(
-        "watchlisted_news.refreshed unique_tickers=%d inserted=%d duplicate=%d failed=%d",
-        len(symbols), inserted, skipped_dup, failed,
+        "watchlisted_news.refreshed unique_tickers=%d processed=%d inserted=%d "
+        "duplicate=%d failed=%d budget_hit=%s elapsed=%.1fs",
+        len(symbols), processed, inserted, skipped_dup, failed, budget_hit,
+        (datetime.now(UTC) - run_started).total_seconds(),
     )
 
 
@@ -1400,6 +1505,11 @@ async def _refresh_insider_cache() -> None:
     )
 
 
+_SECTOR_BACKFILL_BATCH = 20
+"""Rows written per short-lived transaction in _backfill_sectors. Small enough
+that no connection is held across more than ~22s of Finnhub pacing."""
+
+
 async def _backfill_sectors(cap: int = 2500) -> None:
     """
     Find Tickers with sector="Unknown" / "N/A" / NULL and fetch their sector
@@ -1441,26 +1551,45 @@ async def _backfill_sectors(cap: int = 2500) -> None:
         logger.info("sector_backfill.no_unknown_tickers")
         return
 
+    async def _flush(batch: list[tuple[str, str]]) -> int:
+        """Write one small batch in its own short-lived transaction."""
+        if not batch:
+            return 0
+        try:
+            async with session_scope() as session:
+                for sym, target in batch:
+                    await session.execute(
+                        update(Ticker).where(Ticker.symbol == sym)
+                        .values(sector=target)
+                    )
+            return len(batch)
+        except Exception:
+            logger.exception("sector_backfill.flush_failed size=%d", len(batch))
+            return 0
+
+    # Fetch + sleep OUTSIDE any session. This loop runs for ~46 minutes at the
+    # 2500 cap; holding one write transaction (and its pooled connection) open
+    # across all of it pinned a connection for the whole run and kept an
+    # uncommitted write txn open against Neon. Now the network work happens
+    # unsessioned and results land in short batched transactions.
     backfilled = 0
-    async with session_scope() as session:
-        for sym, asset_class in rows:
-            try:
-                profile = await fetch_company_profile(sym)
-                raw_sector = (profile or {}).get("sector") if profile else None
-                # Apply the canonical mapping at write time so storage matches
-                # the heatmap's render-time grouping. If Finnhub returned no
-                # sector, canonical_sector still routes by asset_class (e.g.
-                # ETFs → Funds & ETFs) instead of leaving "Unknown" in the DB.
-                target = canonical_sector(raw_sector, asset_class)
-                await session.execute(
-                    update(Ticker).where(Ticker.symbol == sym)
-                    .values(sector=target)
-                )
-                backfilled += 1
-            except Exception:
-                logger.exception("sector_backfill.fetch_failed symbol=%s", sym)
-            await asyncio.sleep(1.1)
-        await session.commit()
+    pending: list[tuple[str, str]] = []
+    for sym, asset_class in rows:
+        try:
+            profile = await fetch_company_profile(sym)
+            raw_sector = (profile or {}).get("sector") if profile else None
+            # Apply the canonical mapping at write time so storage matches
+            # the heatmap's render-time grouping. If Finnhub returned no
+            # sector, canonical_sector still routes by asset_class (e.g.
+            # ETFs → Funds & ETFs) instead of leaving "Unknown" in the DB.
+            pending.append((sym, canonical_sector(raw_sector, asset_class)))
+        except Exception:
+            logger.exception("sector_backfill.fetch_failed symbol=%s", sym)
+        await asyncio.sleep(1.1)
+        if len(pending) >= _SECTOR_BACKFILL_BATCH:
+            backfilled += await _flush(pending)
+            pending = []
+    backfilled += await _flush(pending)
 
     logger.info("sector_backfill.done backfilled=%d candidates=%d cap=%d",
                 backfilled, len(rows), cap)

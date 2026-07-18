@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { SECTORS } from "./sector/sectors";
 import { SIGNALS } from "./signal/signals";
 import { STRATEGIES } from "./best-stocks-for/[strategy]/strategies";
+import { FACTORS } from "./how-it-works/factors";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
 // the day, without paying a DB roundtrip on every crawler hit.
@@ -113,12 +114,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const STATIC_LAST_MODIFIED = new Date("2026-05-18");
   const LEGAL_LAST_MODIFIED = new Date("2026-05-17");   // privacy rewrite in PR #35
   const HOWITWORKS_LAST_MODIFIED = new Date("2026-05-17");
+  // Per-factor methodology pages, /why and /limitations shipped together.
+  const TRUST_LAST_MODIFIED = new Date("2026-07-18");
 
   const staticEntries: MetadataRoute.Sitemap = [
     { url: base,                                lastModified: STATIC_LAST_MODIFIED, priority: 1.0 },
     { url: `${base}/pricing`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.9 },
     { url: `${base}/how-it-works`,              lastModified: HOWITWORKS_LAST_MODIFIED, priority: 0.9 },
     { url: `${base}/data-sources`,              lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    // Trust surfaces — un-gated, indexable, no signup wall. These exist to be
+    // CITABLE (droppable into a forum thread when somebody asks what the score
+    // actually measures), not to rank; new pages realistically reach the top 10
+    // at a low single-digit rate inside a year. /limitations and /why are
+    // deliberately listed at the same priority as the marketing pages, because
+    // the honest-limits page is the one most worth linking to.
+    { url: `${base}/limitations`,               lastModified: TRUST_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/why`,                       lastModified: TRUST_LAST_MODIFIED, priority: 0.7 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
     // Daily-picks newsletter lead-magnet landing — preview of what
@@ -202,6 +213,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "daily" as const,
     priority: 0.7,
   }));
+  // One page per scoring factor — /how-it-works/{trend, relative-strength,
+  // fundamentals, smart-money, macro, momentum}. Static content (no live data),
+  // so lastModified tracks the methodology, not the market: these change only
+  // when a factor's implementation changes, which also gets a /changelog entry.
+  const factorEntries: MetadataRoute.Sitemap = FACTORS.map((f) => ({
+    url: `${base}/how-it-works/${f.slug}`,
+    lastModified: TRUST_LAST_MODIFIED,
+    changeFrequency: "monthly" as const,
+    priority: 0.8,
+  }));
   const signalEntries: MetadataRoute.Sitemap = SIGNALS.map((s) => ({
     url: `${base}/signal/${s.slug}`,
     lastModified: now,
@@ -267,6 +288,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticEntries,
+    ...factorEntries,
     ...sectorEntries,
     ...signalEntries,
     ...strategyEntries,

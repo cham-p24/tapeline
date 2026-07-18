@@ -44,6 +44,11 @@ logger = logging.getLogger(__name__)
 # Kept conservative; missing one means we'd back-check across a closed day
 # and skip naturally because Polygon returns no aggregate. The list is
 # refreshed annually; entries past their date stay harmless.
+#
+# NYSE observance rules baked into the dates below: a holiday falling on a
+# Saturday is observed the preceding Friday, one falling on a Sunday the
+# following Monday — EXCEPT New Year's Day, which is simply not observed when
+# it lands on a Saturday (hence no New Year entry for 2028).
 _US_MARKET_HOLIDAYS_2026: set[date] = {
     date(2026, 1, 1),    # New Year's Day
     date(2026, 1, 19),   # MLK Day
@@ -57,12 +62,85 @@ _US_MARKET_HOLIDAYS_2026: set[date] = {
     date(2026, 12, 25),  # Christmas
 }
 
+_US_MARKET_HOLIDAYS_2027: set[date] = {
+    date(2027, 1, 1),    # New Year's Day
+    date(2027, 1, 18),   # MLK Day
+    date(2027, 2, 15),   # Presidents Day
+    date(2027, 3, 26),   # Good Friday
+    date(2027, 5, 31),   # Memorial Day
+    date(2027, 6, 18),   # Juneteenth observed (19th is Saturday)
+    date(2027, 7, 5),    # July 4 observed (4th is Sunday)
+    date(2027, 9, 6),    # Labor Day
+    date(2027, 11, 25),  # Thanksgiving
+    date(2027, 12, 24),  # Christmas observed (25th is Saturday)
+}
+
+_US_MARKET_HOLIDAYS_2028: set[date] = {
+    # No New Year's Day entry — Jan 1 2028 is a Saturday and the NYSE does
+    # not close the preceding Friday for it.
+    date(2028, 1, 17),   # MLK Day
+    date(2028, 2, 21),   # Presidents Day
+    date(2028, 4, 14),   # Good Friday
+    date(2028, 5, 29),   # Memorial Day
+    date(2028, 6, 19),   # Juneteenth
+    date(2028, 7, 4),    # Independence Day
+    date(2028, 9, 4),    # Labor Day
+    date(2028, 11, 23),  # Thanksgiving
+    date(2028, 12, 25),  # Christmas
+}
+
+_US_MARKET_HOLIDAYS_2029: set[date] = {
+    date(2029, 1, 1),    # New Year's Day
+    date(2029, 1, 15),   # MLK Day
+    date(2029, 2, 19),   # Presidents Day
+    date(2029, 3, 30),   # Good Friday
+    date(2029, 5, 28),   # Memorial Day
+    date(2029, 6, 19),   # Juneteenth
+    date(2029, 7, 4),    # Independence Day
+    date(2029, 9, 3),    # Labor Day
+    date(2029, 11, 22),  # Thanksgiving
+    date(2029, 12, 25),  # Christmas
+}
+
+_US_MARKET_HOLIDAYS: set[date] = (
+    _US_MARKET_HOLIDAYS_2026
+    | _US_MARKET_HOLIDAYS_2027
+    | _US_MARKET_HOLIDAYS_2028
+    | _US_MARKET_HOLIDAYS_2029
+)
+
+# Years the table above actually covers. Anything outside this range is a
+# silent-wrong-answer risk (we'd treat every closed session as a trading day),
+# so `is_trading_day` logs loudly instead of quietly assuming "open".
+_HOLIDAY_COVERAGE_YEARS: frozenset[int] = frozenset(
+    d.year for d in _US_MARKET_HOLIDAYS
+)
+
+# Years we've already warned about — `_next_trading_day` calls `is_trading_day`
+# in a loop, so warn once per year per process rather than per call.
+_warned_uncovered_years: set[int] = set()
+
 
 def is_trading_day(d: date) -> bool:
-    """True if US equity markets are open on `d`."""
+    """True if US equity markets are open on `d`.
+
+    Weekends are always closed. Holidays are looked up in `_US_MARKET_HOLIDAYS`,
+    which is a hand-maintained table. For a date in a year the table does not
+    cover we can only fall back to the weekday check — that is wrong on ~9 days
+    a year, so we emit a warning (once per year per process) telling whoever
+    reads the logs to extend the table.
+    """
     if d.weekday() >= 5:  # Saturday=5, Sunday=6
         return False
-    return d not in _US_MARKET_HOLIDAYS_2026
+    if d.year not in _HOLIDAY_COVERAGE_YEARS and d.year not in _warned_uncovered_years:
+        _warned_uncovered_years.add(d.year)
+        logger.warning(
+            "backcheck.holiday_table_uncovered_year year=%d covered=%s - market "
+            "holidays for this year are unknown, weekday-only fallback in use. "
+            "Extend _US_MARKET_HOLIDAYS in app/services/scorecard_backcheck.py.",
+            d.year, sorted(_HOLIDAY_COVERAGE_YEARS),
+        )
+    return d not in _US_MARKET_HOLIDAYS
 
 
 def _next_trading_day(d: date) -> date:

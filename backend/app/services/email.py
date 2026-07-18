@@ -2394,6 +2394,12 @@ async def run_eod_watchlist_digest(
                 "reason": t.reason,
             })
 
+        # Nothing to report — skip the send entirely rather than mailing a
+        # daily "your watchlist is empty" nag to a Pro+ user who hasn't
+        # added anything yet.
+        if not items:
+            continue
+
         try:
             html = render_eod_watchlist_digest(user.name or "trader", items)
             res = await send_email(
@@ -2424,7 +2430,7 @@ async def run_daily_drip(
         - "3"   day-3  email   — trial_ends_at in (now+9d,  now+11d)
         - "7"   day-7  email   — trial_ends_at in (now+5d,  now+7d )
         - "11"  T-3    email   — trial_ends_at in (now+1d,  now+3d )
-        - "13"  T-1    email   — trial_ends_at in (now-1d,  now+1d )
+        - "13"  T-1    email   — trial_ends_at in (now,     now+1d )
 
       Post-expiry (trial_ends_at in the PAST — user didn't convert):
         - "expired" T+0  email — trial_ends_at in (now-2d, now)
@@ -2435,6 +2441,12 @@ async def run_daily_drip(
       24h, so one failed/missed daily run silently aged every in-window
       user out of their stage forever. The per-user drip_state token keeps
       each stage at-most-once, so the extra day can't double-send.
+
+      day13 is the ONE exception: it stops dead at `now` (24h wide) so it
+      can never overlap "expired". Its grace day used to reach back to
+      now-1d, which meant an already-lapsed trial could be told "your
+      trial ends tomorrow". A user missed on day13 now ages into the
+      "expired" stage instead, which is the honest copy for them.
 
       Lapsed-trial win-back (handled in its own block below, NOT the
       shared windows loop — different pref bucket + tier filter):
@@ -2470,10 +2482,10 @@ async def run_daily_drip(
     # 48h windows: each stage's nominal day plus one grace day on the trailing
     # edge (the direction users age in), so a failed/missed daily run can't
     # silently drop a cohort — the next successful run still catches them, and
-    # the drip_state tokens keep each stage at-most-once. (day13's grace half
-    # sits below `now`, but the pre-expiry tier filter plus the hourly worker
-    # downgrade mean an already-expired user is normally on Free by drip time
-    # and falls through to the "expired" stage's honest copy instead.)
+    # the drip_state tokens keep each stage at-most-once. day13 is the
+    # exception: its lower bound is `now`, so it is mutually exclusive with
+    # "expired" and an already-lapsed trial can never receive "your trial
+    # ends tomorrow".
     windows = [
         # Pre-expiry
         ("3",   "day3",   now + timedelta(days=9),  now + timedelta(days=11),
@@ -2485,7 +2497,7 @@ async def run_daily_drip(
         ("11",  "day11",  now + timedelta(days=1),  now + timedelta(days=3),
          render_trial_day11_email,        "Tapeline — 3 days left on your trial",
          True, False),
-        ("13",  "day13",  now - timedelta(days=1),  now + timedelta(days=1),
+        ("13",  "day13",  now,                      now + timedelta(days=1),
          render_trial_day13_email,        "Tapeline — your trial ends tomorrow",
          True, False),
         # Post-expiry
@@ -2497,7 +2509,6 @@ async def run_daily_drip(
          False, True),
     ]
 
-    any_sent = False
     for token, label, lower, upper, renderer, subject, personalise, post_expiry in windows:
         filters = [
             User.trial_ends_at.isnot(None),
@@ -2576,6 +2587,11 @@ async def run_daily_drip(
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
                     user.drip_state = ",".join(sorted(sent_tokens))
+                    # Commit per user, inside the try: a write that fails on
+                    # one row must not roll back the tokens of users Resend
+                    # has ALREADY delivered to (that turns one bad row into a
+                    # batch-wide duplicate send on the next run).
+                    await session.commit()
                     counts[label] += 1
                     any_sent = True
                     if governor is not None:
@@ -2625,6 +2641,7 @@ async def run_daily_drip(
             if not res.get("skipped", False):
                 sent_tokens.add("lapse30")
                 user.drip_state = ",".join(sorted(sent_tokens))
+                await session.commit()
                 counts["lapse30"] += 1
                 any_sent = True
                 if governor is not None:
@@ -2632,8 +2649,6 @@ async def run_daily_drip(
         except Exception:
             logger.exception("drip.send_failed user=%s stage=lapse30", user.id)
 
-    if any_sent:
-        await session.commit()
     return counts
 
 
@@ -2906,8 +2921,11 @@ async def run_weekly_newsletter(
 
     Dedupe: a "weekly_{ISO-year}W{ISO-week}" token is added to
     User.drip_state on successful send, so a worker restart on the same
-    Monday doesn't double-send. Returns the count of emails sent. Pure
-    no-op when RESEND_API_KEY isn't set (send_email returns skipped:True).
+    Monday doesn't double-send. Superseded weekly_* tokens are dropped at
+    the same time — only the current week's token is ever read, and
+    appending forever overflowed the String(255) column. Returns the count
+    of emails sent. Pure no-op when RESEND_API_KEY isn't set (send_email
+    returns skipped:True).
 
     `now` is an optional override for tests — defaults to datetime.now(UTC).
     """
@@ -2932,7 +2950,6 @@ async def run_weekly_newsletter(
     users = result.scalars().all()
 
     sent = 0
-    any_changes = False
     for user in users:
         if not wants(user, EmailPref.WEEKLY_NEWSLETTER):
             continue
@@ -2962,8 +2979,19 @@ async def run_weekly_newsletter(
                 unsubscribe_category="weekly_newsletter",
             )
             if not res.get("skipped", False):
+                # Prune superseded weekly_* tokens. Only the CURRENT week's
+                # token is ever read (the dedupe check above; nothing else
+                # queries historical weekly tokens), and appending one 15-char
+                # token per week overran drip_state's String(255) inside a few
+                # months — Postgres then raised StringDataRightTruncation on
+                # commit and took the rest of the batch down with it.
+                sent_tokens = {
+                    t for t in sent_tokens if not t.startswith("weekly_")
+                }
                 sent_tokens.add(token)
                 user.drip_state = ",".join(sorted(sent_tokens))
+                # Commit per user, inside the try — see run_daily_drip.
+                await session.commit()
                 sent += 1
                 any_changes = True
                 if governor is not None:
@@ -2971,8 +2999,6 @@ async def run_weekly_newsletter(
         except Exception:
             logger.exception("weekly_newsletter.send_failed user=%s", user.id)
 
-    if any_changes:
-        await session.commit()
     logger.info("weekly_newsletter.sent count=%d token=%s", sent, token)
     return sent
 
@@ -3518,7 +3544,9 @@ async def run_annual_renewal_reminder_drip(
 
     Dedup is per renewal CYCLE via a date-stamped token "renA{YYMMDD}" keyed on
     current_period_end — so the reminder fires once each year (a fresh period
-    end → a fresh token), not once ever. No-op when RESEND_API_KEY is unset.
+    end → a fresh token), not once ever. Superseded renA* tokens are dropped
+    on write so drip_state doesn't grow one token per year. No-op when
+    RESEND_API_KEY is unset.
     """
     from datetime import UTC, datetime, timedelta
 
@@ -3581,6 +3609,12 @@ async def run_annual_renewal_reminder_drip(
                 persona="billing",
             )
             if not res.get("skipped", False):
+                # Dedupe is per renewal CYCLE, so only the current
+                # period-end token matters — drop superseded renA* tokens
+                # instead of appending one per year to drip_state.
+                sent_tokens = {
+                    t for t in sent_tokens if not t.startswith("renA")
+                }
                 sent_tokens.add(token)
                 user.drip_state = ",".join(sorted(sent_tokens))
                 counts["renewal_reminder"] += 1

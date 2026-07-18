@@ -77,11 +77,19 @@ async def create_rule(
                 f"Upgrade for 10 alerts/day plus Telegram at /app/billing.",
             )
 
+    # Normalize the symbol on write. Ticker.symbol / CongressTrade.symbol are
+    # stored uppercase, so "aapl" would never match — and the evaluators treat
+    # a symbol-less rule as "any ticker", so an unmatched symbol used to widen
+    # the rule to the whole universe instead of narrowing it. Blank string
+    # collapses to None (the explicit "any ticker" mode). Regime rules store a
+    # label here (e.g. "BEAR"), which the evaluator already uppercases.
+    symbol = (body.symbol or "").strip().upper() or None
+
     rule = AlertRule(
         user_id=user.id,
         name=body.name,
         rule_type=body.rule_type,
-        symbol=body.symbol,
+        symbol=symbol,
         threshold=body.threshold,
         channel=body.channel,
     )

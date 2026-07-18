@@ -106,9 +106,14 @@ jobs:
           echo "boot_time=$pre" >> "$GITHUB_OUTPUT"
           echo "pre-deploy boot_time: ${pre:-<unreachable>}"
 
+      # Pinned to an immutable commit SHA, NOT @master. This job holds the
+      # production FLY_API_TOKEN, so a compromised or retagged upstream branch
+      # would otherwise execute with full deploy credentials against
+      # tapeline-backend. Bump deliberately (verify the tag -> SHA yourself);
+      # never loosen this back to a branch or a floating tag.
       - name: Setup flyctl
         if: steps.gate.outputs.ready == 'true'
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
       - name: Deploy (remote build + alembic release_command)
         if: steps.gate.outputs.ready == 'true'

@@ -186,6 +186,14 @@ def configured() -> bool:
 # Keyed by URL not tab-name because each tab is a separate published URL.
 # In-memory only — survives the lifetime of the worker process. A worker
 # restart re-fetches once per tab (cheap) and re-caches.
+#
+# IMPORTANT: the hash is only written by commit_csv_hash(), which each
+# refresh_*_from_workbook() calls AFTER its parse + upsert both succeeded.
+# fetch_csv() deliberately only *reads* the cache. If fetch_csv stored the
+# hash eagerly, a subsequent parse/upsert failure would leave that CSV
+# version marked "already ingested" forever — the data would stay stranded
+# until a human edited the sheet again. Per-URL keying keeps the tabs
+# independent: a failure on one tab never blocks another from committing.
 _CSV_HASH_CACHE: dict[str, str] = {}
 
 
@@ -204,10 +212,16 @@ async def fetch_csv(url: str, *, dedup: bool = True) -> str | None:
     network blip drops one refresh cycle without taking down scoring.
 
     When `dedup=True` (the default), returns None if the content hash
-    matches what we cached on the previous call for this URL — the
-    caller should short-circuit instead of re-parsing identical data.
-    The first call per URL always returns the body (cache is empty);
-    subsequent calls only return when the sheet actually changed.
+    matches the hash committed after the last *successful* ingest for
+    this URL — the caller should short-circuit instead of re-parsing
+    identical data. The first call per URL always returns the body
+    (cache is empty); subsequent calls only return when the sheet
+    changed or the previous ingest never completed.
+
+    This function only READS the hash cache. The caller must call
+    commit_csv_hash(url, body) once its parse + upsert have succeeded,
+    so a failed ingest is retried on the next tick instead of being
+    permanently skipped as "unchanged".
 
     Pass `dedup=False` to force a parse — useful for manual triggers
     via /api/internal/sheet-changed where the caller knows the sheet
@@ -228,7 +242,6 @@ async def fetch_csv(url: str, *, dedup: bool = True) -> str | None:
                 url[:60], new_hash[:8],
             )
             return None
-        _CSV_HASH_CACHE[url] = new_hash
         logger.info(
             "sheet_feed.fetch_csv.changed url=%s old=%s new=%s bytes=%d",
             url[:60],
@@ -238,6 +251,17 @@ async def fetch_csv(url: str, *, dedup: bool = True) -> str | None:
         )
 
     return body
+
+
+def commit_csv_hash(url: str, text: str) -> None:
+    """Mark this CSV body as fully ingested for `url`.
+
+    Call ONLY after the parse + upsert for that tab both succeeded. Until
+    this runs, the next fetch_csv() for the same URL still sees a hash
+    mismatch and re-delivers the body, so a transient parse/upsert failure
+    self-heals on the following tick rather than stranding the data.
+    """
+    _CSV_HASH_CACHE[url] = _hash_csv(text)
 
 
 def reset_csv_hash_cache() -> None:
@@ -492,6 +516,9 @@ async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.upsert_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    # Parse + upsert both succeeded — only now is this CSV version safe to
+    # mark as ingested. Committing earlier would strand the data on failure.
+    commit_csv_hash(url, text)
     logger.info(
         "sheet_feed.refreshed rows=%d ins=%d upd=%d",
         counts["total"], counts["inserted"], counts["updated"],
@@ -692,6 +719,7 @@ async def refresh_spikes_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.spike_upsert_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    commit_csv_hash(url, text)
     logger.info(
         "sheet_feed.spikes_refreshed rows=%d ins=%d upd=%d",
         counts["total"], counts["inserted"], counts["updated"],
@@ -828,6 +856,7 @@ async def refresh_etfs_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.etf_upsert_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    commit_csv_hash(url, text)
     logger.info("sheet_feed.etfs_refreshed rows=%d ins=%d upd=%d",
                 counts["total"], counts["inserted"], counts["updated"])
     return counts
@@ -999,6 +1028,7 @@ async def refresh_market_from_workbook(session: AsyncSession) -> dict[str, int]:
     except Exception:
         logger.exception("sheet_feed.market_upsert_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    commit_csv_hash(url, text)
     logger.info("sheet_feed.market_refreshed regime=%s vix=%.1f yield=%.2f rate=%s",
                 parsed["regime"], parsed["vix"], parsed["yield_10y"], parsed["rate_direction"])
     return counts
@@ -1101,6 +1131,7 @@ async def refresh_smart_money_from_workbook(session: AsyncSession) -> dict[str, 
     except Exception:
         logger.exception("sheet_feed.smart_money_upsert_failed")
         return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
+    commit_csv_hash(url, text)
     logger.info("sheet_feed.smart_money_refreshed rows=%d", counts["total"])
     return counts
 
