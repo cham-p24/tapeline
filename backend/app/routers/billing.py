@@ -77,10 +77,14 @@ async def create_checkout(
         user_email=user.email,
         tier=body.tier,
         billing_period=body.billing_period,
-        # Params are read by the frontend trial_converted Vercel Analytics event
-        # in /app/billing — keep `checkout=success` + tier + billing_period in
-        # sync with app/app/billing/page.tsx.
-        success_url=f"{settings.app_url}/app/billing?checkout=success&tier={body.tier}&billing_period={body.billing_period}",
+        # Params are read by the frontend conversion analytics in /app/billing —
+        # keep `checkout=success` + tier + billing_period in sync with
+        # app/app/billing/page.tsx. `{CHECKOUT_SESSION_ID}` is a Stripe
+        # template token (escaped as {{...}} so the f-string leaves it intact):
+        # Stripe substitutes the real cs_… id on redirect, and the client uses
+        # it as the GA4/Ads `transaction_id` plus a one-shot dedupe key, so
+        # reloading the success URL can no longer re-fire the purchase event.
+        success_url=f"{settings.app_url}/app/billing?checkout=success&tier={body.tier}&billing_period={body.billing_period}&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{settings.app_url}/app/billing?checkout=cancelled",
         # Pass the user's unspent referral credits; the billing service mints
         # a one-shot 100%-off coupon for that many months when > 0.
@@ -181,7 +185,10 @@ async def email_checkout(
             # exact friction this endpoint exists to remove. /checkout/success
             # fires the trial_converted + subscribe analytics events that
             # /app/billing fires for the authed flow.
-            success_url=f"{settings.app_url}/checkout/success?tier={tier}&billing_period={period}&src=email",
+            # `{CHECKOUT_SESSION_ID}` (escaped {{...}} for the f-string) is
+            # substituted by Stripe — same transaction_id + reload-dedupe role
+            # as the authed success_url above.
+            success_url=f"{settings.app_url}/checkout/success?tier={tier}&billing_period={period}&src=email&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.app_url}/pricing?src=email_checkout_cancelled",
             referral_credit_months=user.referral_credit_months or 0,
             winback=(user.tier == "free" and user.canceled_at is not None),

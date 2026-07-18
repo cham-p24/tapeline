@@ -45,6 +45,7 @@ export type TapelineEvent =
   | "sign_up"              // Account created — primary lead conversion
   // Trial → paid funnel
   | "start_trial"          // Card captured, trial begins
+  | "begin_checkout"       // Upgrade clicked — Stripe Checkout about to open
   | "subscribe"            // First paid charge — primary revenue conversion
   // Engagement signals
   | "view_scorecard"       // Visit /scorecard
@@ -91,21 +92,60 @@ const ADS_CONVERSION_LABEL: Partial<Record<TapelineEvent, string>> = {
   // trackEvent("sign_up"). A separate Ads conversion would double-count the
   // same click. GA4 still gets the start_trial event for funnel analysis.
   start_trial: process.env.NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL || "",
+  // begin_checkout has NO hardcoded default: unlike sign_up / subscribe, no
+  // Google Ads conversion action exists for it yet. Create one (Goals ->
+  // Conversions -> New conversion action -> Website -> Manual event,
+  // SECONDARY so it doesn't compete with Subscribe for Smart Bidding) and set
+  // NEXT_PUBLIC_GOOGLE_ADS_BEGIN_CHECKOUT_LABEL to its label. Until then the
+  // label is empty and only GA4 receives the event — which is already the
+  // whole point: begin_checkout is the missing middle of the funnel.
+  begin_checkout: process.env.NEXT_PUBLIC_GOOGLE_ADS_BEGIN_CHECKOUT_LABEL || "",
 };
 
+type EventParams = Record<string, string | number | boolean>;
+
 /**
- * Track a typed event. No-op on the server, no-op if GA4 hasn't
- * loaded yet (e.g. ad-blocker, network failure). Never throws — fire
- * and forget.
+ * Events fired before gtag.js finished loading. The loader is
+ * `strategy="afterInteractive"`, so any event dispatched during hydration
+ * (an OAuth `sign_up` on the onboarding page, a `view_ticker` on mount) used
+ * to hit `typeof window.gtag !== "function"` and be silently dropped —
+ * permanently losing the conversion. We now park them here and flush once
+ * gtag appears.
  */
-export function trackEvent(
-  event: TapelineEvent,
-  params?: Record<string, string | number | boolean>,
-): void {
-  if (typeof window === "undefined") return;
-  if (typeof window.gtag !== "function") return;
+const pending: Array<[TapelineEvent, EventParams]> = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushAttempts = 0;
+// ~10s of polling (40 × 250ms). Longer than any realistic gtag.js load, short
+// enough that we stop burning timers on ad-blocked sessions where gtag will
+// never arrive.
+const MAX_FLUSH_ATTEMPTS = 40;
+const FLUSH_INTERVAL_MS = 250;
+
+function scheduleFlush(): void {
+  if (flushTimer !== null) return;
+  if (flushAttempts >= MAX_FLUSH_ATTEMPTS) {
+    // gtag is never coming (ad blocker, blocked network). Drop the backlog so
+    // it can't grow unbounded on a long-lived SPA session.
+    pending.length = 0;
+    return;
+  }
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushAttempts += 1;
+    if (typeof window !== "undefined" && typeof window.gtag === "function") {
+      flushAttempts = 0;
+      const queued = pending.splice(0, pending.length);
+      for (const [event, params] of queued) dispatch(event, params);
+      return;
+    }
+    if (pending.length > 0) scheduleFlush();
+  }, FLUSH_INTERVAL_MS);
+}
+
+/** Actually hand an event to gtag. Caller guarantees gtag is a function. */
+function dispatch(event: TapelineEvent, params: EventParams): void {
   try {
-    window.gtag("event", event, params ?? {});
+    window.gtag!("event", event, params);
     // Mirror conversion-worthy events to Google Ads (no-op unless an Ads ID +
     // matching label are configured). This is what makes paid-search clicks
     // attributable to real signups/subscriptions in the Ads dashboard.
@@ -122,9 +162,101 @@ export function trackEvent(
         conversion.value = params.value;
         if (typeof params.currency === "string") conversion.currency = params.currency;
       }
-      window.gtag("event", "conversion", conversion);
+      // Forward the order id so Google Ads can drop server-side duplicates too
+      // — belt and braces alongside the client-side one-shot guard in
+      // trackEventOnce(). Ads dedupes conversions sharing a transaction_id.
+      if (typeof params?.transaction_id === "string" && params.transaction_id) {
+        conversion.transaction_id = params.transaction_id;
+      }
+      window.gtag!("event", "conversion", conversion);
     }
   } catch {
     // Analytics must never break the page.
   }
+}
+
+/**
+ * Track a typed event. No-op on the server. If GA4 hasn't loaded yet the
+ * event is QUEUED and flushed when gtag appears (see `pending` above) rather
+ * than dropped — that silent drop used to lose OAuth signup conversions to a
+ * script-load race. Never throws — fire and forget.
+ *
+ * Returns true when the event was handed to gtag or accepted into the queue,
+ * false only when there is no browser to track in (SSR). Callers that persist
+ * a "already fired" flag must key it off this return value, never fire it
+ * blind before the call.
+ */
+export function trackEvent(
+  event: TapelineEvent,
+  params?: EventParams,
+): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof window.gtag !== "function") {
+    pending.push([event, params ?? {}]);
+    scheduleFlush();
+    return true;
+  }
+  dispatch(event, params ?? {});
+  return true;
+}
+
+/**
+ * Fire an event at most once per browser, keyed on `storageKey`.
+ *
+ * Order matters and is the whole point of this helper: the event is
+ * dispatched FIRST, and the localStorage flag is written only after a
+ * confirmed dispatch. Writing the flag first (the old pattern) meant a failed
+ * or dropped dispatch permanently suppressed the event on that browser.
+ *
+ * Returns true if the event fired on this call, false if it was already
+ * marked as fired (or the dispatch was refused, i.e. SSR).
+ */
+export function trackEventOnce(
+  storageKey: string,
+  event: TapelineEvent,
+  params?: EventParams,
+): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.localStorage.getItem(storageKey) === "1") return false;
+  } catch {
+    // Storage unavailable (private mode / quota). Fall through and fire — an
+    // occasional duplicate beats never counting the conversion at all.
+  }
+  const fired = trackEvent(event, params);
+  if (!fired) return false;
+  try {
+    window.localStorage.setItem(storageKey, "1");
+  } catch {
+    // Storage unavailable — the event already fired, which is what matters.
+  }
+  return true;
+}
+
+/**
+ * Dedupe key for the once-per-browser `first_ticker_added` activation event.
+ * Exported so tests (and any future add surface) reference the same string —
+ * a second key would double-count activation.
+ */
+export const FIRST_TICKER_ADDED_KEY = "tapeline_first_ticker_added";
+
+/**
+ * Activation signal: the user's first watchlist add, from ANY surface.
+ *
+ * Call this after a watchlist add succeeds on the scanner rows, the watchlist
+ * page's own add box, and the ticker page's Add button. It used to live
+ * inline in the scanner only, so adds from the other two surfaces never
+ * counted and activation rate read low.
+ *
+ * @param surface which add path fired it — lets GA4 show WHERE activation happens.
+ * @returns true if this was the first add on this browser (event fired).
+ */
+export function trackFirstTickerAdded(
+  symbol: string,
+  surface: "scanner" | "watchlist" | "ticker",
+): boolean {
+  return trackEventOnce(FIRST_TICKER_ADDED_KEY, "first_ticker_added", {
+    symbol,
+    surface,
+  });
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
-import { trackEvent } from "@/lib/gtag";
+import { trackEvent, trackFirstTickerAdded } from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -104,10 +104,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 // non-sticky: dismissal is permanent, the tune itself is not.
 const TUNE_DISMISSED_KEY = "tapeline_scanner_sector_tune_dismissed";
 
-// Dedupe key for the once-per-browser `first_ticker_added` activation event.
-// The watchlist add itself is idempotent server-side; this only gates the
-// analytics event so activation isn't over-counted on repeat adds.
-const FIRST_TICKER_ADDED_KEY = "tapeline_first_ticker_added";
+// (The once-per-browser `first_ticker_added` dedupe key + firing logic now
+// live in lib/gtag.ts as trackFirstTickerAdded(), shared with the watchlist
+// and ticker pages — adds from those two surfaces used to go uncounted.)
 
 export default function ScannerPage() {
   const { user } = useUser();
@@ -354,17 +353,7 @@ export default function ScannerPage() {
     setAdded((prev) => (prev.has(symbol) ? prev : new Set(prev).add(symbol)));
     try {
       await api.watchlistAdd(symbol);
-      try {
-        if (
-          typeof window !== "undefined" &&
-          window.localStorage.getItem(FIRST_TICKER_ADDED_KEY) !== "1"
-        ) {
-          window.localStorage.setItem(FIRST_TICKER_ADDED_KEY, "1");
-          trackEvent("first_ticker_added", { symbol });
-        }
-      } catch {
-        // localStorage unavailable — skip the dedupe flag; the add still stuck.
-      }
+      trackFirstTickerAdded(symbol, "scanner");
     } catch (e: unknown) {
       const m = errorMessage(e);
       // 409 = already in the watchlist → keep the checked state (it IS there).

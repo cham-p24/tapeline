@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { track } from "@vercel/analytics";
-import { trackEvent } from "@/lib/gtag";
+import { trackEvent, trackEventOnce } from "@/lib/gtag";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { PRICING } from "@/lib/pricing";
@@ -15,15 +15,53 @@ export function CheckoutSuccessClient() {
   // useSearchParams (which would force a Suspense boundary). Without this,
   // email-originated conversions — the exact ones the one-click flow exists
   // to produce — would be invisible in analytics.
+  //
+  // Deduped on Stripe's checkout session id (`?session_id=cs_…`, injected via
+  // the success_url template in backend/app/routers/billing.py): reloading or
+  // re-opening this URL used to re-fire `subscribe` every time, inflating GA4
+  // revenue and feeding Smart Bidding phantom conversions. The id doubles as
+  // the GA4/Ads `transaction_id` so Google dedupes server-side too, and it's
+  // stripped from the address bar afterwards so a shared/bookmarked link
+  // carries no payment identifier.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const qp = new URLSearchParams(window.location.search);
     const tier = qp.get("tier") === "pro" ? "pro" : "premium";
     const period = qp.get("billing_period") === "annual" ? "annual" : "monthly";
-    track("trial_converted", { tier, billing_period: period, src: "email" });
+    const sessionId = qp.get("session_id") || "";
     const p = PRICING[tier];
     const value = period === "annual" ? p.annual : p.monthly;
-    trackEvent("subscribe", { tier, billing_period: period, value, currency: "USD" });
+
+    if (sessionId) {
+      const fired = trackEventOnce(
+        `tapeline_subscribe_fired_${sessionId}`,
+        "subscribe",
+        {
+          tier,
+          billing_period: period,
+          value,
+          currency: "USD",
+          transaction_id: sessionId,
+        },
+      );
+      if (fired) {
+        track("trial_converted", { tier, billing_period: period, src: "email" });
+      }
+      // Strip session_id from the URL either way — the event is settled and
+      // the id shouldn't survive into a shared link or the referrer header.
+      qp.delete("session_id");
+      const qs = qp.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+      );
+    } else {
+      // No session id (legacy link, or Stripe didn't substitute). Fall back to
+      // the old un-deduped behaviour rather than losing the conversion.
+      track("trial_converted", { tier, billing_period: period, src: "email" });
+      trackEvent("subscribe", { tier, billing_period: period, value, currency: "USD" });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

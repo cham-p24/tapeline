@@ -7,6 +7,7 @@ import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
 import { UtmCapture } from "@/components/UtmCapture";
+import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { PRICING, usd } from "@/lib/pricing";
 import {
@@ -186,6 +187,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             back on submit so we attribute revenue to the original
             paid-channel landing, not the eventual direct-return signup. */}
         <UtmCapture />
+        {/* GA4 page_view on SPA route changes. App Router navigations don't
+            reload the document, so gtag('config') below only ever counts the
+            first page of a session — everything after it depended on the GA4
+            Enhanced Measurement history-events toggle. This fires it from
+            code so route-level funnel steps are always measurable. */}
+        <RouteAnalytics />
         {/* Vercel Analytics + Speed Insights. Gated behind NEXT_PUBLIC_VERCEL
             (Vercel sets this to "1" on its builds) so they only mount on
             Vercel-hosted deploys — off-Vercel the beacons 404 against

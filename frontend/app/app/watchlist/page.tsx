@@ -13,6 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import { SearchBox, useDebounced } from "@/components/FilterBar";
 import { matchesQuery } from "@/lib/filters";
+import { trackFirstTickerAdded } from "@/lib/gtag";
 
 // Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
 // start before the worker has populated any scored tickers). Same shape
@@ -105,7 +106,12 @@ export default function WatchlistPage() {
       // viewing "all items" (activeId=null), the backend resolves to
       // the user's default list ("My Watchlist") — auto-creates on
       // first add for new users.
-      await api.watchlistAdd(symbol.trim().toUpperCase(), threshold, activeId);
+      const added = symbol.trim().toUpperCase();
+      await api.watchlistAdd(added, threshold, activeId);
+      // Activation signal, shared with the scanner rows + ticker page so the
+      // first add counts exactly once per browser regardless of surface. Adds
+      // made here used to go uncounted entirely, under-reading activation.
+      trackFirstTickerAdded(added, "watchlist");
       setSymbol("");
       load();
       loadLists();  // refresh list counts shown in the tab strip

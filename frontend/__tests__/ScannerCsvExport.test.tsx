@@ -16,7 +16,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("@/components/UserContext", () => ({ useUser: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
-vi.mock("@/lib/gtag", () => ({ trackEvent: vi.fn() }));
+vi.mock("@/lib/gtag", () => ({
+  trackEvent: vi.fn(),
+  trackFirstTickerAdded: vi.fn(),
+}));
 vi.mock("@/lib/useLiveStream", () => ({
   useLiveStream: () => ({ status: "live", lastUpdate: null }),
 }));
