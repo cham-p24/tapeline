@@ -14,6 +14,12 @@ primary_region = "syd"              # Sydney — lowest latency for Melbourne fo
 
 # Secrets set via:  fly secrets set MASSIVE_API_KEY=xxx ...
 # Required secrets (set before deploy):
+#   SESSION_SECRET  <-- signs every session cookie + the 2FA challenge token.
+#     If unset, services/session.py derives the key from STRIPE_WEBHOOK_SECRET,
+#     and if that is unset too it falls back to a constant hardcoded in this
+#     public repo (i.e. anyone can forge any user's session). Generate with:
+#       fly secrets set SESSION_SECRET=$(openssl rand -hex 32) -a tapeline-backend
+#     Setting or changing it signs every user out once — do it in a quiet window.
 #   DATABASE_URL (from Supabase or Neon)
 #   MASSIVE_API_KEY  (or legacy POLYGON_API_KEY during the rebrand grace period)
 #   FINNHUB_API_KEY, FRED_API_KEY  (optional but enable real fundamentals + macro)
