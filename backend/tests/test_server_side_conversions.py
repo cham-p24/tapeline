@@ -388,13 +388,25 @@ async def test_oauth_new_user_persists_utm_and_gclid(
     """The core fix: an OAuth signup off a paid click is now attributable,
     exactly as the email path already was."""
     email = f"oauth_attr_{_uuid.uuid4().hex}@example.com"
-    monkeypatch.setattr(oauth_module, "httpx", _fake_httpx(email))
 
+    # End-to-end: take the cookie /start ACTUALLY emits (quoting and all) and
+    # feed it back to the callback, rather than hand-rolling an approximation.
+    # This is what catches a cookie-encoding round-trip bug.
     async with client:
-        r = await client.get(
+        started = await client.get("/api/auth/oauth/google/start", params=ATTR)
+    attr_cookie = next(
+        c.split(";")[0] for c in started.headers.get_list("set-cookie")
+        if c.startswith("oauth_attr_google=")
+    )
+
+    monkeypatch.setattr(oauth_module, "httpx", _fake_httpx(email))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test",
+    ) as c2:
+        r = await c2.get(
             "/api/auth/oauth/google/callback",
             params={"code": "fake-code", "state": "st"},
-            headers={"cookie": f"oauth_state_google=st; oauth_attr_google={urlencode(ATTR)}"},
+            headers={"cookie": f"oauth_state_google=st; {attr_cookie}"},
         )
     assert r.status_code == 307
 
@@ -526,6 +538,12 @@ async def test_start_carries_both_next_and_attribution(client, google_configured
     assert any(c.startswith("oauth_next_google=") for c in set_cookies)
     attr = [c for c in set_cookies if c.startswith("oauth_attr_google=")]
     assert len(attr) == 1
-    stored = parse_qs(attr[0].split(";")[0].split("=", 1)[1])
+    # The bundle contains "=", which http.cookies treats as unsafe, so
+    # Starlette emits the value double-quoted. Strip that transport layer
+    # before reading the urlencoded attribution inside. (Request-side parsing
+    # unquotes symmetrically, which is why the callback sees it intact.)
+    raw = attr[0].split(";")[0].split("=", 1)[1].strip('"')
+    stored = parse_qs(raw)
     assert stored["utm_source"] == ["google"]
-    assert "next" not in stored
+    assert stored["gclid"] == ["TeSt-GcLiD-123"]
+    assert "next" not in stored, "the intent param must not leak into attribution"
