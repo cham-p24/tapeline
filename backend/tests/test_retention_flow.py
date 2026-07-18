@@ -334,6 +334,93 @@ async def test_cancel_coerces_unknown_reason_to_other(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_cancel_one_click_empty_body(monkeypatch):
+    """TRUE one-click cancel: POST /cancel with an EMPTY body schedules the
+    cancellation immediately (no survey gate). reason/feedback stay None —
+    "not asked" is never coerced to "other" — and the confirmation email
+    fires exactly once."""
+    monkeypatch.setattr(billing_router, "set_cancel_at_period_end", _fake_set_cancel)
+    sends: list = []
+
+    async def _capture_send(*a, **k):
+        sends.append(a)
+        return {"id": "test-msg"}
+
+    monkeypatch.setattr(email_module, "send_email", _capture_send)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        await _prep_dev_user(c, stripe_customer_id="cus_test", winback_state="wb30")
+        r = await c.post("/api/billing/cancel", json={}, headers=_AUTH)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["period_end"].startswith("2026-07-01")
+    assert body["already_scheduled"] is False
+    assert len(sends) == 1  # confirmation email on the actual cancel
+
+    snap = await _dev_user_snapshot()
+    assert snap["canceled_at"] is not None
+    assert snap["cancellation_reason"] is None  # survey never answered
+    assert snap["cancellation_feedback"] is None
+    assert snap["winback_state"] == ""  # fresh cancellation re-arms the series
+
+
+@pytest.mark.asyncio
+async def test_cancel_survey_followup_is_capture_only(monkeypatch):
+    """POST /cancel while a cancellation is already scheduled is the OPTIONAL
+    post-cancel survey: reason/feedback are recorded, but there is NO second
+    Stripe call, NO second email, and the canceled_at winback clock is left
+    untouched. (Also what makes a double-click on the cancel button harmless.)"""
+
+    async def _stripe_must_not_be_called(customer_id):  # noqa: ANN001
+        raise AssertionError("set_cancel_at_period_end called on survey follow-up")
+
+    monkeypatch.setattr(billing_router, "set_cancel_at_period_end", _stripe_must_not_be_called)
+    sends: list = []
+
+    async def _capture_send(*a, **k):
+        sends.append(a)
+        return {"id": "test-msg"}
+
+    monkeypatch.setattr(email_module, "send_email", _capture_send)
+
+    fixed = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        await _prep_dev_user(
+            c,
+            stripe_customer_id="cus_test",
+            canceled_at=fixed,
+            winback_state="wb30",
+        )
+        r = await c.post(
+            "/api/billing/cancel",
+            json={"reason": "too_expensive", "feedback": " bit pricey "},
+            headers=_AUTH,
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["already_scheduled"] is True
+        assert body["period_end"] is None
+        assert sends == []  # no second "set to cancel" email
+
+        snap = await _dev_user_snapshot()
+        assert snap["cancellation_reason"] == "too_expensive"
+        assert snap["cancellation_feedback"] == "bit pricey"  # trimmed
+        # canceled_at (the winback clock) is untouched by the survey…
+        assert snap["canceled_at"].replace(tzinfo=UTC) == fixed
+        # …and winback_state is NOT re-armed (that would restart the drip).
+        assert snap["winback_state"] == "wb30"
+
+        # A later empty-body POST (double-click) must not clobber the survey.
+        r2 = await c.post("/api/billing/cancel", json={}, headers=_AUTH)
+        assert r2.status_code == 200
+    snap = await _dev_user_snapshot()
+    assert snap["cancellation_reason"] == "too_expensive"
+    assert snap["cancellation_feedback"] == "bit pricey"
+
+
+@pytest.mark.asyncio
 async def test_checkout_winback_flag_gated_on_churned(monkeypatch):
     """The 40%-off win-back coupon is server-gated: create_checkout_session
     is only called with winback=True when the user is BOTH free AND has a

@@ -224,7 +224,8 @@ async def open_portal(
     return {"url": url}
 
 
-# ── Retention: cancel intercept (save offer → pause → exit survey) ──────────
+# ── Retention: cancel intercept (save offer + pause + one-click cancel; ─────
+# ── exit survey is optional, after the cancel — never a gate) ───────────────
 
 
 class PauseRequest(BaseModel):
@@ -232,7 +233,11 @@ class PauseRequest(BaseModel):
 
 
 class CancelRequest(BaseModel):
-    reason: str = "other"
+    # Both optional: the one-click cancel posts an empty body (no survey gate),
+    # and the optional post-cancel survey posts reason/feedback afterwards.
+    # None means "not asked / not answered" — never coerced to "other", so the
+    # churn dashboard only ever sees reasons a human actually chose.
+    reason: str | None = None
     feedback: str | None = None
 
 
@@ -344,27 +349,39 @@ async def cancel(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Schedule cancellation at period end + capture the exit survey.
+    """Schedule cancellation at period end; the exit survey is optional and after.
 
-    We keep the customer on their tier until the paid period ends (Stripe
-    cancel_at_period_end). canceled_at drives the 30/60/90-day winback drip;
-    reason/feedback feed the churn dashboard.
+    First call (no cancellation in flight): schedules the Stripe cancellation
+    (cancel_at_period_end — the customer keeps their tier until the paid
+    period ends), stamps canceled_at (drives the 30/60/90-day winback drip),
+    re-arms winback, and sends the confirmation email. The one-click cancel
+    path posts an empty body — reason/feedback are only stored if provided.
+
+    Follow-up call (canceled_at already set): the OPTIONAL post-cancel exit
+    survey. Records reason/feedback only — no Stripe round-trip (a survey
+    submit must never fail on a Stripe hiccup), no second email, and the
+    canceled_at winback clock is left untouched. This also makes a
+    double-click on the cancel button harmless.
     """
     _require_paid(user)
-    period_end = await set_cancel_at_period_end(user.stripe_customer_id)
-    now = datetime.now(UTC)
-    user.canceled_at = now
-    user.winback_state = ""  # fresh cancellation → eligible for winback again
-    reason = body.reason if body.reason in _CANCEL_REASONS else "other"
-    user.cancellation_reason = reason
+    already_scheduled = user.canceled_at is not None
+    period_end = None
+    if not already_scheduled:
+        period_end = await set_cancel_at_period_end(user.stripe_customer_id)
+        user.canceled_at = datetime.now(UTC)
+        user.winback_state = ""  # fresh cancellation → eligible for winback again
+    if body.reason is not None:
+        user.cancellation_reason = body.reason if body.reason in _CANCEL_REASONS else "other"
     feedback = (body.feedback or "").strip()
-    user.cancellation_feedback = feedback[:1000] or None
+    if feedback:
+        user.cancellation_feedback = feedback[:1000]
     await session.commit()
 
     # Transactional confirmation — fire-and-forget so a Resend hiccup never
     # 500s the cancel. No List-Unsubscribe header: it's account state, not
-    # marketing.
-    if user.email:
+    # marketing. First call only — the optional survey follow-up must not
+    # trigger a second "set to cancel" email.
+    if user.email and not already_scheduled:
         try:
             from app.services.email import render_subscription_canceled_email, send_email
 
@@ -389,4 +406,7 @@ async def cancel(
     return {
         "ok": True,
         "period_end": period_end.isoformat() if period_end else None,
+        # True on the survey follow-up / a double-submit — the cancellation
+        # was already in flight before this request.
+        "already_scheduled": already_scheduled,
     }
