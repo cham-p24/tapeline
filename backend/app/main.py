@@ -681,9 +681,28 @@ app.include_router(telegram_router.router, prefix="/api/telegram", tags=["telegr
 app.include_router(ticker.router, prefix="/api/ticker", tags=["ticker"])
 app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
 app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"])
-# Public dataset exports declare absolute paths (/api/scorecard.csv|.json), so
-# they mount with no prefix — see the note on export_router in the router.
-app.include_router(scorecard.export_router, tags=["scorecard"])
+# Public dataset exports: /api/scorecard.csv and /api/scorecard.json.
+#
+# Registered DIRECTLY on the app rather than via a router. These paths are
+# siblings of the "/api/scorecard" prefix, not children of it, so they cannot
+# be expressed as router sub-paths: a suffix like ".csv" fails Starlette's
+# "routed paths must start with '/'" rule and never mounts, and routing them
+# through an extra prefix-less router proved to register unreliably. Binding
+# the handlers here is explicit and cannot silently no-op — which matters,
+# because the failure mode is a 404 on a public dataset we tell people to audit.
+# Covered by tests/test_scorecard_dataset.py::test_both_export_routes_are_registered.
+app.add_api_route(
+    "/api/scorecard.csv",
+    scorecard.export_scorecard_csv,
+    methods=["GET"],
+    tags=["scorecard"],
+)
+app.add_api_route(
+    "/api/scorecard.json",
+    scorecard.export_scorecard_json,
+    methods=["GET"],
+    tags=["scorecard"],
+)
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(newsletter.router, prefix="/api/newsletter", tags=["newsletter"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])
