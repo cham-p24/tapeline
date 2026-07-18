@@ -49,6 +49,43 @@ def _new_token() -> str:
     return secrets.token_hex(32)
 
 
+# RFC 8058 one-click requires the List-Unsubscribe https URI to answer a
+# POST with a 2xx. `/api/newsletter/unsubscribe` is currently registered
+# GET-only (routers/newsletter.py), so advertising One-Click would make
+# Gmail/Yahoo POST into a 405 and the opt-out would silently fail — worse
+# than not advertising it, because a failed unsubscribe converts straight
+# into a spam complaint. We therefore ship List-Unsubscribe (which mail
+# clients resolve with a GET, the method the route does support) and flip
+# this to True the moment a POST handler is added alongside the GET.
+_ONE_CLICK_POST_SUPPORTED = False
+
+
+def _unsubscribe_url(token: str) -> str:
+    base = (settings.app_url or "https://tapeline.io").rstrip("/")
+    return f"{base}/api/newsletter/unsubscribe?token={token}"
+
+
+def _list_unsubscribe_headers(token: str) -> dict[str, str]:
+    """RFC 2369 / 8058 opt-out headers for the newsletter list.
+
+    Keyed off the subscriber's existing `unsubscribe_token` — the same one
+    the in-body Unsubscribe link and `unsubscribe_by_token()` already use,
+    so there is exactly one opt-out mechanism to reason about.
+
+    Empty token → no headers (better to omit than to ship a link that
+    resolves to "Link expired").
+    """
+    if not token:
+        return {}
+    mailto = "mailto:unsubscribe@tapeline.io?subject=unsub-newsletter"
+    out = {
+        "List-Unsubscribe": f"<{mailto}>, <{_unsubscribe_url(token)}>",
+    }
+    if _ONE_CLICK_POST_SUPPORTED:
+        out["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    return out
+
+
 async def subscribe(
     session: AsyncSession,
     *,
@@ -159,7 +196,7 @@ async def _send_welcome(*, email: str, token: str) -> None:
     growth/sales channel, not a billing or transactional one.
     """
     base = settings.app_url or "https://tapeline.io"
-    unsub_url = f"{base}/api/newsletter/unsubscribe?token={token}"
+    unsub_url = _unsubscribe_url(token)
     scorecard_url = (
         f"{base}/scorecard"
         "?utm_source=newsletter&utm_campaign=welcome&utm_medium=email"
@@ -223,6 +260,7 @@ async def _send_welcome(*, email: str, token: str) -> None:
         html=html,
         text=text,
         persona="sales",
+        headers=_list_unsubscribe_headers(token),
     )
 
 
@@ -340,6 +378,7 @@ async def run_daily_digest(
                 html=html,
                 text=text,
                 persona="sales",
+                headers=_list_unsubscribe_headers(sub.unsubscribe_token),
             )
             if not res.get("skipped", False):
                 sub.last_sent_at = now
@@ -373,7 +412,7 @@ def _render_daily_digest(
     not they click any individual ticker.
     """
     base = settings.app_url or "https://tapeline.io"
-    unsub_url = f"{base}/api/newsletter/unsubscribe?token={unsubscribe_token}"
+    unsub_url = _unsubscribe_url(unsubscribe_token)
 
     def utm(path: str) -> str:
         return (

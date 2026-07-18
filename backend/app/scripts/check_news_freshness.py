@@ -12,14 +12,27 @@ Designed to be run as a Fly cron (or GitHub Actions cron) every 15
 minutes. Exits 0 when fresh, 1 when stale. The 0 / 1 is the signal a
 scheduler can act on (Fly machines stop, alerting hooks, etc.).
 
-Alert hysteresis: a state file ($STATE_PATH, default
-~/.tapeline-news-freshness-state.json) records the last-seen fresh/stale
-status. We only POST a webhook alert on a FRESH→STALE transition, not on
-every consecutive stale tick. Without this, a 4-hour stale window with
-a 15-min cron generates 16 identical Sentry alerts; with it, we get
-exactly 1 alert when it goes stale and 1 "recovered" note when it comes
-back. The exit code (0 fresh, 1 stale) is unaffected — schedulers still
-see staleness on every tick — only the webhook noise is throttled.
+Alert hysteresis (stateless): without this, a 4-hour stale window with a
+15-min cron generates 16 identical alerts. The debounce is derived from
+the article's own published_at rather than from a local state file,
+because the primary runner is a GitHub Actions cron — a fresh VM every
+run, so any file-backed "last status" is always empty and the debounce
+never actually suppresses anything.
+
+The stateless rule (see `should_alert_stale`): the article's age tells us
+how long we have been stale, so we alert only on the first cron tick
+after the threshold is crossed, then re-alert once per --realert-hours
+while it stays stale. On a 15-min cron a 4-hour outage yields ~2 alerts
+instead of 16, and the periodic re-alert means a skipped/late run can
+never swallow the notification entirely.
+
+The exit code (0 fresh, 1 stale) is unaffected — schedulers still see
+staleness on every tick — only the webhook noise is throttled.
+
+The state file ($STATE_PATH, default ~/.tapeline-news-freshness-state.json)
+is still written where the filesystem persists (Fly cron, local runs). It
+is purely advisory now — it powers the "recovered" note and the stale-tick
+counter, and nothing breaks when it is missing.
 
 Why this exists:
     On 2026-05-09 production news went 14 hours stale because a single
@@ -36,6 +49,7 @@ Usage:
     python -m app.scripts.check_news_freshness --base https://api.tapeline.io
     python -m app.scripts.check_news_freshness --webhook https://hooks.slack.com/...
     python -m app.scripts.check_news_freshness --state-path /tmp/freshness.json
+    python -m app.scripts.check_news_freshness --interval-minutes 15 --realert-hours 4
 """
 from __future__ import annotations
 
@@ -104,13 +118,52 @@ def is_market_hours(now_utc: datetime) -> bool:
 
 DEFAULT_STATE_PATH = str(Path.home() / ".tapeline-news-freshness-state.json")
 
+# Nominal spacing between cron runs. Must match the scheduler cadence — it is
+# the window width used to detect "this is the first tick since we went stale".
+DEFAULT_INTERVAL_MINUTES = 15
+# How often to re-alert while news stays stale (bounds the noise, and stops a
+# skipped run from swallowing the one-and-only alert).
+DEFAULT_REALERT_HOURS = 4
+
+
+def should_alert_stale(
+    age_sec: int,
+    threshold_sec: int,
+    interval_sec: int,
+    realert_sec: int,
+) -> bool:
+    """Stateless hysteresis for the stale-news case.
+
+    `age_sec - threshold_sec` is how long we have been over the line, read
+    straight off the article's published_at — no local state needed, so this
+    works identically on an ephemeral CI runner and on a long-lived host.
+
+    Consecutive cron ticks are `interval_sec` apart, so exactly one tick lands
+    in each `interval_sec`-wide window. We alert on the window that starts at
+    the crossing, and on the window starting every `realert_sec` after it:
+
+        age just over threshold      → alert (first detection)
+        age threshold + 30 min       → suppressed (already alerted)
+        age threshold + 4 h          → alert (periodic re-alert)
+    """
+    if age_sec < threshold_sec:
+        return False
+    if interval_sec <= 0:
+        return True
+    stale_for = age_sec - threshold_sec
+    if realert_sec <= 0:
+        return stale_for < interval_sec
+    return stale_for % realert_sec < interval_sec
+
 
 def _load_state(path: str) -> dict:
     """Return last-run state, or an empty dict if the file is missing/corrupt.
 
     State shape: {"last_status": "fresh"|"stale"|"fetch_failed"|"empty_feed",
                   "since": ISO-UTC-string, "consecutive_failures": int}.
-    A missing file is treated as "never run" → first stale tick WILL alert.
+    Advisory only — the stale-news debounce is stateless (see
+    `should_alert_stale`). A missing file just means no "recovered" note and a
+    zeroed stale-tick counter.
     """
     try:
         with open(path, encoding="utf-8") as f:
@@ -137,12 +190,17 @@ def _save_state(path: str, status: str, consecutive_failures: int) -> None:
 
 
 def _should_alert(prev_status: str, new_status: str) -> bool:
-    """Hysteresis rule: alert only on transitions into a failure state.
+    """State-file hysteresis, used only for the timestamp-less failure modes.
 
-    fresh → stale          → alert (state changed)
-    stale → stale          → DO NOT alert (already known stale)
+    fetch_failed / empty_feed have no article timestamp to derive staleness
+    duration from, so they fall back to this transition check. Where state does
+    not persist (CI) it degrades to alerting on every tick — deliberate: a hard
+    outage (API unreachable, empty feed) is worth hearing about every time
+    rather than risking silence.
+
     fresh → fetch_failed   → alert
     fetch_failed → stale   → alert (different failure mode worth knowing)
+    fetch_failed → fetch_failed → DO NOT alert (already known)
     anything → fresh       → DO NOT alert here (handled separately as recovery)
     """
     if new_status == "fresh":
@@ -169,6 +227,24 @@ def main() -> int:
         "--no-hysteresis",
         action="store_true",
         help="Disable hysteresis — alert on every stale tick (old behaviour).",
+    )
+    parser.add_argument(
+        "--interval-minutes",
+        type=int,
+        default=DEFAULT_INTERVAL_MINUTES,
+        help=(
+            "Cron cadence in minutes — the window used to detect the first "
+            f"stale tick. Default: {DEFAULT_INTERVAL_MINUTES}"
+        ),
+    )
+    parser.add_argument(
+        "--realert-hours",
+        type=float,
+        default=DEFAULT_REALERT_HOURS,
+        help=(
+            "Re-alert this often while news stays stale. 0 disables re-alerts. "
+            f"Default: {DEFAULT_REALERT_HOURS}"
+        ),
     )
     args = parser.parse_args()
 
@@ -217,12 +293,17 @@ def main() -> int:
             f"age={age_sec}s threshold={threshold}s "
             f"title={items[0].get('title', '')[:60]!r}"
         )
-        if args.no_hysteresis or _should_alert(prev_status, new_status):
+        interval_sec = max(int(args.interval_minutes), 0) * 60
+        realert_sec = int(max(args.realert_hours, 0) * 3600)
+        if args.no_hysteresis or should_alert_stale(
+            age_sec, threshold, interval_sec, realert_sec
+        ):
             _maybe_alert(args.webhook, new_status, detail)
         else:
+            stale_for = age_sec - threshold
             print(
-                f"  (alert suppressed — already in {prev_status} state since "
-                f"{prev.get('since', 'unknown')})"
+                f"  (alert suppressed — already stale for {stale_for}s; "
+                f"next re-alert after {realert_sec}s stale)"
             )
         _save_state(args.state_path, new_status, prev_failures + 1)
         return 1

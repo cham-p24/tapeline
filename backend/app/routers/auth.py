@@ -33,6 +33,28 @@ from app.services.session import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# ---- Referral-credit anti-abuse ---------------------------------------------
+#
+# A referral credit is a free month that gets minted into a REAL 100%-off
+# Stripe coupon at the holder's next checkout (services/billing.
+# create_checkout_session, duration_in_months=N). Every credit is therefore
+# real money, so the grant is guarded twice:
+#
+#   1. **Not granted on signup.** A raw signup is free to manufacture, so
+#      crediting the referrer per signup let anyone farm unlimited free months
+#      by mass-registering referees. The referrer is credited only once the
+#      referee VERIFIES their email (see _consume_verification below), which
+#      forces the abuser to control a distinct, deliverable, non-disposable
+#      inbox per referral instead of typing throwaway addresses into the form.
+#   2. **Capped outstanding balance.** A referrer stops accruing once they
+#      hold MAX_REFERRAL_CREDIT_MONTHS unspent months, so a single minted
+#      coupon can never exceed that many free months. Redeeming credits frees
+#      the balance up again, so a genuine power-referrer isn't permanently
+#      capped — they just can't bank an unbounded pile.
+#
+# Conservative on purpose. Tune the constant here; nothing else reads it.
+MAX_REFERRAL_CREDIT_MONTHS = 5
+
 
 class SignupBody(BaseModel):
     email: EmailStr
@@ -201,6 +223,9 @@ async def signup(
     # Resolve referral code -> referring user. A valid ref earns BOTH parties
     # one month of free Premium, applied at the next paid checkout via a
     # one-shot Stripe coupon. See services/billing.create_checkout_session.
+    # The REFEREE's month lands here at signup (it's capped at one per account
+    # and only pays out if they actually subscribe); the REFERRER's is deferred
+    # until this account verifies its email — see MAX_REFERRAL_CREDIT_MONTHS.
     referrer: User | None = None
     if body.ref:
         ref_q = await session.execute(select(User).where(User.referral_code == body.ref.upper()))
@@ -250,11 +275,10 @@ async def signup(
         marketing_opt_in=bool(body.marketing_opt_in),
     )
     session.add(user)
-    # Credit the referrer too. Doing this in the same transaction guarantees
-    # that either both users get the bonus or neither does (e.g., constraint
-    # violation on the new user rolls back the referrer credit increment).
-    if referrer:
-        referrer.referral_credit_months = (referrer.referral_credit_months or 0) + 1
+    # NOTE: the referrer is deliberately NOT credited here. Granting a free
+    # month per signup made the balance farmable by anyone willing to submit
+    # the form repeatedly. The credit is applied in _consume_verification once
+    # this account proves control of its inbox.
     await session.commit()
     await session.refresh(user)
 
@@ -316,23 +340,17 @@ async def signup(
     # Referred users get a credit-acknowledgement email instead of the standard
     # welcome — both carry the same trial-is-live framing, but the referral
     # version surfaces the earned bonus front-and-centre.
+    # The referrer's "+1 month credited" note is NOT sent here: their credit
+    # doesn't exist yet. It goes out from _consume_verification at the moment
+    # the balance actually moves, so the email can't claim a credit that was
+    # never granted.
     if referrer:
         try:
-            from app.services.email import (
-                render_referral_referee_email,
-                render_referral_referrer_email,
-                send_email,
-            )
+            from app.services.email import render_referral_referee_email, send_email
             await send_email(
                 user.email,
                 "Welcome to Tapeline — you've earned 1 free month of Premium",
                 render_referral_referee_email(user.name or "trader", referrer.name),
-            )
-            masked_referee = user.email[:3] + "***" + user.email[user.email.index("@"):]
-            await send_email(
-                referrer.email,
-                "Someone joined Tapeline via your link — 1 free month credited",
-                render_referral_referrer_email(referrer.name or "trader", masked_referee),
             )
         except Exception:
             logger.exception("auth.referral_emails_failed user=%s referrer=%s",
@@ -382,6 +400,42 @@ async def signup(
 
 
 # ── Email verification ────────────────────────────────────────────────────
+
+
+async def _apply_referrer_credit(session: AsyncSession, referee: User) -> User | None:
+    """Grant the user who referred `referee` one free month, if they're eligible.
+
+    Called exactly once per referee, at their FIRST successful email
+    verification — that's the conversion signal that makes the credit cost
+    something to farm. Mutates the referrer in the caller's session but does
+    NOT commit; the caller commits alongside the verification stamp so the
+    credit and the "this referee has been counted" marker land atomically.
+
+    Returns the credited referrer (so the caller can email them after the
+    commit), or None when nothing was granted.
+    """
+    if not referee.referred_by:
+        return None
+    r = await session.execute(select(User).where(User.id == referee.referred_by))
+    referrer = r.scalar_one_or_none()
+    if referrer is None or referrer.id == referee.id:
+        return None
+    balance = referrer.referral_credit_months or 0
+    if balance >= MAX_REFERRAL_CREDIT_MONTHS:
+        # Not an error — they've simply banked the maximum. Accrual resumes
+        # once they redeem some at checkout.
+        logger.info(
+            "auth.referral_credit_capped referrer=%s balance=%s cap=%s",
+            referrer.id, balance, MAX_REFERRAL_CREDIT_MONTHS,
+        )
+        return None
+    referrer.referral_credit_months = balance + 1
+    logger.info(
+        "auth.referral_credit_granted referrer=%s referee=%s balance=%s",
+        referrer.id, referee.id, referrer.referral_credit_months,
+    )
+    return referrer
+
 
 class VerifyEmailBody(BaseModel):
     """POST body for the verify-email endpoint. We accept POST + GET so the
@@ -448,10 +502,45 @@ async def _consume_verification(
         return {"status": "cancelled"}
 
     # action == "verify"
+    # Gate the referral payout on email_verified_at being unset rather than on
+    # the token alone. A single-use token is enough TODAY only because
+    # mint_and_send_verification deletes prior unused tokens, so an
+    # already-verified user can still be handed a fresh valid one (via
+    # /resend-verification) and walk this branch a second time. Keying off the
+    # user's verified stamp makes "one credit per referee" hold regardless.
+    first_verification = user.email_verified_at is None
     user.email_verified_at = now
     row.used_at = now
+    credited_referrer = (
+        await _apply_referrer_credit(session, user) if first_verification else None
+    )
     await session.commit()
     logger.info("auth.verification_verified user=%s", user.id)
+
+    # Fire-and-forget, after the commit — the credit is already durable, and a
+    # Resend hiccup must never turn a successful verification into an error.
+    if credited_referrer is not None and credited_referrer.email:
+        try:
+            from app.services.email import (
+                render_referral_referrer_email,
+                send_email,
+            )
+            masked_referee = (
+                user.email[:3] + "***" + user.email[user.email.index("@"):]
+            )
+            await send_email(
+                credited_referrer.email,
+                "Someone joined Tapeline via your link — 1 free month credited",
+                render_referral_referrer_email(
+                    credited_referrer.name or "trader", masked_referee,
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "auth.referral_referrer_email_failed referrer=%s referee=%s",
+                credited_referrer.id, user.id,
+            )
+
     return {"status": "verified"}
 
 

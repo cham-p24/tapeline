@@ -24,6 +24,13 @@ Two design decisions worth knowing:
    configured. When no key is configured (dev / mock mode), we fall through
    to `Ticker.price` ONLY when it differs meaningfully from `price_at_flag`
    — same-value snapshots are skipped and retried on the next run.
+
+3. **Terminal skips vs. retries.** A pending date is either "not ready yet"
+   (retry it) or "can never be scored" (stop). Non-trading days, dates whose
+   remaining rows all have a zero/missing `price_at_flag`, and dates too old
+   for the vendor to still serve history are terminal — see `_TERMINAL_DATES`.
+   Everything else keeps retrying. Without that split the unscorable dates sat
+   at the head of the oldest-first backlog forever and blocked newer ones.
 """
 from __future__ import annotations
 
@@ -121,6 +128,51 @@ _HOLIDAY_COVERAGE_YEARS: frozenset[int] = frozenset(
 _warned_uncovered_years: set[int] = set()
 
 
+# ---------------------------------------------------------------------------
+# Terminal skips — dates the back-check can never finish
+# ---------------------------------------------------------------------------
+# `backcheck_all_pending` replays every `as_of` that still has rows with
+# `price_next_day IS NULL`, oldest first. Some of those dates can NEVER be
+# completed: entries logged on a non-trading day, entries whose `price_at_flag`
+# is zero/missing (no baseline to compute a return from), and long-past dates
+# whose vendor history simply isn't retrievable any more. Retrying them every
+# run kept them parked at the head of the oldest-first queue and starved newer,
+# scorable dates — the backlog never drained. Those dates are recorded here
+# with a reason and excluded from subsequent drains.
+#
+# Only structurally-unscorable dates land here. "Not ready yet" cases (the next
+# session hasn't happened, a vendor fetch failed on a recent date) are left
+# pending and retried as before.
+#
+# The registry is in-process only — `daily_scorecard` has no "skipped" column,
+# and adding one is a migration this fix doesn't need. That also means a
+# restart re-evaluates each date exactly once, so nothing is permanently
+# written off on the strength of a single bad run.
+_TERMINAL_DATES: dict[date, str] = {}
+
+# How long a date stays retryable while its data is missing. Inside this window
+# a failed fetch is "not ready yet" (vendor blip, key rotation, batch lag) and
+# is retried. Past it, missing data is treated as never coming.
+_MAX_BACKCHECK_AGE_DAYS = 90
+
+
+def _mark_terminal(d: date, reason: str) -> None:
+    """Record `d` as never-scorable so the drain stops re-attempting it."""
+    if d in _TERMINAL_DATES:
+        return
+    _TERMINAL_DATES[d] = reason
+    logger.warning(
+        "backcheck.terminal_skip target=%s reason=%s - this date can never be "
+        "back-checked; dropping it from the backlog so newer dates can drain.",
+        d, reason,
+    )
+
+
+def terminal_skips() -> dict[date, str]:
+    """Dates this process has given up on, mapped to the reason (observability)."""
+    return dict(_TERMINAL_DATES)
+
+
 def is_trading_day(d: date) -> bool:
     """True if US equity markets are open on `d`.
 
@@ -213,13 +265,17 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
         equals flag price → we skip and retry next run rather than write 0%)
     """
     target = as_of_override or (datetime.now(UTC).date() - timedelta(days=1))
+    today = datetime.now(UTC).date()
+    age_days = (today - target).days
 
     if not is_trading_day(target):
+        # Structural: the market was shut on `target`, so there is no
+        # flag-day close to measure from. No future run changes that.
+        _mark_terminal(target, "non_trading_day")
         logger.info("backcheck.skip_non_trading_day target=%s", target)
         return 0
 
     next_day = _next_trading_day(target)
-    today = datetime.now(UTC).date()
     if next_day > today:
         # Back-check fired before the next market session — nothing to compare yet.
         logger.info("backcheck.skip_too_early target=%s next=%s today=%s", target, next_day, today)
@@ -237,6 +293,14 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
     if not entries:
         return 0
 
+    if all(not e.price_at_flag or e.price_at_flag <= 0 for e in entries):
+        # Structural: every remaining row has a missing/zero baseline price, so
+        # there is no percentage to compute — and `price_at_flag` is written
+        # once at flag time and never revisited. Bail before spending the SPY
+        # fetch on a date that can't produce a single scored row.
+        _mark_terminal(target, "no_baseline_price")
+        return 0
+
     # SPY closes for both flag and next-day. Single bulk fetch — gives us
     # actual historical bars from Massive instead of the previous fallback
     # that "reconstructed" SPY from the live snapshot, which produced the
@@ -251,6 +315,13 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
             "(skipping back-check this run rather than write wrong values)",
             target, next_day, spy_at_flag, spy_next,
         )
+        if age_days > _MAX_BACKCHECK_AGE_DAYS:
+            # Old enough that "the vendor will have it next run" is no longer a
+            # credible explanation — the history isn't coming.
+            _mark_terminal(
+                target,
+                f"spy_history_unavailable_after_{_MAX_BACKCHECK_AGE_DAYS}d",
+            )
         return 0
     spy_move = ((spy_next / spy_at_flag) - 1) * 100
 
@@ -294,6 +365,17 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
         "backcheck.done target=%s next=%s scored=%d skipped_zero_flag=%d skipped_stale=%d",
         target, next_day, scored, skipped_zero_flag, skipped_stale,
     )
+
+    unresolved = skipped_zero_flag + skipped_stale
+    if unresolved and age_days > _MAX_BACKCHECK_AGE_DAYS:
+        # Whatever is left on this date (delisted symbols, zero baselines, a
+        # close the vendor never returned) has had the full window to resolve.
+        # Rows already scored above are committed; we just stop revisiting.
+        _mark_terminal(
+            target,
+            f"unresolvable_rows_after_{_MAX_BACKCHECK_AGE_DAYS}d "
+            f"(zero_flag={skipped_zero_flag} stale={skipped_stale})",
+        )
     return scored
 
 
@@ -313,23 +395,50 @@ async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> i
     fetch) so a large backlog can't stall the worker loop; remaining dates are
     picked up on subsequent runs. Dates whose next trading day hasn't happened
     yet are skipped cheaply inside `backcheck_yesterday` (returns 0).
+
+    Structurally-unscorable dates (see `_TERMINAL_DATES`) are the reason the
+    candidate query is no longer `LIMIT max_dates`. Those dates sort oldest and
+    can never complete, so they used to occupy every slot of the cap run after
+    run and permanently starve the newer, scorable dates behind them. Now they
+    are skipped outright once identified, the cap counts only dates that were
+    genuinely scorable, and a second (looser) cap bounds the fetches spent
+    discovering newly-terminal dates in any one run.
     """
     rows = await session.execute(
         select(DailyScorecardEntry.as_of)
         .where(DailyScorecardEntry.price_next_day.is_(None))
         .group_by(DailyScorecardEntry.as_of)
         .order_by(DailyScorecardEntry.as_of.asc())
-        .limit(max_dates)
     )
     pending_dates = [d for (d,) in rows.all()]
     if not pending_dates:
         return 0
 
+    max_attempts = max_dates * 3
     total = 0
+    attempts = 0
+    scorable_attempts = 0
+    skipped_terminal = 0
+    newly_terminal = 0
+
     for d in pending_dates:
+        if d in _TERMINAL_DATES:
+            skipped_terminal += 1
+            continue
+        if scorable_attempts >= max_dates or attempts >= max_attempts:
+            break
+        attempts += 1
         total += await backcheck_yesterday(session, as_of_override=d)
+        if d in _TERMINAL_DATES:
+            # The attempt just wrote this date off — it shouldn't burn budget
+            # that was meant for dates the back-check can actually finish.
+            newly_terminal += 1
+        else:
+            scorable_attempts += 1
+
     logger.info(
-        "backcheck.drain pending_dates=%d scored=%d",
-        len(pending_dates), total,
+        "backcheck.drain pending_dates=%d attempted=%d scored=%d "
+        "skipped_terminal=%d newly_terminal=%d",
+        len(pending_dates), attempts, total, skipped_terminal, newly_terminal,
     )
     return total

@@ -427,6 +427,12 @@ async def test_signup_with_referral_credits_both_parties(client, monkeypatch):
     both the referrer and the referee get +1 referral_credit_months. The
     credit is later consumed at first paid checkout via a Stripe coupon.
 
+    The referee's credit lands at signup. The *referrer's* credit is held
+    back until the referee verifies their email — otherwise a single person
+    with a throwaway-address generator can mint unlimited free months
+    without ever proving one deliverable inbox. Accrual is also capped at
+    MAX_REFERRAL_CREDIT_MONTHS.
+
     This test covers the in-DB credit grant. The coupon side is covered
     separately by mocking stripe.Coupon.create — not in this smoke test
     since live Stripe calls aren't available in CI.
@@ -464,18 +470,51 @@ async def test_signup_with_referral_credits_both_parties(client, monkeypatch):
         assert r_signup2.status_code == 200, r_signup2.text
         referee_cookies = r_signup2.cookies
 
-        # 3. Both users now have credit_months == 1.
+        # 3. Referee's own credit lands immediately at signup.
         r_stats_referee = await client.get("/api/referrals/me", cookies=referee_cookies)
         assert r_stats_referee.status_code == 200
         assert r_stats_referee.json()["credit_months"] == 1, (
             "referee must receive 1 free month for signing up via a referral link"
         )
 
+        # 4. The referrer's credit is NOT granted yet — the referee hasn't
+        #    proved a deliverable inbox. The signup itself still counts.
+        r_pending = await client.get("/api/referrals/me", cookies=referrer_cookies)
+        assert r_pending.status_code == 200
+        pending = r_pending.json()
+        assert pending["credit_months"] == 0, (
+            "referrer must not accrue credit until the referee verifies their email"
+        )
+        assert pending["signed_up"] == 1, (
+            "referrer's signed_up count must reflect the new referee immediately"
+        )
+
+        # 5. Referee verifies their email -> referrer's credit is released.
+        from sqlalchemy import select as _select
+
+        from app.db import session_scope
+        from app.models import EmailVerificationToken, User
+
+        async with session_scope() as s:
+            referee_row = (await s.execute(
+                _select(User).where(User.email == referee_email)
+            )).scalar_one()
+            token = (await s.execute(
+                _select(EmailVerificationToken).where(
+                    EmailVerificationToken.user_id == referee_row.id,
+                    EmailVerificationToken.used_at.is_(None),
+                )
+            )).scalars().first()
+        assert token is not None, "signup must mint a verification token for the referee"
+
+        r_verify = await client.get(f"/api/auth/verify-email?token={token.token}")
+        assert r_verify.status_code == 200, r_verify.text
+
         r_stats_referrer = await client.get("/api/referrals/me", cookies=referrer_cookies)
         assert r_stats_referrer.status_code == 200
         body = r_stats_referrer.json()
         assert body["credit_months"] == 1, (
-            "referrer must receive 1 free month when someone uses their link"
+            "referrer must receive 1 free month once their referee verifies"
         )
         assert body["signed_up"] == 1, "referrer's signed_up count must reflect the new referee"
 
