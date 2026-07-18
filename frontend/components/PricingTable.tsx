@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
+import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
 const PLANS = [
   {
@@ -85,6 +86,11 @@ export function PricingTable() {
   // ComparisonTable header on the same page can never disagree with these
   // cards; standalone renders fall back to the same annual default.
   const { billing, setBilling } = useBillingPeriod();
+  // What Stripe will actually take, derived from the live Price object plus
+  // the session kwargs the backend sends — never a hardcoded guess. Falls
+  // back to the PRICING.currency constant and stays silent about tax until
+  // the server confirms it.
+  const disclosure = useChargeDisclosure();
 
   return (
     <div>
@@ -92,7 +98,12 @@ export function PricingTable() {
       <div className="flex justify-center">
         <BillingToggle billing={billing} setBilling={setBilling} />
       </div>
-      <p className="mt-3 text-center text-xs text-muted">All prices in USD</p>
+      {/* Currency + tax, stated here rather than discovered on
+          checkout.stripe.com. "Unexpected cost at the payment step" is the
+          top documented abandonment cause; this is the answer to it. */}
+      <p className="mt-3 text-center text-xs text-muted">
+        {chargeDisclosureLine(disclosure)}
+      </p>
       {billing === "annual" && (
         <p className="mt-1 text-center text-xs text-up/90">Save 2 months · your rate, locked in</p>
       )}
@@ -183,32 +194,74 @@ export function PricingTable() {
         })}
       </div>
 
-      {/* Commitments — single tight strip, 4 chips */}
-      <div className="mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
-        <span>14-day Premium trial · no card</span>
-        <span className="text-subtle">·</span>
+      {/* ── Risk reversals ────────────────────────────────────────────────
+          Only the two that are unconditionally true and cost the user nothing
+          to verify: the trial genuinely takes no card, and cancellation is
+          genuinely one button (POST /api/billing/cancel, no survey gate). Both
+          are stated as mechanisms — what happens, and what does NOT happen —
+          because "no card required" only reassures if the reader can tell it
+          means "we cannot charge you". No urgency, no deadline, no scarcity. */}
+      <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-border bg-panel/60 px-4 py-3">
+          <div className="text-xs font-medium text-fg">14 days of Premium, no card</div>
+          <p className="mt-1 text-xs text-muted leading-relaxed">
+            Signup asks for an email and a password — no card fields. Nothing to
+            charge means nothing can auto-renew: at day 14 the account moves to
+            Free on its own unless you choose to add a card.
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-panel/60 px-4 py-3">
+          <div className="text-xs font-medium text-fg">Cancel in one click</div>
+          <p className="mt-1 text-xs text-muted leading-relaxed">
+            One button on your billing page. No survey to complete, no email to
+            send, no retention call. You keep access until the end of the period
+            you already paid for.
+          </p>
+        </div>
+      </div>
+
+      {/* Remaining commitments — the two that aren't risk reversals. */}
+      <div className="mx-auto mt-4 flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
         <span>{REFUND.short}</span>
         <span className="text-subtle">·</span>
         <span>Founding pricing — locked in for early subscribers</span>
-        <span className="text-subtle">·</span>
-        <span>Cancel in one click</span>
       </div>
 
-      {/* Payment-security trust badge — sits under the plan CTAs at the
-          decision point. Card details are never handled by Tapeline; checkout
-          runs on Stripe. Descriptive only, no security claims of our own. */}
-      <div className="mx-auto mt-5 flex items-center justify-center gap-1.5 text-[11px] text-subtle">
-        <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path
-            d="M8 1.5l5 1.8v3.4c0 3.2-2.1 5.3-5 6.3-2.9-1-5-3.1-5-6.3V3.3L8 1.5z"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinejoin="round"
-          />
-          <path d="M5.8 8l1.6 1.6L10.4 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span>Payments secured by <span className="text-muted font-medium">Stripe</span></span>
-      </div>
+      {/* ── Money-back as a MECHANISM, at the annual decision point ────────
+          An annual buyer is committing 12 months up front, so the useful thing
+          is not a seal — it's knowing exactly what to do, and how long it
+          takes. Every number derives from the REFUND constant in lib/pricing
+          (itself single-sourced from /legal/refund) so the window can never
+          drift from the policy it summarises. */}
+      {billing === "annual" && (
+        <div className="mx-auto mt-6 max-w-2xl rounded-lg border border-border bg-panel/60 px-5 py-4">
+          <div className="text-xs font-medium text-fg">
+            How the {REFUND.short.toLowerCase()} actually works
+          </div>
+          <p className="mt-1.5 text-xs text-muted leading-relaxed">
+            Email support@tapeline.io from your account address within{" "}
+            {REFUND.windowDays} days of your first charge — there is no form and
+            no reason required. We process it within 3 business days, and Stripe
+            returns the money to the card or wallet you paid with, which usually
+            lands in 3&ndash;10 business days depending on your bank. Annual
+            plans get a {REFUND.annual}; monthly plans get a {REFUND.monthly}.{" "}
+            <Link href={REFUND.policyPath} className="text-accent hover:underline">
+              Full policy
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+
+      {/* Payment security, in plain language, at the point of card entry.
+          Factual and verifiable: the card form is Stripe's, on Stripe's
+          domain. No badges, no certification claims, no security promises of
+          our own — we make none because we handle none of it. */}
+      <p className="mx-auto mt-5 max-w-2xl text-center text-[11px] leading-relaxed text-subtle">
+        Card details are entered on Stripe&rsquo;s own checkout page, not on
+        Tapeline. Your card number never reaches a Tapeline server &mdash; we
+        receive only the subscription status Stripe reports back.
+      </p>
 
       {/* B2B / lifetime nudge — one line, no third row of cards.
           Curious enterprise buyers can email; everyone else stays focused

@@ -77,9 +77,19 @@ describe("PricingTable", () => {
     expect(screen.getByText(/sales@tapeline\.io/i)).toBeInTheDocument();
   });
 
-  it("shows the 14-day trial commitment", () => {
+  it("advertises the no-card trial as a mechanism, not just a label", () => {
+    // The two genuinely-true risk reversals are stated as mechanisms — WHY
+    // the reader is safe, not merely that they are. "No card" only reassures
+    // if it's clear that nothing can be auto-charged.
     render(<PricingTable />);
-    expect(screen.getByText(/14-day Premium trial/i)).toBeInTheDocument();
+    expect(screen.getByText(/14 days of Premium, no card/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing can auto-renew/i)).toBeInTheDocument();
+  });
+
+  it("advertises one-click cancel with no survey gate", () => {
+    render(<PricingTable />);
+    expect(screen.getByText(/Cancel in one click/i)).toBeInTheDocument();
+    expect(screen.getByText(/No survey to complete/i)).toBeInTheDocument();
   });
 
   it("sells the Free tier the backend actually enforces (FREE_LIMITS)", () => {
@@ -115,11 +125,44 @@ describe("PricingTable", () => {
     expect(screen.getByText(REFUND.short)).toBeInTheDocument();
   });
 
-  it("shows the Stripe payment-security trust badge near the CTAs", () => {
-    // Trust badge at the decision point (Part 2 / trust badges). Text is
-    // split across spans ("Payments secured by" + "Stripe").
+  it("states payment security as a plain fact, not a badge", () => {
+    // Deliberately NOT a shield/seal: the claim has to be something the
+    // reader can verify (the card form is on Stripe's domain) rather than a
+    // security assertion Tapeline makes about itself.
     render(<PricingTable />);
-    expect(screen.getByText(/Payments secured by/i)).toBeInTheDocument();
-    expect(screen.getByText("Stripe")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Card details are entered on Stripe’s own checkout page/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/never reaches a Tapeline server/i),
+    ).toBeInTheDocument();
+  });
+
+  it("discloses the charge currency before the redirect", () => {
+    // Currency is stated on OUR page so checkout.stripe.com can't surprise.
+    // With no API reachable in jsdom the hook keeps its currency-only default
+    // sourced from PRICING.currency — and says nothing at all about tax,
+    // which is the safe direction when the tax posture is unconfirmed.
+    render(<PricingTable />);
+    expect(
+      screen.getByText(new RegExp(`Charged in ${PRICING.currency}`, "i")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No tax is added/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tax may be added/i)).not.toBeInTheDocument();
+  });
+
+  it("explains the money-back mechanism at the annual decision point", () => {
+    // Annual buyers commit 12 months up front — the useful reassurance is the
+    // procedure and the timing, not a seal. Window derives from REFUND.
+    render(<PricingTable />);
+    expect(
+      screen.getByText(new RegExp(`within ${REFUND.windowDays} days of your first charge`, "i")),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/no form and\s+no reason required/i)).toBeInTheDocument();
+    // Monthly view drops it — the annual commitment is what warrants it.
+    fireEvent.click(screen.getByRole("button", { name: /monthly/i }));
+    expect(
+      screen.queryByText(new RegExp(`within ${REFUND.windowDays} days of your first charge`, "i")),
+    ).not.toBeInTheDocument();
   });
 });

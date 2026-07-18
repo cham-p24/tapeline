@@ -21,6 +21,7 @@ assertions read the SPECIFIC dev_user row, never aggregates.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -178,3 +179,95 @@ async def test_checkout_no_trial_end_when_not_on_trial(monkeypatch):
             )
         assert r.status_code == 200
         assert captured["trial_end"] is None, trial_ends
+
+
+# ── Cancelled-checkout return path ──────────────────────────────────────────
+
+async def test_cancel_url_carries_tier_and_period_for_resume(monkeypatch):
+    """Stripe's "back" link must name the plan the user was part-way through.
+
+    /app/billing reads these params to render the "nothing was charged"
+    recovery panel with ONE resume button. Without them the page can still
+    reassure, but it has to fall back to the whole plan grid — so the params
+    are the difference between one click and a re-decision.
+    """
+    captured = _capture_checkout(monkeypatch)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        await _prep_dev_user(c, tier="free", stripe_customer_id=None)
+        r = await c.post(
+            "/api/billing/checkout",
+            json={"tier": "premium", "billing_period": "annual"},
+            headers=_AUTH,
+        )
+    assert r.status_code == 200
+    cancel_url = captured["cancel_url"]
+    assert "checkout=cancelled" in cancel_url
+    assert "tier=premium" in cancel_url
+    assert "billing_period=annual" in cancel_url
+
+
+# ── Dunning state on the endpoint the billing page already calls ────────────
+
+async def test_retention_options_reports_past_due():
+    """A failed renewal surfaces on /api/billing/retention-options so the
+    billing page can render its recovery panel — and stop quoting a "next
+    charge" price — without a second round-trip."""
+    from sqlalchemy import delete
+
+    from app.models import Subscription
+
+    sub_id = f"sub_ro_{uuid4().hex[:12]}"
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        await _prep_dev_user(c, tier="premium", stripe_customer_id="cus_ro_pastdue")
+        async with session_scope() as s:
+            s.add(Subscription(
+                id=sub_id,
+                user_id="dev_user",
+                status="past_due",
+                tier="premium",
+                current_period_end=datetime.now(UTC) + timedelta(days=30),
+            ))
+            await s.commit()
+        try:
+            body = (
+                await c.get("/api/billing/retention-options", headers=_AUTH)
+            ).json()
+            assert body["past_due"] is True
+            assert body["subscription_status"] == "past_due"
+        finally:
+            async with session_scope() as s:
+                await s.execute(delete(Subscription).where(Subscription.id == sub_id))
+                await s.commit()
+
+
+async def test_retention_options_healthy_subscription_not_past_due():
+    """An active subscription must never trip the dunning panel."""
+    from sqlalchemy import delete
+
+    from app.models import Subscription
+
+    sub_id = f"sub_ok_{uuid4().hex[:12]}"
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        await _prep_dev_user(c, tier="premium", stripe_customer_id="cus_ro_active")
+        async with session_scope() as s:
+            s.add(Subscription(
+                id=sub_id,
+                user_id="dev_user",
+                status="active",
+                tier="premium",
+                current_period_end=datetime.now(UTC) + timedelta(days=30),
+            ))
+            await s.commit()
+        try:
+            body = (
+                await c.get("/api/billing/retention-options", headers=_AUTH)
+            ).json()
+            assert body["past_due"] is False
+            assert body["subscription_status"] == "active"
+        finally:
+            async with session_scope() as s:
+                await s.execute(delete(Subscription).where(Subscription.id == sub_id))
+                await s.commit()

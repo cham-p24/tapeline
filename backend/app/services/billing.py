@@ -19,6 +19,20 @@ if settings.stripe_secret_key:
 stripe.max_network_retries = 1
 
 
+# ── Tax posture: one switch, read by BOTH the session and the disclosure ────
+#
+# We do NOT enable Stripe Tax, so Stripe calculates and adds nothing on top of
+# the sticker price — the advertised amount is the amount charged. The plan
+# cards state that BEFORE the redirect (see get_charge_disclosure), and the
+# only way that promise can stay true is if the disclosure and the Checkout
+# session read the same constant. They do: this flag is forwarded as
+# `automatic_tax` in create_checkout_session below AND reported as `tax_added`
+# by get_charge_disclosure. Flip it here and both surfaces move together —
+# there is no way to turn on tax collection and leave the copy claiming
+# otherwise.
+AUTOMATIC_TAX_ENABLED = False
+
+
 def _tier_from_price(price_id: str) -> str:
     """Map Stripe price ID to Tapeline tier (handles both monthly + annual)."""
     if price_id in (settings.stripe_price_pro_monthly, settings.stripe_price_pro_annual):
@@ -87,6 +101,13 @@ async def create_checkout_session(
         # checkout.stripe.com which Stripe pre-registers for Apple Pay, so no
         # extra domain verification step is needed. We list "link" explicitly
         # so Stripe Link's 1-click flow gets surfaced as its own option.
+        #
+        # Wallet buttons render ABOVE the card form, so on a supported device
+        # the whole card-entry step collapses into one biometric tap — the
+        # single largest documented friction reduction available at this step.
+        # This is checked by test_billing_checkout so a future refactor that
+        # drops "card" (and with it the wallets) fails loudly instead of
+        # silently reverting every mobile buyer to manual card entry.
         sub_metadata: dict[str, Any] = {
             "user_id": user_id, "tier": tier, "billing_period": billing_period,
         }
@@ -98,6 +119,11 @@ async def create_checkout_session(
             "client_reference_id": user_id,
             "success_url": success_url,
             "cancel_url": cancel_url,
+            # Stated on the plan card before the redirect. Sending this
+            # explicitly (rather than relying on the API default) is what makes
+            # the "the amount shown is the amount charged" line verifiable
+            # against the request we actually issue.
+            "automatic_tax": {"enabled": AUTOMATIC_TAX_ENABLED},
         }
         if expires_in_minutes is not None:
             # Stripe clamps expires_at to [30 min, 24 h] from creation.
@@ -134,7 +160,19 @@ async def create_checkout_session(
         else:
             kwargs["allow_promotion_codes"] = True
 
-        subscription_data: dict[str, Any] = {"metadata": sub_metadata}
+        # Dunning prerequisite. Stripe's Smart Retries can only re-attempt a
+        # failed renewal against a payment method stored ON THE SUBSCRIPTION;
+        # without this the card collected at Checkout is attached to the
+        # customer but is not the subscription's default, and a retry can find
+        # nothing to charge. That turns a recoverable soft decline (expired
+        # card, temporary insufficient funds) into silent involuntary churn —
+        # roughly a quarter of all SaaS churn by vendor benchmark. The retry
+        # SCHEDULE itself is dashboard config (see the runbook note in the PR);
+        # this is the half that has to be set per-subscription in code.
+        subscription_data: dict[str, Any] = {
+            "metadata": sub_metadata,
+            "payment_settings": {"save_default_payment_method": "on_subscription"},
+        }
         if trial_end is not None:
             # Older rows can carry naive datetimes — stored values are UTC.
             if trial_end.tzinfo is None:
@@ -152,6 +190,107 @@ async def create_checkout_session(
     except stripe.error.StripeError as exc:
         logger.exception("stripe.checkout_create_failed")
         raise HTTPException(502, f"Stripe error: {exc}") from exc
+
+
+# ── Charge disclosure: what Stripe will actually take, before the redirect ──
+#
+# Checkout research (Baymard) puts "unexpected cost at the payment step" at the
+# top of the abandonment list, so the plan card has to state the real charge
+# currency — and whether anything is added on top — BEFORE the user is thrown
+# to checkout.stripe.com. Every field below is derived from live Stripe config
+# or from the session kwargs this module actually sends. Nothing is guessed:
+# when Stripe can't be reached, `currency` comes back None and the UI simply
+# says less rather than inventing a claim.
+#
+# The tax half needs no network call at all: AUTOMATIC_TAX_ENABLED (top of this
+# module) is the exact value forwarded as `automatic_tax` in the Checkout
+# session, so reporting it here describes OUR OWN REQUEST rather than a guess
+# about Stripe's account settings. That is what makes the "no tax is added"
+# sentence a statement of fact instead of a promise we can't keep.
+
+# Memoised: Price objects are immutable in Stripe (a price change means a new
+# id), so one successful fetch per process is plenty.
+_charge_disclosure_cache: dict[str, Any] | None = None
+
+
+def _configured_price_ids() -> list[str]:
+    """Every Stripe price id this deployment has configured, in preference
+    order (the cheapest recurring plan first — any of them answers the
+    currency question identically)."""
+    return [
+        p
+        for p in (
+            settings.stripe_price_pro_monthly,
+            settings.stripe_price_pro_annual,
+            settings.stripe_price_premium_monthly,
+            settings.stripe_price_premium_annual,
+        )
+        if p
+    ]
+
+
+async def get_charge_disclosure() -> dict[str, Any]:
+    """Describe the real charge: currency, and whether tax is added on top.
+
+    Returns::
+
+        {
+          "currency": "USD" | None,     # None = couldn't determine, say nothing
+          "tax_added": False | None,    # None = unknown, make NO tax claim
+          "tax_behavior": "unspecified" | "inclusive" | "exclusive" | None,
+          "source": "stripe" | "unavailable",
+        }
+
+    `currency` is only ever reported when a real Price object confirmed it.
+
+    `tax_added` is deliberately three-valued. We only assert False — "nothing is
+    added on top" — when BOTH halves agree: automatic tax is off in the session
+    we send, AND the Price is not marked tax_behavior="exclusive". An exclusive
+    price is one configured on the assumption that tax gets added on top, so
+    even though our session adds none today, a dashboard-level tax rate could
+    make the negative claim wrong. In that case we return None and the UI
+    states the currency alone. A missing sentence is recoverable; a wrong tax
+    claim at the payment step is not.
+    """
+    global _charge_disclosure_cache
+    if _charge_disclosure_cache is not None:
+        return dict(_charge_disclosure_cache)
+
+    result: dict[str, Any] = {
+        "currency": None,
+        # No Price fetched yet, so the exclusive-price caveat above is
+        # unverified — stay silent rather than assert.
+        "tax_added": None,
+        "tax_behavior": None,
+        "source": "unavailable",
+    }
+
+    price_ids = _configured_price_ids()
+    if settings.stripe_secret_key and price_ids:
+        try:
+            price = await asyncio.to_thread(stripe.Price.retrieve, price_ids[0])
+            currency = price.get("currency") if isinstance(price, dict) else getattr(price, "currency", None)
+            behavior = (
+                price.get("tax_behavior") if isinstance(price, dict)
+                else getattr(price, "tax_behavior", None)
+            )
+            if currency:
+                result["currency"] = str(currency).upper()
+                result["tax_behavior"] = behavior
+                result["source"] = "stripe"
+                if not AUTOMATIC_TAX_ENABLED and behavior != "exclusive":
+                    result["tax_added"] = False
+                elif AUTOMATIC_TAX_ENABLED:
+                    result["tax_added"] = True
+                # else: exclusive price — leave None, currency-only copy.
+                # Cache only a genuine answer, so a transient Stripe blip
+                # doesn't pin "unavailable" for the life of the process.
+                _charge_disclosure_cache = dict(result)
+        except stripe.error.StripeError:
+            # Non-fatal: the disclosure degrades to currency-less rather than
+            # failing the page or asserting something unverified.
+            logger.warning("stripe.price_disclosure_failed", exc_info=True)
+    return result
 
 
 async def create_portal_session(customer_id: str, return_url: str) -> str:
