@@ -133,13 +133,22 @@ jobs:
         # only — no secrets needed.
         run: |
           base="https://api.tapeline.io"
-          code=000
-          for i in $(seq 1 12); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$base/api/status" || echo 000)
-            [ "$code" = "200" ] && break
-            echo "status attempt $i: $code — retrying in 10s"; sleep 10
+          # /api/status returns 200 even when its own sub-checks are degraded,
+          # so asserting the HTTP code alone proved almost nothing: a deploy
+          # that killed the worker or lost the DB still shipped green. Inspect
+          # the payload. 18 attempts (~3min) because the worker machine also
+          # restarts during a deploy and needs a tick (60s) to report fresh.
+          verdict=unreachable
+          for i in $(seq 1 18); do
+            verdict=$(curl -s --max-time 20 "$base/api/status" | python3 -c "import sys,json;d=json.load(sys.stdin);c=d.get('checks',{});bad=[k for k in ('database','worker_last_tick') if c.get(k,{}).get('status')!='ok']+([] if d.get('status')=='ok' else ['status']);print('ok' if not bad else 'degraded:'+','.join(bad))" 2>/dev/null || echo unreachable)
+            [ "$verdict" = "ok" ] && break
+            echo "status attempt $i: $verdict — retrying in 10s"; sleep 10
           done
-          [ "$code" = "200" ] || { echo "::error title=Smoke check failed::/api/status returned $code after deploy"; exit 1; }
+          if [ "$verdict" != "ok" ]; then
+            echo "::error title=Smoke check failed::/api/status is $verdict after deploy — see https://api.tapeline.io/api/status"
+            curl -s --max-time 20 "$base/api/status" || true
+            exit 1
+          fi
           # 401 = the public API router is mounted and key-gated (i.e. live).
           # 404 would mean the build shipped without the api_v1 routes (the
           # exact regression the clobbered v128/v129 deploys caused).
@@ -153,4 +162,4 @@ jobs:
             echo "::error title=Cutover failed::api machine boot_time unchanged ($post) — the old machine is still serving. Check 'fly machines list -a tapeline-backend' and the health-check grace period."
             exit 1
           fi
-          echo "✅ Post-deploy smoke check passed (status 200, /api/v1 gated, boot_time ${pre:-?} → ${post:-?})."
+          echo "✅ Post-deploy smoke check passed (status ok incl. database + worker_last_tick, /api/v1 gated, boot_time ${pre:-?} → ${post:-?})."
