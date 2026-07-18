@@ -67,6 +67,39 @@ function SignInForm() {
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
 
+  // OAuth → 2FA handoff. Signing in through a provider used to skip TOTP
+  // entirely: the callback minted a full session regardless of mfa_enabled,
+  // so anyone holding the victim's Google account walked straight past their
+  // authenticator. routers/oauth.py now mints NO session for an MFA-enabled
+  // account — it redirects here with ?mfa=1 and leaves the 5-minute challenge
+  // in a readable `tapeline_mfa_challenge` cookie (kept out of the URL so the
+  // token never lands in browser history, Referer headers or CDN logs).
+  // Pick it up and drop into the same code step the password flow uses.
+  const mfaHandoff = qp.get("mfa") === "1";
+  useEffect(() => {
+    if (!mfaHandoff) return;
+    const hit = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("tapeline_mfa_challenge="));
+    if (!hit) {
+      // Cookie already expired, or blocked. Don't strand them on a form that
+      // looks like the provider button silently failed — say what happened.
+      setErr(
+        "That sign-in took too long to confirm. Sign in again to get a new code prompt.",
+      );
+      return;
+    }
+    setMfaToken(decodeURIComponent(hit.split("=").slice(1).join("=")));
+    // Burn it — a challenge shouldn't outlive the handoff. Cleared against
+    // both the host and the registrable domain, because the cookie is set
+    // with a domain so it spans the apex and the api subdomain in prod.
+    const host = window.location.hostname;
+    const parts = host.split(".");
+    const registrable = parts.length > 2 ? parts.slice(-2).join(".") : host;
+    document.cookie = "tapeline_mfa_challenge=; Max-Age=0; path=/";
+    document.cookie = `tapeline_mfa_challenge=; Max-Age=0; path=/; domain=.${registrable}`;
+  }, [mfaHandoff]);
+
   // Shared post-auth handoff: push the new session into UserContext BEFORE
   // navigating, so the destination page mounts already signed-in (and any
   // later back-navigation sees correct state) instead of flashing signed-out.

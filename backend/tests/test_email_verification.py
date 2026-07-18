@@ -114,13 +114,20 @@ async def test_verify_endpoint_invalid_token(client):
 
 @pytest.mark.asyncio
 async def test_verify_endpoint_cancel_deletes_user(client):
-    """`?action=cancel` is the 'this wasn't me' path — must hard-delete
-    the account so the squatter loses access."""
+    """`action=cancel` is the 'this wasn't me' path — must hard-delete
+    the account so the squatter loses access.
+
+    Now requires an explicit POST carrying confirm=true. It used to fire on a
+    bare GET, which meant a mail-security link detonator or a prefetcher could
+    destroy a fresh signup with no human involved — see
+    tests/test_auth_hardening.py for the guards on the non-destructive paths.
+    """
     user_id, _, token = await _seed_user_with_token()
 
     async with client:
-        r = await client.get(
-            f"/api/auth/verify-email?token={token}&action=cancel",
+        r = await client.post(
+            "/api/auth/verify-email",
+            json={"token": token, "action": "cancel", "confirm": True},
         )
         assert r.status_code == 200
         assert r.json() == {"status": "cancelled"}

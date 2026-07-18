@@ -15,12 +15,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Status =
   | "loading"
+  | "confirm_cancel"
   | "verified"
   | "cancelled"
   | "already_verified"
@@ -43,16 +44,19 @@ function VerifyEmailInner() {
   const action = (qp.get("action") || "verify") as "verify" | "cancel";
   const [status, setStatus] = useState<Status>("loading");
 
-  useEffect(() => {
-    if (!token) {
-      setStatus("invalid");
-      return;
-    }
+  const submit = useCallback(() => {
+    setStatus("loading");
     fetch(`${API_BASE}/api/auth/verify-email`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, action }),
+      // `confirm` is the SERVER's gate on deletion — it refuses to delete
+      // without it, rather than trusting that a client bothered to ask. The
+      // confirmation button below is the UX half; this is the half that
+      // actually holds if someone calls the API directly.
+      body: JSON.stringify(
+        action === "cancel" ? { token, action, confirm: true } : { token, action },
+      ),
     })
       .then(async (r) => {
         if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -61,6 +65,24 @@ function VerifyEmailInner() {
       })
       .catch(() => setStatus("error"));
   }, [token, action]);
+
+  useEffect(() => {
+    if (!token) {
+      setStatus("invalid");
+      return;
+    }
+    // `action=cancel` DELETES the account, irreversibly. This used to fire
+    // straight from this effect, so merely *loading* the URL destroyed the
+    // account — and that URL is sitting in an email, where link scanners that
+    // render JavaScript, browser prefetches and idle clicks all open it with
+    // no human intent. Cancellation now requires an explicit confirmation
+    // click. Verification is idempotent and harmless, so it still auto-runs.
+    if (action === "cancel") {
+      setStatus("confirm_cancel");
+      return;
+    }
+    submit();
+  }, [token, action, submit]);
 
   return (
     <main id="main" className="relative min-h-screen">
@@ -73,7 +95,12 @@ function VerifyEmailInner() {
           </Link>
 
           <div className="mt-10 rounded-lg border border-border bg-panel p-6">
-            <Outcome status={status} action={action} router={router} />
+            <Outcome
+              status={status}
+              action={action}
+              router={router}
+              onConfirmCancel={submit}
+            />
           </div>
 
           <p className="mt-6 text-center text-xs text-subtle">
@@ -93,16 +120,49 @@ function Outcome({
   status,
   action,
   router,
+  onConfirmCancel,
 }: {
   status: Status;
   action: "verify" | "cancel";
   router: ReturnType<typeof useRouter>;
+  onConfirmCancel: () => void;
 }) {
   if (status === "loading") {
     return (
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Checking your link…</h1>
         <p className="mt-2 text-sm text-muted">One moment.</p>
+      </div>
+    );
+  }
+
+  if (status === "confirm_cancel") {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">
+          Delete this account?
+        </h1>
+        <p className="mt-2 text-sm text-muted">
+          You followed a “this wasn’t me” link. Confirming permanently deletes the
+          account this email was used to create, along with its watchlists and
+          alerts. This cannot be undone.
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          If you didn’t mean to open this, just close the page — nothing has
+          happened yet.
+        </p>
+        <button
+          onClick={onConfirmCancel}
+          className="mt-6 flex h-10 w-full items-center justify-center rounded-md bg-down text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
+        >
+          Yes, delete the account
+        </button>
+        <button
+          onClick={() => router.push("/")}
+          className="mt-3 flex h-10 w-full items-center justify-center rounded-md border border-border text-sm font-medium transition-all hover:bg-panel active:scale-[0.98]"
+        >
+          Keep my account
+        </button>
       </div>
     );
   }

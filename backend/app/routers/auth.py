@@ -1,13 +1,22 @@
 """Native auth: signup, signin, signout, session me."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 import string
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+)
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +29,7 @@ from app.services.bot_protection import (
     verify_turnstile,
 )
 from app.services.rate_limit import client_ip as resolve_client_ip
-from app.services.rate_limit import limit_auth
+from app.services.rate_limit import limit_auth, limiter
 from app.services.session import (
     SESSION_COOKIE,
     hash_password,
@@ -29,6 +38,7 @@ from app.services.session import (
     verify_password,
     verify_session_token,
 )
+from app.services.trial_abuse import normalise_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -445,16 +455,20 @@ class VerifyEmailBody(BaseModel):
 
     token: str = Field(..., min_length=8, max_length=200)
     action: str = Field("verify", pattern=r"^(verify|cancel)$")
+    # Second gesture required for action="cancel" ONLY — see the cancel branch
+    # in _consume_verification. Ignored for action="verify".
+    confirm: bool = False
 
 
 async def _consume_verification(
-    session: AsyncSession, token: str, action: str,
+    session: AsyncSession, token: str, action: str, *, confirmed: bool = False,
 ) -> dict:
     """Shared implementation for GET and POST verification endpoints.
 
     Returns a dict the caller can shape into JSON. Never raises 5xx —
     every branch is a user-readable outcome:
       - {"status": "verified"}             token good, email stamped
+      - {"status": "confirm_required"}     cancel asked for without confirm=true
       - {"status": "cancelled"}            user said "this wasn't me" — account deleted
       - {"status": "already_verified"}     token already consumed earlier
       - {"status": "expired"}              token past 24h
@@ -492,7 +506,24 @@ async def _consume_verification(
         return {"status": "invalid"}
 
     if action == "cancel":
-        # "This wasn't me" — delete the account before any further damage.
+        # "This wasn't me" — hard, cascading, irreversible account deletion.
+        #
+        # It used to fire on nothing more than the URL being fetched, which
+        # meant NO HUMAN had to act for an account to be destroyed: the
+        # cancel_url is an <a href> in every verification email, and mail
+        # security stacks detonate emailed links in an instrumented headless
+        # browser (Defender for Office 365 Safe Links, Proofpoint URL Defense)
+        # — as do link prefetchers, antivirus crawlers and browser prerender.
+        # The token stays valid for 24h, so every one of those loads re-fired
+        # the delete on a brand-new signup.
+        #
+        # Two gates now stand in front of it: GET can never confirm (it passes
+        # confirmed=False unconditionally — a safe method must not destroy
+        # state), and POST must carry an explicit confirm=true that only a
+        # deliberate button press sets. A crawler following the link lands on
+        # confirm_required, which is a screen, not a deletion.
+        if not confirmed:
+            return {"status": "confirm_required"}
         # Token row cascades via the FK; we delete the user explicitly.
         await session.delete(user)
         await session.commit()
@@ -555,12 +586,17 @@ async def verify_email_get(
     Validation is identical to the Pydantic body in POST; we re-do the
     pattern check here so a malformed query string returns 400 rather
     than passing junk into _consume_verification.
+
+    Deliberately takes no `confirm` parameter: action="cancel" over GET always
+    resolves to {"status": "confirm_required"}, never a deletion. A GET is a
+    safe method that prefetchers, mail scanners and crawlers issue without a
+    human — it may report what the link WOULD do, not do it.
     """
     if action not in ("verify", "cancel"):
         raise HTTPException(400, "action must be 'verify' or 'cancel'")
     if not (8 <= len(token) <= 200):
         raise HTTPException(400, "token has an invalid length")
-    return await _consume_verification(session, token, action)
+    return await _consume_verification(session, token, action, confirmed=False)
 
 
 @router.post("/verify-email")
@@ -568,7 +604,9 @@ async def verify_email_post(
     body: VerifyEmailBody,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    return await _consume_verification(session, body.token, body.action)
+    return await _consume_verification(
+        session, body.token, body.action, confirmed=body.confirm,
+    )
 
 
 @router.post("/resend-verification", dependencies=[Depends(limit_auth)])
@@ -611,9 +649,47 @@ class ResetPasswordBody(BaseModel):
     password: str = Field(..., min_length=8, max_length=200)
 
 
+# Constant-time floor for /forgot-password, in seconds.
+#
+# The endpoint returns an identical body for known and unknown addresses, but
+# that only hides enumeration if the two branches also COST the same. They
+# didn't: a hit awaited mint_and_send_password_reset (DELETE + INSERT + commit,
+# then an httpx POST to Resend with a 10s timeout) while a miss returned after
+# one SELECT — a sub-millisecond baseline against a several-hundred-millisecond
+# hit, which is a clean oracle at 10 probes/min/IP. The Resend round-trip is now
+# deferred to a background task (below) so it lands AFTER the response is
+# flushed, and this floor pads whatever is left so both branches sit on the same
+# wall-clock shelf. Cheap insurance: nobody is latency-sensitive on a
+# password-reset request.
+_FORGOT_PASSWORD_FLOOR_SECONDS = 0.5
+
+
+async def _send_password_reset_bg(user_id: str) -> None:
+    """Mint + send the reset email OUTSIDE the request path.
+
+    Runs as a Starlette background task, i.e. after the response bytes are
+    flushed, which is the point — see _FORGOT_PASSWORD_FLOOR_SECONDS. It must
+    open its OWN session: FastAPI tears down `yield` dependencies (and hence
+    the request-scoped AsyncSession) before background tasks run.
+    """
+    from app.db import session_scope
+    from app.services.email import mint_and_send_password_reset
+
+    try:
+        async with session_scope() as s:
+            r = await s.execute(select(User).where(User.id == user_id))
+            user = r.scalar_one_or_none()
+            if user is None:
+                return
+            await mint_and_send_password_reset(s, user)
+    except Exception:
+        logger.exception("auth.password_reset_send_failed user=%s", user_id)
+
+
 @router.post("/forgot-password", dependencies=[Depends(limit_auth)])
 async def forgot_password(
     body: ForgotPasswordBody,
+    background: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Initiate a password reset.
@@ -622,23 +698,42 @@ async def forgot_password(
     matches a real account. This is deliberate: a different response for
     unknown emails would let attackers enumerate which addresses have
     accounts. Slightly worse UX for typos, much better security posture.
-    Rate-limited by limit_auth.
+    Rate-limited by limit_auth, and padded to a constant time floor so the
+    uniform body isn't undone by a non-uniform latency.
     """
+    started = time.monotonic()
     email = body.email.lower().strip()
-    r = await session.execute(select(User).where(User.email == email))
-    user = r.scalar_one_or_none()
+
+    # Look the address up BOTH as typed and in the canonical form signup
+    # stores. signup writes normalise_email(body.email) (see the signup
+    # handler), which strips dots and +tags for Gmail/Outlook-family domains —
+    # so a user who registered "bob.smith@gmail.com" is on file as
+    # "bobsmith@gmail.com" and an exact-match lookup here silently missed them.
+    # The endpoint still answered {"status": "sent"}, so the account was
+    # unrecoverable through the UI with no error to report. Both candidates go
+    # into ONE query: two sequential SELECTs would reintroduce the timing
+    # difference this endpoint is trying to erase. Storage is unchanged; only
+    # the lookup widened, and an exact hit still wins over a canonical one.
+    candidates = {email, normalise_email(body.email)}
+    rows = (
+        await session.execute(select(User).where(User.email.in_(candidates)))
+    ).scalars().all()
+    user = next((u for u in rows if u.email == email), None) or (
+        rows[0] if rows else None
+    )
+
     if user is not None and user.password_hash:
         # OAuth-only users (password_hash IS NULL) can't reset what they
         # never had — silently no-op for them too, same response as
         # unknown-email case, so we don't leak "this email signed up with
         # Google" either.
-        try:
-            from app.services.email import mint_and_send_password_reset
-            await mint_and_send_password_reset(session, user)
-        except Exception:
-            logger.exception("auth.password_reset_send_failed user=%s", user.id)
+        background.add_task(_send_password_reset_bg, user.id)
     else:
         logger.info("auth.forgot_password_noop email=%s", email)
+
+    remaining = _FORGOT_PASSWORD_FLOOR_SECONDS - (time.monotonic() - started)
+    if remaining > 0:
+        await asyncio.sleep(remaining)
     return {"status": "sent"}
 
 
@@ -728,8 +823,20 @@ async def signin(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     email = body.email.lower().strip()
-    result = await session.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+    # Same two-candidate lookup as /forgot-password. Signup normalises the
+    # address before storing it (Gmail dots and +tags collapse), so a user who
+    # signed up as "first.last@gmail.com" is stored as "firstlast@gmail.com"
+    # and an exact-match signin never found them — they could complete a
+    # password reset and STILL be unable to log in, which is the worst kind of
+    # broken: the recovery path appears to work. One IN query rather than two
+    # SELECTs so both branches stay the same shape; an exact hit still wins.
+    candidates = {email, normalise_email(body.email)}
+    rows = (
+        await session.execute(select(User).where(User.email.in_(candidates)))
+    ).scalars().all()
+    user = next((u for u in rows if u.email == email), None) or (
+        rows[0] if rows else None
+    )
     if user is None or not verify_password(body.password, user.password_hash):
         # Identical error message for both branches = no account enumeration
         raise HTTPException(401, "Invalid email or password")
@@ -753,6 +860,27 @@ class TwoFASigninBody(BaseModel):
     code: str = Field(..., min_length=6, max_length=20)
 
 
+# ---- Per-account 2FA guess budget -------------------------------------------
+#
+# limit_auth buckets on client IP alone (services/rate_limit.limit_auth), which
+# a distributed guesser sidesteps for free: every proxy gets its own auth:{ip}
+# bucket while NOTHING on the account side moves. A TOTP is 1e6 codes and
+# verify_totp accepts a ±1 step window, so ~333k guesses is the expected hit —
+# roughly half an hour across a thousand IPs, and a failed code neither burns
+# the mfa_token nor leaves a trace. This second bucket is keyed on the ACCOUNT,
+# so the budget being spent belongs to the victim rather than the attacker, and
+# a distributed guesser exhausts it just as fast as a single host would.
+#
+# Reuses the existing in-process TokenBucket rather than adding a
+# users.failed_2fa_attempts column: no migration needed, and the bucket refills
+# on its own so there is no lockout for support to clear by hand. It inherits
+# limit_auth's known limitation — the counter is per Fly machine, so the true
+# ceiling is TWOFA_MAX_ATTEMPTS × (running machines). One machine today; move
+# both to a shared store together when we scale out.
+TWOFA_MAX_ATTEMPTS = 5
+TWOFA_WINDOW_SECONDS = 900
+
+
 @router.post("/2fa", dependencies=[Depends(limit_auth)])
 async def signin_2fa(
     body: TwoFASigninBody,
@@ -770,6 +898,20 @@ async def signin_2fa(
     user_id = verify_mfa_token(body.mfa_token)
     if not user_id:
         raise HTTPException(401, "Your verification window expired. Please sign in again.")
+
+    # Per-account guess budget — see TWOFA_MAX_ATTEMPTS above. Consumed before
+    # the code is checked (and before the user row is loaded) so a locked-out
+    # account costs the attacker a 429 and nothing else.
+    if not await limiter.consume(
+        f"2fa:{user_id}", TWOFA_MAX_ATTEMPTS, TWOFA_WINDOW_SECONDS
+    ):
+        logger.warning("auth.2fa_attempt_cap_hit user=%s", user_id)
+        raise HTTPException(
+            429,
+            "Too many verification attempts on this account. "
+            "Wait a few minutes, then sign in again.",
+        )
+
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None or not user.mfa_enabled or not user.totp_secret:

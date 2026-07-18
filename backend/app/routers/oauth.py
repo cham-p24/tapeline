@@ -16,6 +16,11 @@ return 503 so the UI can fall back.
     JWT (decoded without signature verification because we just sourced
     it directly from Apple's token endpoint over TLS).
 
+**Microsoft** additionally requires the `xms_edov` optional claim to be added
+to the app registration before sign-in will work at all — see
+`_microsoft_identity` for why (nOAuth) and for the exact portal steps. Without
+it every Microsoft sign-in is refused, by design.
+
 To enable Apple Sign-In, the operator needs an Apple Developer Program
 membership ($99/yr), a Services ID, a registered redirect URL, and a
 .p8 private key (Apple Developer portal -> Certificates -> Keys ->
@@ -185,6 +190,151 @@ def _apple_client_secret() -> str | None:
     except Exception:
         logger.exception("oauth.apple.client_secret_mint_failed")
         return None
+
+
+def _truthy_claim(value: object) -> bool:
+    """Entra optional claims arrive as bool, int or string depending on the
+    token version, so normalise before trusting one. Only an explicit
+    true/1 counts — anything else (absent, false, "", "False") is a no."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value == 1
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1"}
+    return False
+
+
+def _microsoft_identity(id_token: str | None, client_id: str) -> tuple[str, str | None]:
+    """Resolve (email, name) for a Microsoft sign-in from the ID token alone.
+
+    **nOAuth.** This callback used to read the identity straight out of the
+    Graph `/v1.0/me` response body:
+
+        email = (profile.get("email") or profile.get("mail") or "").lower()
+
+    `mail` is a *writable directory attribute*. Any Entra tenant admin — and a
+    free trial tenant costs nothing — can set it to an address in a domain they
+    do not own (e.g. `owner@tapeline.io`, the seeded admin), and Graph returns
+    it verbatim. Because we register against the `/common/` multi-tenant
+    endpoints, Microsoft will happily issue an authorization code for that
+    foreign tenant; the callback then matched the real user row by email and
+    minted that user's session. That is the published nOAuth account-takeover
+    pattern (disclosed 2023, still the #1 Entra integration bug).
+
+    The fix is Microsoft's own documented mitigation: never treat a
+    provider-supplied email string as an identity assertion unless the issuer
+    states that the tenant proved it owns the domain. That statement is the
+    `xms_edov` ("email domain owner verified") optional claim. We require it,
+    and refuse the sign-in when it is absent or false rather than guessing.
+
+    OPERATOR NOTE — `xms_edov` is an *optional* claim and is not emitted until
+    it is added to the app registration (Azure portal -> App registrations ->
+    Token configuration -> Add optional claim -> ID -> `xms_edov`, plus
+    `email`). Until that is done every Microsoft sign-in fails closed here.
+    That is deliberate: Microsoft OAuth has never been enabled in production
+    (no client id/secret on Fly), so there is nothing to regress, and shipping
+    it un-mitigated is exactly what this guard exists to prevent.
+
+    We still do not verify the token signature — same reasoning as the Apple
+    branch below: the token arrived on a back-channel call we initiated to
+    Microsoft's canonical token endpoint over TLS, so the bytes are authentic.
+    nOAuth was never a forgery problem; it was trusting a claim that Microsoft
+    itself does not vouch for. `aud` and `exp` are still checked so a token
+    minted for a different app or a stale one can't be pasted through.
+    """
+    if not id_token:
+        raise HTTPException(400, "Microsoft returned no id_token")
+    try:
+        claims = jwt.decode(
+            id_token,
+            options={"verify_signature": False, "verify_aud": True, "verify_exp": True},
+            audience=client_id,
+        )
+    except Exception as exc:
+        raise HTTPException(400, "Failed to decode Microsoft id_token") from exc
+
+    # `sub` is the immutable, issuer-scoped subject — the only thing here that
+    # is safe to treat as an identity. We have nowhere to persist it yet (User
+    # has no provider/provider_subject columns), but its absence means a token
+    # shape we don't understand, so refuse rather than fall back to email.
+    if not claims.get("sub"):
+        raise HTTPException(400, "Microsoft id_token carries no subject claim")
+
+    if not _truthy_claim(claims.get("xms_edov")):
+        logger.warning(
+            "oauth.microsoft.unverified_email_rejected tid=%s sub=%s",
+            claims.get("tid"), claims.get("sub"),
+        )
+        raise HTTPException(
+            400,
+            "Microsoft did not confirm this account owns its email domain. "
+            "Sign in with your email and password instead.",
+        )
+
+    email = (claims.get("email") or "").lower().strip()
+    name = claims.get("name")
+    logger.info(
+        "oauth.microsoft.identity tid=%s sub=%s", claims.get("tid"), claims.get("sub"),
+    )
+    return email, (name.strip() or None) if isinstance(name, str) else None
+
+
+# ── MFA hand-off ─────────────────────────────────────────────────────────────
+
+MFA_HANDOFF_COOKIE = "tapeline_mfa_challenge"
+
+
+def _mfa_challenge_token(user_id: str) -> str:
+    """Thin wrapper around services/mfa.issue_mfa_token.
+
+    Imported lazily for the same reason routers/auth.py does it: services/mfa
+    pulls in pyotp + segno, which the OAuth path otherwise never needs.
+    """
+    from app.services.mfa import issue_mfa_token
+
+    return issue_mfa_token(user_id)
+
+
+def _mfa_handoff_cookie_kwargs() -> dict:
+    """Cookie carrying the 5-minute MFA challenge token from the OAuth callback
+    (api.tapeline.io) across to the sign-in page (tapeline.io).
+
+    Deliberately NOT httponly: /signin's JS has to read the token and POST it
+    to /api/auth/2fa in the request body, which is the contract the native
+    password path already uses. It is not a session — on its own it grants
+    nothing. It only attests that the first factor passed, and still needs a
+    live TOTP or recovery code to redeem (verify_session_token explicitly
+    rejects purpose="mfa" so it can never be replayed as a session cookie).
+
+    Why a cookie rather than `?mfa_token=` on the redirect URL: query strings
+    land in browser history, `Referer` headers and CDN/proxy access logs. Same
+    reason the `?next=` intent and the marketing attribution above ride
+    cookies through this round-trip instead of the URL.
+
+    Domain is borrowed from session_cookie_kwargs() so it is shared across the
+    apex + api subdomain in prod exactly like the session cookie, and stays
+    host-only on localhost in dev.
+    """
+    kw: dict = {
+        "max_age": 300,  # matches services/mfa.MFA_TOKEN_MINUTES (5 min)
+        "httponly": False,
+        "samesite": "lax",
+        "secure": settings.app_env != "development",
+        "path": "/",
+    }
+    domain = session_cookie_kwargs().get("domain")
+    if domain:
+        kw["domain"] = domain
+    return kw
+
+
+def _clear_oauth_cookies(resp: Response, provider: str) -> None:
+    """Burn the one-shot round-trip cookies once the callback has consumed
+    them — on every exit path, session or MFA challenge."""
+    resp.delete_cookie(f"oauth_state_{provider}", path="/")
+    resp.delete_cookie(f"oauth_next_{provider}", path="/")
+    resp.delete_cookie(f"oauth_attr_{provider}", path="/")
 
 
 def _provider_creds(name: str) -> tuple[str, str, str] | None:
@@ -372,7 +522,15 @@ async def oauth_callback(
                     name = (f"{fn} {ln}").strip() or None
                 except Exception:
                     name = None
+        elif provider == "microsoft":
+            # Identity comes from the ID token's issuer-verified claims, NOT
+            # from the Graph profile — see _microsoft_identity for the nOAuth
+            # write-up. We deliberately no longer call `/v1.0/me` at all: the
+            # attacker-controlled `mail`/`displayName` attributes were the
+            # whole vulnerability, and the id_token already carries `name`.
+            email, name = _microsoft_identity(id_token, cid)
         else:
+            # Google — standard OpenID userinfo endpoint.
             if not access_token:
                 raise HTTPException(400, "No access token in response")
             ui = await c.get(
@@ -381,8 +539,8 @@ async def oauth_callback(
             )
             ui.raise_for_status()
             profile = ui.json()
-            email = (profile.get("email") or profile.get("mail") or "").lower().strip()
-            name = profile.get("name") or profile.get("displayName")
+            email = (profile.get("email") or "").lower().strip()
+            name = profile.get("name")
 
     if not email:
         raise HTTPException(400, "OAuth provider did not return an email")
@@ -451,6 +609,34 @@ async def oauth_callback(
             await session.commit()
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
+    next_path = _safe_next(request.cookies.get(f"oauth_next_{provider}"))
+
+    # ── 2FA gate ─────────────────────────────────────────────────────────
+    # The native signin path refuses to mint a session for a TOTP-protected
+    # account (routers/auth.py: `if user.mfa_enabled and user.totp_secret` ->
+    # return an mfa_token instead of a cookie). This path did not, so anyone
+    # who reached the provider — a still-live Google session on a shared
+    # machine, a Workspace admin, a provider-side takeover — was logged
+    # straight in and the victim's authenticator was never consulted. A user
+    # who turns on 2FA reasonably expects it to cover every door.
+    #
+    # Only ever true for a returning user: /api/me/2fa/setup requires a
+    # password, and a brand-new OAuth row has password_hash=None.
+    if user.mfa_enabled and user.totp_secret:
+        logger.info("oauth.mfa_challenge provider=%s user=%s", provider, user.id)
+        resp = RedirectResponse(
+            f"{settings.app_url}/signin?{urlencode({'mfa': '1', 'next': next_path})}"
+        )
+        # No session cookie here — the challenge token in the hand-off cookie
+        # is exchanged for one at POST /api/auth/2fa once a code is supplied.
+        resp.set_cookie(
+            MFA_HANDOFF_COOKIE,
+            _mfa_challenge_token(user.id),
+            **_mfa_handoff_cookie_kwargs(),
+        )
+        _clear_oauth_cookies(resp, provider)
+        return resp
+
     # Issue session cookie + redirect to app. New OAuth signups pass through
     # /app/onboarding first (same flow as native signup). Existing users skip
     # straight to wherever they were headed. The `?next=` intent stashed by
@@ -458,7 +644,6 @@ async def oauth_callback(
     # honoured for BOTH — re-validated through _safe_next because the cookie
     # is client-writable; tampered values fall back to /app/scanner.
     token = issue_session_token(user.id)
-    next_path = _safe_next(request.cookies.get(f"oauth_next_{provider}"))
     if is_new:
         # Server-side `sign_up` conversion (GA4 Measurement Protocol). The
         # client-side beacon is the only record today, so a blocked or
@@ -528,7 +713,5 @@ async def oauth_callback(
         redirect_url = f"{settings.app_url}{next_path}"
     resp = RedirectResponse(redirect_url)
     resp.set_cookie(value=token, **session_cookie_kwargs())
-    resp.delete_cookie(f"oauth_state_{provider}", path="/")
-    resp.delete_cookie(f"oauth_next_{provider}", path="/")
-    resp.delete_cookie(f"oauth_attr_{provider}", path="/")
+    _clear_oauth_cookies(resp, provider)
     return resp
