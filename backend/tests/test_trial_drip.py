@@ -282,7 +282,7 @@ async def test_raising_drip_run_does_not_advance_latch(monkeypatch):
 
     calls = {"n": 0}
 
-    async def _boom(_session):
+    async def _boom(_session, **_kwargs):
         calls["n"] += 1
         raise RuntimeError("transient DB failure (simulated Neon cold-start)")
 
@@ -303,7 +303,7 @@ async def test_raising_drip_run_does_not_advance_latch(monkeypatch):
     assert calls["n"] == 1
 
     # Past the backoff the suite retries; a now-healthy run latches.
-    async def _zero(_session):
+    async def _zero(_session, **_kwargs):
         return defaultdict(int)
 
     for runner in (
@@ -320,7 +320,7 @@ async def test_raising_drip_run_does_not_advance_latch(monkeypatch):
     assert signal_publisher._last_drip_failed_at is None
 
     # Latched: the next tick inside the 24h window is a no-op.
-    async def _explode(_session):
+    async def _explode(_session, **_kwargs):
         raise AssertionError("drip ran again inside the 24h latch")
 
     monkeypatch.setattr(email_module, "run_daily_drip", _explode)
