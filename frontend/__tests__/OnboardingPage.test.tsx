@@ -24,19 +24,13 @@ vi.mock("@vercel/analytics", () => ({
 }));
 
 describe("OnboardingPage", () => {
-  it("renders the headline + all five question prompts", () => {
+  it("renders the headline + the three remaining question prompts", () => {
     render(<OnboardingPage />);
     expect(
       screen.getByRole("heading", { name: /tell us a bit about you/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/what's your investing experience\?/i),
-    ).toBeInTheDocument();
-    expect(
       screen.getByText(/how do you typically trade\?/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/roughly what size portfolio do you run\?/i),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/which sectors are you most interested in\?/i),
@@ -44,6 +38,21 @@ describe("OnboardingPage", () => {
     expect(
       screen.getByText(/how did you hear about tapeline\?/i),
     ).toBeInTheDocument();
+  });
+
+  // Regression guard for the Rule 8 removal in #360. Investing experience and
+  // portfolio/capital size are suitability data — collecting them is one of the
+  // inputs that turns general information into personal financial advice. These
+  // prompts must never come back. See docs/COMPLIANCE_COPY_RULES.md.
+  it("does NOT ask for investing experience or portfolio size (suitability data)", () => {
+    render(<OnboardingPage />);
+    expect(
+      screen.queryByText(/what's your investing experience\?/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/roughly what size portfolio do you run\?/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/portfolio/i)).not.toBeInTheDocument();
   });
 
   it("renders both Save and Skip controls so the form is never forced", () => {
