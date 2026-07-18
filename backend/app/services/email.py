@@ -60,6 +60,12 @@ from app.services.email_design import (
 # single source of truth) instead of hardcoding numbers means a freemium
 # retune can never leave the drip emails selling against a Free tier that no
 # longer exists (which is exactly what happened after the 2026-06-20 retune).
+# The global frequency governor. Every non-transactional send in this module
+# routes through it so no user can receive colliding messages from two flows
+# that don't know about each other. Safe to import at module scope: lifecycle
+# imports nothing from here (its only app import is a TYPE_CHECKING-guarded
+# models reference), so there's no cycle.
+from app.services.lifecycle import FrequencyGovernor, SendClass
 from app.services.tier import (
     FREE_DAILY_LOOKUPS,
     FREE_SCANNER_ROWS,
@@ -67,13 +73,6 @@ from app.services.tier import (
     FREE_WEB_PUSH_ALERTS,
 )
 from app.services.universe import ACTIVE_UNIVERSE_SIZE
-
-# The global frequency governor. Every non-transactional send in this module
-# routes through it so no user can receive colliding messages from two flows
-# that don't know about each other. Safe to import at module scope: lifecycle
-# imports nothing from here (its only app import is a TYPE_CHECKING-guarded
-# models reference), so there's no cycle.
-from app.services.lifecycle import FrequencyGovernor, SendClass
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -2593,7 +2592,6 @@ async def run_daily_drip(
                     # batch-wide duplicate send on the next run).
                     await session.commit()
                     counts[label] += 1
-                    any_sent = True
                     if governor is not None:
                         governor.record(user, SendClass.LIFECYCLE)
             except Exception:
@@ -2643,7 +2641,6 @@ async def run_daily_drip(
                 user.drip_state = ",".join(sorted(sent_tokens))
                 await session.commit()
                 counts["lapse30"] += 1
-                any_sent = True
                 if governor is not None:
                     governor.record(user, SendClass.LIFECYCLE)
         except Exception:
@@ -2993,7 +2990,6 @@ async def run_weekly_newsletter(
                 # Commit per user, inside the try — see run_daily_drip.
                 await session.commit()
                 sent += 1
-                any_changes = True
                 if governor is not None:
                     governor.record(user, SendClass.SCHEDULED)
         except Exception:

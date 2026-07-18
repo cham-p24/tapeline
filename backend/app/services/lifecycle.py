@@ -58,7 +58,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -122,7 +122,7 @@ def _tokens(drip_state: str | None) -> set[str]:
 
 # ── Lifecycle stage ─────────────────────────────────────────────────────────
 
-class LifecycleStage(str, Enum):
+class LifecycleStage(StrEnum):
     """Where a user sits in the lifecycle, resolved from durable columns.
 
     Deliberately coarse. The stage answers "what kind of message is even
@@ -248,7 +248,7 @@ def resolve_stage(
 
 # ── Send classes ────────────────────────────────────────────────────────────
 
-class SendClass(str, Enum):
+class SendClass(StrEnum):
     """How the governor treats a given send.
 
     TRANSACTIONAL — account state the user cannot opt out of (welcome, email
