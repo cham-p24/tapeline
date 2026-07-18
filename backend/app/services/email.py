@@ -101,6 +101,7 @@ async def send_email(
     persona: EmailPersona = "default",
     unsubscribe_user_id: str | None = None,
     unsubscribe_category: str = "all",
+    headers: dict[str, str] | None = None,
     skip_if_undeliverable: bool = True,
 ) -> dict[str, Any]:
     """Send a single email via Resend. Returns the Resend response or raises.
@@ -119,6 +120,12 @@ async def send_email(
     payment-failed, verification, subscription-started) should NOT pass
     these — they're account-state notifications the user can't opt out
     of, and adding the header would mislead Gmail's classifier.
+
+    `headers` is a raw passthrough for senders whose recipients aren't
+    Users and so have no HMAC unsubscribe token — currently the newsletter
+    list, which keys its opt-out off NewsletterSubscriber.unsubscribe_token
+    (see services/newsletter.py). `unsubscribe_user_id` wins on key
+    collisions, since that path is the audited one.
 
     `skip_if_undeliverable` defaults True — checks `User.email_undeliverable_at`
     via the email address (one extra DB query per send, acceptable at our
@@ -173,6 +180,12 @@ async def send_email(
     if text:
         payload["text"] = text
 
+    # Caller-supplied headers (newsletter List-Unsubscribe, etc). Copied so
+    # we never mutate the caller's dict; the user-keyed path below may add to
+    # or override these.
+    if headers:
+        payload["headers"] = dict(headers)
+
     # RFC 8058 / 2369 List-Unsubscribe headers for marketing categories.
     # Gmail + Outlook render a native unsubscribe button when both headers
     # are present and the URL resolves on POST. Omitted when session_secret
@@ -185,7 +198,9 @@ async def send_email(
                 unsubscribe_user_id, unsubscribe_category,
             )
             if extra_headers:
-                payload["headers"] = extra_headers
+                payload["headers"] = {
+                    **payload.get("headers", {}), **extra_headers,
+                }
         except Exception:
             logger.exception(
                 "email.unsubscribe_header_failed user=%s",
@@ -1836,24 +1851,55 @@ def render_annual_upgrade_email(user_name: str, *, tier: str) -> str:
 # expires and a renewal declines into the dunning sequence.
 
 def render_annual_renewal_reminder_email(
-    user_name: str, *, tier: str, amount_label: str, renew_date_label: str,
+    user_name: str, *, tier: str, amount_label: str | None, renew_date_label: str,
 ) -> str:
     """T-7 heads-up before an ANNUAL plan auto-renews. Gives a clean window to
-    update a card or cancel, and stops the renewal charge being a surprise."""
+    update a card or cancel, and stops the renewal charge being a surprise.
+
+    `amount_label` MUST be the amount Stripe will actually charge (from the
+    upcoming-invoice preview), not the current sticker price — grandfathered,
+    coupon'd and proration-adjusted subscriptions renew at a different figure.
+    Pass None when it can't be determined: the email then points the customer
+    at billing for the exact number instead of quoting a wrong one.
+    """
     tier_label = tier.capitalize()
-    return shell(
-        h1(f"Your {tier_label} plan renews {renew_date_label}.")
-        + lead(
+    if amount_label:
+        lead_copy = (
             f"{user_name}, a quick heads-up so it's never a surprise: your "
             f"Tapeline {tier_label} annual plan renews on {renew_date_label} "
             f"for {amount_label}. It renews automatically — you don't need to "
             "do anything."
         )
+        detail_copy = (
+            f'<strong>{amount_label}</strong> on <strong>{renew_date_label}</strong> '
+            f"&middot; {tier_label} annual. "
+            "Want to switch plans, update your card, or cancel? It's all one click from billing."
+        )
+        preheader_copy = (
+            f"Your Tapeline {tier_label} plan renews {renew_date_label} "
+            f"for {amount_label} — nothing to do."
+        )
+    else:
+        lead_copy = (
+            f"{user_name}, a quick heads-up so it's never a surprise: your "
+            f"Tapeline {tier_label} annual plan renews on {renew_date_label}. "
+            "It renews automatically — you don't need to do anything."
+        )
+        detail_copy = (
+            f'Renews <strong>{renew_date_label}</strong> &middot; {tier_label} annual. '
+            "Your exact renewal amount is on the billing page — that's also where "
+            "you can switch plans, update your card, or cancel."
+        )
+        preheader_copy = (
+            f"Your Tapeline {tier_label} plan renews {renew_date_label} — nothing to do."
+        )
+    return shell(
+        h1(f"Your {tier_label} plan renews {renew_date_label}.")
+        + lead(lead_copy)
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Upcoming renewal</div>'
             f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
-            f'<strong>{amount_label}</strong> on <strong>{renew_date_label}</strong> &middot; {tier_label} annual. '
-            "Want to switch plans, update your card, or cancel? It's all one click from billing.</p>"
+            f"{detail_copy}</p>"
             + button(
                 "Manage billing",
                 "https://tapeline.io/app/billing?utm_source=email&utm_campaign=renewal_reminder&utm_medium=transactional",
@@ -1864,7 +1910,7 @@ def render_annual_renewal_reminder_email(
             "makes sure the charge never catches you off guard."
         )
         + footnote("Questions about your bill? Reply to this email — billing@tapeline.io reads every one."),
-        preheader=f"Your Tapeline {tier_label} plan renews {renew_date_label} for {amount_label} — nothing to do.",
+        preheader=preheader_copy,
     )
 
 
@@ -3165,6 +3211,85 @@ async def run_annual_nudge_drip(session) -> dict[str, int]:
     return counts
 
 
+_ZERO_DECIMAL_CURRENCIES = frozenset({
+    "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
+    "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf",
+})
+
+
+def _format_money(amount_minor: int, currency: str) -> str:
+    """Render a Stripe minor-unit amount for display. USD → "$199.00"."""
+    code = (currency or "usd").lower()
+    if code in _ZERO_DECIMAL_CURRENCIES:
+        value, text = float(amount_minor), f"{amount_minor:,}"
+    else:
+        value = amount_minor / 100
+        text = f"{value:,.2f}"
+    if code == "usd":
+        return f"${text}"
+    return f"{text} {code.upper()}"
+
+
+async def upcoming_renewal_amount_label(
+    customer_id: str | None, subscription_id: str | None,
+) -> str | None:
+    """The amount Stripe will ACTUALLY charge at the next renewal, formatted.
+
+    Reads Stripe's upcoming-invoice preview so the figure reflects what's
+    genuinely on file — grandfathered/legacy prices, active coupons and
+    discounts, credit balance, proration. The public sticker price
+    (`tier.TIER_PRICES`) is *not* a safe substitute: quoting it would tell a
+    discounted or grandfathered customer the wrong renewal amount.
+
+    Returns None whenever the real figure can't be established (Stripe not
+    configured, no customer/subscription id, API error, unexpected payload).
+    Callers must then omit the amount rather than fall back to sticker price.
+    """
+    if not customer_id or not subscription_id:
+        return None
+    settings_ = get_settings()
+    if not settings_.stripe_secret_key:
+        return None
+    try:
+        import asyncio
+
+        import stripe
+
+        invoice = await asyncio.to_thread(
+            stripe.Invoice.create_preview,
+            customer=customer_id,
+            subscription=subscription_id,
+        )
+    except Exception:
+        logger.warning(
+            "renewal_reminder.upcoming_invoice_failed customer=%s sub=%s",
+            customer_id, subscription_id, exc_info=True,
+        )
+        return None
+
+    def _field(key: str) -> Any:
+        if isinstance(invoice, dict):
+            return invoice.get(key)
+        return getattr(invoice, key, None)
+
+    # amount_due is post-discount / post-credit — the real charge. Fall back
+    # to total only if amount_due is absent.
+    raw = _field("amount_due")
+    if raw is None:
+        raw = _field("total")
+    if raw is None:
+        return None
+    try:
+        minor = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if minor <= 0:
+        # $0 renewals (full credit / 100% coupon) — say nothing rather than
+        # print "$0.00" next to copy about a charge.
+        return None
+    return _format_money(minor, str(_field("currency") or "usd"))
+
+
 async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
     """Courtesy heads-up ~7 days before an ANNUAL plan auto-renews.
 
@@ -3173,6 +3298,11 @@ async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
     `Subscription.billing_period` column (added 0031) — no period-length
     inference needed. Transactional: always sent (no email_prefs gate, no
     List-Unsubscribe), persona "billing".
+
+    The quoted amount comes from Stripe's upcoming-invoice preview (see
+    `upcoming_renewal_amount_label`) so discounted/grandfathered subscribers
+    are told what they'll actually be charged. If Stripe can't be reached the
+    reminder still sends, minus the figure.
 
     Dedup is per renewal CYCLE via a date-stamped token "renA{YYMMDD}" keyed on
     current_period_end — so the reminder fires once each year (a fresh period
@@ -3185,7 +3315,6 @@ async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
     from sqlalchemy import select
 
     from app.models import Subscription, User
-    from app.services.tier import TIER_PRICES
 
     now = datetime.now(UTC)
     counts = {"renewal_reminder": 0}
@@ -3219,8 +3348,14 @@ async def run_annual_renewal_reminder_drip(session) -> dict[str, int]:
             handled.add(user.id)
             continue
         tier = (sub.tier or user.tier or "pro").lower()
-        price = TIER_PRICES.get((tier, "annual"))
-        amount_label = f"${price:,.2f}" if price else "your annual rate"
+        # The amount Stripe will really charge — NOT the current sticker
+        # price. Grandfathered/legacy prices, coupons and credit balances all
+        # make TIER_PRICES wrong for real subscribers. None → the renderer
+        # omits the figure and points at billing instead of stating one that
+        # doesn't match the card statement.
+        amount_label = await upcoming_renewal_amount_label(
+            user.stripe_customer_id, sub.id,
+        )
         # Portable day-without-leading-zero (Windows strftime lacks %-d).
         renew_date_label = f"{cpe.strftime('%B')} {cpe.day}, {cpe.year}"
         try:

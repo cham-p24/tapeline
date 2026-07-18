@@ -10,12 +10,16 @@ from svix.webhooks import Webhook, WebhookVerificationError
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import StripeWebhookEvent, Subscription, User
+from app.models import NewsletterSubscriber, StripeWebhookEvent, Subscription, User
 from app.services.billing import parse_webhook, subscription_payload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+
+# Tier precedence, mirroring services/tier.py:_ORDER. Used to pick which tier
+# a user keeps when a cancelled subscription leaves other live ones behind.
+_TIER_RANK = {"free": 0, "pro": 1, "premium": 2}
 
 
 @router.post("/clerk")
@@ -394,12 +398,73 @@ async def stripe_webhook(
 
     elif evt_type == "customer.subscription.deleted":
         customer_id = obj["customer"]
+        sub_id = obj.get("id")
+
+        # Record the cancellation on the Subscription row itself. Without
+        # this the row stays "active" forever: the admin revenue dashboard
+        # (routers/admin.py counts Subscription.status in active/trialing)
+        # keeps billing a dead sub into MRR, and the remaining-subscription
+        # check below would see a phantom live sub.
+        cancelled_row: Subscription | None = None
+        if sub_id:
+            sub_result = await session.execute(
+                select(Subscription).where(Subscription.id == sub_id)
+            )
+            cancelled_row = sub_result.scalar_one_or_none()
+            if cancelled_row is not None:
+                cancelled_row.status = str(obj.get("status") or "canceled")
+                cancelled_row.cancel_at_period_end = False
+
         result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
+        if not user:
+            # Same metadata fallback as the created/updated branch above: in
+            # the duplicate-checkout case the older subscription's customer no
+            # longer maps to any user by column, so its cancellation would be
+            # dropped entirely. Fall back to the user_id we stamp into
+            # subscription metadata at checkout-session create.
+            meta_user_id = (obj.get("metadata") or {}).get("user_id")
+            if meta_user_id:
+                result = await session.execute(select(User).where(User.id == meta_user_id))
+                user = result.scalar_one_or_none()
+            if not user and cancelled_row is not None:
+                result = await session.execute(
+                    select(User).where(User.id == cancelled_row.user_id)
+                )
+                user = result.scalar_one_or_none()
+            if user:
+                logger.warning(
+                    "stripe.deleted_resolved_via_fallback customer=%s user=%s sub=%s",
+                    customer_id, user.id, sub_id,
+                )
+
         if user:
-            user.tier = "free"
-            await session.commit()
-            logger.info("stripe.subscription_cancelled user=%s", user.id)
+            # Only drop to free if NO other subscription of theirs is still
+            # live. A duplicate-conversion user holds two subs; cancelling one
+            # must not strand the other (still-charging) one at Free tier.
+            # past_due counts as live — the dunning branch above deliberately
+            # keeps those customers on their paid tier while Stripe retries.
+            conditions = [
+                Subscription.user_id == user.id,
+                Subscription.status.in_(("active", "trialing", "past_due")),
+            ]
+            if sub_id:
+                conditions.append(Subscription.id != sub_id)
+            remaining = await session.execute(select(Subscription).where(*conditions))
+            live_subs = remaining.scalars().all()
+            if live_subs:
+                best = max(live_subs, key=lambda s: _TIER_RANK.get(s.tier, 0))
+                user.tier = best.tier
+                logger.warning(
+                    "stripe.subscription_cancelled_but_still_subscribed "
+                    "user=%s cancelled=%s kept_tier=%s remaining=%d",
+                    user.id, sub_id, best.tier, len(live_subs),
+                )
+            else:
+                user.tier = "free"
+                logger.info("stripe.subscription_cancelled user=%s sub=%s", user.id, sub_id)
+
+        await session.commit()
 
     elif evt_type == "invoice.payment_failed":
         # Card declined on a renewal charge — dunning. Email the customer a
@@ -564,6 +629,12 @@ async def resend_webhook(
     sender reputation fast. We stamp `User.email_undeliverable_at` and
     `send_email` short-circuits future sends to that address.
 
+    Newsletter subscribers live in their OWN table (most never create a
+    `users` row), so the User stamp alone doesn't stop the daily Top 10
+    digest — it selects on `NewsletterSubscriber.status == "confirmed"`.
+    We therefore flip the subscriber row to `unsubscribed` as well, which
+    is the same terminal state the one-click unsubscribe link writes.
+
     Resend uses Svix for webhook signing — same library as Clerk above.
     Without `RESEND_WEBHOOK_SECRET` configured the endpoint returns 204
     No Content, which silently no-ops the webhook. The OLD behaviour
@@ -577,9 +648,11 @@ async def resend_webhook(
     which is already the existing state when the secret is missing.
 
     Events we handle:
-      email.bounced     — set email_undeliverable_at to now()
+      email.bounced     — set email_undeliverable_at to now(); unsubscribe
+                          any matching newsletter subscriber
       email.complained  — set email_undeliverable_at + clear all email_prefs
-                          + clear marketing_opt_in (spam-flag IS opt-out)
+                          + clear marketing_opt_in (spam-flag IS opt-out);
+                          unsubscribe any matching newsletter subscriber
 
     Other events (delivered, opened, clicked, sent, delivery_delayed)
     are ignored — they're useful for analytics later but not for this
@@ -618,6 +691,21 @@ async def resend_webhook(
 
     affected = 0
     for addr in recipients:
+        if evt_type in ("email.bounced", "email.complained"):
+            # Suppress the newsletter list independently of `users` — the
+            # two tables overlap only for subscribers who later signed up.
+            sub_r = await session.execute(
+                select(NewsletterSubscriber).where(NewsletterSubscriber.email == addr)
+            )
+            subscriber = sub_r.scalar_one_or_none()
+            if subscriber is not None and subscriber.status != "unsubscribed":
+                subscriber.status = "unsubscribed"
+                subscriber.unsubscribed_at = now
+                affected += 1
+                logger.warning(
+                    "resend.newsletter_suppressed addr=%s reason=%s", addr, evt_type,
+                )
+
         r = await session.execute(select(User).where(User.email == addr))
         user = r.scalar_one_or_none()
         if user is None:
