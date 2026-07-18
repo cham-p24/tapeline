@@ -9,6 +9,7 @@ import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
 import { UtmCapture } from "@/components/UtmCapture";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { GeneralInformationNotice } from "@/components/GeneralInformationNotice";
 import { PRICING, usd } from "@/lib/pricing";
 import {
   jsonLdScript,
@@ -181,6 +182,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PostHogProvider>{children}</PostHogProvider>
           </UserProvider>
         </ThemeProvider>
+        {/* Persistent general-information statement — rendered on every route
+            (marketing, signed-in app, checkout, error pages) rather than only
+            on pages that happen to include MarketingFooter. Inside the
+            providers' sibling position so it is never conditionally mounted.
+            NOTE (Rule 9): this is additional to compliant copy, not a
+            substitute for it — see the component's own header comment and
+            docs/COMPLIANCE_COPY_RULES.md. */}
+        <GeneralInformationNotice />
         {/* First-touch UTM capture — runs once per page-load and writes
             ?utm_* query params to localStorage with a 30-day TTL. The
             signup page + newsletter capture component both read this
