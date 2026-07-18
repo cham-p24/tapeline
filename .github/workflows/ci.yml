@@ -7,6 +7,26 @@ on:
     branches: [main]
 
 jobs:
+  # Copy-compliance gate. Blocks any change that reintroduces a performance
+  # claim, an evaluative adjective on a security, manufactured urgency, or a
+  # vs-SPY figure in a headline slot. See docs/COMPLIANCE_COPY_RULES.md.
+  #
+  # Runs first and depends on nothing: no npm install, no pip, no lockfile —
+  # bare Node, so it stays fast and cannot be broken by an unrelated dependency
+  # problem. A compliance gate that is flaky is a compliance gate that gets
+  # marked non-required.
+  copy-compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Linter self-tests
+        run: node --test scripts/lint-copy-compliance.test.mjs
+      - name: Copy-compliance lint
+        run: node scripts/lint-copy-compliance.mjs
+
   backend:
     runs-on: ubuntu-latest
     defaults:

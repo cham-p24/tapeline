@@ -1,0 +1,138 @@
+{
+  "_readme": [
+    "Scope + allowlist for scripts/lint-copy-compliance.mjs.",
+    "",
+    "'include' / 'exclude' define what counts as user-facing copy. Keep this",
+    "tight: linting engineering internals produces noise, and a noisy linter",
+    "gets disabled.",
+    "",
+    "'allow' entries are EXEMPTIONS. Every entry needs a written 'reason' — the",
+    "linter refuses to run if one is missing. An exemption is a decision someone",
+    "has to defend later, so it should read like a decision, not like a mute.",
+    "Match on any combination of: file (glob), rule (id or '*'), phrase (substring",
+    "of the matched text). Narrower is better — prefer file+rule+phrase over a",
+    "blanket file exemption.",
+    "",
+    "See docs/COMPLIANCE_COPY_RULES.md."
+  ],
+
+  "include": [
+    "frontend/app/**/*.tsx",
+    "frontend/app/**/*.ts",
+    "frontend/components/**/*.tsx",
+    "frontend/lib/**/*.ts",
+    "backend/app/services/email*.py",
+    "backend/app/services/inbox_templates.py",
+    "backend/app/services/**/*template*.py"
+  ],
+
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/__tests__/**",
+    "**/e2e/**",
+    "frontend/app/**/opengraph-image.tsx",
+    "frontend/app/**/icon.tsx"
+  ],
+
+  "allow": [
+    {
+      "file": "frontend/app/legal/**",
+      "rule": "*",
+      "reason": "The legal pages exist to DESCRIBE the constraints — /legal/risk has to be able to say 'we do not guarantee returns' and 'past performance is not indicative of future performance'. Negating a prohibited claim requires naming it. These pages are hand-reviewed, not templated, so the replication risk that motivates the linter does not apply."
+    },
+    {
+      "file": "frontend/app/how-it-works/**",
+      "rule": "derived-performance-stat",
+      "phrase": "backtest",
+      "reason": "The methodology page explains that scores are computed forward-only and that we do NOT publish backtests. Rule 4 prohibits publishing derived performance statistics, not disclosing their absence."
+    },
+    {
+      "rule": "performance-claim",
+      "phrase": "money-back",
+      "reason": "'30-day money-back guarantee' is a factual refund term, not a returns promise. Belt-and-braces: the 'guaranteed' patterns are already gated on returns/profit/gains nouns so this should not fire, but the exemption documents the intent."
+    },
+    {
+      "file": "frontend/components/TrialBanner.tsx",
+      "rule": "urgency-scarcity",
+      "reason": "Rule 6's single exception: a factual statement about the user's OWN real trial expiry. The banner reports days remaining on a trial the user actually started. NOTE — a separate finding stands against this file's escalating red styling (see PR body); the exemption covers the FACT of the countdown text, not the alarm styling."
+    },
+    {
+      "file": "frontend/components/UpgradeNudge.tsx",
+      "rule": "urgency-scarcity",
+      "phrase": "expires in",
+      "reason": "Same Rule 6 trial-expiry exception — reports the user's own real trial end date."
+    }
+  ],
+
+  "_knownViolations_readme": [
+    "PRE-EXISTING findings, carried so the linter can be switched on TODAY without",
+    "a repo-wide copy rewrite (which would collide with work in flight).",
+    "",
+    "These are NOT exemptions. They print on every run and are listed in the PR",
+    "that introduced this linter. The ledger is meant to shrink to zero. Adding a",
+    "NEW entry here to get a build green is an abuse of the mechanism — fix the",
+    "copy instead.",
+    "",
+    "Entries are pinned by file+rule+phrase so that new violations of the same",
+    "rule in the same file still fail the build."
+  ],
+
+  "knownViolations": [
+    {
+      "file": "backend/app/services/email.py",
+      "rule": "performance-claim",
+      "phrase": "best pick",
+      "reason": "PRIORITY. Trial-summary and recap emails render 'Best pick this trial: <SYM> · alpha vs SPY +N%'. This is a superlative evaluative label on a specific security inside a 1:1 templated email, and it reports how a security performed — Rules 1, 2 and 7. Needs a copy fix by the email owner (suggested: drop the superlative and report activity, e.g. 'N picks logged during your trial'). Not fixed here to avoid colliding with concurrent email work."
+    },
+    {
+      "file": "frontend/app/app/onboarding/page.tsx",
+      "rule": "prohibited-data-collection",
+      "reason": "PRIORITY. Onboarding asks 'What's your investing experience?' and 'Roughly what size portfolio do you run?' with capital bands. Rule 8 prohibits collecting experience level and portfolio size outright — this is the finding most likely to be treated as building a suitability profile. Requires a product decision (remove the questions and the stored fields), not a copy tweak, so it is escalated in the PR rather than patched here."
+    },
+    {
+      "file": "frontend/app/scorecard/page.tsx",
+      "rule": "performance-claim",
+      "phrase": "beat the market",
+      "reason": "Glossary row defining the alpha column ('Positive = beat the market; negative = lagged it'). Definitional rather than promotional, but 'beat the market' is a Rule 1 banned phrase and a neutral rewrite exists ('Positive = ahead of SPY that session; negative = behind'). Owned by the scorecard workstream."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "performance-claim",
+      "phrase": "beat the market",
+      "reason": "Editorial critique quoting what competitors claim ('Every stock scanner claims to beat the market. Almost none publish a track record you can audit'). The phrase is used to attack the claim, not make it. Low risk; left in place pending an editorial pass."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "performance-claim",
+      "phrase": "strong buy",
+      "reason": "Names Zacks' own published rating label ('Strong Buy') in a comparison. Naming a competitor's product feature is not Tapeline rating a security."
+    },
+    {
+      "file": "frontend/app/compare/tradingview/page.tsx",
+      "rule": "performance-claim",
+      "phrase": "strong buy",
+      "reason": "Names TradingView's technical-rating output ('Buy/Sell/Strong Buy from technicals only') in a feature-comparison row. Describes a competitor's UI, not a Tapeline recommendation."
+    },
+    {
+      "file": "frontend/app/congressional-trades/page.tsx",
+      "rule": "performance-claim",
+      "phrase": "beaten the market",
+      "reason": "Reports the academic literature on congressional trading ('studies are mixed; some senate trades have historically beaten the market') and immediately disclaims that Tapeline makes no such claim. Statement about third-party research, not about Tapeline. Flagged for an editorial pass to soften the phrasing."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "evaluative-adjective",
+      "phrase": "strong name",
+      "reason": "Hand-written editorial ('a fundamentally strong name that the market hasn't priced in'). A genuine Rule 2 evaluative adjective, but in one-off prose rather than a template, so it does not replicate. Queued for the editorial pass."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "derived-performance-stat",
+      "phrase": "back-tested results",
+      "reason": "Quotes the phrase in order to criticise it ('the \"back-tested results\" in marketing ... don't actually track it'). Tapeline publishes no backtest; the post argues against relying on them."
+    }
+  ]
+}
