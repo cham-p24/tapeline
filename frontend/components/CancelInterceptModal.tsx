@@ -9,17 +9,26 @@ import { FREE_LIMITS } from "@/lib/pricing";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 /**
- * Cancel-intercept modal — the retention play that fires when a paid user
- * clicks "Cancel subscription" on /app/billing.
+ * Cancel-intercept modal — shown when a paid user clicks "Cancel subscription"
+ * on /app/billing.
  *
- * Flow (best-practice save funnel, in order of decreasing value to us):
- *   1. menu   — offer the 50%-off-3-months save coupon + a 1-3 month pause
- *               BEFORE letting them cancel. If they take either, they never
- *               reach the cancel call.
- *   2. survey — only if they decline: a one-question exit survey (reason +
- *               optional free-text) that feeds the churn dashboard.
- *   3. done   — terminal confirmation, copy varies by what actually happened
- *               (saved / paused / resumed / canceled).
+ * TRUE ONE-CLICK CANCEL (founder decision): the FIRST screen carries a
+ * clearly visible "Just cancel my subscription" button that performs the
+ * cancel immediately — no survey gate, no second confirm. The save offer and
+ * pause options stay on that same screen for anyone who wants them, but they
+ * never stand between the user and cancelling. This is what makes the
+ * "cancel in one click" claim across the site literally true.
+ *
+ * Flow:
+ *   1. menu — save offer + pause AND the direct cancel button, all on one
+ *             screen. Direct cancel calls POST /api/billing/cancel with an
+ *             empty body and jumps straight to the done screen.
+ *   2. done — terminal confirmation. For a cancellation it confirms the
+ *             end-of-period date from the API response and offers the exit
+ *             survey as a clearly OPTIONAL afterthought ("Mind telling us
+ *             why? (optional)") — submitting it is a second POST /cancel
+ *             that the backend treats as survey-capture only (no second
+ *             Stripe call, no second email).
  *
  * State is read live from GET /api/billing/retention-options so the modal
  * reflects an in-flight pause or an already-scheduled cancellation instead
@@ -69,14 +78,17 @@ export function CancelInterceptModal({
   onChanged?: () => void;
   tier: string;
 }) {
-  const [step, setStep] = useState<"menu" | "survey" | "done">("menu");
+  const [step, setStep] = useState<"menu" | "done">("menu");
   const [opts, setOpts] = useState<RetentionOptions | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ kind: DoneKind; detail?: string | null } | null>(null);
-  const [reason, setReason] = useState<string>("not_using");
+  // Post-cancel exit survey (optional). No preselected reason — a default
+  // radio would fabricate churn data from people who never chose anything.
+  const [reason, setReason] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [surveySent, setSurveySent] = useState(false);
 
   const tierLabel = (tier || "your").replace(/^\w/, (c) => c.toUpperCase());
 
@@ -89,6 +101,9 @@ export function CancelInterceptModal({
     setDone(null);
     setError(null);
     setBusy(null);
+    setReason(null);
+    setFeedback("");
+    setSurveySent(false);
     setLoading(true);
     track("cancel_intercept_shown", { tier });
     (async () => {
@@ -167,12 +182,22 @@ export function CancelInterceptModal({
       setStep("done");
     }, "resume");
 
-  const confirmCancel = () =>
-    action("/api/billing/cancel", { reason, feedback: feedback.trim() || null }, (d) => {
-      track("subscription_canceled", { tier, reason });
+  /** THE one-click cancel: fires from the first screen, empty body (the
+   *  survey comes after, optionally), straight to the confirmation. */
+  const directCancel = () =>
+    action("/api/billing/cancel", {}, (d) => {
+      track("subscription_canceled", { tier, via: "one_click" });
       setDone({ kind: "canceled", detail: d.period_end });
       setStep("done");
     }, "cancel");
+
+  /** Optional post-cancel survey. The backend treats a POST /cancel while a
+   *  cancellation is already scheduled as survey-capture only. */
+  const submitSurvey = () =>
+    action("/api/billing/cancel", { reason, feedback: feedback.trim() || null }, () => {
+      track("cancel_survey_submitted", { tier, reason: reason ?? "other" });
+      setSurveySent(true);
+    }, "survey");
 
   const pausedActive =
     opts?.paused_until && new Date(opts.paused_until).getTime() > Date.now();
@@ -191,7 +216,77 @@ export function CancelInterceptModal({
         {loading ? (
           <div className="py-10 text-center text-sm text-muted">Loading your plan…</div>
         ) : step === "done" && done ? (
-          <DonePanel done={done} onClose={onClose} />
+          done.kind === "canceled" ? (
+            /* Cancelled — descriptive confirmation with the real end-of-period
+               date from the API, then the OPTIONAL exit survey. Never a gate:
+               Close works at any point, survey or no survey. */
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wider text-muted">
+                Cancellation scheduled
+              </div>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight">Cancelled.</h2>
+              <p className="mt-3 text-sm text-muted">
+                {done.detail
+                  ? `You'll keep full access until ${fmtDate(done.detail)}, then drop to Free. No further charges.`
+                  : "You'll keep access until the end of your billing period, then drop to Free. No further charges."}
+              </p>
+
+              {error && <ErrorNote text={error} />}
+
+              {surveySent ? (
+                <p className="mt-5 text-sm text-up">Thanks — noted.</p>
+              ) : (
+                <div className="mt-6 rounded-xl border border-border bg-panel p-4">
+                  <div className="text-sm font-semibold">Mind telling us why? (optional)</div>
+                  <div className="mt-3 space-y-1.5">
+                    {REASONS.map((r) => (
+                      <label
+                        key={r.code}
+                        className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors ${
+                          reason === r.code ? "border-accent bg-accent/5" : "border-border hover:border-muted"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="cancel_reason"
+                          value={r.code}
+                          checked={reason === r.code}
+                          onChange={() => setReason(r.code)}
+                          className="accent-accent"
+                        />
+                        <span>{r.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <textarea
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value.slice(0, 1000))}
+                    placeholder="Anything else? (optional)"
+                    rows={3}
+                    className="mt-3 block w-full rounded-md border border-border bg-panel px-3 py-2 text-sm focus:border-accent focus:outline-none"
+                  />
+                  <button
+                    onClick={submitSurvey}
+                    disabled={busy !== null || reason === null}
+                    className="mt-3 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-panel-hover disabled:opacity-50"
+                  >
+                    {busy === "survey" ? "Sending…" : "Send feedback"}
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={onClose}
+                  className="flex h-10 items-center justify-center rounded-md border border-border px-5 text-sm font-medium hover:bg-panel-hover"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : (
+            <DonePanel done={done} onClose={onClose} />
+          )
         ) : pausedActive ? (
           /* Already paused — reflect it, offer immediate resume. */
           <div>
@@ -217,27 +312,28 @@ export function CancelInterceptModal({
               </button>
             </div>
           </div>
-        ) : step === "menu" ? (
+        ) : (
+          /* menu — offers AND the direct cancel, all on one screen */
           <div>
             <div className="text-xs font-medium uppercase tracking-wider text-muted">
-              {opts?.canceled_at ? "Scheduled to cancel" : "Before you go"}
+              {opts?.canceled_at ? "Scheduled to cancel" : "Cancel subscription"}
             </div>
             <h2 className="mt-2 text-2xl font-bold tracking-tight">
               {opts?.canceled_at
                 ? `Your ${tierLabel} plan is set to cancel.`
-                : "Wait — can we keep you for less?"}
+                : "Cancel now, or stay for less?"}
             </h2>
             <p className="mt-3 text-sm text-muted">
               {opts?.canceled_at
                 ? "You'll keep full access until the end of your billing period. Changed your mind? Here's a reason to stay."
                 : // Downgrade description derives from FREE_LIMITS (mirrors
                   // backend tier.py) — never overstate what cancelling costs.
-                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.webPushAlerts} browser push alerts — no email or Telegram alerts. Two ways to stay on better terms first.`}
+                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.webPushAlerts} browser push alerts — no email or Telegram alerts. Cancel below, or take one of these instead.`}
             </p>
 
             {error && <ErrorNote text={error} />}
 
-            {/* Save offer — the highest-value retention lever, shown first. */}
+            {/* Save offer — visible but never a gate. */}
             {opts?.save_offer_available && (
               <div className="mt-5 rounded-xl border border-accent/40 bg-accent/5 p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">
@@ -280,82 +376,37 @@ export function CancelInterceptModal({
               </div>
             )}
 
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                onClick={() => {
-                  track("cancel_intercept_declined", { tier });
-                  setStep("survey");
-                }}
-                disabled={busy !== null}
-                className="text-sm text-muted underline-offset-2 hover:text-fg hover:underline disabled:opacity-50"
-              >
-                No thanks, cancel my plan →
-              </button>
-              <button
-                onClick={onClose}
-                disabled={busy !== null}
-                className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover disabled:opacity-50"
-              >
-                Never mind, stay on {tierLabel}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* survey */
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted">One quick question</div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">What's driving the cancellation?</h2>
-            <p className="mt-2 text-sm text-muted">
-              Honest answers shape what we build next. You'll keep access until your period ends.
-            </p>
-
-            {error && <ErrorNote text={error} />}
-
-            <div className="mt-4 space-y-1.5">
-              {REASONS.map((r) => (
-                <label
-                  key={r.code}
-                  className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors ${
-                    reason === r.code ? "border-accent bg-accent/5" : "border-border hover:border-muted"
-                  }`}
+            {opts?.canceled_at ? (
+              /* Already scheduled — nothing left to cancel; just close. */
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={onClose}
+                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover"
                 >
-                  <input
-                    type="radio"
-                    name="cancel_reason"
-                    value={r.code}
-                    checked={reason === r.code}
-                    onChange={() => setReason(r.code)}
-                    className="accent-accent"
-                  />
-                  <span>{r.label}</span>
-                </label>
-              ))}
-            </div>
-
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value.slice(0, 1000))}
-              placeholder="Anything else? (optional)"
-              rows={3}
-              className="mt-3 block w-full rounded-md border border-border bg-panel px-3 py-2 text-sm focus:border-accent focus:outline-none"
-            />
-
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-between">
-              <button
-                onClick={() => setStep("menu")}
-                disabled={busy !== null}
-                className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover disabled:opacity-50"
-              >
-                ← Back to offers
-              </button>
-              <button
-                onClick={confirmCancel}
-                disabled={busy !== null}
-                className="flex h-10 items-center justify-center rounded-md border border-down/50 bg-down/10 px-5 text-sm font-medium text-down transition-all hover:bg-down/20 active:scale-[0.98] disabled:opacity-50"
-              >
-                {busy === "cancel" ? "Cancelling…" : "Confirm cancellation"}
-              </button>
-            </div>
+                  Close
+                </button>
+              </div>
+            ) : (
+              /* THE one-click cancel — a real, clearly visible button on the
+                 first screen that cancels immediately. No survey, no second
+                 confirm. This is what makes "cancel in one click" true. */
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  onClick={directCancel}
+                  disabled={busy !== null}
+                  className="flex h-10 items-center justify-center rounded-md border border-down/50 bg-down/10 px-5 text-sm font-medium text-down transition-all hover:bg-down/20 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {busy === "cancel" ? "Cancelling…" : "Just cancel my subscription"}
+                </button>
+                <button
+                  onClick={onClose}
+                  disabled={busy !== null}
+                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover disabled:opacity-50"
+                >
+                  Never mind, stay on {tierLabel}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -364,7 +415,7 @@ export function CancelInterceptModal({
 }
 
 function DonePanel({ done, onClose }: { done: { kind: DoneKind; detail?: string | null }; onClose: () => void }) {
-  const copy: Record<DoneKind, { title: string; body: string }> = {
+  const copy: Record<Exclude<DoneKind, "canceled">, { title: string; body: string }> = {
     saved: {
       title: "Done — you're staying.",
       body: "Your next 3 months are 50% off, applied automatically. Same plan, half the price.",
@@ -379,23 +430,12 @@ function DonePanel({ done, onClose }: { done: { kind: DoneKind; detail?: string 
       title: "Welcome back.",
       body: "Billing has resumed and your plan is fully active again.",
     },
-    canceled: {
-      title: "Your plan is set to cancel.",
-      body: done.detail
-        ? `You'll keep full access until ${fmtDate(done.detail)}, then drop to Free. No further charges.`
-        : "You'll keep access until the end of your billing period, then drop to Free. No further charges.",
-    },
   };
-  const c = copy[done.kind];
+  const c = copy[done.kind as Exclude<DoneKind, "canceled">];
+  if (!c) return null;
   return (
     <div>
-      <div
-        className={`text-xs font-medium uppercase tracking-wider ${
-          done.kind === "canceled" ? "text-muted" : "text-up"
-        }`}
-      >
-        {done.kind === "canceled" ? "Cancellation scheduled" : "All set"}
-      </div>
+      <div className="text-xs font-medium uppercase tracking-wider text-up">All set</div>
       <h2 className="mt-2 text-2xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-3 text-sm text-muted">{c.body}</p>
       <div className="mt-6 flex justify-end">
