@@ -216,6 +216,12 @@ function UserChip() {
           <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             Account &amp; settings
           </Link>
+          {/* /app/usage shipped fully built but was linked from NOWHERE, so a
+              user's only way to learn the daily look-up limit existed was to
+              hit it. This is its one inbound link. */}
+          <Link href="/app/usage" className="block px-4 py-2 text-sm hover:bg-panel-hover">
+            Usage &amp; limits
+          </Link>
           <Link href="/app/watchlist" className="block px-4 py-2 text-sm hover:bg-panel-hover">
             My watchlist
           </Link>

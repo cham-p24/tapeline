@@ -202,6 +202,43 @@ async def _fetch_ticker_news(symbol: str) -> list[dict]:
         return []
 
 
+def _next_utc_midnight() -> datetime:
+    """Start of the next UTC day — when the daily look-up counter rolls over.
+
+    services.usage keys the durable counter on the UTC date
+    (lookups_reset_on), so "resets at the next UTC midnight" is exact, not an
+    estimate. Derived rather than stored: there is no reset-timestamp column.
+    """
+    now = datetime.now(UTC)
+    return (now + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+
+def _lookup_meter_payload(meter: dict) -> dict:
+    """Shape the freemium look-up meter for the /api/ticker 200 response.
+
+    These numbers are ALREADY computed by consume_ticker_lookup on every
+    metered look-up; until now they were used only to decide 402-vs-200 and
+    then discarded. That meant a free user's first contact with metering was
+    the hard wall at the cap, with no warning at 9, 10 or 11 — a normal limit
+    presented as a punishment. Returning the meter lets the page state the
+    user's own usage calmly and factually well before the wall.
+
+    `limit is None` is the UNLIMITED sentinel (paid tiers, active no-card
+    trial, and the first-session grace window). There is no cap to report, so
+    remaining and resets_at are None too — the counter that would reset isn't
+    running for that caller.
+    """
+    cap = meter.get("limit")
+    return {
+        "used": meter.get("used", 0),
+        "limit": cap,
+        "remaining": meter.get("remaining"),
+        "resets_at": None if cap is None else _next_utc_midnight().isoformat(),
+    }
+
+
 def _client_ip(request: Request) -> str | None:
     """Real client IP behind Fly's edge proxy. Mirrors routers/auth +
     services/rate_limit: request.client.host is the proxy's internal peer (the
@@ -225,6 +262,11 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     "signup_required" for anon). The lookup is only counted AFTER the symbol is
     confirmed to resolve to a real ticker, so a 404/invalid symbol never burns
     the caller's daily budget.
+
+    The 200 response also carries the meter as `lookups`
+    (used / limit / remaining / resets_at) so the client can show the count
+    approaching the cap rather than only discovering it at the 402. See
+    _lookup_meter_payload.
 
     Connection + latency discipline (incident fix 2026-05-31, rev 2): this
     endpoint backs the SSR'd public /t/{symbol} page and the daily SEO audit
@@ -300,6 +342,12 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # users are still capped (durable per-user counter); Pro/Premium/active-
         # trial remain uncapped. (consume_anon_lookup stays in services.usage as
         # a dormant utility for that future client-side gate.)
+        #
+        # The meter is also RETURNED (see `lookups` in the payload) so the
+        # ticker page can show the user where they stand before the wall,
+        # instead of the cap arriving as a surprise 402. Anonymous callers
+        # aren't metered here, so `lookups` stays None for them.
+        lookups_payload: dict | None = None
         if user is not None:
             meter = await consume_ticker_lookup(session, user)
             if not meter["allowed"]:
@@ -312,6 +360,7 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                         "tier": "free",
                     },
                 )
+            lookups_payload = _lookup_meter_payload(meter)
 
         sq = (
             await session.execute(
@@ -366,6 +415,10 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
             "reason": sq.reason,
         },
         "news": news_payload,
+        # Freemium daily look-up meter for THIS caller (null for anonymous
+        # callers, who aren't metered on this endpoint). limit=null means
+        # unmetered — paid tier, active trial, or first-session grace.
+        "lookups": lookups_payload,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
     }
 
