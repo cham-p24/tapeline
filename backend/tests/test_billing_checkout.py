@@ -165,3 +165,133 @@ async def test_create_checkout_session_unconfigured_price_is_400(monkeypatch):
             cancel_url="https://x/c",
         )
     assert exc.value.status_code == 400
+
+
+# ── Checkout trust polish: wallets, tax posture, dunning prerequisite ────────
+#
+# These three assertions guard config that is invisible in the UI but decides
+# whether a real customer can pay (wallets), whether the price we advertise is
+# the price charged (automatic_tax), and whether a failed renewal is even
+# recoverable (save_default_payment_method). All three are one-line kwargs that
+# a refactor could silently drop, and none of them would fail loudly in prod —
+# the failure mode is a quieter conversion rate and unexplained churn.
+
+async def _capture_session_kwargs(monkeypatch, **overrides) -> dict:
+    """Build a checkout session against a stubbed Stripe and return the kwargs."""
+    from app.services import billing
+
+    monkeypatch.setattr(
+        billing.settings, "stripe_price_pro_monthly", "price_test_pro_monthly",
+        raising=False,
+    )
+    captured: dict = {}
+
+    def _fake_session_create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(url="https://checkout.stripe.com/c/pay/cs_polish")
+
+    monkeypatch.setattr(billing.stripe.checkout.Session, "create", _fake_session_create)
+
+    params = {
+        "user_id": "u_polish",
+        "user_email": "polish@example.com",
+        "tier": "pro",
+        "billing_period": "monthly",
+        "success_url": "https://x/s",
+        "cancel_url": "https://x/c",
+    }
+    params.update(overrides)
+    await billing.create_checkout_session(**params)
+    return captured
+
+
+async def test_checkout_enables_wallet_payments(monkeypatch):
+    """Apple Pay / Google Pay ride on the "card" payment method type and render
+    above the card form; Link is listed explicitly for its 1-click flow. Losing
+    "card" here would silently drop every wallet button."""
+    captured = await _capture_session_kwargs(monkeypatch)
+    assert "card" in captured["payment_method_types"]
+    assert "link" in captured["payment_method_types"]
+
+
+async def test_checkout_tax_posture_matches_the_disclosed_copy(monkeypatch):
+    """The plan card promises the sticker amount is the amount charged. That
+    promise is only keepable if the session forwards the same constant the
+    disclosure reports — assert they are literally the same value."""
+    from app.services import billing
+
+    captured = await _capture_session_kwargs(monkeypatch)
+    assert captured["automatic_tax"] == {"enabled": billing.AUTOMATIC_TAX_ENABLED}
+
+
+async def test_checkout_saves_default_payment_method_for_retries(monkeypatch):
+    """Dunning prerequisite: Stripe Smart Retries can only re-attempt against a
+    payment method stored on the SUBSCRIPTION. Without this the collected card
+    is attached to the customer but not the subscription default, and a
+    recoverable soft decline becomes involuntary churn."""
+    captured = await _capture_session_kwargs(monkeypatch)
+    settings_ = captured["subscription_data"]["payment_settings"]
+    assert settings_["save_default_payment_method"] == "on_subscription"
+
+
+# ── Charge disclosure ───────────────────────────────────────────────────────
+
+async def test_charge_disclosure_reports_currency_and_no_tax(monkeypatch):
+    """A normal (non-exclusive) price with automatic tax off yields the full
+    two-part disclosure: real currency from Stripe, and an explicit False."""
+    from app.services import billing
+
+    monkeypatch.setattr(billing, "_charge_disclosure_cache", None, raising=False)
+    monkeypatch.setattr(billing, "AUTOMATIC_TAX_ENABLED", False, raising=False)
+    monkeypatch.setattr(billing.settings, "stripe_secret_key", "sk_test_x", raising=False)
+    monkeypatch.setattr(
+        billing.settings, "stripe_price_pro_monthly", "price_test_pro_monthly",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        billing.stripe.Price, "retrieve",
+        lambda *a, **k: {"currency": "usd", "tax_behavior": "unspecified"},
+    )
+
+    out = await billing.get_charge_disclosure()
+    assert out["currency"] == "USD"
+    assert out["tax_added"] is False
+    assert out["source"] == "stripe"
+
+
+async def test_charge_disclosure_makes_no_tax_claim_on_exclusive_price(monkeypatch):
+    """An "exclusive" price is configured on the assumption tax gets added on
+    top. Even though our session adds none today, a dashboard-level tax rate
+    could make a "no tax" claim wrong — so the server declines to make one and
+    the UI falls back to the currency sentence alone."""
+    from app.services import billing
+
+    monkeypatch.setattr(billing, "_charge_disclosure_cache", None, raising=False)
+    monkeypatch.setattr(billing, "AUTOMATIC_TAX_ENABLED", False, raising=False)
+    monkeypatch.setattr(billing.settings, "stripe_secret_key", "sk_test_x", raising=False)
+    monkeypatch.setattr(
+        billing.settings, "stripe_price_pro_monthly", "price_test_pro_monthly",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        billing.stripe.Price, "retrieve",
+        lambda *a, **k: {"currency": "usd", "tax_behavior": "exclusive"},
+    )
+
+    out = await billing.get_charge_disclosure()
+    assert out["currency"] == "USD"
+    assert out["tax_added"] is None  # "unknown" — say nothing about tax
+
+
+async def test_charge_disclosure_degrades_silently_without_stripe(monkeypatch):
+    """No Stripe key (CI, local dev, an outage): assert NOTHING. The UI keeps
+    its currency constant and drops the tax sentence entirely."""
+    from app.services import billing
+
+    monkeypatch.setattr(billing, "_charge_disclosure_cache", None, raising=False)
+    monkeypatch.setattr(billing.settings, "stripe_secret_key", "", raising=False)
+
+    out = await billing.get_charge_disclosure()
+    assert out["currency"] is None
+    assert out["tax_added"] is None
+    assert out["source"] == "unavailable"

@@ -11,12 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
-from app.models import User
+from app.models import Subscription, User
 from app.services.auth import current_user_required
 from app.services.billing import (
     apply_save_offer_coupon,
     create_checkout_session,
     create_portal_session,
+    get_charge_disclosure,
     pause_subscription,
     resume_subscription,
     set_cancel_at_period_end,
@@ -85,7 +86,12 @@ async def create_checkout(
         # it as the GA4/Ads `transaction_id` plus a one-shot dedupe key, so
         # reloading the success URL can no longer re-fire the purchase event.
         success_url=f"{settings.app_url}/app/billing?checkout=success&tier={body.tier}&billing_period={body.billing_period}&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{settings.app_url}/app/billing?checkout=cancelled",
+        # Stripe's "back" link. Carries the tier + period the user was part-way
+        # through so /app/billing can restate the choice and offer ONE resume
+        # button instead of dumping them on a generic plan grid. Read by the
+        # `checkout=cancelled` handler in app/app/billing/page.tsx — keep the
+        # param names in sync with the success_url above.
+        cancel_url=f"{settings.app_url}/app/billing?checkout=cancelled&tier={body.tier}&billing_period={body.billing_period}",
         # Pass the user's unspent referral credits; the billing service mints
         # a one-shot 100%-off coupon for that many months when > 0.
         referral_credit_months=user.referral_credit_months or 0,
@@ -256,13 +262,36 @@ def _require_paid(user: User) -> None:
 
 
 @router.get("/retention-options")
-async def retention_options(user: User = Depends(current_user_required)) -> dict:
+async def retention_options(
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
     """State the cancel-intercept modal needs to decide what to offer.
 
     `save_offer_available` gates the one-time 50%-off-3-months card.
     `paused_until` / `canceled_at` let the modal reflect an in-flight pause
     or scheduled cancellation rather than re-offering the same actions.
+
+    `past_due` / `subscription_status` mirror what GET /api/me exposes to the
+    global DunningBanner. The billing page already fetches THIS endpoint, so
+    piggy-backing the dunning state here lets the page render a failed-renewal
+    panel without a second round-trip — and, more importantly, stops the "Next
+    charge" tile from cheerfully quoting a renewal price to someone whose card
+    just declined.
     """
+    past_due = False
+    sub_status: str | None = None
+    if user.tier != "free":
+        sub_row = await session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == user.id)
+            .order_by(Subscription.current_period_end.desc())
+            .limit(1)
+        )
+        sub = sub_row.scalar_one_or_none()
+        if sub is not None:
+            sub_status = sub.status
+            past_due = sub.status in ("past_due", "unpaid")
     return {
         "has_subscription": bool(user.stripe_customer_id),
         "tier": user.tier,
@@ -271,7 +300,23 @@ async def retention_options(user: User = Depends(current_user_required)) -> dict
         if user.subscription_paused_until
         else None,
         "canceled_at": user.canceled_at.isoformat() if user.canceled_at else None,
+        "past_due": past_due,
+        "subscription_status": sub_status,
     }
+
+
+@router.get("/charge-disclosure")
+async def charge_disclosure() -> dict:
+    """What Stripe will actually charge — currency, and whether tax is added.
+
+    Read by the plan cards so the hosted Checkout page can never surprise a
+    user with a different currency or an unmentioned line item. Derived from
+    the live Stripe Price object plus the session kwargs we send; when the
+    Stripe lookup fails `currency` is null and the UI drops the currency
+    sentence rather than asserting one. No auth: it describes public list
+    pricing, and the pre-signup /pricing cards need it too.
+    """
+    return await get_charge_disclosure()
 
 
 @router.post("/save-offer", dependencies=[Depends(limit_strict)])

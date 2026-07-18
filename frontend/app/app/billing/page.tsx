@@ -18,6 +18,7 @@ import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
 import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving, DEFAULT_BILLING_PERIOD } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
+import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -73,6 +74,24 @@ export default function BillingPage() {
   // (billing page reads it back as ?intent=…&billing=…). Pre-selects the
   // toggle + highlights the intended card; never auto-fires checkout.
   const [intentPlan, setIntentPlan] = useState<"pro" | "premium" | null>(null);
+  // Stripe's cancel_url lands here with ?checkout=cancelled&tier=…&billing_period=….
+  // Two pieces of state, deliberately separate: the panel must render on the
+  // BARE ?checkout=cancelled too. Links minted before the tier params were
+  // added (and the email-checkout path) carry no tier, and "nothing was
+  // charged" is the reassurance that matters — it must not be conditional on
+  // knowing which plan they were buying.
+  const [checkoutCancelled, setCheckoutCancelled] = useState(false);
+  // Which tier they were part-way through, when we know it — upgrades the
+  // resume button from "pick a plan" to one click back into the same checkout.
+  const [cancelledTier, setCancelledTier] = useState<"pro" | "premium" | null>(null);
+  // Failed-renewal state from GET /api/billing/retention-options (mirrors the
+  // billing.past_due that /api/me feeds the global DunningBanner). Drives the
+  // in-page recovery panel and suppresses the "Next charge" quote, which is
+  // actively misleading while a charge is failing.
+  const [pastDue, setPastDue] = useState(false);
+  // What Stripe actually charges — currency, and whether anything is added on
+  // top. Derived server-side from the live Price plus the session kwargs.
+  const disclosure = useChargeDisclosure();
 
   const tier = (user?.tier || "free") as TierKey;
   const meta = TIER_META[tier] ?? TIER_META.free;
@@ -116,6 +135,9 @@ export default function BillingPage() {
           // optimistically; a racing fetch that beat the Stripe webhook
           // must not flip it back to false.
           setHasBilling((prev) => (prev === true ? true : !!body.has_subscription));
+          // Dunning state rides along on this same request — no second
+          // round-trip for a field the page needs on every paid render.
+          setPastDue(Boolean(body.past_due));
         }
       } catch {
         // Network blip — leave unknown; portal/cancel simply stay hidden.
@@ -200,6 +222,26 @@ export default function BillingPage() {
       setMsg({ kind: "ok", text: "Payment received — your plan is active." });
       setHasBilling(true);
       refresh();
+    }
+    // Stripe's cancel_url. The backend has always sent ?checkout=cancelled and
+    // this page has always ignored it, so backing out of Stripe dropped the
+    // user on a billing page that looked exactly like the one they left —
+    // no acknowledgement, no answer to the only question they have ("did that
+    // charge me?"), and no way back in short of re-navigating the whole plan
+    // grid. Read it, answer the question first, and offer one resume button.
+    //
+    // Deliberately NOT an error: backing out of a checkout is a normal thing to
+    // do. It renders in the calm neutral panel, never the red error style, and
+    // carries no deadline, no expiring-spot language and no second ask. If the
+    // user wants to leave, the panel is dismissible and that is the end of it.
+    if (qp.get("checkout") === "cancelled") {
+      const t = (qp.get("tier") || "").toLowerCase();
+      const period = (qp.get("billing") || qp.get("billing_period") || "").toLowerCase();
+      if (period === "monthly" || period === "annual") setBillingPeriod(period);
+      setCheckoutCancelled(true);
+      setCancelledTier(t === "pro" || t === "premium" ? t : null);
+      setShowPlans(true);
+      track("checkout_cancelled", { tier: t || "unknown", billing_period: period || "unknown" });
     }
     // Plan intent from the marketing /pricing page, carried through
     // /signup?plan=…&billing=… → onboarding → here. Open the picker,
@@ -359,6 +401,85 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* ── Failed-renewal recovery ────────────────────────────────────────
+          A card declined on renewal. Stripe is mid-retry and the customer
+          keeps their tier for the duration of that grace window, so the honest
+          framing is "this needs a fix", not "your account is suspended". The
+          global DunningBanner says the same thing in one line from the app
+          shell; this panel is the destination version — it explains what
+          happens next and what happens if nothing changes, because an
+          involuntary failure the user never understood is how a payment
+          problem quietly becomes a cancellation. */}
+      {pastDue && (
+        <div className="rounded-lg border border-warn/40 bg-warn/5 p-5">
+          <div className="font-semibold text-fg">Your last renewal payment didn&rsquo;t go through.</div>
+          <p className="mt-1.5 text-sm text-muted leading-relaxed">
+            This is usually an expired card or a bank declining an online
+            charge, not a problem with your account. Stripe will retry it
+            automatically over the next few days, and you keep full {meta.name}{" "}
+            access while it does. Updating your card fixes it immediately; if
+            every retry fails, the plan drops to Free and you can re-subscribe
+            whenever you like.
+          </p>
+          {hasBilling === true && (
+            <button onClick={openPortal} className="btn-accent mt-4 text-sm">
+              Update payment method →
+            </button>
+          )}
+          <p className="mt-3 text-xs text-subtle">
+            Card details are updated on Stripe&rsquo;s own portal &mdash; they never
+            reach a Tapeline server. Questions: support@tapeline.io.
+          </p>
+        </div>
+      )}
+
+      {/* ── Cancelled-checkout recovery ────────────────────────────────────
+          Answers "was I charged?" before anything else, then offers exactly
+          one way back. No urgency, no expiring reservation, no discount
+          rescue-offer — the plan and price are the same as they were a minute
+          ago, and saying so is the whole point. */}
+      {checkoutCancelled && !pastDue && (
+        <div className="rounded-lg border border-border bg-panel p-5">
+          <div className="font-semibold text-fg">Checkout cancelled &mdash; nothing was charged.</div>
+          <p className="mt-1.5 text-sm text-muted leading-relaxed">
+            You came back from Stripe without completing the payment, so no card
+            was charged and your plan is unchanged.{" "}
+            {cancelledTier
+              ? `The ${TIER_META[cancelledTier].name} plan is still here at the same price whenever you want it.`
+              : "The plans below are unchanged and still here whenever you want them."}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {/* One obvious way to resume. With a known tier that's a single
+                click straight back into the same Stripe session; without one
+                we scroll to the picker rather than guessing a plan for them. */}
+            {cancelledTier ? (
+              <button
+                onClick={() => startCheckout(cancelledTier)}
+                disabled={busy === cancelledTier}
+                className="btn-accent text-sm disabled:opacity-60"
+              >
+                {busy === cancelledTier
+                  ? "Opening…"
+                  : `Resume ${TIER_META[cancelledTier].name} checkout →`}
+              </button>
+            ) : (
+              <a href="#plan-picker" className="btn-accent text-sm">
+                Pick up where you left off →
+              </a>
+            )}
+            <button
+              onClick={() => setCheckoutCancelled(false)}
+              className="text-xs text-muted hover:text-fg"
+            >
+              Not now
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-subtle">
+            Ran into a problem paying? Email support@tapeline.io and we&rsquo;ll sort it.
+          </p>
+        </div>
+      )}
+
       {/* Win-back landing banner (?winback=1 from the day-90 email). The 40%
           discount is applied server-side at checkout for genuinely churned
           accounts — this is purely the welcome-back framing. */}
@@ -443,10 +564,28 @@ export default function BillingPage() {
         {/* Next charge / trial preview — spans 2 of 5 cols */}
         <div className="md:col-span-2 rounded-2xl border border-border bg-panel p-6">
           <div className="text-[11px] uppercase tracking-wider text-muted">
-            {isCardlessTrial ? "When the trial ends" : tier === "free" ? "What you get on Premium" : "Next charge"}
+            {isCardlessTrial
+              ? "When the trial ends"
+              : tier === "free"
+              ? "What you get on Premium"
+              : pastDue
+              ? "Payment status"
+              : "Next charge"}
           </div>
 
-          {isCardlessTrial ? (
+          {/* A failing renewal makes "Next charge $99/year" a statement the
+              user has already seen fail. Say what's actually true instead —
+              the recovery panel above carries the detail and the fix. */}
+          {pastDue && !isCardlessTrial && tier !== "free" ? (
+            <>
+              <div className="mt-2 text-lg font-semibold text-warn">Retrying your card</div>
+              <p className="mt-2 text-xs text-muted leading-relaxed">
+                The last renewal charge didn&rsquo;t complete. Your next charge date
+                depends on when it succeeds, so there isn&rsquo;t a reliable one to
+                show yet.
+              </p>
+            </>
+          ) : isCardlessTrial ? (
             <>
               <div className="mt-2 text-2xl font-bold nums">
                 {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
@@ -522,8 +661,12 @@ export default function BillingPage() {
             <div>
               <h2 className="text-xl font-semibold">{tier === "free" ? "Pick a plan" : "Change plan"}</h2>
               <p className="mt-1 text-sm text-muted">
-                {REFUND.short}, no questions — full on monthly, prorated on annual. Cancel in one click. Founding pricing — your rate is locked in while you stay subscribed. All prices in USD.
+                {REFUND.short}, no questions — full on monthly, prorated on annual. Cancel in one click. Founding pricing — your rate is locked in while you stay subscribed.
               </p>
+              {/* Currency + tax, from the live Stripe config rather than a
+                  hardcoded "All prices in USD" that nobody re-checks. Stated
+                  before the redirect so the hosted page can't surprise. */}
+              <p className="mt-1 text-xs text-subtle">{chargeDisclosureLine(disclosure)}</p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
               {(["monthly", "annual"] as const).map((p) => (
@@ -603,22 +746,39 @@ export default function BillingPage() {
             />
           </div>
 
-          {/* Payment-security trust badge — directly under the upgrade buttons,
-              the highest-value placement (signup takes no card; the first card
-              entry happens at Stripe Checkout from here). Card details are never
-              handled by Tapeline. Descriptive only, no security claims of our own. */}
-          <div className="flex items-center justify-center gap-1.5 text-[11px] text-subtle">
-            <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path
-                d="M8 1.5l5 1.8v3.4c0 3.2-2.1 5.3-5 6.3-2.9-1-5-3.1-5-6.3V3.3L8 1.5z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinejoin="round"
-              />
-              <path d="M5.8 8l1.6 1.6L10.4 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Payments secured by <span className="text-muted font-medium">Stripe</span></span>
-          </div>
+          {/* Money-back as a MECHANISM at the annual decision point. An annual
+              buyer commits 12 months up front; the useful reassurance is the
+              procedure and the timing, not a seal. Numbers come from the
+              REFUND constant (single-sourced from /legal/refund). */}
+          {billingPeriod === "annual" && (
+            <div className="mx-auto max-w-2xl rounded-lg border border-border bg-panel/60 px-5 py-4">
+              <div className="text-xs font-medium text-fg">
+                How the {REFUND.short.toLowerCase()} actually works
+              </div>
+              <p className="mt-1.5 text-xs text-muted leading-relaxed">
+                Email support@tapeline.io from your account address within{" "}
+                {REFUND.windowDays} days of your first charge — no form, no
+                reason required. We process it within 3 business days and Stripe
+                returns the money to the card or wallet you paid with, usually
+                landing in 3&ndash;10 business days depending on your bank.
+                Annual plans get a {REFUND.annual}.{" "}
+                <Link href={REFUND.policyPath} className="text-accent hover:underline">
+                  Full policy
+                </Link>
+                .
+              </p>
+            </div>
+          )}
+
+          {/* Payment security in plain language, directly under the upgrade
+              buttons — the highest-value placement, since signup takes no card
+              and the first card entry happens at Stripe Checkout from here.
+              Factual and verifiable; no badge, no certification claim. */}
+          <p className="mx-auto max-w-2xl text-center text-[11px] leading-relaxed text-subtle">
+            Card details are entered on Stripe&rsquo;s own checkout page, not on
+            Tapeline. Your card number never reaches a Tapeline server &mdash; we
+            receive only the subscription status Stripe reports back.
+          </p>
 
           <div>
             <details className="group rounded-xl border border-border bg-panel/40">
