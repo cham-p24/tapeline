@@ -21,9 +21,16 @@ test.describe("Landing page", () => {
     await expect(page.getByRole("heading", { name: /how it works/i })).toBeVisible();
     await expect(page.getByText(/six named factors/i)).toBeVisible();
 
-    // ScannerPreview should render a sample row
-    await expect(page.getByText("NVDA")).toBeVisible();
-    await expect(page.getByText("HIGH CONVICTION").first()).toBeVisible();
+    // ScannerPreview renders the real anonymous top-scored rows (or the
+    // clearly-labeled sample fallback when the API is unreachable), so
+    // assert structure, not specific tickers: a ticker cell linking to its
+    // public /t/[symbol] page, and no fabricated-liveness copy.
+    await expect(page.locator('table a[href^="/t/"]').first()).toBeVisible();
+    await expect(page.getByText(/updated just now/i)).toHaveCount(0);
+    // Fold link into the zero-signup Top 10.
+    await expect(
+      page.getByRole("link", { name: /see today.s full top 10/i }),
+    ).toBeVisible();
   });
 
   test("nav links route to expected pages", async ({ page }) => {
