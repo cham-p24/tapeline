@@ -681,6 +681,9 @@ app.include_router(telegram_router.router, prefix="/api/telegram", tags=["telegr
 app.include_router(ticker.router, prefix="/api/ticker", tags=["ticker"])
 app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
 app.include_router(scorecard.router, prefix="/api/scorecard", tags=["scorecard"])
+# Public dataset exports declare absolute paths (/api/scorecard.csv|.json), so
+# they mount with no prefix — see the note on export_router in the router.
+app.include_router(scorecard.export_router, tags=["scorecard"])
 app.include_router(news.router, prefix="/api/news", tags=["news"])
 app.include_router(newsletter.router, prefix="/api/newsletter", tags=["newsletter"])
 app.include_router(heatmap.router, prefix="/api/heatmap", tags=["heatmap"])

@@ -93,12 +93,6 @@
       "reason": "PRIORITY. Onboarding asks 'What's your investing experience?' and 'Roughly what size portfolio do you run?' with capital bands. Rule 8 prohibits collecting experience level and portfolio size outright — this is the finding most likely to be treated as building a suitability profile. Requires a product decision (remove the questions and the stored fields), not a copy tweak, so it is escalated in the PR rather than patched here."
     },
     {
-      "file": "frontend/app/scorecard/page.tsx",
-      "rule": "performance-claim",
-      "phrase": "beat the market",
-      "reason": "Glossary row defining the alpha column ('Positive = beat the market; negative = lagged it'). Definitional rather than promotional, but 'beat the market' is a Rule 1 banned phrase and a neutral rewrite exists ('Positive = ahead of SPY that session; negative = behind'). Owned by the scorecard workstream."
-    },
-    {
       "file": "frontend/app/blog/posts.ts",
       "rule": "performance-claim",
       "phrase": "beat the market",

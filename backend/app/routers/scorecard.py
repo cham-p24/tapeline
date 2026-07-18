@@ -28,6 +28,16 @@ from app.services.auth import current_user_optional
 
 router = APIRouter()
 
+# The two public dataset exports live on their OWN router, mounted with NO
+# prefix and declaring absolute paths.
+#
+# They cannot hang off `router` (prefix "/api/scorecard") as ".csv"/".json":
+# Starlette asserts a routed path starts with "/", so an extension-style
+# suffix never registers and the route silently does not exist. That is
+# exactly how these two shipped unregistered the first time — the unit test
+# caught it, so keep the explicit absolute paths below.
+export_router = APIRouter()
+
 # Free + anonymous viewers see scorecard picks delayed by this many days.
 # Pro and Premium see live. The summary stats stay live for everyone.
 _FREE_DELAY_DAYS = 7
@@ -300,7 +310,7 @@ def _export_filename(ext: str) -> str:
     return f"tapeline-scorecard-{datetime.now(UTC).strftime('%Y-%m-%d')}.{ext}"
 
 
-@router.get(".csv")
+@export_router.get("/api/scorecard.csv")
 async def export_scorecard_csv(since: str | None = None) -> StreamingResponse:
     """The full append-only archive as CSV, with the context in the file.
 
@@ -324,7 +334,7 @@ async def export_scorecard_csv(since: str | None = None) -> StreamingResponse:
     )
 
 
-@router.get(".json")
+@export_router.get("/api/scorecard.json")
 async def export_scorecard_json(since: str | None = None) -> StreamingResponse:
     """The full append-only archive as JSON: `{"meta": {...}, "rows": [...]}`.
 
