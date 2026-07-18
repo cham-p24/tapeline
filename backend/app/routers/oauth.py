@@ -33,7 +33,7 @@ import string
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode
 
 import httpx
 import jwt
@@ -88,6 +88,49 @@ def _safe_next(next_param: str | None, fallback: str = "/app/scanner") -> str:
     ):
         return fallback
     return next_param
+
+
+# Marketing attribution carried through the OAuth round-trip.
+#
+# The EMAIL signup path already persists these: lib/utm.ts captures `?utm_*`
+# and `?gclid|gbraid|wbraid` on the landing visit, stores them in localStorage
+# for 30 days, and the signup POST body forwards them onto the User row
+# (routers/auth.py writes signup_utm_* / signup_gclid|gbraid|wbraid). OAuth —
+# the designed-PRIMARY signup path — dropped all of it, so channel ROI was
+# uncomputable for most signups.
+#
+# OAuth is a full-page round-trip through the provider, so (exactly like the
+# `?next=` intent carry above) the only place these survive is a short-lived
+# cookie set at /start and read back in the callback. `OAuthButtons.tsx`
+# appends the already-stored values to the /start URL.
+#
+# Lengths mirror the DB columns in models/user.py so a hostile cookie can't
+# overflow the insert; anything longer is truncated, not rejected.
+ATTRIBUTION_FIELDS: dict[str, int] = {
+    "utm_source": 80,
+    "utm_medium": 80,
+    "utm_campaign": 120,
+    "utm_term": 120,
+    "utm_content": 120,
+    "gclid": 200,
+    "gbraid": 200,
+    "wbraid": 200,
+}
+
+
+def _clean_attribution(raw: dict[str, str | None]) -> dict[str, str]:
+    """Keep only known attribution keys, stripped, truncated to the column
+    width, and free of control characters (these round-trip through a
+    client-writable cookie, same threat model as `_safe_next`)."""
+    out: dict[str, str] = {}
+    for key, max_len in ATTRIBUTION_FIELDS.items():
+        val = (raw.get(key) or "").strip()
+        if not val:
+            continue
+        if any(ord(c) < 0x20 or ord(c) == 0x7F for c in val):
+            continue
+        out[key] = val[:max_len]
+    return out
 
 
 PROVIDERS = {
@@ -177,6 +220,7 @@ async def list_providers() -> dict:
 @router.get("/{provider}/start")
 async def oauth_start(
     provider: str,
+    request: Request,
     response: Response,
     # `alias="next"` keeps the wire name the funnel-wide convention
     # (?next=…) while the Python name avoids shadowing builtins.
@@ -225,6 +269,16 @@ async def oauth_start(
     if next_param and _safe_next(next_param, fallback="") == next_param:
         resp.set_cookie(f"oauth_next_{provider}", next_param, httponly=True, max_age=600,
                         samesite="lax", secure=settings.app_env != "development", path="/")
+    # Marketing attribution carry — same mechanism, one urlencoded cookie for
+    # the whole bundle so we don't burn eight cookies on it. Absent params →
+    # no cookie (direct/untagged traffic is the common case).
+    attribution = _clean_attribution(dict(request.query_params))
+    if attribution:
+        resp.set_cookie(
+            f"oauth_attr_{provider}", urlencode(attribution), httponly=True,
+            max_age=600, samesite="lax",
+            secure=settings.app_env != "development", path="/",
+        )
     return resp
 
 
@@ -352,6 +406,13 @@ async def oauth_callback(
             if conflict.scalar_one_or_none() is None:
                 break
             ref_code = _generate_referral_code()
+        # Marketing attribution stashed by /start, re-validated here because
+        # the cookie is client-writable. Mirrors the email-signup write in
+        # routers/auth.py exactly: written once at signup, never updated,
+        # nullable so direct/untagged traffic doesn't blow up.
+        attr = _clean_attribution(
+            dict(parse_qsl(request.cookies.get(f"oauth_attr_{provider}") or ""))
+        )
         user = User(
             id=f"u_{uuid.uuid4().hex}",
             email=email,
@@ -360,6 +421,14 @@ async def oauth_callback(
             password_hash=None,  # OAuth-only account
             trial_ends_at=trial_ends,
             referral_code=ref_code,
+            signup_utm_source=attr.get("utm_source"),
+            signup_utm_medium=attr.get("utm_medium"),
+            signup_utm_campaign=attr.get("utm_campaign"),
+            signup_utm_term=attr.get("utm_term"),
+            signup_utm_content=attr.get("utm_content"),
+            signup_gclid=attr.get("gclid"),
+            signup_gbraid=attr.get("gbraid"),
+            signup_wbraid=attr.get("wbraid"),
             # OAuth providers proved ownership of this address — auto-stamp
             # email_verified_at so the user doesn't see a redundant
             # "verify your email" banner.
@@ -368,8 +437,11 @@ async def oauth_callback(
         session.add(user)
         await session.commit()
         await session.refresh(user)
-        logger.info("oauth.user_created provider=%s email=%s trial_ends=%s",
-                    provider, email, trial_ends.isoformat())
+        logger.info(
+            "oauth.user_created provider=%s email=%s trial_ends=%s utm_source=%s gclid=%s",
+            provider, email, trial_ends.isoformat(),
+            attr.get("utm_source") or "-", "y" if attr.get("gclid") else "-",
+        )
     else:
         # Returning OAuth user. If they were never verified (signed up
         # natively first, then later via OAuth), stamp it now — the
@@ -388,6 +460,19 @@ async def oauth_callback(
     token = issue_session_token(user.id)
     next_path = _safe_next(request.cookies.get(f"oauth_next_{provider}"))
     if is_new:
+        # Server-side `sign_up` conversion (GA4 Measurement Protocol). The
+        # client-side beacon is the only record today, so a blocked or
+        # crashed client makes a real signup invisible to GA4/Ads. Keyed on
+        # our user id, which is also what the client beacon reports, so the
+        # two describe the same user rather than two. Fire-and-forget,
+        # env-gated, never raises — see services/analytics.
+        try:
+            from app.services.analytics import track_sign_up
+
+            await track_sign_up(user_id=user.id, method=provider)
+        except Exception:
+            logger.exception("oauth.ga4_sign_up_failed user=%s", user.id)
+
         # Real-time founder ping (same as native signup) so a new OAuth signup /
         # live trial never goes unnoticed. Self-guarding + never raises.
         from app.services.telegram import notify_founder_new_signup
@@ -445,4 +530,5 @@ async def oauth_callback(
     resp.set_cookie(value=token, **session_cookie_kwargs())
     resp.delete_cookie(f"oauth_state_{provider}", path="/")
     resp.delete_cookie(f"oauth_next_{provider}", path="/")
+    resp.delete_cookie(f"oauth_attr_{provider}", path="/")
     return resp
