@@ -1,12 +1,20 @@
 "use client";
 
-import { PRICING, FREE_LIMITS, usd, annualSaving } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
+import { useBillingPeriod } from "@/components/BillingToggle";
 
 /**
  * Three-column comparison: Free / Pro ($9.99/mo or $8.25/mo annual) /
  * Premium ($19.99/mo or $16.58/mo annual). Prices render from lib/pricing.ts
  * (single source of truth). Mirrors the gating in
  * backend/app/services/tier.py.
+ *
+ * Header prices follow the shared BillingPeriod context (annual by default,
+ * founder decision 2026-07-18) so this header and the PricingTable cards on
+ * the same page always show the same billing period — previously the header
+ * was hardcoded to annual while the cards defaulted to monthly, putting two
+ * different prices for the same plan on one screen. Annual per-month figures
+ * always carry the explicit "billed annually ($99/yr)" qualifier.
  *
  * Rows are grouped into sections (Data, Scoring, Discovery, Watchlist & Alerts,
  * Pro intelligence, Account & support) so the table reads like a spec sheet,
@@ -89,6 +97,10 @@ const SECTIONS: Section[] = [
 ];
 
 export function ComparisonTable() {
+  // Same toggle state as the plan cards (annual default). Standalone embeds
+  // without a provider read the sitewide annual default — still qualified.
+  const { billing } = useBillingPeriod();
+  const annual = billing === "annual";
   return (
     // Constrain to max-w-5xl + center so the table doesn't stretch the
     // full viewport on wide monitors. Outer surface uses `bg-panel` so
@@ -122,13 +134,25 @@ export function ComparisonTable() {
                   Best value
                 </span>
                 <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-fg">Pro</span>
-                <span className="mt-2 block text-lg font-bold text-fg nums">{usd(PRICING.pro.annualPerMonth)}</span>
-                <span className="block text-[10px] text-subtle">{`/mo · annual · save $${annualSaving(PRICING.pro)}`}</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">
+                  {usd(annual ? PRICING.pro.annualPerMonth : PRICING.pro.monthly)}
+                </span>
+                <span className="block text-[10px] text-subtle">
+                  {annual
+                    ? `/mo · ${billedAnnuallyNote(PRICING.pro)} · save $${annualSaving(PRICING.pro)}/yr`
+                    : "/mo · billed monthly"}
+                </span>
               </th>
               <th className="bg-accent/[0.04] px-3 py-5 text-center align-bottom">
                 <span className="block text-xs font-semibold uppercase tracking-wider text-accent">Premium</span>
-                <span className="mt-2 block text-lg font-bold text-fg nums">{usd(PRICING.premium.annualPerMonth)}</span>
-                <span className="block text-[10px] text-subtle">{`/mo · annual · save $${annualSaving(PRICING.premium)}`}</span>
+                <span className="mt-2 block text-lg font-bold text-fg nums">
+                  {usd(annual ? PRICING.premium.annualPerMonth : PRICING.premium.monthly)}
+                </span>
+                <span className="block text-[10px] text-subtle">
+                  {annual
+                    ? `/mo · ${billedAnnuallyNote(PRICING.premium)} · save $${annualSaving(PRICING.premium)}/yr`
+                    : "/mo · billed monthly"}
+                </span>
               </th>
             </tr>
           </thead>
@@ -140,7 +164,9 @@ export function ComparisonTable() {
         </table>
       </div>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
-        {`All prices in USD · Monthly billing $${(PRICING.pro.monthly - PRICING.pro.annualPerMonth).toFixed(2)} / $${(PRICING.premium.monthly - PRICING.premium.annualPerMonth).toFixed(2)} higher`}
+        {annual
+          ? `All prices in USD · billed annually — Pro ${usdCompact(PRICING.pro.annual)}/yr · Premium ${usdCompact(PRICING.premium.annual)}/yr`
+          : `All prices in USD · billed monthly — annual saves $${annualSaving(PRICING.pro)}/yr (Pro) · $${annualSaving(PRICING.premium)}/yr (Premium)`}
       </div>
     </div>
   );

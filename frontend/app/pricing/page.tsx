@@ -9,12 +9,18 @@ import { LiveCounters } from "@/components/LiveCounters";
 import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
-import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, annualRateLabel } from "@/lib/pricing";
+import { BillingPeriodProvider } from "@/components/BillingToggle";
 
+// SERP title keeps the $8.25 headline but ALWAYS qualified — a bare annual
+// rate in the title while the page shows $9.99 monthly is exactly the
+// two-prices-one-screen drift the 2026-07-18 annual-default decision killed.
+// The "(billed annually)" parenthetical directly follows and scopes both
+// listed rates; the description carries the real totals.
 export const metadata = pageMeta({
-  title: `Tapeline Pricing: Pro ${usd(PRICING.pro.annualPerMonth)}/mo · Premium ${usd(PRICING.premium.annualPerMonth)}/mo · 14-Day Free Trial`,
+  title: `Tapeline Pricing: Pro from ${usd(PRICING.pro.annualPerMonth)}/mo · Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (billed annually) · 14-Day Free Trial`,
   description:
-    `Tapeline pricing: Free forever (live scores, ${FREE_LIMITS.dailyLookups} look-ups/day, top-${FREE_LIMITS.scannerRows} scanner), Pro from ${usd(PRICING.pro.annualPerMonth)}/mo (unlimited look-ups, real-time full-universe scanner), Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (Congress + insider Form 4). 14-day Premium trial, no card.`,
+    `Tapeline pricing: Free forever (live scores, ${FREE_LIMITS.dailyLookups} look-ups/day, top-${FREE_LIMITS.scannerRows} scanner), Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial, no card.`,
   path: "/pricing",
 });
 
@@ -58,6 +64,10 @@ export default function PricingPage() {
           choice of product. Same data, same formula, same public record
           across all three tiers — the price is just about how much of the
           surface you want. */}
+      {/* One shared billing-period state (annual default) for every priced
+          surface on this page — the plan cards and the comparison header can
+          never show different billing periods again. */}
+      <BillingPeriodProvider>
       <section className="section py-8 sm:py-10">
         <div className="mx-auto max-w-3xl text-center">
           <p className="eyebrow">Pricing</p>
@@ -110,6 +120,7 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+      </BillingPeriodProvider>
 
       {/* TRUST — the same live, verifiable numbers the homepage and signup
           page already show, at the moment of purchase decision. Two parts:

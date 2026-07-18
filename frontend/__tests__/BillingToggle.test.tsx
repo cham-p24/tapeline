@@ -2,7 +2,8 @@
  * Billing page tests.
  *
  * Covers:
- *   - monthly/annual toggle + effective monthly pricing (original suite)
+ *   - annual-default toggle (founder decision 2026-07-18) + qualified
+ *     effective monthly pricing; monthly one click away
  *   - the trial checkout dead-end fix: a no-card trial user (tier="premium",
  *     trial_ends_at in the future, no Stripe customer) must be able to CLICK
  *     the Premium plan button — the old disabled={tier === "premium"} meant
@@ -85,24 +86,29 @@ describe("BillingPage", () => {
     expect(screen.getByRole("heading", { name: "Premium" })).toBeInTheDocument();
   });
 
-  it("defaults to monthly billing and shows the headline monthly prices", () => {
+  it("defaults to ANNUAL billing with qualified effective-monthly prices", () => {
     render(<BillingPage />);
-    // Monthly is the default (smaller first yes) — founding prices Pro
-    // $9.99/mo and Premium $19.99/mo show without any toggle click.
-    expect(screen.getByText("$9.99")).toBeInTheDocument();
-    expect(screen.getByText("$19.99")).toBeInTheDocument();
-  });
-
-  it("switches to annual effective-monthly pricing when toggle is clicked", () => {
-    render(<BillingPage />);
-    const annualBtn = screen.getByRole("button", { name: /annual/i });
-    fireEvent.click(annualBtn);
-    // Annual displays the exact effective monthly rate: Pro $8.25/mo
-    // ($99/yr) and Premium $16.58/mo ($199/yr). Each can appear twice —
-    // once in the plan card, once in the embedded ComparisonTable — so match
-    // all occurrences rather than asserting a single element.
+    // Annual is the default (founder decision 2026-07-18): Pro $8.25/mo and
+    // Premium $16.58/mo show without any toggle click, each qualified with
+    // the real annual total ("$99.00/yr · billed annually"). Rates can appear
+    // twice — plan card + the embedded ComparisonTable header.
     expect(screen.getAllByText("$8.25").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$16.58").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/billed annually/i).length).toBeGreaterThan(0);
+    // No bare monthly sticker in the default annual view.
+    expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
+  });
+
+  it("switches to monthly pricing when the toggle is clicked", () => {
+    render(<BillingPage />);
+    const monthlyBtn = screen.getByRole("button", { name: /monthly/i });
+    fireEvent.click(monthlyBtn);
+    // Monthly shows consistently in the plan cards AND the embedded
+    // ComparisonTable header (both read the same toggle state).
+    expect(screen.getAllByText("$9.99").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$19.99").length).toBeGreaterThan(0);
+    expect(screen.queryByText("$8.25")).not.toBeInTheDocument();
+    expect(screen.queryByText("$16.58")).not.toBeInTheDocument();
   });
 });
 
@@ -174,8 +180,9 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     ctx.user = freeUser();
     window.history.replaceState({}, "", "/app/billing?intent=pro&billing=monthly");
     render(<BillingPage />);
-    // Billing toggle flipped to monthly → headline monthly prices visible.
-    expect(await screen.findByText("$9.99")).toBeInTheDocument();
+    // Billing toggle flipped to monthly → headline monthly prices visible
+    // (plan card + embedded ComparisonTable header both follow the toggle).
+    expect((await screen.findAllByText("$9.99")).length).toBeGreaterThan(0);
     // The intended plan is flagged "Selected" (never "Current" — they don't own it).
     expect(screen.getByText("Selected")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Current plan" })).not.toBeInTheDocument();

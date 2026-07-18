@@ -8,7 +8,8 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ComparisonTable } from "@/components/ComparisonTable";
-import { FREE_LIMITS } from "@/lib/pricing";
+import { BillingPeriodProvider } from "@/components/BillingToggle";
+import { PRICING, FREE_LIMITS, usd } from "@/lib/pricing";
 
 describe("ComparisonTable", () => {
   it("renders the post-#343 Free-tier limits from FREE_LIMITS", () => {
@@ -44,5 +45,28 @@ describe("ComparisonTable", () => {
     expect(screen.queryByText("5 look-ups/day")).not.toBeInTheDocument();
     expect(screen.queryByText(/3-ticker watchlist/i)).not.toBeInTheDocument();
     expect(screen.queryByText("5 tickers · no alerts")).not.toBeInTheDocument();
+  });
+
+  it("header defaults to ANNUAL rates with the billed-annually qualifier", () => {
+    // Founder decision 2026-07-18: annual default, total always explicit.
+    render(<ComparisonTable />);
+    expect(screen.getByText(usd(PRICING.pro.annualPerMonth))).toBeInTheDocument();
+    expect(screen.getByText(usd(PRICING.premium.annualPerMonth))).toBeInTheDocument();
+    // One qualifier per paid column — never a bare annual rate.
+    expect(screen.getAllByText(/billed annually \(\$\d/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(usd(PRICING.pro.monthly))).not.toBeInTheDocument();
+  });
+
+  it("header follows the shared toggle state when the provider says monthly", () => {
+    render(
+      <BillingPeriodProvider value="monthly">
+        <ComparisonTable />
+      </BillingPeriodProvider>,
+    );
+    expect(screen.getByText(usd(PRICING.pro.monthly))).toBeInTheDocument();
+    expect(screen.getByText(usd(PRICING.premium.monthly))).toBeInTheDocument();
+    // No stale annual effective rate on the monthly view.
+    expect(screen.queryByText(usd(PRICING.pro.annualPerMonth))).not.toBeInTheDocument();
+    expect(screen.queryByText(usd(PRICING.premium.annualPerMonth))).not.toBeInTheDocument();
   });
 });
