@@ -396,6 +396,45 @@ async def oauth_callback(
             email=user.email, tier=user.tier,
             trial_ends_at=user.trial_ends_at, source=provider,
         )
+        # Day-0 welcome email — the SAME send the native path fires in
+        # routers/auth.py. Without it, OAuth signups (the designed-primary
+        # path — Google button first, above the fold) received nothing until
+        # the 24-72h activation nudge. Welcome is transactional/account-state
+        # (see services/email_prefs.py — not gated by EmailPref bits, matching
+        # auth.py), and OAuth users are auto-verified above, so there is NO
+        # verification email here — just the welcome. Fire-and-forget:
+        # failures must never fail the signup, and send_email is a no-op
+        # without RESEND_API_KEY, so this is safe in dev.
+        try:
+            from sqlalchemy import desc as _desc
+
+            from app.models import Ticker
+            from app.services.email import render_welcome_email, send_email
+            from app.services.ticker_freshness import live_clauses
+
+            # Freshness + data-quality floor — same query as auth.py: a new
+            # signup's first email should show live, clean top picks, not
+            # stale ghost rows or corrupt (score>100 / emoji-symbol /
+            # <2-factor) artifacts. See app.services.ticker_freshness.
+            _top_stmt = select(
+                Ticker.symbol, Ticker.score, Ticker.signal, Ticker.reason
+            )
+            for _clause in await live_clauses(session):
+                _top_stmt = _top_stmt.where(_clause)
+            top_result = await session.execute(
+                _top_stmt.order_by(_desc(Ticker.score)).limit(3)
+            )
+            picks = [
+                {"symbol": r[0], "score": r[1], "signal": r[2], "reason": r[3]}
+                for r in top_result.all()
+            ]
+            await send_email(
+                user.email,
+                "Welcome to Tapeline — your trial is live",
+                render_welcome_email(user.name or "trader", picks=picks),
+            )
+        except Exception:
+            logger.exception("oauth.welcome_email_failed user=%s", user.id)
         # oauth=1 marks a brand-new OAuth signup so the frontend can fire
         # signup-funnel analytics events later (no frontend event work yet).
         qs = urlencode({"next": next_path, "oauth": "1"})
