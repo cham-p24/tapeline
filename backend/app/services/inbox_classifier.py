@@ -97,31 +97,97 @@ TIER_2_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "ticker_score",
         re.compile(r"\$([A-Z]{1,6})\b"),
     ),
-    # "how does pricing work" / "what are your prices" / "what are the plans"
+    # "how does pricing work" / "what are your prices" / "what are the plans".
+    # Bare keywords are NOT enough: "cost", "monthly", "plan" and "tier" all
+    # appear incidentally in ordinary trading talk ("I plan to hold through
+    # earnings", "the cost of being wrong", "my monthly rebalance"), and a
+    # bare-keyword match auto-sent a pricing template at those. Every
+    # alternative below needs an explicit pricing framing.
     (
         "pricing",
         re.compile(
-            r"\b(?:pricing|how\s+much|cost|monthly|annually|tiers?|plans?)\b",
+            r"\bpricing\b"
+            r"|\bhow\s+much\s+(?:is|are|does|do|would|for)\b"
+            r"|\b(?:what|how)(?:'s|\s+is|\s+are|\s+do|\s+does)?\s+(?:the\s+|your\s+|it\s+)?"
+            r"(?:price|prices|plans?|tiers?)\b"
+            r"|\b(?:monthly|annual|yearly|subscription)\s+(?:cost|price|fee|plan|tier)s?\b"
+            r"|\bprice\s+(?:point|list)s?\b"
+            r"|\bpaid\s+(?:plan|tier)s?\b",
             re.IGNORECASE,
         ),
     ),
+    # Trial questions. "trial" alone is too loose (clinical trial, trial and
+    # error, "trial by fire"), so it has to sit in a signup framing.
     (
         "trial",
         re.compile(
-            r"\b(?:trial|free trial|premium trial|try premium|sign up free)\b",
+            r"\bfree\s+trial\b"
+            r"|\bpremium\s+trial\b"
+            r"|\btrial\s+(?:period|account|version)\b"
+            r"|\b(?:start|get|have|offer|is\s+there|do\s+you\s+(?:have|offer)|can\s+i\s+get)"
+            r"\s+(?:a\s+)?trial\b"
+            r"|\btry\s+premium\b"
+            r"|\bsign\s+up\s+free\b",
             re.IGNORECASE,
         ),
     ),
-    # Generic "great work" / "love this" — short positive sentiment with no
-    # specific question.
+    # Generic "great work" / "love this" — SHORT positive sentiment with no
+    # specific question. The whole body must be short and question-free:
+    # the old first-80-chars scan fired the thanks template at "I have a
+    # great deal of trouble with your momentum weighting…", i.e. it
+    # auto-thanked people who were actually critiquing the methodology.
     (
         "thanks",
         re.compile(
-            r"^.{0,80}\b(?:love|great|cool|nice|awesome|impressive|solid)\b",
+            r"^(?=[\s\S]{0,120}$)(?![\s\S]*\?)[\s\S]*"
+            r"\b(?:thanks|thank\s+you"
+            r"|love\s+(?:this|it|the|your)"
+            r"|(?:this|it|that|tapeline)(?:'s|\s+is|\s+looks)\s+"
+            r"(?:great|cool|nice|awesome|impressive|solid)"
+            r"|(?:great|cool|nice|awesome|impressive|solid)(?:\s+\w+){0,2}\s+"
+            r"(?:work|job|product|tool|stuff|build|app|site))\b",
             re.IGNORECASE,
         ),
     ),
 ]
+
+# Escalation signals — these take PRECEDENCE over the Tier 2 fast path.
+# A message carrying any of them is never safe to answer with a canned
+# template, even when it also contains a cashtag or the word "pricing"
+# (press asking "what's your pricing model?", a fund evaluating seats, a
+# 300-word factor-model critique that happens to mention $NVDA). Matching
+# here returns None so the caller escalates to the LLM, which can still
+# land on Tier 2/3 with full context.
+ESCALATION_PATTERNS: list[re.Pattern[str]] = [
+    # Press / podcast / partnership — always needs the founder's voice.
+    re.compile(
+        r"\b(?:journalist|reporter|editor|press\s+(?:enquiry|inquiry|request)|"
+        r"podcast|newsletter|interview|writing\s+(?:a\s+)?(?:piece|story|article)|"
+        r"partnership|affiliate|sponsor|sponsorship|collaborate|collaboration)\b",
+        re.IGNORECASE,
+    ),
+    # Evaluating for an organisation rather than one retail seat — a very
+    # different pricing conversation from the pricing-101 template.
+    re.compile(
+        r"\b(?:my|our)\s+(?:team|fund|firm|desk|shop|clients?)\b"
+        r"|\b(?:enterprise|institutional|procurement|invoice|purchase\s+order|"
+        r"volume\s+discount|bulk\s+licen[sc]e|seats?\s+for)\b",
+        re.IGNORECASE,
+    ),
+    # Methodology / factor-model discussion — the "long thoughtful critique"
+    # in the tier definitions.
+    re.compile(
+        r"\b(?:methodolog\w*|factor\s+model|back-?test\w*|weightings?|"
+        r"look-?ahead\s+bias|survivorship|sharpe|drawdown|out-?of-?sample|"
+        r"walk\s+me\s+through)\b",
+        re.IGNORECASE,
+    ),
+]
+
+# Bodies at least this long are, per the tier definitions above ("Long
+# thoughtful (200+ char) methodology critique"), out of templatable
+# territory regardless of which keywords they happen to contain.
+ESCALATION_MIN_LENGTH = 200
 
 # Tier 3 — obvious spam / bot / hostile patterns. Match against the
 # whole body; any hit drops to ignore-without-LLM.
@@ -151,7 +217,11 @@ TIER_3_PATTERNS: list[re.Pattern[str]] = [
 
 def classify_rule_based(body: str) -> ClassifiedMessage | None:
     """Fast deterministic classifier. Returns None when the message
-    doesn't match any known pattern (i.e. needs the LLM)."""
+    doesn't match any known pattern, or when it carries an escalation
+    signal that outranks the Tier 2 templates (i.e. needs the LLM).
+
+    Order is deliberate: Tier 3 spam → escalation → Tier 2 templates.
+    Tier 2 is the only auto-sending tier, so it is checked last."""
     if not body or not body.strip():
         # Empty body = no signal. Treat as Tier 3 ignore.
         return ClassifiedMessage(
@@ -171,6 +241,27 @@ def classify_rule_based(body: str) -> ClassifiedMessage | None:
                 suggested_reply=None,
                 template_key=None,
             )
+
+    # Escalation check BEFORE the Tier 2 fast path. Tier 2 is the only
+    # tier that auto-sends, so anything carrying a founder-review signal
+    # must get out ahead of it — otherwise a journalist asking about the
+    # pricing model, or a fund evaluating seats for a desk, gets a canned
+    # template instead of a human. Returning None (not Tier 1) keeps the
+    # existing semantics: the caller escalates to the LLM, which can still
+    # settle on Tier 2 or 3 once it has the full context.
+    stripped = body.strip()
+    if len(stripped) >= ESCALATION_MIN_LENGTH:
+        logger.info(
+            "inbox.classify.escalated reason=length len=%d", len(stripped),
+        )
+        return None
+    for pat in ESCALATION_PATTERNS:
+        if pat.search(body):
+            logger.info(
+                "inbox.classify.escalated reason=pattern pat=%s",
+                pat.pattern[:60],
+            )
+            return None
 
     # Tier 2 patterns. First match wins; order matters (ticker_score
     # before pricing before thanks).

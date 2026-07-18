@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -449,6 +449,52 @@ def _channel_entitled(user: User, channel: str) -> bool:
     return has_feature(tier, feature)
 
 
+async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
+    """True when the user has already used their `email_alerts_per_day` cap.
+
+    The meter is the SAME one /api/usage reads (routers/usage.py): delivered
+    AlertEvent rows created since the current UTC midnight — no separate
+    counter to drift out of sync. Scoped to `channel == "email"` because this
+    is the EMAIL cap; a Premium user's Telegram alerts must not eat into it.
+
+    The cap was metered and marketed (Pro = 10/day) but never enforced at send
+    time, so a noisy rule set could bill zero and email without limit.
+
+    Counting is by delivered rows only, so the in-flight event (still
+    delivered=False at this point) can't count itself, and a suppressed or
+    failed send never burns budget.
+
+    The explicit flush is load-bearing: SessionLocal sets autoflush=False and
+    each evaluator commits only once at the END of the tick, so without it the
+    query would miss every event fired earlier in the SAME tick and a user with
+    N matching rules would get all N emails regardless of the cap. Flushing
+    stays inside the evaluator's open transaction — it pushes the pending
+    INSERTs and the delivered=True updates down to the DB, it doesn't commit.
+
+    UNLIMITED (None) never caps. A cap of 0 is a real "no email at all" —
+    though Free never reaches here anyway, since `_channel_entitled` already
+    rejects the email channel below Pro.
+    """
+    from app.services.tier import effective_limit
+
+    cap = effective_limit(user, "email_alerts_per_day")
+    if cap is None:
+        return False
+
+    await session.flush()
+    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_today = (await session.execute(
+        select(func.count()).select_from(AlertEvent)
+        .where(
+            AlertEvent.user_id == user.id,
+            AlertEvent.channel == "email",
+            AlertEvent.delivered.is_(True),
+            AlertEvent.created_at >= day_start,
+        )
+    )).scalar() or 0
+    return bool(sent_today >= cap)
+
+
 async def _fire(
     session: AsyncSession,
     rule: AlertRule,
@@ -492,6 +538,16 @@ async def _fire(
             # that the rule DID fire — they just chose not to receive it
             # by email. Helps debug "why am I getting fewer emails?".
             event.message = f"[suppressed: email prefs] {message}"
+        elif await _email_cap_reached(session, user):
+            # Daily email-alert cap spent. Same posture as the two suppressions
+            # above: keep the AlertEvent so /app/alerts/history shows the rule
+            # DID fire, just skip the send. Rolls over at the next UTC midnight.
+            event.delivered = False
+            event.message = f"[suppressed: daily email alert cap reached] {message}"
+            logger.info(
+                "alert.suppressed_email_cap user=%s rule=%s tier=%s",
+                user.id, rule.id, user.tier,
+            )
         else:
             try:
                 html = render_alert_email(

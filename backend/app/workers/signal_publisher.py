@@ -10,7 +10,7 @@ import asyncio
 import logging
 from datetime import UTC, date, datetime
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, select, update
 
 from app.config import get_settings
 from app.db import session_scope
@@ -25,11 +25,13 @@ from app.models import (
 
 # --- DATA-FEED IMPORTS ---
 # Hybrid swap (2026-05-02): real prices + live macro from Massive (api.massive.com).
-# Squeeze detection stays mock for now — running per-ticker /v2/aggs across the full
-# universe each tick burns API calls; revisit once a daily back-fill job is built.
-# Congress trades stay mock unless the smart_money_congress Google Sheet is
-# configured — Polygon/Massive don't offer that data (deferred per CLAUDE.md
-# known-issues).
+# Squeeze detection and congress trades have NO real source wired: both come from
+# mock_feed, which fabricates rows (including invented trades attributed to real,
+# named politicians). Those generators are therefore only ever PERSISTED outside
+# production — see `_mock_writes_enabled()`. In production the SqueezeSetup table
+# is owned by the SPIKE INTELLIGENCE sheet tab (sheet_feed.upsert_spikes) and the
+# congress_trades table simply stops accruing rows until a real disclosure feed
+# is wired.
 from app.services.mock_feed import (
     fetch_congress_trades,
     fetch_squeezes,
@@ -79,9 +81,74 @@ _last_insider_refresh: datetime | None = None
 _last_sector_backfill: datetime | None = None
 _last_watchlisted_news_refresh: datetime | None = None
 _last_aggregates_refresh: datetime | None = None
+_last_aggregates_failed_at: datetime | None = None  # last failed aggregates run (short retry backoff)
 _last_inbox_tick: datetime | None = None
 _last_checkout_recovery: datetime | None = None
 _last_activation_nudge: datetime | None = None
+
+# Symbols the ALL SIGNALS sheet governs. Refreshed alongside the sheet tick;
+# consumed by the per-tick snapshot upsert so the market feed can't clobber the
+# authoritative Tapeline composite. Empty when no sheet is configured.
+_sheet_governed_symbols: frozenset[str] = frozenset()
+
+
+def _mock_writes_enabled() -> bool:
+    """May fabricated (mock_feed) rows be PERSISTED to the DB?
+
+    Only outside production. `mock_feed.fetch_squeezes` /
+    `fetch_congress_trades` invent rows on every call — the congress generator
+    attributes randomly-generated trades to real, named politicians. Persisting
+    those in production publishes fabrication as fact (routers/congress.py
+    serves them as disclosures, services/alerts.py emails users about them), so
+    the write path is gated to dev/test where mock data is the point.
+
+    When a real source for either dataset is wired, gate on that source's
+    config here instead of (or in addition to) the env check.
+    """
+    return get_settings().app_env != "production"
+
+
+def _sheet_is_scoring_source() -> bool:
+    """True when the signal-system sheet owns Ticker.score + the sub-scores.
+
+    `sheet_feed.upsert_tickers` writes the authoritative Tapeline composite
+    (score, signal, all six sub_* factors, confidence_pct) for the symbols it
+    covers. It runs on a 5-minute throttle AND skips entirely when the CSV
+    content hash is unchanged, whereas `fetch_snapshots` runs every 60s — so
+    without a guard the market-feed snapshot (whose macro factor and reason
+    string are still synthesised) overwrites the sheet composite within one
+    tick of every sheet refresh and keeps it overwritten indefinitely.
+    """
+    return bool(get_settings().signal_sheet_csv_url)
+
+
+async def _refresh_sheet_governed_symbols() -> None:
+    """Cache the symbol set the ALL SIGNALS tab covers.
+
+    Deliberately scoped to the sheet's OWN symbols: the discovered universe is
+    far larger than the sheet, and freezing the composite for symbols the sheet
+    never publishes would leave them ranked on a permanently stale score.
+    Failures leave the previous set in place (fail-soft)."""
+    global _sheet_governed_symbols
+    url = get_settings().signal_sheet_csv_url
+    if not url:
+        return
+    try:
+        from app.services.sheet_feed import fetch_csv, parse_all_signals_csv
+
+        # dedup=False: refresh_from_workbook consumes the content-hash dedupe,
+        # so a deduped fetch here would return None on every steady-state tick
+        # and the set could never be (re)built after a worker restart.
+        text = await fetch_csv(url, dedup=False)
+        if not text:
+            return
+        symbols = frozenset(
+            r["symbol"] for r in parse_all_signals_csv(text) if r.get("symbol")
+        )
+        if symbols:
+            _sheet_governed_symbols = symbols
+    except Exception:
+        logger.exception("sheet_feed.governed_symbols_refresh_failed")
 
 
 async def seed_universe() -> None:
@@ -104,9 +171,21 @@ async def tick() -> None:
     # Await the async ones so we get actual data instead of a coroutine object.
     import inspect
     snapshots = await fetch_snapshots() if inspect.iscoroutinefunction(fetch_snapshots) else fetch_snapshots()
-    squeezes = await fetch_squeezes() if inspect.iscoroutinefunction(fetch_squeezes) else fetch_squeezes()
     regime = await fetch_regime() if inspect.iscoroutinefunction(fetch_regime) else fetch_regime()
-    new_trades = await fetch_congress_trades() if inspect.iscoroutinefunction(fetch_congress_trades) else fetch_congress_trades()
+
+    # Squeezes + congress trades are FABRICATED by mock_feed (no real source is
+    # wired for either). Don't even generate them in production — see
+    # `_mock_writes_enabled()`.
+    mock_writes = _mock_writes_enabled()
+    squeezes: list[dict] = []
+    new_trades: list[dict] = []
+    if mock_writes:
+        squeezes = await fetch_squeezes() if inspect.iscoroutinefunction(fetch_squeezes) else fetch_squeezes()
+        new_trades = (
+            await fetch_congress_trades()
+            if inspect.iscoroutinefunction(fetch_congress_trades)
+            else fetch_congress_trades()
+        )
 
     # Live breadth: % of universe with sub_trend > 50 (proxy for "above
     # the 200DMA" since the trend factor incorporates that). Replaces the
@@ -139,54 +218,103 @@ async def tick() -> None:
         # Don't let regime breakage propagate — keep whatever fetch_regime returned
         logger.exception("regime.sector_leaders_compute_failed")
 
+    # Symbols whose composite the sheet owns — the snapshot upsert below writes
+    # only market-feed fields for those (see _sheet_is_scoring_source).
+    sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
+
     async with session_scope() as session:
         # --- Update ticker snapshots (dialect-neutral upsert) ---
-        existing = {
-            t.symbol: t
-            for t in (await session.execute(select(Ticker))).scalars().all()
+        # Only the PK is selected: loading full ORM Ticker objects for the whole
+        # table made per-tick memory scale with the universe (5.7k rows and
+        # growing) for what is just an exists-check.
+        existing_symbols = {
+            s for (s,) in (await session.execute(select(Ticker.symbol))).all()
         }
+        full_updates: list[dict] = []
+        market_updates: list[dict] = []
         for snap in snapshots:
-            row = existing.get(snap["symbol"])
-            data = {
-                "score": snap["score"],
-                "signal": snap["signal"],
+            market_only = {
                 "price": snap["price"],
                 "change_pct_1d": snap["change_pct_1d"],
                 "change_pct_5d": snap["change_pct_5d"],
                 "change_pct_1m": snap["change_pct_1m"],
                 "volume": snap["volume"],
-                "sub_trend": snap["sub_trend"],
-                "sub_rs": snap["sub_rs"],
-                "sub_fundamentals": snap["sub_fundamentals"],
-                "sub_momentum": snap["sub_momentum"],
-                "sub_macro": snap["sub_macro"],
-                "sub_smart_money": snap["sub_smart_money"],
-                "confidence_pct": snap.get("confidence_pct"),
-                "reason": snap["reason"],
             }
-            if row is None:
-                session.add(Ticker(symbol=snap["symbol"], name=snap["symbol"], **data))
+            is_sheet_owned = snap["symbol"] in sheet_owned
+            if is_sheet_owned:
+                # Sheet-governed: price/volume/changes come from the market feed,
+                # but the composite, the six sub-scores and confidence stay
+                # whatever sheet_feed.upsert_tickers last wrote.
+                data = market_only
             else:
-                for k, v in data.items():
-                    setattr(row, k, v)
+                data = {
+                    **market_only,
+                    "score": snap["score"],
+                    "signal": snap["signal"],
+                    "sub_trend": snap["sub_trend"],
+                    "sub_rs": snap["sub_rs"],
+                    "sub_fundamentals": snap["sub_fundamentals"],
+                    "sub_momentum": snap["sub_momentum"],
+                    "sub_macro": snap["sub_macro"],
+                    "sub_smart_money": snap["sub_smart_money"],
+                    "confidence_pct": snap.get("confidence_pct"),
+                    "reason": snap["reason"],
+                }
+            if snap["symbol"] not in existing_symbols:
+                session.add(Ticker(symbol=snap["symbol"], name=snap["symbol"], **data))
+            elif is_sheet_owned:
+                market_updates.append({"symbol": snap["symbol"], **data})
+            else:
+                full_updates.append({"symbol": snap["symbol"], **data})
+
+        # Bulk UPDATE ... WHERE symbol = :symbol, executemany'd per column set.
+        for batch in (full_updates, market_updates):
+            if batch:
+                await session.execute(update(Ticker), batch)
 
         # --- Replace squeeze setups ---
-        await session.execute(delete(SqueezeSetup))
-        for s in squeezes:
-            session.add(SqueezeSetup(**s))
+        # ONLY when the rows we're about to write are real enough to persist.
+        # In production this table is owned by the SPIKE INTELLIGENCE sheet tab
+        # (5-min throttle, skipped entirely when the CSV is unchanged), so
+        # wiping it every 60s here deleted real data and served ~15 fabricated
+        # setups in its place.
+        if mock_writes:
+            await session.execute(delete(SqueezeSetup))
+            for s in squeezes:
+                session.add(SqueezeSetup(**s))
 
         # --- Upsert regime (single row) ---
         await session.execute(delete(RegimeState))
         session.add(RegimeState(id=1, **regime))
 
         # --- Append new congress trades ---
+        # Idempotent on the natural key (politician + symbol + trade_date +
+        # direction + amount band) so a real disclosure feed re-reporting the
+        # same filing can't duplicate it. Existing rows are never deleted here
+        # — purging the fabricated backlog is an operator decision.
         for t in new_trades:
-            session.add(CongressTrade(**t))
+            dupe = await session.execute(
+                select(CongressTrade.id)
+                .where(
+                    CongressTrade.politician == t["politician"],
+                    CongressTrade.symbol == t["symbol"],
+                    CongressTrade.trade_date == t["trade_date"],
+                    CongressTrade.direction == t["direction"],
+                    CongressTrade.amount_min == t["amount_min"],
+                    CongressTrade.amount_max == t["amount_max"],
+                )
+                .limit(1)
+            )
+            if dupe.scalar_one_or_none() is None:
+                session.add(CongressTrade(**t))
 
     # Publish to SSE
     await broker.publish("scores_updated", {"ts": started.isoformat(), "count": len(snapshots)})
     await broker.publish("regime_updated", regime)
-    await broker.publish("squeeze_updated", {"count": len(squeezes)})
+    if mock_writes:
+        # Only announce a squeeze change when this tick actually wrote one —
+        # otherwise the event carried count=0 while the table held real rows.
+        await broker.publish("squeeze_updated", {"count": len(squeezes)})
 
     # Evaluate alert rules against the freshly-updated state.
     # Each evaluator is debounced internally (15min), safe to run every tick.
@@ -389,6 +517,9 @@ async def tick() -> None:
             async with session_scope() as sheet_session:
                 if settings.signal_sheet_csv_url:
                     counts = await refresh_from_workbook(sheet_session)
+                    # Which symbols the sheet owns — consumed by the snapshot
+                    # upsert so the market feed can't clobber their composite.
+                    await _refresh_sheet_governed_symbols()
                     if counts.get("total"):
                         logger.info(
                             "sheet_feed.tick rows=%d ins=%d upd=%d",
@@ -430,10 +561,21 @@ async def tick() -> None:
     # this tick. Idempotent: returns early when today's row already exists.
     # Isolated so a freeze failure can't abort every stage below it; the
     # once-per-day semantics are enforced in-DB, so a retry next tick is safe.
-    try:
-        await _ensure_daily_scorecard(started.date())
-    except Exception:
-        logger.exception("scorecard.snapshot_failed")
+    #
+    # Only AFTER the as_of session's close (see _SCORECARD_FREEZE_UTC_*): the
+    # back-check computes `change_pct_1d_after` as
+    # close(next trading day) / price_at_flag, so price_at_flag has to BE the
+    # as_of session's close. Freezing at the top of the UTC day (the old
+    # behaviour) captured the PREVIOUS session's close, making every published
+    # "1-day" move actually span 2 sessions — and 4 across a long weekend.
+    if (started.hour, started.minute) >= (
+        _SCORECARD_FREEZE_UTC_HOUR,
+        _SCORECARD_FREEZE_UTC_MINUTE,
+    ):
+        try:
+            await _ensure_daily_scorecard(started.date())
+        except Exception:
+            logger.exception("scorecard.snapshot_failed")
 
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
@@ -508,13 +650,25 @@ async def tick() -> None:
     # Daily Massive aggregates refresh — pre-fetches 250 days of OHLC bars per
     # ticker, computes trend/RS/momentum, populates the in-memory caches that
     # polygon_feed.fetch_snapshots reads per tick.
-    global _last_aggregates_refresh
-    if (settings.massive_api_key or settings.polygon_api_key) and (
+    global _last_aggregates_refresh, _last_aggregates_failed_at
+    aggregates_due = (
         _last_aggregates_refresh is None
         or (started - _last_aggregates_refresh).total_seconds() >= 86400
+    )
+    aggregates_backoff_elapsed = (
+        _last_aggregates_failed_at is None
+        or (started - _last_aggregates_failed_at).total_seconds()
+        >= _AGGREGATES_RETRY_BACKOFF_SECONDS
+    )
+    if (settings.massive_api_key or settings.polygon_api_key) and (
+        aggregates_due and aggregates_backoff_elapsed
     ):
+        # Latch BEFORE dispatch so concurrent ticks can't double-run it; the
+        # runner CLEARS the latch on failure (see _run_aggregates_refresh) so a
+        # single bad benchmark fetch can't disable the trend/RS/momentum caches
+        # for a full 24h.
         _last_aggregates_refresh = started
-        asyncio.create_task(_refresh_aggregates_cache())
+        _spawn(_run_aggregates_refresh())
 
     # End-of-day watchlist email digest. Fires once per UTC day shortly after
     # 21:00 UTC (~5pm ET, after US market close). Tracks last-sent date in
@@ -706,6 +860,30 @@ async def tick() -> None:
     )
 
 
+_SCORECARD_FREEZE_UTC_HOUR = 21
+_SCORECARD_FREEZE_UTC_MINUTE = 15
+"""Earliest UTC wall-clock the daily top-10 may be frozen.
+
+The US cash session closes at 16:00 ET — 20:00 UTC on EDT, 21:00 UTC on EST —
+and 21:15 UTC clears the later of the two with a margin for the closing print
+to land in the snapshot feed. It is also still the same calendar date in ET, so
+`started.date()` remains the session date the frozen close belongs to.
+
+Consequence: the freeze window is ~21:15-24:00 UTC instead of the whole UTC day.
+A worker outage spanning that window means no scorecard row for that session —
+deliberately preferred over publishing a mislabelled multi-session return."""
+
+_AGGREGATES_RETRY_BACKOFF_SECONDS = 900
+"""Wait before retrying the daily aggregates refresh after a failed run. Short
+enough that a transient SPY/vendor blip costs minutes rather than the full 24h
+the success latch would otherwise burn, long enough that a sustained vendor
+outage isn't hammered every 60s tick."""
+
+_SPY_BENCHMARK_ATTEMPTS = 3
+"""Attempts at the SPY benchmark bars before giving up on an aggregates run.
+SPY is a hard prerequisite (it's the RS denominator for every other ticker), so
+one transient failure must not silently strand the caches."""
+
 _MAX_PER_SECTOR = 3
 """Concentration cap on the daily top-10. Without it the freeze frequently
 holds 5+ semiconductors or 5+ regional banks because the sheet ranks them
@@ -818,6 +996,12 @@ async def _ensure_daily_scorecard(today: date) -> None:
     to a real "next trading day" close — writing rows on Sat/Sun/holidays
     breaks that assumption and causes the back-check to skip entries forever
     or write 0% return values comparing same-day snapshots.
+
+    `price_at_flag` is the baseline the back-check divides by, so it must be
+    `today`'s close: the caller therefore only invokes this after the US
+    session closes (see _SCORECARD_FREEZE_UTC_HOUR). Called earlier in the UTC
+    day, `Ticker.price` is still the PREVIOUS session's close and every
+    resulting "1-day" figure silently spans 2-4 sessions.
 
     Also skips tickers with a missing/zero price (bad upstream data) — a $0
     flag price would cause divide-by-zero when computing return.
@@ -1365,11 +1549,46 @@ async def _refresh_fundamentals_cache() -> None:
     logger.info("fundamentals.refreshed scored=%d cache_size=%d", refreshed, fund_cache_size())
 
 
-async def _refresh_aggregates_cache() -> None:
+async def _run_aggregates_refresh() -> None:
+    """Run the daily aggregates refresh, un-latching it if it didn't succeed.
+
+    The dispatch site latches `_last_aggregates_refresh` for 24h BEFORE
+    spawning (so concurrent ticks can't double-run a ~12 minute job). That
+    latch used to survive a failed run, so one bad SPY fetch left
+    trend/RS/momentum served from the synthesised fallback for a full day —
+    and on a cold start the caches simply stayed empty. Clearing the latch here
+    hands the retry decision back to the tick gate, which re-tries after
+    `_AGGREGATES_RETRY_BACKOFF_SECONDS`.
+    """
+    global _last_aggregates_refresh, _last_aggregates_failed_at
+    try:
+        succeeded = await _refresh_aggregates_cache()
+    except Exception:
+        logger.exception("aggregates.refresh_failed")
+        succeeded = False
+
+    if succeeded:
+        _last_aggregates_failed_at = None
+        return
+
+    _last_aggregates_refresh = None
+    _last_aggregates_failed_at = datetime.now(UTC)
+    logger.error(
+        "aggregates.refresh_unsuccessful — trend/RS/momentum caches NOT "
+        "refreshed; retrying in %ds",
+        _AGGREGATES_RETRY_BACKOFF_SECONDS,
+    )
+
+
+async def _refresh_aggregates_cache() -> bool:
     """
     Daily pre-fetch of OHLC aggregates for every ticker. Computes trend, RS,
     and momentum scores from the bars and populates the in-memory caches that
     polygon_feed.fetch_snapshots reads per tick.
+
+    Returns True only when the run actually populated caches; False means the
+    caller should NOT treat the 24h refresh as done (see
+    `_run_aggregates_refresh`).
 
     Strategy:
     1. Fetch SPY first (needed for RS comparisons across all other tickers)
@@ -1395,18 +1614,38 @@ async def _refresh_aggregates_cache() -> None:
         set_cached_trend,
     )
 
-    # Fetch SPY first as the RS benchmark
+    # Fetch SPY first as the RS benchmark. Retried: SPY is a hard prerequisite
+    # for the whole run, so a single transient vendor error must not cost the
+    # day's caches.
     today = _d.today()
     start = today - _td(days=365)
-    try:
-        spy_bars = await fetch_aggregates("SPY", from_date=start, to_date=today)
-    except Exception:
-        logger.exception("aggregates.spy_fetch_failed — skipping aggregates refresh this cycle")
-        return
+    spy_bars: list[dict] | None = None
+    for attempt in range(1, _SPY_BENCHMARK_ATTEMPTS + 1):
+        try:
+            spy_bars = await fetch_aggregates("SPY", from_date=start, to_date=today)
+        except Exception:
+            logger.exception(
+                "aggregates.spy_fetch_failed attempt=%d/%d",
+                attempt, _SPY_BENCHMARK_ATTEMPTS,
+            )
+            spy_bars = None
+        if spy_bars and len(spy_bars) >= 63:
+            break
+        logger.warning(
+            "aggregates.spy_insufficient_bars count=%d attempt=%d/%d",
+            len(spy_bars) if spy_bars else 0, attempt, _SPY_BENCHMARK_ATTEMPTS,
+        )
+        spy_bars = None
+        if attempt < _SPY_BENCHMARK_ATTEMPTS:
+            await asyncio.sleep(5 * attempt)
 
-    if not spy_bars or len(spy_bars) < 63:
-        logger.warning("aggregates.spy_insufficient_bars count=%d — skipping refresh", len(spy_bars) if spy_bars else 0)
-        return
+    if not spy_bars:
+        logger.error(
+            "aggregates.spy_unavailable attempts=%d — aggregates refresh NOT "
+            "completed (caches left as-is, run will be retried)",
+            _SPY_BENCHMARK_ATTEMPTS,
+        )
+        return False
 
     # Same liquidity cap as the Finnhub refreshes — Massive Stocks Starter
     # IS unlimited on call volume, but iterating 5700 tickers at 0.3s each
@@ -1450,6 +1689,9 @@ async def _refresh_aggregates_cache() -> None:
         "aggregates.refreshed scored=%d trend_cache=%d rs_cache=%d mom_cache=%d",
         refreshed, sizes["trend"], sizes["rs"], sizes["momentum"],
     )
+    # An empty result is a failure, not a successful no-op — don't let it latch
+    # the 24h window and leave the caches stranded.
+    return refreshed > 0
 
 
 async def _refresh_insider_cache() -> None:

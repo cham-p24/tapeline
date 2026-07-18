@@ -33,6 +33,20 @@ for _live_key in (
 ):
     os.environ.pop(_live_key, None)
 
+# Hard-pin the test database to local SQLite. The suite signs users up, mints
+# verification tokens and deletes rows — pointed at the production Neon URL it
+# would do all of that to real customer data. That very nearly happened: a run
+# from a git worktree (no local .env to shadow it) picked up the exported
+# production DATABASE_URL and was only stopped by psycopg refusing Windows'
+# ProactorEventLoop. Refusing to inherit a non-SQLite URL makes the safety
+# property explicit instead of leaving it to whichever .env happens to be on
+# disk. Set TAPELINE_TEST_DATABASE_URL to aim the suite at a real throwaway DB.
+_test_db = os.environ.get("TAPELINE_TEST_DATABASE_URL")
+if _test_db:
+    os.environ["DATABASE_URL"] = _test_db
+elif not os.environ.get("DATABASE_URL", "").startswith("sqlite"):
+    os.environ["DATABASE_URL"] = "sqlite:///./tapeline_dev.sqlite"
+
 import asyncio  # noqa: E402
 
 import pytest  # noqa: E402

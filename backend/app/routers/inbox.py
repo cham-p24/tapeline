@@ -36,6 +36,7 @@ from app.config import get_settings
 from app.db import get_session
 from app.models import InboundMessage, User
 from app.services import email as email_service
+from app.services import inbox_kill_switch
 from app.services import telegram as telegram_service
 from app.services.auth import current_user_required
 from app.services.inbox_router import (
@@ -215,6 +216,33 @@ async def email_inbound(
                 "ok": True, "auto_replied": False, "blocked": "prescriptive_language",
                 "phrase": banned, "tier": 2, "message_id": result.message.id,
             }
+
+        # Kill switches gate the wire, not just the classifier. A disabled
+        # email channel or a dry run must never put an auto-reply in front of
+        # a real person. The row stays at 'auto_replied' (drafted, not
+        # delivered) so the founder can send it from /app/inbox once the
+        # switch is flipped back.
+        if not inbox_kill_switch.channel_enabled("email"):
+            logger.info(
+                "inbox.email.auto_reply_skipped reason=channel_disabled msg_id=%d",
+                result.message.id,
+            )
+            await session.commit()
+            return {
+                "ok": True, "auto_replied": False, "skipped": "channel_disabled",
+                "tier": 2, "message_id": result.message.id,
+            }
+        if inbox_kill_switch.dry_run():
+            logger.info(
+                "inbox.email.dry_run to=%s subject=%r tier=2 msg_id=%d would_send=%s",
+                sender, subject, result.message.id, result.auto_reply_text[:300],
+            )
+            await session.commit()
+            return {
+                "ok": True, "auto_replied": False, "dry_run": True,
+                "tier": 2, "message_id": result.message.id,
+            }
+
         try:
             res = await email_service.send_email(
                 to=sender,
@@ -548,7 +576,11 @@ async def _approve_core(
 
     On a send failure (or a skipped email) the row is left at
     status='approved', NOT 'sent' — so re-approving from the UI or
-    Telegram simply retries delivery. There is no background drain."""
+    Telegram simply retries delivery. There is no background drain.
+
+    Honours the kill switches: a disabled channel or `INBOX_DRY_RUN`
+    returns without sending (error='channel_disabled' / 'dry_run'), same
+    'approved' status, so a shadow run never reaches a real recipient."""
     row = (await session.execute(
         select(InboundMessage).where(InboundMessage.id == message_id)
     )).scalar_one_or_none()
@@ -579,6 +611,34 @@ async def _approve_core(
 
     row.suggested_reply = final_reply
     row.status = "approved"
+
+    # Kill switches gate EVERY outbound path, operator-approved sends
+    # included — otherwise INBOX_DRY_RUN isn't the safe-testing switch it's
+    # documented to be, and a one-tap Telegram approve still hits the wire.
+    # Both branches leave the row at 'approved' (never 'sent'), so
+    # re-approving after flipping the switch back simply retries delivery.
+    # Reddit is checked here as well as inside send_reddit_reply so the
+    # result dict reports the real reason instead of a generic send_failed.
+    if not inbox_kill_switch.channel_enabled(row.channel):
+        logger.info(
+            "inbox.approve.skip reason=channel_disabled id=%d channel=%s",
+            row.id, row.channel,
+        )
+        await session.commit()
+        return {
+            "ok": False, "error": "channel_disabled",
+            "id": row.id, "channel": row.channel,
+        }
+    if inbox_kill_switch.dry_run():
+        logger.info(
+            "inbox.approve.dry_run id=%d channel=%s to=%s would_send=%s",
+            row.id, row.channel, row.author, final_reply[:300],
+        )
+        await session.commit()
+        return {
+            "ok": False, "error": "dry_run", "id": row.id,
+            "channel": row.channel, "status": row.status,
+        }
 
     # Deliver synchronously on the inbound channel. Each branch returns a
     # failure dict (leaving status='approved' for a retry) or falls through
