@@ -512,7 +512,7 @@ async def test_onboarding_requires_auth(client):
     async with client:
         r = await client.post(
             "/api/me/onboarding",
-            json={"experience_level": "beginner"},
+            json={"trading_style": "swing"},
         )
         assert r.status_code == 401
 
@@ -543,9 +543,12 @@ async def test_onboarding_persists_profile_fields(client, monkeypatch):
         r_post = await client.post(
             "/api/me/onboarding",
             json={
+                # Suitability fields are deliberately sent here to prove the
+                # API IGNORES them (Rule 8) — they must never be persisted or
+                # echoed back. See the assertions below.
                 "experience_level": "intermediate",
-                "trading_style": "swing",
                 "portfolio_band": "10_50k",
+                "trading_style": "swing",
                 "referral_source": "twitter_x",
                 "marketing_opt_in": True,
                 "sectors_of_interest": ["technology", "healthcare", "made_up_sector"],
@@ -562,9 +565,11 @@ async def test_onboarding_persists_profile_fields(client, monkeypatch):
         me = r_me.json()
         assert me["onboarding_completed_at"] is not None
         profile = me["profile"]
-        assert profile["experience_level"] == "intermediate"
+        # Rule 8: suitability data must be neither stored nor exposed, even
+        # when a client sends it. Regression guard against reintroduction.
+        assert "experience_level" not in profile
+        assert "portfolio_band" not in profile
         assert profile["trading_style"] == "swing"
-        assert profile["portfolio_band"] == "10_50k"
         assert profile["referral_source"] == "twitter_x"
         assert profile["marketing_opt_in"] is True
         assert set(profile["sectors_of_interest"]) == {"technology", "healthcare"}
@@ -599,7 +604,8 @@ async def test_onboarding_skip_stamps_completion(client, monkeypatch):
         me = r_me.json()
         assert me["onboarding_completed_at"] is not None
         profile = me["profile"]
-        assert profile["experience_level"] is None
+        assert "experience_level" not in profile
+        assert "portfolio_band" not in profile
         assert profile["trading_style"] is None
         assert profile["marketing_opt_in"] is False
         assert profile["sectors_of_interest"] == []
