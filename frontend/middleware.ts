@@ -128,8 +128,25 @@ export function middleware(request: NextRequest) {
  * multi-segment garbage under /t/* now just 404s (negligibly rare) — a
  * fair trade for working social cards.
  */
-const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/([^/]+)$/;
-const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
+export const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/([^/]+)$/;
+export const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
+
+/**
+ * Next.js metadata routes that sit DIRECTLY under a ticker-prefix segment
+ * and are therefore indistinguishable from a one-segment ticker path.
+ *
+ * The single-segment capture above already protects NESTED metadata routes
+ * (/t/AAPL/opengraph-image is two segments, so it never matches). It does
+ * NOT protect a section's OWN card: /scorecard/opengraph-image is one
+ * segment, fails VALID_TICKER_RE, and was 308'd to /search — so every share
+ * of /scorecard on X, LinkedIn, Slack or Facebook rendered with no image at
+ * all. That is the page the whole transparency pitch points people at.
+ *
+ * Matched case-insensitively, with an optional Next build hash suffix
+ * (opengraph-image-1a2b3c4d). Falling through returns the real PNG.
+ */
+export const METADATA_ROUTE_RE =
+  /^(opengraph-image|twitter-image|icon|apple-icon)(-[a-z0-9]+)?$/i;
 
 function handleTickerRoute(request: NextRequest): NextResponse | null {
   const pathname = request.nextUrl.pathname;
@@ -154,6 +171,14 @@ function handleTickerRoute(request: NextRequest): NextResponse | null {
   // Send to /search?q=<raw> so the visitor lands somewhere useful and
   // Google can crawl a 200 instead of a 404.
   if (!VALID_TICKER_RE.test(upper)) {
+    // ...unless it's this section's OWN metadata route. Checked HERE, after
+    // the ticker-shape test, so a real symbol can never be shadowed: anything
+    // matching VALID_TICKER_RE (e.g. ICON) is still handled as a ticker and
+    // never reaches this branch. Only hyphenated metadata names —
+    // opengraph-image, twitter-image, apple-icon — get through, and those
+    // cannot be valid tickers. Falling through lets Next serve the PNG.
+    if (METADATA_ROUTE_RE.test(raw)) return null;
+
     const target = new URL("/search", request.url);
     // Don't URL-encode the placeholder twice — pass through whatever the
     // crawler had. If raw is literally "{search_term_string}", that's what
