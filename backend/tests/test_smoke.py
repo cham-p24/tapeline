@@ -1033,6 +1033,7 @@ def test_mfa_service_helpers():
         hash_recovery_code,
         issue_mfa_token,
         verify_mfa_token,
+        verify_recovery_code,
         verify_totp,
     )
     from app.services.session import issue_session_token, verify_session_token
@@ -1047,7 +1048,17 @@ def test_mfa_service_helpers():
     assert len(codes) == 10
     assert len(set(codes)) == 10
     c = codes[0]
-    assert hash_recovery_code(c) == hash_recovery_code(c.replace("-", "").upper())
+    # Dash/case-insensitivity is now asserted through verify_recovery_code
+    # rather than by comparing two hashes. hash_recovery_code is bcrypt as of
+    # 2026-07-19 (it was an unsalted sha256, so one GPU pass over the shared
+    # 40-bit keyspace cracked every row in the table at once) and bcrypt salts
+    # per call — hashing the same code twice MUST now differ. That difference
+    # is the fix, so the old equality assertion cannot survive it. Same
+    # property under test, expressed against the verify path that the handler
+    # actually uses.
+    assert verify_recovery_code(c, hash_recovery_code(c))
+    assert verify_recovery_code(c.replace("-", "").upper(), hash_recovery_code(c))
+    assert not verify_recovery_code(codes[1], hash_recovery_code(c))
 
     # Challenge token round-trips, but is namespaced by purpose="mfa".
     tok = issue_mfa_token("u_mfa_test")
@@ -1097,6 +1108,15 @@ async def test_2fa_enable_and_two_step_signin(client, monkeypatch):
         assert r2.status_code == 200, r2.text
         recovery = r2.json()["recovery_codes"]
         assert len(recovery) == 10
+
+        # Enabling 2FA bumps users.session_epoch, which revokes every session
+        # cookie minted before the account was hardened — including the one
+        # this test signed up with. The handler hands the caller a replacement
+        # on the new epoch in the same response, so pick it up here.
+        assert r2.cookies.get("tapeline_session"), (
+            "2FA enable must re-issue the caller's session cookie, not log them out"
+        )
+        cookies = r2.cookies
 
         r3 = await client.get("/api/me/2fa", cookies=cookies)
         assert r3.json()["enabled"] is True

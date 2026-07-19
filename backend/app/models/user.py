@@ -3,7 +3,16 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import (
+    BigInteger,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -32,6 +41,27 @@ class User(Base):
     # are cleared. See services/mfa.py + routers/me.py:2fa endpoints.
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # Highest TOTP time-step this account has already spent. verify_totp uses
+    # valid_window=1, so without this a single 6-digit code stays acceptable
+    # for ~90s and can be replayed — including after the real owner has
+    # already signed in with it. Codes at or below this step are refused.
+    # NULL means "never completed a TOTP challenge", which is NOT step 0 and
+    # must not reject a first login.
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    # Revocation counter for session JWTs. The token carries this value at
+    # issue; verify_session_token rejects any token whose claim doesn't match.
+    # Bump it to evict every outstanding session for this user — that is what
+    # makes signout-everywhere and "reset my password because I was
+    # compromised" actually mean something. Before this existed, a captured
+    # cookie survived both for its full 30-day lifetime.
+    #
+    # A token with NO epoch claim is read as 0, matching this default, so
+    # introducing the column did not sign existing users out.
+    session_epoch: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False,
+    )
 
     # Stamped when the user clicks the verification link in their welcome
     # email (native signup) OR auto-set on OAuth signup (the provider already
@@ -281,8 +311,12 @@ class MfaRecoveryCode(Base):
     """Single-use 2FA recovery codes.
 
     Ten codes are minted when a user enables TOTP 2FA and shown exactly once
-    (plaintext) in the settings UI. We store only the sha256 hash of the
+    (plaintext) in the settings UI. We store only a bcrypt hash of the
     normalised code — never the plaintext — so a DB leak can't be replayed.
+    (Codes minted before 2026-07-19 are unsalted sha256 over a 40-bit
+    keyspace, which a GPU cracked table-wide in one pass; those rows are still
+    ACCEPTED so nobody is locked out, but every new code is 80 bits + bcrypt.
+    services/mfa.verify_recovery_code detects the format per row.)
     A code is consumed (used_at stamped) the first time it's accepted at
     /api/auth/2fa, so it can't be reused. All rows for a user are wiped on
     disable or on a fresh enable (which re-issues a new set).
@@ -297,7 +331,11 @@ class MfaRecoveryCode(Base):
         nullable=False,
         index=True,
     )
-    # sha256 hex of the normalised (lowercased, dash-stripped) plaintext code.
+    # bcrypt hash (60 chars) of the normalised (lowercased, dash-stripped)
+    # plaintext code. Legacy rows hold a 64-char sha256 hex digest instead.
+    # The index is now vestigial for lookup — bcrypt salts per row, so
+    # verification loops the user's ~10 unused rows rather than matching on
+    # equality — but it still serves the user_id-scoped scan.
     code_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,

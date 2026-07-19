@@ -643,7 +643,7 @@ async def oauth_callback(
     # /start (e.g. /app/billing?intent=premium from the pricing page) is
     # honoured for BOTH — re-validated through _safe_next because the cookie
     # is client-writable; tampered values fall back to /app/scanner.
-    token = issue_session_token(user.id)
+    token = issue_session_token(user.id, user.session_epoch)
     if is_new:
         # Server-side `sign_up` conversion (GA4 Measurement Protocol). The
         # client-side beacon is the only record today, so a blocked or

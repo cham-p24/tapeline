@@ -48,20 +48,37 @@ def verify_password(plain: str, hashed: str | None) -> bool:
         return False
 
 
-def issue_session_token(user_id: str) -> str:
-    """Issue a signed JWT used as the session cookie payload."""
+def issue_session_token(user_id: str, session_epoch: int | None = 0) -> str:
+    """Issue a signed JWT used as the session cookie payload.
+
+    `session_epoch` is the caller's User.session_epoch at mint time. It is the
+    revocation dimension: bumping the column invalidates every token minted
+    before the bump (see decode_session_token / session_epoch_matches).
+    Callers that mint a session MUST pass the user's current value.
+    """
     now = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(days=SESSION_DAYS)).timestamp()),
         "nonce": secrets.token_hex(8),
+        "epoch": int(session_epoch or 0),
     }
     return jwt.encode(payload, _session_secret(), algorithm="HS256")
 
 
-def verify_session_token(token: str) -> str | None:
-    """Return user_id if the cookie is valid, else None."""
+def decode_session_token(token: str) -> tuple[str, int] | None:
+    """Return (user_id, epoch_claim) if the cookie's signature + exp are good.
+
+    Deliberately does NO database access — it is on the hot path for every
+    authenticated request. The epoch claim is returned so the caller, which
+    already has to load the User row anyway, can compare it without paying for
+    a second query. See services/auth.current_user_optional.
+
+    A token minted before the epoch existed carries no "epoch" claim and reads
+    as 0, which matches the column's default of 0 — so introducing this did not
+    invalidate a single outstanding session.
+    """
     try:
         payload = jwt.decode(token, _session_secret(), algorithms=["HS256"])
     except Exception:
@@ -72,7 +89,35 @@ def verify_session_token(token: str) -> str | None:
     if payload.get("purpose") == "mfa":
         return None
     sub = payload.get("sub")
-    return sub if isinstance(sub, str) else None
+    if not isinstance(sub, str):
+        return None
+    raw_epoch = payload.get("epoch", 0)
+    try:
+        epoch = int(raw_epoch)
+    except (TypeError, ValueError):
+        return None
+    return sub, epoch
+
+
+def verify_session_token(token: str) -> str | None:
+    """Return user_id if the cookie's signature + exp are valid, else None.
+
+    NOTE: this checks the token in isolation and therefore does NOT enforce
+    revocation. Every caller must additionally compare the epoch claim against
+    the loaded user's session_epoch — use decode_session_token +
+    session_epoch_matches. Kept for callers that only need the subject.
+    """
+    decoded = decode_session_token(token)
+    return decoded[0] if decoded else None
+
+
+def session_epoch_matches(stored: int | None, claimed_epoch: int) -> bool:
+    """True when a token's epoch claim still matches the user's stored epoch.
+
+    NULL/absent on either side reads as 0 so pre-existing rows and pre-existing
+    tokens both land on the same value and stay valid.
+    """
+    return int(stored or 0) == int(claimed_epoch or 0)
 
 
 def session_cookie_kwargs() -> dict:
