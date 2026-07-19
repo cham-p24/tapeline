@@ -1,12 +1,13 @@
 """GET/PATCH /api/me — current user, tier, Telegram chat-id management."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -724,6 +725,7 @@ async def setup_2fa(
 @router.post("/2fa/enable")
 async def enable_2fa(
     body: TwoFAEnableBody,
+    response: Response,
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -741,10 +743,21 @@ async def enable_2fa(
     from app.services.mfa import (
         generate_recovery_codes,
         hash_recovery_code,
-        verify_totp,
+        verify_totp_step,
     )
 
-    if not verify_totp(user.totp_secret, body.code):
+    # Enrolment honours the spent-step high-water mark (a code already burned
+    # at signin can't turn 2FA back on) but deliberately does NOT advance it.
+    #
+    # Advancing here would invalidate the enrolment code for the ~30s window it
+    # is still displayed in, so a user who enables 2FA and then signs in on
+    # their phone straight after would be told their fresh code is invalid. The
+    # replay finding is about the SIGNIN path — an observed code minting a
+    # session for someone else — and that is where the step is burned
+    # (routers/auth.signin_2fa). The residual gap is narrow: reaching this
+    # endpoint already requires an authenticated session on the account.
+    step = verify_totp_step(user.totp_secret, body.code, user.totp_last_step)
+    if step is None:
         raise HTTPException(
             400,
             "That code didn't match. Check your authenticator app's clock and try again.",
@@ -755,11 +768,30 @@ async def enable_2fa(
         delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user.id)
     )
     codes = generate_recovery_codes()
-    for c in codes:
-        session.add(MfaRecoveryCode(user_id=user.id, code_hash=hash_recovery_code(c)))
+    # Hash off the event loop. bcrypt at cost 12 is ~190ms per code by design,
+    # so hashing ten of them inline stalls the ENTIRE process for ~1.9s — this
+    # is a single uvicorn worker (see fly.toml, no --workers). This endpoint is
+    # reachable by any free signup with only the 120/min default limit, and
+    # setup -> enable -> disable is a loop an account holder can drive against
+    # their own account indefinitely, which is a self-service way to wedge the
+    # API past Fly's health-check timeout. The cost factor stays at 12 — the
+    # stretching is the entire point of the fix; it just doesn't belong on the
+    # loop. Same pattern as services/reddit_inbox.py.
+    hashes = await asyncio.to_thread(lambda: [hash_recovery_code(c) for c in codes])
+    for code_hash in hashes:
+        session.add(MfaRecoveryCode(user_id=user.id, code_hash=code_hash))
     user.mfa_enabled = True
+    # Turning 2FA on is a security-posture change: evict every session that
+    # predates it, so a cookie an attacker captured before the account was
+    # hardened doesn't sail straight past the authenticator the owner just
+    # enrolled. The caller keeps working — we hand them a fresh cookie on the
+    # new epoch below rather than logging the user out of the tab they're in.
+    user.session_epoch = int(user.session_epoch or 0) + 1
     await session.commit()
-    logger.info("me.2fa_enabled user=%s", user.id)
+    _reissue_session_cookie(response, user)
+    logger.info(
+        "me.2fa_enabled user=%s session_epoch=%s", user.id, user.session_epoch,
+    )
 
     # Security-confirmation receipt — fire-and-forget so a Resend hiccup
     # never fails the enable. Account-state notification (the user can't opt
@@ -791,9 +823,30 @@ async def enable_2fa(
     return {"ok": True, "recovery_codes": codes}
 
 
+def _reissue_session_cookie(response: Response, user: User) -> None:
+    """Hand the CURRENT client a cookie on the user's new session_epoch.
+
+    Bumping session_epoch invalidates every outstanding token, including the
+    one belonging to the person who just asked for the change. Without this
+    they'd be logged out of their own settings page mid-flow. Everyone else
+    stays evicted, which is the point.
+
+    No-op for a caller who authenticated with a bearer token rather than the
+    cookie — setting one is harmless, and their next request re-authenticates
+    through the same path it always did.
+    """
+    from app.services.session import issue_session_token, session_cookie_kwargs
+
+    response.set_cookie(
+        value=issue_session_token(user.id, user.session_epoch),
+        **session_cookie_kwargs(),
+    )
+
+
 @router.post("/2fa/disable")
 async def disable_2fa(
     body: TwoFADisableBody,
+    response: Response,
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -814,8 +867,18 @@ async def disable_2fa(
     )
     user.mfa_enabled = False
     user.totp_secret = None
+    # Clearing the secret makes the spent-step high-water mark meaningless —
+    # a future enrolment gets a NEW secret, and carrying a stale step forward
+    # would reject its genuine first code until the clock caught up.
+    user.totp_last_step = None
+    # Same reasoning as enable: dropping a factor is a posture change, so
+    # sessions that predate it don't survive it. The caller is re-cookied.
+    user.session_epoch = int(user.session_epoch or 0) + 1
     await session.commit()
-    logger.info("me.2fa_disabled user=%s", user.id)
+    _reissue_session_cookie(response, user)
+    logger.info(
+        "me.2fa_disabled user=%s session_epoch=%s", user.id, user.session_epoch,
+    )
 
     # Security-confirmation receipt — fire-and-forget so a Resend hiccup
     # never fails the disable. Account-state notification (the user can't opt

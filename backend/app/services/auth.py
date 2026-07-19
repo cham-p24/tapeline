@@ -151,14 +151,28 @@ async def current_user_optional(
     to one write per user per hour. Drives the re-engagement drip.
     """
     # 1. Cookie session (primary in native-auth mode)
-    from app.services.session import SESSION_COOKIE, verify_session_token
+    from app.services.session import (
+        SESSION_COOKIE,
+        decode_session_token,
+        session_epoch_matches,
+    )
 
     cookie = request.cookies.get(SESSION_COOKIE)
     if cookie:
-        user_id = verify_session_token(cookie)
-        if user_id:
+        decoded = decode_session_token(cookie)
+        if decoded:
+            user_id, epoch = decoded
             result = await session.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
+            # Revocation check. It costs ZERO extra queries: the User row was
+            # already being loaded here, and decode_session_token is pure
+            # crypto. A password reset (or a 2FA change) bumps the column, so
+            # every cookie minted before it stops resolving from this point on.
+            if user is not None and not session_epoch_matches(
+                user.session_epoch, epoch
+            ):
+                logger.info("auth.session_revoked user=%s", user.id)
+                user = None
             if user is not None:
                 await _bump_last_seen(session, user)
                 return user

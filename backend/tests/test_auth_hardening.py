@@ -52,8 +52,14 @@ def stub_mfa(monkeypatch):
     """
     mod = types.ModuleType("app.services.mfa")
     mod.verify_mfa_token = lambda t: t[4:] if t.startswith("mfa:") else None  # type: ignore[attr-defined]
+    # verify_totp_step returns the accepted time-step (or None). None here =
+    # "never a valid code", which is what these attempt-cap tests want.
+    mod.verify_totp_step = lambda secret, code, last_step=None: None  # type: ignore[attr-defined]
     mod.verify_totp = lambda secret, code: False  # type: ignore[attr-defined]
-    mod.hash_recovery_code = lambda code: "no-such-hash"  # type: ignore[attr-defined]
+    mod.verify_recovery_code = lambda code, stored: False  # type: ignore[attr-defined]
+    mod.normalise_recovery_code = (  # type: ignore[attr-defined]
+        lambda code: code.strip().lower().replace("-", "").replace(" ", "")
+    )
     monkeypatch.setitem(sys.modules, "app.services.mfa", mod)
     return mod
 

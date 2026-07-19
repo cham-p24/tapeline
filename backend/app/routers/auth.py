@@ -18,7 +18,7 @@ from fastapi import (
     Response,
 )
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -32,11 +32,12 @@ from app.services.rate_limit import client_ip as resolve_client_ip
 from app.services.rate_limit import limit_auth, limiter
 from app.services.session import (
     SESSION_COOKIE,
+    decode_session_token,
     hash_password,
     issue_session_token,
     session_cookie_kwargs,
+    session_epoch_matches,
     verify_password,
-    verify_session_token,
 )
 from app.services.trial_abuse import normalise_email
 
@@ -341,7 +342,7 @@ async def signup(
         trial_ends_at=user.trial_ends_at, source="email",
     )
 
-    token = issue_session_token(user.id)
+    token = issue_session_token(user.id, user.session_epoch)
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signup user=%s referred_by=%s", user.id, referred_by_id or "none")
 
@@ -624,12 +625,13 @@ async def resend_verification(
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(401, "Not signed in")
-    user_id = verify_session_token(token)
-    if not user_id:
+    decoded = decode_session_token(token)
+    if not decoded:
         raise HTTPException(401, "Invalid session")
+    user_id, epoch = decoded
     r = await session.execute(select(User).where(User.id == user_id))
     user = r.scalar_one_or_none()
-    if user is None:
+    if user is None or not session_epoch_matches(user.session_epoch, epoch):
         raise HTTPException(401, "Invalid session")
     if user.email_verified_at is not None:
         return {"status": "already_verified"}
@@ -782,9 +784,23 @@ async def reset_password(
         return {"status": "weak_password"}
 
     user.password_hash = pw
+    # Evict every outstanding session for this account.
+    #
+    # This is the whole point of a reset done under compromise: the receipt
+    # email below offers an "if this wasn't you" path, and before the epoch
+    # existed that path did nothing — session JWTs are stateless, so an
+    # attacker's captured cookie kept working for the remainder of its 30-day
+    # exp no matter how many times the victim changed their password. Bumping
+    # the counter makes every token minted before this line fail on the next
+    # request. No cookie is re-issued: the user is anonymous here (they hold a
+    # reset token, not a session) and signs in again straight after.
+    user.session_epoch = int(user.session_epoch or 0) + 1
     row.used_at = datetime.now(UTC)
     await session.commit()
-    logger.info("auth.password_reset_completed user=%s", user.id)
+    logger.info(
+        "auth.password_reset_completed user=%s session_epoch=%s",
+        user.id, user.session_epoch,
+    )
 
     # Security-confirmation receipt — fire-and-forget so a Resend hiccup
     # never fails the reset. Account-state notification (the user can't opt
@@ -849,7 +865,7 @@ async def signin(
         logger.info("auth.signin_mfa_challenge user=%s", user.id)
         return {"mfa_required": True, "mfa_token": issue_mfa_token(user.id)}
 
-    token = issue_session_token(user.id)
+    token = issue_session_token(user.id, user.session_epoch)
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signin user=%s", user.id)
     return {"user": _user_out(user)}
@@ -857,7 +873,11 @@ async def signin(
 
 class TwoFASigninBody(BaseModel):
     mfa_token: str = Field(..., min_length=8, max_length=2048)
-    code: str = Field(..., min_length=6, max_length=20)
+    # 6 digits for a TOTP, or a recovery code. Recovery codes grew from
+    # "a1b2c-d3e4f" (11 chars) to 80 bits dash-grouped in fives —
+    # "a1b2c-d3e4f-5a6b7-c8d9e", 23 chars — so the old max_length=20 would
+    # have 422'd every newly minted code before it reached the handler.
+    code: str = Field(..., min_length=6, max_length=64)
 
 
 # ---- Per-account 2FA guess budget -------------------------------------------
@@ -893,7 +913,12 @@ async def signin_2fa(
     single-use recovery codes. The challenge token (from /signin) proves the
     password step already passed and expires after 5 minutes.
     """
-    from app.services.mfa import hash_recovery_code, verify_mfa_token, verify_totp
+    from app.services.mfa import (
+        normalise_recovery_code,
+        verify_mfa_token,
+        verify_recovery_code,
+        verify_totp_step,
+    )
 
     user_id = verify_mfa_token(body.mfa_token)
     if not user_id:
@@ -918,22 +943,72 @@ async def signin_2fa(
         raise HTTPException(401, "Two-factor auth is not active on this account.")
 
     code = body.code.strip()
-    if not verify_totp(user.totp_secret, code):
-        # Not a valid TOTP — try a single-use recovery code.
-        from app.models import MfaRecoveryCode
-        r = await session.execute(
-            select(MfaRecoveryCode).where(
-                MfaRecoveryCode.user_id == user.id,
-                MfaRecoveryCode.code_hash == hash_recovery_code(code),
-                MfaRecoveryCode.used_at.is_(None),
+    # Burn the time-step this code belongs to. verify_totp_step refuses any
+    # step at or below user.totp_last_step, so the same 6 digits can't be
+    # replayed inside their ~90s ±1 window — which is what let an attacker who
+    # observed the victim's own successful login sign in with the same code.
+    step = verify_totp_step(user.totp_secret, code, user.totp_last_step)
+    if step is not None:
+        # Burn the step with a CONDITIONAL update, not a read-then-assign.
+        # The threat this guard exists for is a real-time phishing proxy —
+        # an adversary who controls request timing and will submit the relayed
+        # code ALONGSIDE the victim rather than politely afterwards. Two
+        # overlapping requests both read the pre-burn value, so an in-memory
+        # assignment lets both through and mints two sessions from one code.
+        # Pushing the comparison into the WHERE clause makes the database the
+        # arbiter: the second writer re-evaluates it after the first commits
+        # and matches zero rows.
+        #
+        # A conditional UPDATE rather than SELECT ... FOR UPDATE because
+        # SQLite ignores row locks, which would leave this untestable on the
+        # dev/CI path.
+        res = await session.execute(
+            update(User)
+            .where(
+                User.id == user.id,
+                or_(User.totp_last_step.is_(None), User.totp_last_step < step),
             )
+            .values(totp_last_step=step)
         )
-        rc = r.scalar_one_or_none()
+        if res.rowcount == 0:  # type: ignore[attr-defined]  # CursorResult.rowcount (DML)
+            # Someone else spent this step between our read and our write.
+            raise HTTPException(401, "Invalid code.")
+        user.totp_last_step = step
+    else:
+        # Not a valid TOTP — try a single-use recovery code.
+        #
+        # bcrypt salts per row, so there is no indexed hash lookup any more:
+        # we scan the user's unused rows. Two guards on the cost of that —
+        # a length floor (both code formats normalise to >= 10 chars, a TOTP
+        # to 6), so a mistyped 6-digit code doesn't buy ~10 bcrypt rounds;
+        # and no early break, so the wall-clock cost doesn't reveal WHICH row
+        # matched.
+        from app.models import MfaRecoveryCode
+        rc = None
+        if len(normalise_recovery_code(code)) >= 10:
+            rows = (await session.execute(
+                select(MfaRecoveryCode).where(
+                    MfaRecoveryCode.user_id == user.id,
+                    MfaRecoveryCode.used_at.is_(None),
+                )
+            )).scalars().all()
+            # Off the event loop: each bcrypt check is ~190ms, so scanning ten
+            # rows inline would block the single uvicorn worker for ~1.9s per
+            # attempt. Every row is still checked (no early exit) so wall-clock
+            # doesn't reveal WHICH row matched — the comprehension runs to
+            # completion inside the thread before we pick a winner.
+            stored = [row.code_hash for row in rows]
+            matches = await asyncio.to_thread(
+                lambda: [verify_recovery_code(code, h) for h in stored]
+            )
+            idx = next((i for i, ok in enumerate(matches) if ok), None)
+            if idx is not None:
+                rc = rows[idx]
         if rc is None:
             raise HTTPException(401, "Invalid code.")
         rc.used_at = datetime.now(UTC)  # consume it
 
-    token = issue_session_token(user.id)
+    token = issue_session_token(user.id, user.session_epoch)
     response.set_cookie(value=token, **session_cookie_kwargs())
     await session.commit()
     logger.info("auth.signin_2fa user=%s", user.id)
@@ -942,6 +1017,18 @@ async def signin_2fa(
 
 @router.post("/signout")
 async def signout(response: Response) -> dict:
+    # KNOWN LIMITATION — signout still only clears the BROWSER's copy of the
+    # cookie. It does not revoke the token, so a copy captured before signout
+    # keeps working until its 30-day exp.
+    #
+    # The session_epoch counter added for password reset could evict it, but
+    # the epoch is per-USER, not per-device: bumping it here would sign the
+    # user out of their phone and their other laptop every time they signed
+    # out of one tab. Per-device revocation needs a sessions table keyed on a
+    # per-token id, which is deliberately out of scope. Until then, the
+    # recovery path for a stolen cookie is a password reset, which now
+    # genuinely works (see reset_password).
+    #
     # delete_cookie only takes effect when its (path, domain) tuple matches
     # the original Set-Cookie's scope. In prod the session cookie is set on
     # domain=".tapeline.io" so it's shared between api.* and the apex —
@@ -961,9 +1048,12 @@ async def get_session_user(
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         return {"user": None}
-    user_id = verify_session_token(token)
-    if not user_id:
+    decoded = decode_session_token(token)
+    if not decoded:
         return {"user": None}
+    user_id, epoch = decoded
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    return {"user": _user_out(user) if user else None}
+    if user is None or not session_epoch_matches(user.session_epoch, epoch):
+        return {"user": None}
+    return {"user": _user_out(user)}
