@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
-import { trackEvent, trackFirstTickerAdded } from "@/lib/gtag";
+import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -343,6 +343,20 @@ export default function ScannerPage() {
     trackEvent("open_scanner");
   }, []);
 
+  // Funnel: the server reports the free row cap in meta. A free user whose page
+  // is pinned to the top rows is being refused the rest of the universe — the
+  // scanner_rows cap hit. Keyed on the primitive facts (not the meta object) so
+  // it fires once when the user is first seen capped, not on every 60s refresh.
+  // The DURABLE row is written server-side in routers/scanner.py; this is the
+  // client mirror that opens the on-site funnel.
+  const metaTier = meta?.tier;
+  const metaRowCap = meta?.rowCap;
+  useEffect(() => {
+    if (metaTier === "free" && typeof metaRowCap === "number" && metaRowCap > 0) {
+      trackCapHit("scanner_rows", "scanner");
+    }
+  }, [metaTier, metaRowCap]);
+
   // One-click "add to watchlist" from a scanner row. Optimistic, idempotent,
   // and uses the SAME api the watchlist page's add() uses so it lands in the
   // user's default list. On the FIRST successful add of the session (deduped
@@ -369,6 +383,9 @@ export default function ScannerPage() {
       // un-fill with zero feedback.
       if (e instanceof TierGateError) {
         setWatchlistCapMsg(e.message);
+        // Funnel: free user refused a watchlist add from a scanner row — the
+        // client half of the watchlist_tickers cap (durable row is server-side).
+        trackCapHit("watchlist_tickers", "scanner");
         return;
       }
       if (m.includes("401")) {

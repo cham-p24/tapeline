@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import Ticker, User, Watchlist, WatchlistItem
 from app.services.auth import current_user_required
+from app.services.cap_events import record_cap_hit
 from app.services.tier import Tier, effective_limit
 
 router = APIRouter()
@@ -154,6 +155,11 @@ async def add_to_watchlist(
     current = count_q.scalar() or 0
     if current >= cap:
         tier = Tier(user.tier).value
+        # Cap-hit instrumentation: a free user refused a watchlist add is a
+        # prime free→paid moment. record_cap_hit refuses paid tiers, so a Pro
+        # user at their 50-ticker ceiling never pollutes the free signal.
+        # Fire-and-forget before the 403.
+        await record_cap_hit(session, user.id, "watchlist_tickers", user.tier)
         raise HTTPException(
             403,
             f"Watchlist limit reached ({cap} tickers on {tier}). "

@@ -351,6 +351,12 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         if user is not None:
             meter = await consume_ticker_lookup(session, user)
             if not meter["allowed"]:
+                # Free user out of daily look-ups — the conversion wall. Log the
+                # cap hit (fire-and-forget; only free tiers reach allowed=False,
+                # and record_cap_hit refuses paid tiers anyway) before the 402.
+                from app.services.cap_events import record_cap_hit
+
+                await record_cap_hit(session, user.id, "daily_lookups", user.tier)
                 raise HTTPException(
                     402,
                     detail={

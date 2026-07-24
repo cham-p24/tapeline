@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session, is_sqlite
 from app.models import Ticker, User
 from app.services.auth import current_user_optional
+from app.services.cap_events import record_cap_hit
 from app.services.ticker_freshness import live_clauses
 from app.services.tier import Tier
 from app.services.tier import limit as tier_limit
@@ -195,6 +196,16 @@ async def list_scanner(
 
     result = await session.execute(stmt)
     rows = result.scalars().all()
+
+    # ── Cap-hit instrumentation (free tier only) ─────────────────────────────
+    # A logged-in FREE user whose result FILLED the row cap is being refused the
+    # rest of the ~2,500-ticker universe — that's the scanner-row wall. len(rows)
+    # can never exceed row_cap (the limit clamp above), so len == row_cap means a
+    # full capped page with more behind it. Anonymous callers have no user to
+    # attribute and paid tiers aren't capped, so both are skipped (record_cap_hit
+    # also refuses non-free tiers). Fire-and-forget: never breaks the response.
+    if user is not None and tier is Tier.FREE and row_cap > 0 and len(rows) >= row_cap:
+        await record_cap_hit(session, user.id, "scanner_rows", tier)
 
     # Read the delay from tier.py. Post-freemium-retune (2026-06-20) every tier
     # is LIVE (data_delay_minutes = 0) — the old 24h Free delay cliff is gone;

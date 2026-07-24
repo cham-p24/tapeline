@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import AlertEvent, AlertRule, User
 from app.services.auth import current_user_required
+from app.services.cap_events import record_cap_hit
 from app.services.tier import Tier, effective_limit, has_feature
 
 router = APIRouter()
@@ -71,6 +72,11 @@ async def create_rule(
         current = existing_q.scalar() or 0
         if cap is not None and current >= cap:
             tier = Tier(user.tier).value
+            # Cap-hit instrumentation: a free user who used up the web-push
+            # "alert taste" allowance is a high-intent free→paid moment (alerts
+            # are the #1 thing traders pay for). record_cap_hit refuses paid
+            # tiers, whose effective cap is ~unlimited anyway. Fire-and-forget.
+            await record_cap_hit(session, user.id, "web_push_alerts", user.tier)
             raise HTTPException(
                 403,
                 f"Free web-push alert limit reached ({cap} on {tier}). "

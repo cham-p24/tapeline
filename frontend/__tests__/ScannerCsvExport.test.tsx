@@ -19,6 +19,7 @@ vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
 vi.mock("@/lib/gtag", () => ({
   trackEvent: vi.fn(),
   trackFirstTickerAdded: vi.fn(),
+  trackCapHit: vi.fn(),
 }));
 vi.mock("@/lib/useLiveStream", () => ({
   useLiveStream: () => ({ status: "live", lastUpdate: null }),

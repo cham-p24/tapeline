@@ -1,6 +1,7 @@
 """SQLAlchemy ORM models."""
 from app.models.api_key import ApiKey
 from app.models.calendar_events import EarningsEvent, IPOEvent
+from app.models.cap_events import CapEvent
 from app.models.congress import CongressTrade
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.inbox import InboundMessage
@@ -25,6 +26,7 @@ __all__ = [
     "AlertEvent",
     "AlertRule",
     "ApiKey",
+    "CapEvent",
     "CongressTrade",
     "DailyScorecardEntry",
     "EarningsEvent",
