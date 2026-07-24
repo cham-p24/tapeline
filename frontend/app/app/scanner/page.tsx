@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
 import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
@@ -569,16 +569,19 @@ export default function ScannerPage() {
               <th className="px-2 sm:px-4 py-2 text-right">5D</th>
               <th className="px-2 sm:px-4 py-2 text-right">1M</th>
               <th className="px-2 sm:px-4 py-2 text-right">Volume</th>
-              {/* `Why` is the widest column; hide on narrow viewports so the
-                  numeric grid stays the focus, re-appears at md+ where there's room. */}
-              <th className="hidden md:table-cell px-2 sm:px-4 py-2 text-left min-w-[200px]">Why</th>
+              {/* `Why` is no longer a column. It was the widest one and got
+                  pushed off the right edge, forcing a horizontal scroll to read
+                  the reasoning (and it was hidden entirely on mobile). It now
+                  renders full-width on its own row under each ticker, so the
+                  numeric grid fits without side-scroll and the reasoning is
+                  readable in one glance on every screen size. */}
             </tr>
           </thead>
           <tbody>
             {loading && visibleRows.length === 0 ? (
-              <tr><td colSpan={12}><TableSkeleton cols={12} rows={8} /></td></tr>
+              <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
             ) : visibleRows.length === 0 ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center">
+              <tr><td colSpan={11} className="px-4 py-12 text-center">
                 {filtersActive ? (
                   <div className="text-muted">
                     <p>No tickers match these filters.</p>
@@ -597,7 +600,8 @@ export default function ScannerPage() {
                 )}
               </td></tr>
             ) : visibleRows.map((r) => (
-              <tr key={r.symbol} className="border-b border-border/20 hover:bg-panel/60">
+              <Fragment key={r.symbol}>
+              <tr className="group hover:bg-panel/60">
                 <td className="px-2 sm:px-4 py-2">
                   {/* One-click watchlist add. Optimistic; checked (★) once the
                       symbol is on the list. Tap target is 40x40px. */}
@@ -666,10 +670,24 @@ export default function ScannerPage() {
                 <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
                 <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
                 <td className="px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
-                <td className="hidden md:table-cell px-2 sm:px-4 py-2 text-xs text-muted leading-snug max-w-[520px]" title={r.reason ?? ""}>
-                  {r.reason || "—"}
+              </tr>
+              {/* Why — full-width row under the numbers. Wraps to the whole
+                  table width, so the reasoning reads in one glance with no
+                  horizontal scroll, on every screen size. The bottom border
+                  sits here so each ticker (numbers + why) reads as one block. */}
+              <tr className="border-b border-border/20 group-hover:bg-panel/60 hover:bg-panel/60">
+                <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={11}>
+                  {r.reason ? (
+                    <p className="text-xs text-muted leading-snug">
+                      <span className="mr-2 align-baseline text-[10px] font-medium uppercase tracking-wide text-subtle">
+                        Why
+                      </span>
+                      {r.reason}
+                    </p>
+                  ) : null}
                 </td>
               </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
