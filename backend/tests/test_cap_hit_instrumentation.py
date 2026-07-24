@@ -33,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.db import SessionLocal, session_scope
 from app.main import app
@@ -254,10 +254,17 @@ async def test_web_push_cap_hit_persists(client, monkeypatch):
     assert await _cap_rows(uid, "web_push_alerts") == 1
 
 
-async def _seed_squeeze(n: int) -> None:
+# Namespaced + LOW spike scores on purpose: the preview returns the GLOBAL top-3
+# by spike_score, so a high-scoring seed here would pollute the deterministic
+# top-3 that test_squeeze_preview asserts on. These sit well below any other
+# suite's rows and are torn down in a finally, so they only ever bump the COUNT
+# (which is all this instrumentation cares about), never the ranking.
+_CAP_SQZ_SYMBOLS = [f"CAPHITSQZ{i}" for i in range(FREE_SQUEEZE_PREVIEW_LIMIT + 2)]
+
+
+async def _seed_squeeze() -> None:
     async with session_scope() as s:
-        for i in range(n):
-            sym = f"SQZ{i}"
+        for i, sym in enumerate(_CAP_SQZ_SYMBOLS):
             existing = (
                 await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == sym))
             ).scalar_one_or_none()
@@ -265,7 +272,7 @@ async def _seed_squeeze(n: int) -> None:
                 s.add(
                     SqueezeSetup(
                         symbol=sym,
-                        spike_score=90.0 - i,
+                        spike_score=5.0 - (i * 0.1),
                         squeeze_days=5,
                         volume_multiple=2.0,
                         obv_trend="up",
@@ -277,26 +284,42 @@ async def _seed_squeeze(n: int) -> None:
         await s.commit()
 
 
+async def _delete_squeeze() -> None:
+    async with session_scope() as s:
+        await s.execute(
+            delete(SqueezeSetup).where(SqueezeSetup.symbol.in_(_CAP_SQZ_SYMBOLS))
+        )
+        await s.commit()
+
+
 @pytest.mark.asyncio
 async def test_squeeze_preview_cap_hit_persists(client, monkeypatch):
-    async with client:
-        # More setups than the preview shows → the free user is refused the rest.
-        await _seed_squeeze(FREE_SQUEEZE_PREVIEW_LIMIT + 2)
-        cookies, uid = await _free(client, monkeypatch)
+    try:
+        async with client:
+            # More setups than the preview shows → free user refused the rest.
+            await _seed_squeeze()
+            cookies, uid = await _free(client, monkeypatch)
 
-        r = await client.get("/api/squeeze/preview", cookies=cookies)
-        assert r.status_code == 200, r.text
+            r = await client.get("/api/squeeze/preview", cookies=cookies)
+            assert r.status_code == 200, r.text
 
-    assert await _cap_rows(uid, "squeeze_preview") == 1
+        assert await _cap_rows(uid, "squeeze_preview") == 1
+    finally:
+        await _delete_squeeze()
 
 
-async def _seed_scanner_universe(n: int) -> None:
-    """Seed n tickers that PASS live_clauses (fresh + valid composite) so a free
+# Sector-less (won't appear in any sector-filtered scanner test) and mid-score
+# (outranked by the high-score rows other suites seed), torn down after — so this
+# universe only guarantees "≥ row_cap valid rows exist" for THIS test.
+_CAP_SCAN_SYMBOLS = [f"CAPHITSCAN{i:02d}" for i in range(FREE_SCANNER_ROWS + 3)]
+
+
+async def _seed_scanner_universe() -> None:
+    """Seed tickers that PASS live_clauses (fresh + valid composite) so a free
     user's capped scanner page fills to FREE_SCANNER_ROWS."""
     now = datetime.now(UTC)
     async with session_scope() as s:
-        for i in range(n):
-            sym = f"SCAN{i:02d}"
+        for i, sym in enumerate(_CAP_SCAN_SYMBOLS):
             existing = (
                 await s.execute(select(Ticker).where(Ticker.symbol == sym))
             ).scalar_one_or_none()
@@ -317,20 +340,29 @@ async def _seed_scanner_universe(n: int) -> None:
         await s.commit()
 
 
+async def _delete_scanner_universe() -> None:
+    async with session_scope() as s:
+        await s.execute(delete(Ticker).where(Ticker.symbol.in_(_CAP_SCAN_SYMBOLS)))
+        await s.commit()
+
+
 @pytest.mark.asyncio
 async def test_scanner_rows_cap_hit_persists(client, monkeypatch):
-    async with client:
-        # Comfortably more valid rows than the free cap so the page fills.
-        await _seed_scanner_universe(FREE_SCANNER_ROWS + 3)
-        cookies, uid = await _free(client, monkeypatch)
+    try:
+        async with client:
+            # Comfortably more valid rows than the free cap so the page fills.
+            await _seed_scanner_universe()
+            cookies, uid = await _free(client, monkeypatch)
 
-        r = await client.get("/api/scanner?limit=100", cookies=cookies)
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["tier"] == "free"
-        assert body["count"] == FREE_SCANNER_ROWS
+            r = await client.get("/api/scanner?limit=100", cookies=cookies)
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["tier"] == "free"
+            assert body["count"] == FREE_SCANNER_ROWS
 
-    assert await _cap_rows(uid, "scanner_rows") >= 1
+        assert await _cap_rows(uid, "scanner_rows") >= 1
+    finally:
+        await _delete_scanner_universe()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -357,15 +389,18 @@ async def test_paid_user_lookups_write_no_cap_event(client, monkeypatch):
 async def test_premium_user_squeeze_preview_writes_no_cap_event(client, monkeypatch):
     """A premium user has squeeze.full, so the preview endpoint's cap-hit guard
     is false AND record_cap_hit refuses paid tiers — belt and braces, no row."""
-    async with client:
-        await _seed_squeeze(FREE_SQUEEZE_PREVIEW_LIMIT + 2)
-        cookies, uid = await _signup(client, monkeypatch)
-        await _set_tier(uid, "premium", paying=True)
+    try:
+        async with client:
+            await _seed_squeeze()
+            cookies, uid = await _signup(client, monkeypatch)
+            await _set_tier(uid, "premium", paying=True)
 
-        r = await client.get("/api/squeeze/preview", cookies=cookies)
-        assert r.status_code == 200, r.text
+            r = await client.get("/api/squeeze/preview", cookies=cookies)
+            assert r.status_code == 200, r.text
 
-    assert await _cap_rows(uid) == 0
+        assert await _cap_rows(uid) == 0
+    finally:
+        await _delete_squeeze()
 
 
 # ════════════════════════════════════════════════════════════════════════════
