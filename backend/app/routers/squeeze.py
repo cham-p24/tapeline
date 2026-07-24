@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import SqueezeSetup, User
 from app.services.auth import current_user_required
+from app.services.cap_events import record_cap_hit
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
@@ -51,6 +52,16 @@ async def squeeze_preview(
     total_setups = (
         await session.execute(select(func.count()).select_from(SqueezeSetup))
     ).scalar_one()
+    # Cap-hit instrumentation: a free user (no squeeze.full feature) who is shown
+    # only the top-3 preview while MORE setups exist is being refused the rest of
+    # the Squeeze Watch feed — the preview wall. Gated on the same feature check
+    # that Pro-unlocks the full feed, so Pro/Premium (who'd use the full endpoint)
+    # never log here; record_cap_hit refuses non-free tiers too. Fire-and-forget.
+    if (
+        not has_feature(Tier(user.tier), "squeeze.full")
+        and total_setups > FREE_SQUEEZE_PREVIEW_LIMIT
+    ):
+        await record_cap_hit(session, user.id, "squeeze_preview", user.tier)
     return {
         "count": len(rows),
         "preview": True,

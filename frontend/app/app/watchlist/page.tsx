@@ -13,7 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import { SearchBox, useDebounced } from "@/components/FilterBar";
 import { matchesQuery } from "@/lib/filters";
-import { trackFirstTickerAdded } from "@/lib/gtag";
+import { trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
 
 // Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
 // start before the worker has populated any scored tickers). Same shape
@@ -120,6 +120,9 @@ export default function WatchlistPage() {
       // backend's real cap message — the old native alert() was a dead end.
       if (e instanceof TierGateError) {
         setCapMsg(e.message);
+        // Funnel: free user refused a watchlist add — the client half of the
+        // watchlist_tickers cap (the durable row is written server-side).
+        trackCapHit("watchlist_tickers", "watchlist");
         return;
       }
       const m = errorMessage(e);

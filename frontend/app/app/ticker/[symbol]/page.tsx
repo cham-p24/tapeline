@@ -18,7 +18,7 @@ import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
-import { trackEvent, trackFirstTickerAdded } from "@/lib/gtag";
+import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
 
 type DetailTab = "financials" | "insider";
 
@@ -131,6 +131,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         setLookupLimit(e);
         setData(null);
         setError(null);
+        // Funnel: only the logged-in FREE variant is a cap hit. The anon
+        // "signup_required" wall is a sign-up prompt, not a free→paid cap.
+        if (e.reason === "free_lookup_limit") trackCapHit("daily_lookups", "ticker");
         return;
       }
       setError(errorMessage(e));
@@ -168,6 +171,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       // backend's real cap message instead of a terse failure line.
       if (e instanceof TierGateError) {
         setCapMsg(e.message);
+        // Funnel: free user refused a watchlist add — the client half of the
+        // watchlist_tickers cap (the durable row is written server-side).
+        trackCapHit("watchlist_tickers", "ticker");
         setAdding(false);
         return;
       }

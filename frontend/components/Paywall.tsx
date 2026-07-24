@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useUser } from "@/components/UserContext";
 import { canUse, FEATURE_TIERS } from "@/lib/auth";
+import {
+  trackGateEncountered,
+  trackUpgradePromptShown,
+  trackUpgradePromptClicked,
+} from "@/lib/gtag";
 
 /**
  * Wrap any tier-gated component. If user has access, render children.
@@ -18,6 +24,17 @@ export function Paywall({
   children: React.ReactNode;
 }) {
   const { user, loading } = useUser();
+  // Free→paid funnel: this component IS the tier feature gate. When it renders
+  // locked, the user has met a gate and is being shown an upgrade prompt — fire
+  // both signals once (deps settle to locked=true exactly once). Effect must run
+  // before the early returns (rules-of-hooks).
+  const locked = !loading && !canUse(user, feature);
+  useEffect(() => {
+    if (locked) {
+      trackGateEncountered(feature, "paywall");
+      trackUpgradePromptShown("paywall", feature);
+    }
+  }, [locked, feature]);
   if (loading) return null;
 
   if (canUse(user, feature)) return <>{children}</>;
@@ -49,9 +66,19 @@ export function Paywall({
           </p>
           <div className="mt-6 flex justify-center gap-3">
             {signedIn ? (
-              <Link href="/app/billing" className="btn-primary">Upgrade &rarr;</Link>
+              <Link
+                href="/app/billing"
+                className="btn-primary"
+                onClick={() => trackUpgradePromptClicked("paywall", feature)}
+              >
+                Upgrade &rarr;
+              </Link>
             ) : (
-              <Link href={`/signup?next=${encodeURIComponent("/app/billing")}`} className="btn-primary">
+              <Link
+                href={`/signup?next=${encodeURIComponent("/app/billing")}`}
+                className="btn-primary"
+                onClick={() => trackUpgradePromptClicked("paywall", feature)}
+              >
                 Try Premium free &rarr;
               </Link>
             )}
@@ -65,6 +92,15 @@ export function Paywall({
 
 export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE_TIERS }) {
   const { user } = useUser();
+  // Same funnel signals as the full Paywall card — this is the inline variant of
+  // the tier feature gate. Effect before the early return (rules-of-hooks).
+  const locked = !canUse(user, feature);
+  useEffect(() => {
+    if (locked) {
+      trackGateEncountered(feature, "paywall");
+      trackUpgradePromptShown("paywall", feature);
+    }
+  }, [locked, feature]);
   if (canUse(user, feature)) return null;
   const requiredTier = FEATURE_TIERS[feature];
   return (
@@ -74,7 +110,11 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
       </strong>{" "}
       <span className="text-muted">
         Upgrade to unlock this data.{" "}
-        <Link href={user ? "/app/billing" : "/signup"} className="text-accent underline">
+        <Link
+          href={user ? "/app/billing" : "/signup"}
+          className="text-accent underline"
+          onClick={() => trackUpgradePromptClicked("paywall", feature)}
+        >
           {user ? "Upgrade" : "Try Premium free"} &rarr;
         </Link>
       </span>
@@ -104,6 +144,13 @@ export function PaywallModal({
   // Hook must run before the early return (rules-of-hooks) — used to pick a
   // truthful risk-reversal line, same logic as the inline Paywall above.
   const { user } = useUser();
+  // Funnel: the modal is the count-cap upgrade moment (watchlist full, web-push
+  // allowance used). The matching `cap_hit` already fired at the observation
+  // site; here we record that the prompt actually became VISIBLE. Fires each
+  // time it opens.
+  useEffect(() => {
+    if (open) trackUpgradePromptShown("paywall", feature);
+  }, [open, feature]);
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$19.99/mo · Premium" : "$9.99/mo · Pro";
@@ -143,7 +190,13 @@ export function PaywallModal({
             : "14-day trial, no card required. Cancel in one click."}
         </p>
         <div className="mt-6 flex gap-3">
-          <Link href="/app/billing" className="btn-primary flex-1 text-center text-sm">Upgrade now</Link>
+          <Link
+            href="/app/billing"
+            className="btn-primary flex-1 text-center text-sm"
+            onClick={() => trackUpgradePromptClicked("paywall", feature)}
+          >
+            Upgrade now
+          </Link>
           <button onClick={onClose} className="btn-ghost text-sm">Not yet</button>
         </div>
         <p className="mt-4 text-xs text-muted text-center">

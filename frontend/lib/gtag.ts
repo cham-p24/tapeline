@@ -55,7 +55,18 @@ export type TapelineEvent =
   // ADS_CONVERSION_LABEL below so they do NOT forward to the Google Ads
   // "Sign-up" conversion and pollute paid ROAS).
   | "newsletter_signup"    // Email opt-in to the daily digest (NOT an account signup)
-  | "first_ticker_added";  // First watchlist add of the session
+  | "first_ticker_added"   // First watchlist add of the session
+  // Free→paid micro-funnel — GA4-only (never forwarded to Google Ads; these are
+  // on-site conversion diagnostics, not acquisition conversions). Closes the
+  // chain cap_hit → upgrade_prompt_shown → upgrade_prompt_clicked →
+  // begin_checkout (begin_checkout already exists above). The DURABLE signal is
+  // the server-side cap_events table; these client events add the on-screen half
+  // (prompt seen / clicked) that the backend can't observe. See lib docs +
+  // backend/app/services/cap_events.py.
+  | "cap_hit"              // A free user was refused MORE of a metered cap (client-observed)
+  | "gate_encountered"     // A free user met a tier feature gate (the Paywall lock rendered)
+  | "upgrade_prompt_shown" // An upgrade prompt/paywall actually became visible
+  | "upgrade_prompt_clicked"; // The upgrade CTA on that prompt was clicked
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
 // overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up
@@ -259,4 +270,71 @@ export function trackFirstTickerAdded(
     symbol,
     surface,
   });
+}
+
+/**
+ * The five metered free-tier caps. Mirrors backend CAP_NAMES
+ * (backend/app/models/cap_events.py) so the client half of the funnel keys off
+ * exactly the same vocabulary the durable server-side table records.
+ */
+export type CapName =
+  | "scanner_rows"
+  | "daily_lookups"
+  | "watchlist_tickers"
+  | "web_push_alerts"
+  | "squeeze_preview";
+
+/** Where in the app the funnel event fired — for GA4 segmentation. */
+export type FunnelSurface =
+  | "scanner"
+  | "watchlist"
+  | "ticker"
+  | "squeeze"
+  | "paywall";
+
+/**
+ * A free user was refused MORE of a metered cap and the client observed it (a
+ * 402/403 limit response, or a server-reported capped view). The DURABLE record
+ * is written server-side by cap_events.record_cap_hit; this is the client mirror
+ * that opens the on-site funnel. Fire-and-forget.
+ */
+export function trackCapHit(cap: CapName, surface: FunnelSurface): boolean {
+  return trackEvent("cap_hit", { cap, surface });
+}
+
+/**
+ * A free user met a binary tier FEATURE gate (the Paywall lock rendered),
+ * distinct from a count-cap `cap_hit`. Fired from the shared Paywall components.
+ */
+export function trackGateEncountered(
+  feature: string,
+  surface: FunnelSurface,
+): boolean {
+  return trackEvent("gate_encountered", { feature, surface });
+}
+
+/**
+ * An upgrade prompt/paywall actually became visible. Fired on mount/open of the
+ * shared Paywall components so every surface that renders one is counted the
+ * same way — the middle of the free→paid funnel.
+ */
+export function trackUpgradePromptShown(
+  surface: FunnelSurface,
+  feature?: string,
+): boolean {
+  return trackEvent("upgrade_prompt_shown", feature ? { surface, feature } : { surface });
+}
+
+/**
+ * The upgrade CTA on a visible prompt was clicked — the last step before
+ * begin_checkout. Fired from the shared Paywall components' CTA handlers.
+ */
+export function trackUpgradePromptClicked(
+  surface: FunnelSurface,
+  feature?: string,
+): boolean {
+  return trackEvent(
+    "upgrade_prompt_clicked",
+    feature ? { surface, feature } : { surface },
+  );
 }
