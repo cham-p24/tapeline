@@ -35,7 +35,7 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
-from app.db import session_scope
+from app.db import SessionLocal, session_scope
 from app.main import app
 from app.models import CapEvent, SqueezeSetup, Ticker, User
 from app.routers.squeeze import FREE_SQUEEZE_PREVIEW_LIMIT
@@ -161,10 +161,14 @@ async def test_record_cap_hit_drops_unknown_cap():
 @pytest.mark.asyncio
 async def test_record_cap_hit_swallows_write_error():
     """A commit failure must be swallowed (fire-and-forget) so the caller's
-    reject branch still returns cleanly — record_cap_hit never propagates."""
+    reject branch still returns cleanly — record_cap_hit never propagates.
+
+    Uses a raw SessionLocal (not session_scope, whose own __aexit__ commits and
+    would re-raise the broken commit) so we isolate record_cap_hit's behaviour.
+    """
     uid = f"u-{_uuid.uuid4().hex[:12]}"
 
-    async with session_scope() as s:
+    async with SessionLocal() as s:
         async def _boom():
             raise RuntimeError("db down")
 
