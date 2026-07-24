@@ -82,6 +82,7 @@ def _all_html_outputs() -> list[tuple[str, str]]:
         )),
         ("digest_empty", e.render_eod_watchlist_digest("Alex", [])),
         ("re_engagement", e.render_re_engagement_email("Alex")),
+        ("re_engagement_touch2", e.render_re_engagement_touch2_email("Alex")),
         ("weekly_newsletter_full", e.render_weekly_market_digest(
             "Alex",
             week_label="May 19, 2026",

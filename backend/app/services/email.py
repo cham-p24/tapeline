@@ -65,7 +65,7 @@ from app.services.email_design import (
 # that don't know about each other. Safe to import at module scope: lifecycle
 # imports nothing from here (its only app import is a TYPE_CHECKING-guarded
 # models reference), so there's no cycle.
-from app.services.lifecycle import FrequencyGovernor, SendClass
+from app.services.lifecycle import RE_SUNSET_TOKEN, FrequencyGovernor, SendClass
 from app.services.tier import (
     FREE_DAILY_LOOKUPS,
     FREE_SCANNER_ROWS,
@@ -1442,36 +1442,177 @@ def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
     )
 
 
-# ── Re-engagement (14-day dormant) ──────────────────────────────────────────
+# ── Re-engagement (dormant 2-touch series + sunset) ─────────────────────────
+#
+# COMPLIANCE — the activity-only content guard (docs/COMPLIANCE_COPY_RULES.md
+# rule 7). Both renderers below accept ONLY inputs that describe the SYSTEM or
+# the recipient's own CAPABILITIES: the scanner scoring the public universe,
+# the public scorecard appending dated rows, the user's free look-up quota
+# resetting, a first name, plain return links. There is deliberately NO
+# parameter — and no code path — that can carry per-user ticker performance
+# (how a watched symbol moved, what they "missed", a per-name % change). That
+# absence is the load-bearing guard: rule 7 forbids ever telling a named user
+# how THEIR self-selected securities performed, so the templates are built so
+# they *cannot*. Enforced by
+# tests/test_re_engagement_email.test_renderers_cannot_emit_ticker_performance.
 
-def render_re_engagement_email(user_name: str) -> str:
-    """One-shot nudge for users dormant ~14 days. Calm/factual voice; no
-    drip after this."""
-    return shell(
-        h1(f"Tapeline missed you, {user_name}.")
+# Subjects live as module constants so the drip and any preview share one
+# source of truth. Neither carries a vs-SPY / performance figure (rule 3
+# bans those in subject lines).
+RE_ENGAGEMENT_SUBJECT = "Your Tapeline scores kept updating"
+RE_ENGAGEMENT_TOUCH2_SUBJECT = "Did we miss the mark?"
+
+# Per-touch drip_state dedupe tokens. RE_SUNSET_TOKEN is owned by the governor
+# (services/lifecycle) since that is where it takes effect — imported at module
+# scope above. re14 is unchanged from the single-touch era so existing state
+# and tests keep working.
+RE_TOUCH1_TOKEN = "re14"
+RE_TOUCH2_TOKEN = "re24"
+
+_RE_UTM_BASE = "utm_source=email&utm_campaign=re_engagement&utm_medium=transactional"
+_RE_APP_URL = f"https://tapeline.io/app/scanner?{_RE_UTM_BASE}&utm_content=re14"
+_RE_SCORECARD_URL = f"https://tapeline.io/scorecard?{_RE_UTM_BASE}&utm_content=re14"
+_RE_TOUCH2_APP_URL = f"https://tapeline.io/app/scanner?{_RE_UTM_BASE}&utm_content=re24"
+
+# How far back the sunset scan reaches past the touch-2 window. A user who
+# received touch 2 crosses into the sunset window ~immediately after the
+# [24d, 26d) window closes, so a modest trailing bound catches them with room
+# for missed worker days while keeping the daily scan off the long dead tail.
+_RE_SUNSET_LOOKBACK_DAYS = 60
+
+
+def _re_first_name(name: str | None) -> str:
+    """First token of the stored name, or the neutral 'trader' fallback the
+    single-touch drip already used when User.name is null/blank."""
+    parts = (name or "").split()
+    return parts[0] if parts else "trader"
+
+
+def _trading_days_between(start: datetime, end: datetime) -> int:
+    """Weekday count (Mon-Fri) in (start, end] — a trading-day proxy.
+
+    Market holidays are ignored, so this slightly over-counts; the copy hedges
+    with 'roughly'/'about'. Bounded by the dormancy window (≤ a few weeks), so
+    the day-by-day walk is cheap.
+    """
+    if start is None or end is None or end <= start:
+        return 0
+    from datetime import timedelta as _td
+
+    day = start.date()
+    last = end.date()
+    n = 0
+    while day < last:
+        day = day + _td(days=1)
+        if day.weekday() < 5:
+            n += 1
+    return n
+
+
+def render_re_engagement_email(
+    first_name: str,
+    *,
+    app_url: str = _RE_APP_URL,
+    scorecard_url: str = _RE_SCORECARD_URL,
+    trading_days_away: int | None = None,
+    scorecard_rows_appended: int | None = None,
+    lookups_reset: bool = True,
+    daily_lookups: int = FREE_DAILY_LOOKUPS,
+) -> str:
+    """Touch 1 of the dormant re-engagement series (~14 days quiet).
+
+    Calm, factual voice. Reports SYSTEM / PUBLIC activity only — the scanner
+    kept scoring the universe, the public scorecard kept appending dated rows
+    (winning AND losing days, styled the same), and the recipient's own free
+    look-ups have reset. See the module header for the activity-only content
+    guard: this renderer takes no input that could report how the user's
+    watched tickers moved.
+    """
+    days = trading_days_away if (trading_days_away or 0) > 0 else None
+    rows = scorecard_rows_appended if (scorecard_rows_appended or 0) > 0 else None
+
+    away = f" — roughly {days} sessions —" if days else ","
+    scanner_line = (
+        f"Every trading day you were away{away} the scanner re-scored the full "
+        f"~{ACTIVE_UNIVERSE_SIZE:,}-ticker universe on the same six published "
+        "factors. It never paused."
+    )
+    scorecard_line = (
+        (f"The public scorecard grew by about {rows} dated rows over the same stretch — one "
+         if rows else "The public scorecard kept appending a new dated row every trading day — one ")
+        + "per session, back-checked the next open and left on the page whether the day went "
+        "well or badly. Winning days and losing days are recorded identically; nothing is pruned."
+    )
+    lookup_line = (
+        f"On your side, your free daily look-ups have reset — the full {daily_lookups} are "
+        "available again whenever you want them."
+    ) if lookups_reset else ""
+
+    body = (
+        h1(f"Your scores kept updating, {first_name}.")
         + lead(
-            "It's been two weeks since you last opened the scanner. That's "
-            "fine — life and the market both move on — but two weeks is "
-            "also long enough that what you'd see today is meaningfully "
-            "different from what was there when you stepped away."
+            "You haven't opened Tapeline in about two weeks. Nothing on your end "
+            "needs catching up — this is just what ran while you were away."
         )
-        + paragraph(
-            'The fastest catch-up is the public '
-            f'<a href="https://tapeline.io/scorecard?utm_source=email&utm_campaign=re_engagement&utm_medium=transactional" style="color:{ACCENT};">scorecard</a> — '
-            'every top-10 daily pick we published while you were gone, '
-            'back-checked against SPY the next session. No survivor bias; '
-            'every miss is still on the page.'
+        + paragraph(scanner_line)
+        + paragraph(scorecard_line)
+    )
+    if lookup_line:
+        body += paragraph(lookup_line)
+    body += (
+        paragraph(
+            'The quickest look is the public '
+            f'<a href="{scorecard_url}" style="color:{ACCENT};">scorecard</a> — '
+            'the full dated record, free and open.'
         )
-        + button(
-            "Open the scanner",
-            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=re_engagement&utm_medium=transactional",
-        )
+        + button("Open the scanner", app_url)
         + footnote(
-            'If Tapeline isn\'t what you need, no follow-up — this is the only nudge.'
+            'One more note from me may follow, then nothing further.'
             '<br><br>— Christian, founder. '
             f'<a href="https://tapeline.io/how-it-works" style="color:{LIGHT_SUBTLE};text-decoration:underline;">The formula is still public.</a>'
-        ),
-        preheader="Two weeks since you last opened the scanner — the scorecard kept running.",
+        )
+    )
+    return shell(
+        body,
+        preheader="Two weeks quiet — here's what the scanner and the public scorecard did.",
+    )
+
+
+def render_re_engagement_touch2_email(
+    first_name: str,
+    *,
+    app_url: str = _RE_TOUCH2_APP_URL,
+) -> str:
+    """Touch 2 of the dormant series (~24 days quiet).
+
+    Founder-signed, plain-text feel, a single open question, and a plain return
+    link. The only inputs are the recipient's first name and that link — same
+    activity-only guard as touch 1: no path to per-user ticker performance.
+    """
+    body = (
+        paragraph(f"Hi {first_name},")
+        + paragraph(
+            "I'm Christian — I build Tapeline. You set up an account a few weeks "
+            "ago and haven't been back, and I'd rather ask you than guess."
+        )
+        + paragraph(
+            "One question, if you have a moment to hit reply: what would have "
+            "made Tapeline worth returning to?"
+        )
+        + paragraph(
+            "There's no sequence waiting behind this and no wrong answer — I read "
+            "every reply myself."
+        )
+        + paragraph(
+            "If you'd like another look, the scanner is "
+            f'<a href="{app_url}" style="color:{ACCENT};">right here</a>.'
+        )
+        + paragraph("Thanks for giving it a try.")
+        + footnote("— Christian, founder, Tapeline")
+    )
+    return shell(
+        body,
+        preheader="One question from Christian, who builds Tapeline.",
     )
 
 
@@ -3048,71 +3189,155 @@ async def run_weekly_newsletter(
 async def run_re_engagement_drip(
     session, *, governor: FrequencyGovernor | None = None,
 ) -> dict[str, int]:
-    """Send the re-engagement email to users dormant for ~14 days.
+    """Lean 2-touch dormant re-engagement series + sunset.
 
-    Window: last_seen_at in [now-16d, now-14d) — 48h wide (nominal day-14
-    plus one grace day), same missed-run protection as the trial-drip
-    windows, so one failed/skipped daily run can't silently drop the touch.
-    One-shot, deduplicated via the "re14" token in User.drip_state — so a
-    user only ever receives this email once even if they fall back into
-    dormancy later.
+    TOUCH 1 (re14): last_seen_at in [now-16d, now-14d) — 48h wide (nominal
+        day-14 plus one grace day), so one failed/skipped daily run can't
+        silently drop the touch. Reports SYSTEM/PUBLIC activity only (scanner
+        scored the universe, scorecard appended dated rows, look-ups reset).
 
-    Trial users are EXCLUDED — the trial drip is the right re-engagement
-    channel for them.
+    TOUCH 2 (re24): last_seen_at in [now-26d, now-24d), sent ONLY to users who
+        already received touch 1 (re14 token present) and are STILL dormant —
+        window membership guarantees the latter, since a returning user's
+        last_seen_at bumps out of the window. Founder-signed, one open
+        question.
+
+    SUNSET (re_sunset): a user who received touch 2 and is still dormant PAST
+        the touch-2 window (last_seen_at older than 26d) is stamped with the
+        terminal RE_SUNSET_TOKEN and sent NOTHING. The frequency governor then
+        suppresses them from every future LIFECYCLE/SCHEDULED send
+        (lifecycle.LIFECYCLE_SUPPRESSED_TOKENS) — deliverability insurance so a
+        chronically-dormant address on a tiny list can't spam-fold and poison
+        the trial drip + newsletters. Transactional mail and List-Unsubscribe
+        are unaffected; the user is segmented, never hard-deleted.
+
+    Each stage carries its own one-shot drip_state token, so a user receives
+    each touch at most once even if they lapse again. Trial users are EXCLUDED
+    (the trial drip owns them). Both sends route through the governor as
+    SendClass.LIFECYCLE and record only AFTER a confirmed delivery.
     """
     from datetime import UTC, datetime, timedelta
 
-    from sqlalchemy import or_, select
+    from sqlalchemy import and_, or_, select
 
     from app.models import User
+    from app.services.email_prefs import EmailPref, wants
 
     now = datetime.now(UTC)
-    counts = {"re14": 0}
+    counts = {"re14": 0, "re24": 0, "re_sunset": 0}
 
-    lower = now - timedelta(days=16)
-    upper = now - timedelta(days=14)
+    t1_lower = now - timedelta(days=16)
+    t1_upper = now - timedelta(days=14)
+    t2_lower = now - timedelta(days=26)
+    t2_upper = now - timedelta(days=24)
+    sunset_lower = now - timedelta(days=_RE_SUNSET_LOOKBACK_DAYS)
 
-    filters = [
-        User.last_seen_at.isnot(None),
-        User.last_seen_at >= lower,
-        User.last_seen_at < upper,
-        or_(User.trial_ends_at.is_(None), User.trial_ends_at < now),
-    ]
+    not_on_trial = or_(User.trial_ends_at.is_(None), User.trial_ends_at < now)
 
-    result = await session.execute(select(User).where(*filters))
+    # One query spanning the three bounded populations by last_seen_at: the
+    # touch-1 window, the touch-2 window, and the trailing sunset band just
+    # past touch 2. Stage is decided per-user below; already-sunset users
+    # carry re_sunset and are skipped there.
+    result = await session.execute(
+        select(User).where(
+            User.last_seen_at.isnot(None),
+            not_on_trial,
+            or_(
+                and_(User.last_seen_at >= t1_lower, User.last_seen_at < t1_upper),
+                and_(User.last_seen_at >= t2_lower, User.last_seen_at < t2_upper),
+                and_(User.last_seen_at >= sunset_lower, User.last_seen_at < t2_lower),
+            ),
+        )
+    )
     users = result.scalars().all()
 
-    any_sent = False
+    any_change = False
     for user in users:
-        sent_tokens = set((user.drip_state or "").split(",")) - {""}
-        if "re14" in sent_tokens:
+        tokens = set((user.drip_state or "").split(",")) - {""}
+        seen = user.last_seen_at
+        # SQLite hands back naive datetimes for timezone=True columns; Postgres
+        # hands back aware ones. Normalise before comparing against `now`.
+        if seen is not None and seen.tzinfo is None:
+            seen = seen.replace(tzinfo=UTC)
+        if seen is None:
             continue
-        from app.services.email_prefs import EmailPref, wants
-        if not wants(user, EmailPref.RE_ENGAGEMENT):
-            continue
-        if governor is not None and not governor.allows(
-            user, SendClass.LIFECYCLE, token="re14",
-        ):
-            continue
-        try:
-            html = render_re_engagement_email(user.name or "trader")
-            res = await send_email(
-                user.email, "Tapeline missed you", html,
-                persona="sales",
-                unsubscribe_user_id=user.id,
-                unsubscribe_category="re_engagement",
-            )
-            if not res.get("skipped", False):
-                sent_tokens.add("re14")
-                user.drip_state = ",".join(sorted(sent_tokens))
-                counts["re14"] += 1
-                any_sent = True
-                if governor is not None:
-                    governor.record(user, SendClass.LIFECYCLE)
-        except Exception:
-            logger.exception("re_engagement.send_failed user=%s", user.id)
 
-    if any_sent:
+        # ---- Sunset: completed touch 2, still dormant past the window ------
+        if (
+            RE_TOUCH2_TOKEN in tokens
+            and RE_SUNSET_TOKEN not in tokens
+            and seen < t2_lower
+        ):
+            tokens.add(RE_SUNSET_TOKEN)
+            user.drip_state = ",".join(sorted(tokens))
+            counts["re_sunset"] += 1
+            any_change = True
+            continue
+
+        # ---- Touch 2: had touch 1, still dormant, in the [24d, 26d) window -
+        if (
+            RE_TOUCH1_TOKEN in tokens
+            and RE_TOUCH2_TOKEN not in tokens
+            and t2_lower <= seen < t2_upper
+        ):
+            if not wants(user, EmailPref.RE_ENGAGEMENT):
+                continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=RE_TOUCH2_TOKEN,
+            ):
+                continue
+            try:
+                html = render_re_engagement_touch2_email(_re_first_name(user.name))
+                res = await send_email(
+                    user.email, RE_ENGAGEMENT_TOUCH2_SUBJECT, html,
+                    persona="sales",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="re_engagement",
+                )
+                if not res.get("skipped", False):
+                    tokens.add(RE_TOUCH2_TOKEN)
+                    user.drip_state = ",".join(sorted(tokens))
+                    counts["re24"] += 1
+                    any_change = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
+            except Exception:
+                logger.exception("re_engagement.touch2_send_failed user=%s", user.id)
+            continue
+
+        # ---- Touch 1: first nudge, [14d, 16d) window ----------------------
+        if RE_TOUCH1_TOKEN not in tokens and t1_lower <= seen < t1_upper:
+            if not wants(user, EmailPref.RE_ENGAGEMENT):
+                continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=RE_TOUCH1_TOKEN,
+            ):
+                continue
+            try:
+                trading_days = _trading_days_between(seen, now)
+                html = render_re_engagement_email(
+                    _re_first_name(user.name),
+                    trading_days_away=trading_days,
+                    scorecard_rows_appended=trading_days,
+                )
+                res = await send_email(
+                    user.email, RE_ENGAGEMENT_SUBJECT, html,
+                    persona="sales",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="re_engagement",
+                )
+                if not res.get("skipped", False):
+                    tokens.add(RE_TOUCH1_TOKEN)
+                    user.drip_state = ",".join(sorted(tokens))
+                    counts["re14"] += 1
+                    any_change = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
+            except Exception:
+                logger.exception("re_engagement.send_failed user=%s", user.id)
+            continue
+
+    if any_change:
         await session.commit()
     return counts
 

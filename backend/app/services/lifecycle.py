@@ -92,6 +92,21 @@ ACTIVATION_SERIES_TOKENS = frozenset({
     "act_alert",    # first-alert milestone nudge
 })
 
+# Terminal drip_state token that SUNSETS a user. Set by the re-engagement
+# series (services/email.run_re_engagement_drip) after touch 2 goes out and the
+# user is STILL dormant. Once present, the governor suppresses every
+# non-transactional send to them — see LIFECYCLE_SUPPRESSED_TOKENS below. Kept
+# here (not in email.py) because this is where it takes effect, and email.py
+# already imports from lifecycle, so a single source of truth avoids a cycle.
+RE_SUNSET_TOKEN = "re_sunset"
+
+# drip_state tokens that suppress a user from ALL non-transactional sends
+# (LIFECYCLE and SCHEDULED). This is deliverability insurance, not an
+# unsubscribe: transactional receipts still go out and List-Unsubscribe is
+# untouched. A suppressed user is segmented, never hard-deleted, so the state
+# is fully reversible.
+LIFECYCLE_SUPPRESSED_TOKENS = frozenset({RE_SUNSET_TOKEN})
+
 # How long after signup a returning session counts as "came back". The
 # last_seen_at bump is throttled to one write per hour (services/auth.
 # _bump_last_seen), so a user who browsed for twenty minutes at signup and
@@ -376,6 +391,23 @@ class FrequencyGovernor:
         # render + the round-trip).
         if getattr(user, "email_undeliverable_at", None) is not None:
             self.blocked += 1
+            return False
+
+        # Sunset: a user who went through the full re-engagement series without
+        # returning is suppressed from every non-transactional send going
+        # forward. Checked ABOVE the SCHEDULED early-return on purpose, so even
+        # opted-in recurring mail (EOD digest, weekly newsletter) stops — the
+        # whole point is to quit sending to an address that has gone quiet
+        # through a complete win-back sequence, before it spam-folds and drags
+        # the sender reputation down for everyone else. TRANSACTIONAL already
+        # returned True at the top, so receipts are unaffected, and this never
+        # touches email_prefs, so List-Unsubscribe still works.
+        if LIFECYCLE_SUPPRESSED_TOKENS & _tokens(getattr(user, "drip_state", "")):
+            self.blocked += 1
+            logger.info(
+                "governor.blocked reason=sunset user=%s token=%s",
+                getattr(user, "id", None), token,
+            )
             return False
 
         # Opted-in recurring sends are never suppressed.
