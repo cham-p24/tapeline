@@ -48,7 +48,9 @@ from app.services.email import (
 )
 from app.services.email_prefs import DEFAULT_PREFS, EmailPref
 from app.services.lifecycle import (
+    LIFECYCLE_SUPPRESSED_TOKENS,
     MAX_LIFECYCLE_SENDS_PER_WEEK,
+    RE_SUNSET_TOKEN,
     ActivitySnapshot,
     FrequencyGovernor,
     LifecycleStage,
@@ -234,6 +236,26 @@ def test_governor_blocks_undeliverable_address():
     gov = FrequencyGovernor(ledger=SendLedger())
     u = _user(email_undeliverable_at=datetime.now(UTC))
     assert gov.allows(u, SendClass.LIFECYCLE, token="act_scan6h") is False
+
+
+def test_governor_sunsets_completed_reengagement_user():
+    """A sunset user (terminal RE_SUNSET_TOKEN in drip_state) is suppressed
+    from every non-transactional send — LIFECYCLE and the otherwise-never-
+    blocked SCHEDULED digests alike — but transactional receipts still pass.
+    This is the deliverability contract behind the 2-touch series."""
+    assert RE_SUNSET_TOKEN in LIFECYCLE_SUPPRESSED_TOKENS  # constants stay in sync
+
+    gov = FrequencyGovernor(ledger=SendLedger())
+    sunset = _user(drip_state=f"re14,re24,{RE_SUNSET_TOKEN}")
+
+    assert gov.allows(sunset, SendClass.LIFECYCLE, token="wb30") is False
+    assert gov.allows(sunset, SendClass.SCHEDULED) is False
+    assert gov.allows(sunset, SendClass.TRANSACTIONAL) is True
+
+    # A user who finished the series but has NOT been sunset is unaffected.
+    mid = _user(drip_state="re14,re24")
+    assert gov.allows(mid, SendClass.LIFECYCLE, token="wb30") is True
+    assert gov.allows(mid, SendClass.SCHEDULED) is True
 
 
 def test_governor_caps_the_activation_series_at_four_messages():

@@ -426,8 +426,9 @@ async def tick() -> None:
         _spawn(_refresh_watchlisted_news())
 
     # Daily trial-drip emails (day 3 / 7 / 13, plus the T+30 lapsed no-card
-    # trial win-back inside run_daily_drip) + 14-day re-engagement for
-    # dormant non-trial users + 30/60/90-day post-cancellation win-back +
+    # trial win-back inside run_daily_drip) + the 2-touch dormant re-engagement
+    # series (~14d + ~24d, then a sunset that suppresses further lifecycle mail)
+    # for dormant non-trial users + 30/60/90-day post-cancellation win-back +
     # early-lifecycle activation nudges (first watchlist / first alert) +
     # post-conversion monthly→annual upgrade nudge + personal founder-touch to
     # high-value engaged signups + referral-milestone celebrations (3/5/10/25).
@@ -1412,8 +1413,12 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
                 counts["day3"], counts["day7"], counts["day13"],
                 counts.get("lapse30", 0),
             )
-        if re_counts["re14"]:
-            logger.info("drip.re_engagement_sent re14=%d", re_counts["re14"])
+        if any(re_counts.values()):
+            logger.info(
+                "drip.re_engagement_sent re14=%d re24=%d sunset=%d",
+                re_counts["re14"], re_counts.get("re24", 0),
+                re_counts.get("re_sunset", 0),
+            )
         if any(wb_counts.values()):
             logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
         if any(act_counts.values()):

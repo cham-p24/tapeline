@@ -1,10 +1,17 @@
-"""Tests for the 14-day re-engagement email + the last_seen_at side effect
-that drives it.
+"""Tests for the 2-touch dormant re-engagement series (+ sunset) and the
+last_seen_at side effect that drives it.
 
-The renderer itself is a pure function; the drip function uses a real
-async session with the in-memory SQLite test DB. We don't actually deliver
-mail (settings.resend_api_key is unset in CI, so send_email returns
-{skipped: True} which the drip treats as "skip the token bump").
+Covered here: the touch-1 / touch-2 renderers (pure functions), the
+activity-only content guard (neither renderer can emit ticker performance),
+and the drip sequencing — touch 2 only after touch 1 while still dormant, a
+returned user gets neither, and sunset stamps a terminal token without
+sending. The governor-level suppression that the sunset token triggers is
+pinned in test_lifecycle_governor.py.
+
+The drip function uses a real async session with the in-memory SQLite test
+DB. We don't actually deliver mail (settings.resend_api_key is unset in CI,
+so send_email returns {skipped: True} which the drip treats as "skip the
+token bump") — tests needing a confirmed send monkeypatch send_email.
 
 The last_seen_at bump tests fire signed-cookie requests through the
 in-memory ASGI client and assert the column gets populated.
@@ -12,6 +19,9 @@ in-memory ASGI client and assert the column gets populated.
 from __future__ import annotations
 
 import asyncio
+import inspect
+import re
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -21,7 +31,16 @@ from sqlalchemy import select
 from app.db import session_scope
 from app.main import app
 from app.models import User
-from app.services.email import render_re_engagement_email, run_re_engagement_drip
+from app.services.email import (
+    RE_ENGAGEMENT_SUBJECT,
+    RE_ENGAGEMENT_TOUCH2_SUBJECT,
+    RE_TOUCH1_TOKEN,
+    RE_TOUCH2_TOKEN,
+    render_re_engagement_email,
+    render_re_engagement_touch2_email,
+    run_re_engagement_drip,
+)
+from app.services.lifecycle import RE_SUNSET_TOKEN
 
 
 @pytest.fixture
@@ -33,11 +52,11 @@ def client():
 # ----- renderer ---------------------------------------------------------------
 
 def test_re_engagement_renders_with_name():
-    """Renderer drops the user's name into the headline and signs off as
-    Christian — the public founder identity for tapeline.io."""
+    """Touch 1 drops the user's name into the headline, reports system
+    activity, and signs off as Christian — the public founder identity."""
     html = render_re_engagement_email("Alice")
     assert "Alice" in html
-    assert "Tapeline missed you" in html
+    assert "scores kept updating" in html
     assert "Christian" in html  # founder sign-off
     # Brand fix from PR #44 — must NEVER regress to chamara@ in this renderer.
     assert "chamara@tapeline.io" not in html
@@ -50,7 +69,32 @@ def test_re_engagement_falls_back_to_trader_label():
     """If we call the renderer with a generic 'trader' placeholder (the
     drip default when User.name is null), the email still reads cleanly."""
     html = render_re_engagement_email("trader")
-    assert "Tapeline missed you, trader" in html
+    assert "Your scores kept updating, trader" in html
+
+
+def test_touch1_reports_system_activity_with_counts():
+    """When the drip passes real trading-day counts, touch 1 surfaces them as
+    SYSTEM activity — scanner scoring + scorecard rows + look-up reset — and
+    links to both the app and the public scorecard."""
+    html = render_re_engagement_email(
+        "Alice", trading_days_away=10, scorecard_rows_appended=10,
+    )
+    assert "10 sessions" in html
+    assert "10 dated rows" in html
+    assert "look-ups have reset" in html
+    assert "/app/scanner" in html      # app link
+    assert "/scorecard" in html        # public scorecard link
+
+
+def test_touch2_is_founder_signed_single_question():
+    """Touch 2 is a plain founder note: Christian introduces himself, asks one
+    open question, offers a plain return link, thanks the reader."""
+    html = render_re_engagement_touch2_email("Alice")
+    assert "Hi Alice" in html
+    assert "I'm Christian" in html
+    assert "what would have made Tapeline worth returning to?" in html
+    assert "/app/scanner" in html
+    assert "Thanks for giving it a try" in html
 
 
 # ----- drip filter window -----------------------------------------------------
@@ -103,7 +147,7 @@ async def test_drip_targets_only_dormant_users_in_window():
             await s.delete(u)
         await s.commit()
 
-        assert counts == {"re14": 0}
+        assert counts == {"re14": 0, "re24": 0, "re_sunset": 0}
 
 
 @pytest.mark.asyncio
@@ -218,3 +262,214 @@ def test_async_loop_is_sane():
     async def _ok():
         return 1
     assert asyncio.run(_ok()) == 1
+
+
+# ----- activity-only content guard (the load-bearing compliance piece) -------
+#
+# Rule 7 (docs/COMPLIANCE_COPY_RULES.md) forbids ever telling a named user how
+# THEIR self-selected securities moved. The guard is structural: neither
+# renderer accepts an input that could carry ticker performance, so the
+# rendered HTML cannot contain it. These two tests pin that as an enforced
+# contract, not a guideline.
+
+# Phrases that would report per-user ticker PERFORMANCE.
+_PERFORMANCE_BLOCKLIST = [
+    r"\bgained\b", r"\blost\b", r"\brallied\b", r"\bsurged\b", r"\bdropped\b",
+    r"\bbeat\b", r"vs\.?\s*spy", r"you\s+missed", r"[+]\d+\s*%",
+    r"your\s+watchlist[^.<>]{0,40}\b(?:up|down)\b",
+]
+
+# Parameter-name fragments that would betray a ticker-performance input path.
+# If someone later adds e.g. `watchlist_performance=` or `best_ticker_pct=`,
+# the signature test below fails before any copy can ship.
+_FORBIDDEN_PARAM_FRAGMENTS = (
+    "ticker", "watchlist", "symbol", "performance", "moved", "return",
+    "gain", "loss", "pct", "percent", "price", "holding", "position",
+    "alpha", "spy",
+)
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        render_re_engagement_email(
+            "Alice", trading_days_away=11, scorecard_rows_appended=11,
+        ),
+        render_re_engagement_touch2_email("Alice"),
+    ],
+    ids=["touch1", "touch2"],
+)
+def test_renderers_cannot_emit_ticker_performance(html):
+    """Rendered HTML for BOTH touches contains none of the performance
+    blocklist — even with every activity input populated."""
+    lowered = html.lower()
+    for pattern in _PERFORMANCE_BLOCKLIST:
+        assert re.search(pattern, lowered) is None, (
+            f"re-engagement copy leaked a performance phrase matching {pattern!r}"
+        )
+
+
+def test_reengagement_renderers_accept_only_activity_inputs():
+    """The stronger guard: neither renderer even ACCEPTS a parameter that
+    could carry per-user ticker performance."""
+    for fn in (render_re_engagement_email, render_re_engagement_touch2_email):
+        for pname in inspect.signature(fn).parameters:
+            low = pname.lower()
+            for frag in _FORBIDDEN_PARAM_FRAGMENTS:
+                assert frag not in low, (
+                    f"{fn.__name__} exposes a performance-shaped parameter "
+                    f"{pname!r} (fragment {frag!r}) — rule 7 violation risk"
+                )
+
+
+# ----- 2-touch sequencing + sunset -------------------------------------------
+
+
+def _tracker():
+    sends: list[tuple[str, str]] = []
+
+    async def _track(to, subject, *_a, **_k):
+        sends.append((to, subject))
+        return {"id": "ok"}
+
+    return sends, _track
+
+
+@pytest.mark.asyncio
+async def test_touch1_sends_with_new_subject(monkeypatch):
+    """A user in the [14d, 16d) window with no prior token gets touch 1 under
+    the normalised subject and the re14 token."""
+    import app.services.email as email_module
+    sends, track = _tracker()
+    monkeypatch.setattr(email_module, "send_email", track)
+
+    now = datetime.now(UTC)
+    uid = f"re_t1_{uuid.uuid4().hex}"
+    email = f"{uid}@example.com"
+    async with session_scope() as s:
+        s.add(User(
+            id=uid, email=email, name="Ann Example", tier="free",
+            last_seen_at=now - timedelta(days=14, hours=12),
+        ))
+        await s.commit()
+
+        await run_re_engagement_drip(s)
+
+        row = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        assert RE_TOUCH1_TOKEN in (row.drip_state or "").split(",")
+        assert (email, RE_ENGAGEMENT_SUBJECT) in sends
+
+        await s.delete(row)
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_touch2_fires_only_after_touch1_and_while_dormant(monkeypatch):
+    """Touch 2 (re24) fires at ~24d dormant ONLY for a user who already got
+    touch 1 (re14 present). A same-age user WITHOUT re14 gets neither touch."""
+    import app.services.email as email_module
+    sends, track = _tracker()
+    monkeypatch.setattr(email_module, "send_email", track)
+
+    now = datetime.now(UTC)
+    ready_id = f"re2_ready_{uuid.uuid4().hex}"
+    ready_email = f"{ready_id}@example.com"
+    no1_id = f"re2_no1_{uuid.uuid4().hex}"
+    no1_email = f"{no1_id}@example.com"
+    async with session_scope() as s:
+        s.add_all([
+            User(
+                id=ready_id, email=ready_email, name="Ready", tier="free",
+                last_seen_at=now - timedelta(days=25),
+                drip_state=RE_TOUCH1_TOKEN,
+            ),
+            User(
+                id=no1_id, email=no1_email, name="NoTouch1", tier="free",
+                last_seen_at=now - timedelta(days=25),
+                drip_state="",
+            ),
+        ])
+        await s.commit()
+
+        await run_re_engagement_drip(s)
+
+        ready = (await s.execute(select(User).where(User.id == ready_id))).scalar_one()
+        no1 = (await s.execute(select(User).where(User.id == no1_id))).scalar_one()
+
+        # Had touch 1 → touch 2 fires.
+        assert RE_TOUCH2_TOKEN in (ready.drip_state or "").split(",")
+        assert (ready_email, RE_ENGAGEMENT_TOUCH2_SUBJECT) in sends
+
+        # No touch 1, and 25d is past the touch-1 window → nothing at all.
+        assert RE_TOUCH2_TOKEN not in (no1.drip_state or "")
+        assert RE_TOUCH1_TOKEN not in (no1.drip_state or "")
+        assert no1_email not in [to for (to, _s) in sends]
+
+        # Idempotent: a second run doesn't re-send touch 2 to this user.
+        await run_re_engagement_drip(s)
+        assert sum(1 for (to, _s) in sends if to == ready_email) == 1
+
+        for u in (ready, no1):
+            await s.delete(u)
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_returned_user_gets_neither_touch(monkeypatch):
+    """A user whose last_seen_at was refreshed (they came back) sits in none of
+    the dormancy windows, so neither touch fires — even if they still carry the
+    re14 token from an earlier dormant spell."""
+    import app.services.email as email_module
+    sends, track = _tracker()
+    monkeypatch.setattr(email_module, "send_email", track)
+
+    now = datetime.now(UTC)
+    uid = f"re_ret_{uuid.uuid4().hex}"
+    email = f"{uid}@example.com"
+    async with session_scope() as s:
+        s.add(User(
+            id=uid, email=email, name="Returned", tier="free",
+            last_seen_at=now - timedelta(days=1),   # active again
+            drip_state=RE_TOUCH1_TOKEN,
+        ))
+        await s.commit()
+
+        await run_re_engagement_drip(s)
+
+        row = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        assert RE_TOUCH2_TOKEN not in (row.drip_state or "")
+        assert RE_SUNSET_TOKEN not in (row.drip_state or "")
+        assert email not in [to for (to, _s) in sends]
+
+        await s.delete(row)
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_sunset_stamps_terminal_token_without_sending(monkeypatch):
+    """A user who received touch 2 and stayed dormant past the touch-2 window
+    is stamped with the terminal sunset token and sent NOTHING further."""
+    import app.services.email as email_module
+    sends, track = _tracker()
+    monkeypatch.setattr(email_module, "send_email", track)
+
+    now = datetime.now(UTC)
+    uid = f"re_sunset_{uuid.uuid4().hex}"
+    email = f"{uid}@example.com"
+    async with session_scope() as s:
+        s.add(User(
+            id=uid, email=email, name="Done", tier="free",
+            last_seen_at=now - timedelta(days=30),   # past the [24d,26d) window
+            drip_state=f"{RE_TOUCH1_TOKEN},{RE_TOUCH2_TOKEN}",
+        ))
+        await s.commit()
+
+        counts = await run_re_engagement_drip(s)
+
+        row = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        assert RE_SUNSET_TOKEN in (row.drip_state or "").split(",")
+        assert email not in [to for (to, _s) in sends]  # sunset sends nothing
+        assert counts["re_sunset"] >= 1
+
+        await s.delete(row)
+        await s.commit()
