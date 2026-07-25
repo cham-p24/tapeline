@@ -505,7 +505,28 @@ export function scorecardDatasetJsonLd() {
       { "@type": "PropertyValue", name: "Momentum factor", minValue: 0, maxValue: 100 },
       { "@type": "PropertyValue", name: "Realised 1-day return vs SPY", description: "Pick performance one trading session forward, benchmarked against SPY", unitText: "percent" },
     ],
+    // DataDownload distributions are what makes this eligible for Google
+    // Dataset Search and citable by AI crawlers: the machine-readable raw
+    // files, not just the HTML view. The CSV + JSON endpoints are the same
+    // ones linked from the /scorecard "Verify this yourself" block, served by
+    // backend/app/routers/scorecard.py (text/csv and application/json) and
+    // resolved same-origin via the next.config.js /api/* rewrite. They carry
+    // the full append-only archive since inception. robots.txt Allows these
+    // two paths explicitly (the rest of /api/ is Disallow'd) so Googlebot can
+    // actually fetch them.
     distribution: [
+      {
+        "@type": "DataDownload",
+        encodingFormat: "text/csv",
+        contentUrl: "https://tapeline.io/api/scorecard.csv",
+        name: "Scorecard — raw CSV (full archive)",
+      },
+      {
+        "@type": "DataDownload",
+        encodingFormat: "application/json",
+        contentUrl: "https://tapeline.io/api/scorecard.json",
+        name: "Scorecard — raw JSON (full archive)",
+      },
       {
         "@type": "DataDownload",
         encodingFormat: "text/html",

@@ -59,7 +59,14 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "*",
-        allow: "/",
+        // The two public scorecard dataset exports are the ONLY /api/* paths a
+        // crawler should reach: they're the machine-readable distributions the
+        // /scorecard Dataset JSON-LD points at (see scorecardDatasetJsonLd),
+        // and Google Dataset Search must be able to fetch them. A more-specific
+        // Allow overrides the blanket "/api/" Disallow below (Googlebot picks
+        // the longest matching path; Bing takes first-match and these are
+        // listed first), so the rest of the API surface stays blocked.
+        allow: ["/", "/api/scorecard.csv", "/api/scorecard.json"],
         disallow: [
           // Backend API surface — not for crawlers.
           "/api/",
