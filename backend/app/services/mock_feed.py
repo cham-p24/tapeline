@@ -287,18 +287,21 @@ def _signal_from_score(score: float) -> str:
 
 def _render_reason(symbol: str, sector: str, trend: float, rs: float, fund: float, mom: float, macro: float, smart: float) -> str:
     """
-    Per-ticker plain-English reason string. Designed (April 2026, post-AI-Why-
-    commodity-shift) to read like a human analyst, not a template:
+    Per-ticker reason string that describes WHICH of Tapeline's six factor
+    scores are driving the composite, and nothing else.
 
-    - ~100 phrase variants across factor states (vs the previous 7 fixed phrases)
-    - Sector-aware relative-strength clauses ("leading tech peers", "outperforming
-      the oil patch", etc.)
-    - Top-3 strongest factors selected, then woven with varied sentence structure
-    - Same composite score will render different sentences each tick — feels
-      generative without actually being LLM-generated
-
-    Real polygon_feed should pass deterministic seeds for stability across reads;
-    mock here uses fresh randomness each tick which is fine for dev.
+    - Selects the top-3 factors furthest from the 50 midpoint and states each
+      one's score band in plain, DESCRIPTIVE language (see the phrase banks).
+    - Every clause is a statement about a factor SCORE — never a claim about a
+      specific external event (a filing, a Congressional trade, a particular
+      RSI/DMA/VIX reading) and never an evaluative adjective on the security.
+      This is a hard compliance boundary: the clauses are chosen from the
+      sub-scores alone, and five of the six sub-scores are still synthesised
+      rather than sourced (see polygon_feed), so anything beyond "this factor
+      scores high/low" would be a fabricated claim about a real security.
+    - Sentence structure varies for readability; the substance is fixed by the
+      scores. (Real polygon_feed should pass deterministic seeds for stable
+      wording across reads.)
     """
     parts: list[tuple[float, str]] = []  # (abs_strength, phrase)
 
@@ -391,122 +394,102 @@ _SECTOR_PEER = {
     "ETF":                    "the broader market",
 }
 
+# COMPLIANCE (2026-07): every phrase below describes Tapeline's own 0-100
+# factor SCORE band and nothing else. A phrase must NOT (a) assert a specific
+# external event the system has not verified — no "Form 4 filings",
+# "Congressional buys", "insiders trimming", no specific RSI/DMA/VIX/12-month-
+# high reading — and must NOT (b) apply an evaluative adjective to the security
+# (exceptional / best-in-class / solid / weak / bullish / by a wide margin).
+# Reason:  these clauses are selected purely from the factor sub-score, and
+# five of the six sub-scores are still synthesised rather than sourced (see
+# polygon_feed's docstring). Describing the score band is honest; asserting a
+# market fact or a specific filing/technical reading is a fabricated claim
+# about a real security. Keep new phrases score-descriptive only.
 _TREND_STRONG_UP = [
-    "primary trend decisively up across all timeframes",
-    "leadership uptrend with steepening slope",
-    "breakout from multi-month base, holding gains",
-    "above all major moving averages and accelerating",
-    "trend strength at a fresh cycle high",
+    "trend factor in the top band of its score",
+    "trend among this ticker's highest-scoring factors",
+    "trend factor near the top of its range",
 ]
 _TREND_UP = [
-    "uptrend intact above the 50DMA",
-    "higher-highs structure holding",
-    "trend persistent on the daily and weekly",
-    "above the 200DMA with positive slope",
-    "constructive trend pattern, no breakdown signal",
+    "trend factor above the score midpoint",
+    "trend factor on the upper side of its range",
+    "positive trend factor reading",
 ]
 _TREND_DOWN = [
-    "trend rolling under the 50DMA",
-    "primary trend under pressure",
-    "lower-highs forming on the daily",
-    "below 50DMA with the 200DMA flattening",
+    "trend factor below the score midpoint",
+    "trend factor on the lower side of its range",
 ]
 _TREND_STRONG_DOWN = [
-    "trend broken across all timeframes",
-    "below the 200DMA with negative slope",
-    "structural downtrend confirmed",
-    "lower-lows compounding",
-    "breakdown from prior support, no reclaim",
+    "trend factor in the bottom band of its score",
+    "trend among this ticker's lowest-scoring factors",
+    "trend factor near the bottom of its range",
 ]
 
 _RS_STRONG_UP = [
-    "leading {peer} by a wide margin",
-    "outperforming {peer} on every timeframe",
-    "relative strength near 12-month highs vs {peer}",
-    "among the strongest names in {peer} this quarter",
+    "relative-strength factor in the top band vs {peer}",
+    "relative-strength among this ticker's highest-scoring factors vs {peer}",
+    "relative-strength factor near the top of its range vs {peer}",
 ]
 _RS_UP = [
-    "outperforming {peer}",
-    "ahead of {peer} on the 1M and 3M view",
-    "relative strength tilting up vs {peer}",
-    "above the {peer} average",
+    "relative-strength factor above the midpoint vs {peer}",
+    "relative-strength factor on the upper side vs {peer}",
 ]
 _RS_DOWN = [
-    "underperforming {peer}",
-    "lagging {peer} on the 1M view",
-    "RS line trending down vs {peer}",
+    "relative-strength factor below the midpoint vs {peer}",
+    "relative-strength factor on the lower side vs {peer}",
 ]
 _RS_STRONG_DOWN = [
-    "lagging {peer} badly",
-    "among the weakest in {peer}",
-    "relative strength near 12-month lows",
-    "underperforming {peer} on every timeframe",
+    "relative-strength factor in the bottom band vs {peer}",
+    "relative-strength among this ticker's lowest-scoring factors vs {peer}",
 ]
 
 _FUND_STRONG = [
-    "fundamentals exceptional — margin expansion, growth accelerating",
-    "fundamentals top decile (revenue + margin trend + ROE)",
-    "best-in-class fundamentals on every metric we track",
-    "growth and profitability both above sector median",
+    "fundamentals factor in the top band (revenue, margin, ROE inputs)",
+    "fundamentals among this ticker's highest-scoring factors",
+    "fundamentals factor near the top of its range",
 ]
 _FUND_GOOD = [
-    "solid fundamentals (revenue trend, margins, balance sheet)",
-    "fundamentals supportive — clean balance sheet, healthy margins",
-    "fundamentals trend up — margin and growth both improving",
-    "fundamentals score above sector median",
+    "fundamentals factor above the score midpoint",
+    "fundamentals factor on the upper side of its range",
 ]
 _FUND_WEAK = [
-    "fundamentals deteriorating — margin compression visible",
-    "weak fundamentals — debt high, growth slowing",
-    "fundamentals below sector median",
-    "EPS revisions trending down",
+    "fundamentals factor below the score midpoint",
+    "fundamentals factor in the lower band of its range",
 ]
 
 _MOM_STRONG = [
-    "momentum accelerating into the move",
-    "RSI on a fresh leg up, volume confirming",
-    "momentum reading at a 6-month high",
-    "thrust signal triggered, breadth widening",
+    "momentum factor in the top band of its score",
+    "momentum among this ticker's highest-scoring factors",
+    "momentum factor near the top of its range",
 ]
 _MOM_WEAK = [
-    "momentum stalling — bearish RSI divergence forming",
-    "thrust fading on lighter volume",
-    "momentum below the 6-month average",
-    "negative momentum divergence on the daily",
+    "momentum factor below the score midpoint",
+    "momentum factor in the lower band of its range",
 ]
 
 _SMART_BUYING = [
-    "insider net buying over the last 90 days (recent Form 4 filings)",
-    "insider net buying over the last 90 days",
-    "smart-money flow positive — insiders + Congress",
-    "Congressional buys disclosed in the last 30 days",
-    "insider positioning bullish",
+    "smart-money factor above the score midpoint",
+    "smart-money factor on the upper side of its range",
+    "smart-money factor near the top of its range",
 ]
 _SMART_SELLING = [
-    "insider net selling over the last 90 days",
-    "smart-money flow negative — insiders trimming positions",
-    "insider net selling accelerating (recent Form 4 filings)",
-    "Congressional sells outnumber buys recently",
+    "smart-money factor below the score midpoint",
+    "smart-money factor in the lower band of its range",
 ]
 
 _MACRO_TAILWIND = [
-    "macro tailwind — sector aligned with the current regime",
-    "favourable macro setup — rates and breadth supportive",
-    "regime backdrop constructive (breadth healthy, VIX contained)",
-    "macro factors aligned with the move",
+    "macro factor above the midpoint for the current regime",
+    "macro factor on the upper side for the current regime",
 ]
 _MACRO_HEADWIND = [
-    "macro headwind — rate-sensitive in a tightening regime",
-    "regime backdrop cautious — VIX elevated, breadth narrow",
-    "macro factors offsetting the technical setup",
-    "sector under pressure from the current macro regime",
+    "macro factor below the midpoint for the current regime",
+    "macro factor in the lower band for the current regime",
 ]
 
 _NEUTRAL = [
-    "Mixed signals across factors — no decisive read.",
-    "Factor data balanced; no edge in either direction.",
-    "Composite reads neutral; no factor dominates.",
-    "No factor extreme enough to drive a directional view.",
+    "Factor scores are balanced; no single factor drives the composite.",
+    "Composite reads neutral; no factor at an extreme.",
+    "Mixed factor scores; no factor stands out either way.",
 ]
 
 
