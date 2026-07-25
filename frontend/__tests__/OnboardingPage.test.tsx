@@ -71,6 +71,32 @@ describe("OnboardingPage", () => {
     expect(checkbox).toBeInTheDocument();
     expect(checkbox.checked).toBe(false);
   });
+
+  // First-session time-to-value: the page must point the new user at the three
+  // activation actions that get them to the "aha" in session one — add a
+  // watchlist ticker, run a scan, view the public scorecard — each linking to
+  // the right surface. Descriptive only (no performance/returns promise).
+  it("renders the three first-session next-steps, each linking to its surface", () => {
+    render(<OnboardingPage />);
+    const watchlist = screen.getByRole("link", {
+      name: /add a ticker you follow to your watchlist/i,
+    });
+    const scan = screen.getByRole("link", { name: /run your first scan/i });
+    const scorecard = screen.getByRole("link", {
+      name: /see the public scorecard/i,
+    });
+    expect(watchlist).toHaveAttribute("href", "/app/watchlist");
+    expect(scan).toHaveAttribute("href", "/app/scanner");
+    expect(scorecard).toHaveAttribute("href", "/scorecard");
+  });
+
+  it("keeps the next-steps nudge descriptive — no performance/returns promise", () => {
+    const { container } = render(<OnboardingPage />);
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/\bwinning (?:stocks?|picks?|tickers?|names?)\b/i);
+    expect(text).not.toMatch(/\bbeat the market\b/i);
+    expect(text).not.toMatch(/\bguaranteed returns?\b/i);
+  });
 });
 
 // ── Non-destructive consent semantics ───────────────────────────────────────

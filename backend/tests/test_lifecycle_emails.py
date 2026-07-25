@@ -3,10 +3,15 @@
 Covers the two orchestrators added for conversion lever #2 (annual nudge) and
 #3 (activation):
 
-  1. run_activation_drip — two one-shot prompts dedup'd via User.drip_state:
-       "act_wl"    signed up 24-72h ago, zero watchlist items (any tier)
-       "act_alert" signed up 3-5d ago, alert-capable tier (pro/premium),
-                   no alert rule yet
+  1. run_activation_drip — two one-shot prompts dedup'd via User.drip_state,
+     both aligned to the first-session aha and gated on the fail-safe
+     lifecycle.has_recorded_activity helper (any recorded activity suppresses
+     the nudge — an empty watchlist alone is no longer enough):
+       "act_wl"    signed up 24-72h ago, no recorded activity (any tier) —
+                   the three-step aha checklist (watchlist, scan, scorecard)
+       "act_alert" signed up 3-5d ago, no recorded activity, alert-capable
+                   tier (pro/premium) — leads with the zero-setup scorecard
+                   (token name historical; see run_activation_drip)
 
   2. run_annual_nudge_drip — monthly subscribers ~28-45 days post-conversion
        "annual_p"  switch-to-annual upsell. Monthly vs annual is INFERRED from
@@ -62,6 +67,8 @@ async def _seed_user(
     drip_state: str = "",
     with_watchlist: bool = False,
     with_alert: bool = False,
+    activated_at: datetime | None = None,
+    last_seen_at: datetime | None = None,
 ) -> tuple[str, str]:
     """Insert a fresh user aged `age` ago. Returns (user_id, email).
 
@@ -69,7 +76,9 @@ async def _seed_user(
     fills when the value is omitted), so we can place the user inside or
     outside an orchestrator's signup window. `trial_drip=False` clears the
     TRIAL_DRIP bit (the activation gate); `with_watchlist` / `with_alert` add
-    the artefact whose ABSENCE the activation drip looks for.
+    the artefact whose ABSENCE the activation drip looks for. `activated_at`
+    and `last_seen_at` simulate recorded activity (an activation stamp / a
+    return visit) so the has_recorded_activity gate can be exercised.
     """
     uid = f"lc_{_uuid.uuid4().hex}"
     email = f"{uid}@example.com"
@@ -89,6 +98,8 @@ async def _seed_user(
             email_prefs=prefs,
             drip_state=drip_state,
             created_at=created,
+            activated_at=activated_at,
+            last_seen_at=last_seen_at,
         ))
         if with_watchlist:
             s.add(WatchlistItem(user_id=uid, symbol="AAPL"))
@@ -220,6 +231,56 @@ async def test_act_wl_respects_trial_drip_optout(monkeypatch):
     Delivered fake proves '' means 'gated', not 'skipped'."""
     monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
     uid, _ = await _seed_user(age=timedelta(hours=48), tier="free", trial_drip=False)
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+# ── Aligns the drip to the aha milestone: target only NOT-yet-activated users ─
+# The drip must nudge users who have not reached the first-session aha (add a
+# watchlist ticker + run a scan + view the scorecard), measured with the
+# existing fail-safe lifecycle.has_recorded_activity helper. An empty watchlist
+# is no longer sufficient — any recorded activity suppresses the nudge.
+
+@pytest.mark.asyncio
+async def test_act_wl_skips_activated_user(monkeypatch):
+    """In-window + empty watchlist, but activated_at is stamped (recorded
+    activity) → NOT the activation target, so no 'you haven't started' nudge."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(hours=48), tier="free",
+        activated_at=datetime.now(UTC) - timedelta(hours=1),
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_wl_skips_returned_user(monkeypatch):
+    """Empty watchlist but the user came BACK after signup (last_seen_at well
+    past created_at) → has_recorded_activity is True (fail-safe), so no nudge.
+    This is the signal SQL can't express, proving the Python re-check runs."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    now = datetime.now(UTC)
+    uid, _ = await _seed_user(
+        age=timedelta(hours=48), tier="free",
+        last_seen_at=now - timedelta(hours=40),  # ~8h after a 48h-ago signup
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_alert_skips_activated_user(monkeypatch):
+    """Alert-capable, in the 3-5d window, empty watchlist, but activated_at is
+    stamped → the realigned drip suppresses the nudge for an activated user."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(days=4), tier="premium",
+        activated_at=datetime.now(UTC) - timedelta(days=1),
+    )
     async with session_scope() as s:
         await run_activation_drip(s)
     assert await _drip_state(uid) == ""
@@ -393,14 +454,22 @@ def test_activation_watchlist_renderer():
     html = render_activation_watchlist_email("Alex")
     assert "Alex" in html
     assert len(html) > 200
-    assert "watchlist" in html.lower()
+    # The act_wl nudge is the three-step aha checklist: watchlist, scan,
+    # scorecard. All three surfaces are named; none is a performance claim.
+    lowered = html.lower()
+    assert "watchlist" in lowered
+    assert "scan" in lowered
+    assert "scorecard" in lowered
 
 
 def test_activation_alert_renderer():
     html = render_activation_alert_email("Alex")
     assert "Alex" in html
     assert len(html) > 200
-    assert "alert" in html.lower()
+    # Realigned to the aha: this stage now leads with the zero-setup public
+    # scorecard (the token name "act_alert" is retained only for governor /
+    # worker compatibility — see run_activation_drip).
+    assert "scorecard" in html.lower()
 
 
 def test_annual_upgrade_renderer_each_tier():
