@@ -20,6 +20,8 @@ vi.mock("@/lib/gtag", () => ({
   trackEvent: vi.fn(),
   trackFirstTickerAdded: vi.fn(),
   trackCapHit: vi.fn(),
+  trackUpgradePromptShown: vi.fn(),
+  trackUpgradePromptClicked: vi.fn(),
 }));
 vi.mock("@/lib/useLiveStream", () => ({
   useLiveStream: () => ({ status: "live", lastUpdate: null }),
@@ -88,6 +90,7 @@ function scannerResponse(tier: string) {
     count: 0,
     tier,
     row_cap: tier === "free" ? 10 : 1000,
+    total_matched: tier === "free" ? 0 : null,
     data_delayed_minutes: 0,
     items: [],
   };

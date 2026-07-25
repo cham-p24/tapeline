@@ -81,6 +81,33 @@ describe("AlertsPage channel default", () => {
   });
 });
 
+describe("AlertsPage locked delivery channels (show don't hide)", () => {
+  it("shows Email (Pro) and Telegram (Premium) as VISIBLE-but-locked for free users", async () => {
+    mockedUseUser.mockReturnValue(asUser(freeUser));
+    render(<AlertsPage />);
+    await waitFor(() => expect(rulesMock).toHaveBeenCalled());
+
+    const panel = screen.getByTestId("alerts-channels-locked");
+    // Both paid delivery channels are surfaced, not hidden, each with its tier.
+    expect(within(panel).getByText("Email")).toBeInTheDocument();
+    expect(within(panel).getByText("Pro")).toBeInTheDocument();
+    expect(within(panel).getByText("Telegram")).toBeInTheDocument();
+    expect(within(panel).getByText("Premium")).toBeInTheDocument();
+    // Web push is shown as the included/free channel.
+    expect(within(panel).getByText(/Web push/i)).toBeInTheDocument();
+    // A descriptive upgrade CTA points at billing.
+    expect(within(panel).getByRole("link", { name: /Unlock email \+ Telegram/i }))
+      .toHaveAttribute("href", "/app/billing?intent=pro");
+  });
+
+  it("does not show the locked-channels panel for paid tiers", async () => {
+    mockedUseUser.mockReturnValue(asUser(proUser));
+    render(<AlertsPage />);
+    await waitFor(() => expect(rulesMock).toHaveBeenCalled());
+    expect(screen.queryByTestId("alerts-channels-locked")).not.toBeInTheDocument();
+  });
+});
+
 describe("AlertsPage tier-gate errors", () => {
   it("humanizes the web-push cap 403 and renders a real billing link", async () => {
     mockedUseUser.mockReturnValue(asUser(freeUser));

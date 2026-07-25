@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import desc, or_, select, text
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, is_sqlite
@@ -180,6 +180,12 @@ async def list_scanner(
             )
         )
 
+    # Snapshot the fully-filtered SELECT — every filter, freshness and liquidity
+    # clause applied, but no ordering/paging yet — so a Free/anonymous response
+    # can also report total_matched (below) without rebuilding the where-clause
+    # stack a second time and risking the two drifting apart.
+    filtered_stmt = stmt
+
     col = getattr(Ticker, sort)
     stmt = stmt.order_by(desc(col) if order == "desc" else col)
     stmt = stmt.limit(limit).offset(offset)
@@ -196,6 +202,28 @@ async def list_scanner(
 
     result = await session.execute(stmt)
     rows = result.scalars().all()
+
+    # ── "Show don't hide": total_matched for the capped tiers ────────────────
+    # A Free/anonymous caller is pinned to the first row_cap rows (offset forced
+    # to 0 above). total_matched is the REAL count of ALL rows matching the
+    # current filters, before the row cap — so the client can state how many
+    # more tickers sit in the full ranked universe behind the wall WITHOUT
+    # leaking any of the held-back symbols or scores (it's a COUNT of existing
+    # data, never new rows; the offset scrape guard stays fully intact).
+    #
+    # Only computed for the non-paginating (Free/anon) tiers — Pro/Premium page
+    # the whole universe and have no cap to describe. And skipped entirely when
+    # the page wasn't even full: len(rows) < limit at offset 0 means we've
+    # already returned every matching row, so total_matched == len(rows) with no
+    # extra COUNT query. The COUNT only fires on a genuinely capped page (the
+    # same condition that records the durable cap-hit below).
+    total_matched: int | None = None
+    if not is_paginating_tier:
+        if len(rows) < limit:
+            total_matched = len(rows)
+        else:
+            count_stmt = select(func.count()).select_from(filtered_stmt.subquery())
+            total_matched = int((await session.execute(count_stmt)).scalar_one())
 
     # ── Cap-hit instrumentation (free tier only) ─────────────────────────────
     # A logged-in FREE user whose result FILLED the row cap is being refused the
@@ -216,6 +244,10 @@ async def list_scanner(
         "count": len(rows),
         "tier": tier.value,
         "row_cap": row_cap,
+        # Real size of the ranked universe behind the row cap (Free/anon only;
+        # null for the paginating tiers, which see everything). Drives the
+        # client's locked-remainder band — a real count, never a fabricated one.
+        "total_matched": total_matched,
         "data_delayed_minutes": delay_minutes,
         "items": [
             {

@@ -4,7 +4,13 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
-import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
+import {
+  trackEvent,
+  trackFirstTickerAdded,
+  trackCapHit,
+  trackUpgradePromptShown,
+  trackUpgradePromptClicked,
+} from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -115,7 +121,15 @@ export default function ScannerPage() {
   // capped to the top rows (row_cap) with live scores (data_delayed_minutes
   // is 0); Pro/Premium get the full universe. Drives the inline upgrade hint
   // below the filters.
-  const [meta, setMeta] = useState<{ tier: string; rowCap: number; delayMinutes: number } | null>(null);
+  const [meta, setMeta] = useState<{
+    tier: string;
+    rowCap: number;
+    delayMinutes: number;
+    // Real count of ALL rows matching the current filters, before the Free row
+    // cap (server-reported; null for Pro/Premium and until the first load
+    // resolves). Drives the locked-remainder band below the table.
+    totalMatched: number | null;
+  } | null>(null);
   const [minScore, setMinScore] = useState<number | "">(0);
   const [maxScore, setMaxScore] = useState<number | "">("");
   const [sort, setSort] = useState<SortKey>("score");
@@ -255,7 +269,17 @@ export default function ScannerPage() {
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       const r = await api.scanner(params);
       setRows(r.items);
-      setMeta({ tier: r.tier, rowCap: r.row_cap, delayMinutes: r.data_delayed_minutes });
+      setMeta({
+        tier: r.tier,
+        rowCap: r.row_cap,
+        delayMinutes: r.data_delayed_minutes,
+        // total_matched is sent by the backend for the capped tiers (the real
+        // count behind the Free row cap), but the shared api.scanner() return
+        // type lives in lib/api.ts — owned by a parallel change — so read it
+        // through a narrow cast until that type lands. See PR notes.
+        totalMatched:
+          (r as { total_matched?: number | null }).total_matched ?? null,
+      });
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, [minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
@@ -356,6 +380,32 @@ export default function ScannerPage() {
       trackCapHit("scanner_rows", "scanner");
     }
   }, [metaTier, metaRowCap]);
+
+  // "Show don't hide" locked remainder. The server reports total_matched — the
+  // real count of every row matching these filters — for Free/anon callers only
+  // (null for Pro/Premium). When it exceeds the rows the cap let through, the
+  // rest of the ranked universe is walled off; we surface that below the table
+  // as a locked band stating the REAL held-back count. shownRows is the raw
+  // server row count (already capped), not the client asset-filtered view, so
+  // the subtraction matches the server-side total. Never renders fabricated
+  // symbols/scores and never implies the locked rows are better — it states a
+  // count and points at the plan that unlocks them.
+  const shownRows = rows.length;
+  const lockedRemainder =
+    meta && meta.tier === "free" && meta.totalMatched != null
+      ? Math.max(0, meta.totalMatched - shownRows)
+      : 0;
+  const showLockedRemainder = lockedRemainder > 0;
+
+  // Funnel: the locked-remainder band IS an upgrade prompt becoming visible.
+  // Fire upgrade_prompt_shown when it first appears (keyed on the boolean so a
+  // 60s refresh that keeps it up doesn't re-fire), closing the chain
+  // cap_hit → upgrade_prompt_shown → upgrade_prompt_clicked → begin_checkout.
+  useEffect(() => {
+    if (showLockedRemainder) {
+      trackUpgradePromptShown("scanner", "scanner_rows");
+    }
+  }, [showLockedRemainder]);
 
   // One-click "add to watchlist" from a scanner row. Optimistic, idempotent,
   // and uses the SAME api the watchlist page's add() uses so it lands in the
@@ -692,6 +742,57 @@ export default function ScannerPage() {
           </tbody>
         </table>
       </div>
+
+      {/* "Show don't hide" locked remainder — Free users see the shape of the
+          rest of the ranked universe (locked/blurred factor columns) plus the
+          REAL held-back count from the server. No fabricated symbols or scores
+          are rendered (none are fetched past the cap), and the copy states a
+          count, never a performance/returns claim. The offset scrape guard is
+          untouched: this is a count, not the rows themselves. */}
+      {showLockedRemainder && (
+        <div
+          className="card mt-4 overflow-hidden"
+          data-testid="scanner-locked-remainder"
+        >
+          {/* Locked/blurred stub rows — the factor columns exist on Pro; their
+              SHAPE is shown greyed and blurred. Decorative only (aria-hidden):
+              no ticker symbols, scores or numbers appear here. */}
+          <div aria-hidden className="select-none px-4 pt-4">
+            <div className="space-y-2.5 opacity-60 blur-[3px]">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-xs text-muted">🔒</span>
+                  <span className="h-3 flex-1 rounded bg-muted/25" />
+                  <span className="h-3 w-16 rounded bg-muted/25" />
+                  <span className="h-3 w-12 rounded bg-muted/25" />
+                  <span className="h-3 w-12 rounded bg-muted/25" />
+                  <span className="h-3 w-16 rounded bg-muted/25" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="px-4 pb-5 pt-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <p className="text-sm font-medium text-fg">
+                <span className="text-accent">{lockedRemainder.toLocaleString()}</span>{" "}
+                more {lockedRemainder === 1 ? "ticker matches" : "tickers match"} your
+                filters in the full ranked universe.
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Free shows the top {meta?.rowCap} rows. Pro unlocks every matching
+                row, live — plus pagination, CSV export and saved scans.
+              </p>
+            </div>
+            <Link
+              href="/app/billing?intent=pro"
+              onClick={() => trackUpgradePromptClicked("scanner", "scanner_rows")}
+              className="mt-3 inline-block shrink-0 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 sm:mt-0"
+            >
+              Upgrade to Pro
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Watchlist-cap upgrade moment — opens when the server 403s a star
           click. Backend message carries the real cap numbers. */}
