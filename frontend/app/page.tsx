@@ -141,13 +141,13 @@ export default function LandingPage() {
           <FadeIn delayMs={0}>
             <Differentiator
               num="01"
-              label="Six named factors"
+              label="Published, fixed weights"
               body={
                 <>
-                  Trend &middot; Relative Strength &middot; Fundamentals &middot;
-                  Smart Money &middot; Macro &middot; Momentum &mdash; weighted most
-                  toward Trend and Relative Strength, least toward Momentum. No black
-                  box. No hidden factors. Every change is{" "}
+                  The exact weight on each of the six factors is public and fixed
+                  &mdash; no black box, no hidden inputs, no mystery AI. Weighted
+                  most toward Trend and Relative Strength, least toward Momentum,
+                  and every change is{" "}
                   <Link href="/changelog" className="link">
                     announced before it ships
                   </Link>
