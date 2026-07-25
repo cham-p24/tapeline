@@ -50,6 +50,38 @@ import {
 const SCORECARD_CSV_URL = "/api/scorecard.csv";
 const SCORECARD_JSON_URL = "/api/scorecard.json";
 
+/**
+ * Hero header (H1 + mechanism intro). Extracted so it renders in BOTH the SSR
+ * loading state and the data-loaded state.
+ *
+ * WHY THIS EXISTS: this page is a client component, so its server render is the
+ * `!data` branch below — which previously showed only a <Skeleton> where the H1
+ * belongs. Googlebot's first (HTML) crawl wave therefore saw ZERO H1 on the
+ * flagship trust page, throwing away the single strongest on-page relevance
+ * signal for the "transparent stock screener / public track record" cluster
+ * this page is meant to own. Rendering the real H1 + intro in the loading
+ * branch too puts the H1 in the SSR HTML regardless of the client-side fetch.
+ *
+ * COMPLIANCE — Rule 3: states the MECHANISM (what is recorded, when it is
+ * frozen, what it is checked against, that losing days stay), never the
+ * outcome. No hit rate, no alpha, no percentage.
+ */
+function ScorecardHero() {
+  return (
+    <>
+      <h1 className="text-4xl font-bold tracking-tight">
+        Every daily top-10, frozen when it printed and checked against SPY. Losing days included.
+      </h1>
+      <p className="mt-3 max-w-2xl text-muted">
+        At each US market close the six-factor composite produces a ranking. We write the top 10 down &mdash;
+        symbol, rank, score, price &mdash; and never touch the row again. The next session we record what the
+        price did and what SPY did over the same two closes. Entries are never re-ranked, back-filled or
+        removed, so what is here is what was published on the day, whichever way it went.
+      </p>
+    </>
+  );
+}
+
 export default function ScorecardPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -101,8 +133,9 @@ export default function ScorecardPage() {
         {scorecardSchema}
         <MarketingNav />
         <div className="mx-auto max-w-5xl px-6 py-10">
-          <Skeleton className="h-10 w-2/3" />
-          <Skeleton className="mt-4 h-4 w-full max-w-xl" />
+          {/* Real H1 + intro (not a skeleton) so the SSR HTML always carries
+              the page's H1 for the first crawl wave — see ScorecardHero. */}
+          <ScorecardHero />
           {/* Mirrors the loaded layout: the verify-yourself panel, then the
               summary table. (It previously mirrored a 4-tile stat grid that
               no longer exists, which made the page visibly jump on load.) */}
@@ -142,20 +175,12 @@ export default function ScorecardPage() {
         <Link href="/signup?from=scorecard" className="btn-primary text-sm">Start free &mdash; no card &rarr;</Link>
       </div>
 
-      {/* H1 states the MECHANISM, not the outcome (Rule 3). No hit rate, no
-          alpha, no percentage — the same constraint the <title> and meta
-          description in layout.tsx are held to, and the reason both were
-          rewritten while the live number is a coin flip rather than after a
-          good month. */}
-      <h1 className="text-4xl font-bold tracking-tight">
-        Every daily top-10, frozen when it printed and checked against SPY. Losing days included.
-      </h1>
-      <p className="mt-3 max-w-2xl text-muted">
-        At each US market close the six-factor composite produces a ranking. We write the top 10 down &mdash;
-        symbol, rank, score, price &mdash; and never touch the row again. The next session we record what the
-        price did and what SPY did over the same two closes. Entries are never re-ranked, back-filled or
-        removed, so what is here is what was published on the day, whichever way it went.
-      </p>
+      {/* H1 + mechanism intro. Shared with the SSR loading state via
+          ScorecardHero so the H1 is present in the first-wave HTML. States the
+          MECHANISM, not the outcome (Rule 3): no hit rate, no alpha, no
+          percentage — the same constraint the <title> and meta description in
+          layout.tsx are held to. */}
+      <ScorecardHero />
 
       {/* Tier-gate banner — shown when the viewer is anonymous or on Free.
           Only the per-day entries are delayed; the archive summary and the

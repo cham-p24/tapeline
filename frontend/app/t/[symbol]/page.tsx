@@ -430,15 +430,26 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const signal = data.signal ?? "—";
   const why = data.reason ?? "Six-factor synthesis updated live.";
   const title = `${sym} Stock Score & 6-Factor Analysis · Tapeline`;
-  // Long-tail-friendly description hits queries traders actually run:
-  // "TICKER stock score", "TICKER analysis", "TICKER technical rating", etc.
-  // The Finviz-alternative phrasing at the end is deliberate — GSC shows a
-  // strong "[ticker] finviz" pattern (snowflake finviz, clrb finviz, auud
-  // finviz, etc.) across the ~2,500-ticker universe. Mentioning "free
-  // Finviz alternative" in the description lets every per-ticker page
-  // compete for "${sym} finviz" without keyword stuffing the title.
-  // Keeps copy honest (no return claims, descriptive not prescriptive).
-  const description = `Tapeline Score ${score}/100 (${signal}) for ${data.name} (${sym}). ${why} 6-factor quantitative analysis: trend, relative strength, fundamentals, smart money, macro, momentum. A free Finviz alternative for ${sym} — public methodology, back-checked scorecard, live updates.`;
+  // Meta description: front-loaded and hard-capped at ~155 chars so it renders
+  // in full in the SERP.
+  //
+  // The prior template interpolated the whole `why` sentence
+  // (`Tapeline Score … ${why} 6-factor quantitative analysis: …`) and ran
+  // 250-320 chars on nearly every ticker, so Google truncated the differentiator
+  // — the "free Finviz alternative" hook — clean off the end of every snippet
+  // across the ~2,461-page cluster. That's a site-wide CTR leak. The
+  // "[ticker] finviz" query pattern is real in GSC (snowflake finviz, clrb
+  // finviz, …); keeping "free Finviz alternative" inside the visible window is
+  // the point of the rewrite. `why` is dropped from the meta (it still drives
+  // the OG/Twitter description and the on-page copy). Descriptive only: score
+  // and signal are model outputs, no return claim, no vs-SPY figure (Rule 3).
+  const rawDescription =
+    `${sym} stock score ${score}/100 (${signal}) for ${data.name} on Tapeline — ` +
+    `a free Finviz alternative with a public six-factor methodology and a back-checked daily scorecard.`;
+  const description =
+    rawDescription.length > 160
+      ? rawDescription.slice(0, 157).replace(/\s+\S*$/, "").trimEnd() + "…"
+      : rawDescription;
   // Keyword set for crawlers — narrow, ticker-specific, no spam stuffing.
   // Finviz keywords added 2026-05-19: GSC shows ~half a dozen "{ticker}
   // finviz" queries per 90 days where we already accidentally rank but

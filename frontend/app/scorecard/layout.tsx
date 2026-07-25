@@ -14,10 +14,14 @@ import { pageMeta } from "@/lib/seo";
 // first good month, not today, and by then the rule needs to already exist.
 // scripts/lint-copy-compliance.mjs enforces the same constraint in CI.
 export const metadata = pageMeta({
-  title:
-    "Tapeline Public Scorecard — Every Daily Top-10, Frozen at the Close and Checked Against SPY",
+  // Title trimmed to <60 chars so it renders in full in the SERP (the prior
+  // ~91-char title truncated mid-phrase). Still describes the MECHANISM, never
+  // the outcome — no hit rate, no alpha, no vs-SPY figure (Rule 3).
+  title: "Tapeline Public Scorecard — Daily Top-10 Track Record",
+  // Front-loaded and tightened to ~155 chars so the differentiator (raw
+  // downloadable record) survives SERP truncation. Descriptive only.
   description:
-    "The append-only archive of every daily top-10 ranking Tapeline has published: frozen at the session close it printed, checked against the next session's SPY move, losing days kept. Raw CSV and JSON published so you can re-run the arithmetic yourself.",
+    "The append-only public record of every daily top-10 Tapeline ranks — frozen at the close, checked against SPY the next session, losing days kept. Raw CSV and JSON to verify it yourself.",
   path: "/scorecard",
 });
 
