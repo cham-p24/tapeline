@@ -1,3 +1,9 @@
+> ⚠️ **SUPERSEDED (2026-07-26) — use [`FIRE_NOW.md`](FIRE_NOW.md) instead.**
+> The prices here ($9.99/$19.99) are still correct, but the **Free-tier
+> description below is wrong** — Free is now *live* (12 look-ups/day, top-10
+> rows), not "top 20, 24h delayed" — and the scorecard numbers are first-week
+> placeholders. `FIRE_NOW.md` has the corrected, current paste-ready posts.
+
 # Reddit paste-ready — Tue 19 May launch week
 
 Three subs, three posts. Reddit + MCP-blocked, so the agent can't drive

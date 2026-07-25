@@ -1,3 +1,9 @@
+> ⚠️ **SUPERSEDED (2026-07-26) — use [`FIRE_NOW.md`](FIRE_NOW.md) instead.**
+> The scorecard numbers in these variants ("first week", "35 clean entries",
+> "-0.7% alpha") are stale — the live record is 52 days / 478 calls / ~47%
+> beat-SPY. The Free-tier "top 20, 24h delay" line is also outdated (Free is
+> now live, 12 look-ups/day). `FIRE_NOW.md` has the corrected Show HN post.
+
 # Show HN — alternative variants
 
 `LAUNCH_PLAYBOOK.md` §1 has the primary draft (focus: public formula + public
