@@ -207,6 +207,56 @@ export default function AlertsPage() {
         </div>
       )}
 
+      {/* "Show don't hide" delivery channels — free users can only CREATE
+          web-push rules, but the Email and Telegram delivery channels stay
+          VISIBLE here as locked (never removed from view) so a free user setting
+          up a web-push alert can SEE that those channels exist on a paid plan.
+          This changes nothing a free user can actually create; it only surfaces
+          the locked value. Descriptive only — no urgency, no performance claims. */}
+      {isFree && (
+        <div
+          className="mt-4 rounded-lg border border-border bg-panel/40 px-4 py-3 text-sm"
+          data-testid="alerts-channels-locked"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Delivery channels
+            </h2>
+            <Link href="/app/billing?intent=pro" className="link text-xs">
+              Unlock email + Telegram delivery →
+            </Link>
+          </div>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            <li className="inline-flex items-center gap-1.5 rounded-md border border-up/30 bg-up/5 px-2.5 py-1 text-xs">
+              <span aria-hidden>✓</span> Web push{" "}
+              <span className="text-muted">· included</span>
+            </li>
+            <li
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2.5 py-1 text-xs text-muted"
+              title="Email delivery is a Pro feature"
+            >
+              <span aria-hidden>🔒</span> Email
+              <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                Pro
+              </span>
+            </li>
+            <li
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2.5 py-1 text-xs text-muted"
+              title="Telegram delivery is a Premium feature"
+            >
+              <span aria-hidden>🔒</span> Telegram
+              <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                Premium
+              </span>
+            </li>
+          </ul>
+          <p className="mt-2 text-xs text-muted">
+            Web-push alerts are included on Free. Email delivery is on Pro;
+            Telegram delivery is on Premium.
+          </p>
+        </div>
+      )}
+
       {/* Create form — p-4 to match the watchlist "add ticker" form's
           compactness. Both are top-of-page input blocks of the same
           shape; before this they were drifting at p-5 vs p-4 which
