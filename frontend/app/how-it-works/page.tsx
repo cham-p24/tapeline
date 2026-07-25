@@ -55,13 +55,19 @@ const HOW_FAQ = [
 // Same fix on Relative strength: the line claimed a sector comparison. sub_rs
 // in backend/app/services/score.py measures the ticker's change minus the
 // broad-market benchmark's over 3M/6M/1Y and is not sector-adjusted at all.
+// `live` marks whether the sub-score is sourced from live data in production
+// today. Per backend/app/services/polygon_feed.py (fetch_snapshots "Strategy"
+// section), only Fundamentals is live so far — alongside the Price and Volume
+// inputs behind every score. The other five run on placeholder values until
+// each factor's live source is wired in. The provenance note below states this
+// plainly, and each not-yet-live factor carries an inline "beta" tag.
 const FACTORS = [
-  { name: "Trend",               slug: "trend",             emphasis: "Weighted most", desc: "Direction and quality of the price trend across short-, medium-, and long-term timeframes." },
-  { name: "Relative strength",   slug: "relative-strength", emphasis: "High",          desc: "The stock's price change minus the broad-market benchmark's, over three horizons. Not sector-adjusted." },
-  { name: "Fundamentals",        slug: "fundamentals",      emphasis: "Core",          desc: "Earnings quality, growth, profitability, and balance-sheet health." },
-  { name: "Smart money",         slug: "smart-money",       emphasis: "Core",          desc: "Net direction of insider transactions disclosed to the SEC on Form 4." },
-  { name: "Macro",               slug: "macro",             emphasis: "Core",          desc: "The prevailing market regime, applied identically to every ticker on a given tick." },
-  { name: "Momentum",            slug: "momentum",          emphasis: "Weighted least", desc: "Short-horizon price acceleration and breakout posture." },
+  { name: "Trend",               slug: "trend",             emphasis: "Weighted most", live: false, desc: "Direction and quality of the price trend across short-, medium-, and long-term timeframes." },
+  { name: "Relative strength",   slug: "relative-strength", emphasis: "High",          live: false, desc: "The stock's price change minus the broad-market benchmark's, over three horizons. Not sector-adjusted." },
+  { name: "Fundamentals",        slug: "fundamentals",      emphasis: "Core",          live: true,  desc: "Earnings quality, growth, profitability, and balance-sheet health." },
+  { name: "Smart money",         slug: "smart-money",       emphasis: "Core",          live: false, desc: "Net direction of insider transactions disclosed to the SEC on Form 4." },
+  { name: "Macro",               slug: "macro",             emphasis: "Core",          live: false, desc: "The prevailing market regime, applied identically to every ticker on a given tick." },
+  { name: "Momentum",            slug: "momentum",          emphasis: "Weighted least", live: false, desc: "Short-horizon price acceleration and breakout posture." },
 ];
 
 const SIGNALS = [
@@ -110,6 +116,16 @@ export default function HowItWorksPage() {
                 <div className="flex-1">
                   <h3 className="font-semibold transition-colors group-hover:text-accent">
                     {f.name}
+                    {f.live ? (
+                      <span className="ml-2 align-middle rounded border border-up/40 px-1.5 py-px text-[0.6rem] font-medium uppercase tracking-wide text-up">Live</span>
+                    ) : (
+                      <span
+                        title="Not yet powered by live data — placeholder pending its live source."
+                        className="ml-2 align-middle rounded border border-border px-1.5 py-px text-[0.6rem] font-medium uppercase tracking-wide text-subtle"
+                      >
+                        Beta
+                      </span>
+                    )}
                     <span aria-hidden="true" className="ml-2 text-xs text-subtle">&rarr;</span>
                   </h3>
                   <p className="mt-1.5 text-sm text-muted leading-relaxed">{f.desc}</p>
@@ -124,6 +140,30 @@ export default function HowItWorksPage() {
             are stated on each factor&rsquo;s own page rather than collected out
             of sight.
           </p>
+
+          {/* Data-provenance disclosure. Only Fundamentals (plus the Price and
+              Volume inputs) is sourced from live data today; the other five are
+              placeholders pending their live source. Stated here plainly so the
+              beta tags above and in the score breakdown are not a mystery. */}
+          <div className="mt-8 rounded-xl border border-accent/30 bg-panel p-6">
+            <p className="text-xs uppercase tracking-wider text-subtle">Data provenance</p>
+            <h3 className="mt-2 text-lg font-semibold">Which factors run on live data today</h3>
+            <p className="mt-3 text-sm text-muted leading-relaxed">
+              We would rather tell you where the data spine stands than let a
+              placeholder read as a live feed. Today, <strong>Fundamentals</strong> is
+              sourced from live data, along with the <strong>Price</strong> and{" "}
+              <strong>Volume</strong> inputs behind every score. The other five factors
+              &mdash; Trend, Relative Strength, Smart Money, Macro and Momentum &mdash;
+              are marked <span className="font-medium uppercase tracking-wide">Beta</span>:
+              they run on placeholder values while each is wired to its live source.
+            </p>
+            <p className="mt-3 text-sm text-muted leading-relaxed">
+              Because those five feed the composite, the composite score and the
+              per-ticker reason are partly placeholder today. This note changes as each
+              factor moves to live data, and every change is dated in the{" "}
+              <Link href="/changelog" className="link">changelog</Link>.
+            </p>
+          </div>
 
           <div className="mt-8 rounded-xl border border-border bg-panel p-6">
             <p className="text-xs uppercase tracking-wider text-subtle">How the blend is weighted</p>
