@@ -1873,71 +1873,107 @@ def render_winback_email(
     )
 
 
-# ── Activation nudges (lever #3: first-watchlist, first-alert) ──────────────
+# ── Activation nudges (lever #3: first-session time-to-value) ───────────────
 #
-# Early-lifecycle prompts that fire when a user signed up but skipped the
-# core habit-forming step. Both gate on EmailPref.TRIAL_DRIP (the
-# early-lifecycle suppressable bucket) and send under the "default"
-# transactional-onboarding persona. Dedup'd via User.drip_state tokens
-# "act_wl" / "act_alert" in run_activation_drip below.
+# Early-lifecycle prompts that fire when a user signed up but hasn't reached
+# the first-session "aha": a scored ticker they follow, seen against the
+# public scorecard. The three activation actions are add a watchlist ticker,
+# run a scan, and view the public scorecard — NOT setting an alert (a Pro+
+# retention feature that is not part of the aha). Both gate on
+# EmailPref.TRIAL_DRIP (the early-lifecycle suppressable bucket), only target
+# users with NO recorded activity (lifecycle.has_recorded_activity — see
+# run_activation_drip), and send under the "default" transactional-onboarding
+# persona. Dedup'd via User.drip_state tokens "act_wl" / "act_alert".
+#
+# The token names are historical ("act_alert" once nudged toward a first
+# alert). They are kept verbatim because the frequency governor's activation
+# ceiling (lifecycle.ACTIVATION_SERIES_TOKENS) and the worker's per-token
+# counters key off them; the MESSAGE each token carries was realigned to the
+# aha, so the label and the copy no longer match one-to-one. Renaming the
+# tokens is an out-of-lane change (governor + worker + admin preview) queued
+# as a follow-up.
+#
+# Rule 1/7: describe the MECHANISM only. No security is named, nothing implies
+# a return, and the public scorecard is described as winning AND losing days
+# (Rule 3 — the record is shown whole, never cherry-picked).
 
 def render_activation_watchlist_email(user_name: str) -> str:
-    """Activation nudge — signed up but hasn't added a single watchlist ticker
-    within ~24h. The watchlist is the core habit loop: it powers smart alerts
-    and the end-of-day digest, so the first ticker added is activation
-    milestone #1. Calm, helpful voice; persona "default"."""
+    """Activation nudge — signed up 24-72h ago with no recorded activity yet.
+
+    Lays out the three first-session activation actions in one calm checklist:
+    add a watchlist ticker, run a scan, and read the public scorecard. That set
+    is the "aha" — a scored ticker you follow, seen against the published
+    record. The first ticker added is activation milestone #1 (it stamps
+    User.activated_at and powers the end-of-day digest); the scan and the
+    scorecard are the other two. Descriptive only, persona "default"."""
     return shell(
-        h1(f"Add one ticker, {user_name}.")
+        h1(f"Three steps to your first session, {user_name}.")
         + lead(
-            "You're all set up — but your watchlist is still empty. That's the "
-            "one step that turns Tapeline from a scanner into your scanner."
+            "You're all set up. Here's the short path to seeing Tapeline work on "
+            "the names you actually follow — about two minutes, in any order."
         )
-        + paragraph(
-            # Rule 7: "a digest of what moved" was ambiguous — the EOD digest
-            # reports SCORE changes (a factor value, which Rule 7 permits), but
-            # the wording reads as price movement, which it does not permit.
-            # Say which number changes and the ambiguity disappears.
-            "Pick three or four names you already follow. From then on you get "
-            "their current score, a flag when that score shifts, and an "
-            "end-of-day digest of the score changes — without re-running a "
-            "single filter."
+        + card(
+            # Rule 7: the watchlist line says which NUMBER changes (the score),
+            # not "what moved" — the score is a factor value Rule 7 permits,
+            # where price movement would not be.
+            f"""
+            <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
+              <li><strong>Add a ticker you follow</strong> to your watchlist — from then on you see its current score and a flag when that score shifts.</li>
+              <li><strong>Run one scan</strong> — rank US equities on the six measured factors and read why each name matched, with the numbers next to every row.</li>
+              <li><strong>See the public scorecard</strong> — every daily call we've logged, winning and losing days alike, each with the original reasoning.</li>
+            </ol>
+            """
         )
         + button(
-            "Add my first tickers",
+            "Open the scanner",
             "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=activation_watchlist&utm_medium=transactional",
         )
-        + footnote("Takes about thirty seconds. — Christian, founder."),
-        preheader="One ticker on your watchlist unlocks alerts + your daily digest.",
+        + muted_paragraph(
+            "The scorecard is public and always free — "
+            '<a href="https://tapeline.io/scorecard" '
+            f'style="color:{ACCENT};">read the track record</a> before you touch '
+            "a single filter."
+        )
+        + footnote("Takes about two minutes. — Christian, founder."),
+        preheader="Three quick steps: a watchlist ticker, one scan, the public scorecard.",
     )
 
 
 def render_activation_alert_email(user_name: str) -> str:
-    """Activation nudge — three days in, on a plan that can set alerts (trial
-    Premium or paid Pro/Premium), but no alert rule yet. Alerts are the
-    retention hook: a user who receives one genuinely useful alert comes back.
-    Persona "default"."""
+    """Activation nudge — 3-5 days in, on an alert-capable tier (trial Premium
+    or paid Pro/Premium), and still no recorded activity of any kind.
+
+    A gentle second nudge for someone who signed up and hasn't been back. It
+    leads with the zero-setup surface — the public scorecard, which asks
+    nothing of them — and offers one scan as the first hands-on step. Activity
+    and capability only: no security is named and nothing implies a return.
+    (Historically this nudged toward a first alert; realigned to the aha, the
+    token name is retained only for governor/worker compatibility.) Persona
+    "default"."""
     return shell(
-        h1("Let Tapeline watch while you don't.")
+        h1("Start with the part that needs no setup.")
         + lead(
-            f"{user_name}, you've had a few days to look around. The next step "
-            f"is to stop looking — set one alert and let the scanner tap you on "
-            f"the shoulder instead."
+            f"{user_name}, a few days in and the account's still untouched. The "
+            f"lowest-friction way in doesn't ask you to build anything first."
         )
         + paragraph(
-            # Rule 7: the earlier wording here ended "no missed setups", which
-            # is a performance claim wearing a workflow costume — a setup is
-            # only worth missing because of the return it implies. Replaced
-            # with a description of what the rule actually does.
-            "A rule takes one line: name a score threshold, a squeeze trigger, "
-            "or a regime flip, and Tapeline emails you when the condition is "
-            "met. No dashboard-watching required."
+            'The <a href="https://tapeline.io/scorecard" '
+            f'style="color:{ACCENT};">public scorecard</a> is every daily call '
+            "we've logged — winning and losing days alike, each with the score "
+            "and the reasoning it was published on. It's free, and it's the "
+            "honest way to read the scanner before you rely on it."
+        )
+        + paragraph(
+            "When you want a hands-on step, one scan is the whole thing: rank US "
+            "equities on the six measured factors and read the numbers behind "
+            "each row."
         )
         + button(
-            "Set up an alert",
-            "https://tapeline.io/app/alerts?utm_source=email&utm_campaign=activation_alert&utm_medium=transactional",
+            "See the public scorecard",
+            "https://tapeline.io/scorecard?utm_source=email&utm_campaign=activation_scorecard&utm_medium=transactional",
         )
-        + footnote("One rule is enough to feel the difference. — Christian, founder."),
-        preheader="Set one alert and let the scanner watch the tape for you.",
+        + footnote("Nothing to configure. — Christian, founder."),
+        preheader="The public scorecard needs no setup — winning and losing days, with the reasoning.",
     )
 
 
@@ -3463,24 +3499,35 @@ async def run_activation_drip(
 ) -> dict[str, int]:
     """Early-lifecycle activation nudges. Returns per-stage counts.
 
+    Both stages target users who have NOT reached the first-session "aha"
+    (add a watchlist ticker + run a scan + view the public scorecard). "Not
+    yet activated" is lifecycle.has_recorded_activity, the same fail-safe helper
+    the hourly nudge uses: any durable hint of use — an activation stamp, a
+    consumed lookup, a watchlist item, an alert rule, a saved scan, or simply
+    having returned to the site after signup — counts as active and suppresses
+    the nudge. Telling someone who has used the product that they haven't is the
+    worse error, so the ambiguous case is always "don't send". A cheap SQL
+    no-artefact pre-filter narrows the candidate set; the Python re-check adds
+    the lookups counter and the last_seen_at return signal SQL can't express.
+
     Two one-shot prompts, both dedup'd via User.drip_state tokens and gated
     on EmailPref.TRIAL_DRIP (the early-lifecycle suppressable bucket):
 
-      "act_wl"    — signed up 24-72h ago and still has zero watchlist items.
-                    The watchlist is the core habit loop (it powers smart
-                    alerts and the EOD digest), so the first ticker added is
-                    activation milestone #1. Sent to every tier — a Free user
-                    with an empty watchlist is exactly who to nudge.
+      "act_wl"    — signed up 24-72h ago, still no recorded activity. The
+                    three-step aha checklist (watchlist ticker, one scan, the
+                    public scorecard). Sent to every tier — a Free user who
+                    hasn't started is exactly who to nudge.
 
-      "act_alert" — signed up 3-5 days ago, on a plan that can create alert
-                    rules (trial Premium or paid Pro/Premium), but has none.
-                    Free is excluded: alerts are a Pro+ feature, so nudging a
-                    Free user toward one would just point at a paywall.
+      "act_alert" — signed up 3-5 days ago, still no recorded activity, on a
+                    tier that unlocks alerts (trial Premium or paid Pro/
+                    Premium). A gentler second nudge that leads with the
+                    zero-setup surface: the public scorecard. Free is excluded
+                    (kept off the Pro-only cohort); token name is historical.
 
     Bounded signup windows (not just a lower bound) keep the nudge timely — we
     don't email someone who signed up two months ago. A daily run catches each
     user once inside the window; the drip_state token prevents a repeat if
-    they're still empty the next day. Both send under the "default"
+    they're still inactive the next day. Both send under the "default"
     transactional-onboarding persona. No-op when RESEND_API_KEY is unset
     (send_email returns skipped:True, so the token is never stamped).
     """
@@ -3488,43 +3535,53 @@ async def run_activation_drip(
 
     from sqlalchemy import exists, select
 
-    from app.models import AlertRule, User, WatchlistItem
+    from app.models import AlertRule, ScannerPreset, User, WatchlistItem
     from app.services.email_prefs import EmailPref, wants
+    from app.services.lifecycle import ActivitySnapshot, has_recorded_activity
 
     now = datetime.now(UTC)
     counts = {"act_wl": 0, "act_alert": 0}
 
-    # act_wl — no watchlist item, 24-72h after signup. Correlated EXISTS so
-    # the "has any ticker" test stays a single round-trip.
-    no_watchlist = ~exists().where(WatchlistItem.user_id == User.id)
+    # Cheap "no durable activation artefact" pre-filter pushed into SQL for
+    # volume. The Python has_recorded_activity() re-check below re-tests these
+    # AND the lookups_today counter and last_seen_at return signal, so this is
+    # a pre-filter, not the decision.
+    no_artefacts = [
+        User.activated_at.is_(None),
+        User.lookups_reset_on.is_(None),
+        ~exists().where(WatchlistItem.user_id == User.id),
+        ~exists().where(AlertRule.user_id == User.id),
+        ~exists().where(ScannerPreset.user_id == User.id),
+    ]
+
+    # act_wl — 24-72h after signup, no recorded activity.
     wl_users = (
         await session.execute(
             select(User).where(
                 User.created_at >= now - timedelta(hours=72),
                 User.created_at < now - timedelta(hours=24),
-                no_watchlist,
+                *no_artefacts,
             )
         )
     ).scalars().all()
 
-    # act_alert — no alert rule, 3-5d after signup, on an alert-capable tier.
-    no_alert_rule = ~exists().where(AlertRule.user_id == User.id)
+    # act_alert — 3-5d after signup, no recorded activity, alert-capable tier.
     al_users = (
         await session.execute(
             select(User).where(
                 User.created_at >= now - timedelta(days=5),
                 User.created_at < now - timedelta(days=3),
                 User.tier.in_(["pro", "premium"]),
-                no_alert_rule,
+                *no_artefacts,
             )
         )
     ).scalars().all()
 
     stages = [
         ("act_wl", wl_users, render_activation_watchlist_email,
-         "Your Tapeline watchlist is still empty"),
+         "Three steps to your first Tapeline session"),
         ("act_alert", al_users, render_activation_alert_email,
-         "Set one alert and let Tapeline watch for you"),
+         "The Tapeline scorecard needs no setup"),
     ]
 
     any_sent = False
@@ -3536,6 +3593,13 @@ async def run_activation_drip(
             if token in sent_tokens:
                 continue
             if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
+            # Fail-safe activity re-check: any sign of use (a lookup consumed,
+            # or a return visit after signup) suppresses the nudge even if the
+            # SQL pre-filter let the row through. The no_artefacts filter above
+            # already guarantees no watchlist / alert / saved scan, so an empty
+            # snapshot is sufficient here.
+            if has_recorded_activity(user, ActivitySnapshot()):
                 continue
             if governor is not None and not governor.allows(
                 user, SendClass.LIFECYCLE, token=token,
