@@ -192,8 +192,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* HOW IT WORKS — three-step process. Cards are appropriate here
-          because each step is sequential and self-contained. */}
+      {/* HOW IT WORKS — three-step process. Borderless numbered steps (the
+          accent badge keeps them distinct from the mono-numeral Differentiators
+          above) on a subtle full-width panel band, rather than three floating
+          card panels — seamless, not boxed. */}
       <section className="bg-panel/10">
         <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
           <p className="eyebrow text-accent">How it works</p>
@@ -201,7 +203,7 @@ export default function LandingPage() {
             From data to decision in one glance.
           </h2>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-12">
             <FadeIn delayMs={0}>
               <Step n="1" title="Six named factors">
                 Trend &middot; relative strength &middot; fundamentals &middot;
@@ -258,7 +260,7 @@ export default function LandingPage() {
               <FadeIn key={p.slug} delayMs={0}>
                 <Link
                   href={`/blog/${p.slug}`}
-                  className="lift block h-full rounded-2xl border border-border bg-panel/40 p-6 hover:border-accent/40 hover:bg-panel/60"
+                  className="lift block h-full rounded-2xl bg-panel/40 p-6 hover:bg-panel/70"
                 >
                   <p className="text-xs font-mono text-subtle">
                     {new Date(p.publishedAt).toLocaleDateString("en-GB", {
@@ -443,7 +445,7 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <div className="card p-7">
+    <div>
       <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 font-mono text-sm font-semibold text-accent">
         {n}
       </div>

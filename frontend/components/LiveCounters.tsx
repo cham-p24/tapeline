@@ -60,8 +60,9 @@ export function LiveCounters() {
 
   return (
     // grid-cols-2 on mobile so the strip is compact (2x2) rather than four
-    // tall cards stacked. Expands to 1x4 from sm breakpoint up.
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
+    // tall cards stacked. Expands to 1x4 from sm breakpoint up. Borderless:
+    // hairline column dividers on desktop instead of four floating boxes.
+    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-0">
       <Counter
         label="Tickers tracked"
         value={tickersAnim != null ? tickersAnim.toLocaleString() : "—"}
@@ -96,7 +97,7 @@ function Counter({
   live?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-panel/40 px-4 py-4">
+    <div className="px-0 py-1 sm:px-5 sm:border-l sm:border-border/60 sm:first:border-l-0 sm:first:pl-0">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-subtle">
         {live && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" aria-hidden="true" />}
         <span>{label}</span>
