@@ -8,6 +8,7 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { WatchlistTabs } from "@/components/WatchlistTabs";
+import { WatchlistTrackRecord } from "@/components/WatchlistTrackRecord";
 import { PaywallModal } from "@/components/Paywall";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
@@ -485,6 +486,12 @@ export default function WatchlistPage() {
         </table>
       </div>
       )}
+
+      {/* Track record — the Premium blend of watchlist + scorecard: each
+          watched ticker's live score alongside its own next-day-vs-SPY record.
+          Self-gates (Premium → data, Free/Pro → upgrade teaser) and self-hides
+          when nothing is watched. */}
+      <WatchlistTrackRecord />
 
       {/* Watchlist-cap upgrade moment — opens when the server 403s an add.
           Backend message carries the real cap numbers. */}

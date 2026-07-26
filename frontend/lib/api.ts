@@ -279,6 +279,44 @@ export type WatchlistItem = {
   alert_triggered: boolean;
 };
 
+// One frozen session in a watched ticker's personal track record — the same
+// shape as a public ScorecardEntry (minus rank, plus the signal at flag).
+export type WatchlistTrackRecordRow = {
+  as_of: string;
+  score_at_flag: number;
+  price_at_flag: number;
+  signal_at_flag: string | null;
+  price_next_day: number | null;
+  change_pct_1d_after: number | null;
+  spy_change_pct_1d: number | null;
+  alpha_vs_spy: number | null;
+};
+
+// One watched ticker's live score + its on-the-record next-day-vs-SPY history.
+export type WatchlistTrackRecordItem = {
+  symbol: string;
+  added_at: string;
+  baseline_score: number | null;
+  current_score: number | null;
+  current_signal: string | null;
+  price: number | null;
+  name: string | null;
+  sector: string | null;
+  summary: {
+    days_tracked: number;
+    entries_scored: number;
+    entries_excluded_outliers: number;
+    avg_1d_return: number | null;
+    median_1d_return: number | null;
+    avg_alpha_vs_spy: number | null;
+    median_alpha_vs_spy: number | null;
+    hit_rate_beat_spy: number | null;
+    best_alpha: number | null;
+    worst_alpha: number | null;
+  };
+  rows: WatchlistTrackRecordRow[];
+};
+
 // Phase A — one row returned by /api/watchlists (the LIST CRUD, not the
 // per-item watchlist). `item_count` is the number of WatchlistItems
 // currently attached to this list (computed server-side).
@@ -789,6 +827,13 @@ export const api = {
     const qs = list_id != null ? `?list_id=${list_id}` : "";
     return getAuth<{ count: number; items: WatchlistItem[] }>(`/api/watchlist${qs}`, DEV_TOKEN);
   },
+  // Premium: each watched ticker's live score + its next-day-vs-SPY track
+  // record (403 for Free/Pro — the client also gates via canUse).
+  watchlistTrackRecord: () =>
+    getAuth<{ count: number; items: WatchlistTrackRecordItem[] }>(
+      "/api/watchlist/track-record",
+      DEV_TOKEN,
+    ),
   // Phase A: optional list_id. When provided, the new item lands in
   // that list; when omitted, the backend resolves to the user's default
   // list (auto-creates "My Watchlist" on first add for new users).
