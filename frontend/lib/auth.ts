@@ -142,6 +142,11 @@ export const FEATURE_TIERS = {
   "csv_export":         "pro" as const,
   "ratings.analyst":    "premium" as const,
   "insider.form4":      "premium" as const,
+  // Personal watchlist track record (each watched ticker frozen daily +
+  // back-checked next-day-vs-SPY). Mirrors backend
+  // tier.FEATURES["watchlist.track_record"] = Tier.PREMIUM. The plain
+  // "watchlist" feature stays FREE; only the track record is Premium.
+  "watchlist.track_record": "premium" as const,
 };
 
 export function canUse(user: SessionUser | null, feature: keyof typeof FEATURE_TIERS): boolean {
