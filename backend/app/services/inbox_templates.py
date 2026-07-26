@@ -94,9 +94,12 @@ async def render_ticker_score(body: str) -> str | None:
 
 async def render_pricing(_body: str) -> str:
     """Canonical pricing answer. Mirrors what /pricing shows."""
+    from app.services.tier import FREE_WATCHLIST_TICKERS, free_has_watchlist
+
+    wl = f" + a {FREE_WATCHLIST_TICKERS}-ticker watchlist" if free_has_watchlist() else ""
     return (
-        "Free tier covers the top 20 tickers (24h delayed) + the public "
-        "scorecard + a 5-ticker watchlist. Pro is $8.25/mo annual "
+        f"Free tier covers the top 10 live tickers + the public scorecard{wl}. "
+        "Pro is $8.25/mo annual "
         "($9.99 monthly) for the full ~2,500-ticker live scan + smart "
         "watchlist alerts. Premium is $16.58/mo annual ($19.99 monthly) "
         "for everything in Pro + congressional trades + insider Form 4 "

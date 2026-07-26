@@ -71,6 +71,7 @@ from app.services.tier import (
     FREE_SCANNER_ROWS,
     FREE_WATCHLIST_TICKERS,
     FREE_WEB_PUSH_ALERTS,
+    free_has_watchlist,
 )
 from app.services.universe import ACTIVE_UNIVERSE_SIZE
 
@@ -612,9 +613,15 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
             f"When the trial ends, your account drops to Free — the scanner cuts "
             f"from the full ~{ACTIVE_UNIVERSE_SIZE:,}-ticker universe to the top "
             f"{FREE_SCANNER_ROWS} rows, ticker look-ups cap at "
-            f"{FREE_DAILY_LOOKUPS} a day, the watchlist caps at "
-            f"{FREE_WATCHLIST_TICKERS} tickers, and alerts, Telegram, and the "
-            f"Congress feed switch off. To keep what you have, add a card."
+            f"{FREE_DAILY_LOOKUPS} a day, "
+            + (
+                f"the watchlist caps at {FREE_WATCHLIST_TICKERS} tickers, and "
+                "alerts, Telegram, and the Congress feed switch off."
+                if free_has_watchlist()
+                else "and the watchlist, alerts, Telegram, and the Congress "
+                "feed switch off."
+            )
+            + " To keep what you have, add a card."
         )
         + _pricing_card(
             "Pro", "$9.99", "$8.25", "$99", "$20",
@@ -763,9 +770,13 @@ def render_trial_expired_email(
         + muted_paragraph(
             'A few things stay open regardless of tier: the '
             f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
-            '(every top-10 call back-checked vs SPY), the '
-            f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring formula</a>, '
-            f'and your watchlist (capped at {FREE_WATCHLIST_TICKERS} tickers on Free).'
+            '(every top-10 call back-checked vs SPY) and the '
+            f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring formula</a>'
+            + (
+                f', and your watchlist (capped at {FREE_WATCHLIST_TICKERS} tickers on Free).'
+                if free_has_watchlist()
+                else '.'
+            )
         )
         + muted_paragraph(
             "One click brings it all back, and your watchlist + alerts come "
@@ -1658,13 +1669,18 @@ def _free_tier_changelog_lines() -> list[str]:
     so the copy can never quote a cap the product no longer enforces. Shared
     by the HTML and plain-text renderers so the two can't drift.
     """
-    return [
-        f"A watchlist on the free plan, with up to {FREE_WATCHLIST_TICKERS} saved tickers.",
+    lines = [
         f"{FREE_DAILY_LOOKUPS} full ticker look-ups a day.",
         f"{FREE_SCANNER_ROWS} live scanner rows (live data, not delayed).",
         f"The squeeze radar's top {_free_squeeze_preview_limit()} setups.",
         f"{FREE_WEB_PUSH_ALERTS} browser alerts you can set on your own tickers.",
     ]
+    if free_has_watchlist():
+        lines.insert(
+            0,
+            f"A watchlist on the free plan, with up to {FREE_WATCHLIST_TICKERS} saved tickers.",
+        )
+    return lines
 
 
 def render_free_tier_changelog_email(user_name: str) -> str:
@@ -1714,8 +1730,13 @@ def render_free_tier_changelog_email(user_name: str) -> str:
             "<br><br>— Christian, founder."
         ),
         preheader=(
-            f"The free plan now includes a {FREE_WATCHLIST_TICKERS}-ticker "
-            f"watchlist, {FREE_DAILY_LOOKUPS} look-ups a day, and "
+            (
+                f"The free plan now includes a {FREE_WATCHLIST_TICKERS}-ticker "
+                "watchlist, "
+                if free_has_watchlist()
+                else "The free plan now includes "
+            )
+            + f"{FREE_DAILY_LOOKUPS} look-ups a day and "
             f"{FREE_WEB_PUSH_ALERTS} browser alerts."
         ),
     )
