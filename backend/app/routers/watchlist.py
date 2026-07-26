@@ -9,10 +9,11 @@ from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import Ticker, User, Watchlist, WatchlistItem
+from app.models import Ticker, User, Watchlist, WatchlistItem, WatchlistTrackRecordEntry
 from app.services.auth import current_user_required
 from app.services.cap_events import record_cap_hit
-from app.services.tier import Tier, effective_limit
+from app.services.tier import Tier, effective_limit, has_feature
+from app.services.watchlist_trackrecord import summary_for_rows
 
 router = APIRouter()
 
@@ -127,6 +128,78 @@ async def list_watchlist(
             "score_delta": delta,
             "alert_triggered": alert_triggered,
         })
+    return {"count": len(items), "items": items}
+
+
+@router.get("/track-record")
+async def watchlist_track_record(
+    user: User = Depends(current_user_required),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Per-watchlist-ticker on-the-record performance (Premium).
+
+    For each ticker the caller watches, returns its live score/signal PLUS its
+    frozen daily snapshots back-checked next-day-vs-SPY — the personal analogue
+    of the public /scorecard, keyed to what the user actually tracks. Symbols
+    with no frozen sessions yet come back with an empty `rows` + zeroed summary
+    (so the UI can say "tracking — no record yet" rather than hide the row).
+
+    Premium-gated server-side. The client mirrors the gate (lib/auth.ts
+    FEATURE_TIERS + Paywall) but this 403 is the authoritative enforcement.
+    """
+    if not has_feature(Tier(user.tier), "watchlist.track_record"):
+        raise HTTPException(
+            403, "Personal track record is a Premium feature."
+        )
+
+    # Live half: the watched symbols + their current score/signal, newest-added
+    # first (same ordering the main watchlist table uses).
+    wl = await session.execute(
+        select(WatchlistItem, Ticker)
+        .outerjoin(Ticker, Ticker.symbol == WatchlistItem.symbol)
+        .where(WatchlistItem.user_id == user.id)
+        .order_by(desc(WatchlistItem.added_at))
+    )
+    watched = wl.all()
+
+    # Record half: every frozen row for this user, grouped by symbol.
+    tr = await session.execute(
+        select(WatchlistTrackRecordEntry)
+        .where(WatchlistTrackRecordEntry.user_id == user.id)
+        .order_by(WatchlistTrackRecordEntry.as_of.desc())
+    )
+    by_symbol: dict[str, list[WatchlistTrackRecordEntry]] = {}
+    for entry in tr.scalars().all():
+        by_symbol.setdefault(entry.symbol, []).append(entry)
+
+    items = []
+    for w, t in watched:
+        rows = by_symbol.get(w.symbol, [])  # already as_of desc
+        items.append({
+            "symbol": w.symbol,
+            "added_at": w.added_at.isoformat(),
+            "baseline_score": w.baseline_score,
+            "current_score": t.score if t else None,
+            "current_signal": t.signal if t else None,
+            "price": t.price if t else None,
+            "name": t.name if t else None,
+            "sector": t.sector if t else None,
+            "summary": summary_for_rows(rows),
+            "rows": [
+                {
+                    "as_of": r.as_of.isoformat(),
+                    "score_at_flag": r.score_at_flag,
+                    "price_at_flag": r.price_at_flag,
+                    "signal_at_flag": r.signal_at_flag,
+                    "price_next_day": r.price_next_day,
+                    "change_pct_1d_after": r.change_pct_1d_after,
+                    "spy_change_pct_1d": r.spy_change_pct_1d,
+                    "alpha_vs_spy": r.alpha_vs_spy,
+                }
+                for r in rows
+            ],
+        })
+
     return {"count": len(items), "items": items}
 
 
