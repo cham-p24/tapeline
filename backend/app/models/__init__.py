@@ -19,6 +19,7 @@ from app.models.telegram_token import TelegramLinkToken
 from app.models.ticker import Ticker
 from app.models.user import AlertEvent, AlertRule, MfaRecoveryCode, Subscription, User
 from app.models.watchlist import Watchlist, WatchlistItem
+from app.models.watchlist_trackrecord import WatchlistTrackRecordEntry
 from app.models.web_push import WebPushSubscription
 from app.models.webhook_event import StripeWebhookEvent
 
@@ -50,5 +51,6 @@ __all__ = [
     "User",
     "Watchlist",
     "WatchlistItem",
+    "WatchlistTrackRecordEntry",
     "WebPushSubscription",
 ]

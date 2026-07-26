@@ -578,6 +578,17 @@ async def tick() -> None:
         except Exception:
             logger.exception("scorecard.snapshot_failed")
 
+        # Personal track record: freeze each Premium user's watchlist tickers
+        # for the same session (per-user analogue of the public freeze above).
+        # Isolated so a failure here can't abort the public scorecard freeze or
+        # anything downstream; idempotent per (user, symbol, day).
+        try:
+            from app.services.watchlist_trackrecord import ensure_watchlist_snapshot
+            async with session_scope() as _wl_session:
+                await ensure_watchlist_snapshot(_wl_session, started.date())
+        except Exception:
+            logger.exception("watchlist_trackrecord.snapshot_failed")
+
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
     # listings without needing manual ticker-list maintenance.
@@ -1326,6 +1337,17 @@ async def _run_backcheck() -> None:
                 logger.info("scorecard.backcheck_scored total=%d", scored)
         except Exception:
             logger.exception("scorecard.backcheck_failed")
+
+        # Same next-day-vs-SPY back-check for the per-user watchlist track
+        # record. Shares this session + the 6h cadence; dedupes the vendor
+        # fetch per (symbol, session) across users.
+        try:
+            from app.services.watchlist_trackrecord import backcheck_watchlist
+            wl_scored = await backcheck_watchlist(session)
+            if wl_scored:
+                logger.info("watchlist_trackrecord.backcheck_scored total=%d", wl_scored)
+        except Exception:
+            logger.exception("watchlist_trackrecord.backcheck_failed")
 
 
 async def _run_telegram_digest() -> None:

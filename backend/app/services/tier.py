@@ -68,6 +68,12 @@ FEATURES: dict[str, Tier] = {
     "holdings.elite": Tier.PREMIUM,   # Recent insider buys feed (SEC Form 4 via Finnhub)
     "ratings.analyst": Tier.PREMIUM,  # Finnhub analyst consensus widget
     "insider.form4": Tier.PREMIUM,    # Per-ticker SEC Form 4 insider transactions
+    # Personal track record: each watchlist ticker frozen daily + back-checked
+    # next-day-vs-SPY (the per-user analogue of the public scorecard). Enforced
+    # server-side on GET /api/watchlist/track-record and mirrored client-side in
+    # frontend/lib/auth.ts FEATURE_TIERS. The plain "watchlist" flag stays FREE
+    # (add/see tickers); only the track record is Premium.
+    "watchlist.track_record": Tier.PREMIUM,
     # Removed 2026-05-04: alerts.discord (low usage, webhook setup friction
     # turned out to be a real conversion blocker) and alerts.sms (Twilio
     # billing overhead per send made the unit economics ugly at low volume).
