@@ -166,10 +166,10 @@ export default async function DailyPicksPage() {
           </div>
 
           {hasPicks ? (
-            <div className="overflow-hidden rounded-lg border border-border bg-bg">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-panel/60">
-                  <tr className="text-xs uppercase tracking-wider text-muted">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                     <th className="px-3 py-3 text-left font-medium">#</th>
                     <th className="px-3 py-3 text-left font-medium">Ticker</th>
                     <th className="px-3 py-3 text-right font-medium">Score</th>

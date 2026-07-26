@@ -220,10 +220,10 @@ export default async function SignalsPage() {
             </p>
           </div>
         ) : (
-          <div className="card overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-panel">
-                <tr className="text-left text-xs uppercase tracking-wide text-muted">
+              <thead className="border-b border-border">
+                <tr className="text-left text-xs uppercase tracking-wide text-subtle">
                   <th className="py-3 pl-4 pr-3">Symbol</th>
                   <th className="py-3 pr-3">Name</th>
                   <th className="py-3 pr-3">Sector</th>
@@ -346,7 +346,7 @@ export default async function SignalsPage() {
         {/* Newsletter mid-funnel capture — anonymous + free users see this
             below the signup gate; paid users see it below the scanner CTA.
             Either way it's a lower-commitment funnel step. */}
-        <section className="mt-8 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-8 border-t border-border/60 pt-8">
           <NewsletterCapture source="signals" heading="" sub="" />
         </section>
 
@@ -399,7 +399,7 @@ function CountTile({
   return (
     <Link
       href={href}
-      className={`block rounded-md border border-border p-3 transition-colors hover:border-accent/60 ${tone}`}
+      className={`block rounded-md p-3 transition-colors hover:border-accent/60 ${tone}`}
     >
       <div className="text-xs uppercase tracking-wide opacity-80">{label}</div>
       <div className="mt-1 text-2xl font-bold nums">{count}</div>

@@ -51,7 +51,7 @@ export function CompareIndex({ currentSlug }: { currentSlug: string }) {
   return (
     <section
       aria-label="Other Tapeline comparisons"
-      className="mx-auto max-w-4xl px-4 sm:px-6 py-10 border-t border-border/40"
+      className="mx-auto max-w-5xl px-4 sm:px-6 py-10 border-t border-border/40"
     >
       <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
         Compare Tapeline to another tool
@@ -67,7 +67,7 @@ export function CompareIndex({ currentSlug }: { currentSlug: string }) {
           <li key={c.slug}>
             <Link
               href={`/compare/${c.slug}`}
-              className="group block rounded-md border border-border/60 bg-panel/40 px-3 py-2.5 hover:border-accent/60 hover:bg-panel transition"
+              className="group block rounded-md bg-panel/40 px-3 py-2.5 hover:border-accent/60 hover:bg-panel transition"
             >
               <div className="text-sm font-medium group-hover:text-accent">
                 Tapeline vs {c.name}

@@ -121,7 +121,7 @@ export default function EmailSettingsPage() {
         <p className="mt-3 text-xs text-down">Couldn&rsquo;t save: {error}</p>
       )}
 
-      <div className="mt-8 rounded-md border border-border bg-panel p-4 text-sm text-muted">
+      <div className="card mt-8 p-4 text-sm text-muted">
         <strong className="text-fg">A note on transactional emails.</strong>{" "}
         Three types of email don&rsquo;t appear above and aren&rsquo;t
         opt-out-able: the <strong>welcome email</strong> when you sign up, the

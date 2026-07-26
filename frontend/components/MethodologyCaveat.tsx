@@ -19,7 +19,7 @@ export function MethodologyCaveat({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-4 rounded-lg border border-border/70 border-l-2 border-l-subtle/60 bg-panel/40 px-4 py-3">
+    <div className="mt-4 rounded-lg border-l-2 border-l-subtle/60 bg-panel/40 px-4 py-3">
       <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-subtle">
         {label}
       </p>

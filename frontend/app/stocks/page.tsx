@@ -219,7 +219,7 @@ export default async function StocksDirectoryPage() {
                 contents and spread internal-link signal across the sections. */}
             <nav
               aria-label="Jump to sector"
-              className="mt-8 flex flex-wrap gap-x-4 gap-y-2 rounded-xl border border-border bg-panel/40 p-4 text-sm"
+              className="mt-8 flex flex-wrap gap-x-4 gap-y-2 text-sm"
             >
               {groups.map((g) => (
                 <a

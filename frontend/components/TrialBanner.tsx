@@ -55,7 +55,7 @@ export function TrialBanner() {
     <div
       data-testid="trial-banner"
       // Deliberately constant. Do not reintroduce a tone ternary here.
-      className="mb-4 flex flex-col gap-2 rounded-lg border border-border bg-panel px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+      className="mb-4 flex flex-col gap-2 rounded-lg bg-panel/60 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
     >
       <span className="text-muted">
         {isStart ? (

@@ -115,7 +115,7 @@ export function SeoFeaturePage({
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+      <article className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
         {/* Hero */}
         <p className="eyebrow">{eyebrow}</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
@@ -128,7 +128,7 @@ export function SeoFeaturePage({
 
         {/* Methodology — long-form, signals depth to Google + answers the
             "how does this actually work" question new visitors ask. */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <h2 className="text-lg font-semibold">{methodology.heading}</h2>
           <div className="mt-3 space-y-3 text-sm text-muted leading-relaxed">
             {methodology.body}
@@ -159,7 +159,7 @@ export function SeoFeaturePage({
             visitor 4 adjacent things to look at if this one didn't land. */}
         <nav
           aria-label="Other Tapeline features"
-          className="mt-12 rounded-xl border border-border bg-panel/40 p-6"
+          className="mt-12 border-t border-border/60 pt-8"
         >
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
             Other Tapeline features
@@ -184,7 +184,7 @@ export function SeoFeaturePage({
             because they had no inbound from the rest of the site). */}
         <nav
           aria-label="Related ticker rankings"
-          className="mt-6 rounded-xl border border-border bg-panel/40 p-6"
+          className="mt-6 border-t border-border/60 pt-8"
         >
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
             Related ticker rankings
@@ -206,12 +206,12 @@ export function SeoFeaturePage({
             a trial but willing to give us an email for the daily Top 10
             digest. Lower-commitment than /signup; same conversion bucket
             in GA4 via method='newsletter'. */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <NewsletterCapture source="feature" heading="" sub="" />
         </section>
 
         {/* CTA — tier-aware copy + same gradient as the homepage final CTA. */}
-        <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
+        <section className="mt-12 rounded-2xl bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <p className="eyebrow text-accent">{tierLabel} feature</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
             See this live across the full ~2,500-ticker universe.

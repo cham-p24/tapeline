@@ -417,7 +417,7 @@ const NEXT_STEPS: { label: string; hint: string; href: string }[] = [
 
 function NextStepsNudge() {
   return (
-    <section className="mt-12 rounded-lg border border-border bg-panel p-5">
+    <section className="mt-12">
       <p className="eyebrow text-muted">Your first session</p>
       <h2 className="mt-1 text-lg font-semibold tracking-tight">
         Three steps to seeing it work
@@ -426,12 +426,12 @@ function NextStepsNudge() {
         About two minutes, in any order. Everything below is unlocked on your
         trial.
       </p>
-      <ol className="mt-4 space-y-2">
+      <ol className="mt-4 divide-y divide-border/60 border-t border-border/60">
         {NEXT_STEPS.map((s, i) => (
           <li key={s.href}>
             <Link
               href={s.href}
-              className="group flex items-start gap-3 rounded-md border border-border bg-panel2 p-3 transition-colors hover:border-accent/50"
+              className="group flex items-start gap-3 py-5 transition-colors"
             >
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
                 {i + 1}

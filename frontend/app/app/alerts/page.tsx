@@ -215,7 +215,7 @@ export default function AlertsPage() {
           the locked value. Descriptive only — no urgency, no performance claims. */}
       {isFree && (
         <div
-          className="mt-4 rounded-lg border border-border bg-panel/40 px-4 py-3 text-sm"
+          className="card mt-4 px-4 py-3 text-sm"
           data-testid="alerts-channels-locked"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">

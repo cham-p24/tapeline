@@ -60,7 +60,7 @@ export function ScannerLegend() {
 
 function Factor({ name, emphasis, desc }: { name: string; emphasis: string; desc: string }) {
   return (
-    <div className="rounded-md border border-border bg-panel px-3 py-2">
+    <div className="px-1 py-1">
       <div className="flex items-baseline gap-2">
         <span className="font-semibold">{name}</span>
         <span className="font-mono text-[0.65rem] uppercase tracking-wide text-accent">{emphasis}</span>

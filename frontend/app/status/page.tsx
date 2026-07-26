@@ -211,9 +211,11 @@ export default function StatusPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
             Live checks
           </h2>
-          {PROBES.map((p) => (
-            <ProbeRow key={p.key} probe={p} result={results[p.key]} />
-          ))}
+          <div className="divide-y divide-border/60 border-t border-border/60">
+            {PROBES.map((p) => (
+              <ProbeRow key={p.key} probe={p} result={results[p.key]} />
+            ))}
+          </div>
           <p className="text-xs text-subtle">
             Live check only — measured from your browser at the time shown above. We
             don&rsquo;t publish a synthetic uptime percentage or a backlog of past
@@ -230,30 +232,32 @@ export default function StatusPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
               Service detail
             </h2>
-            <DetailRow
-              label="Database"
-              ok={detail.checks.database?.status === "ok"}
-              detail={
-                detail.checks.database?.status === "ok"
-                  ? `${detail.checks.database.tickers?.toLocaleString()} tickers · ${detail.checks.database.news_items?.toLocaleString()} news items`
-                  : detail.checks.database?.detail || "unknown"
-              }
-            />
-            <DetailRow
-              label="Scoring worker"
-              ok={detail.checks.worker_last_tick?.status === "ok"}
-              stale={detail.checks.worker_last_tick?.status === "stale"}
-              detail={
-                detail.checks.worker_last_tick?.regime
-                  ? `regime: ${detail.checks.worker_last_tick.regime} · last tick ${detail.checks.worker_last_tick.age_seconds}s ago`
-                  : detail.checks.worker_last_tick?.detail || "—"
-              }
-            />
-            <DetailRow
-              label="Build"
-              ok
-              detail={`${detail.app} · ${detail.env} · v${detail.version}`}
-            />
+            <div className="divide-y divide-border/60 border-t border-border/60">
+              <DetailRow
+                label="Database"
+                ok={detail.checks.database?.status === "ok"}
+                detail={
+                  detail.checks.database?.status === "ok"
+                    ? `${detail.checks.database.tickers?.toLocaleString()} tickers · ${detail.checks.database.news_items?.toLocaleString()} news items`
+                    : detail.checks.database?.detail || "unknown"
+                }
+              />
+              <DetailRow
+                label="Scoring worker"
+                ok={detail.checks.worker_last_tick?.status === "ok"}
+                stale={detail.checks.worker_last_tick?.status === "stale"}
+                detail={
+                  detail.checks.worker_last_tick?.regime
+                    ? `regime: ${detail.checks.worker_last_tick.regime} · last tick ${detail.checks.worker_last_tick.age_seconds}s ago`
+                    : detail.checks.worker_last_tick?.detail || "—"
+                }
+              />
+              <DetailRow
+                label="Build"
+                ok
+                detail={`${detail.app} · ${detail.env} · v${detail.version}`}
+              />
+            </div>
           </section>
         )}
 
@@ -330,7 +334,7 @@ function ProbeRow({ probe, result }: { probe: Probe; result?: ProbeResult }) {
     result?.latencyMs != null ? `${result.latencyMs} ms` : null;
   const detail = result?.detail ?? latency ?? "checking…";
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-panel px-4 py-3">
+    <div className="flex items-center justify-between gap-4 py-4">
       <div className="flex min-w-0 items-center gap-3">
         <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} aria-hidden="true" />
         <div className="min-w-0">
@@ -361,7 +365,7 @@ function DetailRow({
   const text = ok ? "text-up" : stale ? "text-warn" : "text-down";
   const word = ok ? "OK" : stale ? "Stale" : "Down";
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-panel px-4 py-3">
+    <div className="flex items-center justify-between gap-4 py-4">
       <div className="flex items-center gap-3">
         <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
         <span className="font-medium">{label}</span>

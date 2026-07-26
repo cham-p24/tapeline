@@ -678,7 +678,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
       <script {...jsonLdScript(faqJsonLd(faqItems))} />
       <MarketingNav />
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
         {/* Visible breadcrumb — mirrors the BreadcrumbList JSON-LD (Google
             requires the schema to reflect on-page content for the breadcrumb
             rich result) AND gives every ticker page a real link up to its
@@ -733,7 +733,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             the score a *shape*, not just a number. Same role Simply Wall St's
             Snowflake plays for theirs. Each axis is one factor; lopsided
             polygons read as "strong on X, weak on Y" at a glance. */}
-        <div className="mt-8 sm:mt-10 rounded-2xl border border-border bg-panel p-5 sm:p-8">
+        <div className="mt-8 sm:mt-10 rounded-2xl bg-panel p-5 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-6 sm:gap-8">
             <div className="min-w-0 flex-1">
               <div className="text-xs uppercase tracking-wider text-muted">Tapeline Score</div>
@@ -798,9 +798,9 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         <h2 className="mt-10 sm:mt-12 text-sm font-semibold uppercase tracking-wider text-muted">
           Score breakdown · six named factors
         </h2>
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 divide-y divide-border/60 border-t border-border/60">
           {factors.map((f) => (
-            <div key={f.label} className="flex items-center gap-3 sm:gap-4 rounded-lg border border-border bg-panel/40 px-3 sm:px-4 py-3">
+            <div key={f.label} className="flex items-center gap-3 sm:gap-4 py-4">
               <div className="w-28 sm:w-44 flex-shrink-0">
                 <div className="text-xs sm:text-sm font-medium truncate">{f.label}</div>
                 <div className="text-[10px] uppercase tracking-wider text-subtle">{f.emphasis}</div>
@@ -829,7 +829,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             full ~1000-line page; this one catches the majority who don't.
             Copy is digest-accurate: subscribers get the daily Top 10 ranked
             by this same formula, not a per-ticker feed. */}
-        <div className="mt-8 rounded-lg border border-border bg-panel/30 p-5 sm:p-6">
+        <div className="mt-8 rounded-lg bg-panel/30 p-5 sm:p-6">
           <div className="mx-auto max-w-md">
             <NewsletterCapture
               source="ticker"
@@ -859,7 +859,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
             What the score says about {data.symbol} right now
           </h2>
-          <div className="mt-4 rounded-2xl border border-border bg-panel/30 p-5 sm:p-6">
+          <div className="mt-4">
             <p className="text-sm sm:text-base leading-relaxed text-fg">
               {buildEditorialCommentary(data)}
             </p>
@@ -940,14 +940,14 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             <p className="mt-2 text-sm text-muted">
               Latest market-moving headlines mentioning {data.symbol}, sourced from Tapeline&rsquo;s news feed (Polygon/Massive + Finnhub).
             </p>
-            <ul className="mt-6 divide-y divide-border/40 rounded-lg border border-border bg-panel/30">
+            <ul className="mt-6 divide-y divide-border/40">
               {news.map((n) => {
                 const pubDate = new Date(n.published_at);
                 const ageMs = Date.now() - pubDate.getTime();
                 const ageH = Math.round(ageMs / 3_600_000);
                 const ageStr = ageH < 1 ? "<1h ago" : ageH < 24 ? `${ageH}h ago` : `${Math.round(ageH / 24)}d ago`;
                 return (
-                  <li key={n.id} className="p-4 sm:p-5">
+                  <li key={n.id} className="py-4 sm:py-5">
                     <a
                       href={n.url}
                       target="_blank"
@@ -1095,7 +1095,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             entry point (search for "AAPL stock score" / "NVDA buy or
             sell" lands here). Curious visitor with no account: capture
             the email so the daily digest does the conversion work. */}
-        <div className="mt-12 rounded-lg border border-border bg-panel/30 p-6">
+        <div className="mt-12 rounded-lg bg-panel/30 p-6">
           <div className="text-center mb-4">
             <h3 className="text-lg font-semibold text-fg">
               See this ticker scored each market morning

@@ -137,7 +137,7 @@ export default function FreeStockScannerNoCreditCardPage() {
       <script {...jsonLdScript(faqJsonLd(FAQ))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+      <article className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
         <p className="eyebrow">Buyer's guide</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Free Stock Scanner — No Credit Card
@@ -162,21 +162,21 @@ export default function FreeStockScannerNoCreditCardPage() {
             Features only. We compare no-card access, formula transparency, and track record —
             never claimed returns.
           </p>
-          <div className="mt-4 card overflow-x-auto">
+          <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+              <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                 <tr>
-                  <th className="px-3 py-3 text-left">Scanner</th>
-                  <th className="px-3 py-3 text-left">No-card access</th>
-                  <th className="px-3 py-3 text-center">Card needed</th>
-                  <th className="px-3 py-3 text-center">Public formula</th>
-                  <th className="px-3 py-3 text-center">Track record</th>
+                  <th className="px-3 py-3 text-left font-medium">Scanner</th>
+                  <th className="px-3 py-3 text-left font-medium">No-card access</th>
+                  <th className="px-3 py-3 text-center font-medium">Card needed</th>
+                  <th className="px-3 py-3 text-center font-medium">Public formula</th>
+                  <th className="px-3 py-3 text-center font-medium">Track record</th>
                 </tr>
               </thead>
               <tbody>
                 {SCANNERS.map((s) => (
-                  <tr key={s.name} className="border-b border-border/30">
-                    <td className="px-3 py-3 font-medium">
+                  <tr key={s.name} className="border-b border-border/50">
+                    <td className="px-3 py-4 font-medium">
                       <a
                         href={`#${s.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                         className="hover:text-accent"
@@ -184,14 +184,14 @@ export default function FreeStockScannerNoCreditCardPage() {
                         {s.name}
                       </a>
                     </td>
-                    <td className="px-3 py-3 text-muted">{s.access}</td>
-                    <td className={`px-3 py-3 text-center ${cardChip(s.cardNeeded)}`}>
+                    <td className="px-3 py-4 text-muted">{s.access}</td>
+                    <td className={`px-3 py-4 text-center ${cardChip(s.cardNeeded)}`}>
                       {s.cardNeeded}
                     </td>
-                    <td className={`px-3 py-3 text-center ${formulaChip(s.publicFormula)}`}>
+                    <td className={`px-3 py-4 text-center ${formulaChip(s.publicFormula)}`}>
                       {s.publicFormula}
                     </td>
-                    <td className={`px-3 py-3 text-center ${trackChip(s.trackRecord)}`}>
+                    <td className={`px-3 py-4 text-center ${trackChip(s.trackRecord)}`}>
                       {s.trackRecord}
                     </td>
                   </tr>
@@ -227,7 +227,7 @@ export default function FreeStockScannerNoCreditCardPage() {
           </section>
         ))}
 
-        <section className="mt-16 rounded-2xl border border-border bg-panel/40 p-6 sm:p-8">
+        <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we compared them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Three feature criteria, no performance criteria: is there a{" "}
@@ -250,7 +250,7 @@ export default function FreeStockScannerNoCreditCardPage() {
 
         {/* Mid-page email capture — lower-commitment step for a reader not yet
             ready to open even a free account. */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <NewsletterCapture source="blog" heading="" sub="" />
         </section>
 
