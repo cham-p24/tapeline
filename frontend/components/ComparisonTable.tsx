@@ -102,11 +102,10 @@ export function ComparisonTable() {
   const { billing } = useBillingPeriod();
   const annual = billing === "annual";
   return (
-    // Constrain to max-w-5xl + center so the table doesn't stretch the
-    // full viewport on wide monitors. Outer surface uses `bg-panel` so
-    // the atmospheric layer underneath shows through — `bg-surface` was
-    // rendering as a stark white island against the blue tint.
-    <div className="mx-auto mt-8 max-w-5xl overflow-hidden rounded-2xl border border-border bg-panel shadow-[0_1px_3px_rgb(var(--shadow))]">
+    // Borderless: constrain to max-w-5xl + center and let the spec-sheet table
+    // sit directly on the page (no outer card box), matching the de-boxed
+    // /compare tables — hairline row + section dividers carry the structure.
+    <div className="mx-auto mt-8 max-w-5xl">
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
           {/* Explicit column widths so the FEATURE column doesn't greedily
@@ -120,7 +119,7 @@ export function ComparisonTable() {
             <col style={{ width: "22%" }} />
           </colgroup>
           <thead>
-            <tr className="border-b border-border2 bg-panel">
+            <tr className="border-b border-border2">
               <th className="px-5 py-5 text-left align-bottom">
                 <span className="block text-[10px] uppercase tracking-[0.12em] text-subtle">Feature</span>
               </th>
@@ -178,7 +177,7 @@ function SectionGroup({ section }: { section: Section }) {
       <tr>
         <td
           colSpan={4}
-          className="border-y border-border/60 bg-panel2 px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent"
+          className="border-y border-border/60 px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent"
         >
           {section.name}
         </td>
