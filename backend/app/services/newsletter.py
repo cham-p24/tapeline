@@ -382,11 +382,23 @@ async def run_daily_digest(
             )
             if not res.get("skipped", False):
                 sub.last_sent_at = now
+                # Commit per subscriber, NOT once at the end. last_sent_at is
+                # the idempotency key, but a batch-end commit means a mid-loop
+                # cancellation — Fly sends SIGTERM on every merge-to-main deploy,
+                # and CancelledError is a BaseException that slips past the
+                # `except Exception` below — rolls back last_sent_at for every
+                # subscriber Resend has ALREADY delivered to. The next process
+                # (its _last_daily_newsletter_date reset to None) then re-runs
+                # the same UTC day and re-sends them a duplicate. Same reasoning
+                # as run_daily_drip's per-user commit.
+                await session.commit()
                 sent += 1
                 any_commits = True
         except Exception:
             logger.exception("newsletter.digest_send_failed email=%s", sub.email)
 
+    # Per-row commits above are the durable record; this is a harmless no-op
+    # unless a future edit reintroduces deferred writes.
     if any_commits:
         await session.commit()
 

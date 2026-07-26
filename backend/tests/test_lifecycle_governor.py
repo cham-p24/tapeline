@@ -214,6 +214,35 @@ def test_governor_never_blocks_scheduled_but_does_record_it():
     assert gov2.allows(v, SendClass.LIFECYCLE, token="act_scan6h") is False
 
 
+def test_scheduled_sends_do_not_consume_the_weekly_lifecycle_budget():
+    """Guarantee #2 is a LIFECYCLE ceiling. A user's opted-in daily digest
+    (SCHEDULED) fires every trading day; counting those against the weekly
+    lifecycle cap meant an engaged user with a watchlist hit the ceiling by
+    day 3-4 and never received a founder-touch or annual nudge. Scheduled
+    sends enforce only the min-gap, not the weekly cap."""
+    import time
+
+    ledger = SendLedger()
+    gov = FrequencyGovernor(ledger=ledger)
+    u = _user()
+    now = time.time()
+
+    # More scheduled digests in the past week than the lifecycle cap, all
+    # older than the min-gap window so only the weekly cap could block.
+    assert MAX_LIFECYCLE_SENDS_PER_WEEK == 3
+    for days_ago in (5, 4, 3, 2):
+        ledger.record(u.id, now - days_ago * 86400, is_lifecycle=False)
+
+    # Pre-fix this returned False (4 scheduled >= cap of 3). A lifecycle email
+    # must still be allowed — scheduled sends don't fill the lifecycle budget.
+    assert gov.allows(u, SendClass.LIFECYCLE, token="founder_touch") is True
+
+    # But a genuine lifecycle send DOES still count toward the cap.
+    for days_ago in (5, 4, 3):
+        ledger.record(u.id, now - days_ago * 86400, is_lifecycle=True)
+    assert gov.allows(u, SendClass.LIFECYCLE, token="founder_touch") is False
+
+
 def test_governor_blocks_globally_unsubscribed_user():
     """email_prefs == 0 is the 'unsubscribe from everything' state written by
     services/unsubscribe. Nothing but transactional may pass."""

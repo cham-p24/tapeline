@@ -299,26 +299,42 @@ class SendLedger:
     __slots__ = ("_log",)
 
     def __init__(self) -> None:
-        self._log: dict[str, list[float]] = {}
+        # Each entry is (timestamp, is_lifecycle). The class tag is what lets
+        # the weekly LIFECYCLE cap count only lifecycle sends while the min-gap
+        # still counts every send — see recent()'s lifecycle_only.
+        self._log: dict[str, list[tuple[float, bool]]] = {}
 
-    def record(self, user_id: str, at: float | None = None) -> None:
+    def record(
+        self, user_id: str, at: float | None = None, *, is_lifecycle: bool = True,
+    ) -> None:
         at = time.time() if at is None else at
-        self._log.setdefault(user_id, []).append(at)
+        self._log.setdefault(user_id, []).append((at, is_lifecycle))
 
-    def recent(self, user_id: str, within_seconds: float) -> list[float]:
-        """Timestamps for this user inside the window, pruning stale rows."""
+    def recent(
+        self, user_id: str, within_seconds: float, *, lifecycle_only: bool = False,
+    ) -> list[float]:
+        """Timestamps for this user inside the window, pruning stale rows.
+
+        `lifecycle_only` restricts the count to LIFECYCLE sends — used by the
+        weekly cap, whose budget is lifecycle-only. The min-gap check leaves it
+        False so an opted-in scheduled send (the daily digest) still holds a
+        lifecycle nudge off for the gap.
+        """
         entries = self._log.get(user_id)
         if not entries:
             return []
         cutoff = time.time() - _LEDGER_TTL_SECONDS
-        fresh = [t for t in entries if t >= cutoff]
+        fresh = [(t, lc) for (t, lc) in entries if t >= cutoff]
         if fresh:
             self._log[user_id] = fresh
         else:
             self._log.pop(user_id, None)
             return []
         window_start = time.time() - within_seconds
-        return [t for t in fresh if t >= window_start]
+        return [
+            t for (t, lc) in fresh
+            if t >= window_start and (lc or not lifecycle_only)
+        ]
 
     def clear(self) -> None:
         self._log.clear()
@@ -434,7 +450,7 @@ class FrequencyGovernor:
             )
             return False
 
-        if len(self._ledger.recent(uid, 7 * 24 * 3600)) >= MAX_LIFECYCLE_SENDS_PER_WEEK:
+        if len(self._ledger.recent(uid, 7 * 24 * 3600, lifecycle_only=True)) >= MAX_LIFECYCLE_SENDS_PER_WEEK:
             self.blocked += 1
             logger.info(
                 "governor.blocked reason=weekly_cap user=%s token=%s", uid, token,
@@ -449,7 +465,13 @@ class FrequencyGovernor:
         """Note a CONFIRMED delivery against this user's frequency budget."""
         if send_class is SendClass.TRANSACTIONAL:
             return
-        self._ledger.record(user.id)
+        # Tag the entry with its class so the weekly LIFECYCLE cap counts only
+        # lifecycle sends. A SCHEDULED send (the daily digest) is still recorded
+        # — it enforces the min-gap so a nudge won't pile on the same day — but
+        # it must not consume the lifecycle weekly budget, or an engaged user
+        # with a watchlist (daily digest) would never receive a founder-touch
+        # or annual-nudge email.
+        self._ledger.record(user.id, is_lifecycle=(send_class is SendClass.LIFECYCLE))
         self.sent += 1
 
 
