@@ -25,7 +25,7 @@ All four other tabs (SPIKE INTELLIGENCE, MARKET INTELLIGENCE, SMART MONEY & CONG
 - **Today's date for relative refs:** see system date.
 
 ## Stack
-FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 14 + TypeScript + Tailwind frontend. SQLite dev / Postgres prod (Supabase or Neon). SSE for live updates. Native cookie-JWT auth (built) + Clerk + Google/Microsoft OAuth (env-gated). Stripe billing (env-gated). Resend email (env-gated). Hosting plan: Fly.io backend + Vercel frontend.
+FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 16 + TypeScript + Tailwind frontend. SQLite dev / Postgres prod (Supabase or Neon). SSE for live updates. Native cookie-JWT auth (built) + Clerk + Google/Microsoft OAuth (env-gated). Stripe billing (env-gated). Resend email (env-gated). Hosting plan: Fly.io backend + Vercel frontend.
 
 ## Worker
 Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
