@@ -15,7 +15,7 @@ overrides handle larger seat counts or API caps if needed.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Final
 
@@ -107,7 +107,35 @@ FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)
 # activation DEADLOCK: the day-1 seeder filled the watchlist to its full 3/3,
 # so a new Free user's own FIRST "add a ticker" 403'd — killing the exact
 # activation action. Raising to 5 + seeding to <= cap-1 leaves them a free slot.
-FREE_WATCHLIST_TICKERS = 5
+FREE_WATCHLIST_TICKERS = 5       # the FREE cap WHILE the free tier still has a watchlist — see the cutover below
+
+# ── Watchlist → Pro+ cutover (announced to all free users by email 2026-07-26) ──
+# On this date the saved watchlist becomes a Pro-and-up feature: the FREE cap
+# drops to 0. Date-gated on purpose so the cutover activates automatically — no
+# deploy, merge, or manual step is needed on the day, and enforcement + every
+# marketing/email/pricing surface stay in lock-step because they all read the
+# ONE function below. Non-destructive: existing free users' saved rows are kept
+# in the DB, just no longer addable/shown on Free, so upgrading RESTORES the list.
+FREE_WATCHLIST_REMOVAL_DATE: Final[date] = date(2026, 8, 2)
+
+
+def free_watchlist_cap(today: date | None = None) -> int:
+    """Saved-ticker cap for the FREE tier.
+
+    Returns 0 on/after FREE_WATCHLIST_REMOVAL_DATE (watchlist is Pro+ from then
+    on), else FREE_WATCHLIST_TICKERS. The single source of truth for both
+    enforcement (via `limit()`) and every copy surface, so the two can't drift.
+    `today` is injectable for tests.
+    """
+    d = today or datetime.now(UTC).date()
+    return 0 if d >= FREE_WATCHLIST_REMOVAL_DATE else FREE_WATCHLIST_TICKERS
+
+
+def free_has_watchlist(today: date | None = None) -> bool:
+    """True while the FREE tier still includes a saved watchlist."""
+    return free_watchlist_cap(today) > 0
+
+
 FREE_DAILY_LOOKUPS = 12          # 12 ticker-detail (/api/ticker/{symbol}) views per UTC day (raised from 5)
 
 # First-session grace: a brand-new FREE account (created within this window) is
@@ -199,6 +227,11 @@ def limit(user_tier: Tier | str, key: str) -> int | None:
     callers that may receive None must handle the sentinel (see usage.py).
     """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
+    # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
+    # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
+    # cutover needs no restart/redeploy. Paid tiers are unaffected.
+    if actual is Tier.FREE and key == "watchlist_tickers":
+        return free_watchlist_cap()
     return TIER_LIMITS[actual].get(key, 0)
 
 

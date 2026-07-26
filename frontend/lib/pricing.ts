@@ -76,6 +76,20 @@ export const FREE_LIMITS = {
 } as const;
 
 /**
+ * Watchlist → Pro+ cutover. On this date the saved watchlist becomes a Pro-and-up
+ * feature and the Free tier loses it (announced to all free users by email
+ * 2026-07-26). Mirrors backend tier.py `FREE_WATCHLIST_REMOVAL_DATE` — keep the two
+ * in sync. Date-gated so pricing copy flips automatically; `freeHasWatchlist()` is
+ * the single guard every Free-tier surface should use before quoting the watchlist.
+ */
+export const FREE_WATCHLIST_REMOVAL_DATE = new Date("2026-08-02T00:00:00Z");
+
+/** True while the Free tier still includes a saved watchlist. */
+export function freeHasWatchlist(now: Date = new Date()): boolean {
+  return now < FREE_WATCHLIST_REMOVAL_DATE;
+}
+
+/**
  * The refund guarantee, single-sourced from the legal ground truth at
  * /legal/refund: monthly plans get a FULL refund within 30 days of the first
  * paid charge; annual plans get a PRORATED refund within 30 days (one month at

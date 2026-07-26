@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
@@ -16,7 +16,7 @@ const PLANS = [
       "Live scores — no delay",
       `${FREE_LIMITS.dailyLookups} ticker look-ups per day — unmetered your first ${FREE_LIMITS.firstSessionGraceHours}h`,
       `Top-${FREE_LIMITS.scannerRows} scanner rows`,
-      `Watchlist (${FREE_LIMITS.watchlistTickers} tickers)`,
+      ...(freeHasWatchlist() ? [`Watchlist (${FREE_LIMITS.watchlistTickers} tickers)`] : []),
       `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
       `${FREE_LIMITS.webPushAlerts} browser push alerts`,
       "Public scorecard, fully open",

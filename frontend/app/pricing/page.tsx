@@ -9,8 +9,14 @@ import { LiveCounters } from "@/components/LiveCounters";
 import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
-import { PRICING, FREE_LIMITS, REFUND, usd, annualRateLabel } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, annualRateLabel, freeHasWatchlist } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
+
+// ISR: regenerate periodically so the date-gated FREE_WATCHLIST_REMOVAL_DATE
+// cutover (watchlist → Pro+ on 2026-08-02) flips the Free-tier copy here without
+// waiting for the next deploy. 6h keeps the marketing copy within a quarter-day
+// of the cutover.
+export const revalidate = 21600;
 
 // SERP title keeps the $8.25 headline but ALWAYS qualified — a bare annual
 // rate in the title while the page shows $9.99 monthly is exactly the
@@ -31,7 +37,7 @@ export const metadata = pageMeta({
 const FAQ_ITEMS = [
   {
     q: "What happens when my trial ends?",
-    a: `Your account moves to Free forever — live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, the top-${FREE_LIMITS.squeezePreviewRows} squeeze preview, and ${FREE_LIMITS.webPushAlerts} browser push alerts. Watchlists and settings stay intact. Add a card any time to keep Premium.`,
+    a: `Your account moves to Free forever — live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner,${freeHasWatchlist() ? ` a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} the top-${FREE_LIMITS.squeezePreviewRows} squeeze preview, and ${FREE_LIMITS.webPushAlerts} browser push alerts. ${freeHasWatchlist() ? "Watchlists and settings stay intact." : "Your settings stay intact, and anything you saved to a watchlist is kept — upgrade to Pro any time to use it again."} Add a card any time to keep Premium.`,
   },
   {
     q: "Can I switch plans later?",
