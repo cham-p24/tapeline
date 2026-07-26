@@ -42,8 +42,8 @@ export function MarketingNav() {
 
   return (
     <>
-      <nav className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="sticky top-0 z-40 px-3 pt-3 sm:px-4 sm:pt-4">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between rounded-2xl border border-border bg-background/70 px-5 py-3 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
           <Link href="/" className="flex items-center gap-2">
             <div className="h-2 w-6 rounded-full bg-accent" />
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
@@ -95,8 +95,8 @@ export function MarketingNav() {
               )}
             </button>
           </div>
-        </div>
-      </nav>
+        </nav>
+      </div>
 
       {/* Mobile menu sheet — drops down from the nav bar. Solid bg + backdrop
           blur so it reads cleanly over whatever section is behind it. Tap
@@ -107,9 +107,9 @@ export function MarketingNav() {
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="fixed inset-0 top-[65px] z-30 bg-background/40 backdrop-blur-sm sm:hidden"
+            className="fixed inset-0 top-[76px] z-30 bg-background/40 backdrop-blur-sm sm:hidden"
           />
-          <div className="fixed inset-x-0 top-[65px] z-40 border-b border-border bg-background sm:hidden">
+          <div className="fixed inset-x-3 top-[76px] z-40 rounded-2xl border border-border bg-background shadow-lg sm:hidden">
             <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4">
               {LINKS.map((l) => (
                 <Link
