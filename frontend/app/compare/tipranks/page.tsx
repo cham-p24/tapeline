@@ -2,16 +2,16 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Tipranks (2026): Published Weights vs Smart Score Black Box",
+  title: "Tapeline vs Tipranks (2026): Named Factors vs Smart Score Black Box",
   description:
-    "Tapeline vs Tipranks — published six-factor weights with a per-pick public scorecard, vs Tipranks' Smart Score that aggregates eight factors at undisclosed weights. Honest comparison at $8.25/mo entry vs $30-76/mo.",
+    "Tapeline vs Tipranks — six named factors and a published methodology with a per-pick public scorecard, vs Tipranks' Smart Score that aggregates eight factors at undisclosed weights. Honest comparison at $8.25/mo entry vs $30-76/mo.",
   path: "/compare/tipranks",
 });
 
 const WINS: CompareRow[] = [
   {
-    label: "Factor weights — fully public",
-    tapeline: "✓ Six named factors on /how-it-works",
+    label: "Transparent factor set",
+    tapeline: "✓ Six named factors + their ranking on /how-it-works",
     competitor: "Eight factors aggregated, weights NOT published",
   },
   {

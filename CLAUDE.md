@@ -59,12 +59,23 @@ Descriptive, NOT prescriptive — protects the publisher's exemption.
 - `CAUTION` (25–39) — was "WATCH"
 - `WEAK` (0–24) — was "AVOID"
 
-## Scoring formula — do not change (transparency is the moat)
-Documented publicly on `/how-it-works`:
+## Scoring formula — do not change (the composite weighting is the moat)
+Internal computation (do not change the weights without a `/changelog` entry):
 ```
 score = 0.25*trend + 0.20*relative_strength + 0.15*fundamentals
       + 0.15*smart_money + 0.15*macro + 0.10*momentum
 ```
+**NOT published publicly.** PR #342 deliberately stripped the exact weights, the
+scoring equation, and the per-factor indicator/parameter recipe (MACD, Bollinger,
+RSI, moving averages, Piotroski) from the public site. The public methodology
+(`/how-it-works` + the six `/how-it-works/{factor}` pages) names the six factors
+and their weight **ordering** ("weighted most toward Trend + RS, least toward
+Momentum") only — never the numbers. Guarded by
+`frontend/__tests__/methodologyPages.test.ts` (the "disclosure boundary" suite).
+The transparency that's public is the factor *set + ordering + what each measures*,
+which is enough to justify the descriptive-only posture without handing over a
+cloneable recipe. Keep it that way — marketing copy must not claim the exact
+weights are published.
 
 ## Mock-to-real data switch
 **Production runs on real data.** The worker imports `app.services.polygon_feed` (Massive-backed). `mock_feed` only fires when no `MASSIVE_API_KEY` / `POLYGON_API_KEY` is set (dev fallback). The adapter file is still named `polygon_feed.py` because Polygon.io rebranded to Massive on 2025-10-30 — same API, same auth, same endpoint shapes, only the hostname changed (`api.polygon.io` → `api.massive.com`). Massive accepts both `MASSIVE_API_KEY` and the legacy `POLYGON_API_KEY` env vars.

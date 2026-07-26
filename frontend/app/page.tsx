@@ -141,12 +141,12 @@ export default function LandingPage() {
           <FadeIn delayMs={0}>
             <Differentiator
               num="01"
-              label="Published, fixed weights"
+              label="Public method, not a black box"
               body={
                 <>
-                  The exact weight on each of the six factors is public and fixed
-                  &mdash; no black box, no hidden inputs, no mystery AI. Weighted
-                  most toward Trend and Relative Strength, least toward Momentum,
+                  The six factors and how they&rsquo;re ordered &mdash; weighted
+                  most toward Trend and Relative Strength, least toward Momentum
+                  &mdash; are public and fixed. No hidden inputs, no mystery AI,
                   and every change is{" "}
                   <Link href="/changelog" className="link">
                     announced before it ships

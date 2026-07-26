@@ -10,7 +10,7 @@ import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/
 export const metadata = pageMeta({
   title: "Tapeline vs WallStreetZen (2026): Public Weights, Live Data, Per-Pick Scorecard",
   description:
-    "Tapeline vs WallStreetZen Premium — 6-factor model with PUBLISHED weights, sub-60s live data, per-pick public scorecard, vs WallStreetZen's 115-factor proprietary Zen Ratings. Honest comparison.",
+    "Tapeline vs WallStreetZen Premium — 6-factor model with named factors + published methodology, sub-60s live data, per-pick public scorecard, vs WallStreetZen's 115-factor proprietary Zen Ratings. Honest comparison.",
   path: "/compare/wallstreetzen",
 });
 
