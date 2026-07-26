@@ -14,6 +14,7 @@ import { canUse } from "@/lib/auth";
 import { SearchBox, useDebounced } from "@/components/FilterBar";
 import { matchesQuery } from "@/lib/filters";
 import { trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 // Hardcoded fallback if /api/scanner/popular is unreachable (e.g. cold
 // start before the worker has populated any scored tickers). Same shape
@@ -55,6 +56,11 @@ export default function WatchlistPage() {
   // paywall instead of downloading. `exporting` guards double-clicks.
   const [csvPaywallOpen, setCsvPaywallOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Watchlist → Pro+ cutover (2026-08-02). A Free user past the cutover sees a
+  // locked upgrade state instead of the interactive list; `unlockOpen` drives
+  // that page's Paywall. Date-gated off the same freeHasWatchlist() helper the
+  // pricing surfaces use, so enforcement (cap=0) and this UI can't disagree.
+  const [unlockOpen, setUnlockOpen] = useState(false);
 
   // Refresh the starter pack from the API on mount. Falls back to the
   // hardcoded mega-cap list if the call fails for any reason.
@@ -94,6 +100,13 @@ export default function WatchlistPage() {
   const { status, lastUpdate } = useLiveStream(load);
 
   const watchlistsCap = WATCHLISTS_CAP_BY_TIER[user?.tier ?? "free"] ?? 1;
+
+  // Free users past the 2026-08-02 cutover: the watchlist is now a Pro+
+  // feature. Their saved rows are preserved server-side (adds already 403 at
+  // cap=0) — we show a locked "upgrade to unlock your N tickers" state rather
+  // than the interactive list. Paid/trial users (tier pro/premium) are never
+  // locked; Free before the cutover keeps the normal view.
+  const watchlistLocked = user?.tier === "free" && !freeHasWatchlist();
 
   // Search narrows the visible rows by ticker. Never filters during the
   // initial load (we want the skeleton to show against the real count).
@@ -197,6 +210,80 @@ export default function WatchlistPage() {
     } finally {
       setSeeding(false);
     }
+  }
+
+  // Locked state — Free user past the watchlist cutover. Shows their saved
+  // tickers behind a Pro upgrade instead of the interactive list. All hooks
+  // above have already run, so this early return is React-safe.
+  if (watchlistLocked) {
+    const n = items.length;
+    return (
+      <div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Watchlist</h1>
+          <p className="text-sm text-muted">Saved watchlists are a Pro feature.</p>
+        </div>
+        <div className="mt-6 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent text-xl">
+              🔒
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold tracking-tight">
+                {n > 0 ? "Your watchlist is a Pro feature" : "The watchlist is a Pro feature"}
+              </h2>
+              <p className="mt-1.5 text-sm text-muted leading-relaxed">
+                {n > 0 ? (
+                  <>
+                    You have <strong className="text-fg">{n} ticker{n === 1 ? "" : "s"}</strong> saved.
+                    They&rsquo;re safe — upgrade to Pro to unlock your watchlist and keep tracking them
+                    with smart alerts.
+                  </>
+                ) : (
+                  <>
+                    Upgrade to Pro to build a watchlist and get smart alerts when your tickers&rsquo;
+                    scores move.
+                  </>
+                )}
+              </p>
+              {n > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2" aria-label="Your saved tickers (locked)">
+                  {items.slice(0, 12).map((w) => (
+                    <span
+                      key={w.id}
+                      className="rounded-md border border-border bg-panel px-2.5 py-1 text-xs font-mono text-muted select-none"
+                    >
+                      {w.symbol}
+                    </span>
+                  ))}
+                  {n > 12 && <span className="px-2 py-1 text-xs text-subtle">+{n - 12} more</span>}
+                </div>
+              )}
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button onClick={() => setUnlockOpen(true)} className="btn-accent text-sm">
+                  Unlock with Pro &rarr;
+                </button>
+                <Link href="/app/scanner" className="btn-ghost text-sm">
+                  Back to the scanner
+                </Link>
+              </div>
+              {n > 0 && (
+                <p className="mt-3 text-xs text-subtle">
+                  Your saved tickers stay exactly as they are — upgrading restores them instantly.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+        <PaywallModal
+          open={unlockOpen}
+          onClose={() => setUnlockOpen(false)}
+          feature="watchlist"
+          heading="Unlock your watchlist"
+          description="Saved watchlists are a Pro feature. Upgrade to keep tracking your tickers with smart alerts."
+        />
+      </div>
+    );
   }
 
   return (
