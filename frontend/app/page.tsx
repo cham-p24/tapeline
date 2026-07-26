@@ -19,9 +19,12 @@ export default function LandingPage() {
     // The page-wide blue atmospheric gradient now lives on `body::before`
     // in globals.css (PR #141) so EVERY route gets it consistently
     // without per-page wiring. <main> here just needs the structural
-    // container styles. `overflow-x-hidden` clips any wide blob halos
-    // from the hero section so they can't create a horizontal scrollbar.
-    <main id="main" className="relative min-h-screen overflow-x-hidden">
+    // container styles. `overflow-x-clip` (not -hidden) prevents a horizontal
+    // scrollbar WITHOUT turning <main> into a scroll container — `overflow-x:
+    // hidden` does, which silently breaks the floating nav's position:sticky
+    // (the header scrolls away instead of pinning). `clip` leaves overflow-y
+    // visible, so the sticky nav keeps floating.
+    <main id="main" className="relative min-h-screen overflow-x-clip">
       <MarketingNav />
 
       {/* HERO — single-purpose fold.
