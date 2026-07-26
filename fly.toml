@@ -19,6 +19,8 @@ primary_region = "syd"              # Sydney — lowest latency for Melbourne fo
 #     and if that is unset too it falls back to a constant hardcoded in this
 #     public repo (i.e. anyone can forge any user's session). Generate with:
 #       fly secrets set SESSION_SECRET=$(openssl rand -hex 32) -a tapeline-backend
+#     or, with no local flyctl, run the "Set SESSION_SECRET (bootstrap / rotate)"
+#     GitHub Actions workflow. The backend now REFUSES TO BOOT in prod without it.
 #     Setting or changing it signs every user out once — do it in a quiet window.
 #   DATABASE_URL (from Supabase or Neon)
 #   MASSIVE_API_KEY  (or legacy POLYGON_API_KEY during the rebrand grace period)
