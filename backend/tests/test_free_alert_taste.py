@@ -206,3 +206,92 @@ async def test_premium_user_unaffected_by_free_web_push_cap():
             assert effective_limit(u, "web_push_alerts") >= 10_000
         finally:
             await _restore_dev_user()
+
+
+# ── rule_type CONTENT gate (not just the delivery channel) ────────────────────
+#
+# create_rule used to gate only the channel. But a congress/squeeze/regime/news
+# rule carries PAID CONTENT regardless of how it's delivered, and web_push is a
+# free channel — so a free user could subscribe to a `congress` rule on
+# web_push and receive Premium congressional-trade detail at $0 (also readable
+# via GET /api/alerts/events). These pin the content gate.
+
+@pytest.mark.asyncio
+async def test_free_user_cannot_create_premium_rule_type_on_free_channel():
+    """Free + congress (Premium content) on the free web_push channel → 403,
+    even though the channel itself is allowed. score (base) still works."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        try:
+            await _set_tier(c, "free")
+
+            congress = await c.post(
+                "/api/alerts/rules",
+                json={"name": "C", "rule_type": "congress", "symbol": "NVDA",
+                      "threshold": None, "channel": "web_push"},
+                headers=_AUTH,
+            )
+            assert congress.status_code == 403, congress.text
+            assert "congress" in congress.text.lower()
+
+            # Pro-gated content (squeeze) is also blocked for Free on web_push.
+            squeeze = await c.post(
+                "/api/alerts/rules",
+                json={"name": "S", "rule_type": "squeeze", "symbol": "NVDA",
+                      "threshold": None, "channel": "web_push"},
+                headers=_AUTH,
+            )
+            assert squeeze.status_code == 403, squeeze.text
+
+            # score is the base product — still allowed as the free taste.
+            score = await c.post("/api/alerts/rules", json=_web_push_body(0), headers=_AUTH)
+            assert score.status_code == 200, score.text
+        finally:
+            await _restore_dev_user()
+
+
+@pytest.mark.asyncio
+async def test_pro_user_gets_pro_rule_types_but_not_premium_congress():
+    """A Pro user can create squeeze/regime/news (Pro content) but NOT congress
+    (Premium) — the content gate is tier-accurate, not all-or-nothing."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        try:
+            await _set_tier(c, "pro")
+
+            for rt in ("squeeze", "regime", "news"):
+                r = await c.post(
+                    "/api/alerts/rules",
+                    json={"name": rt, "rule_type": rt, "symbol": "NVDA",
+                          "threshold": None, "channel": "web_push"},
+                    headers=_AUTH,
+                )
+                assert r.status_code == 200, f"{rt}: {r.text}"
+
+            congress = await c.post(
+                "/api/alerts/rules",
+                json={"name": "C", "rule_type": "congress", "symbol": "NVDA",
+                      "threshold": None, "channel": "web_push"},
+                headers=_AUTH,
+            )
+            assert congress.status_code == 403, congress.text
+        finally:
+            await _restore_dev_user()
+
+
+@pytest.mark.asyncio
+async def test_premium_user_can_create_congress_rule():
+    """Premium is entitled to congress content — it must go through."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        try:
+            await _set_tier(c, "premium")
+            r = await c.post(
+                "/api/alerts/rules",
+                json={"name": "C", "rule_type": "congress", "symbol": "NVDA",
+                      "threshold": None, "channel": "web_push"},
+                headers=_AUTH,
+            )
+            assert r.status_code == 200, r.text
+        finally:
+            await _restore_dev_user()

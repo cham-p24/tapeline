@@ -55,6 +55,28 @@ async def create_rule(
             f"{feature} requires a higher tier. Upgrade at /app/billing",
         )
 
+    # Content gate on the rule TYPE, not just the delivery channel. The channel
+    # gate above only decides how an alert is delivered; without this, a Free
+    # user could create a `congress` rule on the Free `web_push` channel and
+    # receive Premium congressional-trade detail (politician, direction,
+    # symbol, dollar amount) at $0 — the alert body is also readable via
+    # GET /api/alerts/events, so the leak doesn't even need a live push sub.
+    # `score` is the base product and stays ungated (it's the Free web-push
+    # "taste"); the paid signal types map to the same features the scanner
+    # enforces. Enforced server-side because a forked/old client can't be
+    # trusted.
+    rule_type_feature = {
+        "squeeze": "squeeze.full",
+        "regime": "regime.full",
+        "news": "news.full",
+        "congress": "congress.feed",
+    }.get(body.rule_type)
+    if rule_type_feature and not has_feature(Tier(user.tier), rule_type_feature):
+        raise HTTPException(
+            403,
+            f"{body.rule_type} alerts require {rule_type_feature}. Upgrade at /app/billing",
+        )
+
     # Web-push count cap. Web push is the one channel a FREE user may create
     # rules on (the activation "taste"), but only up to a SMALL allowance —
     # tier.web_push_alerts (Free=FREE_WEB_PUSH_ALERTS=2, paid=effectively

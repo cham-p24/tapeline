@@ -322,7 +322,30 @@ async def stripe_webhook(
             # and by customer.subscription.deleted.
             user.tier = p["tier"]
         else:
-            user.tier = "free"
+            # Mirror the customer.subscription.deleted guard: only drop to free
+            # if NO other subscription of theirs is still live. A duplicate-
+            # conversion user can hold two subs; if one goes unpaid/canceled
+            # (this else branch) while the other is still active and charging,
+            # dropping to free strands a paying customer at Free tier. The
+            # current sub was just upserted to its non-live status above, so it
+            # won't match this query; excluding p["id"] is belt-and-suspenders.
+            other_live = (await session.execute(
+                select(Subscription).where(
+                    Subscription.user_id == user.id,
+                    Subscription.status.in_(("active", "trialing", "past_due")),
+                    Subscription.id != p["id"],
+                )
+            )).scalars().all()
+            if other_live:
+                best = max(other_live, key=lambda s: _TIER_RANK.get(s.tier, 0))
+                user.tier = best.tier
+                logger.warning(
+                    "stripe.subscription_downgraded_but_still_subscribed "
+                    "user=%s sub=%s kept_tier=%s remaining=%d",
+                    user.id, p["id"], best.tier, len(other_live),
+                )
+            else:
+                user.tier = "free"
 
         # Consume referral credits ONLY on the initial .created event —
         # .updated also lands here and would otherwise double-consume from

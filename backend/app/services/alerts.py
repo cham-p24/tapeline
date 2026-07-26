@@ -495,6 +495,37 @@ async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
     return bool(sent_today >= cap)
 
 
+async def _telegram_cap_reached(session: AsyncSession, user: User) -> bool:
+    """True when the user has used their `telegram_alerts_per_day` cap.
+
+    Mirrors `_email_cap_reached` for the Telegram channel. Matters most for
+    no-card TRIAL Premium users, whom the trial throttle drops from ~unlimited
+    to 100/day (tier.py) — the cap was metered but never enforced at send time,
+    so a couple of symbol-less congress rules on a busy disclosure day (each
+    firing up to ~96x/day on the 15-min debounce) could blow well past it.
+    Real (paying) Premium sits at 10,000 ≈ unlimited, so this never bites them;
+    Free/Pro can't reach the telegram branch at all (`_channel_entitled` gates
+    alerts.telegram to Premium). Same flush caveat as the email cap.
+    """
+    from app.services.tier import effective_limit
+
+    cap = effective_limit(user, "telegram_alerts_per_day")
+    if cap is None:
+        return False
+    await session.flush()
+    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_today = (await session.execute(
+        select(func.count()).select_from(AlertEvent)
+        .where(
+            AlertEvent.user_id == user.id,
+            AlertEvent.channel == "telegram",
+            AlertEvent.delivered.is_(True),
+            AlertEvent.created_at >= day_start,
+        )
+    )).scalar() or 0
+    return bool(sent_today >= cap)
+
+
 async def _fire(
     session: AsyncSession,
     rule: AlertRule,
@@ -568,17 +599,28 @@ async def _fire(
             except Exception:
                 logger.exception("alert.email_failed user=%s rule=%s", user.id, rule.id)
     elif rule.channel == "telegram" and user.telegram_chat_id:
-        try:
-            from app.services.telegram import send_message
-            text = (
-                f"*[Tapeline] {rule.name}*\n\n"
-                f"{message}\n\n"
-                f"_Open: tapeline.io/app/scanner_"
+        if await _telegram_cap_reached(session, user):
+            # Daily telegram-alert cap spent (chiefly the trial throttle of
+            # 100/day). Same posture as the email cap: keep the AlertEvent so
+            # /app/alerts/history shows the rule fired, just skip the send.
+            event.delivered = False
+            event.message = f"[suppressed: daily telegram alert cap reached] {message}"
+            logger.info(
+                "alert.suppressed_telegram_cap user=%s rule=%s tier=%s",
+                user.id, rule.id, user.tier,
             )
-            ok = await send_message(user.telegram_chat_id, text)
-            event.delivered = ok
-        except Exception:
-            logger.exception("alert.telegram_failed user=%s rule=%s", user.id, rule.id)
+        else:
+            try:
+                from app.services.telegram import send_message
+                text = (
+                    f"*[Tapeline] {rule.name}*\n\n"
+                    f"{message}\n\n"
+                    f"_Open: tapeline.io/app/scanner_"
+                )
+                ok = await send_message(user.telegram_chat_id, text)
+                event.delivered = ok
+            except Exception:
+                logger.exception("alert.telegram_failed user=%s rule=%s", user.id, rule.id)
     # SMS + Discord channels were retired 2026-05-04. The dispatch arms
     # were removed but the underlying app.services.{sms,discord}.py service
     # files + DB columns are kept so the channels can be re-enabled later

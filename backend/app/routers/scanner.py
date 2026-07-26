@@ -158,7 +158,13 @@ async def list_scanner(
     if q:
         needle = q.strip().upper()
         if needle:
-            stmt = stmt.where(Ticker.symbol.like(f"%{needle}%"))
+            # Escape LIKE metacharacters so a symbol search stays a literal
+            # substring match. Unescaped, `_` matches any single char (q=B_C
+            # would return BAC) and `%` matches everything (q=% returns the
+            # whole capped result set instead of narrowing). Keep in sync with
+            # the identical guard in routers/export.py.
+            esc = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            stmt = stmt.where(Ticker.symbol.like(f"%{esc}%", escape="\\"))
 
     # Freshness + data-quality floor — exclude stale "ghost" rows AND corrupt
     # rows so the score sort reflects the current, clean universe. Without it,
