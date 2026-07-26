@@ -4,7 +4,7 @@ SaaS quantitative market scanner for retail stock pickers. Lives at `C:\Project 
 
 **Pitch:** "Every other scanner gives you 500 filters and a blank stare. Tapeline gives you one number, one sentence, and a public track record."
 
-**Domain:** `tapeline.io` — **REGISTERED + LIVE** (Cloudflare DNS, Vercel frontend, Fly.io backend at `api.tapeline.io`).
+**Domain:** `tapeline.io` — **REGISTERED + LIVE** (Cloudflare DNS, Fly.io frontend `tapeline-web` serving `tapeline.io`, Fly.io backend at `api.tapeline.io`).
 
 ## Boundary — do not touch
 The personal trading system at `C:\signal-system\` is a separate project. Tapeline does NOT share **files** with it (no imports, no symlinks, no cross-repo dependencies — never edit anything outside `C:\Project 1\`). **Tapeline DOES share data** with it via the signal-system's published Google Sheet ("Live Dashboard - Stocks"). The sheet is the bridge:
@@ -18,14 +18,14 @@ The personal trading system at `C:\signal-system\` is a separate project. Tapeli
 All four other tabs (SPIKE INTELLIGENCE, MARKET INTELLIGENCE, SMART MONEY & CONGRESS, ETF BENCHMARKS) are **already wired and ingesting in prod** (not "Phase 2 future" — that framing is stale). Each has a parser + upsert in `services/sheet_feed.py`, the worker calls all five every tick (`signal_publisher.py`), and all five `*_CSV_URL` secrets are set on Fly (each gated independently by its own URL). `refresh_all_tabs()` + the `/api/internal/sheet-changed` webhook drive the live-push path; per-tab column order is documented in each `parse_*_csv()`. (RUN HEALTH is deliberately not pulled.) **Caveat:** SMART MONEY only boosts `sub_smart_money` by per-ticker appearance count — the individual congress/insider/13F trades are read but NOT stored as structured rows; each tab also keeps only a subset of its columns.
 
 ## Operational facts
-- **Git is live** at https://github.com/cham-p24/tapeline. **Vercel auto-deploys the frontend** on push to `main`. **Backend auto-deploys to Fly.io** via `.github/workflows/deploy-backend.yml` on merge to `main` (ruff + mypy + pytest gate, then `flyctl deploy --remote-only`, which runs the `alembic upgrade head` release command) — but **only once the `FLY_API_TOKEN` repo secret is set** (`fly tokens create deploy -a tapeline-backend`). Until then that workflow runs green but *skips* the deploy, so backend deploys stay manual (`fly deploy` from `C:\Project 1`). Use normal commit/push flow.
+- **Git is live** at https://github.com/cham-p24/tapeline. **The frontend auto-deploys to Fly.io** (app `tapeline-web`, serving `tapeline.io` directly) via `.github/workflows/deploy-frontend.yml` on push to `main` touching `frontend/**` — **Vercel-independent since 2026-06-14** after a Vercel Hobby pause caused a multi-day outage; gated on the `FLY_WEB_API_TOKEN` secret with a post-deploy smoke check (fails hard if the token is missing). Vercel still builds PR previews via its git integration (you'll see a passing Vercel check on PRs), but no longer serves production `tapeline.io` — `frontend/vercel.json` only configures those previews now. **Backend auto-deploys to Fly.io** via `.github/workflows/deploy-backend.yml` on merge to `main` (ruff + mypy + pytest gate, then `flyctl deploy --remote-only`, which runs the `alembic upgrade head` release command) — but **only once the `FLY_API_TOKEN` repo secret is set** (`fly tokens create deploy -a tapeline-backend`). Until then that workflow runs green but *skips* the deploy, so backend deploys stay manual (`fly deploy` from `C:\Project 1`). Use normal commit/push flow.
 - **No Docker required for dev.** Run `.\scripts\run_nodocker.ps1` from project root. Uses SQLite, opens browser to `http://localhost:3000`.
 - **Owner login** (already seeded): `owner@tapeline.io` / `TapelineOwner!2026` — premium tier, admin. Re-seed via `python -m app.scripts.seed_owner` from `backend/` (idempotent; reads `OWNER_EMAIL` / `OWNER_PASSWORD` env vars).
 - **Dev auth bypass:** `Authorization: Bearer dev-bypass` returns a premium token, but the gate (`auth.py:142`) only fires when `settings.app_env == "development"`. Production has `APP_ENV=production` set in `fly.toml`, so the bypass is inert in prod — verified live: `/api/me` with the bypass token returns `authenticated: false` against api.tapeline.io.
 - **Today's date for relative refs:** see system date.
 
 ## Stack
-FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 16 + TypeScript + Tailwind frontend. SQLite dev / Postgres prod (Supabase or Neon). SSE for live updates. Native cookie-JWT auth (built) + Clerk + Google/Microsoft OAuth (env-gated). Stripe billing (env-gated). Resend email (env-gated). Hosting plan: Fly.io backend + Vercel frontend.
+FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 16 + TypeScript + Tailwind frontend. SQLite dev / Postgres prod (Supabase or Neon). SSE for live updates. Native cookie-JWT auth (built) + Clerk + Google/Microsoft OAuth (env-gated). Stripe billing (env-gated). Resend email (env-gated). Hosting: Fly.io backend + Fly.io frontend (both on Fly since the 2026-06-14 Vercel migration).
 
 ## Worker
 Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
@@ -237,7 +237,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `frontend/app/app/inbox/page.tsx` — admin inbox review UI
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
-Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Vercel frontend.
+Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Fly.io frontend.
 
 **Inbox bot go-live secrets** (the bot is shipped but dormant until set):
 - `ANTHROPIC_API_KEY` — Anthropic console; without it every ambiguous message defaults to Tier 1 manual review
