@@ -149,7 +149,7 @@ export function ScannerPreviewTable({ rows, real }: { rows: Row[]; real: boolean
         </div>
         <div className="text-muted">
           {real ? (
-            <>Top {rows.length} of today&rsquo;s Top 10</>
+            <>Top {rows.length}{" "}of today&rsquo;s Top 10</>
           ) : (
             <>Sample rows &mdash; not live data</>
           )}

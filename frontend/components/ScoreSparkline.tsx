@@ -113,7 +113,7 @@ export function ScoreSparkline({ symbol, width = 360, days = 60 }: Props) {
           Score history · last {days}d
         </h3>
         <span className="text-[10px] text-subtle nums">
-          {points.length} top-10 day{points.length === 1 ? "" : "s"}
+          {points.length}{" "}top-10 day{points.length === 1 ? "" : "s"}
         </span>
       </div>
       <svg

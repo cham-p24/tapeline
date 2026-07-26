@@ -57,7 +57,7 @@ export function CompareIndex({ currentSlug }: { currentSlug: string }) {
         Compare Tapeline to another tool
       </h2>
       <p className="mt-2 text-sm text-muted">
-        We&rsquo;ve published side-by-side comparisons against the {COMPARE_INDEX.length} tools
+        We&rsquo;ve published side-by-side comparisons against the {COMPARE_INDEX.length}{" "}tools
         traders most commonly evaluate Tapeline against. Pick yours — each comparison includes
         pricing, scoring methodology, scorecard transparency, and the categories where the
         competitor honestly wins.

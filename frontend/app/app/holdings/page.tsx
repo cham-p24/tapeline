@@ -131,7 +131,7 @@ export default function HoldingsPage() {
         <p className="mt-6 text-xs text-muted">
           Most recent <strong className="text-fg">{rows.length}</strong>{" "}
           {rows.length === 1 ? "filing" : "filings"}
-          {previewDays != null && <> from the last {previewDays} days</>}
+          {previewDays != null && <> from the last {previewDays}{" "}days</>}
           {feedSize > 0 && (
             <>
               {" "}·{" "}

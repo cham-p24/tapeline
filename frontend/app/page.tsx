@@ -281,7 +281,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-10">
             <Link href="/blog" className="link text-sm">
-              See all {POSTS.length} posts &rarr;
+              See all {POSTS.length}{" "}posts &rarr;
             </Link>
           </div>
         </div>
@@ -338,8 +338,8 @@ export default function LandingPage() {
           </Faq>
           <Faq q="What if I cancel?">
             Cancel anytime, one click in billing settings. Monthly plans get a
-            full refund within {REFUND.windowDays} days; annual plans a
-            prorated refund within {REFUND.windowDays} days. See the{" "}
+            full refund within {REFUND.windowDays}{" "}days; annual plans a
+            prorated refund within {REFUND.windowDays}{" "}days. See the{" "}
             <Link href={REFUND.policyPath} className="link">
               refund policy
             </Link>

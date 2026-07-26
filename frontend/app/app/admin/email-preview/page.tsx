@@ -92,7 +92,7 @@ export default function EmailPreviewPage() {
           <p className="eyebrow text-muted">Admin</p>
           <h1 className="mt-1 text-lg font-semibold tracking-tight">Email preview</h1>
           <p className="mt-1 text-xs text-muted">
-            {items.length} renderer{items.length === 1 ? "" : "s"}
+            {items.length}{" "}renderer{items.length === 1 ? "" : "s"}
           </p>
         </div>
         <ul className="space-y-0.5">

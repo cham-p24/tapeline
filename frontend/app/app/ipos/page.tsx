@@ -65,7 +65,7 @@ export default function IPOPage() {
       {/* Search + sector filters (client-side). The status segmented control
           is kept below as a quick toggle. */}
       <FilterBar
-        trailing={<>{filtered.length} listings</>}
+        trailing={<>{filtered.length}{" "}listings</>}
       >
         <SearchBox
           value={search}

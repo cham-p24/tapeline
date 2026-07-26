@@ -592,7 +592,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
                 Add a card before then to lock in {meta.name} access. Otherwise your account moves to Free
-                forever — live scores, top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist.
+                forever — live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
@@ -757,7 +757,7 @@ export default function BillingPage() {
               </div>
               <p className="mt-1.5 text-xs text-muted leading-relaxed">
                 Email support@tapeline.io from your account address within{" "}
-                {REFUND.windowDays} days of your first charge — no form, no
+                {REFUND.windowDays}{" "}days of your first charge — no form, no
                 reason required. We process it within 3 business days and Stripe
                 returns the money to the card or wallet you paid with, usually
                 landing in 3&ndash;10 business days depending on your bank.

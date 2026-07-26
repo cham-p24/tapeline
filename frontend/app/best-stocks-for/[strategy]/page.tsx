@@ -169,7 +169,7 @@ export default async function BestStocksForStrategyPage({
                   })}
                   .
                 </strong>{" "}
-                {rows.length} stocks currently make today&apos;s {s.display} list
+                {rows.length}{" "}stocks currently make today&apos;s {s.display}{" "}list
                 {s.apiParams.min_score ? (
                   <>
                     {" "}
