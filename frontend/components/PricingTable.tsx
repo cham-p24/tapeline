@@ -240,7 +240,7 @@ export function PricingTable() {
           </div>
           <p className="mt-1.5 text-xs text-muted leading-relaxed">
             Email support@tapeline.io from your account address within{" "}
-            {REFUND.windowDays} days of your first charge — there is no form and
+            {REFUND.windowDays}{" "}days of your first charge — there is no form and
             no reason required. We process it within 3 business days, and Stripe
             returns the money to the card or wallet you paid with, which usually
             lands in 3&ndash;10 business days depending on your bank. Annual

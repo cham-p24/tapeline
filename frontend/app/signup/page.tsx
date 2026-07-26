@@ -513,7 +513,7 @@ function SignUpForm() {
                 the real Free-tier caps again (it previously hardcoded all
                 three and had already drifted once). */}
             <p className="mt-1.5">
-              Stay on Free forever (live scores, top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day) — or upgrade to{" "}
+              Stay on Free forever (live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day) — or upgrade to{" "}
               <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span> for the full
               real-time universe with unlimited look-ups. No card on file means no surprise charge.
             </p>

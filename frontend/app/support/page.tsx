@@ -71,10 +71,10 @@ export default function SupportPage() {
             q="My scanner only shows 10 tickers."
             a={
               <>
-                Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows} scanner rows
+                Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
                 by design — it's the same product, just narrower. Sign up gets you a 14-day Premium trial
                 automatically (no card). At trial end, no card on file = back to Free forever (live scores,
-                top-{FREE_LIMITS.scannerRows} scanner, {FREE_LIMITS.dailyLookups} look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist).{" "}
+                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist).{" "}
                 <Link href="/app/billing" className="text-accent hover:underline">Add a card →</Link>
               </>
             }

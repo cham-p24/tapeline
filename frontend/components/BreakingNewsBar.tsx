@@ -101,7 +101,7 @@ export function BreakingNewsBar() {
           Live news
         </span>
         <span className="text-[10px] text-subtle">
-          {items.length} headlines · refreshing every 60s
+          {items.length}{" "}headlines · refreshing every 60s
         </span>
         <Link href="/app/news" className="ml-auto text-[11px] text-muted hover:text-fg">
           view all →

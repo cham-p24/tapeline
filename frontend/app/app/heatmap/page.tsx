@@ -157,7 +157,7 @@ export default function HeatmapPage() {
               Oldest tile: <span className="font-semibold text-fg nums">{oldestMin}m</span> ago
             </span>
             <span className="text-subtle">·</span>
-            <span className="text-muted nums">{freshness.count} tickers shown</span>
+            <span className="text-muted nums">{freshness.count}{" "}tickers shown</span>
           </div>
         );
       })()}

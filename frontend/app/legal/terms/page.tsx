@@ -43,7 +43,7 @@ export default function TermsPage() {
             the Refund & Cancellation Policy — the ground truth. Previously
             said 7 days while every marketing surface promised 30; aligned
             upward to the marketed guarantee. */}
-        <p>Paid plans auto-renew until cancelled. Cancel anytime from your account settings; cancellation takes effect at the end of the current billing period. Within {REFUND.windowDays} days of a monthly plan&apos;s first charge, email <a href="mailto:support@tapeline.io" className="text-accent">support@tapeline.io</a> for a full refund, no questions asked. Annual plans receive a prorated refund within {REFUND.windowDays} days (one month at the monthly rate is retained). Full details in the <Link href={REFUND.policyPath} className="text-accent">Refund &amp; Cancellation Policy</Link>.</p>
+        <p>Paid plans auto-renew until cancelled. Cancel anytime from your account settings; cancellation takes effect at the end of the current billing period. Within {REFUND.windowDays}{" "}days of a monthly plan&apos;s first charge, email <a href="mailto:support@tapeline.io" className="text-accent">support@tapeline.io</a> for a full refund, no questions asked. Annual plans receive a prorated refund within {REFUND.windowDays}{" "}days (one month at the monthly rate is retained). Full details in the <Link href={REFUND.policyPath} className="text-accent">Refund &amp; Cancellation Policy</Link>.</p>
 
         <h2 className="mt-6 text-lg font-semibold text-fg">6. Intellectual property</h2>
         <p>Tapeline owns or licenses all content, code, and trademarks in the service. You receive a limited, non-transferable license to use the service for personal research purposes while your subscription is active.</p>
