@@ -44,7 +44,7 @@ export default function ContactPage() {
           </p>
         </header>
 
-        <section className="rounded-xl border border-border bg-elevated p-6 md:p-8">
+        <section className="rounded-xl bg-elevated p-6 md:p-8">
           <h2 className="text-lg font-semibold mb-1">Send a message</h2>
           <p className="text-sm text-muted mb-6">
             Routed to <code className="text-accent">support@tapeline.io</code>. I&apos;ll reply from there.
@@ -58,7 +58,7 @@ export default function ContactPage() {
             {ADDRESSES.map((a) => (
               <li
                 key={a.email}
-                className="rounded-lg border border-border p-4 bg-bg-soft hover:bg-elevated transition-colors"
+                className="rounded-lg p-4 bg-bg-soft hover:bg-elevated transition-colors"
               >
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">{a.label}</div>
                 <a

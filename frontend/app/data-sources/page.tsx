@@ -154,9 +154,9 @@ export default function DataSourcesPage() {
       </section>
 
       <section className="mx-auto max-w-4xl px-6 pb-16">
-        <ol className="space-y-8">
+        <ol className="divide-y divide-border/60 border-t border-border/60">
           {CATEGORIES.map((c) => (
-            <li key={c.name} className="card p-6">
+            <li key={c.name} className="py-8">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="text-xl font-semibold">{c.name}</h2>
                 {c.publicRecord ? (

@@ -130,7 +130,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
       <script {...jsonLdScript(faqJsonLd(faq))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+      <article className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
         {/* Visible breadcrumb — mirrors the BreadcrumbList JSON-LD */}
         <nav aria-label="Breadcrumb" className="text-xs text-subtle">
           <ol className="flex flex-wrap items-center gap-1.5">
@@ -170,38 +170,38 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
               </p>
             </div>
           ) : (
-            <div className="card overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+                <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                   <tr>
-                    <th className="px-3 py-3 text-left">#</th>
-                    <th className="px-3 py-3 text-left">Ticker</th>
-                    <th className="px-3 py-3 text-left">Name</th>
-                    <th className="px-3 py-3 text-right">Score</th>
-                    <th className="px-3 py-3 text-left">Signal</th>
-                    <th className="px-3 py-3 text-right">Price</th>
-                    <th className="px-3 py-3 text-right">1d</th>
+                    <th className="px-3 py-3 text-left font-medium">#</th>
+                    <th className="px-3 py-3 text-left font-medium">Ticker</th>
+                    <th className="px-3 py-3 text-left font-medium">Name</th>
+                    <th className="px-3 py-3 text-right font-medium">Score</th>
+                    <th className="px-3 py-3 text-left font-medium">Signal</th>
+                    <th className="px-3 py-3 text-right font-medium">Price</th>
+                    <th className="px-3 py-3 text-right font-medium">1d</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tickers.map((t, i) => (
-                    <tr key={t.symbol} className="border-b border-border/30 hover:bg-panel/40">
-                      <td className="px-3 py-3 font-mono text-subtle">{i + 1}</td>
-                      <td className="px-3 py-3 font-mono font-medium">
+                    <tr key={t.symbol} className="border-b border-border/50 hover:bg-panel/40">
+                      <td className="px-3 py-4 font-mono text-subtle">{i + 1}</td>
+                      <td className="px-3 py-4 font-mono font-medium">
                         <Link href={`/t/${t.symbol}`} className="hover:text-accent">
                           {t.symbol}
                         </Link>
                       </td>
-                      <td className="px-3 py-3 text-muted truncate max-w-[18ch]">{t.name}</td>
-                      <td className="px-3 py-3 text-right font-mono nums font-semibold">
+                      <td className="px-3 py-4 text-muted truncate max-w-[18ch]">{t.name}</td>
+                      <td className="px-3 py-4 text-right font-mono nums font-semibold">
                         {t.score != null ? t.score.toFixed(0) : "—"}
                       </td>
-                      <td className="px-3 py-3 text-xs text-muted">{t.signal ?? "—"}</td>
-                      <td className="px-3 py-3 text-right font-mono nums">
+                      <td className="px-3 py-4 text-xs text-muted">{t.signal ?? "—"}</td>
+                      <td className="px-3 py-4 text-right font-mono nums">
                         {t.price != null ? `$${t.price.toFixed(2)}` : "—"}
                       </td>
                       <td
-                        className={`px-3 py-3 text-right font-mono nums ${
+                        className={`px-3 py-4 text-right font-mono nums ${
                           (t.change_pct_1d ?? 0) > 0
                             ? "text-up"
                             : (t.change_pct_1d ?? 0) < 0
@@ -222,7 +222,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
         </section>
 
         {/* Sector-aware methodology context */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <h2 className="text-lg font-semibold">How the {sector.display} ranking works</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             The Tapeline Score is a transparent weighted blend of six named sub-scores:{" "}
@@ -267,7 +267,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
         {/* Sister sectors — internal links spread crawl across the set */}
         <nav
           aria-label="Other sector rankings"
-          className="mt-12 rounded-xl border border-border bg-panel/40 p-6"
+          className="mt-12 border-t border-border/60 pt-8"
         >
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
             Other sector rankings

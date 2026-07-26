@@ -136,7 +136,7 @@ export default async function BestStocksForStrategyPage({
       {itemList ? <script {...jsonLdScript(itemList)} /> : null}
       <MarketingNav />
 
-      <article className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+      <article className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
         <p className="eyebrow">Best stocks · {s.display}</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           {s.h1}
@@ -158,7 +158,7 @@ export default async function BestStocksForStrategyPage({
           const lo = scores.length ? Math.min(...scores) : null;
           const hi = scores.length ? Math.max(...scores) : null;
           return (
-            <div className="mt-6 rounded-xl border border-border bg-panel/40 p-5 text-sm leading-relaxed text-muted">
+            <div className="mt-8 border-t border-border/60 pt-8 text-sm leading-relaxed text-muted">
               <p>
                 <strong className="text-fg">
                   Updated{" "}
@@ -234,38 +234,38 @@ export default async function BestStocksForStrategyPage({
               </p>
             </div>
           ) : (
-            <div className="card overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+                <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                   <tr>
-                    <th className="px-3 py-3 text-left">#</th>
-                    <th className="px-3 py-3 text-left">Ticker</th>
-                    <th className="px-3 py-3 text-left">Name</th>
-                    <th className="px-3 py-3 text-right">Score</th>
-                    <th className="px-3 py-3 text-left">Signal</th>
-                    <th className="px-3 py-3 text-right">Price</th>
-                    <th className="px-3 py-3 text-right">1d</th>
+                    <th className="px-3 py-3 text-left font-medium">#</th>
+                    <th className="px-3 py-3 text-left font-medium">Ticker</th>
+                    <th className="px-3 py-3 text-left font-medium">Name</th>
+                    <th className="px-3 py-3 text-right font-medium">Score</th>
+                    <th className="px-3 py-3 text-left font-medium">Signal</th>
+                    <th className="px-3 py-3 text-right font-medium">Price</th>
+                    <th className="px-3 py-3 text-right font-medium">1d</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((t, i) => (
-                    <tr key={t.symbol} className="border-b border-border/30 hover:bg-panel/40">
-                      <td className="px-3 py-3 font-mono text-subtle">{i + 1}</td>
-                      <td className="px-3 py-3 font-mono font-medium">
+                    <tr key={t.symbol} className="border-b border-border/50">
+                      <td className="px-3 py-4 font-mono text-subtle">{i + 1}</td>
+                      <td className="px-3 py-4 font-mono font-medium">
                         <Link href={`/t/${t.symbol}`} className="hover:text-accent">
                           {t.symbol}
                         </Link>
                       </td>
-                      <td className="px-3 py-3 text-muted truncate max-w-[18ch]">{t.name}</td>
-                      <td className="px-3 py-3 text-right font-mono nums font-semibold">
+                      <td className="px-3 py-4 text-muted truncate max-w-[18ch]">{t.name}</td>
+                      <td className="px-3 py-4 text-right font-mono nums font-semibold">
                         {t.score != null ? t.score.toFixed(0) : "—"}
                       </td>
-                      <td className="px-3 py-3 text-xs text-muted">{t.signal ?? "—"}</td>
-                      <td className="px-3 py-3 text-right font-mono nums">
+                      <td className="px-3 py-4 text-xs text-muted">{t.signal ?? "—"}</td>
+                      <td className="px-3 py-4 text-right font-mono nums">
                         {t.price != null ? `$${t.price.toFixed(2)}` : "—"}
                       </td>
                       <td
-                        className={`px-3 py-3 text-right font-mono nums ${
+                        className={`px-3 py-4 text-right font-mono nums ${
                           (t.change_pct_1d ?? 0) > 0
                             ? "text-up"
                             : (t.change_pct_1d ?? 0) < 0
@@ -294,7 +294,7 @@ export default async function BestStocksForStrategyPage({
         )}
 
         {/* Methodology context — what makes a "best stock for X" per the score */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <h2 className="text-lg font-semibold">How the {s.display} ranking works</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             The Tapeline composite is a transparent weighted blend of six named factors:{" "}
@@ -353,7 +353,7 @@ export default async function BestStocksForStrategyPage({
         {/* Sister strategies — internal links spread crawl across the set */}
         <nav
           aria-label="Other trading-strategy rankings"
-          className="mt-12 rounded-xl border border-border bg-panel/40 p-6"
+          className="mt-12 border-t border-border/60 pt-8"
         >
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
             Other trading-strategy rankings
@@ -378,7 +378,7 @@ export default async function BestStocksForStrategyPage({
             because they sat as siloed templated content. */}
         <nav
           aria-label="Related Tapeline tools"
-          className="mt-6 rounded-xl border border-border bg-panel/40 p-6"
+          className="mt-6 border-t border-border/60 pt-8"
         >
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
             Related Tapeline tools

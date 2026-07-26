@@ -450,7 +450,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       <div className="mt-6 card">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="font-semibold">More on {data.symbol}</h2>
-          <div className="flex gap-1 rounded-md border border-border p-1 text-xs">
+          <div className="flex gap-1 rounded-full bg-fg/5 p-1 text-xs">
             <button
               onClick={() => setDetailTab("financials")}
               className={`rounded px-2.5 py-1 transition-colors ${

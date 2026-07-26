@@ -200,7 +200,7 @@ export default function BestStockScannersPage() {
       <script {...jsonLdScript(faqJsonLd(FAQ))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+      <article className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
         <p className="eyebrow">Buyer's guide</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           10 Best Stock Scanners in 2026
@@ -224,31 +224,31 @@ export default function BestStockScannersPage() {
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance</h2>
-          <div className="mt-4 card overflow-x-auto">
+          <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+              <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                 <tr>
-                  <th className="px-3 py-3 text-left">#</th>
-                  <th className="px-3 py-3 text-left">Tool</th>
-                  <th className="px-3 py-3 text-left">Best for</th>
-                  <th className="px-3 py-3 text-left">Scoring</th>
-                  <th className="px-3 py-3 text-left">Scorecard</th>
-                  <th className="px-3 py-3 text-left">Entry price</th>
+                  <th className="px-3 py-3 text-left font-medium">#</th>
+                  <th className="px-3 py-3 text-left font-medium">Tool</th>
+                  <th className="px-3 py-3 text-left font-medium">Best for</th>
+                  <th className="px-3 py-3 text-left font-medium">Scoring</th>
+                  <th className="px-3 py-3 text-left font-medium">Scorecard</th>
+                  <th className="px-3 py-3 text-left font-medium">Entry price</th>
                 </tr>
               </thead>
               <tbody>
                 {TOOLS.map((t) => (
-                  <tr key={t.name} className="border-b border-border/30">
-                    <td className="px-3 py-3 font-mono text-subtle">{t.rank}</td>
-                    <td className="px-3 py-3 font-medium">
+                  <tr key={t.name} className="border-b border-border/50">
+                    <td className="px-3 py-4 font-mono text-subtle">{t.rank}</td>
+                    <td className="px-3 py-4 font-medium">
                       <a href={`#${t.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="hover:text-accent">
                         {t.name}
                       </a>
                     </td>
-                    <td className="px-3 py-3 text-muted">{t.bestFor}</td>
-                    <td className={`px-3 py-3 ${transparencyChip(t.scoring)}`}>{t.scoring}</td>
-                    <td className={`px-3 py-3 ${scorecardChip(t.scorecard)}`}>{t.scorecard}</td>
-                    <td className="px-3 py-3 text-muted nums whitespace-nowrap">
+                    <td className="px-3 py-4 text-muted">{t.bestFor}</td>
+                    <td className={`px-3 py-4 ${transparencyChip(t.scoring)}`}>{t.scoring}</td>
+                    <td className={`px-3 py-4 ${scorecardChip(t.scorecard)}`}>{t.scorecard}</td>
+                    <td className="px-3 py-4 text-muted nums whitespace-nowrap">
                       {t.price.split("·")[0].trim()}
                     </td>
                   </tr>
@@ -287,7 +287,7 @@ export default function BestStockScannersPage() {
           </section>
         ))}
 
-        <section className="mt-16 rounded-2xl border border-border bg-panel/40 p-6 sm:p-8">
+        <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we ranked them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Five weighted criteria: <strong>transparency of methodology</strong> (does the formula
@@ -306,7 +306,7 @@ export default function BestStockScannersPage() {
         {/* Mid-page email capture — lower-commitment step for a visitor who's
             read the ranking but isn't ready to start an account. Same
             conversion bucket as signup in GA4 via method='newsletter'. */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <NewsletterCapture source="blog" heading="" sub="" />
         </section>
 

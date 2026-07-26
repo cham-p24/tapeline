@@ -656,12 +656,9 @@ export default function BestFinvizAlternativesPage() {
           <p className="mt-2 text-sm text-muted">
             Skip the table — match your job-to-be-done to the recommended tool.
           </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="mt-5 divide-y divide-border/60 border-t border-border/60">
             {QUICK_PICKS.map((q) => (
-              <div
-                key={q.intent}
-                className="rounded-lg border border-border/60 bg-panel/40 p-4"
-              >
+              <div key={q.intent} className="py-5">
                 <p className="text-sm text-fg leading-relaxed">
                   <span className="text-muted">If you want:</span> {q.intent}
                 </p>
@@ -695,9 +692,9 @@ export default function BestFinvizAlternativesPage() {
             Finviz Elite remains an excellent tool. The reasons users search for an alternative
             are usually one of these five — be honest about which one matches your situation.
           </p>
-          <div className="mt-6 space-y-5">
+          <div className="mt-6 divide-y divide-border/60 border-t border-border/60">
             {WHY_LOOK_BEYOND.map((w, i) => (
-              <div key={w.title} className="rounded-lg border border-border/60 bg-panel/30 p-5">
+              <div key={w.title} className="py-5">
                 <h3 className="text-base font-semibold">
                   <span className="text-muted font-mono mr-2">{i + 1}.</span>
                   {w.title}
@@ -719,24 +716,24 @@ export default function BestFinvizAlternativesPage() {
             half = limited; dash = not supported. Methodology behind each cell
             is in the per-tool sections below.
           </p>
-          <div className="mt-5 card overflow-x-auto">
+          <div className="mt-5 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+              <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                 <tr>
-                  <th className="px-3 py-3 text-left sticky left-0 bg-panel">Tool</th>
-                  <th className="px-3 py-3 text-center" title="Single 0-100 score per ticker">Composite score</th>
-                  <th className="px-3 py-3 text-center" title="Per-pick public track record">Scorecard</th>
-                  <th className="px-3 py-3 text-center" title="Sub-minute refresh during market hours">Intraday</th>
-                  <th className="px-3 py-3 text-center">Charting</th>
-                  <th className="px-3 py-3 text-center">Fundamentals</th>
-                  <th className="px-3 py-3 text-center" title="AI/ML-driven signals">AI signals</th>
-                  <th className="px-3 py-3 text-center">Free tier</th>
-                  <th className="px-3 py-3 text-center">Mobile</th>
+                  <th className="px-3 py-3 text-left font-medium sticky left-0 bg-background">Tool</th>
+                  <th className="px-3 py-3 text-center font-medium" title="Single 0-100 score per ticker">Composite score</th>
+                  <th className="px-3 py-3 text-center font-medium" title="Per-pick public track record">Scorecard</th>
+                  <th className="px-3 py-3 text-center font-medium" title="Sub-minute refresh during market hours">Intraday</th>
+                  <th className="px-3 py-3 text-center font-medium">Charting</th>
+                  <th className="px-3 py-3 text-center font-medium">Fundamentals</th>
+                  <th className="px-3 py-3 text-center font-medium" title="AI/ML-driven signals">AI signals</th>
+                  <th className="px-3 py-3 text-center font-medium">Free tier</th>
+                  <th className="px-3 py-3 text-center font-medium">Mobile</th>
                 </tr>
               </thead>
               <tbody>
                 {TOOLS.map((t) => (
-                  <tr key={t.name} className="border-b border-border/30 hover:bg-panel/40">
+                  <tr key={t.name} className="border-b border-border/60">
                     <td className="px-3 py-3 font-medium sticky left-0 bg-background">
                       <a
                         href={`#${t.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
@@ -764,20 +761,20 @@ export default function BestFinvizAlternativesPage() {
         {/* Summary table — at-a-glance recap */}
         <section className="mt-14">
           <h2 className="text-xl font-semibold">At a glance: tools, prices, ratings</h2>
-          <div className="mt-4 card overflow-x-auto">
+          <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+              <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                 <tr>
-                  <th className="px-3 py-3 text-left">#</th>
-                  <th className="px-3 py-3 text-left">Tool</th>
-                  <th className="px-3 py-3 text-left">Best for</th>
-                  <th className="px-3 py-3 text-left">Entry price</th>
-                  <th className="px-3 py-3 text-center">Rating</th>
+                  <th className="px-3 py-3 text-left font-medium">#</th>
+                  <th className="px-3 py-3 text-left font-medium">Tool</th>
+                  <th className="px-3 py-3 text-left font-medium">Best for</th>
+                  <th className="px-3 py-3 text-left font-medium">Entry price</th>
+                  <th className="px-3 py-3 text-center font-medium">Rating</th>
                 </tr>
               </thead>
               <tbody>
                 {TOOLS.map((t) => (
-                  <tr key={t.name} className="border-b border-border/30">
+                  <tr key={t.name} className="border-b border-border/60">
                     <td className="px-3 py-3 font-mono text-subtle">{t.rank}</td>
                     <td className="px-3 py-3 font-medium">
                       <a
@@ -870,12 +867,12 @@ export default function BestFinvizAlternativesPage() {
             checklist we recommend — same checklist whether you&apos;re moving to Tapeline or any
             other alternative on this list. Don&apos;t cancel Finviz on day one.
           </p>
-          <ol className="mt-6 space-y-5">
+          <ol className="mt-6 divide-y divide-border/60 border-t border-border/60">
             {MIGRATION_STEPS.map((s, i) => (
               <li
                 key={s.name}
                 id={`migration-step-${i + 1}`}
-                className="rounded-lg border border-border/60 bg-panel/30 p-5 scroll-mt-20"
+                className="py-5 scroll-mt-20"
               >
                 <div className="flex items-baseline gap-3">
                   <span className="font-mono text-xs text-accent">Step {i + 1}</span>
@@ -888,7 +885,7 @@ export default function BestFinvizAlternativesPage() {
         </section>
 
         {/* Methodology */}
-        <section className="mt-16 rounded-2xl border border-border bg-panel/40 p-6 sm:p-8">
+        <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we ranked them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Five weighted criteria: <strong>transparency</strong> of methodology (does the formula

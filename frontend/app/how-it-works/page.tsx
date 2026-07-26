@@ -104,7 +104,7 @@ export default function HowItWorksPage() {
               <Link
                 key={f.name}
                 href={`/how-it-works/${f.slug}`}
-                className="group flex items-start gap-6 rounded-xl border border-border bg-panel p-6 transition-colors hover:border-accent/40"
+                className="group flex items-start gap-6 rounded-xl bg-panel p-6 transition-colors hover:border-accent/40"
               >
                 <div className="font-mono text-[0.7rem] font-semibold uppercase tracking-wider text-accent w-24 pt-1">{f.emphasis}</div>
                 <div className="flex-1">
@@ -125,7 +125,7 @@ export default function HowItWorksPage() {
             of sight.
           </p>
 
-          <div className="mt-8 rounded-xl border border-border bg-panel p-6">
+          <div className="mt-8 border-t border-border/60 pt-8">
             <p className="text-xs uppercase tracking-wider text-subtle">How the blend is weighted</p>
             <p className="mt-3 text-sm text-muted leading-relaxed">
               The composite leans most heavily on <strong>Trend</strong> and <strong>Relative
@@ -142,7 +142,7 @@ export default function HowItWorksPage() {
           </div>
 
           {/* Confidence band — explains the per-ticker confidence column */}
-          <div className="mt-6 rounded-xl border border-border bg-panel p-6">
+          <div className="mt-6 border-t border-border/60 pt-8">
             <p className="text-xs uppercase tracking-wider text-subtle">Per-ticker confidence</p>
             <h3 className="mt-2 text-lg font-semibold">Not every signal has the same evidence behind it.</h3>
             <p className="mt-3 text-sm text-muted leading-relaxed">
@@ -150,20 +150,20 @@ export default function HowItWorksPage() {
               data feeds returned data for that ticker — not every ETF has a P/E, not every
               stock has recent insider filings, not every name has analyst coverage.
             </p>
-            <div className="mt-4 grid gap-2 text-sm">
-              <div className="flex justify-between border-b border-border/30 py-2">
+            <div className="mt-4 divide-y divide-border/60 text-sm">
+              <div className="flex justify-between py-2">
                 <span className="text-up font-medium">95%+</span>
                 <span className="text-muted">Full data on every signal feature — strongest evidence</span>
               </div>
-              <div className="flex justify-between border-b border-border/30 py-2">
+              <div className="flex justify-between py-2">
                 <span className="text-up font-medium">80–95%</span>
                 <span className="text-muted">Most features present, missing 1–3 minor data points</span>
               </div>
-              <div className="flex justify-between border-b border-border/30 py-2">
+              <div className="flex justify-between py-2">
                 <span className="font-medium">60–80%</span>
                 <span className="text-muted">Core scoring data + most fundamentals — typical liquid stock</span>
               </div>
-              <div className="flex justify-between border-b border-border/30 py-2">
+              <div className="flex justify-between py-2">
                 <span className="text-warn font-medium">40–60%</span>
                 <span className="text-muted">Only basic price/trend data — caution</span>
               </div>
@@ -234,7 +234,7 @@ export default function HowItWorksPage() {
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <Link
               href="/limitations"
-              className="lift group rounded-xl border border-border bg-panel p-5 hover:border-accent/40"
+              className="lift group rounded-xl bg-panel p-5 hover:border-accent/40"
             >
               <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Limitations</h3>
               <p className="mt-1.5 text-xs text-muted leading-relaxed">
@@ -244,7 +244,7 @@ export default function HowItWorksPage() {
             </Link>
             <Link
               href="/scorecard"
-              className="lift group rounded-xl border border-border bg-panel p-5 hover:border-accent/40"
+              className="lift group rounded-xl bg-panel p-5 hover:border-accent/40"
             >
               <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Public scorecard</h3>
               <p className="mt-1.5 text-xs text-muted leading-relaxed">
@@ -254,7 +254,7 @@ export default function HowItWorksPage() {
             </Link>
             <Link
               href="/why"
-              className="lift group rounded-xl border border-border bg-panel p-5 hover:border-accent/40"
+              className="lift group rounded-xl bg-panel p-5 hover:border-accent/40"
             >
               <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Why it works this way</h3>
               <p className="mt-1.5 text-xs text-muted leading-relaxed">

@@ -496,12 +496,12 @@ export default function BillingPage() {
       {/* ── Hero: current plan + next charge + trial countdown ────────────── */}
       <section className="grid gap-4 md:grid-cols-5">
         {/* Plan summary — spans 3 of 5 cols */}
-        <div className={`md:col-span-3 relative overflow-hidden rounded-2xl border p-6 ${
+        <div className={`md:col-span-3 relative overflow-hidden rounded-2xl p-6 ${
           tier === "premium"
-            ? "border-accent/40 bg-gradient-to-br from-accent/15 via-panel to-panel"
+            ? "border border-accent/40 bg-gradient-to-br from-accent/15 via-panel to-panel"
             : tier === "pro"
-            ? "border-fg/30 bg-gradient-to-br from-fg/8 via-panel to-panel"
-            : "border-border bg-panel"
+            ? "border border-fg/30 bg-gradient-to-br from-fg/8 via-panel to-panel"
+            : "bg-panel"
         }`}>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -562,7 +562,7 @@ export default function BillingPage() {
         </div>
 
         {/* Next charge / trial preview — spans 2 of 5 cols */}
-        <div className="md:col-span-2 rounded-2xl border border-border bg-panel p-6">
+        <div className="md:col-span-2 rounded-2xl bg-panel p-6">
           <div className="text-[11px] uppercase tracking-wider text-muted">
             {isCardlessTrial
               ? "When the trial ends"
@@ -751,7 +751,7 @@ export default function BillingPage() {
               procedure and the timing, not a seal. Numbers come from the
               REFUND constant (single-sourced from /legal/refund). */}
           {billingPeriod === "annual" && (
-            <div className="mx-auto max-w-2xl rounded-lg border border-border bg-panel/60 px-5 py-4">
+            <div className="mx-auto max-w-2xl rounded-lg bg-panel/60 px-5 py-4">
               <div className="text-xs font-medium text-fg">
                 How the {REFUND.short.toLowerCase()} actually works
               </div>
@@ -804,7 +804,7 @@ export default function BillingPage() {
 
       {/* ── Why Tapeline (sales reinforcement only on the change-plan view) ─ */}
       {showPlans && tier !== "premium" && (
-        <section className="rounded-2xl border border-border bg-panel/30 p-6">
+        <section className="border-t border-border/60 pt-8">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Why people pay</h2>
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
@@ -878,7 +878,7 @@ function UsageTile({
 }) {
   const display = unlimited ? "∞" : limit === 0 ? "—" : limit.toLocaleString();
   return (
-    <div className="rounded-xl border border-border bg-panel p-4">
+    <div>
       <div className="text-[11px] uppercase tracking-wider text-subtle">{label}</div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
         <span className="text-2xl font-bold nums">{display}</span>

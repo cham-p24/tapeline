@@ -160,9 +160,9 @@ export default function LimitationsPage() {
       </section>
 
       <section className="section pb-8">
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className="mx-auto max-w-3xl divide-y divide-border/60 border-t border-border/60">
           {SECTIONS.map((s) => (
-            <div key={s.heading} className="rounded-xl border border-border bg-panel p-6 sm:p-8">
+            <div key={s.heading} className="py-8 sm:py-10">
               <h2 className="text-xl font-semibold sm:text-2xl">{s.heading}</h2>
               <p className="mt-2 text-sm text-muted leading-relaxed">{s.lede}</p>
               <ul className="mt-5 space-y-3">
@@ -201,7 +201,7 @@ export default function LimitationsPage() {
       </section>
 
       <section className="section py-8">
-        <div className="mx-auto max-w-3xl rounded-xl border border-border bg-panel p-6 sm:p-8">
+        <div className="mx-auto max-w-3xl border-t border-border/60 pt-8">
           <h2 className="text-lg font-semibold">Where the per-factor limits live</h2>
           <p className="mt-2 text-sm text-muted leading-relaxed">
             Each factor carries its own weaknesses on its own page, stated next

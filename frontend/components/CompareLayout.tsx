@@ -236,7 +236,7 @@ export function CompareLayout({
           decided yet but will read a daily Top 10 email. Lower commitment
           than /signup; same conversion bucket via method='newsletter'. */}
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-6">
-        <div className="rounded-xl border border-border bg-panel/40 p-6">
+        <div className="border-t border-border/60 pt-8">
           <NewsletterCapture source="compare" heading="" sub="" />
         </div>
       </section>

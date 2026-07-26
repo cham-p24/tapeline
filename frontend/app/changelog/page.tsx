@@ -320,11 +320,11 @@ export default function ChangelogPage() {
           changes with it and the change is logged here.
         </p>
 
-        <ol className="mt-8 space-y-6">
+        <ol className="mt-8 divide-y divide-border/60 border-t border-border/60">
           {METHODOLOGY_LOG.map((e) => (
             <li
               key={`${e.date}-${e.title}`}
-              className="rounded-xl border border-border bg-panel p-5 sm:p-6"
+              className="py-6"
             >
               <div className="flex flex-wrap items-center gap-3">
                 <span className="nums font-mono text-xs text-muted">{e.date}</span>

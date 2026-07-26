@@ -132,7 +132,7 @@ export default function BestFreeStockScreenerPage() {
       <script {...jsonLdScript(faqJsonLd(FAQ))} />
       <MarketingNav />
 
-      <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
+      <article className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
         <p className="eyebrow">Buyer's guide</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Best Free Stock Screener in 2026
@@ -158,21 +158,21 @@ export default function BestFreeStockScreenerPage() {
             Features only. We compare free-tier depth, methodology transparency, and track record —
             never claimed returns.
           </p>
-          <div className="mt-4 card overflow-x-auto">
+          <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-panel text-xs uppercase text-muted">
+              <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                 <tr>
-                  <th className="px-3 py-3 text-left">Screener</th>
-                  <th className="px-3 py-3 text-left">Free tier</th>
-                  <th className="px-3 py-3 text-center">Public methodology</th>
-                  <th className="px-3 py-3 text-center">Track record</th>
-                  <th className="px-3 py-3 text-center">No card</th>
+                  <th className="px-3 py-3 text-left font-medium">Screener</th>
+                  <th className="px-3 py-3 text-left font-medium">Free tier</th>
+                  <th className="px-3 py-3 text-center font-medium">Public methodology</th>
+                  <th className="px-3 py-3 text-center font-medium">Track record</th>
+                  <th className="px-3 py-3 text-center font-medium">No card</th>
                 </tr>
               </thead>
               <tbody>
                 {SCREENERS.map((s) => (
-                  <tr key={s.name} className="border-b border-border/30">
-                    <td className="px-3 py-3 font-medium">
+                  <tr key={s.name} className="border-b border-border/50">
+                    <td className="px-3 py-4 font-medium">
                       <a
                         href={`#${s.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                         className="hover:text-accent"
@@ -180,14 +180,14 @@ export default function BestFreeStockScreenerPage() {
                         {s.name}
                       </a>
                     </td>
-                    <td className="px-3 py-3 text-muted">{s.freePlan}</td>
-                    <td className={`px-3 py-3 text-center ${formulaChip(s.publicFormula)}`}>
+                    <td className="px-3 py-4 text-muted">{s.freePlan}</td>
+                    <td className={`px-3 py-4 text-center ${formulaChip(s.publicFormula)}`}>
                       {s.publicFormula}
                     </td>
-                    <td className={`px-3 py-3 text-center ${trackChip(s.trackRecord)}`}>
+                    <td className={`px-3 py-4 text-center ${trackChip(s.trackRecord)}`}>
                       {s.trackRecord}
                     </td>
-                    <td className={`px-3 py-3 text-center ${cardChip(s.noCard)}`}>{s.noCard}</td>
+                    <td className={`px-3 py-4 text-center ${cardChip(s.noCard)}`}>{s.noCard}</td>
                   </tr>
                 ))}
               </tbody>
@@ -221,7 +221,7 @@ export default function BestFreeStockScreenerPage() {
           </section>
         ))}
 
-        <section className="mt-16 rounded-2xl border border-border bg-panel/40 p-6 sm:p-8">
+        <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we compared them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Four feature criteria, no performance criteria: is there a{" "}
@@ -243,7 +243,7 @@ export default function BestFreeStockScreenerPage() {
 
         {/* Mid-page email capture — lower-commitment step for a reader who's
             seen the comparison but isn't ready to open an account. */}
-        <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
+        <section className="mt-12 border-t border-border/60 pt-8">
           <NewsletterCapture source="blog" heading="" sub="" />
         </section>
 

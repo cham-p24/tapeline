@@ -200,7 +200,7 @@ export default function DevelopersPage() {
         </section>
 
         {/* Quota + access */}
-        <section className="mt-12 rounded-2xl border border-border bg-panel/40 p-6 sm:p-8">
+        <section className="mt-12 rounded-2xl bg-panel/40 p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight">Access &amp; quota</h2>
           <ul className="mt-4 space-y-2 text-sm text-muted">
             <li>
