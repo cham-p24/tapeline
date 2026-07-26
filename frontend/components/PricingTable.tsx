@@ -123,12 +123,12 @@ export function PricingTable() {
           return (
             <div
               key={p.name}
-              className={`relative rounded-2xl border p-6 sm:p-8 transition-all ${
+              className={`relative rounded-2xl p-6 sm:p-8 transition-all ${
                 p.highlight
-                  ? "border-accent/60 bg-gradient-to-b from-accent/10 via-panel to-panel shadow-lg shadow-accent/20"
+                  ? "border border-accent/60 bg-gradient-to-b from-accent/10 via-panel to-panel shadow-lg shadow-accent/20"
                   : isPower
-                  ? "border-border2 bg-gradient-to-b from-panel2/60 via-panel to-panel"
-                  : "border-border bg-panel"
+                  ? "bg-gradient-to-b from-panel2/60 via-panel to-panel shadow-md"
+                  : "bg-panel shadow-sm"
               }`}
             >
               {p.highlight && p.badge && (
@@ -161,7 +161,7 @@ export function PricingTable() {
                   bullets so the upgrade reason is the additions, not "look
                   here's a duplicate of the Pro list". */}
               {isPower && (
-                <div className="mt-6 flex items-center gap-2 rounded-md border border-border bg-panel2/40 px-3 py-2 text-xs text-muted">
+                <div className="mt-6 flex items-center gap-2 rounded-md bg-panel2/40 px-3 py-2 text-xs text-muted">
                   <svg className="h-3.5 w-3.5 text-up flex-shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -202,7 +202,7 @@ export function PricingTable() {
           because "no card required" only reassures if the reader can tell it
           means "we cannot charge you". No urgency, no deadline, no scarcity. */}
       <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-border bg-panel/60 px-4 py-3">
+        <div className="rounded-lg bg-panel/60 px-4 py-3">
           <div className="text-xs font-medium text-fg">14 days of Premium, no card</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
             Signup asks for an email and a password — no card fields. Nothing to
@@ -210,7 +210,7 @@ export function PricingTable() {
             Free on its own unless you choose to add a card.
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-panel/60 px-4 py-3">
+        <div className="rounded-lg bg-panel/60 px-4 py-3">
           <div className="text-xs font-medium text-fg">Cancel in one click</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
             One button on your billing page. No survey to complete, no email to
@@ -234,7 +234,7 @@ export function PricingTable() {
           (itself single-sourced from /legal/refund) so the window can never
           drift from the policy it summarises. */}
       {billing === "annual" && (
-        <div className="mx-auto mt-6 max-w-2xl rounded-lg border border-border bg-panel/60 px-5 py-4">
+        <div className="mx-auto mt-6 max-w-2xl rounded-lg bg-panel/60 px-5 py-4">
           <div className="text-xs font-medium text-fg">
             How the {REFUND.short.toLowerCase()} actually works
           </div>
