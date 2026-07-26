@@ -3327,6 +3327,8 @@ async def run_re_engagement_drip(
         ):
             tokens.add(RE_SUNSET_TOKEN)
             user.drip_state = ",".join(sorted(tokens))
+            # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+            await session.commit()
             counts["re_sunset"] += 1
             any_change = True
             continue
@@ -3354,6 +3356,8 @@ async def run_re_engagement_drip(
                 if not res.get("skipped", False):
                     tokens.add(RE_TOUCH2_TOKEN)
                     user.drip_state = ",".join(sorted(tokens))
+                    # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                    await session.commit()
                     counts["re24"] += 1
                     any_change = True
                     if governor is not None:
@@ -3386,6 +3390,8 @@ async def run_re_engagement_drip(
                 if not res.get("skipped", False):
                     tokens.add(RE_TOUCH1_TOKEN)
                     user.drip_state = ",".join(sorted(tokens))
+                    # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                    await session.commit()
                     counts["re14"] += 1
                     any_change = True
                     if governor is not None:
@@ -3503,6 +3509,8 @@ async def run_winback_drip(
             if not res.get("skipped", False):
                 sent_tokens.add(stage)
                 user.winback_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
                 counts[stage] += 1
                 any_sent = True
                 if governor is not None:
@@ -3637,6 +3645,8 @@ async def run_activation_drip(
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
                     user.drip_state = ",".join(sorted(sent_tokens))
+                    # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                    await session.commit()
                     counts[token] += 1
                     any_sent = True
                     if governor is not None:
@@ -3769,6 +3779,8 @@ async def run_activation_nudge_drip(
                 if not res.get("skipped", False):
                     sent_tokens.add(token)
                     user.drip_state = ",".join(sorted(sent_tokens))
+                    # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                    await session.commit()
                     counts[token] += 1
                     any_sent = True
                     if governor is not None:
@@ -3870,6 +3882,8 @@ async def run_annual_nudge_drip(
             if not res.get("skipped", False):
                 sent_tokens.add("annual_p")
                 user.drip_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
                 counts["annual_p"] += 1
                 any_sent = True
                 handled.add(user.id)
@@ -4058,6 +4072,8 @@ async def run_annual_renewal_reminder_drip(
                 }
                 sent_tokens.add(token)
                 user.drip_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
                 counts["renewal_reminder"] += 1
                 any_sent = True
                 handled.add(user.id)
@@ -4140,6 +4156,8 @@ async def run_founder_touch_drip(
             )
             if not res.get("skipped", False):
                 user.founder_touch_sent_at = now
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
                 counts["founder_touch"] += 1
                 any_sent = True
                 if governor is not None:
@@ -4224,6 +4242,8 @@ async def run_referral_milestone_drip(
             if not res.get("skipped", False):
                 sent_tokens.add(token)
                 user.drip_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
                 counts[token] += 1
                 any_sent = True
                 if governor is not None:
@@ -4319,6 +4339,8 @@ async def run_checkout_abandonment_recovery(
             if not res.get("skipped", False):
                 sent_tokens.add("abandon1")
                 user.drip_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
                 counts["abandon1"] += 1
                 any_sent = True
                 if governor is not None:
