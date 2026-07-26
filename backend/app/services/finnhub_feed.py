@@ -522,11 +522,15 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
     cache_key = f"fund_{sym}"
     cached = _load_cache(cache_key, CACHE_TTL_FUNDAMENTALS_HOURS)
     if cached is not None:
-        # Defensive: prior versions of this function (pre-2026-05-16) cached an
-        # all-null dict for ETFs because the explicit all-None check below
-        # wasn't here. Treat any cached value where every field is None as
-        # "no coverage" so the bug doesn't haunt us until the 7-day TTL clears.
-        if isinstance(cached, dict) and cached and all(v is None for v in cached.values()):
+        # `{}` is the cached "no coverage" sentinel (mirrors fetch_company_profile
+        # below). It must be a NON-None value or _load_cache can't distinguish a
+        # cached negative from a genuine miss — caching None here made the 7-day
+        # negative cache dead code, so every ETF/ADR re-polled Finnhub on every
+        # call. Also treat a legacy all-None dict (pre-2026-05-16 rows) as no
+        # coverage until its TTL clears.
+        if not cached or (
+            isinstance(cached, dict) and all(v is None for v in cached.values())
+        ):
             return None
         return cached
 
@@ -543,7 +547,7 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
     metric = data.get("metric") or {}
     if not metric:
         # ETFs / funds typically return empty here — that's fine, caller falls back
-        _save_cache(cache_key, None)  # cache the negative so we don't re-poll
+        _save_cache(cache_key, {})  # {} sentinel so the cached negative is honoured
         return None
 
     out = {
@@ -561,7 +565,7 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
     # dashes — exactly what the user reported on /app/ticker/BBP. Treat
     # all-null as no coverage.
     if all(v is None for v in out.values()):
-        _save_cache(cache_key, None)
+        _save_cache(cache_key, {})  # {} sentinel (not None) so it caches
         return None
     _save_cache(cache_key, out)
     return out
