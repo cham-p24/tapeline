@@ -144,7 +144,11 @@ async def export_scanner_csv(
     if q:
         needle = q.strip().upper()
         if needle:
-            stmt = stmt.where(Ticker.symbol.like(f"%{needle}%"))
+            # Escape LIKE metacharacters — see the matching note in
+            # routers/scanner.py. Without this, `_`/`%` in `q` return wrong rows
+            # and the CSV export drifts out of sync with the on-screen scanner.
+            esc = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            stmt = stmt.where(Ticker.symbol.like(f"%{esc}%", escape="\\"))
 
     # Same freshness + data-quality floor as the scanner — the export must
     # never contain ghost/corrupt rows the in-app view hides.

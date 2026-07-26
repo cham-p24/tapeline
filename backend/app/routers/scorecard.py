@@ -158,12 +158,23 @@ async def get_scorecard(
             "alpha_vs_spy": e.alpha_vs_spy,
         })
 
-    # Aggregate stats across all scored entries, with outlier filtering and
-    # median alongside mean. See `_summary_stats` + `_is_outlier` docstrings.
-    # Computed BEFORE the delay filter so the public trust signal stays the
-    # same regardless of viewer tier.
-    scored = [e for e in entries if e.alpha_vs_spy is not None]
-    summary = {"days_tracked": len(dates), **_summary_stats(scored)}
+    # Aggregate stats across ALL back-checked history — NOT the `days` display
+    # window above. The docstring promises the summary "always reflect[s] ALL
+    # back-checked data", the JSON-LD Dataset markup and marketing lean on it,
+    # and the CSV/JSON export computes it over the full archive; deriving it
+    # from the windowed `entries` instead understated days_tracked (30 instead
+    # of the true total) and let the hit-rate / alpha swing with whatever
+    # display range the caller passed. Outlier filtering + median live in
+    # `_summary_stats`; the delay filter below is applied only to `by_date`, so
+    # the headline stays tier-invariant.
+    all_scored_result = await session.execute(
+        select(DailyScorecardEntry).where(DailyScorecardEntry.alpha_vs_spy.is_not(None))
+    )
+    all_scored = list(all_scored_result.scalars().all())
+    total_days = (await session.execute(
+        select(func.count(func.distinct(DailyScorecardEntry.as_of)))
+    )).scalar() or 0
+    summary = {"days_tracked": int(total_days), **_summary_stats(all_scored)}
 
     # Non-paying viewers see picks delayed N days. Filter `by_date` after the
     # summary is built so the headline stats are tier-invariant.

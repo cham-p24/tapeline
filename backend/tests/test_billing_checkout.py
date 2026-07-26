@@ -295,3 +295,90 @@ async def test_charge_disclosure_degrades_silently_without_stripe(monkeypatch):
     assert out["currency"] is None
     assert out["tax_added"] is None
     assert out["source"] == "unavailable"
+
+
+# ── Month-denominated coupons on ANNUAL checkouts ───────────────────────────
+#
+# A repeating N-month coupon is only correct on a monthly price. Stripe applies
+# a repeating coupon's full percent_off to every invoice inside its month
+# window and never prorates within one invoice — so on an annual price, whose
+# single yearly invoice lands at t=0 inside any N>=1 window, a 1-month 100%-off
+# referral credit zeroes the whole $199/yr sub (a free year for a ~$16 credit)
+# and the win-back takes 40% off the entire year. The fix values the discount
+# in currency and applies it `once`.
+
+async def _capture_referral_coupon(monkeypatch, *, billing_period, **overrides):
+    from app.services import billing
+
+    monkeypatch.setattr(
+        billing.settings, "stripe_price_premium_annual", "price_prem_annual", raising=False)
+    monkeypatch.setattr(
+        billing.settings, "stripe_price_premium_monthly", "price_prem_monthly", raising=False)
+
+    coupons: list[dict] = []
+    monkeypatch.setattr(
+        billing.stripe.Coupon, "create",
+        lambda **kw: (coupons.append(kw), SimpleNamespace(id="co_test"))[1])
+    monkeypatch.setattr(
+        billing.stripe.Price, "retrieve",
+        lambda price_id, **k: SimpleNamespace(unit_amount=1999, currency="usd"))
+    monkeypatch.setattr(
+        billing.stripe.checkout.Session, "create",
+        lambda **kw: SimpleNamespace(url="https://checkout.stripe.com/c/pay/cs"))
+
+    params = {
+        "user_id": "u", "user_email": "x@example.com", "tier": "premium",
+        "billing_period": billing_period,
+        "success_url": "https://x/s", "cancel_url": "https://x/c",
+    }
+    params.update(overrides)
+    await billing.create_checkout_session(**params)
+    assert len(coupons) == 1
+    return coupons[0]
+
+
+async def test_annual_referral_credit_is_bounded_once_coupon(monkeypatch):
+    """1-month referral credit on annual → amount_off of one month, applied
+    once — NEVER percent_off=100 repeating (that free-years the whole sub)."""
+    c = await _capture_referral_coupon(monkeypatch, billing_period="annual",
+                                       referral_credit_months=1)
+    assert c["duration"] == "once", "an annual coupon must not span the year"
+    assert c["amount_off"] == 1999, "1 month credit == one month at the monthly rate"
+    assert c["currency"] == "usd"
+    assert "percent_off" not in c, "percent_off on the annual invoice is the exploit"
+
+
+async def test_annual_referral_credit_scales_with_months(monkeypatch):
+    """N months → N × the monthly amount off, still bounded and once."""
+    c = await _capture_referral_coupon(monkeypatch, billing_period="annual",
+                                       referral_credit_months=3)
+    assert c["amount_off"] == 3 * 1999
+    assert c["duration"] == "once"
+
+
+async def test_monthly_referral_credit_unchanged(monkeypatch):
+    """The monthly path is correct as-is and must stay a repeating 100%-off."""
+    c = await _capture_referral_coupon(monkeypatch, billing_period="monthly",
+                                       referral_credit_months=2)
+    assert c["percent_off"] == 100
+    assert c["duration"] == "repeating"
+    assert c["duration_in_months"] == 2
+    assert "amount_off" not in c
+
+
+async def test_annual_winback_is_bounded_once_coupon(monkeypatch):
+    """Win-back on annual → 40% of three months, applied once (not 40% off the
+    whole year)."""
+    c = await _capture_referral_coupon(monkeypatch, billing_period="annual",
+                                       winback=True)
+    assert c["duration"] == "once"
+    assert c["amount_off"] == round(0.40 * 3 * 1999)
+    assert "percent_off" not in c
+
+
+async def test_monthly_winback_unchanged(monkeypatch):
+    c = await _capture_referral_coupon(monkeypatch, billing_period="monthly",
+                                       winback=True)
+    assert c["percent_off"] == 40
+    assert c["duration"] == "repeating"
+    assert c["duration_in_months"] == 3

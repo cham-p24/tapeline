@@ -42,6 +42,37 @@ def _tier_from_price(price_id: str) -> str:
     return "free"
 
 
+async def _monthly_unit_amount(tier: str) -> tuple[int, str]:
+    """(unit_amount_in_minor_units, currency) for `tier`'s MONTHLY price.
+
+    Used to value month-denominated discounts (referral credits, the win-back
+    offer) in actual currency, so they can be applied as a `duration="once"`
+    `amount_off` on an ANNUAL checkout. Without this, a repeating N-month
+    coupon attached to a yearly price discounts the whole single annual invoice
+    — Stripe applies a repeating coupon's full percent_off to every invoice
+    inside its month window and never prorates within one invoice, so a
+    1-month 100%-off referral credit zeroes an entire $199/yr subscription.
+
+    Read from Stripe rather than a local constant so it can't drift from the
+    real price. `unit_amount` is the plan's per-period charge in minor units
+    (cents); it is populated for every standard recurring price Tapeline uses.
+    """
+    price_id = {
+        "pro": settings.stripe_price_pro_monthly,
+        "premium": settings.stripe_price_premium_monthly,
+    }.get(tier)
+    if not price_id:
+        raise HTTPException(400, f"No monthly Stripe Price ID configured for {tier}.")
+    price = await asyncio.to_thread(stripe.Price.retrieve, price_id)
+    amount = getattr(price, "unit_amount", None)
+    currency = getattr(price, "currency", None)
+    if amount is None or currency is None:
+        # Defensive: refuse rather than fall back to the exploitable repeating
+        # coupon. A failed checkout the user can retry beats a free year.
+        raise HTTPException(502, "Could not read the monthly price to value the discount.")
+    return int(amount), str(currency)
+
+
 async def create_checkout_session(
     user_id: str,
     user_email: str,
@@ -135,26 +166,57 @@ async def create_checkout_session(
         # referral credit (100% off, best deal) > win-back (40% off) > manual
         # promo codes. The customer can still apply a promo on a later checkout
         # once any auto-applied coupon is spent.
+        # A repeating N-month coupon is only correct on a MONTHLY price, where
+        # one invoice == one month. On an ANNUAL price the single yearly invoice
+        # falls inside any N>=1-month window and Stripe discounts the WHOLE
+        # invoice, so a 1-month referral credit would zero a $199/yr sub and the
+        # win-back would take 40% off the entire year. For annual we translate
+        # the month-denominated value into a fixed `amount_off` applied `once`.
+        is_annual = billing_period == "annual"
         if referral_credit_months > 0:
-            coupon = await asyncio.to_thread(
-                stripe.Coupon.create,
-                percent_off=100,
-                duration="repeating",
-                duration_in_months=referral_credit_months,
-                name=f"Tapeline referral credit ({referral_credit_months} mo)",
-                metadata={"user_id": user_id, "kind": "referral"},
-            )
+            if is_annual:
+                amount, currency = await _monthly_unit_amount(tier)
+                coupon = await asyncio.to_thread(
+                    stripe.Coupon.create,
+                    amount_off=referral_credit_months * amount,
+                    currency=currency,
+                    duration="once",
+                    name=f"Tapeline referral credit ({referral_credit_months} mo, annual)",
+                    metadata={"user_id": user_id, "kind": "referral"},
+                )
+            else:
+                coupon = await asyncio.to_thread(
+                    stripe.Coupon.create,
+                    percent_off=100,
+                    duration="repeating",
+                    duration_in_months=referral_credit_months,
+                    name=f"Tapeline referral credit ({referral_credit_months} mo)",
+                    metadata={"user_id": user_id, "kind": "referral"},
+                )
             kwargs["discounts"] = [{"coupon": coupon.id}]
             sub_metadata["referral_credits_to_consume"] = str(referral_credit_months)
         elif winback:
-            coupon = await asyncio.to_thread(
-                stripe.Coupon.create,
-                percent_off=40,
-                duration="repeating",
-                duration_in_months=3,
-                name="Tapeline win-back (40% off 3 months)",
-                metadata={"user_id": user_id, "kind": "winback"},
-            )
+            if is_annual:
+                amount, currency = await _monthly_unit_amount(tier)
+                # 40% off three months of value, applied once to the annual
+                # invoice (not 40% off the whole year).
+                coupon = await asyncio.to_thread(
+                    stripe.Coupon.create,
+                    amount_off=round(0.40 * 3 * amount),
+                    currency=currency,
+                    duration="once",
+                    name="Tapeline win-back (40% off 3 months, annual)",
+                    metadata={"user_id": user_id, "kind": "winback"},
+                )
+            else:
+                coupon = await asyncio.to_thread(
+                    stripe.Coupon.create,
+                    percent_off=40,
+                    duration="repeating",
+                    duration_in_months=3,
+                    name="Tapeline win-back (40% off 3 months)",
+                    metadata={"user_id": user_id, "kind": "winback"},
+                )
             kwargs["discounts"] = [{"coupon": coupon.id}]
             sub_metadata["winback"] = "1"
         else:
@@ -362,6 +424,31 @@ def _sub_field(sub: Any, key: str) -> Any:
     return sub.get(key) if isinstance(sub, dict) else getattr(sub, key, None)
 
 
+def _nested(obj: Any, key: str) -> Any:
+    """Read `key` off a value that may be a dict or a Stripe SDK object."""
+    if obj is None:
+        return None
+    return obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)
+
+
+def _sub_primary_price(sub: Any) -> Any:
+    """The Price of the subscription's first line item (dict or SDK object)."""
+    data = _nested(_sub_field(sub, "items"), "data")
+    return _nested(data[0], "price") if data else None
+
+
+def _sub_is_annual(sub: Any) -> bool:
+    """True when the subscription bills on a yearly interval.
+
+    A repeating N-month retention coupon must never be attached to a yearly
+    sub: it either lands entirely outside the next annual invoice (does
+    nothing) or, if the invoice is near, discounts the whole year — see
+    _monthly_unit_amount for the mechanism.
+    """
+    return _nested(_sub_primary_price(sub), "recurring") is not None and \
+        _nested(_nested(_sub_primary_price(sub), "recurring"), "interval") == "year"
+
+
 async def pause_subscription(customer_id: str, months: int) -> datetime:
     """Pause billing for `months` (1-3) via Stripe pause_collection.
 
@@ -408,14 +495,30 @@ async def apply_save_offer_coupon(customer_id: str) -> None:
     _require_stripe()
     sub = await _primary_subscription(customer_id)
     try:
-        coupon = await asyncio.to_thread(
-            stripe.Coupon.create,
-            percent_off=50,
-            duration="repeating",
-            duration_in_months=3,
-            name="Tapeline retention — 50% off 3 months",
-            metadata={"customer_id": customer_id, "kind": "save_offer"},
-        )
+        if _sub_is_annual(sub):
+            # On a yearly sub, a repeating 3-month coupon either misses the
+            # next (up to a year away) annual invoice entirely or discounts the
+            # whole year — and burns the one-shot save_offer_redeemed_at flag
+            # either way. Value it as 50% of three months, applied once.
+            price_id = _nested(_sub_primary_price(sub), "id") or ""
+            amount, currency = await _monthly_unit_amount(_tier_from_price(price_id))
+            coupon = await asyncio.to_thread(
+                stripe.Coupon.create,
+                amount_off=round(0.50 * 3 * amount),
+                currency=currency,
+                duration="once",
+                name="Tapeline retention — 50% off 3 months (annual)",
+                metadata={"customer_id": customer_id, "kind": "save_offer"},
+            )
+        else:
+            coupon = await asyncio.to_thread(
+                stripe.Coupon.create,
+                percent_off=50,
+                duration="repeating",
+                duration_in_months=3,
+                name="Tapeline retention — 50% off 3 months",
+                metadata={"customer_id": customer_id, "kind": "save_offer"},
+            )
         # Apply the discount AND clear any scheduled cancellation in the same
         # call — accepting "keep my plan" should fully reactivate, not just
         # discount a sub that's still set to lapse. cancel_at_period_end=False
