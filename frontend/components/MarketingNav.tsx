@@ -43,7 +43,11 @@ export function MarketingNav() {
   return (
     <>
       <div className="sticky top-0 z-40 px-3 pt-3 sm:px-4 sm:pt-4">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between rounded-2xl border border-border bg-background/70 px-5 py-3 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+        {/* Frosted-glass floating bar. Translucent bg + heavy blur/saturate so
+            the content scrolling underneath tints through (seamless, not a
+            solid pill); a hairline ring for the glass edge and a soft, diffuse
+            drop shadow for lift instead of a tight hard-edged one. */}
+        <nav className="mx-auto flex max-w-6xl items-center justify-between rounded-2xl bg-background/55 px-5 py-3 shadow-[0_10px_40px_-12px_rgb(var(--shadow))] ring-1 ring-border backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-background/45">
           <Link href="/" className="flex items-center gap-2">
             <div className="h-2 w-6 rounded-full bg-accent" />
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
