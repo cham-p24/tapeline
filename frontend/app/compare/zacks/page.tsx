@@ -143,7 +143,7 @@ export default function VsZacksPage() {
       ))}
       <MarketingNav />
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+      <section className="mx-auto max-w-5xl px-6 py-8">
         <p className="eyebrow">Comparison</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Tapeline vs Zacks — why traders switch.
@@ -167,36 +167,31 @@ export default function VsZacksPage() {
         <LandingCta from="compare" showPreview={false} secondaryLabel="See the scorecard first" />
       </section>
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-8">
-        {/* "All prices in USD" used to float top-right next to this heading —
-            looked orphaned, especially because the table has no prices.
-            Moved into the data-provenance footer at the bottom of the page. */}
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-up">
-          Where Tapeline wins
-        </h2>
-        <div className="card overflow-x-auto">
+      <section className="mx-auto max-w-5xl px-6 pb-8">
+        <h2 className="mb-4 eyebrow text-up">Where Tapeline wins</h2>
+        {/* Borderless table (mirrors the /compare/finviz reference) — no outer
+            card box, no vertical dividers, no alternating fills; a single
+            hairline between rows so the comparison blends into the page. */}
+        <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
             <colgroup>
               <col style={{ width: "32%" }} />
               <col style={{ width: "36%" }} />
               <col style={{ width: "32%" }} />
             </colgroup>
-            <thead className="border-b border-border bg-panel/60 text-xs uppercase text-muted">
+            <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
               <tr>
-                <th className="px-4 py-3 text-left">Feature</th>
-                <th className="px-4 py-3 text-left text-accent border-l border-border/40">Tapeline</th>
-                <th className="px-4 py-3 text-left border-l border-border/40">Zacks Premium</th>
+                <th className="px-4 py-3 text-left font-medium">Feature</th>
+                <th className="px-4 py-3 text-left font-medium text-accent">Tapeline</th>
+                <th className="px-4 py-3 text-left font-medium">Zacks Premium</th>
               </tr>
             </thead>
             <tbody>
-              {WINS.map((r, i) => (
-                <tr
-                  key={r.label}
-                  className={"border-b border-border/30 " + (i % 2 === 1 ? "bg-panel/40" : "")}
-                >
-                  <td className="px-4 py-3 font-medium align-top min-h-[3rem]">{r.label}</td>
-                  <td className="px-4 py-3 font-medium text-accent align-top border-l border-border/30 min-h-[3rem]">{r.tapeline}</td>
-                  <td className="px-4 py-3 text-muted align-top border-l border-border/30 min-h-[3rem]">
+              {WINS.map((r) => (
+                <tr key={r.label} className="border-b border-border/50">
+                  <td className="px-4 py-4 font-medium align-top">{r.label}</td>
+                  <td className="px-4 py-4 font-medium text-accent align-top">{r.tapeline}</td>
+                  <td className="px-4 py-4 text-muted align-top">
                     {r.competitor === "—" ? "Not available" : r.competitor}
                   </td>
                 </tr>
@@ -206,16 +201,14 @@ export default function VsZacksPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-12">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
-          Honest tradeoffs
-        </h2>
-        <p className="mb-3 text-xs text-subtle">
+      <section className="mx-auto max-w-5xl px-6 pb-12">
+        <h2 className="mb-2 eyebrow">Honest tradeoffs</h2>
+        <p className="mb-5 text-xs text-subtle">
           Where Zacks has a real edge — explained so you can decide what matters.
         </p>
-        <div className="space-y-3">
+        <div className="divide-y divide-border/60 border-t border-border/60">
           {TRADEOFFS.map((r) => (
-            <div key={r.label} className="rounded-lg border border-border bg-panel/40 p-4">
+            <div key={r.label} className="py-5">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <h3 className="font-medium">{r.label}</h3>
                 <div className="text-xs text-subtle">{r.competitor} <span className="opacity-50">vs</span> {r.tapeline}</div>
