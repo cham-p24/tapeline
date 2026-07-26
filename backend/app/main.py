@@ -85,49 +85,38 @@ if settings.sentry_dsn:
 
 
 def _check_session_secret() -> None:
-    """Alarm loudly when SESSION_SECRET is unset in a non-dev environment.
+    """Refuse to boot in a non-dev environment when SESSION_SECRET is unset.
 
-    `services/session._session_secret()` fails OPEN: with SESSION_SECRET unset
-    it derives the session-signing key from STRIPE_WEBHOOK_SECRET, and with
-    THAT unset too it falls back to a constant hardcoded in the source of a
-    public repo — making every session cookie (and the 2FA challenge token)
-    forgeable by anyone who can read the file. Neither `.env.example` nor
-    `fly.toml` used to mention SESSION_SECRET, so nothing ever prompted an
-    operator to set it.
+    `services/session._session_secret()` now fails CLOSED — with SESSION_SECRET
+    unset in prod it raises rather than deriving a forgeable key (previously it
+    fell back to STRIPE_WEBHOOK_SECRET, and failing that a constant hardcoded in
+    a public repo, either of which let session cookies + the 2FA challenge token
+    be forged). Surfacing that here converts a would-be per-request 500 into a
+    clean, loud boot failure that the post-deploy smoke check catches — so a
+    misconfiguration is caught at deploy, never on a user's first request.
 
-    This only warns; it deliberately does NOT raise. Setting the variable for
-    the first time changes the signing key and therefore signs every user out,
-    so making an unset secret fatal here would turn a silent weakness into a
-    hard outage on the next deploy. Set the secret first, then tighten
-    `_session_secret()` to fail closed.
+    PREREQUISITE: SESSION_SECRET must be set in prod BEFORE this ships (run the
+    'Set SESSION_SECRET' workflow). Setting it changes the signing key and signs
+    every user out once — a one-time cost, not a fallback.
     """
     if settings.app_env == "development":
         return
     if getattr(settings, "session_secret", None):
         return
-    derived_from_stripe = bool(settings.stripe_webhook_secret)
-    logger.error(
-        "SECURITY session.secret_unset env=%s derived_from=%s — set SESSION_SECRET "
-        "(fly secrets set SESSION_SECRET=$(openssl rand -hex 32) -a tapeline-backend). "
-        "%s",
-        settings.app_env,
-        "stripe_webhook_secret" if derived_from_stripe else "HARDCODED_PUBLIC_CONSTANT",
-        "Session keys are currently derived from the Stripe webhook secret, so anyone "
-        "with Stripe dashboard access can forge any user's session, and rotating that "
-        "secret will sign everyone out."
-        if derived_from_stripe
-        else "SESSION FORGERY IS TRIVIAL FOR ANYONE WHO CAN READ THE PUBLIC REPO.",
-    )
     try:
         import sentry_sdk
 
         sentry_sdk.capture_message(
-            "SESSION_SECRET is not set — session-signing key is derived "
-            f"from {'STRIPE_WEBHOOK_SECRET' if derived_from_stripe else 'a public constant'}",
-            level="error" if derived_from_stripe else "fatal",
+            "SESSION_SECRET is not set — refusing to boot", level="fatal",
         )
     except Exception:
         pass
+    raise RuntimeError(
+        "SESSION_SECRET is not set in a non-development environment. Run the "
+        "'Set SESSION_SECRET (bootstrap / rotate)' GitHub Actions workflow, then "
+        "redeploy. The app refuses to start rather than sign sessions with a "
+        "guessable key."
+    )
 
 
 @asynccontextmanager

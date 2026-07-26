@@ -22,15 +22,30 @@ SESSION_DAYS = 30
 
 
 def _session_secret() -> str:
-    """Derive a deterministic session-signing secret. If SESSION_SECRET is set,
-    use it; else derive one from STRIPE_WEBHOOK_SECRET or fall back to a fixed
-    dev string. Production MUST set SESSION_SECRET explicitly."""
+    """The session-signing secret (also signs the 2FA challenge token).
+
+    In any non-development environment SESSION_SECRET MUST be set explicitly —
+    there is NO fallback, and that is the fix. Both previous fallbacks were
+    forgeable: deriving from STRIPE_WEBHOOK_SECRET let anyone with Stripe
+    dashboard access mint sessions, and the final constant was hardcoded in a
+    public repo. This now fails closed: it refuses to sign/verify with a
+    guessable key rather than serve forgeable sessions. The startup check in
+    main.py turns that into a clean boot failure at deploy time (which the
+    post-deploy smoke check catches) instead of a per-request 500.
+
+    In development only, a fixed constant keeps local sessions stable across
+    restarts. Provision the prod secret with the "Set SESSION_SECRET" GitHub
+    Actions workflow.
+    """
     s = getattr(settings, "session_secret", None) or ""
     if s:
         return s
-    # Deterministic derivation so restarting doesn't invalidate dev sessions
-    base = (settings.stripe_webhook_secret or "tapeline-dev-secret") + "|session"
-    return hashlib.sha256(base.encode()).hexdigest()
+    if settings.app_env != "development":
+        raise RuntimeError(
+            "SESSION_SECRET is required in non-development environments. "
+            "Run the 'Set SESSION_SECRET (bootstrap / rotate)' workflow, then redeploy."
+        )
+    return hashlib.sha256(b"tapeline-dev-secret|session").hexdigest()
 
 
 def hash_password(plain: str) -> str:

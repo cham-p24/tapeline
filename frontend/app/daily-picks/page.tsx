@@ -109,7 +109,9 @@ export default async function DailyPicksPage() {
   const hasPicks = picks.length > 0;
 
   return (
-    <main id="main" className="relative min-h-screen overflow-x-hidden">
+    // overflow-x-clip (not -hidden): prevents horizontal scroll without
+    // breaking the floating nav's position:sticky. See app/page.tsx.
+    <main id="main" className="relative min-h-screen overflow-x-clip">
       <MarketingNav />
 
       <section className="px-6 pt-12 pb-10 sm:pt-20 sm:pb-12">
