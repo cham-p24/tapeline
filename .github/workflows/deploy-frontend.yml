@@ -46,7 +46,21 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
         # Dockerfile bakes the production NEXT_PUBLIC_* defaults (API_URL,
         # APP_URL); no build args needed here. Remote builders, no Docker in CI.
-        run: flyctl deploy --remote-only --config fly.toml --ha=false
+        # NOTE: no --ha=false — the frontend runs HA (2 machines) so a rolling
+        # deploy updates one while the other serves. The scale step below
+        # guarantees the second machine exists.
+        run: flyctl deploy --remote-only --config fly.toml
+
+      - name: Ensure HA (2 machines)
+        working-directory: frontend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
+        # Idempotent: sets the machine count to 2 (a no-op once there are two).
+        # min_machines_running=2 in fly.toml only holds if two machines actually
+        # exist, so this is what makes the site highly available — a single
+        # machine's restart/suspend/crash no longer takes tapeline.io offline.
+        # Both in the primary region (syd); Fly spreads them across hosts.
+        run: flyctl scale count 2 --region syd -y -a tapeline-web
 
       - name: Post-deploy smoke check
         run: |
