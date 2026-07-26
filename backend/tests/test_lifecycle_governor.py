@@ -571,6 +571,48 @@ async def test_governor_blocks_nudge_when_another_flow_already_emailed(
         assert governor.allows(u, SendClass.LIFECYCLE, token="act_ask48h") is False
 
 
+@pytest.mark.asyncio
+async def test_re_engagement_commits_each_send_before_a_mid_loop_cancel(monkeypatch):
+    """Per-user commit under a mid-loop cancellation.
+
+    Fly sends SIGTERM on every merge-to-main deploy; the resulting
+    CancelledError is a BaseException that slips past the flow's
+    `except Exception`. A user already emailed this run must keep their stamped
+    drip_state — against the old batch-commit-at-end, the enclosing
+    session_scope discarded every uncommitted stamp, so the next process
+    re-sent them a duplicate re-engagement email.
+    """
+    import asyncio
+
+    now = datetime.now(UTC)
+    a_uid, _ = await _seed_inactive_user(
+        age=timedelta(days=40), last_seen_at=now - timedelta(days=15))
+    b_uid, _ = await _seed_inactive_user(
+        age=timedelta(days=40), last_seen_at=now - timedelta(days=15))
+
+    # Deliver the first send; the second is interrupted by a deploy SIGTERM.
+    state = {"n": 0}
+
+    async def _send_then_cancel(*_a, **_k):
+        state["n"] += 1
+        if state["n"] >= 2:
+            raise asyncio.CancelledError()
+        return {"id": "ok"}
+
+    monkeypatch.setattr(email_module, "send_email", _send_then_cancel)
+
+    with pytest.raises(asyncio.CancelledError):
+        async with session_scope() as s:
+            await run_re_engagement_drip(s, governor=None)
+
+    # The user emailed BEFORE the cancel kept their committed re14. With
+    # batch-commit-at-end this union would be empty (both rolled back).
+    persisted = (await _drip_state(a_uid)) | (await _drip_state(b_uid))
+    assert "re14" in persisted, (
+        "a user emailed before a mid-loop cancel must retain committed drip_state"
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 4. RULE 7 + RULE 6 — asserted on the RENDERED output
 # ═══════════════════════════════════════════════════════════════════════════
