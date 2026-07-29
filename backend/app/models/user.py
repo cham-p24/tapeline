@@ -233,6 +233,18 @@ class User(Base):
     signup_gbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_wbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Set ONCE by the offline-conversion upload job
+    # (app.scripts.upload_google_ads_conversions) the first time this
+    # subscriber's paid conversion (trial -> active) has been reported back to
+    # Google Ads via the offline-conversion import — tying signup_gclid/gbraid/
+    # wbraid to the paid event so Smart Bidding optimises on real payers, not
+    # trial signups. Null = not yet uploaded, and it IS the job's idempotency
+    # key: the job only picks up users where this is NULL, so a conversion can
+    # never be double-counted. Set only, never cleared.
+    ads_conversion_uploaded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     # Activation milestone (Growth Playbook §4.2). Stamped the FIRST time the
     # user adds a watchlist ticker — the codebase already treats "first
     # watchlist ticker added" as activation milestone #1 (see

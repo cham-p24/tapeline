@@ -35,6 +35,304 @@ export type BlogPost = {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "how-to-read-a-stock-chart",
+    title: "How to Read a Stock Chart: Price, Volume, Trend, Support",
+    excerpt: "A stock chart is a compressed record of every transaction ever made in one stock — not a prediction of the next one. This guide breaks down the four things every chart actually shows: price, volume, trend, and the support, resistance, and moving-average lines traders draw on top. Each is taught honestly — including where it quietly lies — and connected to how Tapeline's Trend factor reads the same structure.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>A stock chart looks like a line wandering up and down. It is actually a compressed record of every decision thousands of buyers and sellers made about one company — each price a moment where someone was willing to trade and someone else was willing to take the other side. Learning to read a chart is not learning to predict the future. It is learning to read that record clearly, so the story the tape is telling stops sounding like noise.</p>
+
+<p>Here is how the four building blocks — price, volume, trend, and the lines traders draw on top of them — actually work, and where each one quietly lies to you.</p>
+
+<h2>Price and volume: the two dimensions of every chart</h2>
+<p>Every chart has two axes doing two different jobs. Price, on the vertical, tells you where the market settled. Volume, the bars along the bottom, tells you how much conviction was behind getting there. They are only meaningful together.</p>
+<p>A 4% up-day on twice the average volume means real demand showed up — a lot of shares changed hands to move the price that far. A 4% up-day on half the average volume means a thin market drifted higher on almost nothing, and it can drift back just as easily. The same price move describes two completely different situations depending on the volume underneath it. Reading price without volume is reading half the sentence.</p>
+
+<h2>Trend: direction is the first thing to establish</h2>
+<p>Before any pattern, the first question is direction. An uptrend is a sequence of higher highs and higher lows — each rally peaks above the last, each pullback bottoms above the previous one. A downtrend is the mirror: lower highs and lower lows. When highs and lows overlap sideways, there is no trend, just a range.</p>
+<p>This matters because most chart signals mean opposite things depending on the trend they sit inside. A sharp pullback in a healthy uptrend and the same pullback inside a downtrend can look identical on the day and resolve in opposite directions. Establishing the trend first is what keeps a single candle from being read in a vacuum.</p>
+
+<h2>Support and resistance: memory, not magic</h2>
+<p>Support is a price level where buying has repeatedly shown up and stopped a decline. Resistance is a level where selling has repeatedly capped a rally. They work because they are memory: traders who bought at a level remember it, traders who missed a move remember the price they wish they had taken, and those memories cluster into real activity when price returns to the level.</p>
+<p>The honest caveat is that these are approximate zones, not exact prices, and they break. A level that held three times can fail on the fourth, and broken support often flips into resistance on the way back up. Treating a round number as a guarantee is exactly how the level stops being useful.</p>
+
+<h2>Moving averages: the trend, smoothed</h2>
+<p>A moving average plots the average closing price over a window — 50 days, 200 days — as a single line, smoothing out daily noise so the underlying direction is visible. The 50-day and the 200-day are the two most-watched. Price above a rising 200-day line is the textbook shape of a long-term uptrend; price below a falling one is the opposite.</p>
+<p>Because so many traders watch the same averages, they can become self-fulfilling support and resistance. But a moving average is built entirely from past prices — it is a lagging line by construction. It confirms a trend that already exists; it never announces one early. Anyone selling a moving-average crossover as a crystal ball is selling yesterday's news.</p>
+
+<h2>How Tapeline's Trend factor reads the same chart</h2>
+<p>The <a href="/how-it-works">Trend factor</a> is one of the six inputs in the Tapeline composite, and it reads the structure above mechanically rather than by eye. It looks at where price sits relative to its key moving averages, whether those averages are stacked in uptrend order and sloping up, and whether the higher-high, higher-low structure is still intact — then compresses that into one 0–100 sub-score so a chart's direction becomes a single comparable number across every US ticker. It is deliberately descriptive: the score reports what the tape is currently doing, not what it will do next. You can see how Trend combines with the other five factors on the public <a href="/scorecard">scorecard</a> — which, in the interest of transparency, currently trails a plain SPY buy-and-hold. The Trend read also shows up pre-computed on lists like <a href="/best-stocks-for/swing-traders">the swing-trading board</a>.</p>
+
+<h2>The honest limit</h2>
+<p>Every chart is a picture of the past. It records what has already happened with total accuracy and says nothing certain about tomorrow. Patterns fail, trends reverse without warning, and the cleanest setup can be undone by a single event the chart could never contain:</p>
+<ul>
+<li>A chart cannot show tomorrow's earnings surprise, only the market's positioning ahead of it.</li>
+<li>It cannot show a macro shock — a rate decision, a geopolitical headline — until price has already reacted to it.</li>
+<li>It cannot tell you whether the volume behind a move was one large holder repositioning or broad demand from many.</li>
+</ul>
+<p>A chart is a way to organize a read of risk, not a way to remove it. The <a href="/legal/risk">risk disclosure</a> covers what a chart, by its nature, leaves out.</p>`,
+    howToSteps: [
+      { name: "Match the chart's timeframe to your horizon", text: "A 1-minute chart and a daily chart tell different stories about the same stock. Pick the timeframe that matches how long a position would be held — intraday, days, or months — before reading anything into the pattern." },
+      { name: "Establish the trend before anything else", text: "Look for higher highs and higher lows (uptrend), lower highs and lower lows (downtrend), or overlapping swings (a range). Direction changes what every later signal means, so it comes first." },
+      { name: "Read every price move against its volume", text: "Check the volume bars under each move. A rise on above-average volume shows real demand; the same rise on thin volume shows a drifting, easily-reversed market. Price and volume are only meaningful together." },
+      { name: "Mark support and resistance as zones", text: "Find levels where declines have repeatedly stalled (support) and rallies have repeatedly capped (resistance). Treat them as approximate zones, not exact prices — they break, and broken support often becomes resistance." },
+      { name: "Add the 50- and 200-day moving averages", text: "Overlay the two most-watched averages to see the smoothed trend. Price above a rising 200-day line is a textbook uptrend shape. Remember the line lags — it confirms direction, it never announces it early." },
+      { name: "Cross-check the chart against other factors", text: "A chart shows price behaviour only. Read it alongside fundamentals, relative strength, and macro context so one clean-looking pattern isn't carrying the whole decision on its own." },
+    ],
+    howToTime: "PT7M",
+  },
+  {
+    slug: "how-to-use-macd",
+    title: "How to Use MACD: The Indicator Explained (Line, Signal, Histogram)",
+    excerpt: "MACD is the most-screenshotted indicator in trading and the most misread. Here's how the MACD indicator is actually built — the line, signal, and histogram — what crossovers and divergence mean, and where it whipsaws in choppy markets. Then, honestly, how Tapeline reads the same trend and momentum ideas underneath it as two separate factors.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>MACD is the most-screenshotted indicator in retail trading — and probably the most misread. Every charting app ships it, every YouTube thumbnail circles a crossover on it, and almost nobody stops to explain what the three squiggles are actually made of. This post does the boring, useful thing: it explains how MACD is built, what each part is conventionally read to mean, where it misleads, and how the same two ideas underneath it — trend and momentum — show up as two separate factors inside the Tapeline score.</p>
+
+<h2>What MACD actually is</h2>
+<p>MACD stands for Moving Average Convergence Divergence. Despite the intimidating name, it is just the distance between two moving averages, plotted over time. There are three pieces:</p>
+<ul>
+<li><strong>The MACD line</strong> — the 12-period exponential moving average (EMA) minus the 26-period EMA. When the fast average is above the slow one, the line is positive; when it's below, negative. It's a running measure of how far short-term price has pulled away from longer-term price.</li>
+<li><strong>The signal line</strong> — a 9-period EMA of the MACD line itself. It's a smoothed, slower version of the MACD line, used as a reference to compare against.</li>
+<li><strong>The histogram</strong> — the MACD line minus the signal line, drawn as bars. When the two lines converge the bars shrink toward zero; when they spread apart the bars grow.</li>
+</ul>
+<p>The 12/26/9 settings are the defaults Gerald Appel chose in the 1970s. They are conventions, not laws of nature — and it's worth remembering that nothing about those particular numbers is tuned to any specific stock or timeframe.</p>
+
+<h2>Reading crossovers and the zero line</h2>
+<p>Two events get the most attention. The first is the signal-line crossover: when the MACD line crosses above its signal line, momentum is conventionally read as turning up; when it crosses below, turning down. The second is the zero-line crossover: the MACD line moving above zero means the 12-EMA has overtaken the 26-EMA (shorter-term strength), and below zero the reverse.</p>
+<p>The histogram is the early-warning version of the same information. Because it measures the gap between the two lines, it starts shrinking before they actually cross. The bars flipping from growing to shrinking is often read as a hint that a crossover may be coming — momentum decelerating even while price is still rising.</p>
+
+<h2>Divergence — the part worth learning</h2>
+<p>The most information-dense pattern on MACD is divergence. Price makes a higher high, but MACD makes a lower high: the move is still going, but with less momentum behind each push. That's bearish divergence. The mirror case — price making a lower low while MACD makes a higher low — is bullish divergence. Divergence doesn't time anything; it describes a loss of conviction underneath the surface of the price. Sometimes that resolves in a reversal; often it just resolves in more of the same.</p>
+
+<h2>Where MACD misleads</h2>
+<p>Here is the honest part most tutorials skip. MACD is built entirely from moving averages, so it is a lagging indicator by construction — it confirms moves after they've begun, it never predicts them. And in a sideways, choppy market it whipsaws mercilessly: the MACD and signal lines coil around each other near zero, generating crossover after crossover with no follow-through. Every one of those looks like a signal on a screenshot and none of them means much. The single biggest error with MACD is reading crossovers in a range the same way one would read them in a clean trend.</p>
+<p>This is why MACD works best as a description of an existing trend's health rather than a standalone trigger, and why it pairs naturally with something that tells you whether a real trend is even present.</p>
+
+<h2>How Tapeline reads the same two ideas</h2>
+<p>MACD quietly fuses two different things: trend (are the moving averages stacked in one direction?) and momentum (how fast is price accelerating away from its own average?). Tapeline keeps those as two of its six named factors rather than blending them into a single line. The <a href="/best-stocks-for/momentum">Momentum factor</a> reads the rate and persistence of price change — the same acceleration MACD's histogram is gesturing at. The Trend factor reads moving-average structure and alignment — the same stacking that pushes the MACD line above or below zero.</p>
+<p>Keeping them apart is deliberate. A stock can have strong momentum inside a weak trend (a sharp bounce in a downtrend) or a solid trend with fading momentum (exactly the divergence case above). A single MACD line collapses those two states together; two separate factors let the scanner show which one is on screen. The full weighting of all six factors is written up in <a href="/how-it-works">how the score works</a>.</p>
+
+<h2>The caveat that matters</h2>
+<p>MACD is a lens, not an oracle. It is arithmetic on past prices, and no arrangement of past prices guarantees anything about the next bar. Tapeline treats indicators like this as descriptive inputs, never predictions — and we publish a <a href="/scorecard">public scorecard</a> that currently trails the S&amp;P 500, precisely so nobody mistakes a tidy factor model for a promise. Read MACD for what it is: a compact, lagging summary of trend and momentum that is genuinely informative when a trend exists and genuinely misleading when one doesn't. The <a href="/legal/risk">risk disclosure</a> has the full picture.</p>`,
+    howToSteps: [
+      { name: "Identify the three components", text: "On the MACD panel, locate the MACD line (12-EMA minus 26-EMA), the signal line (a 9-EMA of the MACD line), and the histogram (the gap between the two, drawn as bars)." },
+      { name: "Check the zero line", text: "Note whether the MACD line sits above or below zero. Above zero means the faster average has overtaken the slower one; below zero is the reverse. This frames whether shorter-term strength or weakness is in control." },
+      { name: "Watch the signal-line crossover", text: "See where the MACD line sits relative to its signal line. A cross above the signal is conventionally read as momentum turning up; a cross below, turning down. In choppy ranges these crossovers repeat with little follow-through." },
+      { name: "Read the histogram", text: "Track whether the bars are growing or shrinking. Shrinking bars mean the two lines are converging — momentum decelerating — and often precede a crossover, even while price is still moving in the same direction." },
+      { name: "Look for divergence against price", text: "Compare the MACD peaks and troughs with price. Price making a higher high while MACD makes a lower high (or the mirror on the downside) signals momentum fading beneath the surface. It describes conviction, not timing." },
+      { name: "Confirm the trend context", text: "Ask whether a real trend is present before trusting any MACD event. The indicator is lagging and built from moving averages, so its signals are informative in a trend and unreliable in a sideways range." },
+    ],
+    howToTime: "PT6M",
+  },
+  {
+    slug: "best-technical-indicators-swing-trading",
+    title: "Best Technical Indicators for Swing Trading: An Honest Read",
+    excerpt: "\"Best technical indicators for swing trading\" is the wrong question — no indicator predicts, they only describe. Here's an honest walk through RSI, moving averages, relative strength, and volume: what each actually measures, where it goes quiet, and how Tapeline folds the trend and relative-strength reads into named factors instead of a single line on a chart.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>Type "best technical indicators for swing trading" into any search box and you'll get a hundred listicles ranking RSI against MACD against Bollinger Bands as if one of them were a secret. The honest version is duller and more useful: no indicator is <em>best</em>, because indicators don't predict — they describe. Each one is a different compression of the same price and volume data. The skill isn't picking the winner. It's knowing what each one actually measures, and where it goes quiet.</p>
+
+<p>This is a walk through the handful that matter over a multi-day, multi-session holding period — the swing-trading horizon — with an honest note on what each does and doesn't tell you.</p>
+
+<h2>RSI: a momentum gauge, not a bottom-caller</h2>
+<p>The Relative Strength Index (confusingly named — more on that below) measures the speed of recent gains against recent losses on a 0–100 scale. The folklore is "below 30 is oversold, above 70 is overbought." The reality: in a strong trend, RSI can pin above 70 for weeks while a stock keeps climbing, or sit below 30 the whole way down. It's a rate-of-change gauge, not a reversal signal. Where it earns its keep for a swing horizon is divergence — price making a new high while RSI makes a lower one, which describes momentum thinning out under the surface. Descriptive, not a trigger.</p>
+
+<h2>Moving averages: the trend, made visible</h2>
+<p>A moving average is just the average close over the last N sessions, redrawn each day. Its whole job is to strip intraday noise so the direction underneath is legible. The 50-day and 200-day are the conventional swing anchors; their slope and their order — is the 50 above the 200, or below? — is a compact description of whether the multi-week trend is constructive or deteriorating. The catch is baked in: moving averages lag. They confirm a trend that has already turned. They never call the turn itself. Anyone selling a moving-average "cross signal" as prediction is selling a rear-view mirror.</p>
+
+<h2>Relative strength: the one most retail traders skip</h2>
+<p>This is the important one, and it's not the RSI above. True relative strength compares a stock's return to a benchmark — usually the S&P 500 and the stock's own sector. A name grinding higher while the index chops sideways is showing relative strength; a name rising less than the index on an up day is quietly lagging. Over a multi-day holding period this is often the most information-dense read on the chart, because it filters out moves that are really just the whole market moving. It describes leadership, not destiny.</p>
+
+<h2>Volume: the confirmation layer</h2>
+<p>Volume is participation. A breakout on heavy volume describes broad agreement; the same move on thin volume describes a handful of orders and a lot of empty tape. Volume doesn't stand alone — it's the corroboration check on everything above. A trend, a relative-strength breakout, an RSI reading: each reads stronger when volume confirms it, and weaker when it doesn't.</p>
+
+<h2>How Tapeline reads these — as factors, not signals</h2>
+<p>Tapeline doesn't hand you a single indicator; it folds these reads into named factors inside a six-factor composite (<a href="/how-it-works">the full methodology is here</a>). Two of the six map directly onto the indicators above. The <a href="/how-it-works/trend">Trend factor</a> reads moving-average structure and slope — the same 50/200 posture, scored 0–100 instead of eyeballed. The <a href="/how-it-works/relative-strength">Relative Strength factor</a> compares each name to SPY and its sector, the leadership read that pure price charts hide. Volume and short-horizon acceleration feed the Momentum factor. The point of naming them is that you can see which read is carrying a score and which is conspicuously silent, instead of trusting one line on one chart.</p>
+
+<p>If you want that composite pre-sorted for a multi-day horizon, the <a href="/best-stocks-for/swing-traders">best swing trade stocks list</a> ranks the US universe by the composite and shows the per-factor breakdown on every row — Trend and Relative Strength included — so you can read where the confluence sits before you do your own chart work.</p>
+
+<h2>The honest caveat</h2>
+<p>Every indicator here is lagging by construction. They summarise what price and volume have already done; none of them forecast, and stacking five of them doesn't turn description into prediction. Tapeline's composite is the same kind of summary — a structured read, not a crystal ball. Its daily top picks are back-checked in public at <a href="/scorecard">the scorecard</a>, unedited, and it currently trails SPY. Treat indicators, factors, and composites as ways to read the tape more carefully, never as a substitute for your own judgement and risk limits — see the <a href="/legal/risk">risk disclosure</a>.</p>`,
+    howToSteps: [
+      { name: "Read the trend with moving averages", text: "Start with the 50- and 200-day moving averages. Their slope and order describe whether the multi-week trend is constructive or deteriorating. Moving averages lag — they confirm a trend, they never call the turn." },
+      { name: "Check relative strength vs the benchmark", text: "Compare the stock's move to the S&P 500 and its sector. A name outperforming the index shows leadership; one lagging on an up day is quietly weak. Over a multi-day horizon this is often the densest read on the chart." },
+      { name: "Confirm with volume", text: "Read volume as participation. A move on heavy volume describes broad agreement; the same move on thin volume is a few orders and empty tape. Volume corroborates the trend and relative-strength reads rather than standing alone." },
+      { name: "Sanity-check momentum with RSI", text: "Use RSI as a rate-of-change gauge, not a reversal trigger. In a strong trend it can stay 'overbought' or 'oversold' for weeks. Its useful read is divergence — price and RSI disagreeing — which describes momentum thinning, not a timed signal." },
+    ],
+    howToTime: "PT6M",
+  },
+  {
+    slug: "bollinger-band-squeeze",
+    title: "Bollinger Band Squeeze: How to Find a Volatility Contraction",
+    excerpt: "A Bollinger Band squeeze is when a stock's volatility bands pinch tight — the classic sign that a large move may be loading. But a squeeze tells you when something might happen, never which way, and the fakeouts are brutal. Here's how to spot a genuine volatility contraction, why it fires false signals, and how Tapeline reads the directional context around it — descriptively, with no dedicated \"squeeze\" score.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>The Bollinger Band squeeze is one of the most-searched setups in technical analysis, and one of the most misread. The idea is seductive: the bands pinch tight, volatility drains out of a stock, and a big move is "loading." Traders screenshot the narrow bands and call the direction before anything has actually happened. That last part is where most squeeze analysis quietly goes wrong.</p>
+
+<p>This post walks through what a squeeze actually is, why it fires false signals as often as real ones, and how Tapeline reads the surrounding context descriptively — without pretending to know which way a coiled stock will break.</p>
+
+<h2>What a Bollinger Band squeeze actually is</h2>
+<p>Bollinger Bands, developed by John Bollinger, are three lines: a 20-period moving average in the middle, and an upper and lower band set two standard deviations away from it. Standard deviation is a volatility measure, so the bands breathe — they widen when a stock is moving violently and contract when it goes quiet.</p>
+
+<p>A squeeze is simply that contraction taken to an extreme: the bands pull in close to the moving average because realized volatility has fallen to a local low. Bollinger built a companion indicator, BandWidth, to measure exactly this — it tracks the distance between the upper and lower band as a percentage of the middle line. When BandWidth drops to a multi-month low, you have a squeeze.</p>
+
+<p>The logic behind watching for it is genuinely sound, not mystical: volatility is <em>mean-reverting</em>. Quiet periods tend to be followed by active ones, and active periods by quiet ones. A squeeze is a stock coiling — narrowing price range, thinning volume, indecision — and that state historically doesn't last forever. Something usually gives.</p>
+
+<h2>The part nobody screenshots: a squeeze has no direction</h2>
+<p>Here is the honest limitation. A squeeze tells you a volatility <em>expansion</em> is more likely than usual. It tells you nothing about which way. The bands narrow identically whether a stock is about to break out or break down — contraction is a statement about range, not about direction.</p>
+
+<p>That is the source of the classic false signals:</p>
+<ul>
+<li><strong>The fakeout.</strong> Price pokes above the upper band, every breakout scanner lights up, and then it reverses straight back through the range. Low-volatility bases are exactly where stop-runs and liquidity grabs tend to happen.</li>
+<li><strong>The squeeze that stays squeezed.</strong> There is no rule that a contraction must resolve on your timeframe. Bands can stay tight for weeks. "It has to move soon" is a feeling, not a signal.</li>
+<li><strong>The whipsaw.</strong> Expansion often means a violent move in <em>both</em> directions before a trend establishes — the band-touch that looks like confirmation is frequently the high or low of a shakeout.</li>
+</ul>
+
+<p>None of this makes the squeeze useless. It makes it a <em>timing</em> observation, not a <em>direction</em> one. Treating "the bands are tight" as a reason to expect a specific outcome is the mistake.</p>
+
+<h2>Squeeze is not the same as short squeeze</h2>
+<p>Worth clearing up, because the words collide: a Bollinger Band squeeze is a volatility-contraction pattern on the chart. A <em>short</em> squeeze is a completely different thing — a crowded short position forced to cover, mechanically driving price up. They can occur together, but they are measured from entirely different data. Tapeline's <a href="/short-squeeze-scanner">short-squeeze scanner</a> reads short interest, float, and crowding, not band width. Don't conflate the two.</p>
+
+<h2>How Tapeline reads the context around a squeeze</h2>
+<p>Tapeline does <strong>not</strong> have a dedicated "squeeze" score, and this post isn't going to invent one. What the scanner provides is the directional context a squeeze itself can't: a 0–100 composite built from <a href="/how-it-works">six named factors</a> — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum.</p>
+
+<p>Two of those speak most directly to a coiled chart. <a href="/how-it-works/trend">Trend</a> reads whether the quiet base is sitting inside an established uptrend, a downtrend, or genuine indecision. <a href="/how-it-works/momentum">Momentum</a> reads the rate-of-change and where the recent tape is leaning as the range tightens. Neither predicts the break — but together they describe which way the underlying data is tilted while price is still flat.</p>
+
+<p>When several factors line up, the composite lands in the <a href="/signal/strong-setup">STRONG SETUP</a> band (Tapeline Score 70–84): four to five of the six factors favourable, usually a clean trend-plus-relative-strength read with a factor or two lagging. That label is descriptive — it says the factor data is in a particular state, not that a squeeze is about to resolve upward. A tight base under a STRONG SETUP score simply carries more constructive context than the same base under a CAUTION score. The chart pattern and the factor read are two independent lenses: the squeeze is one, the score is the other.</p>
+
+<p>You can check whether that framing has held up over time on the public <a href="/scorecard">scorecard</a>, which back-checks every top-10 daily pick against the next session versus SPY. It's honest about where the model is trailing, not only where it lands.</p>
+
+<h2>The genuine caveat</h2>
+<p>A Bollinger Band squeeze is a description of volatility, not a forecast. Most tight bases resolve into noise rather than clean trends, and no factor score changes the fact that direction is unknown until price actually moves. Read the squeeze as a <em>when might</em>, never a <em>which way</em>, and treat any tool — Tapeline included — as one input into your own judgement rather than an answer. Nothing here is a recommendation to trade anything; see the <a href="/legal/risk">risk disclosure</a> for the full picture.</p>`,
+    howToSteps: [
+      { name: "Plot the bands", text: "Apply Bollinger Bands with the standard settings — a 20-period simple moving average with the upper and lower bands two standard deviations away. This is the default on almost every charting platform, so no configuration is usually needed." },
+      { name: "Track BandWidth", text: "Add Bollinger's BandWidth indicator, which measures the gap between the upper and lower band as a percentage of the middle line. It turns 'the bands look tight' into a number you can compare across time rather than eyeball." },
+      { name: "Find the contraction", text: "A squeeze is present when BandWidth falls to a multi-month low — for example its lowest reading in roughly six months. That marks realized volatility bottoming out, which is the coil that squeeze-watchers are looking for." },
+      { name: "Confirm the quiet", text: "Check that the low-volatility state has persisted across several bars, not a single quiet candle. Thinning volume and a visibly narrowing price range alongside the low BandWidth reading make the contraction more credible." },
+      { name: "Read direction separately", text: "The squeeze indicates a move is more likely, not which way. Read directional context — trend, relative strength, momentum — as a separate lens, and accept that the break stays unknown until price actually leaves the range." },
+    ],
+    howToTime: "PT7M",
+  },
+  {
+    slug: "descriptive-vs-prescriptive-ratings",
+    title: "Stock Rating Systems: Descriptive vs Prescriptive Labels",
+    excerpt: "A stock rating can tell you what to do, or it can tell you what's true — and those are very different products. This post breaks down descriptive rating systems versus prescriptive buy/sell verdicts: the cognitive traps a verdict hides, the legal line it crosses, and why Tapeline's labels describe a state instead of issuing a command.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>Every stock "rating" answers one of two very different questions. A prescriptive rating answers <em>what should I do?</em> — Buy, Sell, Hold, Strong Buy, target $180. A descriptive rating answers <em>what is currently true?</em> — the trend is intact, relative strength is lagging, insiders are accumulating. On a screen the two look almost identical. They are not the same object, and the gap between them is wider than most rating systems admit.</p>
+
+<p>Most of the retail world runs on the prescriptive kind. Analyst desks publish Buy/Hold/Sell. Aggregators average those into a "Strong Buy." The format is comforting because it collapses a messy pile of evidence into a single instruction. That is also exactly the problem.</p>
+
+<h2>What a prescriptive rating hides</h2>
+
+<p>A verdict is lossy. When a system compresses trend, valuation, momentum, and flow into the word "Buy," everything that made the picture interesting disappears. You can no longer see that the fundamentals are excellent while the chart is broken, or that momentum is screaming while relative strength quietly lags. The label has already decided the tradeoff and discarded the components that would let a reader disagree.</p>
+
+<p>It also invites a specific cognitive trap: anchoring. Once a verdict is on the screen, the mind treats it as the reference point and reasons backward from it. "Strong Buy, target $180" doesn't start a thought process — it ends one. The reader stops asking what the evidence says and starts asking whether $180 is close.</p>
+
+<p>And a verdict is almost impossible to check. "Buy" carries no timeframe, no confidence interval, no falsifiable claim. If the stock falls, the call was "long-term." If it rises, the call was right. Prescriptive labels are structurally unaccountable, which is convenient for whoever is issuing them.</p>
+
+<h2>The legal line most tools walk past</h2>
+
+<p>There is a second reason to avoid verdicts, and it isn't cosmetic. In the United States, telling a specific person to buy or sell a specific security — for compensation, as a business — is regulated activity. That is the territory of registered investment advisers, with the fiduciary duties, disclosures, and licensing that come attached. A tool that prints "Buy AAPL" is, arguably, doing exactly that: issuing individualized investment advice.</p>
+
+<p>Tapeline is a data and scanning tool, not a licensed advisor, and it does not pretend otherwise. Describing what the data shows is analysis. Instructing a reader to act is advice. Keeping those two things clearly separated isn't legal theater — it is an honest statement of what the product is allowed to do and what it isn't. The full version of that boundary lives on the <a href="/legal/risk">risk and disclosures page</a>.</p>
+
+<h2>How Tapeline labels stay descriptive</h2>
+
+<p>The six-factor score — trend, relative strength, fundamentals, smart money, macro, and momentum, documented on <a href="/how-it-works">how it works</a> — rolls up into a single label. Those labels are deliberately descriptions of a <em>state</em>, not commands:</p>
+
+<ul>
+  <li><a href="/signal/high-conviction">HIGH CONVICTION</a> — all six factors aligned positive at high sub-score values; a rare configuration.</li>
+  <li>STRONG SETUP — most factors favourable, usually a clean trend-and-strength combination with one or two lagging behind.</li>
+  <li>CONSTRUCTIVE — net positive, but with at least one factor pulling meaningfully against the others.</li>
+  <li>NEUTRAL, CAUTION, and WEAK — the same descriptive vocabulary applied to the flat and negative side of the spectrum.</li>
+</ul>
+
+<p>Notice what none of those words do: none of them tell anyone to act. "HIGH CONVICTION" is a statement about factor alignment, not an instruction to buy. The decision stays with the reader — their timeframe, their risk tolerance, their portfolio context — because those things live with the reader, not inside a scanner. A descriptive label hands over the observation and stops there, on purpose.</p>
+
+<p>That design is also what makes the system checkable. Because a label is a concrete claim about a measurable state, it can be logged and compared against what actually happened next. The <a href="/scorecard">public scorecard</a> does precisely that — it back-checks each day's top-ranked names against the following session, in the open, whether the result flatters the model or not. A verdict you cannot audit isn't transparency; a description you can is.</p>
+
+<h2>The honest tradeoff</h2>
+
+<p>Descriptive labels ask more of the reader. A "Strong Buy" requires no thought; "CONSTRUCTIVE — strong fundamentals, weak trend" requires weighing two things that point in opposite directions and reaching an independent conclusion. That friction is the feature, not a bug — but it is real, and it isn't for everyone. Some people genuinely want to be told what to do, and a descriptive scanner will always feel like it is withholding the last step.</p>
+
+<p>It is withholding it because the last step isn't ours to take. A label is a starting observation about a noisy, uncertain market — not a forecast, and not a recommendation. It can be accurate about the state of the data and still be followed by a move in either direction. That is why the labels read as descriptions rather than instructions, and why the <a href="/legal/risk">risk disclosures</a> belong to the methodology rather than the fine print.</p>`,
+  },
+  {
+    slug: "case-against-ai-stock-scanners",
+    title: "AI Stock Scanner: The Case for Seeing the Formula and the Losses",
+    excerpt: "\"AI stock scanner\" has become a marketing label, not a disclosure — most tools that wear it will show you the winners and hide the formula. This is the honest case for the opposite: a published methodology and a public scorecard that includes the trades it got wrong. Transparency isn't an edge, but opacity should be a red flag.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>Search "AI stock scanner" or "best AI stock picker" today and you get a wall of tools that all promise the same thing in the same font: an algorithm, a neural network, a proprietary model that finds the moves before you do. The word "AI" is doing a lot of work in those headlines — and almost none of it is disclosure. It's persuasion. "AI" has quietly become the modern version of "secret formula": a phrase designed to make you stop asking how the thing actually works.</p>
+
+<p>The problem was never artificial intelligence. Plenty of honest tools use machine learning in the pipeline, and there's nothing wrong with a model. The problem is <strong>opacity</strong>, and "AI" is just the most fashionable wrapper for it. When a scanner hides behind the word, it's usually hiding two specific things: the formula it runs, and the record of how that formula has actually done.</p>
+
+<h2>The two things an opaque scanner won't show you</h2>
+
+<p>The first is the formula. If a tool ranks the entire market and hands you a verdict, the only question that matters is: <em>what is it weighing, and why?</em> A scanner that can't answer that is asking you to trust an output with no way to audit the input. "Our AI analyzes thousands of data points" is not an answer. It's a way of not answering. You can't disagree with a weighting you're not allowed to see, and you can't tell noise from signal when the whole thing is a black box.</p>
+
+<p>The second is the track record — and this is where "AI stock signals" marketing gets genuinely misleading. Look closely at how these tools present results. It's almost always a gallery of winners: a screenshot of the ticker that ran 40%, a testimonial, a green arrow. What's missing is the denominator. How many signals fired that week? How many went nowhere? How many were flatly wrong? A wall of winning trades with no losing trades isn't a track record — it's survivorship bias with a marketing budget. Any process that only publishes its wins is telling you it doesn't want you to keep score.</p>
+
+<p>"AI" makes both problems worse because complexity becomes the excuse. A simple weighted score is at least legible; you could, in principle, ask what each factor contributes. Once a vendor says "deep learning," the honesty bar somehow drops to zero, as if the math being complicated relieves them of the duty to show it to you. It doesn't. The more a model influences what you look at, the <em>more</em> you're owed an explanation, not less.</p>
+
+<h2>The opposite approach: publish the formula</h2>
+
+<p>Tapeline's answer to all of this is deliberately boring: show the formula. The score is a composite of six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — and each one is documented, including what data feeds it and where its lags are. Smart Money, for example, reads SEC Form 4 filings: the disclosures corporate insiders are legally required to file when they trade their own company's stock. Not a mysterious "institutional signal," not hedge-fund tea leaves — a specific, public filing you can go read yourself. You can walk through every factor's methodology on <a href="/how-it-works">how it works</a>. There is no hidden layer where the "real" model lives. The published formula <em>is</em> the model.</p>
+
+<p>The harder half is the losses. Tapeline runs a <a href="/scorecard">public scorecard</a> that tracks how the highest-scoring names actually performed afterward — and it publishes that record whether it's flattering or not. Right now it isn't especially flattering: over its tracked window the scorecard trails a simple S&P 500 index fund. That's stated plainly, on the page, because a scorecard that only shows good stretches would be exactly the survivorship theatre this whole post is complaining about. The honest reason to keep score isn't to prove the process wins. It's so you can see, in the open, whether it does.</p>
+
+<h2>What to actually look for</h2>
+
+<p>None of this requires taking a side on any particular competitor. It's a lens for reading all of them. When you evaluate any "AI" scanner — Trade Ideas, Tapeline, or the next one — the questions are the same: Can I see the formula, or just the output? Can I see the losses, or just the highlight reel? Is there a denominator anywhere? Our own side-by-side on <a href="/compare/trade-ideas">Tapeline vs Trade Ideas</a> is written to make those exact differences legible rather than to declare a winner. If a tool makes it hard to answer those three questions, that difficulty is itself the answer.</p>
+
+<h2>The honest caveat</h2>
+
+<p>Transparency is not the same thing as edge. A fully published formula can still be wrong, and Tapeline's currently underperforms a plain index — being able to read the methodology doesn't make the methodology correct. A visible track record describes the past; it does not forecast the next quarter, and past scores carry no promise about future ones. Nothing here is a recommendation to buy or sell anything, and none of it is investment advice — see the <a href="/legal/risk">risk disclosure</a> for the full version. The only claim being made is a modest one: a tool that shows you its formula and its losses has given you enough to judge it. A tool that hides both is asking you to judge nothing — and calling that "AI."</p>`,
+  },
+  {
+    slug: "sector-rotation-2026-q3",
+    title: "Sector Rotation Strategy: How to Read What's Leading (Q3 2026)",
+    excerpt: "Sector rotation sounds like a strategy but is really an observation — which of the eleven GICS sectors the market has been favouring, and which it has left behind. Heading through Q3 2026, here is how to read sector leadership honestly: regime first, then Relative Strength by sector, without pretending anyone can forecast the next rotation. It connects that read to Tapeline's Macro factor and per-sector pages.",
+    publishedAt: "2026-07-29",
+    author: "Tapeline",
+    body: `<p>"Sector rotation" is one of those phrases that sounds like a strategy and is really a description. Money does not march through the eleven equity sectors on a schedule you can set your watch to. But over weeks and months, leadership does shift — energy leads one stretch, technology another, utilities and staples take over when the market turns defensive. Reading which sectors are carrying the market, and which are lagging, is one of the oldest ways to understand what kind of market you are actually in.</p>
+
+<p>Heading through the third quarter of 2026, the question "what sectors are leading?" is being asked again, as it always is. This post is about how to read that honestly — without pretending anyone can forecast the next rotation. That distinction runs through everything below.</p>
+
+<h2>What sector rotation actually is</h2>
+<p>The US equity market is divided into eleven broad sectors under the GICS taxonomy: Information Technology, Health Care, Financials, Consumer Discretionary, Consumer Staples, Communication Services, Industrials, Energy, Utilities, Real Estate and Materials. Every listed company sits in exactly one. Sector rotation is simply the observation that, at any given time, relative performance concentrates in some of those buckets more than others — and that the concentration moves.</p>
+
+<p>The textbook version ties rotation to the business cycle: cyclicals and financials early, energy and materials late, staples and utilities and health care when growth slows. It is a useful vocabulary. As a timing tool it is unreliable — cycles are only obvious in hindsight, the labels blur, and every cycle insists it is different. Treat the framework as a way to describe what already happened, not a calendar for what happens next.</p>
+
+<h2>Regime first, sectors second</h2>
+<p>Before asking which sector leads, it helps to ask what kind of market is doing the leading. A rotation into defensives during a falling market means something different from a rotation into those same sectors during a broad advance. That is why Tapeline treats the market backdrop as its own input rather than burying it inside every ticker.</p>
+
+<p>That input is the <a href="/how-it-works/macro">Macro factor</a>, one of the six factors in the Tapeline Score. Macro reads a single market-wide regime classification and resolves it into one of three broad families — a rising or positive backdrop, a sideways or neutral one, and a falling or negative one. It is deliberately the same number for every ticker on a given tick: it describes the room, not the individual name. It is also strictly backward-looking, identifying a regime only once one is already under way, and it makes no forecast of when the regime will change. Read it as context, never as a prediction.</p>
+
+<h2>How to read which sectors are leading</h2>
+<p>Tapeline does not publish a "buy this sector" verdict, and it never will. What it does is score every name in the liquid universe on the same six factors, then let you slice that scored universe by sector. Each sector page shows how the names in one bucket are reading now — most usefully through Relative Strength, the factor that measures a ticker's price change against the broad-market benchmark over several horizons.</p>
+
+<ul>
+  <li>Start with the backdrop above: note which Macro regime family is in force, because the same leadership reads differently in a rising versus a falling market.</li>
+  <li>Open a sector page — for example <a href="/sector/information-technology">Information Technology</a>, <a href="/sector/energy">Energy</a> or <a href="/sector/utilities">Utilities</a> — and look at the spread of Relative Strength readings across the names inside it.</li>
+  <li>Compare that spread against other sectors. A sector where many names carry high Relative Strength is one the market has been favouring; a sector where most names lag is one it has been leaving behind. That comparison is the whole of what "leading" and "lagging" honestly mean.</li>
+</ul>
+
+<p>None of this tells you what a sector will do next. It tells you, in plain and checkable terms, what it has already done and how broadly. That is the honest ceiling of any rotation read, and it is where Tapeline deliberately stops.</p>
+
+<h2>What this cannot tell you</h2>
+<p>Sector leadership is a lagging description built on price that has already printed. Relative Strength is a difference between two returns, so a sector can "lead" over a stretch in which every name in it fell — because the benchmark fell further. Sector membership itself is coarse: a diversified conglomerate and a single-product company can share one bucket. And the Macro regime that frames all of it is a discrete label imposed on a continuous world, revised after the fact. You can see how each factor is built, and where each one fails, across the <a href="/how-it-works">methodology pages</a>; the live <a href="/scorecard">public scorecard</a> shows how the whole scored approach has actually done, including where it has trailed the market. Sector rotation is a lens for understanding the market you are in — not a signal for the one you are about to be in.</p>`,
+    howToSteps: [
+      { name: "Read the market regime first", text: "Start with the backdrop. Tapeline's Macro factor resolves the market-wide regime into a rising, sideways or falling family. The same sector leadership reads differently depending on which family is in force. It is context, not a forecast." },
+      { name: "Open the sector pages", text: "Open a sector page such as Information Technology, Energy or Utilities and look at the spread of Relative Strength readings across the names inside that GICS bucket." },
+      { name: "Compare leading versus lagging sectors", text: "Set one sector's spread of readings against the others. A sector where many names carry high Relative Strength is one the market has been favouring; a sector where most lag has been left behind. That comparison is all 'leading' honestly means." },
+      { name: "Note what the read cannot tell you", text: "Sector leadership is backward-looking, built on price that already printed. Relative Strength is a difference, so a sector can lead while its own names fell. Treat the read as description of the past, never a prediction of the next rotation." },
+    ],
+    howToTime: "PT5M",
+  },
+  {
     slug: "what-smart-money-actually-means",
     title: "What 'Smart Money' actually means in the Tapeline Score (and why it's not what you think).",
     excerpt:
