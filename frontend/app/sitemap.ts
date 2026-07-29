@@ -102,6 +102,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io";
   const now = new Date();
 
+  // Blog hub lastmod = the newest post date, so /blog is re-crawled whenever a
+  // post is added (its old static date told Google "nothing changed" here).
+  // POSTS is imported ONCE here and reused for the per-post entries below.
+  const { POSTS } = await import("./blog/posts");
+  const blogLastModified = POSTS.length
+    ? new Date(Math.max(...POSTS.map((p) => new Date(p.publishedAt).getTime())))
+    : new Date("2026-05-18");
+
   // Per-URL stable lastModified dates. Previously every entry used `now`,
   // which Google heuristics treat as "the whole site changed" — a signal
   // they're known to downweight (and a likely contributor to the 496
@@ -150,7 +158,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/sectors`,                   lastModified: now, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
-    { url: `${base}/blog`,                      lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
+    { url: `${base}/blog`,                      lastModified: blogLastModified, priority: 0.7 },
     { url: `${base}/changelog`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/roadmap`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/status`,                    lastModified: now, changeFrequency: "hourly", priority: 0.4 },
@@ -270,7 +278,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Blog posts — pulled from the same manifest the /blog routes use so
   // adding a post automatically lands in the sitemap.
-  const { POSTS } = await import("./blog/posts");
   const postEntries: MetadataRoute.Sitemap = POSTS.map((p) => ({
     url: `${base}/blog/${p.slug}`,
     lastModified: new Date(p.publishedAt),
