@@ -1,0 +1,42 @@
+name: IndexNow submit
+
+# Self-service search-engine indexing: pings IndexNow (Bing / Yandex / Seznam /
+# Naver) with the live sitemap so new + changed pages get crawled with zero
+# human login. Needs NO secrets — IndexNow authenticates via the key file
+# hosted at /<key>.txt (see frontend/public + frontend/scripts/indexnow-submit.mjs).
+#
+# NOTE: Google does not support IndexNow. Google indexing is discovery via the
+# sitemap it already has in Search Console; there is no public API to force it.
+
+on:
+  push:
+    branches: [main]
+    # Only when something crawlable actually changed.
+    paths:
+      - "frontend/app/blog/**"
+      - "frontend/app/**/page.tsx"
+      - "frontend/app/**/page.mdx"
+      - "frontend/app/sitemap.ts"
+  schedule:
+    # Weekly safety net (Mondays 06:17 UTC) in case a deploy path is missed.
+    - cron: "17 6 * * 1"
+  workflow_dispatch: {}
+
+# Don't let overlapping deploys double-submit.
+concurrency:
+  group: indexnow
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Wait for the Vercel deploy to publish (push events only)
+        if: github.event_name == 'push'
+        run: sleep 180
+      - name: Submit sitemap to IndexNow
+        run: node frontend/scripts/indexnow-submit.mjs
