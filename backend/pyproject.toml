@@ -48,6 +48,11 @@ dev = [
     "mypy>=1.13.0",
     "httpx>=0.28.0",
 ]
+# google-ads is heavy (grpc + protobuf) and only used by the cron script
+# app.scripts.upload_google_ads_conversions, so it's an OPTIONAL group — the
+# main runtime image stays lean. Install where the job runs:
+#   pip install 'tapeline-backend[ads]'   (or: pip install google-ads)
+ads = ["google-ads>=25.1.0"]
 
 [tool.ruff]
 line-length = 100
