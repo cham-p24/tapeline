@@ -104,6 +104,31 @@ async def delete_my_account(
         except Exception:  # confirmation must never block the erasure
             logger.exception("account.deletion_confirmation_email_failed user=%s", user_id)
 
+    # Stop billing BEFORE erasing the rows. Deleting the Subscription + User
+    # rows does NOT tell Stripe anything — the subscription stays active and
+    # keeps charging the ex-customer's card at the next cycle, and once the User
+    # row is gone the renewal webhooks can't even resolve the customer
+    # (webhooks key on stripe_customer_id), so the billing is orphaned. That's
+    # real money charged to someone who exercised GDPR erasure. Best-effort:
+    # cancel_all_subscriptions_now swallows Stripe errors and logs them, so a
+    # Stripe hiccup can't block a legally-required erasure — the log is the
+    # manual-follow-up hook.
+    if user.stripe_customer_id:
+        try:
+            from app.services.billing import cancel_all_subscriptions_now
+
+            n = await cancel_all_subscriptions_now(user.stripe_customer_id)
+            logger.info(
+                "account.deletion_cancelled_subs user=%s customer=%s count=%d",
+                user_id, user.stripe_customer_id, n,
+            )
+        except Exception:
+            logger.exception(
+                "account.deletion_stripe_cancel_failed user=%s customer=%s — "
+                "erasure proceeds; cancel this customer in Stripe manually",
+                user_id, user.stripe_customer_id,
+            )
+
     # Cascade delete user-owned rows
     await session.execute(delete(AlertEvent).where(AlertEvent.user_id == user_id))
     await session.execute(delete(AlertRule).where(AlertRule.user_id == user_id))

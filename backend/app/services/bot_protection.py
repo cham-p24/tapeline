@@ -61,11 +61,19 @@ DISPOSABLE_EMAIL_DOMAINS: set[str] = {
 
 
 def is_disposable_email(email: str) -> bool:
-    """True if the email domain is on the disposable-providers list."""
+    """True if the email domain is on the disposable-providers list.
+
+    Matches the domain OR any subdomain of it: providers like mailinator and
+    yopmail route every subdomain to the same public throwaway inboxes, so
+    foo@test.mailinator.com is just as disposable as foo@mailinator.com — an
+    exact-set membership check let the listed providers be bypassed for free.
+    """
     if "@" not in email:
         return False
     domain = email.rsplit("@", 1)[1].lower().strip()
-    return domain in DISPOSABLE_EMAIL_DOMAINS
+    return any(
+        domain == d or domain.endswith("." + d) for d in DISPOSABLE_EMAIL_DOMAINS
+    )
 
 
 def is_honeypot_tripped(value: str | None) -> bool:

@@ -29,15 +29,22 @@ class TokenBucket:
         async with self._lock:
             now = time.monotonic()
             b = self._buckets[key]
-            if b.capacity == 0:  # first use, initialize
-                b.capacity = capacity
-                b.refill_rate = capacity / per_seconds
-                b.tokens = capacity
-                b.last_refill = now
+            refill_rate = capacity / per_seconds
+            if b.capacity == 0:  # first use for this key
+                b.tokens = float(capacity)
             else:
-                elapsed = now - b.last_refill
-                b.tokens = min(b.capacity, b.tokens + elapsed * b.refill_rate)
-                b.last_refill = now
+                # Honor the CURRENT (capacity, per_seconds), not whatever the
+                # first caller froze in. Previously this else-branch reused
+                # b.capacity/b.refill_rate, so if a key was ever consumed with
+                # two different caps the FIRST one won forever — which silently
+                # killed limit_strict's 10/min cap once the 120/min middleware
+                # limiter initialized the shared key. Callers now also namespace
+                # their keys (api:/strict:/auth:), so a key maps to one cap; this
+                # keeps it correct even if that ever changes.
+                b.tokens = min(float(capacity), b.tokens + (now - b.last_refill) * refill_rate)
+            b.last_refill = now
+            b.capacity = float(capacity)
+            b.refill_rate = refill_rate
 
             if b.tokens >= cost:
                 b.tokens -= cost
@@ -70,14 +77,21 @@ def _client_key(request: Request) -> str:
 
 async def limit_api(request: Request, capacity: int = 120, per_seconds: int = 60) -> None:
     """Default: 120 req/min per client. Strict enough to stop abusers, loose for humans."""
-    ok = await limiter.consume(_client_key(request), capacity, per_seconds)
+    # Namespaced key: the global middleware calls this on every /api/* request,
+    # so it must NOT share a bucket with limit_strict (which would let the
+    # 120/min budget satisfy the strict endpoints' intended 10/min cap).
+    ok = await limiter.consume(f"api:{_client_key(request)}", capacity, per_seconds)
     if not ok:
         raise HTTPException(status_code=429, detail="Too many requests. Slow down.")
 
 
 async def limit_strict(request: Request) -> None:
-    """Tighter limit for expensive endpoints (briefing send, checkout)."""
-    ok = await limiter.consume(_client_key(request), 10, 60)
+    """Tighter limit (10/min) for expensive endpoints (briefing send, checkout).
+
+    Its own `strict:` namespace so the always-first middleware limit_api bucket
+    can't pre-initialize and swallow this cap.
+    """
+    ok = await limiter.consume(f"strict:{_client_key(request)}", 10, 60)
     if not ok:
         raise HTTPException(status_code=429, detail="Too many requests.")
 
