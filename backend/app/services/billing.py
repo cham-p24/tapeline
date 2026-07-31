@@ -557,6 +557,43 @@ async def set_cancel_at_period_end(customer_id: str) -> datetime | None:
     return None
 
 
+async def cancel_all_subscriptions_now(customer_id: str) -> int:
+    """Immediately cancel EVERY live subscription for this customer.
+
+    Used by account deletion (GDPR Art. 17 erasure): once the account is gone
+    there is nobody to bill, so we stop charges NOW (not at period end), and we
+    cover the duplicate-conversion case where a customer holds more than one
+    subscription. Returns the number cancelled.
+
+    Best-effort by design: a missing Stripe key, an unreachable Stripe, or a
+    per-sub error is logged and never raised — an erasure request must complete
+    regardless. The log line is the manual-follow-up hook if a cancel didn't
+    land, so a deleted user is never left silently billed.
+    """
+    if not settings.stripe_secret_key:
+        return 0
+    try:
+        subs = await asyncio.to_thread(
+            stripe.Subscription.list, customer=customer_id, status="all", limit=100,
+        )
+    except stripe.error.StripeError:
+        logger.exception("stripe.cancel_all_list_failed customer=%s", customer_id)
+        return 0
+    cancelled = 0
+    for sub in list(getattr(subs, "data", None) or []):
+        if _sub_field(sub, "status") in ("canceled", "incomplete_expired"):
+            continue
+        try:
+            await asyncio.to_thread(stripe.Subscription.cancel, _sub_id(sub))
+            cancelled += 1
+        except stripe.error.StripeError:
+            logger.exception(
+                "stripe.cancel_all_failed customer=%s sub=%s",
+                customer_id, _sub_id(sub),
+            )
+    return cancelled
+
+
 def parse_webhook(payload: bytes, signature: str) -> stripe.Event:
     """Verify and parse a Stripe webhook."""
     try:

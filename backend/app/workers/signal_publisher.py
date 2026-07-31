@@ -10,7 +10,7 @@ import asyncio
 import logging
 from datetime import UTC, date, datetime
 
-from sqlalchemy import delete, desc, select, update
+from sqlalchemy import delete, desc, func, select, update
 
 from app.config import get_settings
 from app.db import session_scope
@@ -1550,11 +1550,17 @@ async def _refresh_fundamentals_cache() -> None:
     )
 
     async with session_scope() as session:
-        # Order by an approximation of $-volume. NULLs land last via the desc
-        # sort (NULLs are treated as min in most dialects under DESC).
+        # Order by an approximation of $-volume, LIQUID FIRST. Newly discovered
+        # tickers have volume=price=NULL until they get a snapshot, and there
+        # are ~3200 of those vs a 2500 cap. Under a plain `desc(volume*price)`,
+        # Postgres (prod/Neon) sorts NULL FIRST — so the cap fills with illiquid
+        # NULL-volume names and the liquid universe never gets real sub-scores
+        # cached (leaving mock values in prod). SQLite (dev) sorts NULL last, so
+        # it looked fine locally. coalesce(..., -1) is the cross-dialect NULLS
+        # LAST used in services/universe.py — keep them in sync.
         result = await session.execute(
             select(Ticker.symbol, Ticker.volume, Ticker.price)
-            .order_by(desc(Ticker.volume * Ticker.price))
+            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
             .limit(FUNDAMENTALS_CAP)
         )
         symbols = [row[0] for row in result.all()]
@@ -1688,7 +1694,8 @@ async def _refresh_aggregates_cache() -> bool:
     async with session_scope() as session:
         result = await session.execute(
             select(Ticker.symbol)
-            .order_by(_desc(Ticker.volume * Ticker.price))
+            # NULLS LAST across dialects — see _refresh_fundamentals_cache.
+            .order_by(_desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
             .limit(AGGREGATES_CAP)
         )
         symbols = [row[0] for row in result.all() if row[0] != "SPY"]
@@ -1747,7 +1754,8 @@ async def _refresh_insider_cache() -> None:
     async with session_scope() as session:
         result = await session.execute(
             select(Ticker.symbol)
-            .order_by(desc(Ticker.volume * Ticker.price))
+            # NULLS LAST across dialects — see _refresh_fundamentals_cache.
+            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
             .limit(INSIDER_CAP)
         )
         symbols = [row[0] for row in result.all()]
