@@ -74,6 +74,10 @@ async def submit_contact(body: ContactMessage, request: Request) -> dict:
     safe_email = _html.escape(body.email)
     safe_subject = _html.escape(subject)
     safe_msg_html = _html.escape(body.message.strip()).replace("\n", "<br>")
+    # The IP comes from client-supplied headers (cf-connecting-ip / X-Forwarded-For)
+    # and is otherwise the one field interpolated raw — escape it too, or an
+    # attacker injects arbitrary markup (phishing links) into the support email.
+    safe_ip = _html.escape(ip)
 
     html = f"""<!doctype html><html><body style="font-family:Inter,system-ui,sans-serif;background:#0a0a0a;color:#f4f4f5;padding:24px;margin:0;">
   <div style="max-width:560px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
@@ -81,7 +85,7 @@ async def submit_contact(body: ContactMessage, request: Request) -> dict:
     <h1 style="margin:0 0 16px;font-size:18px;">{safe_subject}</h1>
     <table style="width:100%;font-size:14px;border-collapse:collapse;">
       <tr><td style="padding:6px 0;color:#9ca3af;width:80px;">From</td><td style="padding:6px 0;">{safe_name} &lt;{safe_email}&gt;</td></tr>
-      <tr><td style="padding:6px 0;color:#9ca3af;">IP</td><td style="padding:6px 0;font-family:'JetBrains Mono',monospace;font-size:12px;">{ip}</td></tr>
+      <tr><td style="padding:6px 0;color:#9ca3af;">IP</td><td style="padding:6px 0;font-family:'JetBrains Mono',monospace;font-size:12px;">{safe_ip}</td></tr>
     </table>
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1f1f23;line-height:1.55;">{safe_msg_html}</div>
     <p style="margin-top:24px;color:#6b7280;font-size:12px;">Reply directly to {safe_email} to respond.</p>

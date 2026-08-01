@@ -22,6 +22,7 @@ from app.models import (
     User,
     Watchlist,
     WatchlistItem,
+    WatchlistTrackRecordEntry,
     WebPushSubscription,
 )
 from app.services.auth import current_user_required
@@ -140,6 +141,17 @@ async def delete_my_account(
     await session.execute(delete(WebPushSubscription).where(WebPushSubscription.user_id == user_id))
     await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.user_id == user_id))
     await session.execute(delete(RoadmapVote).where(RoadmapVote.user_id == user_id))
+    # watchlist_track_record (migration 0042) has a user_id FK with NO ON DELETE
+    # CASCADE, and — unlike some sibling tables — it isn't cascaded from
+    # delete(User). Without this explicit delete, delete(User) below raises a
+    # ForeignKeyViolation on Postgres and the whole commit rolls back: the
+    # account survives even though the deletion email + Stripe cancel already
+    # fired (a misleading half-done erasure). On SQLite it would instead orphan
+    # the rows (user data surviving a GDPR erasure). Delete it explicitly, in
+    # the same style as the other non-cascade children above.
+    await session.execute(
+        delete(WatchlistTrackRecordEntry).where(WatchlistTrackRecordEntry.user_id == user_id)
+    )
     await session.execute(delete(Subscription).where(Subscription.user_id == user_id))
     await session.execute(delete(ApiKey).where(ApiKey.user_id == user_id))
     await session.execute(delete(User).where(User.id == user_id))
