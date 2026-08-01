@@ -415,7 +415,7 @@ export default async function BestStocksForStrategyPage({
             Run this scan live + every other strategy.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Full
             ~2,500-ticker live universe, every sort/filter combination, watchlist + alerts.
           </p>
