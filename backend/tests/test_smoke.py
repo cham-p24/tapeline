@@ -280,15 +280,22 @@ def test_email_normalisation():
 
 
 def test_ip_signup_rate_limit():
-    """3 signups per IP per 24h is the hard cap."""
-    from app.services.trial_abuse import record_signup, signup_allowed, signup_count_24h
+    """The per-IP signup cap (MAX_PER_IP_PER_24H) is enforced per 24h. Tracks the
+    constant rather than a hardcoded number so tuning the cap (raised 3 -> 25 to
+    stop 429ing legitimate shared/CGNAT paid traffic) doesn't break this guard."""
+    from app.services.trial_abuse import (
+        MAX_PER_IP_PER_24H,
+        record_signup,
+        signup_allowed,
+        signup_count_24h,
+    )
     ip = "10.20.30.40"  # never used elsewhere in tests
     assert signup_count_24h(ip) == 0
-    for _ in range(3):
+    for _ in range(MAX_PER_IP_PER_24H):
         assert signup_allowed(ip)
         record_signup(ip)
-    assert not signup_allowed(ip), "4th signup must be blocked"
-    assert signup_count_24h(ip) == 3
+    assert not signup_allowed(ip), "signup past the cap must be blocked"
+    assert signup_count_24h(ip) == MAX_PER_IP_PER_24H
 
 
 def test_fingerprint_cap_is_tolerant():
@@ -310,7 +317,7 @@ async def test_signup_ip_cap_keys_off_xforwarded_for(client, monkeypatch):
     """Regression guard for the global-cap bug. Behind Fly's edge proxy,
     request.client.host is the proxy's internal peer IP (identical for every
     visitor), so the per-IP signup cap MUST key off X-Forwarded-For — otherwise
-    it collapses into a GLOBAL 3-per-24h limit that 429s everyone. We prove the
+    it collapses into a GLOBAL per-IP limit that 429s everyone. We prove the
     fix by confirming the signup is accounted under the XFF client IP, not the
     loopback test-client IP. If the handler reverts to request.client.host, the
     count under the XFF IP stays 0 and this fails."""
