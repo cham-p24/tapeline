@@ -78,7 +78,7 @@ export function OnboardingTip() {
                 <Link href="/app/watchlist" className="text-fg hover:text-accent transition-colors">
                   Set up a watchlist
                 </Link>{" "}
-                — one click adds 8 mega-caps + SPY so smart alerts can fire from day one.
+                — one click adds a starter set of mega-caps plus SPY so smart alerts can fire from day one.
               </span>
             </li>
             <li className="flex items-start gap-2">
