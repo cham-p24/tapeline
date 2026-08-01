@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { FREE_LIMITS } from "@/lib/pricing";
 import { track } from "@vercel/analytics";
 
 /**
@@ -10,6 +11,14 @@ import { track } from "@vercel/analytics";
  * left. Sits bottom-right on desktop, hidden on mobile (TrialBanner already
  * does the heavy lifting there — adding a second floating card on a small
  * viewport is hostile).
+ *
+ * The body NAMES the Premium → Free feature delta (what Free keeps vs what
+ * Pro/Premium add), derived from FREE_LIMITS so it can't drift from the
+ * enforced caps. During the trial every Free wall is suppressed, so a trial
+ * user never feels what they'd lose until the walls appear at trial end — by
+ * which point most have gone. Stating the delta here, while they still hold
+ * Premium, is the primary trial→paid lever. It is a factual account statement,
+ * never urgency: do NOT add "act now" / "last chance" / a price deadline.
  *
  * COMPLIANCE (Rule 6 — see docs/COMPLIANCE_COPY_RULES.md): stating the days
  * remaining on the user's OWN trial is permitted, because it is a factual
@@ -83,11 +92,13 @@ export function TrialEarlyCapture() {
               Your Premium trial has {daysLeft} {daysLeft === 1 ? "day" : "days"} left
             </div>
             <p className="mt-1 text-xs text-muted">
-              Adding a card now doesn&rsquo;t charge you and doesn&rsquo;t
-              shorten the trial &mdash; your remaining days stay, and the first
-              charge would only happen when the trial ends. If you&rsquo;d
-              rather not, the account moves to Free on its own. Nothing to
-              cancel either way.
+              You have every Premium feature right now. When the trial ends,
+              Free keeps the top {FREE_LIMITS.scannerRows} scored rows and{" "}
+              {FREE_LIMITS.dailyLookups} look-ups a day &mdash; the full
+              real-time universe and unlimited look-ups are Pro and Premium.
+              Adding a card keeps them on; it doesn&rsquo;t charge you or
+              shorten the trial, and if you&rsquo;d rather not, the account
+              moves to Free on its own &mdash; nothing to cancel.
             </p>
             <div className="mt-3 flex items-center gap-3">
               <Link
