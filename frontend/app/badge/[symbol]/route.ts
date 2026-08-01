@@ -97,15 +97,25 @@ function buildBadgeSvg(
   const leftBg = isDark ? "#0a0d14" : "#27272a"; // dark muted grey
   const leftFg = "#fafafa";
   const score = data?.score;
-  const scoreStr = score != null ? score.toFixed(0) : "—";
-  const sig = signalShort(data?.signal ?? null);
+  // XML-escape EVERY value interpolated into the SVG below. `label` is a raw
+  // query param and the error-branch `symbol` is the raw decoded path — both
+  // attacker-controlled; the rest are ours but escaped defensively. This route
+  // serves a genuine top-level image/svg+xml document, so without escaping a
+  // label like `</text><script>…</script>` breaks out of <text> and executes
+  // JS on the tapeline.io origin (reflected XSS; the CSP is Report-Only and
+  // does not block it, and the session cookie is domain-wide). `label` is also
+  // capped so a huge value can't bloat the badge.
+  const esc = (s: string): string =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const symE = esc(symbol);
+  const scoreStr = esc(score != null ? score.toFixed(0) : "—");
+  const sig = esc(signalShort(data?.signal ?? null));
   const rightBg = data ? signalColor(data.signal) : "#52525b";
   const rightFg = "#fafafa";
 
   // Layout: [ symbol · label | score · signal ]
-  // Left segment: "TAPELINE NVDA"
-  // Right segment: "76 STRONG"
-  const leftText = `${opts.label} ${symbol}`;
+  const leftText = `${esc(opts.label.slice(0, 24))} ${symE}`;
   const rightText = data ? `${scoreStr} ${sig}` : "—";
   const padX = 8;
   const leftW = textWidth(leftText) + padX * 2;
@@ -117,8 +127,8 @@ function buildBadgeSvg(
   // Build SVG. Inline styles + Verdana fallback chain (matches shields.io,
   // ensures consistent rendering across GitHub / GitLab / Bitbucket /
   // generic markdown renderers).
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" role="img" aria-label="Tapeline Score for ${symbol}: ${scoreStr}">
-  <title>Tapeline Score for ${symbol}: ${scoreStr} (${sig})</title>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" role="img" aria-label="Tapeline Score for ${symE}: ${scoreStr}">
+  <title>Tapeline Score for ${symE}: ${scoreStr} (${sig})</title>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#fff" stop-opacity=".06"/>
     <stop offset="1" stop-opacity=".15"/>
