@@ -94,7 +94,7 @@ export function TrialEarlyCapture() {
             <p className="mt-1 text-xs text-muted">
               You have every Premium feature right now. When the trial ends,
               Free keeps the top {FREE_LIMITS.scannerRows} scored rows and{" "}
-              {FREE_LIMITS.dailyLookups} look-ups a day &mdash; the full
+              {FREE_LIMITS.dailyLookups}{" "}look-ups a day &mdash; the full
               real-time universe and unlimited look-ups are Pro and Premium.
               Adding a card keeps them on; it doesn&rsquo;t charge you or
               shorten the trial, and if you&rsquo;d rather not, the account
