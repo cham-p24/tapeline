@@ -33,6 +33,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { Skeleton } from "@/components/Skeleton";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
+import { LandingCta } from "@/components/LandingCta";
 import { userLocale } from "@/lib/datetime";
 import { trackEvent } from "@/lib/gtag";
 import {
@@ -78,6 +79,18 @@ function ScorecardHero() {
         price did and what SPY did over the same two closes. Entries are never re-ranked, back-filled or
         removed, so what is here is what was published on the day, whichever way it went.
       </p>
+      {/* Offer + price + CTA. Lives INSIDE ScorecardHero so it renders in BOTH
+          the SSR/loading branch and the loaded branch — a paid ad landing page
+          previously had no in-body CTA at first paint and never showed a price.
+          LandingCta is descriptive-only (offer/pricing facts, no performance
+          claims), so it respects this page's Rule 3/4 constraints. */}
+      <LandingCta
+        from="scorecard"
+        showPreview={false}
+        primaryLabel="Start free — no card"
+        secondaryHref="/pricing"
+        secondaryLabel="See full pricing"
+      />
     </>
   );
 }
@@ -164,17 +177,6 @@ export default function ScorecardPage() {
       {scorecardSchema}
       <MarketingNav />
       <div className="mx-auto max-w-5xl px-6 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <Link href="/pricing" className="text-sm text-muted hover:text-fg">
-          See pricing →
-        </Link>
-        {/* Primary hero CTA points at /signup, NOT /app/scanner: the scanner is
-            gated, so an anonymous paid-traffic visitor clicking it was bounced
-            to /signin (a returning-user login wall). The trust-builder page now
-            converts cold traffic straight to the no-card trial. */}
-        <Link href="/signup?from=scorecard" className="btn-primary text-sm">Start free &mdash; no card &rarr;</Link>
-      </div>
-
       {/* H1 + mechanism intro. Shared with the SSR loading state via
           ScorecardHero so the H1 is present in the first-wave HTML. States the
           MECHANISM, not the outcome (Rule 3): no hit rate, no alpha, no
