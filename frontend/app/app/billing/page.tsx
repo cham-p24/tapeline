@@ -108,6 +108,14 @@ export default function BillingPage() {
   // who already added a card mid-trial.
   const isCardlessTrial = tier === "premium" && isOnTrial && hasBilling !== true;
 
+  // Stripe defers the first charge to the trial-end date ONLY when that date is
+  // >= 48h out (backend routers/billing.py); inside 48h it falls back to a
+  // charge-now session. So a cardless-trial user is billed TODAY iff < 48h left.
+  // Surface this honestly so "add a card" never implies a free continuation
+  // that actually charges immediately.
+  const chargesToday =
+    !!trialEndsAt && trialEndsAt.getTime() - Date.now() < 48 * 3_600_000;
+
   // Free users AND cardless trial users see the upgrade picker by default —
   // both groups arrive here to pick a plan (every conversion surface points
   // at /app/billing). Paid users see a tucked "Change plan" button — they're
@@ -591,8 +599,20 @@ export default function BillingPage() {
                 {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
               </div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
-                Add a card before then to lock in {meta.name} access. Otherwise your account moves to Free
-                forever — live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist.
+                {chargesToday ? (
+                  <>
+                    Your trial ends within 48 hours, so adding a card now starts
+                    your {meta.name} subscription and the first charge is today.
+                  </>
+                ) : (
+                  <>
+                    Adding a card now doesn&rsquo;t charge you today — the first
+                    charge is only on this date, and you can cancel any time
+                    before then and never be billed.
+                  </>
+                )}{" "}
+                Skip it and your account moves to Free forever — live scores,
+                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
