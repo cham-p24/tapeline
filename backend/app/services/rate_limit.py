@@ -56,9 +56,27 @@ limiter = TokenBucket()
 
 
 def client_ip(request: Request) -> str:
-    """Best client IP. Prefer Cloudflare's un-forgeable cf-connecting-ip header
-    (set by the proxy, not the client), then fall back to the leftmost
-    X-Forwarded-For token, then the direct socket peer."""
+    """Best client IP, resolved for the actual topology (DNS-only Cloudflare).
+
+    tapeline.io / api.tapeline.io use Cloudflare for DNS ONLY — there is no
+    Cloudflare proxy in front of the origin, so every external request reaches
+    Fly's edge directly and Fly stamps the REAL client IP into `Fly-Client-IP`.
+    A client cannot forge that header: Fly's proxy sets it from the actual TCP
+    peer (overwriting any client-supplied value), and the app's internal port
+    is only reachable through that proxy. So in prod that header is present and
+    authoritative — key on it.
+
+    We deliberately do NOT trust `cf-connecting-ip` or the leftmost
+    `X-Forwarded-For` in production: with no Cloudflare proxy, both are just
+    attacker-supplied strings, and honoring them let a client rotate a fake IP
+    per request to sail past limit_auth and the per-IP signup cap. Those headers
+    survive only as a LOCAL-DEV convenience — reached solely when Fly-Client-IP
+    is absent (i.e. not running on Fly), where there is no adversary.
+    """
+    fly_ip = (request.headers.get("Fly-Client-IP") or "").strip()
+    if fly_ip:
+        return fly_ip
+    # Not on Fly (local dev / tests): old header order, no adversary here.
     xff = request.headers.get("X-Forwarded-For", "")
     return (
         request.headers.get("cf-connecting-ip")
