@@ -83,6 +83,39 @@ async def test_token_bucket_honors_the_passed_capacity_not_the_first_one():
     assert allowed <= 2, f"cap of 2 must hold after re-init; got {allowed}"
 
 
+# ── #3: client_ip keys on the un-forgeable Fly peer in prod ───────────────────
+
+def test_client_ip_uses_fly_header_and_ignores_forged_headers():
+    from app.services.rate_limit import client_ip
+
+    # In prod every request carries Fly-Client-IP (Fly-set, un-forgeable). A
+    # forged cf-connecting-ip / X-Forwarded-For must NOT move the key.
+    a = SimpleNamespace(
+        headers={"Fly-Client-IP": "9.9.9.9", "cf-connecting-ip": "1.1.1.1",
+                 "X-Forwarded-For": "2.2.2.2"},
+        client=SimpleNamespace(host="10.0.0.1"),
+    )
+    b = SimpleNamespace(
+        headers={"Fly-Client-IP": "9.9.9.9", "cf-connecting-ip": "3.3.3.3",
+                 "X-Forwarded-For": "4.4.4.4"},
+        client=SimpleNamespace(host="10.0.0.2"),
+    )
+    assert client_ip(a) == "9.9.9.9"
+    assert client_ip(b) == "9.9.9.9", "rotating forged headers must not change the key"
+
+
+def test_client_ip_dev_fallback_when_not_on_fly():
+    from app.services.rate_limit import client_ip
+
+    # No Fly-Client-IP (local dev / tests) → the old header order still works,
+    # so tests that simulate distinct clients keep functioning.
+    req = SimpleNamespace(
+        headers={"cf-connecting-ip": "1.2.3.4"},
+        client=SimpleNamespace(host="10.0.0.9"),
+    )
+    assert client_ip(req) == "1.2.3.4"
+
+
 # ── #4: disposable-email subdomain match ──────────────────────────────────────
 
 def test_disposable_subdomains_are_blocked_without_false_positives():
