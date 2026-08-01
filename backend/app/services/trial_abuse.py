@@ -12,11 +12,14 @@ Turnstile defences:
    permutations.
 
 2. **IP-based signup rate limit.** Tracks signups per IP address in a sliding
-   24-hour window in memory. If an IP has already created N (default 3)
-   accounts, the next signup attempt 429s. Resets on worker restart — fine
-   for the abuse profile we're worried about (drive-by trial farming, not
-   coordinated APT). Move to Redis-backed when concurrent fly machines
-   exceed one.
+   24-hour window in memory. If an IP has already created N (default 25)
+   accounts, the next signup attempt 429s. Kept deliberately generous: it is a
+   coarse backstop, not the primary defence — shared / CGNAT IPs carry many
+   legitimate users, so a low cap 429s real paid clicks. The device
+   fingerprint + email normalisation are the real farm defences. Resets on
+   worker restart — fine for the abuse profile we're worried about (drive-by
+   trial farming, not coordinated APT). Move to Redis-backed when concurrent
+   fly machines exceed one.
 """
 from __future__ import annotations
 
@@ -76,7 +79,16 @@ def normalise_email(email: str) -> str:
 _signup_log: dict[str, deque[float]] = defaultdict(deque)
 
 WINDOW_SECONDS = 24 * 60 * 60
-MAX_PER_IP_PER_24H = 3
+# Raised 3 -> 25 (2026-08). 3 was far too low once paid-search traffic scales:
+# the cap keys on the client IP, and shared / CGNAT addresses (mobile carriers,
+# offices, universities, cafes) route many *legitimate* users through a single
+# IP — so a low cap 429s real paid clicks at the signup goal line, with a
+# message that reads like the user did something wrong. The real anti-farm
+# layer is the device fingerprint (record_fingerprint_signup, 1/30d) + email
+# normalisation + honeypot + Turnstile, all of which run alongside this. The IP
+# cap is only a coarse backstop against a lazy single-IP farmer, so keep it
+# generous to avoid collateral damage to shared-IP cohorts.
+MAX_PER_IP_PER_24H = 25
 
 
 def signup_allowed(ip: str | None) -> bool:
