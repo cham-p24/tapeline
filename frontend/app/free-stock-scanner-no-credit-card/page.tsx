@@ -305,7 +305,7 @@ export default function FreeStockScannerNoCreditCardPage() {
             Start free — no credit card, nothing to cancel.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. The 14-day
             Premium trial needs no card either.
           </p>

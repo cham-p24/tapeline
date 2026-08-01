@@ -230,7 +230,7 @@ export default function VsWallStreetZenPage() {
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
           Free forever tier (live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day) — no card.
-          Pro from {usd(PRICING.pro.monthly)}/mo ({usd(PRICING.pro.annual)}/yr), with a
+          Pro from {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr), with a
           {" "}{REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">

@@ -56,11 +56,11 @@ describe("LandingCta", () => {
     expect(screen.getByText(/30-day money-back guarantee/i)).toBeInTheDocument();
     // Founding Pro price is read from the single source of truth, not
     // hardcoded. The price sits in its own <li> split across text nodes
-    // ("Pro from", "$9.99", "/mo · ", "$99.00", "/yr"), so match on the
+    // ("Pro from", "$8.25", "/mo · ", "$99.00", "/yr"), so match on the
     // list item's combined textContent rather than a single text node.
     const offerStrip = screen.getByRole("list", { name: /pricing and guarantee/i });
     const text = offerStrip.textContent ?? "";
-    expect(text).toContain(`Pro from ${usd(PRICING.pro.monthly)}`);
+    expect(text).toContain(`Pro from ${usd(PRICING.pro.annualPerMonth)}`);
     expect(text).toContain(usd(PRICING.pro.annual));
   });
 

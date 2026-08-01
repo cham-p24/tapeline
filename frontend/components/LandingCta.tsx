@@ -98,7 +98,7 @@ export function LandingCta({
           <Check /> 14-day Premium trial — no card, nothing charged
         </li>
         <li className="flex items-center gap-1.5">
-          <Check /> Pro from {usd(PRICING.pro.monthly)}/mo · {usd(PRICING.pro.annual)}/yr
+          <Check /> Pro from {usd(PRICING.pro.annualPerMonth)}/mo · {usd(PRICING.pro.annual)}/yr
         </li>
         <li className="flex items-center gap-1.5">
           <Check /> {REFUND.windowDays}-day money-back guarantee

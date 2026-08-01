@@ -328,7 +328,7 @@ export default function BestStockScannersPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner, free.</h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
