@@ -75,10 +75,10 @@ export function OnboardingTip() {
             <li className="flex items-start gap-2">
               <span className="text-accent flex-shrink-0">→</span>
               <span>
-                <Link href="/app/watchlist" className="text-fg hover:text-accent transition-colors">
-                  Set up a watchlist
+                <Link href="/app/ticker/NVDA" className="text-fg hover:text-accent transition-colors">
+                  Score a stock you know
                 </Link>{" "}
-                — one click adds a starter set of mega-caps plus SPY so smart alerts can fire from day one.
+                — see its 0-100 score and the 6-factor breakdown in one look, then search any ticker you own.
               </span>
             </li>
             <li className="flex items-start gap-2">
