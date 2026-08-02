@@ -27,6 +27,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useFirstRunTip } from "@/components/FirstRunTip";
 
 type Headline = {
   id: string;
@@ -44,6 +45,7 @@ const FETCH_LIMIT = 20;       // pulled per refresh
 const VISIBLE_COUNT = 3;       // shown simultaneously
 
 export function BreakingNewsBar() {
+  const { tipVisible } = useFirstRunTip();
   const [items, setItems] = useState<Headline[]>([]);
   const [startIdx, setStartIdx] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -76,7 +78,8 @@ export function BreakingNewsBar() {
     return () => clearInterval(t);
   }, [paused, items.length]);
 
-  if (items.length === 0) return null;
+  // Let a brand-new user focus on the first-run welcome, not the news ticker.
+  if (tipVisible || items.length === 0) return null;
 
   // Build the visible trio. Wraps around the end of the array so the
   // ticker never has empty cells even when fewer than VISIBLE_COUNT items

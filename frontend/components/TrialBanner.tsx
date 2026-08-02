@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useUser } from "@/components/UserContext";
+import { useFirstRunTip } from "@/components/FirstRunTip";
 
 /**
  * Premium-trial status banner. Shows on every /app page while the user's
@@ -37,6 +38,11 @@ const START_PHASE_DAYS_LEFT = TRIAL_DAYS - 1;
 
 export function TrialBanner() {
   const { user } = useUser();
+  const { tipVisible } = useFirstRunTip();
+  // The first-run OnboardingTip already states "your 14-day Premium trial is
+  // live" — don't stack the countdown on top of the welcome. Returns the moment
+  // the tip is dismissed.
+  if (tipVisible) return null;
   if (!user?.trial_ends_at) return null;
 
   const endsAt = new Date(user.trial_ends_at);

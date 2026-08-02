@@ -24,6 +24,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useFirstRunTip } from "@/components/FirstRunTip";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const STORAGE_KEY = "tapeline_upgrade_nudge_dismissed_at";
@@ -42,6 +43,7 @@ type Nudge = {
 
 export function UpgradeNudge() {
   const pathname = usePathname();
+  const { tipVisible } = useFirstRunTip();
   const [nudge, setNudge] = useState<Nudge | null>(null);
   // Start dismissed so a user who closed it yesterday never sees a flash
   // before the cooldown check resolves. hidden→shown is fine; shown→hidden
@@ -87,7 +89,9 @@ export function UpgradeNudge() {
   }
 
   const suppressedHere = SUPPRESSED_PREFIXES.some((p) => pathname?.startsWith(p));
-  if (suppressedHere || dismissed || !nudge) return null;
+  // Value before ask: don't upsell over the first-run welcome. The nudge
+  // returns once the OnboardingTip is dismissed.
+  if (tipVisible || suppressedHere || dismissed || !nudge) return null;
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
