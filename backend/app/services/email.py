@@ -3665,10 +3665,15 @@ async def run_activation_drip(
                     # act_wl reaches every tier; the watchlist step-one is a
                     # dead end for a Free recipient after the 2026-08-02 cutover
                     # (watchlist is Pro-and-up). Paid/trial recipients keep it.
+                    # Call the renderer directly (not via the loop's `renderer`,
+                    # which mypy narrows to the two stages' common (str)->str
+                    # signature and would reject the has_watchlist kwarg).
                     recipient_has_watchlist = (
                         user.tier in ("pro", "premium") or free_has_watchlist()
                     )
-                    html = renderer(user.name or "trader", has_watchlist=recipient_has_watchlist)
+                    html = render_activation_watchlist_email(
+                        user.name or "trader", has_watchlist=recipient_has_watchlist
+                    )
                 else:
                     html = renderer(user.name or "trader")
                 res = await send_email(
