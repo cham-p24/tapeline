@@ -225,6 +225,13 @@ function SignUpForm() {
       token = hidden?.value || "";
     }
     if (TURNSTILE_SITE_KEY && !token) {
+      // Instrument the friction: how often a real-looking submit is blocked
+      // because Turnstile never produced a token (its script blocked by a
+      // privacy extension / ad-blocker / corporate proxy, or the challenge
+      // failed). The gate is UNCHANGED — this only makes the drop-off
+      // measurable so the Cloudflare widget mode (managed vs always-interactive)
+      // can be tuned against real numbers instead of guesses.
+      track("signup_turnstile_blocked", { next });
       setErr("Please complete the bot check above.");
       return;
     }
