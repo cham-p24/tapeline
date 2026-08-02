@@ -15,12 +15,22 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { useFirstRunTip } from "@/components/FirstRunTip";
 
 const STORAGE_KEY = "tapeline_onboarding_dismissed_v1";
 
 export function OnboardingTip() {
   const { user, loading } = useUser();
+  const { setTipVisible } = useFirstRunTip();
   const [show, setShow] = useState(false);
+
+  // Publish our on-screen state so the promotional banners can yield while the
+  // welcome is up. Clear it on unmount too (e.g. navigating away from /app), so
+  // the stack is never left suppressed once the tip is gone.
+  useEffect(() => {
+    setTipVisible(show);
+    return () => setTipVisible(false);
+  }, [show, setTipVisible]);
 
   useEffect(() => {
     if (loading || !user) return;

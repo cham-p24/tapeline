@@ -15,6 +15,7 @@ import { DunningBanner } from "@/components/DunningBanner";
 import { UpgradeNudge } from "@/components/UpgradeNudge";
 import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
+import { FirstRunTipProvider } from "@/components/FirstRunTip";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 
 /**
@@ -119,16 +120,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <GlobalSearch />
 
         <div className="mx-auto max-w-7xl px-6 py-6">
+          {/* Account-health banners (always shown, action-required) sit OUTSIDE
+              the first-run provider so a welcome card can never hide a payment,
+              data, or verification warning. */}
           <DunningBanner />
           <StaleDataBanner />
           <EmailVerificationBanner />
-          <TrialBanner />
-          {/* Free→Pro nudge. Trialing users are on Premium → TrialBanner owns
-              their conversion moment; genuine Free users get this instead, so
-              the two never show together. Self-gating on /api/me.nudge. */}
-          <UpgradeNudge />
-          <BreakingNewsBar />
-          <OnboardingTip />
+          {/* First-run coordination: while the OnboardingTip welcome is up, the
+              promotional/status banners below yield so a brand-new user gets a
+              clean welcome. They return the moment the tip is dismissed. */}
+          <FirstRunTipProvider>
+            <TrialBanner />
+            {/* Free→Pro nudge. Trialing users are on Premium → TrialBanner owns
+                their conversion moment; genuine Free users get this instead, so
+                the two never show together. Self-gating on /api/me.nudge. */}
+            <UpgradeNudge />
+            <BreakingNewsBar />
+            <OnboardingTip />
+          </FirstRunTipProvider>
           {/* fade-in: 180ms opacity + 4px translateY on every route entry.
               `key={pathname}` forces a remount on each client-side nav so
               the CSS animation re-fires; without it the animation would
