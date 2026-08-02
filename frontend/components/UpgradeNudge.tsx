@@ -93,12 +93,29 @@ export function UpgradeNudge() {
   // returns once the OnboardingTip is dismissed.
   if (tipVisible || suppressedHere || dismissed || !nudge) return null;
 
+  // watchlist_cap comes straight from the server's date-gated free_watchlist_cap()
+  // (tier.py): it drops to 0 on/after FREE_WATCHLIST_REMOVAL_DATE, when the saved
+  // watchlist becomes Pro-only. Keying off the live value (not a client-side date)
+  // means the banner can never render a nonsensical "0-ticker watchlist" — instead
+  // the watchlist flips to a Pro selling point.
+  const freeHasSavedWatchlist = nudge.watchlist_cap > 0;
+
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
       <span className="text-fg">
-        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers,{" "}
-        a {nudge.watchlist_cap}-ticker watchlist.
-        Go Pro for the full real-time universe with unlimited look-ups, plus squeeze, regime &amp; heatmap.
+        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers
+        {freeHasSavedWatchlist ? (
+          <>
+            , a {nudge.watchlist_cap}-ticker watchlist. Go Pro for the full
+            real-time universe with unlimited look-ups, plus squeeze, regime
+            &amp; heatmap.
+          </>
+        ) : (
+          <>
+            . Go Pro for the full real-time universe with unlimited look-ups, a
+            saved watchlist, plus squeeze, regime &amp; heatmap.
+          </>
+        )}
       </span>
       <span className="flex shrink-0 items-center gap-2">
         <Link

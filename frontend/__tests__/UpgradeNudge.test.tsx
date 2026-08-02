@@ -32,6 +32,16 @@ const FREE_NUDGE = {
   watchlist_cap: 5,
 };
 
+// Post FREE_WATCHLIST_REMOVAL_DATE the server's date-gated free_watchlist_cap()
+// returns 0 (the saved watchlist is Pro-only from then on), so /api/me ships
+// watchlist_cap:0.
+const FREE_NUDGE_NO_WATCHLIST = {
+  id: "free_upgrade",
+  scanner_cap: 10,
+  delayed_hours: 0,
+  watchlist_cap: 0,
+};
+
 beforeEach(() => {
   try {
     localStorage.removeItem(STORAGE_KEY);
@@ -55,6 +65,25 @@ describe("UpgradeNudge", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /dismiss upgrade nudge/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("drops the watchlist clause and sells it as a Pro perk when watchlist_cap is 0", async () => {
+    // Regression: once the watchlist becomes Pro-only the server reports
+    // watchlist_cap:0. The banner must NEVER read "a 0-ticker watchlist" — it
+    // should omit the Free watchlist clause and pitch a saved watchlist as a
+    // Pro feature instead.
+    mockMe(FREE_NUDGE_NO_WATCHLIST);
+    render(<UpgradeNudge />);
+    expect(await screen.findByText(/top 10 tickers/i)).toBeInTheDocument();
+    // The bug this guards against: a literal "0-ticker watchlist".
+    expect(screen.queryByText(/0-ticker watchlist/i)).not.toBeInTheDocument();
+    // No Free "N-ticker watchlist" clause at all now.
+    expect(screen.queryByText(/-ticker watchlist/i)).not.toBeInTheDocument();
+    // Watchlist is repositioned as a Pro selling point.
+    expect(screen.getByText(/a saved watchlist/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /see pro plans/i }),
     ).toBeInTheDocument();
   });
 
