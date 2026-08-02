@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { track } from "@vercel/analytics";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { FREE_LIMITS } from "@/lib/pricing";
+import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -328,7 +328,7 @@ export function CancelInterceptModal({
                 ? "You'll keep full access until the end of your billing period. Changed your mind? Here's a reason to stay."
                 : // Downgrade description derives from FREE_LIMITS (mirrors
                   // backend tier.py) — never overstate what cancelling costs.
-                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.webPushAlerts} browser push alerts — no email or Telegram alerts. Cancel below, or take one of these instead.`}
+                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, ${freeHasWatchlist() ? `a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ` : ""}${FREE_LIMITS.webPushAlerts} browser push alerts — no email or Telegram alerts. Cancel below, or take one of these instead.`}
             </p>
 
             {error && <ErrorNote text={error} />}

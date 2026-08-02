@@ -1,6 +1,6 @@
 "use client";
 
-import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 import { useBillingPeriod } from "@/components/BillingToggle";
 
 /**
@@ -69,7 +69,7 @@ const SECTIONS: Section[] = [
   {
     name: "Watchlist & alerts",
     rows: [
-      { label: "Watchlist", free: `${FREE_LIMITS.watchlistTickers} tickers`, pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+      { label: "Watchlist", free: freeHasWatchlist() ? `${FREE_LIMITS.watchlistTickers} tickers` : "—", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
       { label: "Browser push", free: `${FREE_LIMITS.webPushAlerts} alert rules`, pro: "✓", premium: "✓" },

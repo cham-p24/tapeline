@@ -233,6 +233,15 @@ async def test_watchlist_cap_hit_persists(client, monkeypatch):
             "/api/watchlist", json={"symbol": "WLOVER"}, cookies=cookies
         )
         assert over.status_code == 403, over.text
+        # At cap 0 (post-cutover) the message must not tell a Free user to
+        # "remove a ticker first" — there's nothing to remove; it points them
+        # to Pro instead.
+        detail = over.json()["detail"]
+        if free_watchlist_cap() == 0:
+            assert "Pro" in detail
+            assert "Remove a ticker first" not in detail
+        else:
+            assert "Remove a ticker first" in detail
 
     assert await _cap_rows(uid, "watchlist_tickers") == 1
 

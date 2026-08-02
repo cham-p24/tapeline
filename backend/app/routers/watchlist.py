@@ -233,11 +233,17 @@ async def add_to_watchlist(
         # user at their 50-ticker ceiling never pollutes the free signal.
         # Fire-and-forget before the 403.
         await record_cap_hit(session, user.id, "watchlist_tickers", user.tier)
-        raise HTTPException(
-            403,
-            f"Watchlist limit reached ({cap} tickers on {tier}). "
-            f"Remove a ticker first, or upgrade for a larger watchlist.",
-        )
+        # At cap 0 (Free after the 2026-08-02 watchlist→Pro cutover) "remove a
+        # ticker first" is nonsensical — there's nothing to remove. Give the
+        # Free user the accurate reason instead.
+        if cap == 0:
+            detail = "Saved watchlists are a Pro feature — upgrade to add tickers to your watchlist."
+        else:
+            detail = (
+                f"Watchlist limit reached ({cap} tickers on {tier}). "
+                f"Remove a ticker first, or upgrade for a larger watchlist."
+            )
+        raise HTTPException(403, detail)
 
     # Resolve target list. Explicit list_id → validate ownership. Otherwise
     # use the user's default list (auto-create on first add). Either path
