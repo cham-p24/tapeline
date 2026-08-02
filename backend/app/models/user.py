@@ -184,6 +184,17 @@ class User(Base):
     lookups_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lookups_reset_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Public-API daily request quota, enforced PER ACCOUNT (not per key) — a
+    # user may mint up to tier.MAX_KEYS_PER_USER keys, but `api_requests_per_day`
+    # is a single per-account entitlement (the marketed "1,000 requests/day").
+    # `api_requests_today` is the running count for the UTC day named by
+    # `api_requests_reset_on` ("YYYY-MM-DD", matching ApiKey.requests_day); both
+    # roll over on the first call of a new day. Enforced atomically in
+    # app/services/api_keys.authenticate_api_key. (Per-key ApiKey.requests_today
+    # counters are kept for the /app/api-keys usage display only.)
+    api_requests_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    api_requests_reset_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
     # Per-user email preferences bitmask. See app.services.email_prefs for
     # the bit constants. Default 15 = all four suppressable categories on.
     # Transactional emails (welcome, payment-failed, referral) ignore this

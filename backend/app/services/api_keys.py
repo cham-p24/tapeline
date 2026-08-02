@@ -116,42 +116,61 @@ async def authenticate_api_key(session: AsyncSession, raw: str | None) -> tuple[
     cap = effective_limit(user, "api_requests_per_day")
     today = _today()
 
-    # Atomic read-modify-write: a single UPDATE that (a) resets the counter to 1
-    # on a day-rollover else increments it by 1, and (b) only matches when the
-    # key is under quota for *today*, encoded in the WHERE clause. Concurrent
-    # requests on one key serialise on the row write, so two callers can't both
-    # pass the cap and both increment. rowcount==0 means the quota guard in the
-    # WHERE rejected the bump -> over quota. (SQLite ignores row-level locking
-    # but is single-writer per transaction, so this is still safe in dev.)
-    new_today = case(
+    # PER-ACCOUNT quota gate. `api_requests_per_day` is a single per-account
+    # entitlement, but a user may hold up to MAX_KEYS_PER_USER keys — so the cap
+    # is enforced against ONE per-user counter, not each key's own. (Enforcing
+    # per-key let a user mint N keys for N x the cap and defeat the trial
+    # anti-abuse throttle.) Atomic read-modify-write on the User row (mirrors
+    # usage.consume_ticker_lookup): a single UPDATE that resets the counter to 1
+    # on a UTC-day rollover else increments it, matching ONLY when the account is
+    # under cap for *today*. Concurrent requests across ALL the user's keys now
+    # serialise on this one row write, so they can't collectively pass the cap.
+    # rowcount==0 -> the account is at/over quota. (SQLite is single-writer per
+    # transaction, so this is still safe in dev.)
+    new_account_today = case(
+        (User.api_requests_reset_on != today, 1),
+        else_=User.api_requests_today + 1,
+    )
+    gate = await session.execute(
+        update(User)
+        .where(
+            User.id == user.id,
+            (User.api_requests_reset_on != today) | (User.api_requests_today < cap),
+        )
+        .values(api_requests_today=new_account_today, api_requests_reset_on=today)
+    )
+    if gate.rowcount == 0:  # type: ignore[attr-defined]  # CursorResult.rowcount (DML)
+        await session.rollback()
+        raise HTTPException(
+            429,
+            f"Daily API quota of {cap:,} requests reached for your account. Resets at 00:00 UTC.",
+        )
+
+    # Per-KEY counters are display-only now (the /app/api-keys usage column and
+    # /api/v1/me both surface per-account figures) — bump them unconditionally,
+    # with the same day-rollover, but WITHOUT a cap gate: enforcement is the
+    # per-account UPDATE above.
+    new_key_today = case(
         (ApiKey.requests_day != today, 1),
         else_=ApiKey.requests_today + 1,
     )
-    result = await session.execute(
+    await session.execute(
         update(ApiKey)
-        .where(
-            ApiKey.id == row.id,
-            (ApiKey.requests_day != today) | (ApiKey.requests_today < cap),
-        )
+        .where(ApiKey.id == row.id)
         .values(
             requests_day=today,
-            requests_today=new_today,
+            requests_today=new_key_today,
             request_count_total=ApiKey.request_count_total + 1,
             last_used_at=datetime.now(UTC),
         )
     )
-    if result.rowcount == 0:  # type: ignore[attr-defined]  # CursorResult.rowcount (DML)
-        # WHERE didn't match -> the key is at/over its cap for today.
-        await session.rollback()
-        raise HTTPException(
-            429,
-            f"Daily API quota of {cap:,} requests reached for this key. Resets at 00:00 UTC.",
-        )
 
     await session.commit()
-    # Reflect the just-committed counters on the returned row (callers read
-    # these), without trusting the stale pre-UPDATE in-session values.
+    # Reflect the just-committed counters on the returned row + user (callers,
+    # incl. /api/v1/me, read these), without trusting the stale pre-UPDATE
+    # in-session values.
     await session.refresh(row)
+    await session.refresh(user)
     return user, row
 
 

@@ -106,6 +106,17 @@ async def _seed_key(
     return raw
 
 
+async def _set_account_quota(user_id: str, *, used: int, day: str | None) -> None:
+    """Seed the PER-ACCOUNT API quota counter on the user. Enforcement moved off
+    the per-key counter to a single per-user counter (migration 0044) so the cap
+    can't be multiplied by minting extra keys."""
+    async with session_scope() as s:
+        u = (await s.execute(select(User).where(User.id == user_id))).scalar_one()
+        u.api_requests_today = used
+        u.api_requests_reset_on = day
+        await s.commit()
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 1. Pure helpers
 # ════════════════════════════════════════════════════════════════════════════
@@ -260,7 +271,8 @@ async def test_quota_exhaustion_429(client, monkeypatch):
     async with client:
         _, uid = await _premium(client, monkeypatch)
         today = datetime.now(UTC).strftime("%Y-%m-%d")
-        raw = await _seed_key(uid, requests_today=1000, requests_day=today)  # at cap
+        await _set_account_quota(uid, used=1000, day=today)  # account at cap
+        raw = await _seed_key(uid)
         r = await client.get("/api/v1/me", headers={"X-API-Key": raw})
         assert r.status_code == 429, r.text
 
@@ -270,11 +282,33 @@ async def test_quota_resets_next_utc_day(client, monkeypatch):
     async with client:
         _, uid = await _premium(client, monkeypatch)
         yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d")
-        raw = await _seed_key(uid, requests_today=1000, requests_day=yesterday)  # yesterday at cap
+        await _set_account_quota(uid, used=1000, day=yesterday)  # yesterday at cap
+        raw = await _seed_key(uid)
         r = await client.get("/api/v1/me", headers={"X-API-Key": raw})
         assert r.status_code == 200, r.text
         # Counter rolled to a new day then counted this one call.
-        assert r.json()["quota"]["used_today"] == 1
+
+
+@pytest.mark.asyncio
+async def test_quota_is_shared_across_all_of_an_accounts_keys(client, monkeypatch):
+    """The daily quota is PER ACCOUNT, not per key — it can't be multiplied by
+    minting extra keys (that was the whole point of the fix)."""
+    async with client:
+        _, uid = await _premium(client, monkeypatch)
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        # One request under the 1,000/day cap.
+        await _set_account_quota(uid, used=999, day=today)
+        key_a = await _seed_key(uid)
+        key_b = await _seed_key(uid)
+        # The 1,000th request (on key A) is allowed and tips the account to cap.
+        r1 = await client.get("/api/v1/me", headers={"X-API-Key": key_a})
+        assert r1.status_code == 200, r1.text
+        assert r1.json()["quota"]["used_today"] == 1000
+        # The very next request — on a DIFFERENT key — is refused: the cap is the
+        # ACCOUNT's, not each key's. Pre-fix, key B had its own 0 counter and
+        # sailed through, giving up to MAX_KEYS_PER_USER x the cap.
+        r2 = await client.get("/api/v1/me", headers={"X-API-Key": key_b})
+        assert r2.status_code == 429, r2.text
 
 
 @pytest.mark.asyncio
