@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 vi.mock("@/components/UserContext", () => ({ useUser: vi.fn() }));
 vi.mock("@/lib/useLiveStream", () => ({
@@ -74,6 +75,17 @@ describe("Watchlist CSV export button", () => {
   it("shows the locked label for Free and opens the paywall instead of downloading", async () => {
     setUser("free");
     render(<WatchlistPage />);
+
+    if (!freeHasWatchlist()) {
+      // On/after FREE_WATCHLIST_REMOVAL_DATE the whole watchlist is Pro-only, so
+      // a Free user hits the full-page watchlist paywall — there is no in-page
+      // (locked) Export CSV button to find.
+      expect(
+        await screen.findByText(/watchlist is a Pro feature/i),
+      ).toBeInTheDocument();
+      expect(mockedExport).not.toHaveBeenCalled();
+      return;
+    }
 
     const btn = await screen.findByRole("button", { name: /Export CSV/ });
     expect(btn).toHaveTextContent("Export CSV · Pro");
