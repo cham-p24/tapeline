@@ -449,6 +449,40 @@ def _channel_entitled(user: User, channel: str) -> bool:
     return has_feature(tier, feature)
 
 
+# Rule TYPE -> the tier feature that entitles a user to that CONTENT. Mirrors
+# the create-time gate in routers/alerts.py:create_rule. `score` is the base
+# product (the ungated Free web-push "taste"); the paid signal types map to the
+# same features the scanner enforces.
+_RULE_TYPE_FEATURE: dict[str, str] = {
+    "squeeze": "squeeze.full",
+    "regime": "regime.full",
+    "news": "news.full",
+    "congress": "congress.feed",
+}
+
+
+def _content_entitled(user: User, rule_type: str) -> bool:
+    """Re-check the user's CURRENT tier against the rule TYPE's content feature.
+
+    The channel gate (`_channel_entitled`) only decides HOW an alert is
+    delivered; this decides WHETHER the user may still receive this rule type's
+    paid content at all. Same "rules outlive their entitlement" problem: a Premium
+    trial user authors a congress/squeeze/regime/news rule, the trial lapses to
+    Free, and without this the rule keeps firing its Pro/Premium body. `score`
+    (and any unmapped type) is ungated.
+    """
+    from app.services.tier import Tier, has_feature
+
+    feature = _RULE_TYPE_FEATURE.get(rule_type)
+    if feature is None:
+        return True
+    try:
+        tier = Tier(user.tier)
+    except ValueError:
+        return False
+    return has_feature(tier, feature)
+
+
 async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
     """True when the user has already used their `email_alerts_per_day` cap.
 
@@ -546,7 +580,27 @@ async def _fire(
     session.add(event)
     rule.last_fired_at = datetime.now(UTC)
 
-    # Tier re-check at SEND time, not just at rule-creation time. Record the
+    # CONTENT-tier re-check at SEND time. This decides whether the user may
+    # still receive this rule TYPE's paid content at all — independent of the
+    # delivery channel. A `congress`/`squeeze`/`regime`/`news` rule authored on
+    # a Premium trial keeps firing after the trial lapses to Free
+    # (_downgrade_expired_trials only flips tier), so without this it would
+    # deliver Pro/Premium content to a Free user — most reachably via the Free
+    # `web_push` channel, which `_channel_entitled` does NOT suppress. Redact the
+    # premium body entirely (don't just skip the send): the AlertEvent.message is
+    # readable at GET /api/alerts/events, so the full body must never be stored
+    # for a caller who isn't entitled to it. Mirrors routers/alerts.py.
+    if not _content_entitled(user, rule.rule_type):
+        event.delivered = False
+        _feat = _RULE_TYPE_FEATURE.get(rule.rule_type, rule.rule_type)
+        event.message = f"[suppressed: {rule.rule_type} alerts require {_feat}]"
+        logger.info(
+            "alert.suppressed_content_tier user=%s rule=%s type=%s tier=%s",
+            user.id, rule.id, rule.rule_type, user.tier,
+        )
+        return
+
+    # CHANNEL re-check at SEND time, not just at rule-creation time. Record the
     # event either way so the user can see in /app/alerts/history that the rule
     # DID fire — the channel just isn't on their current plan.
     if not _channel_entitled(user, rule.channel):

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -139,6 +139,13 @@ async def delete_rule(
     rule = result.scalar_one_or_none()
     if rule is None:
         raise HTTPException(404, "Rule not found")
+    # Delete the rule's AlertEvent rows FIRST. alert_events.rule_id is a NOT-NULL
+    # FK with no ON DELETE behaviour and there's no ORM relationship/cascade, so
+    # on production Postgres deleting a rule that has ever fired raises a
+    # ForeignKeyViolation (23503) → HTTP 500, and the user can never delete it.
+    # SQLite (FKs off by default in tests) hides this. Mirrors the order in
+    # routers/account.py's account-deletion path.
+    await session.execute(delete(AlertEvent).where(AlertEvent.rule_id == rule_id))
     await session.delete(rule)
     await session.commit()
     return {"ok": True}

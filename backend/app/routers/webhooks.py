@@ -296,6 +296,19 @@ async def stripe_webhook(
         # Update user tier if subscription is active/trialing
         if p["status"] in ("active", "trialing"):
             user.tier = p["tier"]
+            # Link the Stripe customer if we resolved this user via the metadata
+            # fallback (stripe_customer_id still NULL — a first-time subscriber
+            # whose checkout.session.completed hasn't been processed yet). Stripe
+            # does NOT guarantee event ordering, and _downgrade_expired_trials
+            # (signal_publisher.py) treats stripe_customer_id IS NULL as "never
+            # paid": without this, the hourly downgrade task can drop a brand-new
+            # paying subscriber back to Free in the window before checkout.session
+            # .completed lands (which sets stripe_customer_id but NOT tier),
+            # stranding a paying customer at Free. Only set when NULL so the
+            # deliberate duplicate-conversion path (which adopts a *different*
+            # already-linked customer at checkout.session.completed) is untouched.
+            if user.stripe_customer_id is None:
+                user.stripe_customer_id = customer_id
             # Clear stale retention bookkeeping so the cancel-intercept modal
             # and winback drip never act on dead state. Two independent flips:
             #   • un-cancel — if the sub is no longer scheduled to cancel at

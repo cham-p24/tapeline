@@ -372,14 +372,33 @@ _MODEL_COSTS_USD_PER_MTOK: dict[str, tuple[float, float, float]] = {
 _DEFAULT_COST = _MODEL_COSTS_USD_PER_MTOK["claude-sonnet-4-5"]
 
 
-def _cost_for(model: str, input_tokens: int, cached_tokens: int, output_tokens: int) -> Decimal:
+def _cost_for(
+    model: str,
+    input_tokens: int,
+    cached_tokens: int,
+    output_tokens: int,
+    cache_creation_tokens: int = 0,
+) -> Decimal:
     """Approximate USD cost for a single classification call. Uses the
-    Sonnet pricing table as a conservative fallback for unknown models."""
+    Sonnet pricing table as a conservative fallback for unknown models.
+
+    Anthropic's Messages API reports usage.input_tokens NET of cache:
+    input_tokens, cache_read_input_tokens and cache_creation_input_tokens are
+    THREE separate additive buckets (total = their sum). Bill each at its own
+    rate — do NOT subtract cache_read from input_tokens. The old code did
+    (`uncached = input_tokens - cached_tokens`), which double-discounted the
+    fresh input: whenever the cached ~600-token system block was larger than the
+    fresh user block the uncached cost clamped to $0, so every classification
+    was recorded far cheaper than it was and INBOX_CLAUDE_DAILY_CAP_USD
+    (enforced off SUM(cost_usd)) tripped only after real spend had blown past it.
+    """
     in_rate, out_rate, cache_rate = _MODEL_COSTS_USD_PER_MTOK.get(model, _DEFAULT_COST)
-    # Anthropic's API counts cached_tokens as part of input_tokens; subtract
-    # so we don't double-bill the cached portion at the full input rate.
-    uncached = max(0, input_tokens - cached_tokens)
-    total = (uncached * in_rate + cached_tokens * cache_rate + output_tokens * out_rate) / 1_000_000
+    total = (
+        input_tokens * in_rate               # fresh input (already excludes cache)
+        + cache_creation_tokens * in_rate * 1.25  # cache write ≈ 1.25x input
+        + cached_tokens * cache_rate         # cache read ≈ 0.1x input
+        + output_tokens * out_rate
+    ) / 1_000_000
     return Decimal(str(round(total, 6)))
 
 
@@ -574,9 +593,10 @@ async def classify_with_llm(
     input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
     output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
     cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+    cache_creation = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
 
     tier_val, reason, reply = _parse_llm_response(raw_text)
-    cost = _cost_for(model, input_tokens, cache_read, output_tokens)
+    cost = _cost_for(model, input_tokens, cache_read, output_tokens, cache_creation)
 
     await _log_classification(
         session,

@@ -276,8 +276,17 @@ class TestCostAccounting:
         assert cost == Decimal("18.000000")
 
     def test_cached_tokens_discounted(self):
+        # usage.input_tokens is NET of cache — the 100_000 here is fresh input,
+        # billed in full; cache_read (90_000) bills at the discounted cache rate.
+        # (100_000*1.00 + 90_000*0.10 + 1_000*5.00) / 1e6 = 0.114000.
         cost = inbox_classifier._cost_for("claude-haiku-4-5", 100_000, 90_000, 1_000)
-        assert cost == Decimal("0.024000")
+        assert cost == Decimal("0.114000")
+
+    def test_cache_creation_billed_at_write_premium(self):
+        # cache_creation_input_tokens is a separate bucket billed ~1.25x input.
+        # (0*1.00 + 800*1.00*1.25 + 0*0.10 + 0*5.00) / 1e6 = 0.001000.
+        cost = inbox_classifier._cost_for("claude-haiku-4-5", 0, 0, 0, 800)
+        assert cost == Decimal("0.001000")
 
     def test_unknown_model_uses_conservative_fallback(self):
         cost_unknown = inbox_classifier._cost_for("claude-future-99", 1_000_000, 0, 0)
