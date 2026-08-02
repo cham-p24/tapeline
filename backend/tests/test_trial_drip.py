@@ -61,6 +61,7 @@ from app.services.tier import (
     FREE_DAILY_LOOKUPS,
     FREE_SCANNER_ROWS,
     FREE_WATCHLIST_TICKERS,
+    free_has_watchlist,
 )
 from app.workers import signal_publisher
 from app.workers.signal_publisher import _downgrade_expired_trials
@@ -136,7 +137,10 @@ def test_day7_quotes_current_free_caps():
     html = render_trial_day7_email("Alex", None)
     assert f"top {FREE_SCANNER_ROWS} rows" in html
     assert f"look-ups cap at {FREE_DAILY_LOOKUPS} a day" in html
-    assert f"watchlist caps at {FREE_WATCHLIST_TICKERS} tickers" in html
+    # The watchlist cap line is emitted only while the Free tier still HAS a
+    # watchlist; on/after FREE_WATCHLIST_REMOVAL_DATE the renderer drops it.
+    if free_has_watchlist():
+        assert f"watchlist caps at {FREE_WATCHLIST_TICKERS} tickers" in html
 
 
 def test_day13_quotes_current_free_caps():
@@ -149,7 +153,9 @@ def test_expired_quotes_current_free_caps():
     html = render_trial_expired_email("Alex", None)
     assert f"top {FREE_SCANNER_ROWS} scanner rows" in html
     assert f"{FREE_DAILY_LOOKUPS} ticker look-ups a day" in html
-    assert f"capped at {FREE_WATCHLIST_TICKERS} tickers on Free" in html
+    # See test_day7: watchlist line only present while Free still has one.
+    if free_has_watchlist():
+        assert f"capped at {FREE_WATCHLIST_TICKERS} tickers on Free" in html
 
 
 def test_subscription_canceled_quotes_current_free_caps():
