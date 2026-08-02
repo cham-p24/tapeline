@@ -916,8 +916,13 @@ def render_trial_ended_email(user_name: str) -> str:
     return shell(
         h1(f"Your trial just ended, {user_name}.")
         + lead(
-            "Your account is now on the Free plan. Your watchlist and settings "
-            "are intact — only the data feed changes."
+            "Your account is now on the Free plan. "
+            + (
+                "Your watchlist and settings are intact — only the data feed changes."
+                if free_has_watchlist()
+                else "Your settings are intact, and anything you saved to a watchlist is "
+                "kept — you'll need Pro to open the watchlist again."
+            )
         )
         + muted_paragraph(
             "If you want live data + alerts back, the door is always open."
@@ -926,7 +931,11 @@ def render_trial_ended_email(user_name: str) -> str:
         + footnote(
             "No hard feelings if not. The public scorecard stays free for everyone, forever."
         ),
-        preheader="You're on the Free plan now — settings + watchlist intact.",
+        preheader=(
+            "You're on the Free plan now — settings + watchlist intact."
+            if free_has_watchlist()
+            else "You're on the Free plan now — your settings and saved watchlist are kept."
+        ),
     )
 
 
