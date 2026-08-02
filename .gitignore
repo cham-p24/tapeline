@@ -66,6 +66,7 @@ latest_live_monitor.log
 # Test coverage
 coverage/
 .vitest-cache/
+.vite/
 
 # Playwright
 playwright-report/

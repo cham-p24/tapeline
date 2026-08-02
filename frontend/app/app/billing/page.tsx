@@ -721,7 +721,7 @@ export default function BillingPage() {
             <Plan
               name="Pro"
               price={billingPeriod === "annual" ? usd(TIER_META.pro.annualMonthly) : usd(TIER_META.pro.monthly)}
-              note={billingPeriod === "annual" ? `${usd(TIER_META.pro.annual)}/yr · billed annually · save $${annualSaving(TIER_META.pro)}` : "billed monthly"}
+              note={billingPeriod === "annual" ? `${usd(TIER_META.pro.annual)}/yr · billed annually · save $${annualSaving(TIER_META.pro)}${isCardlessTrial ? ` · or ${usd(TIER_META.pro.monthly)}/mo monthly` : ""}` : "billed monthly"}
               items={[
                 "Full ~2,500 ticker universe, live",
                 "Score breakdown + Why on every row",
@@ -741,7 +741,7 @@ export default function BillingPage() {
             <Plan
               name="Premium"
               price={billingPeriod === "annual" ? usd(TIER_META.premium.annualMonthly) : usd(TIER_META.premium.monthly)}
-              note={billingPeriod === "annual" ? `${usd(TIER_META.premium.annual)}/yr · billed annually · save $${annualSaving(TIER_META.premium)}` : "billed monthly"}
+              note={billingPeriod === "annual" ? `${usd(TIER_META.premium.annual)}/yr · billed annually · save $${annualSaving(TIER_META.premium)}${isCardlessTrial ? ` · or ${usd(TIER_META.premium.monthly)}/mo monthly` : ""}` : "billed monthly"}
               proPlus
               items={[
                 "Congressional trades feed (House + Senate)",
