@@ -265,13 +265,18 @@ def test_changelog_copy_quotes_the_live_free_tier_caps():
         FREE_SCANNER_ROWS,
         FREE_WATCHLIST_TICKERS,
         FREE_WEB_PUSH_ALERTS,
+        free_has_watchlist,
     )
 
     html = render_free_tier_changelog_email("Alex")
     text = render_free_tier_changelog_text("Alex")
     for blob in (html, text):
         assert "Alex" in blob
-        assert str(FREE_WATCHLIST_TICKERS) in blob
+        # The watchlist cap is only quoted while the free tier still HAS a
+        # watchlist. On/after FREE_WATCHLIST_REMOVAL_DATE it becomes Pro+ and
+        # the email correctly drops that line, so only assert it before then.
+        if free_has_watchlist():
+            assert str(FREE_WATCHLIST_TICKERS) in blob
         assert str(FREE_DAILY_LOOKUPS) in blob
         assert str(FREE_SCANNER_ROWS) in blob
         assert str(FREE_WEB_PUSH_ALERTS) in blob

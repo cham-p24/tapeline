@@ -47,6 +47,7 @@ from app.services.tier import (
     FREE_WATCHLIST_TICKERS,
     FREE_WEB_PUSH_ALERTS,
     Tier,
+    free_watchlist_cap,
 )
 
 
@@ -217,8 +218,12 @@ async def test_daily_lookups_cap_hit_persists(client, monkeypatch):
 async def test_watchlist_cap_hit_persists(client, monkeypatch):
     async with client:
         cookies, uid = await _free(client, monkeypatch)
-        # Fill to the free watchlist cap.
-        for i in range(FREE_WATCHLIST_TICKERS):
+        # Fill to the free watchlist cap — read from the SAME date-gated source
+        # the router enforces (free_watchlist_cap), so this stays correct across
+        # the FREE_WATCHLIST_REMOVAL_DATE cutover. On/after that date the cap is
+        # 0 (watchlist is Pro+), the loop adds nothing, and the single add below
+        # is itself the cap-hit that records the one watchlist_tickers row.
+        for i in range(free_watchlist_cap()):
             r = await client.post(
                 "/api/watchlist", json={"symbol": f"WL{i}"}, cookies=cookies
             )
