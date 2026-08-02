@@ -541,6 +541,16 @@ async def oauth_callback(
             profile = ui.json()
             email = (profile.get("email") or "").lower().strip()
             name = profile.get("name")
+            # Google reports whether it has verified control of this address
+            # (`verified_email` on the v2 userinfo endpoint, `email_verified` on
+            # OpenID). If it explicitly says the address is NOT verified, we
+            # cannot treat this login as proof of email ownership — refuse rather
+            # than risk merging into (or vouching for) an address the Google user
+            # doesn't actually control. Missing/None is treated as verified
+            # (Google practically always verifies), only an explicit false blocks.
+            _verified = profile.get("email_verified", profile.get("verified_email"))
+            if _verified is False or _verified == "false":
+                raise HTTPException(400, "Google account email is not verified")
 
     if not email:
         raise HTTPException(400, "OAuth provider did not return an email")
@@ -601,12 +611,33 @@ async def oauth_callback(
             attr.get("utm_source") or "-", "y" if attr.get("gclid") else "-",
         )
     else:
-        # Returning OAuth user. If they were never verified (signed up
-        # natively first, then later via OAuth), stamp it now — the
-        # provider just re-proved ownership.
+        # Returning user matched by email. The provider (with a verified email,
+        # checked above) proves THIS login controls the address — but a
+        # pre-existing row matched purely by email is not automatically the same
+        # person. Account pre-hijacking (Classic-Federated-Merge): an attacker
+        # POSTs /api/auth/signup for the victim's address with a known password.
+        # Native signin never gates on email verification, so that password is a
+        # live credential sitting on an UNVERIFIED native row. When the victim
+        # later signs in with Google we match that row — so before adopting it,
+        # NEUTRALISE the untrusted credential: clear the password_hash and bump
+        # session_epoch (killing any pre-existing attacker sessions). The token
+        # minted below carries the new epoch, so the victim's session survives.
+        # A VERIFIED native account is safe (its owner already proved email
+        # control via the verification link), and an OAuth-only row has no
+        # password to worry about — only the unverified-password case is touched.
+        # The legitimate owner can re-add a password via forgot-password.
+        if user.password_hash is not None and user.email_verified_at is None:
+            logger.warning(
+                "oauth.unverified_native_merge provider=%s user=%s — clearing "
+                "untrusted password + bumping session_epoch (pre-hijack guard)",
+                provider, user.id,
+            )
+            user.password_hash = None
+            user.session_epoch = (user.session_epoch or 0) + 1
         if user.email_verified_at is None:
+            # The provider re-proved ownership — stamp it (redundant banner off).
             user.email_verified_at = datetime.now(UTC)
-            await session.commit()
+        await session.commit()
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
     next_path = _safe_next(request.cookies.get(f"oauth_next_{provider}"))

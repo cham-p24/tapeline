@@ -81,6 +81,12 @@ async def create_api_key(
     if not name:
         raise HTTPException(400, "name required")
 
+    # Serialise concurrent key-creates for this user before counting, so a burst
+    # of parallel POSTs can't each read the same pre-insert count and all pass
+    # the cap (a non-atomic check-then-insert TOCTOU). FOR UPDATE locks the user
+    # row on production Postgres; SQLite ignores it (with_for_update is a no-op
+    # there) and serialises writes anyway, so this is safe on both.
+    await session.execute(select(User.id).where(User.id == user.id).with_for_update())
     current = (
         await session.execute(
             select(func.count()).select_from(ApiKey).where(ApiKey.user_id == user.id)

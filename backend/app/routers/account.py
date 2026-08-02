@@ -7,7 +7,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -15,6 +15,7 @@ from app.models import (
     AlertEvent,
     AlertRule,
     ApiKey,
+    NewsletterSubscriber,
     RoadmapVote,
     ScannerPreset,
     Subscription,
@@ -154,6 +155,18 @@ async def delete_my_account(
     )
     await session.execute(delete(Subscription).where(Subscription.user_id == user_id))
     await session.execute(delete(ApiKey).where(ApiKey.user_id == user_id))
+    # newsletter_subscribers is keyed by email (no user_id FK), so it isn't
+    # cascaded from delete(User). If this person also subscribed to the daily
+    # digest (signup opt-in, or a footer capture with the same address), their
+    # email + full UTM attribution would survive the Art. 17 erasure and the
+    # digest would keep mailing them. Purge the row matching this account's
+    # email (case-insensitive — both surfaces lower-case on write).
+    if user_email:
+        await session.execute(
+            delete(NewsletterSubscriber).where(
+                func.lower(NewsletterSubscriber.email) == user_email.lower()
+            )
+        )
     await session.execute(delete(User).where(User.id == user_id))
     await session.commit()
     logger.info("account.deleted user=%s", user_id)
