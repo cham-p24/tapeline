@@ -21,7 +21,7 @@ vi.mock("@vercel/analytics", () => ({
 }));
 
 import { CancelInterceptModal } from "@/components/CancelInterceptModal";
-import { FREE_LIMITS } from "@/lib/pricing";
+import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 
 const PERIOD_END = "2026-08-14T00:00:00+00:00";
 
@@ -74,7 +74,13 @@ describe("CancelInterceptModal", () => {
     const text = body.textContent ?? "";
     expect(text).toContain(`top ${FREE_LIMITS.scannerRows} scanner rows`);
     expect(text).toContain(`${FREE_LIMITS.dailyLookups} look-ups a day`);
-    expect(text).toContain(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`);
+    // Watchlist is Pro-only after the 2026-08-02 cutover → the downgrade copy
+    // lists it only while Free still includes one.
+    if (freeHasWatchlist()) {
+      expect(text).toContain(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`);
+    } else {
+      expect(text).not.toContain("-ticker watchlist");
+    }
     expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);
     // Free keeps browser push — only email/Telegram are paid. Never claim a
     // blanket "no alerts".

@@ -462,6 +462,24 @@ def test_activation_watchlist_renderer():
     assert "scorecard" in lowered
 
 
+def test_activation_watchlist_renderer_free_recipient_drops_the_watchlist_step():
+    # act_wl reaches every tier. After the 2026-08-02 cutover a Free recipient
+    # has no saved watchlist, so telling them to "add a ticker to your watchlist"
+    # is a dead end (403). For has_watchlist=False the nudge must drop that step
+    # entirely and lead with "score a ticker you follow" — same aha, still free.
+    html = render_activation_watchlist_email("Alex", has_watchlist=False)
+    lowered = html.lower()
+    assert "Alex" in html
+    # The dead-end instruction ("add a ticker … to your watchlist") is gone.
+    # (Note: the button URL keeps utm_campaign=activation_watchlist, so we
+    # assert on the visible instruction phrases, not the bare word.)
+    assert "to your watchlist" not in lowered
+    assert "add a ticker you follow" not in lowered
+    assert "score a ticker" in lowered
+    assert "scan" in lowered
+    assert "scorecard" in lowered
+
+
 def test_activation_alert_renderer():
     html = render_activation_alert_email("Alex")
     assert "Alex" in html

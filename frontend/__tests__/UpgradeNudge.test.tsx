@@ -58,6 +58,17 @@ describe("UpgradeNudge", () => {
     ).toBeInTheDocument();
   });
 
+  it("drops the watchlist clause and sells it as a Pro perk when the cap is 0 (post-2026-08-02 cutover)", async () => {
+    // The backend returns watchlist_cap:0 once the Free watchlist is Pro-only.
+    // The nudge must NOT render the awkward "0-ticker watchlist" — it drops the
+    // clause and moves "a saved watchlist" into the Go-Pro benefits instead.
+    mockMe({ ...FREE_NUDGE, watchlist_cap: 0 });
+    render(<UpgradeNudge />);
+    expect(await screen.findByText(/top 10 tickers/i)).toBeInTheDocument();
+    expect(screen.queryByText(/-ticker watchlist/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/a saved watchlist/i)).toBeInTheDocument();
+  });
+
   it("renders nothing for a paid/trial user (nudge:null)", async () => {
     mockMe(null);
     const { container } = render(<UpgradeNudge />);

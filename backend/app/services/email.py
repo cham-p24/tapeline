@@ -916,8 +916,13 @@ def render_trial_ended_email(user_name: str) -> str:
     return shell(
         h1(f"Your trial just ended, {user_name}.")
         + lead(
-            "Your account is now on the Free plan. Your watchlist and settings "
-            "are intact — only the data feed changes."
+            "Your account is now on the Free plan. "
+            + (
+                "Your watchlist and settings are intact — only the data feed changes."
+                if free_has_watchlist()
+                else "Your settings are intact, and anything you saved to a watchlist is "
+                "kept — you'll need Pro to open the watchlist again."
+            )
         )
         + muted_paragraph(
             "If you want live data + alerts back, the door is always open."
@@ -926,7 +931,11 @@ def render_trial_ended_email(user_name: str) -> str:
         + footnote(
             "No hard feelings if not. The public scorecard stays free for everyone, forever."
         ),
-        preheader="You're on the Free plan now — settings + watchlist intact.",
+        preheader=(
+            "You're on the Free plan now — settings + watchlist intact."
+            if free_has_watchlist()
+            else "You're on the Free plan now — your settings and saved watchlist are kept."
+        ),
     )
 
 
@@ -1918,15 +1927,35 @@ def render_winback_email(
 # a return, and the public scorecard is described as winning AND losing days
 # (Rule 3 — the record is shown whole, never cherry-picked).
 
-def render_activation_watchlist_email(user_name: str) -> str:
+def render_activation_watchlist_email(user_name: str, has_watchlist: bool = True) -> str:
     """Activation nudge — signed up 24-72h ago with no recorded activity yet.
 
     Lays out the three first-session activation actions in one calm checklist:
-    add a watchlist ticker, run a scan, and read the public scorecard. That set
-    is the "aha" — a scored ticker you follow, seen against the published
-    record. The first ticker added is activation milestone #1 (it stamps
-    User.activated_at and powers the end-of-day digest); the scan and the
-    scorecard are the other two. Descriptive only, persona "default"."""
+    a scored ticker you follow, one scan, and the public scorecard — the "aha"
+    of a name you know seen against the published record. Step one is the
+    watchlist add (activation milestone #1: it stamps User.activated_at and
+    powers the end-of-day digest) FOR recipients who have a watchlist. This
+    email is sent to every tier, and the saved watchlist is Pro-and-up from the
+    2026-08-02 cutover, so for a Free recipient (`has_watchlist=False`) step one
+    becomes "score a ticker you follow" — a first action Free can actually take,
+    same aha, no dead end. Descriptive only, persona "default"."""
+    if has_watchlist:
+        # Rule 7: the watchlist line says which NUMBER changes (the score), not
+        # "what moved" — the score is a factor value Rule 7 permits, where price
+        # movement would not be.
+        first_step = (
+            "<li><strong>Add a ticker you follow</strong> to your watchlist — "
+            "from then on you see its current score and a flag when that score "
+            "shifts.</li>"
+        )
+        preheader = "Three quick steps: a watchlist ticker, one scan, the public scorecard."
+    else:
+        first_step = (
+            "<li><strong>Score a ticker you follow</strong> — search any US "
+            "stock and see its 0-100 score with the six-factor breakdown behind "
+            "it.</li>"
+        )
+        preheader = "Three quick steps: score a ticker, one scan, the public scorecard."
     return shell(
         h1(f"Three steps to your first session, {user_name}.")
         + lead(
@@ -1934,12 +1963,9 @@ def render_activation_watchlist_email(user_name: str) -> str:
             "the names you actually follow — about two minutes, in any order."
         )
         + card(
-            # Rule 7: the watchlist line says which NUMBER changes (the score),
-            # not "what moved" — the score is a factor value Rule 7 permits,
-            # where price movement would not be.
             f"""
             <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
-              <li><strong>Add a ticker you follow</strong> to your watchlist — from then on you see its current score and a flag when that score shifts.</li>
+              {first_step}
               <li><strong>Run one scan</strong> — rank US equities on the six measured factors and read why each name matched, with the numbers next to every row.</li>
               <li><strong>See the public scorecard</strong> — every daily call we've logged, winning and losing days alike, each with the original reasoning.</li>
             </ol>
@@ -1956,7 +1982,7 @@ def render_activation_watchlist_email(user_name: str) -> str:
             "a single filter."
         )
         + footnote("Takes about two minutes. — Christian, founder."),
-        preheader="Three quick steps: a watchlist ticker, one scan, the public scorecard.",
+        preheader=preheader,
     )
 
 
@@ -3635,7 +3661,21 @@ async def run_activation_drip(
             ):
                 continue
             try:
-                html = renderer(user.name or "trader")
+                if token == "act_wl":
+                    # act_wl reaches every tier; the watchlist step-one is a
+                    # dead end for a Free recipient after the 2026-08-02 cutover
+                    # (watchlist is Pro-and-up). Paid/trial recipients keep it.
+                    # Call the renderer directly (not via the loop's `renderer`,
+                    # which mypy narrows to the two stages' common (str)->str
+                    # signature and would reject the has_watchlist kwarg).
+                    recipient_has_watchlist = (
+                        user.tier in ("pro", "premium") or free_has_watchlist()
+                    )
+                    html = render_activation_watchlist_email(
+                        user.name or "trader", has_watchlist=recipient_has_watchlist
+                    )
+                else:
+                    html = renderer(user.name or "trader")
                 res = await send_email(
                     user.email, subject, html,
                     persona="default",

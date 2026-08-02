@@ -96,9 +96,13 @@ export function UpgradeNudge() {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
       <span className="text-fg">
-        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers,{" "}
-        a {nudge.watchlist_cap}-ticker watchlist.
-        Go Pro for the full real-time universe with unlimited look-ups, plus squeeze, regime &amp; heatmap.
+        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers
+        {/* Watchlist is Pro-and-up from the 2026-08-02 cutover: for a Free user
+            the cap is 0, so drop the "N-ticker watchlist" clause and instead
+            sell the saved watchlist as one of the Pro perks below. */}
+        {nudge.watchlist_cap > 0 ? `, a ${nudge.watchlist_cap}-ticker watchlist.` : "."}{" "}
+        Go Pro for the full real-time universe with unlimited look-ups
+        {nudge.watchlist_cap > 0 ? "" : ", a saved watchlist"}, plus squeeze, regime &amp; heatmap.
       </span>
       <span className="flex shrink-0 items-center gap-2">
         <Link

@@ -3,7 +3,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
 import { LandingCta } from "@/components/LandingCta";
-import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, freeHasWatchlist } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -98,7 +98,7 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Free tier strength",
-    tapeline: `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.dailyLookups} look-ups/day`,
+    tapeline: `Live scores, top-${FREE_LIMITS.scannerRows} scanner,${freeHasWatchlist() ? ` ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} ${FREE_LIMITS.dailyLookups} look-ups/day`,
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
     note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is narrower on purpose but free forever — same product, smaller window.",
   },

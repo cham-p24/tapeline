@@ -20,7 +20,7 @@ vi.mock("@vercel/analytics", () => ({
 
 import { TrialEndedModal } from "@/components/TrialEndedModal";
 import { useUser } from "@/components/UserContext";
-import { FREE_LIMITS, REFUND } from "@/lib/pricing";
+import { FREE_LIMITS, REFUND, freeHasWatchlist } from "@/lib/pricing";
 
 const mockedUseUser = useUser as ReturnType<typeof vi.fn>;
 
@@ -50,7 +50,13 @@ describe("TrialEndedModal", () => {
     const text = container.textContent ?? "";
     expect(screen.getByText(/what your free account keeps/i)).toBeInTheDocument();
     expect(text).toContain(`${FREE_LIMITS.dailyLookups} ticker look-ups a day`);
-    expect(text).toContain(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`);
+    // Watchlist is Pro-only after the 2026-08-02 cutover → listed as a Free
+    // "keep" only while Free still includes one.
+    if (freeHasWatchlist()) {
+      expect(text).toContain(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`);
+    } else {
+      expect(text).not.toContain("-ticker watchlist");
+    }
     expect(text).toContain(`top ${FREE_LIMITS.scannerRows} scanner rows`);
     expect(text).toContain(`top-${FREE_LIMITS.squeezePreviewRows} preview`);
     expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);

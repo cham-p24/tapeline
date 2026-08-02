@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { track } from "@vercel/analytics";
-import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd } from "@/lib/pricing";
+import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist } from "@/lib/pricing";
 
 /**
  * One-time blocking modal that fires the first time a user lands on /app
@@ -33,7 +33,9 @@ import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd } from "@/lib/pricing";
  */
 const FREE_TIER_KEEPS = [
   `${FREE_LIMITS.dailyLookups} ticker look-ups a day`,
-  `A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`,
+  // Watchlist is Pro-and-up from the 2026-08-02 cutover — only list it as a
+  // Free "keep" while the Free tier still includes one.
+  ...(freeHasWatchlist() ? [`A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`] : []),
   `The top ${FREE_LIMITS.scannerRows} scanner rows, live — no delay`,
   `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
   `${FREE_LIMITS.webPushAlerts} browser push alerts`,

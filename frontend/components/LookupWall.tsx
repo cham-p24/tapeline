@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { LookupLimitReason } from "@/lib/api";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 /**
  * Daily look-up wall — rendered in place of ticker data when a FREE or
@@ -88,7 +89,7 @@ export function LookupWall({
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-muted">
             You&rsquo;ve reached {countPhrase} as a guest. A free account keeps
-            live scores, more look-ups each day, a watchlist, and the top-10
+            live scores, more look-ups each day{freeHasWatchlist() ? ", a watchlist," : ","} and the top-10
             scanner &mdash; no card required.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">

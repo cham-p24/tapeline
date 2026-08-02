@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
-import { FREE_LIMITS, REFUND } from "@/lib/pricing";
+import { FREE_LIMITS, REFUND, freeHasWatchlist } from "@/lib/pricing";
 
 export const metadata = pageMeta({
   title: "Tapeline Support — Help, Contact, Common Issues, Billing",
@@ -74,7 +74,7 @@ export default function SupportPage() {
                 Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
                 by design — it's the same product, just narrower. Sign up gets you a 14-day Premium trial
                 automatically (no card). At trial end, no card on file = back to Free forever (live scores,
-                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist).{" "}
+                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}).{" "}
                 <Link href="/app/billing" className="text-accent hover:underline">Add a card →</Link>
               </>
             }

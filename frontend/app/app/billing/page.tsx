@@ -16,7 +16,7 @@ import {
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving, DEFAULT_BILLING_PERIOD } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
@@ -612,7 +612,7 @@ export default function BillingPage() {
                   </>
                 )}{" "}
                 Skip it and your account moves to Free forever — live scores,
-                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day, {FREE_LIMITS.watchlistTickers}-ticker watchlist.
+                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
                 Pick a plan to keep it →
@@ -652,7 +652,10 @@ export default function BillingPage() {
               derive from FREE_LIMITS (lib/pricing.ts). */}
           <UsageTile
             label="Watchlist tickers"
-            limit={tier === "free" ? FREE_LIMITS.watchlistTickers : tier === "pro" ? 50 : 200}
+            // Free watchlist cap is date-gated → 0 after the 2026-08-02 Pro
+            // cutover, matching the Email-alerts / Saved-scans tiles that
+            // already show 0 for free-locked features.
+            limit={tier === "free" ? (freeHasWatchlist() ? FREE_LIMITS.watchlistTickers : 0) : tier === "pro" ? 50 : 200}
             unit="tickers"
           />
           <UsageTile
@@ -714,7 +717,7 @@ export default function BillingPage() {
               items={[
                 `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
                 "Public scorecard + basic regime",
-                `Watchlist of ${FREE_LIMITS.watchlistTickers} · ${FREE_LIMITS.webPushAlerts} browser push alerts`,
+                `${freeHasWatchlist() ? `Watchlist of ${FREE_LIMITS.watchlistTickers} · ` : ""}${FREE_LIMITS.webPushAlerts} browser push alerts`,
               ]}
               highlight={tier === "free"}
             />

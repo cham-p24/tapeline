@@ -22,6 +22,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import BillingPage from "@/app/app/billing/page";
 import type { SessionUser } from "@/lib/auth";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 // Mutable user context so each test can drive tier/trial state. vi.hoisted
 // keeps the holder reachable inside the hoisted mock factory (same pattern
@@ -197,9 +198,16 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     // auto-opened plan picker repeats some of these labels.
     const section = screen.getByText("Plan limits").parentElement!;
     const watchlist = within(section).getByText("Watchlist tickers").parentElement!;
-    // Free watchlist cap raised to 5 (2026-07-12) to break the seed deadlock.
-    expect(watchlist.textContent).toContain("5");
-    expect(watchlist.textContent).not.toContain("3");
+    if (freeHasWatchlist()) {
+      // Free watchlist cap raised to 5 (2026-07-12) to break the seed deadlock.
+      expect(watchlist.textContent).toContain("5");
+      expect(watchlist.textContent).not.toContain("3");
+    } else {
+      // Post-2026-08-02 cutover the watchlist is Pro-only → the Free tile shows
+      // "—" (a 0 limit), like the Email-alerts and Saved-scans tiles.
+      expect(watchlist.textContent).toContain("—");
+      expect(watchlist.textContent).not.toContain("5");
+    }
     const rows = within(section).getByText("Scanner rows").parentElement!;
     expect(rows.textContent).toContain("10");
     expect(rows.textContent).not.toContain("20");
