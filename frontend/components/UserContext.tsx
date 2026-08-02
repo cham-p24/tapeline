@@ -10,7 +10,10 @@ type Ctx = {
   signout: () => Promise<void>;
 };
 
-const UserCtx = createContext<Ctx>({
+// Exported so a guarded, non-production preview route can inject a mocked
+// session (see app/preview-trial-welcome) to render auth-gated components like
+// OnboardingTip / TrialEarlyCapture without a real logged-in user.
+export const UserCtx = createContext<Ctx>({
   user: null, loading: true, refresh: async () => {}, signout: async () => {},
 });
 
