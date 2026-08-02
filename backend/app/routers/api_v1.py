@@ -81,14 +81,17 @@ async def api_me(
     self-check remaining budget before a batch run."""
     user, key = ctx
     limit = effective_limit(user, "api_requests_per_day")
-    used = key.requests_today  # already rolled-over + incremented by the dep
+    # PER-ACCOUNT usage (the authenticator rolled over + incremented the user
+    # counter and refreshed `user`) — the quota is shared across all the account's
+    # keys, so report the account total, not this one key's counter.
+    used = user.api_requests_today
     return {
         "tier": user.tier,
         "key": {"id": key.id, "name": key.name, "prefix": key.prefix},
         "quota": {
             "daily_limit": limit,
             "used_today": used,
-            "remaining_today": max(0, limit - used),
+            "remaining_today": max(0, limit - used) if limit is not None else None,
         },
     }
 
