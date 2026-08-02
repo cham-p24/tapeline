@@ -384,69 +384,7 @@ function OnboardingForm() {
           {busy ? "Saving…" : "Save and continue"}
         </button>
       </div>
-
-      {/* First-session next steps. Points at the three activation actions that
-          get a new user to the "aha" in session one — a scored ticker they
-          follow, seen against the public record. Deliberately DESCRIPTIVE and
-          calm: no performance promise, no urgency (compliance Rules 1 & 6),
-          and it never claims the locked/free surfaces contain "winners". The
-          trial is already running, so this is a gentle map of where value is,
-          not a gate. */}
-      <NextStepsNudge />
     </main>
-  );
-}
-
-const NEXT_STEPS: { label: string; hint: string; href: string }[] = [
-  {
-    label: "Add a ticker you follow to your watchlist",
-    hint: "See its current score and a flag when that score shifts.",
-    href: "/app/watchlist",
-  },
-  {
-    label: "Run your first scan",
-    hint: "Rank US equities on the six measured factors — the numbers sit next to every row.",
-    href: "/app/scanner",
-  },
-  {
-    label: "See the public scorecard — winning and losing days",
-    hint: "Every daily call we've logged, with the original reasoning. Free, no setup.",
-    href: "/scorecard",
-  },
-];
-
-function NextStepsNudge() {
-  return (
-    <section className="mt-12">
-      <p className="eyebrow text-muted">Your first session</p>
-      <h2 className="mt-1 text-lg font-semibold tracking-tight">
-        Three steps to seeing it work
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        About two minutes, in any order. Everything below is unlocked on your
-        trial.
-      </p>
-      <ol className="mt-4 divide-y divide-border/60 border-t border-border/60">
-        {NEXT_STEPS.map((s, i) => (
-          <li key={s.href}>
-            <Link
-              href={s.href}
-              className="group flex items-start gap-3 py-5 transition-colors"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
-                {i + 1}
-              </span>
-              <span className="text-sm">
-                <span className="font-medium text-fg group-hover:text-accent">
-                  {s.label}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted">{s.hint}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ol>
-    </section>
   );
 }
 

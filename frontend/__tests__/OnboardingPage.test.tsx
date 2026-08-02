@@ -72,25 +72,24 @@ describe("OnboardingPage", () => {
     expect(checkbox.checked).toBe(false);
   });
 
-  // First-session time-to-value: the page must point the new user at the three
-  // activation actions that get them to the "aha" in session one — add a
-  // watchlist ticker, run a scan, view the public scorecard — each linking to
-  // the right surface. Descriptive only (no performance/returns promise).
-  it("renders the three first-session next-steps, each linking to its surface", () => {
+  // The in-page NextStepsNudge was removed as a first-run declutter: it sat
+  // below the Save/Skip buttons and duplicated the OnboardingTip banner
+  // (components/OnboardingTip.tsx), whose three activation links — scanner,
+  // watchlist, scorecard — render persistently across /app. The onboarding page
+  // itself must therefore no longer emit those in-page next-step links.
+  it("no longer renders the in-page next-steps nudge (moved to OnboardingTip)", () => {
     render(<OnboardingPage />);
-    const watchlist = screen.getByRole("link", {
-      name: /add a ticker you follow to your watchlist/i,
-    });
-    const scan = screen.getByRole("link", { name: /run your first scan/i });
-    const scorecard = screen.getByRole("link", {
-      name: /see the public scorecard/i,
-    });
-    expect(watchlist).toHaveAttribute("href", "/app/watchlist");
-    expect(scan).toHaveAttribute("href", "/app/scanner");
-    expect(scorecard).toHaveAttribute("href", "/scorecard");
+    expect(
+      screen.queryByRole("link", {
+        name: /add a ticker you follow to your watchlist/i,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /run your first scan/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("keeps the next-steps nudge descriptive — no performance/returns promise", () => {
+  it("keeps the onboarding page copy descriptive — no performance/returns promise", () => {
     const { container } = render(<OnboardingPage />);
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/\bwinning (?:stocks?|picks?|tickers?|names?)\b/i);
