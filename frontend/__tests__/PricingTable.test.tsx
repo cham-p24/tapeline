@@ -14,7 +14,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
-import { PRICING, FREE_LIMITS, REFUND, usd, billedAnnuallyNote } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 
 /** Escape a literal string for use inside a RegExp ("$8.25 (…)" etc.). */
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -109,9 +109,13 @@ describe("PricingTable", () => {
     expect(
       screen.getByText(new RegExp(`Top-${FREE_LIMITS.scannerRows} scanner rows`, "i")),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`Watchlist \\(${FREE_LIMITS.watchlistTickers} tickers\\)`, "i")),
-    ).toBeInTheDocument();
+    // The watchlist line only appears while the free tier still HAS a watchlist;
+    // on/after FREE_WATCHLIST_REMOVAL_DATE it becomes Pro+ and the card drops it.
+    if (freeHasWatchlist()) {
+      expect(
+        screen.getByText(new RegExp(`Watchlist \\(${FREE_LIMITS.watchlistTickers} tickers\\)`, "i")),
+      ).toBeInTheDocument();
+    }
     expect(
       screen.getByText(new RegExp(`Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`, "i")),
     ).toBeInTheDocument();
