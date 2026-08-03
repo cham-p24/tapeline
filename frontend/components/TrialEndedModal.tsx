@@ -77,9 +77,12 @@ export function TrialEndedModal() {
           Your 14-day Premium trial has ended.
         </h2>
         <p className="mt-3 text-sm text-muted">
-          Nothing was charged &mdash; the trial never took a card. Your
-          watchlist, saved scans and alert rules are all intact, and you&rsquo;re
-          now on Free forever.
+          Nothing was charged &mdash; the trial never took a card. Your{" "}
+          {freeHasWatchlist() ? "watchlist, saved scans" : "saved scans"} and alert
+          rules are all intact, and you&rsquo;re now on Free forever.
+          {!freeHasWatchlist() && (
+            <> Your saved watchlist tickers are kept &mdash; upgrade to Pro to unlock them.</>
+          )}
         </p>
 
         {/* Honest downgrade preview. Every number derives from FREE_LIMITS
