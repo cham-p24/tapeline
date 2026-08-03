@@ -56,6 +56,7 @@ export type TapelineEvent =
   // "Sign-up" conversion and pollute paid ROAS).
   | "newsletter_signup"    // Email opt-in to the daily digest (NOT an account signup)
   | "first_ticker_added"   // First watchlist add of the session
+  | "alert_armed"          // User enabled push + armed their first alert (activation)
   // Free→paid micro-funnel — GA4-only (never forwarded to Google Ads; these are
   // on-site conversion diagnostics, not acquisition conversions). Closes the
   // chain cap_hit → upgrade_prompt_shown → upgrade_prompt_clicked →

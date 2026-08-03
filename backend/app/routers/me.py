@@ -486,9 +486,9 @@ async def test_web_push(
     for sub in subs:
         ok = await send_web_push(
             {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh_key, "auth": sub.auth_key}},
-            title="Tapeline test push",
-            body="If you can read this, web push is wired up correctly.",
-            url="/app/scanner",
+            title="Sample alert · Tapeline",
+            body="This is how Tapeline pings you the moment a watched ticker's score moves. Real alerts fire from your watchlist.",
+            url="/app/watchlist",
         )
         if ok:
             delivered += 1
