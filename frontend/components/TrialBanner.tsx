@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useUser } from "@/components/UserContext";
 import { useFirstRunTip } from "@/components/FirstRunTip";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 /**
  * Premium-trial status banner. Shows on every /app page while the user's
@@ -77,8 +78,10 @@ export function TrialBanner() {
               {daysLeft} day{daysLeft === 1 ? "" : "s"} left
             </strong>{" "}
             in your Premium trial, through {endLabel}. There is no card on file: nothing is
-            charged and there is nothing to cancel. On {endLabel} the account moves to Free, and
-            your watchlist, saved scans and alert rules stay intact.
+            charged and there is nothing to cancel. On {endLabel} the account moves to Free, and{" "}
+            {freeHasWatchlist()
+              ? "your watchlist, saved scans and alert rules stay intact."
+              : "your saved scans and alert rules stay intact — your saved watchlist tickers are kept, and unlock on Pro."}
           </>
         )}
       </span>
