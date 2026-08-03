@@ -19,6 +19,7 @@ import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ScannerLegend } from "@/components/ScannerLegend";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
+import { ArmAlerts } from "@/components/ArmAlerts";
 import { PresetMenu } from "@/components/PresetMenu";
 import { RegimeLabel } from "@/components/RegimeLabel";
 import { PaywallModal } from "@/components/Paywall";
@@ -466,6 +467,10 @@ export default function ScannerPage() {
       <div className="mt-4">
         <RecentTickers />
       </div>
+
+      {/* Alerts activation moment — one-click "arm + feel a sample alert". Self-
+          gating: renders only for users who haven't turned on notifications yet. */}
+      <ArmAlerts />
 
       {/* Filters — search + score range + sector/signal/asset filters, plus
           sort. Search / score / sector / signal all map to existing
