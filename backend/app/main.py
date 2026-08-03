@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers import (
@@ -247,56 +247,6 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
         )
         symbols = [row[0] for row in result.all()]
     return {"count": len(symbols), "symbols": symbols}
-
-
-@app.get("/api/public/badge/{symbol}")
-async def public_badge(symbol: str) -> Response:
-    """Public, no-auth embeddable SVG score badge — a distribution loop.
-
-    `<img src="https://api.tapeline.io/api/public/badge/NVDA.svg">` renders the
-    ticker's current Tapeline Score + its descriptive band. Each render is a
-    brand impression + link back — growth through usage, not through posting.
-
-    Descriptive-only (score + published band label) — same compliance posture as
-    the public /t/{symbol} pages. Returns a graceful "no score" badge (never an
-    error image) for unknown/unscored symbols so an embed never breaks.
-    """
-    from sqlalchemy import select
-
-    from app.db import session_scope
-    from app.models import Ticker
-    from app.services.badge import render_score_badge
-    from app.services.symbols import clean_symbol
-
-    raw = symbol[:-4] if symbol.lower().endswith(".svg") else symbol
-    cleaned = clean_symbol(raw)
-    ticker = None
-    if cleaned:
-        async with session_scope() as session:
-            ticker = (
-                await session.execute(select(Ticker).where(Ticker.symbol == cleaned))
-            ).scalar_one_or_none()
-
-    display = cleaned or (raw.strip().upper()[:20] or "?")
-    found = ticker is not None and ticker.score is not None
-    svg = render_score_badge(
-        display,
-        ticker.name if ticker else None,
-        ticker.score if ticker else None,
-        ticker.signal if ticker else None,
-    )
-    # Short cache: scores refresh ~60s, but a few-min-stale badge is fine and
-    # spares the DB from hotlinked-image load. Unknown symbols cache briefly so
-    # a corrected typo recovers fast.
-    ttl = 300 if found else 60
-    return Response(
-        content=svg,
-        media_type="image/svg+xml",
-        headers={
-            "Cache-Control": f"public, max-age={ttl}, s-maxage={ttl}",
-            "Access-Control-Allow-Origin": "*",
-        },
-    )
 
 
 @app.get("/api/public/signals")
