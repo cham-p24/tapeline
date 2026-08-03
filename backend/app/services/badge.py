@@ -69,11 +69,7 @@ def render_score_badge(
     else:
         derived_label, color = _band(score)
         left_label = (signal or derived_label).upper()
-        # FLOOR, not round: the band labels use `score >= threshold`, so a 69.7
-        # rounded up to "70" would read "70 · CONSTRUCTIVE" — contradicting the
-        # published band (70 = STRONG SETUP). floor(score) is always in the same
-        # band as the stored signal, so the number and label never disagree.
-        score_txt = f"{int(score)}"
+        score_txt = f"{score:.0f}"
 
     left = f"tapeline · {symbol}"
     right = f"{score_txt} · {left_label}"

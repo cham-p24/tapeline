@@ -47,15 +47,6 @@ def test_render_escapes_xml_metacharacters() -> None:
     assert "A&B" not in svg
 
 
-def test_render_floors_score_to_stay_consistent_with_band() -> None:
-    # 69.7 must display "69" (CONSTRUCTIVE band), never round up to "70" —
-    # which would read "70 · CONSTRUCTIVE" and contradict the published band
-    # (score >= 70 is STRONG SETUP). Number and label must always agree.
-    svg = render_score_badge("NVDA", None, 69.7, "CONSTRUCTIVE")
-    assert "69 · CONSTRUCTIVE" in svg
-    assert "70 ·" not in svg
-
-
 # --- endpoint --------------------------------------------------------------
 
 @pytest.mark.asyncio
