@@ -3,6 +3,7 @@ import { SECTORS } from "./sector/sectors";
 import { SIGNALS } from "./signal/signals";
 import { STRATEGIES } from "./best-stocks-for/[strategy]/strategies";
 import { FACTORS } from "./how-it-works/factors";
+import { allComparePairs } from "@/lib/comparePairs";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
 // the day, without paying a DB roundtrip on every crawler hit.
@@ -241,6 +242,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "daily" as const,
     priority: 0.7,
   }));
+  // Ticker-vs-ticker comparison pages — "AAPL vs MSFT" and friends, one of the
+  // highest-volume/highest-intent query classes in retail investing, and a
+  // surface only Tapeline can fill with two published six-factor scores head to
+  // head. Curated within-sector pairs (see lib/comparePairs); scores re-tick so
+  // daily. Canonical (alphabetical) slugs only — no a-vs-b / b-vs-a duplication.
+  const compareEntries: MetadataRoute.Sitemap = allComparePairs().map((p) => ({
+    url: `${base}/compare/${p.a.toLowerCase()}-vs-${p.b.toLowerCase()}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.7,
+  }));
   // Strategy listicle pages — /best-stocks-for/{day-traders, swing-traders,
   // momentum, dividend, value}. Each page sorts/filters the live scanner
   // differently so the table content is unique per slug (no dup-content risk).
@@ -303,6 +315,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...sectorEntries,
     ...signalEntries,
     ...strategyEntries,
+    ...compareEntries,
     ...tickerEntries,
     ...postEntries,
     ...tickerPostEntries,
