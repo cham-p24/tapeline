@@ -270,3 +270,132 @@ export function clearStoredGclid(): void {
     /* ignore */
   }
 }
+
+/**
+ * Referrer-host capture + persistence — same mechanism as the UTM and gclid
+ * blocks above, kept here so all attribution captures share one storage
+ * helper.
+ *
+ * Why this exists: AI-assistant referrals (Copilot, ChatGPT, Perplexity, …)
+ * carry NO utm_* params — the only trace is `document.referrer`. Without
+ * capturing it, a real Copilot-referred signup lands as "direct" and the
+ * channel is uncountable. A confirmed Premium-trial signup arrived from
+ * copilot.com exactly this way.
+ *
+ * Privacy: we store the referrer HOSTNAME ONLY — never the path or query
+ * string (which can carry the user's search/chat text). No PII.
+ *
+ * Same persistence contract as UTM: capture on landing, localStorage with a
+ * 30-day TTL, first-touch wins, forward on the signup POST. Internal
+ * navigation (tapeline.io → tapeline.io, or same-host in dev) is skipped so
+ * a page-to-page hop can't claim credit.
+ */
+
+const REFERRER_STORAGE_KEY = "tapeline_ref_host_v1";
+
+export type ReferrerHostPayload = {
+  signup_referrer_host?: string;
+};
+
+type StoredReferrerHost = ReferrerHostPayload & { captured_at: number };
+
+/** True when `host` is our own site (or the page's own host in dev). */
+function isOwnHost(host: string): boolean {
+  const own = window.location.hostname.toLowerCase();
+  const h = host.toLowerCase();
+  return h === own || h === "tapeline.io" || h.endsWith(".tapeline.io");
+}
+
+/**
+ * Read the persisted referrer host. Returns {} if nothing's stored, the
+ * stored value is malformed, the TTL has expired, or storage is unavailable.
+ * Safe to call from SSR — returns {} on the server.
+ */
+export function getStoredReferrerHost(): ReferrerHostPayload {
+  if (!isStorageAvailable()) return {};
+  try {
+    const raw = window.localStorage.getItem(REFERRER_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as StoredReferrerHost;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    if (
+      typeof parsed.captured_at !== "number" ||
+      Date.now() - parsed.captured_at > TTL_MS
+    ) {
+      // Expired — clear so we don't return stale data on later visits.
+      window.localStorage.removeItem(REFERRER_STORAGE_KEY);
+      return {};
+    }
+    const v = parsed.signup_referrer_host;
+    if (typeof v === "string" && v.length > 0) {
+      return { signup_referrer_host: v };
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * If the document has an EXTERNAL referrer, capture its hostname to
+ * localStorage. First-touch wins: if a fresh capture already exists, this is
+ * a no-op so the site that originally brought the user keeps credit over a
+ * later visit's referrer.
+ *
+ * Skipped entirely when the referrer is empty (direct traffic) or points at
+ * our own host — internal navigation must never claim attribution.
+ *
+ * Returns the captured (or already-stored) payload for convenience.
+ */
+export function captureReferrerHostFromLocation(): ReferrerHostPayload {
+  if (typeof window === "undefined") return {};
+  if (!isStorageAvailable()) return {};
+
+  // First-touch: don't overwrite an existing fresh capture.
+  const existing = getStoredReferrerHost();
+  if (Object.keys(existing).length > 0) return existing;
+
+  const ref = typeof document !== "undefined" ? document.referrer : "";
+  if (!ref) return {};
+
+  let host: string;
+  try {
+    // Hostname ONLY — the path/query of an AI-chat referrer can contain the
+    // user's prompt text. We never read or store it.
+    host = new URL(ref).hostname;
+  } catch {
+    return {};
+  }
+
+  if (!host || isOwnHost(host)) return {};
+
+  // Cap defensively — backend col is 100 chars.
+  const captured: ReferrerHostPayload = {
+    signup_referrer_host: host.slice(0, 100),
+  };
+
+  try {
+    const toStore: StoredReferrerHost = {
+      ...captured,
+      captured_at: Date.now(),
+    };
+    window.localStorage.setItem(REFERRER_STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // Best-effort — return the captured payload anyway so the caller can
+    // still forward it to the backend in-flight.
+  }
+  return captured;
+}
+
+/**
+ * Reset the captured referrer host. Called after a successful signup so a
+ * later signup on the same device starts a fresh attribution chain.
+ */
+export function clearStoredReferrerHost(): void {
+  if (!isStorageAvailable()) return;
+  try {
+    window.localStorage.removeItem(REFERRER_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { captureGclidFromLocation, captureUtmFromLocation } from "@/lib/utm";
+import {
+  captureGclidFromLocation,
+  captureReferrerHostFromLocation,
+  captureUtmFromLocation,
+} from "@/lib/utm";
 
 /**
  * Client-only side-effect component. Mounted once in the root layout so
@@ -22,6 +26,10 @@ export function UtmCapture(): null {
   useEffect(() => {
     captureUtmFromLocation();
     captureGclidFromLocation();
+    // AI-assistant referrals (Copilot/ChatGPT/Perplexity) carry no utm_*
+    // params — the referrer HOSTNAME is the only attribution trace. External
+    // hosts only, first-touch, never the path/query.
+    captureReferrerHostFromLocation();
   }, []);
   return null;
 }

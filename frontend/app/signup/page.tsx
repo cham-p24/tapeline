@@ -9,7 +9,7 @@ import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
-import { getStoredGclid, getStoredUtm } from "@/lib/utm";
+import { getStoredGclid, getStoredReferrerHost, getStoredUtm } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import {
   FormAlert,
@@ -248,6 +248,10 @@ function SignUpForm() {
       // Stored on the User row so the founder-gated offline-conversion
       // upload to Google can later tie this subscriber back to the click.
       const gclid = getStoredGclid();
+      // First-touch external referrer HOSTNAME captured on landing — the
+      // only attribution trace AI-assistant referrals (Copilot etc.) leave,
+      // since they carry no utm_* params. Hostname only, never path/query.
+      const referrer = getStoredReferrerHost();
       await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: token || undefined,
@@ -260,6 +264,7 @@ function SignUpForm() {
         daily_top10_opt_in: dailyTop10OptIn,
         ...utm,
         ...gclid,
+        ...referrer,
       });
       // Funnel events: signup landed cleanly. Trial auto-starts on signup
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
