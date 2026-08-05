@@ -24,7 +24,7 @@ const DISMISS_KEY = "tapeline_arm_alerts_dismissed";
  * "granted" user has already armed alerts; "denied"/"unsupported" can't be
  * resolved from here.
  */
-export function ArmAlerts() {
+export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watchlist" } = {}) {
   const { user } = useUser();
   const [show, setShow] = useState(false);
   const [phase, setPhase] = useState<"idle" | "working" | "done" | "error">("idle");
@@ -83,9 +83,9 @@ export function ArmAlerts() {
     await testWebPush().catch(() => {
       /* subscription is registered; the sample is best-effort */
     });
-    trackEvent("alert_armed", ticker ? { surface: "scanner", symbol: ticker } : { surface: "scanner" });
+    trackEvent("alert_armed", ticker ? { surface, symbol: ticker } : { surface });
     setPhase("done");
-  }, [ticker]);
+  }, [ticker, surface]);
 
   const dismiss = useCallback(() => {
     try {
