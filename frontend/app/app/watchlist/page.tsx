@@ -9,6 +9,7 @@ import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { WatchlistTabs } from "@/components/WatchlistTabs";
 import { WatchlistTrackRecord } from "@/components/WatchlistTrackRecord";
+import { ArmAlerts } from "@/components/ArmAlerts";
 import { PaywallModal } from "@/components/Paywall";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
@@ -314,6 +315,16 @@ export default function WatchlistPage() {
           </button>
           <LiveBadge status={status} lastUpdate={lastUpdate} />
         </div>
+      </div>
+
+      {/* Alert-arming at the moment of intent. Production data: engaged
+          trialists build 7-8 ticker watchlists here, yet zero users had ever
+          created an alert rule — the #1 pay-driver was never offered on the
+          page where all the engagement happens (only the scanner, #437).
+          ArmAlerts self-gates on push-permission "default" and picks the
+          user's first watched ticker for the sample. */}
+      <div className="mt-4">
+        <ArmAlerts surface="watchlist" />
       </div>
 
       <div className="mt-4">
