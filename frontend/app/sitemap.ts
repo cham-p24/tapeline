@@ -184,6 +184,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/compare/robinhood`,         lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/marketsmith`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/bloomberg-terminal`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // 2026-08 expansion — paid scanners the engaged ICP actually cross-shops
+    // (pay-inclination deep dive: beginner-intermediate swing traders compare
+    // paid tools, not free Finviz).
+    { url: `${base}/compare/trendspider`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
