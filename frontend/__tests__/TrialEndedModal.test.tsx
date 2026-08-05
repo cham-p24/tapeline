@@ -95,6 +95,27 @@ describe("TrialEndedModal", () => {
     expect(screen.getByText(new RegExp(REFUND.short, "i"))).toBeInTheDocument();
   });
 
+  it("states the one-time save offer only when the server says it's available", () => {
+    // Flag present → the offer line renders, stated as a standing fact
+    // (no countdown — rule 6; it genuinely has no deadline).
+    mockedUseUser.mockReturnValue({
+      ...EXPIRED_TRIAL_USER,
+      user: { ...EXPIRED_TRIAL_USER.user, trial_save_offer_available: true },
+    });
+    const { container } = render(<TrialEndedModal />);
+    const text = container.textContent ?? "";
+    expect(text).toContain("50% off your first 3 months");
+    expect(text).toContain("applied automatically at checkout");
+    expect(text).not.toMatch(/expires (?:in|soon)|last chance|hurry/i);
+  });
+
+  it("omits the save offer when the server flag is absent", () => {
+    const { container } = render(<TrialEndedModal />);
+    expect(container.textContent ?? "").not.toContain(
+      "50% off your first 3 months",
+    );
+  });
+
   it("renders nothing while the trial is still active", () => {
     mockedUseUser.mockReturnValue({
       ...EXPIRED_TRIAL_USER,

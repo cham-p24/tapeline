@@ -777,11 +777,19 @@ def render_trial_expired_email(
     summary: dict | None = None,
     *,
     checkout_urls: dict[str, str] | None = None,
+    save_offer: bool = False,
 ) -> str:
     """T+0 — trial ended within the last 24 hours.
 
     `checkout_urls` → one-click signed Stripe-checkout CTA (no login wall);
-    falls back to /app/billing when unavailable."""
+    falls back to /app/billing when unavailable.
+
+    `save_offer` → the caller (run_daily_drip) verified the user is eligible
+    for the one-time 50%-off-3-months trial save offer
+    (services/billing.trial_save_offer_eligible); the checkout links in this
+    email then auto-apply it, so the email may truthfully state it. Stated as
+    a standing fact — no countdown, no deadline theatre (compliance rule 6);
+    it genuinely has no expiry, it is simply once per account."""
     cu = checkout_urls or {}
     premium_url = cu.get("premium_monthly", "https://tapeline.io/app/billing")
     pro_url = cu.get("pro_monthly", "https://tapeline.io/app/billing")
@@ -795,6 +803,16 @@ def render_trial_expired_email(
             f"or smart alerts."
         )
         + _trial_summary_block(summary)
+        + (
+            muted_paragraph(
+                "Because you finished the trial, there's a one-time offer on "
+                "your account: <strong>50% off your first 3 months</strong> of "
+                "Pro or Premium, applied automatically at checkout. It doesn't "
+                "expire — it's simply once per account."
+            )
+            if save_offer
+            else ""
+        )
         + muted_paragraph(
             'A few things stay open regardless of tier: the '
             f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
@@ -2895,8 +2913,13 @@ async def run_daily_drip(
                             user.name or "trader", summary, checkout_urls=cu,
                         )
                     elif token == "expired":
+                        # The T+0 email may state the one-time 50%-off save
+                        # offer only when checkout will actually apply it —
+                        # same gate as POST /checkout and /api/me.
+                        from app.services.billing import trial_save_offer_eligible
                         html = render_trial_expired_email(
                             user.name or "trader", summary, checkout_urls=cu,
+                            save_offer=trial_save_offer_eligible(user),
                         )
                     else:
                         html = renderer(user.name or "trader", summary)

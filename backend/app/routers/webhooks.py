@@ -281,6 +281,20 @@ async def stripe_webhook(
             logger.warning("stripe.subscription_without_user customer=%s", customer_id)
             return {"ok": True}
 
+        # One-time trial-expiry save offer: consumed by the subscription that
+        # carries the metadata flag (stamped at checkout-session create in
+        # services/billing.create_checkout_session). Marked HERE — not at
+        # session create — so an abandoned checkout doesn't burn the
+        # once-per-account offer. Idempotent via the None check; shares the
+        # save_offer_redeemed_at column with the cancel-intercept offer so an
+        # account can only ever redeem ONE of the two.
+        if (
+            (obj.get("metadata") or {}).get("trial_save_offer") == "1"
+            and user.save_offer_redeemed_at is None
+        ):
+            from datetime import UTC, datetime
+            user.save_offer_redeemed_at = datetime.now(UTC)
+
         # Upsert subscription
         sub_result = await session.execute(select(Subscription).where(Subscription.id == p["id"]))
         existing = sub_result.scalar_one_or_none()

@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.db import get_session
 from app.models import Subscription, TelegramLinkToken, User
 from app.services.auth import current_user_optional, current_user_required
+from app.services.billing import trial_save_offer_eligible
 from app.services.sector import (
     GICS_COMMS,
     GICS_CONSUMER_DISC,
@@ -102,6 +103,11 @@ async def me(
         "tier": user.tier,
         "on_trial": on_trial,
         "billing": billing,
+        # One-time 50%-off-3-months offer for expired card-less trialists —
+        # drives the offer line in TrialEndedModal. Gate shared with checkout
+        # (services/billing.trial_save_offer_eligible) so the UI can never
+        # promise a discount checkout won't apply.
+        "trial_save_offer_available": trial_save_offer_eligible(user),
         # Free→Pro upgrade nudge (None for paid/trial). Drives the global
         # UpgradeNudge banner + the scanner's inline cap hint.
         "nudge": _upgrade_nudge(user),

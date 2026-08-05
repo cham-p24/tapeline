@@ -73,6 +73,33 @@ async def _monthly_unit_amount(tier: str) -> tuple[int, str]:
     return int(amount), str(currency)
 
 
+def trial_save_offer_eligible(user: Any) -> bool:
+    """Expired card-less trialist who never subscribed, never cancelled a paid
+    sub (that cohort is the win-back's), and never redeemed the one-time save
+    offer. Server-side gate shared by checkout, /api/me and the T+0 email so
+    the offer can't be farmed and every surface agrees on who sees it.
+
+    Deliberately NO tier check: at T+0 the hourly downgrade may not have
+    flipped tier to "free" yet, but trial-expired + no Stripe customer is
+    already exactly the cohort — a paying user always has a customer id.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+    ends = user.trial_ends_at
+    if ends is None:
+        return False
+    # SQLite (dev/tests) returns naive datetimes for tz-aware columns; treat
+    # naive as UTC — same idiom as services/tier.is_on_trial.
+    if ends.tzinfo is None:
+        ends = ends.replace(tzinfo=_UTC)
+    return (
+        ends < _dt.now(_UTC)
+        and user.stripe_customer_id is None
+        and user.canceled_at is None
+        and user.save_offer_redeemed_at is None
+    )
+
+
 async def create_checkout_session(
     user_id: str,
     user_email: str,
@@ -82,6 +109,7 @@ async def create_checkout_session(
     cancel_url: str,
     referral_credit_months: int = 0,
     winback: bool = False,
+    trial_save_offer: bool = False,
     expires_in_minutes: int | None = None,
     trial_end: datetime | None = None,
 ) -> str:
@@ -219,6 +247,37 @@ async def create_checkout_session(
                 )
             kwargs["discounts"] = [{"coupon": coupon.id}]
             sub_metadata["winback"] = "1"
+        elif trial_save_offer:
+            # One-time trial-expiry save offer: 50% off 3 months. Extends the
+            # cancel-intercept save offer (same % and duration, same
+            # save_offer_redeemed_at once-per-account column) to the expired
+            # card-less trialist — previously only paid cancels ever saw it.
+            # Eligibility is the caller's job via trial_save_offer_eligible().
+            # Redemption is marked in the subscription webhook (metadata flag
+            # below), NOT here, so an abandoned checkout doesn't burn it.
+            if is_annual:
+                amount, currency = await _monthly_unit_amount(tier)
+                # 50% off three months of value, applied once to the annual
+                # invoice (not 50% off the whole year).
+                coupon = await asyncio.to_thread(
+                    stripe.Coupon.create,
+                    amount_off=round(0.50 * 3 * amount),
+                    currency=currency,
+                    duration="once",
+                    name="Tapeline trial save offer (50% off 3 months, annual)",
+                    metadata={"user_id": user_id, "kind": "trial_save"},
+                )
+            else:
+                coupon = await asyncio.to_thread(
+                    stripe.Coupon.create,
+                    percent_off=50,
+                    duration="repeating",
+                    duration_in_months=3,
+                    name="Tapeline trial save offer (50% off 3 months)",
+                    metadata={"user_id": user_id, "kind": "trial_save"},
+                )
+            kwargs["discounts"] = [{"coupon": coupon.id}]
+            sub_metadata["trial_save_offer"] = "1"
         else:
             kwargs["allow_promotion_codes"] = True
 
