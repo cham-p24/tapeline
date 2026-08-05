@@ -81,7 +81,15 @@ export function TrialBanner() {
             charged and there is nothing to cancel. On {endLabel} the account moves to Free, and{" "}
             {freeHasWatchlist()
               ? "your watchlist, saved scans and alert rules stay intact."
-              : "your saved scans and alert rules stay intact — your saved watchlist tickers are kept, and unlock on Pro."}
+              : "your saved scans and alert rules stay intact — your saved watchlist tickers are kept, and unlock on Pro."}{" "}
+            {/* Voluntary mid-trial card-add. Checkout forwards trial_ends_at
+                as Stripe's subscription trial_end, so this is factually
+                accurate: adding a card now changes nothing until the date the
+                trial was always going to end. Calm, no pressure — the
+                commitment-device upside comes from the option existing, not
+                from pushing it (compliance rule 6). */}
+            Prefer to settle it now? Adding a card any time keeps Premium at the
+            founding price &mdash; you&rsquo;re still not charged until {endLabel}.
           </>
         )}
       </span>

@@ -12,6 +12,10 @@ export type SessionUser = {
   is_admin?: boolean;
   is_lifetime?: boolean;
   trial_ends_at?: string | null;
+  // One-time 50%-off-3-months offer for expired card-less trialists.
+  // Server-computed (services/billing.trial_save_offer_eligible) so the UI
+  // can never promise a discount checkout won't apply.
+  trial_save_offer_available?: boolean;
   referral_code?: string | null;
   telegram_chat_id?: string | null;
   phone_number?: string | null;

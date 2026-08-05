@@ -21,6 +21,7 @@ from app.services.billing import (
     pause_subscription,
     resume_subscription,
     set_cancel_at_period_end,
+    trial_save_offer_eligible,
 )
 from app.services.email_checkout import verify_checkout_token
 from app.services.rate_limit import limit_strict
@@ -101,6 +102,11 @@ async def create_checkout(
         # it mirrors exactly who receives the wb90 email. Referral credit, if
         # any, takes precedence inside create_checkout_session.
         winback=(user.tier == "free" and user.canceled_at is not None),
+        # One-time 50%-off-3-months for the expired card-less trialist (the
+        # cancel-intercept save offer, extended to trial expiry). Gate lives
+        # in services/billing.trial_save_offer_eligible; redeemed-at is set by
+        # the subscription webhook so an abandoned checkout doesn't burn it.
+        trial_save_offer=trial_save_offer_eligible(user),
         # Mid-trial card-add: forward the user's remaining trial so Stripe
         # starts billing when the trial was always going to end, instead of
         # charging today and silently forfeiting the free days the "Keep
@@ -198,6 +204,10 @@ async def email_checkout(
             cancel_url=f"{settings.app_url}/pricing?src=email_checkout_cancelled",
             referral_credit_months=user.referral_credit_months or 0,
             winback=(user.tier == "free" and user.canceled_at is not None),
+            # Same trial-expiry save offer as POST /checkout — the T+0
+            # "trial ended" email's one-click links land here, so the offer
+            # it states must actually be attached to the session it mints.
+            trial_save_offer=trial_save_offer_eligible(user),
             # Same mid-trial preservation as POST /checkout — this endpoint
             # IS the "Keep Premium — add a card" email CTA, so it's the path
             # a day-3 trial user most likely arrives through.

@@ -126,6 +126,22 @@ export function TrialEndedModal() {
             is locked in while you stay subscribed. {REFUND.short} if you change
             your mind.
           </p>
+          {/* One-time save offer for expired card-less trialists. Server-
+              gated (trial_save_offer_available comes from /api/me, same gate
+              checkout applies) so this line can never promise a discount the
+              checkout won't honour. COMPLIANCE rule 6: stated as a standing
+              fact — it genuinely has no deadline, it is once per account —
+              so no countdown, no "expires soon". */}
+          {user?.trial_save_offer_available && (
+            <p className="mt-2 border-t border-accent/20 pt-2">
+              <strong className="text-fg">
+                A one-time offer is on your account:
+              </strong>{" "}
+              50% off your first 3 months of Pro or Premium, applied
+              automatically at checkout. It doesn&rsquo;t expire &mdash;
+              it&rsquo;s simply once per account.
+            </p>
+          )}
         </div>
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
