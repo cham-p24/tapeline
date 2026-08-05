@@ -100,6 +100,13 @@ class SignupBody(BaseModel):
     gclid: str | None = Field(None, max_length=200)
     gbraid: str | None = Field(None, max_length=200)
     wbraid: str | None = Field(None, max_length=200)
+    # First-touch EXTERNAL referrer HOSTNAME captured by lib/utm.ts on the
+    # landing visit (same localStorage mechanism as utm_*) and forwarded
+    # here. AI-assistant referrals (Copilot/ChatGPT/Perplexity) carry no
+    # utm_* params, so document.referrer's host is the only channel trace.
+    # Hostname only — never path/query. Written once at signup, never
+    # updated.
+    signup_referrer_host: str | None = Field(None, max_length=100)
     # Signup-form email consent — BOTH default False and the form renders
     # both boxes unchecked (explicit opt-in only; never pre-ticked).
     #   marketing_opt_in    → users.marketing_opt_in: consent for the weekly
@@ -280,6 +287,9 @@ async def signup(
         signup_gclid=(body.gclid or None),
         signup_gbraid=(body.gbraid or None),
         signup_wbraid=(body.wbraid or None),
+        # First-touch external referrer host — the only attribution trace
+        # AI-assistant referrals leave (no utm_* params). Hostname only.
+        signup_referrer_host=(body.signup_referrer_host or None),
         # Weekly-digest consent from the signup form's unchecked-by-default
         # checkbox. False (no tick) writes the column default — nothing is
         # inferred from silence.

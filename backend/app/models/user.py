@@ -244,6 +244,17 @@ class User(Base):
     signup_gbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_wbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # First-touch EXTERNAL referrer HOSTNAME captured at landing (frontend
+    # lib/utm.ts, same localStorage 30-day-TTL mechanism as signup_utm_*,
+    # forwarded on the signup POST; written once at signup, never updated).
+    # Exists because AI-assistant referrals (Copilot/ChatGPT/Perplexity)
+    # carry no utm_* params — document.referrer's host is the only trace, so
+    # without this column those signups land as "direct". Privacy: hostname
+    # ONLY, never path/query (an AI-chat referrer path can carry the user's
+    # prompt text). Nullable — direct traffic and internal navigation
+    # legitimately have no external referrer.
+    signup_referrer_host: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     # Set ONCE by the offline-conversion upload job
     # (app.scripts.upload_google_ads_conversions) the first time this
     # subscriber's paid conversion (trial -> active) has been reported back to

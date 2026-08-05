@@ -65,6 +65,12 @@ type SignupExtras = {
   gclid?: string;
   gbraid?: string;
   wbraid?: string;
+  // First-touch EXTERNAL referrer hostname — read from localStorage on
+  // submit via lib/utm.ts:getStoredReferrerHost(). The only attribution
+  // trace AI-assistant referrals (Copilot/ChatGPT/Perplexity) leave, since
+  // they carry no utm_* params. Hostname only, never path/query. Backend
+  // writes it once to users.signup_referrer_host; never updated.
+  signup_referrer_host?: string;
   // Signup-form consent boxes — both rendered UNCHECKED by default (explicit
   // opt-in only). `marketing_opt_in` is the weekly-market-digest consent
   // (users.marketing_opt_in); `daily_top10_opt_in` enrols the email in the
