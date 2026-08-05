@@ -163,6 +163,14 @@ const nextConfig = {
         source: "/:path*/twitter-image",
         headers: [{ key: "X-Robots-Tag", value: "noindex" }],
       },
+      // Press kit (/press/*) is meant to be embedded and fetched by third
+      // parties (Product Hunt, directories, journalists' CMSes) — allow
+      // cross-origin reads on these static images only. GET-only public
+      // assets; no credentials involved, so `*` is safe here.
+      {
+        source: "/press/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
     ];
   },
 };
