@@ -673,6 +673,21 @@ def render_trial_day11_email(
             f"Here's what you've actually been using."
         )
         + _trial_summary_block(summary)
+        # The one loss the user personally feels: the watchlist THEY built.
+        # Post-cutover Free has no watchlist, so their saved tickers lock at
+        # expiry. Purely factual capability statement (compliance rules 6/7:
+        # no market-opportunity framing, no performance claims) — and gated on
+        # free_has_watchlist() so it disappears if Free ever regains one.
+        + (
+            muted_paragraph(
+                f"One concrete thing: the {summary['watchlist_count']} saved "
+                f"ticker{'s' if summary['watchlist_count'] != 1 else ''} on "
+                f"your watchlist lock at expiry — the Free tier no longer "
+                f"includes a watchlist. Upgrading restores them instantly."
+            )
+            if summary and summary.get("watchlist_count") and not free_has_watchlist()
+            else ""
+        )
         + muted_paragraph(
             f"If you decide to keep Premium, add a card before {deadline} at "
             f"the founding price — $19.99/mo, or $16.58/mo billed annually "
@@ -717,9 +732,22 @@ def render_trial_day13_email(
             f"{user_name}, your Premium trial expires in less than 24 hours."
         )
         + _trial_summary_block(summary)
+        # Lead the loss list with the user's OWN built asset (their watchlist)
+        # when Free no longer includes one — the generic caps are abstract; the
+        # 7 tickers they saved are not. Factual capability statement only
+        # (compliance rules 6/7); gated on free_has_watchlist().
         + muted_paragraph(
-            f"If you don't add a card, your account drops to Free at expiry — "
-            f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
+            "If you don't add a card, your account drops to Free at expiry — "
+            + (
+                f"the {summary['watchlist_count']} saved "
+                f"ticker{'s' if summary['watchlist_count'] != 1 else ''} on "
+                f"your watchlist lock (Free no longer includes one), "
+                if summary
+                and summary.get("watchlist_count")
+                and not free_has_watchlist()
+                else ""
+            )
+            + f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
             f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts, Telegram, "
             f"and the Congress feed switch off."
         )
@@ -1438,8 +1466,18 @@ def _today_short() -> str:
     return datetime.now(UTC).strftime("%a %b %d")
 
 
-def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
-    """End-of-day watchlist summary — one email per Pro+ user per day."""
+def render_eod_watchlist_digest(
+    user_name: str, items: list[dict], *, trial_note: str | None = None,
+) -> str:
+    """End-of-day watchlist summary — one email per Pro+ user per day.
+
+    `trial_note` (optional): a calm, factual line appended for cardless
+    trialists in their final days — the digest is the one guaranteed daily
+    inbox touch of exactly the engaged-trialist cohort (a watchlist is
+    required to receive it), and previously carried zero trial context even
+    on the last day. Caller composes the wording; keep it a plain statement
+    of the real expiry (compliance rule 6: no manufactured urgency).
+    """
     if not items:
         return shell(
             h1(f"End of day · {_today_short()}")
@@ -1454,6 +1492,7 @@ def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
             f"ticker{'' if len(items) == 1 else 's'} closed today."
         )
         + watchlist_table(items)
+        + (muted_paragraph(trial_note) if trial_note else "")
         + button("Open watchlist", "https://tapeline.io/app/watchlist"),
         preheader=(
             f"Watchlist EOD · {len(items)} ticker"
@@ -2669,8 +2708,30 @@ async def run_eod_watchlist_digest(
         if not items:
             continue
 
+        # Cardless trialist in the final 3 days: append one calm, factual
+        # line naming the real expiry. This digest is the one guaranteed
+        # daily inbox touch of the engaged-trialist cohort (a watchlist is
+        # required to receive it) and previously carried no trial context at
+        # all — the T-3/T-1 drip emails could land while the user's daily
+        # email said nothing. Truthful deadline only; no countdown framing.
+        trial_note = None
+        from datetime import UTC, timedelta
+        _now = datetime.now(UTC)
+        if (
+            user.trial_ends_at is not None
+            and user.stripe_customer_id is None
+            and _now < user.trial_ends_at <= _now + timedelta(days=3)
+        ):
+            trial_note = (
+                f"A quiet note: this daily digest is part of Pro. Your trial "
+                f"ends {user.trial_ends_at:%A, %B} {user.trial_ends_at.day} — "
+                f"plans are at tapeline.io/pricing if you want to keep it."
+            )
+
         try:
-            html = render_eod_watchlist_digest(user.name or "trader", items)
+            html = render_eod_watchlist_digest(
+                user.name or "trader", items, trial_note=trial_note
+            )
             res = await send_email(
                 user.email, f"Tapeline EOD · {_today_short()}", html,
                 persona="alerts",
