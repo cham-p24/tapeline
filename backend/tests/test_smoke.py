@@ -764,13 +764,18 @@ async def test_growth_bot_preview_returns_full_payload(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_growth_bot_run_respects_kill_switch(client, monkeypatch):
-    """When GROWTH_BOT_ENABLED=false (default), POST .../run returns skipped."""
+    """GROWTH_BOT_ENABLED=false must short-circuit the tick.
+
+    The default flipped to ON at the founder's request (2026-08-08), so the
+    kill switch is now exercised explicitly rather than via the default —
+    which is the stronger assertion anyway: the env var must always win."""
+    import app.services.growth_bot as gb
     from app.db import session_scope
     from app.services.growth_bot import run_daily_growth_tick
 
+    monkeypatch.setattr(gb.settings, "growth_bot_enabled", False)
     async with session_scope() as s:
         result = await run_daily_growth_tick(s)
-        # Default is disabled — must short-circuit
         assert result.get("skipped") is True
         assert result.get("reason") == "disabled"
 
