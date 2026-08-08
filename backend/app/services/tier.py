@@ -256,7 +256,12 @@ def limit(user_tier: Tier | str, key: str) -> int | None:
     # users) and does NOT unlock Pro FEATURES (has_feature is unchanged, so the
     # premium tools stay the paid moat). Numeric-cap lift only.
     if actual is Tier.FREE and free_open_access() and key != "watchlist_tickers":
-        return TIER_LIMITS[Tier.PRO].get(key, TIER_LIMITS[Tier.FREE].get(key, 0))
+        pro = TIER_LIMITS[Tier.PRO].get(key, TIER_LIMITS[Tier.FREE].get(key, 0))
+        # Keep the lifted FREE cap a concrete positive int even where Pro is
+        # "unlimited" (None) — the look-up meter + stale-read guards assume an
+        # int cap for Free. 100k/day is effectively unlimited without changing
+        # the type those paths depend on.
+        return 100_000 if pro is None else pro
     # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
     # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
     # cutover needs no restart/redeploy. Paid tiers are unaffected.

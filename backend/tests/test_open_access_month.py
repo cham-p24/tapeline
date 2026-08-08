@@ -30,8 +30,13 @@ def test_during_window_free_caps_lift_to_pro():
     # Guarded so the test is correct whether CI runs inside or after the window.
     if not free_open_access():
         return
-    for key in ("scanner_rows", "daily_lookups", "web_push_alerts"):
-        assert limit(Tier.FREE, key) == TIER_LIMITS[Tier.PRO][key], key
+    # scanner_rows/web_push have concrete Pro ints — lifted to exactly those.
+    assert limit(Tier.FREE, "scanner_rows") == TIER_LIMITS[Tier.PRO]["scanner_rows"]
+    assert limit(Tier.FREE, "web_push_alerts") == TIER_LIMITS[Tier.PRO]["web_push_alerts"]
+    # daily_lookups: Pro is "unlimited" (None); Free is lifted to a large int
+    # (kept int so the meter/stale-read guards stay safe) — effectively no wall.
+    cap = limit(Tier.FREE, "daily_lookups")
+    assert isinstance(cap, int) and cap >= 1000
 
 
 def test_watchlist_is_NOT_lifted_by_open_access():
