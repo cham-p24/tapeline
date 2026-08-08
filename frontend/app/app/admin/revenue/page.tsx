@@ -20,6 +20,7 @@ type Revenue = {
   activated_users: number;
   activation_rate: number;
   gclid_capture_count: number;
+  acquisition_channels: Record<string, { signups: number; paid: number }>;
   cancellations_scheduled: number;
   cancellation_reasons: Record<string, number>;
   save_offers_redeemed: number;
@@ -129,6 +130,44 @@ export default function RevenuePage() {
         signups arriving with a Google Ads click ID stored (available for the
         offline-conversion upload once Ads API access is enabled).
       </p>
+
+      {/* Acquisition channels — first-party "where do signups come from + which converts" */}
+      <h2 className="mt-10 text-xl font-semibold">Acquisition channels</h2>
+      <p className="text-xs text-muted">
+        Every signup by where it came from (UTM source → external referrer host →
+        direct), with how many later paid. First-party — captured at landing, no
+        Google Analytics/Ads connector needed.
+      </p>
+      <div className="card mt-4 overflow-x-auto">
+        {Object.keys(data.acquisition_channels).length === 0 ? (
+          <div className="p-4 text-sm text-subtle">No signups yet</div>
+        ) : (
+          <table className="w-full text-sm nums">
+            <thead>
+              <tr className="border-b border-border/50 text-xs uppercase text-muted">
+                <th className="px-4 py-2 text-left font-medium">Channel</th>
+                <th className="px-4 py-2 text-right font-medium">Signups</th>
+                <th className="px-4 py-2 text-right font-medium">Paid</th>
+                <th className="px-4 py-2 text-right font-medium">Conv.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(data.acquisition_channels)
+                .sort((a, b) => b[1].signups - a[1].signups)
+                .map(([channel, { signups, paid }]) => (
+                  <tr key={channel} className="border-b border-border/30 last:border-0">
+                    <td className="px-4 py-2">{channel}</td>
+                    <td className="px-4 py-2 text-right font-semibold">{signups}</td>
+                    <td className="px-4 py-2 text-right font-semibold">{paid}</td>
+                    <td className="px-4 py-2 text-right text-muted">
+                      {signups > 0 ? `${Math.round((paid / signups) * 100)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* Subscription book */}
       <h2 className="mt-10 text-xl font-semibold">Subscription book</h2>

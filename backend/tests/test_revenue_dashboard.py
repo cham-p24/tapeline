@@ -267,6 +267,39 @@ async def test_revenue_drip_reach_counts_lever_tokens(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_revenue_acquisition_channels_group_and_count_paid(client, monkeypatch):
+    """Signups group by utm_source → external referrer host → 'direct', and each
+    channel carries how many of its signups later reached paid (card on file)."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        # Two from a utm_source; one of them converted (has a Stripe customer id).
+        await _seed_user(signup_utm_source="google")
+        await _seed_user(
+            signup_utm_source="google",
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        # One from an AI-assistant referrer that carries NO utm — must fall back
+        # to the referrer host, not collapse into "direct".
+        await _seed_user(signup_referrer_host="chat.openai.com")
+        # One with neither utm nor referrer → "direct".
+        await _seed_user()
+
+        after = await _revenue(client, cookies)
+        b, a = before["acquisition_channels"], after["acquisition_channels"]
+
+        def ch(chan: str, field: str) -> int:
+            return a.get(chan, {}).get(field, 0) - b.get(chan, {}).get(field, 0)
+
+        assert ch("google", "signups") == 2
+        assert ch("google", "paid") == 1
+        assert ch("chat.openai.com", "signups") == 1
+        assert ch("chat.openai.com", "paid") == 0
+        assert ch("direct", "signups") == 1
+
+
+@pytest.mark.asyncio
 async def test_revenue_webhook_volume_by_type(client, monkeypatch):
     async with client:
         cookies = await _make_admin_cookies(client, monkeypatch)
