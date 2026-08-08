@@ -14,17 +14,20 @@
  */
 
 const GROUPS: string[][] = [
-  ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA"], // mega-cap tech
+  // Full Mag-7 → all 21 pairwise combos (the single highest-demand cluster;
+  // TSLA also sits in autos/EV below, dedup collapses the overlap).
+  ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"], // mega-cap tech (Mag-7)
   ["NVDA", "AMD", "INTC", "AVGO", "MU", "QCOM", "TSM"], // semiconductors
+  ["CRM", "NOW", "SNOW", "DDOG", "PLTR", "MDB", "MSFT"], // cloud / SaaS (MSFT for CRM-vs-MSFT)
   ["JPM", "BAC", "WFC", "C", "GS", "MS"], // big banks
   ["XOM", "CVX", "COP", "OXY", "SLB"], // energy
   ["KO", "PEP", "MDLZ", "PG", "CL"], // consumer staples
-  ["V", "MA", "PYPL", "AXP"], // payments
-  ["TSLA", "F", "GM", "RIVN", "LCID"], // autos / EV
+  ["V", "MA", "PYPL", "AXP", "SOFI"], // payments / fintech
+  ["TSLA", "F", "GM", "RIVN", "LCID", "BYDDY"], // autos / EV
   ["HD", "LOW", "TGT", "WMT", "COST"], // retail
   ["DIS", "NFLX", "WBD", "PARA", "CMCSA"], // media / streaming
   ["UBER", "LYFT", "DASH", "ABNB"], // gig / travel
-  ["PFE", "MRK", "LLY", "JNJ", "ABBV"], // pharma
+  ["PFE", "MRK", "LLY", "JNJ", "ABBV", "NVO"], // pharma
   ["BA", "LMT", "RTX", "GD", "NOC"], // defense / aerospace
 ];
 
