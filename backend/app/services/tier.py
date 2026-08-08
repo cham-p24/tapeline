@@ -122,6 +122,11 @@ FREE_WATCHLIST_TICKERS = 5       # the FREE cap WHILE the free tier still has a 
 # in the DB, just no longer addable/shown on Free, so upgrading RESTORES the list.
 FREE_WATCHLIST_REMOVAL_DATE: Final[date] = date(2026, 8, 2)
 
+# "Everything unlocked" open-access month — FREE behaves like PRO until this
+# date, then auto-reverts (see free_open_access). Keep in sync with the frontend
+# PROMO_OPEN_ACCESS_UNTIL in lib/pricing.ts.
+PROMO_OPEN_ACCESS_UNTIL: Final[date] = date(2026, 9, 8)
+
 
 def free_watchlist_cap(today: date | None = None) -> int:
     """Saved-ticker cap for the FREE tier.
@@ -133,6 +138,19 @@ def free_watchlist_cap(today: date | None = None) -> int:
     """
     d = today or datetime.now(UTC).date()
     return 0 if d >= FREE_WATCHLIST_REMOVAL_DATE else FREE_WATCHLIST_TICKERS
+
+
+def free_open_access(today: date | None = None) -> bool:
+    """True while the "everything unlocked" open-access month is running.
+
+    Founder experiment (2026-08-08): at 0 payers with engaged users who
+    activate but don't convert, drop ALL friction for a month — the FREE tier
+    gets full Pro-level access (caps + every Pro feature) — then auto-revert.
+    Premium-only feeds (congress, insider, Telegram, API) stay gated. Date-gated
+    so it reverts with no deploy. `today` injectable for tests.
+    """
+    d = today or datetime.now(UTC).date()
+    return d < PROMO_OPEN_ACCESS_UNTIL
 
 
 def free_has_watchlist(today: date | None = None) -> bool:
@@ -231,6 +249,14 @@ def limit(user_tier: Tier | str, key: str) -> int | None:
     callers that may receive None must handle the sentinel (see usage.py).
     """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
+    # Open-access month: lift the FREE usage CAPS to Pro level (the walls a free
+    # user actually hits — scanner rows, daily look-ups, web-push allowance),
+    # auto-reverting on PROMO_OPEN_ACCESS_UNTIL. Deliberately does NOT touch
+    # watchlist_tickers (kept removed per the Aug-2 cutover, so we don't yo-yo
+    # users) and does NOT unlock Pro FEATURES (has_feature is unchanged, so the
+    # premium tools stay the paid moat). Numeric-cap lift only.
+    if actual is Tier.FREE and free_open_access() and key != "watchlist_tickers":
+        return TIER_LIMITS[Tier.PRO].get(key, TIER_LIMITS[Tier.FREE].get(key, 0))
     # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
     # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
     # cutover needs no restart/redeploy. Paid tiers are unaffected.
