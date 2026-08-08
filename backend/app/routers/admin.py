@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -334,6 +334,33 @@ async def revenue_dashboard(
         select(func.count()).select_from(User).where(User.signup_gclid.isnot(None))
     )).scalar() or 0
 
+    # ── Acquisition channels — every signup sliced by the attribution captured
+    # at landing: utm_source, else the external referrer HOST (AI assistants /
+    # other sites that carry no utm_*), else "direct". Each channel carries how
+    # many of its signups later reached paid (stripe_customer_id set). This is
+    # the "which channel actually brings users, and which converts" readout,
+    # answered entirely from first-party columns already stored at signup — no
+    # external analytics tool or connector required. count(col) counts non-NULL,
+    # so count(stripe_customer_id) is the paid tally per channel. ──
+    channel_expr = func.coalesce(
+        func.nullif(User.signup_utm_source, ""),
+        func.nullif(User.signup_referrer_host, ""),
+        literal("direct"),
+    )
+    channel_rows = (await session.execute(
+        select(
+            channel_expr.label("channel"),
+            func.count().label("signups"),
+            func.count(User.stripe_customer_id).label("paid"),
+        )
+        .group_by(channel_expr)
+        .order_by(func.count().desc())
+    )).all()
+    acquisition_channels = {
+        row.channel: {"signups": row.signups, "paid": row.paid}
+        for row in channel_rows
+    }
+
     # ── Churn / cancellation ──────────────────────────────────────────────
     cancellations_scheduled = (await session.execute(
         select(func.count()).select_from(Subscription).where(
@@ -416,6 +443,10 @@ async def revenue_dashboard(
         # gclid capture (§3.7): signups whose Google Ads click ID is stored and
         # therefore available for the (founder-gated) offline-conversion upload.
         "gclid_capture_count": gclid_capture_count,
+        # Acquisition channels: {channel: {signups, paid}} keyed by utm_source →
+        # external referrer host → "direct". First-party "where do signups come
+        # from, and which channel converts" — no external analytics required.
+        "acquisition_channels": acquisition_channels,
         "cancellations_scheduled": cancellations_scheduled,
         "cancellation_reasons": cancellation_reasons,
         "save_offers_redeemed": save_offers_redeemed,
