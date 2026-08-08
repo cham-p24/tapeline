@@ -278,9 +278,11 @@ class Settings(BaseSettings):
     # (~8am Melbourne). It pulls live metrics from Postgres, drafts a
     # daily X tweet, LinkedIn post, and 3 fintwit reply candidates from
     # the priority-1 account list, and emails the package to
-    # GROWTH_DIGEST_TO. Defaults to off so a fresh deploy doesn't surprise
-    # the founder with daily email — flip to true once they want it.
-    growth_bot_enabled: bool = False
+    # GROWTH_DIGEST_TO. Default flipped to ON at the founder's request
+    # (2026-08-08) — the daily funnel snapshot is the always-on sales
+    # tracker that survives any local session. Set GROWTH_BOT_ENABLED=false
+    # in the environment to switch it off without a deploy.
+    growth_bot_enabled: bool = True
     # Recipient for the daily growth digest email. Defaults to the brand
     # inbox if blank.
     growth_digest_to: str = "tapeline.inbox@gmail.com"
