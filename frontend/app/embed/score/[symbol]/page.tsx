@@ -15,8 +15,12 @@
  * change. That's the value-prop pitch in the /embed docs page.
  *
  * Each embed produces a HTTP referrer header pointing at the embedding
- * site, so we can later aggregate referrers in analytics to identify
- * the most valuable backlink sources for outreach follow-up.
+ * site. That aggregation is now IMPLEMENTED (it was a TODO here for a
+ * long time): every render records an impression keyed on the embedding
+ * HOSTNAME (never the full referring URL) + symbol + surface + UTC day,
+ * so the most valuable backlink sources are visible for outreach
+ * follow-up. See lib/embedImpression.ts and the "Embed distribution"
+ * section of /app/admin/revenue.
  *
  * No auth required. Caches 60s server-side (same as /t/{TICKER}) so
  * embeds on high-traffic pages don't hammer the API.
@@ -26,8 +30,11 @@
  *   ?theme=dark    — dark bg + light text
  *   ?compact=1     — narrow variant (320×80 instead of 480×140)
  */
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+import { trackEmbedImpression } from "@/lib/embedImpression";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -88,6 +95,20 @@ export default async function EmbedScorePage({
   const { symbol } = await params;
   const sp = await searchParams;
   const sym = symbol.toUpperCase();
+
+  // Count this render as an embed impression. Read the referer BEFORE the
+  // (awaited) ticker fetch so the value is captured regardless of what the
+  // fetch does, but schedule the POST with `after()` so it runs only once the
+  // widget HTML has been sent — the render never waits on tracking, and a
+  // tracking failure can never break the widget (see lib/embedImpression.ts).
+  //
+  // HOSTNAME ONLY: the full referring URL is discarded inside refererHost().
+  // Missing referer, tapeline.io itself, and localhost are all skipped there.
+  //
+  // Like the /badge route, this page is cached, so a cache-served render never
+  // reaches here — counts are DIRECTIONAL, not exact.
+  trackEmbedImpression((await headers()).get("referer"), sym, "iframe");
+
   const data = await fetchTicker(sym);
   if (!data) notFound();
 

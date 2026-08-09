@@ -28,6 +28,8 @@
  */
 import { NextRequest } from "next/server";
 
+import { trackEmbedImpression } from "@/lib/embedImpression";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
@@ -175,6 +177,27 @@ export async function GET(
 
   const data = await fetchTickerForBadge(sym);
   const svg = buildBadgeSvg(sym, data, { theme, label });
+
+  // Count this render as an embed impression. The POST is scheduled with
+  // `after()` so it runs once the response is flushed — the badge is never
+  // delayed by, and can never fail because of, the tracking call. The helper
+  // itself cannot throw. See lib/embedImpression.ts.
+  //
+  // Only the Referer HOSTNAME is forwarded; the full referring URL is discarded
+  // inside refererHost() and never leaves this process. Renders with no
+  // referer, from tapeline.io itself, or from localhost are skipped there.
+  //
+  // Deliberately NOT piggybacked on the /api/ticker fetch above: that fetch is
+  // `revalidate: 1800`, so it reaches the backend at most once per symbol per
+  // 30 min — it would see one embedding host per symbol per half hour, which is
+  // exactly the signal we're trying to recover. (And per-host fetch options
+  // would fragment Next's data cache.)
+  //
+  // CACHING NOTE: this response is CDN-cached (s-maxage=60), so renders served
+  // from the edge never run this handler and are never counted. The totals are
+  // therefore DIRECTIONAL, not exact — real impressions always exceed them.
+  // That's intended; don't "fix" the gap with a cache-buster.
+  trackEmbedImpression(request.headers.get("referer"), sym, "badge");
 
   return new Response(svg, {
     status: 200,
