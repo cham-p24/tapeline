@@ -255,6 +255,20 @@ class User(Base):
     # legitimately have no external referrer.
     signup_referrer_host: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # First-touch LANDING PATH on our own site, captured at landing (frontend
+    # lib/utm.ts, same localStorage 30-day-TTL first-touch mechanism as
+    # signup_utm_*, forwarded on the signup POST; written once, never
+    # updated). The signup_utm_*/referrer_host columns above answer "which
+    # CHANNEL brought this user"; this one answers "which PAGE earned them".
+    # With ~4,750 published SEO URLs (ticker pages, /compare/*,
+    # /best-stocks-for/*, /sectors, /glossary/*), "organic brought 6 signups"
+    # is unactionable without it. Privacy: PATH ONLY — the query string and
+    # hash are stripped client-side and again in the signup route (they can
+    # carry search terms or identifiers, and they wreck aggregation
+    # cardinality). Normalised lowercase, no trailing slash. Nullable —
+    # pre-existing rows and any client that doesn't forward it stay NULL.
+    signup_landing_path: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     # Set ONCE by the offline-conversion upload job
     # (app.scripts.upload_google_ads_conversions) the first time this
     # subscriber's paid conversion (trial -> active) has been reported back to

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import {
   captureGclidFromLocation,
+  captureLandingPathFromLocation,
   captureReferrerHostFromLocation,
   captureUtmFromLocation,
 } from "@/lib/utm";
@@ -30,6 +31,10 @@ export function UtmCapture(): null {
     // params — the referrer HOSTNAME is the only attribution trace. External
     // hosts only, first-touch, never the path/query.
     captureReferrerHostFromLocation();
+    // Which of our ~4,750 SEO pages the visitor actually landed on. The
+    // captures above give the channel; this gives the CONTENT that earned
+    // them. Our own pathname only — never the query string or hash.
+    captureLandingPathFromLocation();
   }, []);
   return null;
 }

@@ -361,6 +361,42 @@ async def revenue_dashboard(
         for row in channel_rows
     }
 
+    # ── Top landing pages by signup — the same population as the channel
+    # readout above, but cut by WHICH page the visitor first landed on
+    # (users.signup_landing_path, first-touch, path only). The channel slice
+    # says "organic brought 6 signups"; with ~4,750 published SEO URLs that
+    # isn't actionable on its own — this says whether /compare/finviz,
+    # /glossary/rsi or a ticker page did the work, so the winning format can
+    # be doubled down on. Cross-cut by channel so a row reads
+    # "organic → /compare/finviz → 3 signups", and carries the same paid
+    # tally. Rows without a captured path (every user created before the
+    # column shipped) are excluded rather than bucketed as "unknown", which
+    # would dominate the ordering for months. Capped — this is a top-N
+    # readout, not an export. ──
+    landing_expr = func.nullif(User.signup_landing_path, "")
+    landing_rows = (await session.execute(
+        select(
+            channel_expr.label("channel"),
+            landing_expr.label("path"),
+            func.count().label("signups"),
+            func.count(User.stripe_customer_id).label("paid"),
+        )
+        .where(User.signup_landing_path.isnot(None))
+        .group_by(channel_expr, landing_expr)
+        .order_by(func.count().desc())
+        .limit(25)
+    )).all()
+    acquisition_landing_pages = [
+        {
+            "channel": row.channel,
+            "path": row.path,
+            "signups": row.signups,
+            "paid": row.paid,
+        }
+        for row in landing_rows
+        if row.path
+    ]
+
     # ── Churn / cancellation ──────────────────────────────────────────────
     cancellations_scheduled = (await session.execute(
         select(func.count()).select_from(Subscription).where(
@@ -447,6 +483,10 @@ async def revenue_dashboard(
         # external referrer host → "direct". First-party "where do signups come
         # from, and which channel converts" — no external analytics required.
         "acquisition_channels": acquisition_channels,
+        # Top landing pages: [{channel, path, signups, paid}], ordered by
+        # signups, capped at 25. The content-level cut of the channel readout
+        # above — which of the ~4,750 SEO pages actually earns signups.
+        "acquisition_landing_pages": acquisition_landing_pages,
         "cancellations_scheduled": cancellations_scheduled,
         "cancellation_reasons": cancellation_reasons,
         "save_offers_redeemed": save_offers_redeemed,
