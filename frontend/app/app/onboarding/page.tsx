@@ -25,7 +25,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { track } from "@vercel/analytics";
 import { api, handle401 } from "@/lib/api";
 import { trackEvent, trackEventOnce } from "@/lib/gtag";
 import { SECTOR_SLUG_TO_CANONICAL } from "@/components/TodaysTape";
@@ -248,7 +247,7 @@ function OnboardingForm() {
         const t = await res.text();
         throw new Error(t || `${res.status} ${res.statusText}`);
       }
-      track("onboarding_submitted", {
+      trackEvent("onboarding_submitted", {
         skipped,
         sectors: sectors.length,
         marketing_opt_in: marketingOptIn,

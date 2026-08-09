@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
 import { getStoredUtm } from "@/lib/utm";
 
@@ -95,8 +94,11 @@ export function NewsletterCapture({
         // `newsletter_signup` event (GA4-only) rather than `sign_up`, so an
         // email opt-in is NOT miscounted as a Google Ads account-signup
         // conversion (which would pollute paid-search ROAS).
-        track("newsletter_subscribed", { source });
-        trackEvent("newsletter_signup", { method: "newsletter" });
+        // A second Vercel-Analytics `newsletter_subscribed` used to fire here.
+        // It went to a sink that never mounted, and `newsletter_signup` below
+        // already records this exact moment — remapping it would only
+        // double-count list growth. `source` is preserved as a param instead.
+        trackEvent("newsletter_signup", { method: "newsletter", source });
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Sign up failed";

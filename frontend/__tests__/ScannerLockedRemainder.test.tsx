@@ -18,9 +18,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/components/UserContext", () => ({ useUser: vi.fn() }));
-vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
 vi.mock("@/lib/gtag", () => ({
   trackEvent: vi.fn(),
+  trackEventOnce: vi.fn(),
   trackFirstTickerAdded: vi.fn(),
   trackCapHit: vi.fn(),
   trackUpgradePromptShown: vi.fn(),

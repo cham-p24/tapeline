@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
-import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/gtag";
 import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist } from "@/lib/pricing";
 
 /**
@@ -59,7 +59,7 @@ export function TrialEndedModal() {
       const ds = Math.max(0, Math.floor((Date.now() - endedAt) / 86_400_000));
       setDaysSince(ds);
       setOpen(true);
-      track("trial_ended_modal_shown", { days_since_expiry: ds });
+      trackEvent("trial_ended_modal_shown", { days_since_expiry: ds });
     } catch {
       // localStorage failures are non-fatal — analytics must never break the page
     }
@@ -147,7 +147,7 @@ export function TrialEndedModal() {
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <button
             onClick={() => {
-              track("trial_ended_modal_dismissed");
+              trackEvent("trial_ended_modal_dismissed");
               setOpen(false);
             }}
             className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover"
@@ -157,7 +157,7 @@ export function TrialEndedModal() {
           <Link
             href="/app/billing?utm_source=trial_ended_modal"
             onClick={() => {
-              track("trial_ended_modal_clicked");
+              trackEvent("trial_ended_modal_clicked");
               setOpen(false);
             }}
             className="flex h-10 items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 px-5 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"

@@ -74,7 +74,51 @@ export type TapelineEvent =
   // marketing route, so we know WHICH content pages get read. What was missing
   // is which of them push a reader onward: a click on the page's primary
   // product-ward CTA. See trackContentCtaClick + components/ContentCtaLink.
-  | "content_cta_click";
+  | "content_cta_click"
+  // ---------------------------------------------------------------------
+  // Recovered funnel diagnostics — ALL GA4-only.
+  //
+  // These used to be fired through `track()` from @vercel/analytics, whose
+  // <Analytics /> component was gated on `NEXT_PUBLIC_VERCEL === "1"` in
+  // app/layout.tsx. That variable is not set anywhere in the repo and is not
+  // one of the vars Vercel injects (it ships VERCEL / VERCEL_ENV /
+  // NEXT_PUBLIC_VERCEL_ENV, never bare NEXT_PUBLIC_VERCEL), so the component
+  // never mounted in ANY environment and every one of these calls was a
+  // silent no-op. They now go to GA4, which is verifiably live.
+  //
+  // NONE of them appear in ADS_CONVERSION_LABEL below, and that is deliberate:
+  // several fire at the same instant as an event that ALREADY forwards a
+  // Google Ads conversion (trial_converted alongside `subscribe`), so giving
+  // any of them a label would double-count a single real conversion. They are
+  // on-site funnel diagnostics only. Events whose meaning was already covered
+  // by an existing GA4 event (checkout_started→begin_checkout,
+  // signup_started→sign_up_started, signup_completed→sign_up,
+  // trial_started→start_trial, newsletter_subscribed→newsletter_signup) were
+  // dropped outright rather than re-fired under a second name.
+  // ---------------------------------------------------------------------
+  | "pricing_page_viewed"        // A pricing surface was seen (surface: marketing | app)
+  | "signup_turnstile_blocked"   // Submit refused because Turnstile produced no token
+  | "onboarding_submitted"       // Onboarding questionnaire saved (or skipped)
+  | "scanner_first_use"          // First scanner open on this browser (activation, once)
+  | "checkout_cancelled"         // Returned from Stripe via the cancel_url
+  | "winback_landing"            // Landed on billing from the day-90 win-back email
+  | "trial_converted"            // Trial → paid, the funnel-side mirror of `subscribe`.
+                                 // NO value/currency and NO Ads label: `subscribe`
+                                 // remains the one and only revenue conversion.
+  | "trial_downgraded"           // Expired trial observed to have dropped to Free
+  | "trial_early_capture_shown"  // Mid-trial add-a-card nudge became visible
+  | "trial_early_capture_dismissed"
+  | "trial_early_capture_clicked"
+  | "trial_ended_modal_shown"    // Post-trial modal became visible
+  | "trial_ended_modal_dismissed"
+  | "trial_ended_modal_clicked"
+  // Cancel-intercept / save-offer flow (components/CancelInterceptModal.tsx)
+  | "cancel_intercept_shown"
+  | "save_offer_accepted"
+  | "subscription_paused"
+  | "subscription_resumed"
+  | "subscription_canceled"
+  | "cancel_survey_submitted";
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
 // overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up

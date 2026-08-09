@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
@@ -184,10 +183,11 @@ function SignUpForm() {
   }, []);
 
   // Funnel event: fired once on mount when a real human sees the signup form.
-  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics
-  // + GA4 (typed event names — see lib/gtag.ts).
+  // Pairs with `sign_up` below to compute drop-off in GA4 (typed event names —
+  // see lib/gtag.ts). This used to fire a second, identical Vercel-Analytics
+  // `signup_started`; that sink never mounted, and mirroring it into GA4 under
+  // a second name would double-count the same form impression.
   useEffect(() => {
-    track("signup_started", { next });
     trackEvent("sign_up_started", { next });
   }, [next]);
 
@@ -236,7 +236,7 @@ function SignUpForm() {
       // failed). The gate is UNCHANGED — this only makes the drop-off
       // measurable so the Cloudflare widget mode (managed vs always-interactive)
       // can be tuned against real numbers instead of guesses.
-      track("signup_turnstile_blocked", { next });
+      trackEvent("signup_turnstile_blocked", { next });
       setErr("Please complete the bot check above.");
       return;
     }
@@ -278,12 +278,14 @@ function SignUpForm() {
       });
       // Funnel events: signup landed cleanly. Trial auto-starts on signup
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
-      // trial event on the same beat. Property `oauth: false` lets us segment
-      // form-vs-OAuth conversion later when OAuth tracking lands.
-      // Mirror to GA4 so Search Console can attribute the query → signup
-      // chain via Acquisition reports.
-      track("signup_completed", { method: "email", next });
-      track("trial_started", { tier: "premium", days: 14, method: "email" });
+      // trial event on the same beat. GA4 is the sink, so Search Console can
+      // attribute the query → signup chain via Acquisition reports; `sign_up`
+      // is also the event that forwards the Google Ads signup conversion.
+      //
+      // The former Vercel-Analytics `signup_completed` / `trial_started` pair
+      // fired here too. They are gone rather than remapped: `sign_up` and
+      // `start_trial` below already record exactly these two moments, and a
+      // second GA4 name for the same instant would double-count the signup.
       trackEvent("sign_up", { method: "email" });
       trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
       // Route through /app/onboarding first — captures use-case + attribution
@@ -345,7 +347,6 @@ function SignUpForm() {
                 // Mirror the email path's funnel start so OAuth conversion is
                 // measurable alongside it. sign_up (completed) fires backend-
                 // side on the OAuth callback; here we only mark intent.
-                track("signup_started", { next, method: provider });
                 trackEvent("sign_up_started", { next, method: provider });
               }}
             />

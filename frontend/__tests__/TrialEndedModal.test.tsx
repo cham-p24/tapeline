@@ -14,10 +14,6 @@ import { render, screen } from "@testing-library/react";
 vi.mock("@/components/UserContext", () => ({
   useUser: vi.fn(),
 }));
-vi.mock("@vercel/analytics", () => ({
-  track: vi.fn(),
-}));
-
 import { TrialEndedModal } from "@/components/TrialEndedModal";
 import { useUser } from "@/components/UserContext";
 import { FREE_LIMITS, REFUND, freeHasWatchlist } from "@/lib/pricing";

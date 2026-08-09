@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { FREE_LIMITS } from "@/lib/pricing";
-import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/gtag";
 
 /**
  * Non-blocking dismissable sheet that fires for trial users with 5-9 days
@@ -59,7 +59,7 @@ export function TrialEarlyCapture() {
       if (window.localStorage.getItem(key) === "1") return;
       setDaysLeft(dl);
       setOpen(true);
-      track("trial_early_capture_shown", { days_left: dl });
+      trackEvent("trial_early_capture_shown", { days_left: dl });
     } catch {
       // localStorage failures are non-fatal
     }
@@ -75,7 +75,7 @@ export function TrialEarlyCapture() {
       // ignore
     }
     if (reason !== "clicked") {
-      track("trial_early_capture_dismissed", { reason });
+      trackEvent("trial_early_capture_dismissed", { reason });
     }
     setOpen(false);
   }
@@ -104,7 +104,7 @@ export function TrialEarlyCapture() {
               <Link
                 href="/app/billing?utm_source=trial_early_capture"
                 onClick={() => {
-                  track("trial_early_capture_clicked", { days_left: daysLeft });
+                  trackEvent("trial_early_capture_clicked", { days_left: daysLeft });
                   dismiss("clicked");
                 }}
                 className="flex h-8 items-center justify-center rounded-md bg-accent px-3 text-xs font-medium text-white hover:opacity-90"

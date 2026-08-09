@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { track } from "@vercel/analytics";
 import { trackEvent, trackEventOnce } from "@/lib/gtag";
 import { useUser } from "@/components/UserContext";
 import { Paywall } from "@/components/Paywall";
@@ -154,13 +153,13 @@ export default function BillingPage() {
     return () => { cancelled = true; };
   }, [user, tier]);
 
-  // Funnel event: pricing-page impression. Pairs with `checkout_started`
-  // (already wired in startCheckout below) to compute click-rate on the
-  // upgrade buttons. `surface: "app"` distinguishes the in-app upgrade
-  // flow from the marketing /pricing page, which fires the same event
-  // with surface="marketing".
+  // Funnel event: pricing-page impression. Pairs with `begin_checkout`
+  // (wired in startCheckout below) to compute click-rate on the upgrade
+  // buttons. `surface: "app"` distinguishes the in-app upgrade flow from
+  // the marketing /pricing page, which fires the same event with
+  // surface="marketing".
   useEffect(() => {
-    track("pricing_page_viewed", { surface: "app", tier });
+    trackEvent("pricing_page_viewed", { surface: "app", tier });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -205,7 +204,10 @@ export default function BillingPage() {
             subscribeParams,
           )
         ) {
-          track("trial_converted", { tier: paidTier, billing_period: period });
+          // Funnel mirror only — deliberately carries NO value/currency and has
+          // no Google Ads label, so the revenue conversion stays exclusively on
+          // the `subscribe` event fired immediately above.
+          trackEvent("trial_converted", { tier: paidTier, billing_period: period });
         }
         // Drop session_id from the address bar now the event is settled, so a
         // shared or bookmarked link carries no payment identifier.
@@ -219,8 +221,8 @@ export default function BillingPage() {
       } else {
         // No session id (legacy link / Stripe didn't substitute) — fall back to
         // the previous un-deduped behaviour rather than losing the conversion.
-        track("trial_converted", { tier: paidTier, billing_period: period });
         trackEvent("subscribe", subscribeParams);
+        trackEvent("trial_converted", { tier: paidTier, billing_period: period });
       }
       // Visible confirmation — previously the redirect back from Stripe landed
       // on a page that looked identical to before paying. Also refresh the
@@ -249,7 +251,7 @@ export default function BillingPage() {
       setCheckoutCancelled(true);
       setCancelledTier(t === "pro" || t === "premium" ? t : null);
       setShowPlans(true);
-      track("checkout_cancelled", { tier: t || "unknown", billing_period: period || "unknown" });
+      trackEvent("checkout_cancelled", { tier: t || "unknown", billing_period: period || "unknown" });
     }
     // Plan intent from the marketing /pricing page, carried through
     // /signup?plan=…&billing=… → onboarding → here. Open the picker,
@@ -270,14 +272,14 @@ export default function BillingPage() {
     if (qp.get("winback") === "1") {
       setWinbackOffer(true);
       setShowPlans(true);
-      track("winback_landing", {});
+      trackEvent("winback_landing", {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Funnel event: trial -> free downgrade (the other side of trial_converted).
   // The downgrade itself runs server-side via the hourly _downgrade_expired_trials
-  // job, which Vercel Analytics can't see directly. Instead we detect the
+  // job, which client-side analytics can't see directly. Instead we detect the
   // post-downgrade state when the user next lands on /app/billing: tier is
   // "free", trial_ends_at is set (so we know they HAD a trial), and the trial
   // is in the past. localStorage dedupes per user so we don't double-count on
@@ -292,7 +294,7 @@ export default function BillingPage() {
       const key = `tapeline_trial_downgraded_${user.id || user.email}`;
       if (window.localStorage.getItem(key) === "1") return;
       window.localStorage.setItem(key, "1");
-      track("trial_downgraded", {
+      trackEvent("trial_downgraded", {
         days_since_downgrade: Math.floor((Date.now() - trialEnd) / 86_400_000),
       });
     } catch {
@@ -306,14 +308,14 @@ export default function BillingPage() {
     // Funnel event: user clicked Upgrade. Fired before the fetch so we capture
     // intent even if the network round-trip or Stripe redirect fails.
     //
-    // GA4 first. The Vercel `checkout_started` call below is a DEAD SINK in
-    // production — <Analytics /> only mounts when NEXT_PUBLIC_VERCEL === "1"
-    // (see app/layout.tsx) and Fly never sets it, so track() silently no-ops.
-    // That left GA4 and Google Ads seeing sign_up and subscribe with NOTHING
-    // in between — precisely the step where the funnel leaks. `begin_checkout`
-    // is the GA4 standard name for this moment; value is the price the user is
-    // about to be charged (Stripe bills USD), so GA4's funnel exploration can
-    // weight checkout intent by plan.
+    // ONE event for this moment, on purpose. The old Vercel-Analytics
+    // `checkout_started` call that used to sit alongside this one is gone: it
+    // was a dead sink (<Analytics /> never mounted — see lib/gtag.ts), and its
+    // payload was a strict subset of what `begin_checkout` already carries, so
+    // re-firing it into GA4 under a second name would only double-count
+    // checkout intent. `begin_checkout` is the GA4 standard name for this
+    // moment; value is the price the user is about to be charged (Stripe bills
+    // USD), so GA4's funnel exploration can weight checkout intent by plan.
     const targetMeta = TIER_META[target];
     trackEvent("begin_checkout", {
       tier: target,
@@ -322,14 +324,6 @@ export default function BillingPage() {
       on_trial: isOnTrial,
       value: billingPeriod === "annual" ? targetMeta.annual : targetMeta.monthly,
       currency: "USD",
-    });
-    // Kept only as a no-cost extra sink for any future Vercel-hosted deploy;
-    // it is no longer the only place this moment is recorded.
-    track("checkout_started", {
-      target_tier: target,
-      billing_period: billingPeriod,
-      current_tier: tier,
-      on_trial: isOnTrial,
     });
     try {
       const res = await fetch(`${API_BASE}/api/billing/checkout`, {

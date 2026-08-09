@@ -78,8 +78,10 @@ const nextConfig = {
   // Allowlist is derived from what the app actually loads:
   //   - Google tag / GA4 + Google Ads  → www.googletagmanager.com (script),
   //     *.google-analytics.com + region1 + www.google-analytics.com (connect)
-  //   - Vercel Analytics + Speed Insights → va.vercel-scripts.com (script),
-  //     *.vercel-insights.com (script+connect)   [env-gated on NEXT_PUBLIC_VERCEL]
+  //   (Vercel Analytics + Speed Insights used to need va.vercel-scripts.com +
+  //   *.vercel-insights.com here. Both packages were removed once it turned out
+  //   <Analytics /> was gated on a NEXT_PUBLIC_VERCEL that nothing ever set, so
+  //   those two origins are gone from script-src and connect-src.)
   //   - PostHog → us-assets.i.posthog.com + *.posthog.com (script),
   //     us.i.posthog.com + *.posthog.com (connect)   [env-gated on POSTHOG_KEY]
   //   - Cloudflare Turnstile → challenges.cloudflare.com (script + frame)
@@ -105,8 +107,8 @@ const nextConfig = {
       "img-src 'self' data: https:",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://va.vercel-scripts.com https://*.vercel-insights.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
-      "connect-src 'self' https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://*.vercel-insights.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "connect-src 'self' https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
       "frame-src https://challenges.cloudflare.com https://s.tradingview.com",
     ].join("; ");
     const securityHeaders = [

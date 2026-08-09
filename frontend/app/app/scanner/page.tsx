@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { track } from "@vercel/analytics";
 import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
 import {
   trackEvent,
+  trackEventOnce,
   trackFirstTickerAdded,
   trackCapHit,
   trackUpgradePromptShown,
@@ -349,16 +349,15 @@ export default function ScannerPage() {
   // localStorage flag dedupes across sessions per browser so we count the
   // first meaningful action exactly once. If they bounce before the scanner,
   // no event fires — which is the signal we want for activation rate.
+  //
+  // Distinct from `open_scanner` below on purpose: that one is a per-mount
+  // engagement signal, this one is a once-per-browser activation signal.
+  // trackEventOnce reuses the SAME storage key the old code wrote, so browsers
+  // that already activated are not re-counted, and it writes the flag only
+  // after a confirmed dispatch (the old order set it first, which permanently
+  // suppressed the event whenever gtag.js hadn't loaded yet).
   useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      if (window.localStorage.getItem("tapeline_scanner_first_use") === "1") return;
-      window.localStorage.setItem("tapeline_scanner_first_use", "1");
-      track("scanner_first_use", {});
-    } catch {
-      // localStorage can throw under private-mode or storage quota — never
-      // let analytics break the page.
-    }
+    trackEventOnce("tapeline_scanner_first_use", "scanner_first_use");
   }, []);
 
   // GA4 engagement event: the scanner was opened. Declared in lib/gtag.ts but
