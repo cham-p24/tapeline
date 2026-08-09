@@ -16,10 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-vi.mock("@vercel/analytics", () => ({
-  track: vi.fn(),
-}));
-
 import { CancelInterceptModal } from "@/components/CancelInterceptModal";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 

@@ -19,10 +19,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: (_: string) => null }),
 }));
 
-vi.mock("@vercel/analytics", () => ({
-  track: vi.fn(),
-}));
-
 describe("OnboardingPage", () => {
   it("renders the headline + the three remaining question prompts", () => {
     render(<OnboardingPage />);

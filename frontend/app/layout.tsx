@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
@@ -202,19 +200,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Enhanced Measurement history-events toggle. This fires it from
             code so route-level funnel steps are always measurable. */}
         <RouteAnalytics />
-        {/* Vercel Analytics + Speed Insights. Gated behind NEXT_PUBLIC_VERCEL
-            (Vercel sets this to "1" on its builds) so they only mount on
-            Vercel-hosted deploys — off-Vercel the beacons 404 against
-            /_vercel/insights/*, so we skip rendering them entirely. Page-view
-            + custom-event tracking + Web Vitals (Core Web Vitals + custom
-            metrics). Complementary to Plausible above (Plausible is the
-            privacy-first aggregate view; Vercel adds per-route + Web Vitals). */}
-        {process.env.NEXT_PUBLIC_VERCEL === "1" && (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        )}
+        {/* Vercel Analytics + Speed Insights used to mount here, gated on an
+            env var that was set nowhere in this repo and that Vercel does not
+            inject (it ships VERCEL / VERCEL_ENV / NEXT_PUBLIC_VERCEL_ENV, never
+            the bare name the gate read). The block was therefore dead in every
+            environment, and the ~31 `track()` calls that depended on it were
+            no-ops. Both packages are removed; the funnel events they carried
+            now go to GA4 via lib/gtag.ts, and Plausible below remains the
+            privacy-first aggregate view. */}
         {/* Google tag (gtag.js) — one loader, shared by GA4 (analytics + the
             GSC attribution loop) AND Google Ads (paid-search conversion
             tracking). Loaded after-interactive so it never blocks first paint.

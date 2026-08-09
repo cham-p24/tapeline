@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/gtag";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
@@ -105,7 +105,7 @@ export function CancelInterceptModal({
     setFeedback("");
     setSurveySent(false);
     setLoading(true);
-    track("cancel_intercept_shown", { tier });
+    trackEvent("cancel_intercept_shown", { tier });
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/billing/retention-options`, {
@@ -163,21 +163,21 @@ export function CancelInterceptModal({
 
   const acceptSave = () =>
     action("/api/billing/save-offer", {}, () => {
-      track("save_offer_accepted", { tier });
+      trackEvent("save_offer_accepted", { tier });
       setDone({ kind: "saved" });
       setStep("done");
     }, "save");
 
   const pause = (months: number) =>
     action("/api/billing/pause", { months }, (d) => {
-      track("subscription_paused", { tier, months });
+      trackEvent("subscription_paused", { tier, months });
       setDone({ kind: "paused", detail: d.resumes_at });
       setStep("done");
     }, `pause${months}`);
 
   const resume = () =>
     action("/api/billing/resume", {}, () => {
-      track("subscription_resumed", { tier });
+      trackEvent("subscription_resumed", { tier });
       setDone({ kind: "resumed" });
       setStep("done");
     }, "resume");
@@ -186,7 +186,7 @@ export function CancelInterceptModal({
    *  survey comes after, optionally), straight to the confirmation. */
   const directCancel = () =>
     action("/api/billing/cancel", {}, (d) => {
-      track("subscription_canceled", { tier, via: "one_click" });
+      trackEvent("subscription_canceled", { tier, via: "one_click" });
       setDone({ kind: "canceled", detail: d.period_end });
       setStep("done");
     }, "cancel");
@@ -195,7 +195,7 @@ export function CancelInterceptModal({
    *  cancellation is already scheduled as survey-capture only. */
   const submitSurvey = () =>
     action("/api/billing/cancel", { reason, feedback: feedback.trim() || null }, () => {
-      track("cancel_survey_submitted", { tier, reason: reason ?? "other" });
+      trackEvent("cancel_survey_submitted", { tier, reason: reason ?? "other" });
       setSurveySent(true);
     }, "survey");
 

@@ -1,92 +1,56 @@
 /**
- * End-to-end validation of the 6 Vercel Analytics funnel events.
+ * End-to-end validation of the funnel events, against GA4.
  *
  * Why this exists:
- *   The events are wired in 4 different files (signup, scanner, billing
- *   client + backend success_url). A unit test for each is brittle; this
+ *   The events are wired across several files (signup, scanner, billing client
+ *   + the Stripe success_url return). A unit test for each is brittle; this
  *   test exercises the real React render path and intercepts the actual
- *   transport that @vercel/analytics emits on, so we know the event fires
- *   the moment its trigger condition is met.
+ *   `gtag()` calls, so we know each event fires the moment its trigger
+ *   condition is met.
+ *
+ * History:
+ *   This suite used to intercept @vercel/analytics beacons and assert on
+ *   `signup_started` / `checkout_started` / `trial_converted` etc. Those calls
+ *   went to a sink that never mounted — <Analytics /> was gated on
+ *   `NEXT_PUBLIC_VERCEL === "1"`, a variable nothing set and Vercel does not
+ *   inject — so the assertions were validating a no-op. The package is gone and
+ *   the events now go to GA4 via lib/gtag.ts.
  *
  * Capture strategy:
- *   @vercel/analytics ships events via two transports — `navigator.sendBeacon`
- *   (preferred, unload-safe) and `window.fetch` (fallback). page.route() only
- *   sees fetch + XHR, so beacons slip through and assertions race the SDK.
- *   We install a pre-page init script that monkey-patches BOTH transports
- *   before any page JS runs, pushing matching payloads to a window-level
- *   array we read at assertion time.
+ *   lib/gtag.ts dispatches through `window.gtag`, and queues events until it
+ *   appears. We install a stub `window.gtag` before any page JS runs, so the
+ *   helper takes the fast path and every event lands in a window-level array
+ *   we read at assertion time. No network interception needed.
  *
  * Run:
  *   npm run e2e -- funnel-events       # full suite
  *   npm run e2e:ui                      # debugging UI
- *
- * If @vercel/analytics is tree-shaken out of a route by mistake, the
- * corresponding assertion fails immediately — a useful regression guard
- * for the conversion infra.
  */
 import { expect, test, type Page } from "@playwright/test";
 
 type CapturedEvent = { name: string; properties: Record<string, unknown> };
 
 /**
- * Install a pre-page capture for @vercel/analytics events.
- *
- * Patches both `navigator.sendBeacon` and `window.fetch` before any page
- * script can grab the originals. Matching payloads are pushed to
- * `window.__capturedEvents` and read via `page.evaluate` at assertion time.
+ * Install a pre-page `window.gtag` stub that records every event.
  *
  * Returns a getter — call `await getEvents()` after exercising the page.
  */
-async function installAnalyticsCapture(page: Page): Promise<() => Promise<CapturedEvent[]>> {
+async function installGtagCapture(page: Page): Promise<() => Promise<CapturedEvent[]>> {
   await page.addInitScript(() => {
-    (window as unknown as { __capturedEvents: CapturedEvent[] }).__capturedEvents = [];
-
-    const push = (raw: string | undefined | null) => {
-      if (!raw) return;
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed?.name) {
-          (window as unknown as { __capturedEvents: CapturedEvent[] }).__capturedEvents.push({
-            name: parsed.name,
-            properties: parsed.data ?? parsed,
-          });
-        }
-      } catch {
-        // Non-JSON beacon (pageview, web-vital, etc.) — ignore.
+    const w = window as unknown as {
+      __capturedEvents: CapturedEvent[];
+      gtag: (command: string, ...args: unknown[]) => void;
+      dataLayer: unknown[];
+    };
+    w.__capturedEvents = [];
+    w.dataLayer = w.dataLayer ?? [];
+    w.gtag = (command: string, ...args: unknown[]) => {
+      if (command === "event" && typeof args[0] === "string") {
+        w.__capturedEvents.push({
+          name: args[0],
+          properties: (args[1] as Record<string, unknown>) ?? {},
+        });
       }
-    };
-
-    const decodeBody = (data: BodyInit | null | undefined): string | undefined => {
-      if (data == null) return undefined;
-      if (typeof data === "string") return data;
-      if (data instanceof ArrayBuffer) return new TextDecoder().decode(data);
-      if (ArrayBuffer.isView(data)) return new TextDecoder().decode(data.buffer);
-      // Blob / FormData / ReadableStream skipped — @vercel/analytics doesn't
-      // emit those for `track()` events.
-      return undefined;
-    };
-
-    const matches = (u: string) =>
-      /vercel-analytics|vitals\.vercel|\/_vercel\/insights/.test(u);
-
-    const origBeacon = navigator.sendBeacon.bind(navigator);
-    navigator.sendBeacon = (url: string | URL, data?: BodyInit | null) => {
-      if (matches(String(url))) push(decodeBody(data));
-      return origBeacon(url as string, data);
-    };
-
-    const origFetch = window.fetch.bind(window);
-    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : (input as Request).url;
-      if (matches(url) && init?.body) {
-        push(typeof init.body === "string" ? init.body : undefined);
-      }
-      return origFetch(input as RequestInfo, init);
     };
   });
 
@@ -145,20 +109,21 @@ async function installApiStubs(page: Page) {
   });
 }
 
-test.describe("Vercel Analytics funnel events", () => {
-  test("signup_started fires on /signup mount", async ({ page }) => {
-    const getEvents = await installAnalyticsCapture(page);
+test.describe("GA4 funnel events", () => {
+  test("sign_up_started fires on /signup mount", async ({ page }) => {
+    const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
     await page.goto("/signup");
     await page.waitForLoadState("networkidle");
-    // Give the analytics SDK a beat to emit.
     await page.waitForTimeout(500);
     const events = await getEvents();
-    expect(events.map((e) => e.name)).toContain("signup_started");
+    expect(events.map((e) => e.name)).toContain("sign_up_started");
+    // The dead-sink twin must not have been remapped into GA4.
+    expect(events.map((e) => e.name)).not.toContain("signup_started");
   });
 
-  test("signup_completed + trial_started fire after form submit", async ({ page }) => {
-    const getEvents = await installAnalyticsCapture(page);
+  test("sign_up + start_trial fire after form submit", async ({ page }) => {
+    const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
     await page.goto("/signup");
     await page.fill('input[type="email"]', "test@example.com");
@@ -166,17 +131,18 @@ test.describe("Vercel Analytics funnel events", () => {
     await page.fill('input[autocomplete="name"]', "Test User");
     await page.click('button[type="submit"]');
     await page.waitForTimeout(800);
-    const events = await getEvents();
-    const names = events.map((e) => e.name);
-    expect(names).toContain("signup_completed");
-    expect(names).toContain("trial_started");
+    const names = (await getEvents()).map((e) => e.name);
+    expect(names).toContain("sign_up");
+    expect(names).toContain("start_trial");
+    expect(names).not.toContain("signup_completed");
+    expect(names).not.toContain("trial_started");
   });
 
   test("scanner_first_use fires once on /app/scanner first visit, not on second", async ({
     page,
     context,
   }) => {
-    const getEvents = await installAnalyticsCapture(page);
+    const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
     // Wipe localStorage so the dedupe flag isn't set from a previous run.
     await context.clearCookies();
@@ -193,34 +159,36 @@ test.describe("Vercel Analytics funnel events", () => {
     expect(events.filter((e) => e.name === "scanner_first_use")).toHaveLength(1);
   });
 
-  test("checkout_started fires when an Upgrade button is clicked", async ({ page }) => {
-    const getEvents = await installAnalyticsCapture(page);
+  test("begin_checkout fires exactly once when an Upgrade button is clicked", async ({
+    page,
+  }) => {
+    const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
     await page.goto("/app/billing");
     await page.waitForTimeout(800);
-    // Find an Upgrade button (Pro or Premium). The Plan component renders
-    // a button with text "Upgrade to ...". Click whichever surfaces first.
     const upgrade = page.locator('button:has-text("Upgrade")').first();
     await upgrade.click();
     await page.waitForTimeout(800);
     const events = await getEvents();
-    expect(events.map((e) => e.name)).toContain("checkout_started");
+    expect(events.filter((e) => e.name === "begin_checkout")).toHaveLength(1);
+    expect(events.map((e) => e.name)).not.toContain("checkout_started");
   });
 
   test("trial_converted fires when ?checkout=success is on the URL", async ({ page }) => {
-    const getEvents = await installAnalyticsCapture(page);
+    const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
     await page.goto("/app/billing?checkout=success&tier=premium&billing_period=annual");
     await page.waitForTimeout(800);
     const events = await getEvents();
     const conv = events.find((e) => e.name === "trial_converted");
     expect(conv).toBeTruthy();
-    // The properties carry the post-conversion segmentation values.
     expect(conv?.properties).toMatchObject({ tier: "premium" });
+    // The funnel mirror must never carry revenue — `subscribe` owns that.
+    expect(conv?.properties).not.toHaveProperty("value");
   });
 
   test("trial_downgraded fires for a post-trial Free user", async ({ page, context }) => {
-    const getEvents = await installAnalyticsCapture(page);
+    const getEvents = await installGtagCapture(page);
     // Stub /api/me as a downgraded user (tier=free, trial_ends_at in past).
     await page.route("**/api/me", async (route) => {
       await route.fulfill({
