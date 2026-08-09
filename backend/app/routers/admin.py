@@ -477,6 +477,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
     """
     from app.services.email import (
         render_activation_alert_email,
+        render_activation_arm_alerts_email,
         render_activation_watchlist_email,
         render_alert_email,
         render_annual_renewal_reminder_email,
@@ -667,6 +668,10 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "activation_alert": (
             "Activation · no alert rule by day 3",
             lambda: render_activation_alert_email("Alex"),
+        ),
+        "activation_arm_alerts": (
+            "Activation · watchlist built, no alert rule (engaged trialist)",
+            lambda: render_activation_arm_alerts_email("Alex", watchlist_count=7),
         ),
         # Annual upgrade nudge (~30 days post monthly conversion)
         "annual_nudge_pro": (

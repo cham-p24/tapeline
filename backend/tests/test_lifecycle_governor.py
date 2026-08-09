@@ -40,6 +40,7 @@ from app.db import session_scope
 from app.models import AlertRule, User, WatchlistItem
 from app.services.email import (
     render_activation_alert_email,
+    render_activation_arm_alerts_email,
     render_activation_ask_email,
     render_activation_first_scan_email,
     render_activation_watchlist_email,
@@ -659,14 +660,23 @@ _URGENCY_LANGUAGE = [
     "price goes up",
 ]
 
-# Every template in the activation series, including the two milestone nudges
-# that pre-date this work — the cap counts all four against one budget, so all
+# Every activation-family template, including the two milestone nudges that
+# pre-date this work — the cap counts those four against one budget, so all
 # four are held to the same content rules.
+#
+# "arm_alerts" is in this list for CONTENT purposes only. It is deliberately
+# outside lifecycle.ACTIVATION_SERIES_TOKENS (it targets the engaged cohort,
+# not the dormant one — see run_activation_drip), but it is still a 1:1
+# activation message to a named person about securities they self-selected,
+# which is precisely the fact pattern Rules 6/7 police. Exempting it from the
+# content bar because it is exempt from the frequency cap would be the wrong
+# conclusion drawn from the right distinction.
 _ACTIVATION_TEMPLATES = [
     ("first_scan", lambda: render_activation_first_scan_email("Sam")),
     ("ask", lambda: render_activation_ask_email("Sam")),
     ("watchlist", lambda: render_activation_watchlist_email("Sam")),
     ("alert", lambda: render_activation_alert_email("Sam")),
+    ("arm_alerts", lambda: render_activation_arm_alerts_email("Sam", watchlist_count=7)),
 ]
 
 
