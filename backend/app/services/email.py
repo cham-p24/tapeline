@@ -2230,6 +2230,75 @@ def render_activation_ask_email(
     )
 
 
+def render_activation_arm_alerts_email(
+    user_name: str,
+    *,
+    watchlist_count: int,
+    trial_ends_at: datetime | None = None,
+) -> str:
+    """The ENGAGED trialist — a watchlist built, no alert rule ever ("act_arm").
+
+    Closes a lifecycle blind spot. Every other activation message targets a user
+    with NO recorded activity, so the person who curated a seven-ticker
+    watchlist and never armed an alert was excluded from all of them — despite
+    being the highest-intent cohort in the trial. Alerts are the #1 pay-driver,
+    and someone who has never felt one arrive has nothing to miss at day 14.
+
+    RULE 7 (the banner above binds here — this is a 1:1 message to a named
+    person about securities they self-selected): the ONLY personal fact quoted
+    is the COUNT of tickers they added, which is an ACTIVITY number and sits on
+    the permitted side of that table. No security is named, nothing is said
+    about how anything moved, and the alert is described by the MECHANISM it
+    watches — a measured value crossing a threshold the user sets — never by an
+    outcome it would have produced. "You'd have caught X" is the framing this
+    template exists to not make.
+
+    Rule 6: no urgency. The only time reference is `_calm_trial_note`, the
+    user's own real trial end date, rendered as a muted footnote.
+    """
+    noun = "ticker" if watchlist_count == 1 else "tickers"
+    return shell(
+        h1(f"You're watching {watchlist_count} {noun}, {user_name}.")
+        + lead(
+            "None of them has an alert rule on it yet. That means Tapeline only "
+            "tells you a number changed when you come and look."
+        )
+        + paragraph(
+            "An alert rule watches one measured condition and notifies you when "
+            "it's met. It reports what the factors measured and stops there — "
+            "what to make of it stays with you."
+        )
+        + card(
+            f"""
+            <ul style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
+              <li><strong>Score move</strong> — a ticker on your watchlist changes score by more than the number of points you choose.</li>
+              <li><strong>Squeeze condition</strong> — the short-interest and float measures cross the levels you set.</li>
+              <li><strong>Regime change</strong> — the market-wide readings Tapeline tracks shift from one state to another.</li>
+            </ul>
+            """
+        )
+        + button(
+            "Arm an alert",
+            "https://tapeline.io/app/watchlist?utm_source=email&utm_campaign=activation_arm_alerts&utm_medium=transactional",
+        )
+        + muted_paragraph(
+            "Your watchlist page carries a one-click card: it turns on browser "
+            "notifications, sends a sample straight away so you can see what one "
+            "looks like, and sets a score-move rule on a ticker you already "
+            "watch. Edit or delete it whenever you like."
+        )
+        + _calm_trial_note(trial_ends_at)
+        + footnote(
+            "Tapeline tells you a measured value moved. It doesn't tell you "
+            "what to do next. — Christian, founder."
+        ),
+        preheader=(
+            f"{watchlist_count} {noun} on your watchlist, no alert rule yet — "
+            f"one click arms one."
+        ),
+    )
+
+
 # ── Annual upgrade nudge (lever #2: monthly → annual, ~30 days post-convert) ─
 #
 # Per-tier annual-savings copy. Mirrors PricingTable.tsx / ComparisonTable.tsx
@@ -3663,6 +3732,10 @@ async def run_activation_drip(
                     zero-setup surface: the public scorecard. Free is excluded
                     (kept off the Pro-only cohort); token name is historical.
 
+    A THIRD stage, "act_arm", runs after those two on the INVERSE cohort — a
+    user who HAS built a watchlist and has zero alert rules. See its own block
+    below for why it can't share the loop.
+
     Bounded signup windows (not just a lower bound) keep the nudge timely — we
     don't email someone who signed up two months ago. A daily run catches each
     user once inside the window; the drip_state token prevents a repeat if
@@ -3672,14 +3745,14 @@ async def run_activation_drip(
     """
     from datetime import UTC, datetime, timedelta
 
-    from sqlalchemy import exists, select
+    from sqlalchemy import exists, func, select
 
     from app.models import AlertRule, ScannerPreset, User, WatchlistItem
     from app.services.email_prefs import EmailPref, wants
     from app.services.lifecycle import ActivitySnapshot, has_recorded_activity
 
     now = datetime.now(UTC)
-    counts = {"act_wl": 0, "act_alert": 0}
+    counts = {"act_wl": 0, "act_alert": 0, "act_arm": 0}
 
     # Cheap "no durable activation artefact" pre-filter pushed into SQL for
     # volume. The Python has_recorded_activity() re-check below re-tests these
@@ -3779,6 +3852,102 @@ async def run_activation_drip(
                 logger.exception(
                     "activation.send_failed user=%s stage=%s", user.id, token,
                 )
+
+    # ── act_arm — the ENGAGED trialist: watchlist built, zero alert rules ────
+    #
+    # This is the INVERSE cohort of the two stages above, which is why it can't
+    # share their loop: they require no recorded activity, and this one requires
+    # a WatchlistItem, so the shared has_recorded_activity() re-check would
+    # suppress every candidate. It also needs a per-user count the stage tuple
+    # has no way to carry.
+    #
+    # The gap it closes: a trialist who curated a watchlist and never armed an
+    # alert was excluded from EVERY behaviour-triggered email, because all of
+    # them keyed off inactivity — while being the highest-intent cohort in the
+    # trial. Alerts are the #1 pay-driver; someone who has never felt one has
+    # nothing to miss at day 14.
+    #
+    # DELIBERATELY NOT in lifecycle.ACTIVATION_SERIES_TOKENS. That cap exists to
+    # stop hammering people who never engaged; this fires only for people who
+    # did. Folding it into that budget would let three ignored dormant nudges
+    # permanently block the one message aimed at an engaged user. The governor
+    # still binds — the token is passed to allows(), so the min-gap and weekly
+    # LIFECYCLE ceiling apply, and adding it to the series cap later is a
+    # one-line change.
+    #
+    # Window: 2-10 days after signup. The lower bound gives the watchlist time
+    # to exist; the upper bound keeps it inside a 14-day trial and clear of the
+    # day-13 trial email.
+    arm_users = (
+        await session.execute(
+            select(User).where(
+                User.created_at >= now - timedelta(days=10),
+                User.created_at < now - timedelta(days=2),
+                User.tier.in_(["pro", "premium"]),
+                exists().where(WatchlistItem.user_id == User.id),
+                ~exists().where(AlertRule.user_id == User.id),
+            )
+        )
+    ).scalars().all()
+
+    arm_candidates = [
+        u for u in arm_users
+        if u.email
+        and "act_arm" not in ((u.drip_state or "").split(","))
+        and wants(u, EmailPref.TRIAL_DRIP)
+    ]
+    # One grouped count for the whole cohort rather than a query per user — the
+    # rendered copy quotes this number, so it has to be the real one.
+    wl_counts: dict[str, int] = {}
+    if arm_candidates:
+        wl_counts = dict(
+            (
+                await session.execute(
+                    select(WatchlistItem.user_id, func.count(WatchlistItem.id))
+                    .where(WatchlistItem.user_id.in_([u.id for u in arm_candidates]))
+                    .group_by(WatchlistItem.user_id)
+                )
+            ).all()
+        )
+
+    for user in arm_candidates:
+        wl_count = wl_counts.get(user.id, 0)
+        if wl_count < 1:
+            # Raced: the last item was removed between the EXISTS filter and the
+            # count. "You're watching 0 tickers" is worse than not sending.
+            continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token="act_arm",
+        ):
+            continue
+        try:
+            html = render_activation_arm_alerts_email(
+                user.name or "trader",
+                watchlist_count=wl_count,
+                trial_ends_at=user.trial_ends_at,
+            )
+            res = await send_email(
+                user.email,
+                "Your Tapeline watchlist has no alert rule yet",
+                html,
+                persona="default",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="trial_drip",
+            )
+            if not res.get("skipped", False):
+                sent_tokens = set((user.drip_state or "").split(",")) - {""}
+                sent_tokens.add("act_arm")
+                user.drip_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
+                counts["act_arm"] += 1
+                any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
+        except Exception:
+            logger.exception(
+                "activation.send_failed user=%s stage=act_arm", user.id,
+            )
 
     if any_sent:
         await session.commit()

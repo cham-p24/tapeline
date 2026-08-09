@@ -1444,7 +1444,11 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
         if any(wb_counts.values()):
             logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
         if any(act_counts.values()):
-            logger.info("drip.activation_sent act_wl=%d act_alert=%d", act_counts["act_wl"], act_counts["act_alert"])
+            logger.info(
+                "drip.activation_sent act_wl=%d act_alert=%d act_arm=%d",
+                act_counts["act_wl"], act_counts["act_alert"],
+                act_counts.get("act_arm", 0),
+            )
         if annual_counts["annual_p"]:
             logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
         if renewal_counts["renewal_reminder"]:
