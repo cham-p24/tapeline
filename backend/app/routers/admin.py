@@ -21,6 +21,13 @@ from app.models import (
     User,
 )
 from app.services.embed_impressions import summarize_embed_impressions
+from app.services.growth_funnel import (
+    MAX_ENDING_SOON_DAYS,
+    MAX_ENDING_SOON_ROWS,
+    MAX_WINDOW_DAYS,
+    MIN_WINDOW_DAYS,
+    summarize_growth_funnel,
+)
 from app.services.tier import mrr_contribution
 
 logger = logging.getLogger(__name__)
@@ -517,6 +524,47 @@ async def revenue_dashboard(
         "webhook_events": webhook_events,
         "generated_at": now.isoformat(),
     }
+
+
+@router.get("/growth-funnel")
+async def growth_funnel(
+    _: None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+    days: int = Query(
+        30,
+        ge=MIN_WINDOW_DAYS,
+        le=MAX_WINDOW_DAYS,
+        description="Cohort window: users created in the last N days.",
+    ),
+    ending_soon_days: int = Query(
+        7,
+        ge=1,
+        le=MAX_ENDING_SOON_DAYS,
+        description="Look-ahead for the trials-ending-soon list.",
+    ),
+    limit: int = Query(
+        25,
+        ge=1,
+        le=MAX_ENDING_SOON_ROWS,
+        description="Cap on trials-ending-soon rows.",
+    ),
+) -> dict:
+    """Windowed acquisition→paid funnel for the admin growth dashboard.
+
+    Separate from `/revenue` on purpose: the window is operator-selectable, so
+    changing it must not re-run the whole (much heavier) revenue roll-up, and a
+    failure in either readout must not blank the other. The service itself
+    fails open — an error returns a zeroed payload with `available: false`
+    rather than a 500.
+
+    Read-only. Everything is aggregated in SQL; no per-user queries.
+    """
+    return await summarize_growth_funnel(
+        session,
+        days=days,
+        ending_soon_days=ending_soon_days,
+        ending_soon_limit=limit,
+    )
 
 
 # ── Email preview ──────────────────────────────────────────────────────────

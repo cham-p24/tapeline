@@ -51,6 +51,44 @@ type EmbedImpressions = {
   by_day: { day: string; impressions: number }[];
 };
 
+/**
+ * Windowed cohort funnel — every user created in the last N days, walked
+ * through the five states they can reach. The rest of this page is
+ * lifetime-to-date, which averages a good month and a dead month into the
+ * same number; this is the cut that moves.
+ */
+type GrowthFunnel = {
+  available: boolean;
+  window_days: number;
+  ending_soon_days: number;
+  signups: number;
+  activated: number;
+  trials_started: number;
+  trials_active: number;
+  paying: number;
+  activation_rate_pct: number;
+  trial_start_rate_pct: number;
+  trial_to_paid_pct: number;
+  signup_to_paid_pct: number;
+  trials_ending_soon: TrialEndingSoon[];
+  trials_ending_soon_count: number;
+};
+
+type TrialEndingSoon = {
+  id: string;
+  email: string;
+  name: string | null;
+  tier: string;
+  trial_ends_at: string;
+  days_left: number;
+  watchlist_count: number;
+  has_alert_rule: boolean;
+};
+
+// Selectable cohort windows. 7 = "did this week do anything", 30 = default,
+// 90 = enough signal to read a trend through the noise of a pre-launch month.
+const FUNNEL_WINDOWS = [7, 30, 90] as const;
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function adminGet<T>(path: string): Promise<T> {
@@ -84,6 +122,12 @@ export default function RevenuePage() {
   const { user, loading } = useUser();
   const [data, setData] = useState<Revenue | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Funnel is fetched separately from the revenue roll-up: its window is
+  // operator-selectable (changing it must not re-run the much heavier revenue
+  // query) and a failure in either readout must not blank the other.
+  const [funnelDays, setFunnelDays] = useState<number>(30);
+  const [funnel, setFunnel] = useState<GrowthFunnel | null>(null);
+  const [funnelErr, setFunnelErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -93,6 +137,17 @@ export default function RevenuePage() {
       .then(setData)
       .catch((e) => setErr(e.message));
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (loading || !user?.is_admin) return;
+    let stale = false;
+    setFunnelErr(null);
+    adminGet<GrowthFunnel>(`/api/admin/growth-funnel?days=${funnelDays}`)
+      .then((d) => { if (!stale) setFunnel(d); })
+      .catch((e) => { if (!stale) setFunnelErr(e.message); });
+    // Guards against an out-of-order response overwriting a newer window.
+    return () => { stale = true; };
+  }, [user, loading, funnelDays]);
 
   if (loading) return <CardSkeleton rows={6} />;
   if (err) {
@@ -147,6 +202,16 @@ export default function RevenuePage() {
         signups arriving with a Google Ads click ID stored (available for the
         offline-conversion upload once Ads API access is enabled).
       </p>
+
+      {/* Windowed cohort funnel — the one section on this page that is NOT
+          lifetime-to-date, so it is the one that actually moves. Fails open:
+          an error here renders a note, never blanks the rest of the page. */}
+      <GrowthFunnelSection
+        data={funnel}
+        err={funnelErr}
+        days={funnelDays}
+        onDaysChange={setFunnelDays}
+      />
 
       {/* Acquisition channels — first-party "where do signups come from + which converts" */}
       <h2 className="mt-10 text-xl font-semibold">Acquisition channels</h2>
@@ -240,6 +305,173 @@ export default function RevenuePage() {
 
       <p className="mt-8 text-xs text-subtle">Generated {new Date(data.generated_at).toLocaleString()}.</p>
     </div>
+  );
+}
+
+/**
+ * Growth funnel — the cohort of users who signed up inside the selected
+ * window, walked through the five states they can reach, plus the trials that
+ * are still open enough to act on.
+ *
+ * Everything else on this page is lifetime-to-date. That is the right shape
+ * for MRR and the subscription book, and the wrong shape for "is growth
+ * working" — a strong month and a dead month average into an identical
+ * number. This section is the windowed cut.
+ *
+ * Fail-open: a failed fetch or a degraded (`available: false`) payload renders
+ * a one-line note. It never throws and never blanks its neighbours.
+ */
+export function GrowthFunnelSection({
+  data,
+  err,
+  days,
+  onDaysChange,
+}: {
+  data: GrowthFunnel | null;
+  err: string | null;
+  days: number;
+  onDaysChange: (d: number) => void;
+}) {
+  const windowPicker = (
+    <div className="flex gap-1">
+      {FUNNEL_WINDOWS.map((d) => (
+        <button
+          key={d}
+          type="button"
+          onClick={() => onDaysChange(d)}
+          aria-pressed={d === days}
+          className={`rounded px-2 py-1 text-xs ${
+            d === days
+              ? "bg-accent/20 text-accent"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          {d}d
+        </button>
+      ))}
+    </div>
+  );
+
+  const header = (
+    <div className="mt-10 flex items-center justify-between gap-3">
+      <h2 className="text-xl font-semibold">Growth funnel</h2>
+      {windowPicker}
+    </div>
+  );
+
+  if (err) {
+    return (
+      <>
+        {header}
+        <div className="card mt-4 p-4 text-sm text-subtle">
+          Funnel unavailable ({err}). The rest of this page is unaffected.
+        </div>
+      </>
+    );
+  }
+  if (!data) {
+    return (
+      <>
+        {header}
+        <div className="card mt-4 p-4 text-sm text-subtle">Loading funnel&hellip;</div>
+      </>
+    );
+  }
+  if (!data.available) {
+    return (
+      <>
+        {header}
+        <div className="card mt-4 p-4 text-sm text-subtle">
+          Funnel could not be computed. The rest of this page is unaffected.
+        </div>
+      </>
+    );
+  }
+
+  // Step-to-step rates, each labelled with its own denominator so no reader
+  // has to guess which base a percentage is against.
+  const steps: { label: string; value: number; rate?: string }[] = [
+    { label: "Signups", value: data.signups },
+    {
+      label: "Activated",
+      value: data.activated,
+      rate: `${data.activation_rate_pct}% of signups`,
+    },
+    {
+      label: "Trials started",
+      value: data.trials_started,
+      rate: `${data.trial_start_rate_pct}% of signups`,
+    },
+    { label: "Trials running", value: data.trials_active },
+    {
+      label: "Paying",
+      value: data.paying,
+      rate: `${data.trial_to_paid_pct}% of trials`,
+    },
+  ];
+
+  return (
+    <>
+      {header}
+      <p className="text-xs text-muted">
+        Users who signed up in the last {data.window_days} days, by how far they
+        got. Activated = added a watchlist ticker or an alert rule. Trials
+        running = trial still dated ahead with no card on file. Paying = a
+        Stripe customer record exists. First-party data only.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {steps.map((s) => (
+          <div key={s.label} className="card p-4">
+            <div className="text-xs uppercase text-muted">{s.label}</div>
+            <div className="mt-1 text-2xl font-bold nums">{s.value}</div>
+            <div className="mt-1 text-xs text-subtle">{s.rate || " "}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Stat label={`Signup → paid (${data.window_days}d)`} value={`${data.signup_to_paid_pct}%`} tone="accent" />
+        <Stat label={`Trial → paid (${data.window_days}d)`} value={`${data.trial_to_paid_pct}%`} tone="accent" />
+      </div>
+
+      {/* The only cohort on this page that is still open to influence. */}
+      <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted">
+        Trials ending within {data.ending_soon_days} days
+      </h3>
+      <p className="text-xs text-muted">
+        No card on file, trial still running. Watchlist size and whether an
+        alert rule is armed are the engagement signals already on record.
+      </p>
+      <div className="card mt-3 overflow-x-auto">
+        {data.trials_ending_soon.length === 0 ? (
+          <div className="p-4 text-sm text-subtle">No trials ending in this window</div>
+        ) : (
+          <table className="w-full text-sm nums">
+            <thead>
+              <tr className="border-b border-border/50 text-xs uppercase text-muted">
+                <th className="px-4 py-2 text-left font-medium">Email</th>
+                <th className="px-4 py-2 text-right font-medium">Days left</th>
+                <th className="px-4 py-2 text-right font-medium">Watchlist</th>
+                <th className="px-4 py-2 text-right font-medium">Alerts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.trials_ending_soon.map((t) => (
+                <tr key={t.id} className="border-b border-border/30 last:border-0">
+                  <td className="px-4 py-2 break-all">{t.email}</td>
+                  <td className="px-4 py-2 text-right font-semibold">{t.days_left}</td>
+                  <td className="px-4 py-2 text-right">{t.watchlist_count}</td>
+                  <td className="px-4 py-2 text-right text-muted">
+                    {t.has_alert_rule ? "Yes" : "No"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
   );
 }
 
