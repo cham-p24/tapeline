@@ -43,6 +43,7 @@ export function MarketingFooter() {
             <FooterLink href="/stocks">Stock directory</FooterLink>
             <FooterLink href="/developers">API for developers</FooterLink>
             <FooterLink href="/glossary">Glossary</FooterLink>
+            <FooterLink href="/embed">Embed a score badge</FooterLink>
             <FooterLink href="/blog">Blog</FooterLink>
             <FooterLink href="/changelog">Changelog</FooterLink>
           </FooterCol>
