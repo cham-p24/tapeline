@@ -446,6 +446,26 @@ async def stripe_webhook(
             except Exception:
                 logger.exception("stripe.welcome_to_paid_send_failed user=%s", user.id)
 
+            # Tell the founder, on the same once-per-subscription branch. A
+            # separate try so a Resend outage on the customer's welcome email
+            # can't also swallow the revenue notification — these are the two
+            # things that must not share a failure mode.
+            try:
+                from app.services.telegram import notify_founder_new_subscription
+
+                sub_item = (obj.get("items", {}).get("data") or [{}])[0]
+                sub_price = sub_item.get("price", {}) or {}
+                unit_amount = sub_price.get("unit_amount")
+                await notify_founder_new_subscription(
+                    email=user.email,
+                    tier=p["tier"],
+                    billing_period=p["billing_period"],
+                    amount=(unit_amount / 100) if unit_amount else None,
+                    currency=sub_price.get("currency") or "usd",
+                )
+            except Exception:
+                logger.exception("stripe.founder_alert_failed user=%s", user.id)
+
     elif evt_type == "customer.subscription.deleted":
         customer_id = obj["customer"]
         sub_id = obj.get("id")

@@ -32,7 +32,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models import NewsletterSubscriber, Ticker, User
+from app.models import AlertRule, NewsletterSubscriber, Ticker, User
 from app.services.email import send_email
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,8 @@ class GrowthMetrics:
     newsletter_subs_total: int
     newsletter_subs_24h: int
     top_utm_sources_24h: list[tuple[str, int]] = field(default_factory=list)
+    trials_ending_soon: list[tuple[str, str]] = field(default_factory=list)
+    trialists_without_alerts: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +77,8 @@ class GrowthMetrics:
             "newsletter_subs_total": self.newsletter_subs_total,
             "newsletter_subs_24h": self.newsletter_subs_24h,
             "top_utm_sources_24h": self.top_utm_sources_24h,
+            "trials_ending_soon": self.trials_ending_soon,
+            "trialists_without_alerts": self.trialists_without_alerts,
         }
 
 
@@ -145,6 +149,40 @@ async def pull_growth_metrics(session: AsyncSession) -> GrowthMetrics:
     ).all()
     top_utm_sources_24h = [(src, count) for src, count in utm_rows]
 
+    # Cardless trials lapsing within 3 days — the last window to reach out
+    # before the account silently drops to free.
+    ending_rows = (
+        await session.execute(
+            select(User.email, User.trial_ends_at)
+            .where(
+                User.trial_ends_at.is_not(None),
+                User.trial_ends_at > now,
+                User.trial_ends_at <= now + timedelta(days=3),
+                User.stripe_customer_id.is_(None),
+            )
+            .order_by(User.trial_ends_at),
+        )
+    ).all()
+    trials_ending_soon = [
+        (email, ends.date().isoformat()) for email, ends in ending_rows if ends
+    ]
+
+    # Live trialists who have never armed an alert. Alerts are the strongest
+    # observed pay-driver, so this counts the people most likely to let the
+    # trial lapse having never felt what expiry would take away.
+    trialists_without_alerts = (
+        await session.execute(
+            select(func.count(User.id)).where(
+                User.trial_ends_at.is_not(None),
+                User.trial_ends_at > now,
+                User.stripe_customer_id.is_(None),
+                ~select(AlertRule.id)
+                .where(AlertRule.user_id == User.id)
+                .exists(),
+            ),
+        )
+    ).scalar() or 0
+
     return GrowthMetrics(
         as_of=now,
         users_total=users_total,
@@ -155,6 +193,8 @@ async def pull_growth_metrics(session: AsyncSession) -> GrowthMetrics:
         newsletter_subs_total=newsletter_subs_total,
         newsletter_subs_24h=newsletter_subs_24h,
         top_utm_sources_24h=top_utm_sources_24h,
+        trials_ending_soon=trials_ending_soon,
+        trialists_without_alerts=trialists_without_alerts,
     )
 
 
@@ -344,6 +384,23 @@ def render_growth_digest_html(
             f"{src}={count}" for src, count in metrics.top_utm_sources_24h
         )
 
+    # Trials lapsing inside 3 days lead the email when they exist — it is the
+    # only line here with a deadline attached.
+    ending_html = ""
+    ending_text = ""
+    if metrics.trials_ending_soon:
+        rows = "".join(
+            f"""<tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">{email}</td>
+                    <td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;color:#fb923c;">{ends}</td></tr>"""
+            for email, ends in metrics.trials_ending_soon
+        )
+        ending_html = f"""
+    <h2 style="margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#fb923c;font-weight:600;">Trials lapsing within 3 days</h2>
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;color:#d4d4d8;margin-bottom:28px;">{rows}</table>"""
+        ending_text = "\nTrials lapsing within 3 days\n" + "".join(
+            f"  {email} — {ends}\n" for email, ends in metrics.trials_ending_soon
+        )
+
     fintwit_html = "".join(
         f"""<li style="margin:8px 0;padding:12px;background:#0a0a0a;border:1px solid #27272a;border-radius:6px;">
               <div style="color:#fb923c;font-weight:600;font-size:13px;margin-bottom:4px;">${c['symbol']} — {c['score']} {c['signal']}</div>
@@ -361,12 +418,13 @@ def render_growth_digest_html(
   <div style="max-width:680px;margin:0 auto;background:#121214;border-radius:12px;padding:32px;border:1px solid #1f1f23;">
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:8px;">Tapeline · Growth tick</div>
     <h1 style="margin:6px 0 24px;font-size:22px;font-weight:600;">{date_label}</h1>
-
+{ending_html}
     <h2 style="margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:500;">Conversion funnel</h2>
     <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;color:#d4d4d8;">
       <tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">Total users (excl. owner)</td><td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;">{metrics.users_non_owner}</td></tr>
       <tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">Signed up last 24h</td><td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;color:{'#22c55e' if metrics.users_signed_up_24h else '#6b7280'};">{metrics.users_signed_up_24h:+d}</td></tr>
       <tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">On trial right now</td><td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;">{metrics.users_on_trial}</td></tr>
+      <tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">On trial, no alert armed</td><td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;color:{'#fb923c' if metrics.trialists_without_alerts else '#6b7280'};">{metrics.trialists_without_alerts}</td></tr>
       <tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">Paid (stripe customer)</td><td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;color:{'#22c55e' if metrics.users_paid else '#6b7280'};">{metrics.users_paid}</td></tr>
       <tr><td style="padding:6px 0;border-bottom:1px solid #27272a;">Newsletter subscribers</td><td style="padding:6px 0;border-bottom:1px solid #27272a;text-align:right;font-family:'JetBrains Mono',monospace;">{metrics.newsletter_subs_total} ({metrics.newsletter_subs_24h:+d} 24h)</td></tr>
       <tr><td style="padding:6px 0;">UTM sources 24h</td><td style="padding:6px 0;text-align:right;font-family:'JetBrains Mono',monospace;color:#9ca3af;">{utm_block}</td></tr>
@@ -391,12 +449,13 @@ def render_growth_digest_html(
   </div></body></html>"""
 
     text = f"""Tapeline growth tick — {date_label}
-==========================================
+=========================================={ending_text}
 
 Conversion funnel
   Total users (excl. owner): {metrics.users_non_owner}
   Signed up last 24h:        {metrics.users_signed_up_24h:+d}
   On trial right now:        {metrics.users_on_trial}
+  On trial, no alert armed:  {metrics.trialists_without_alerts}
   Paid (Stripe customer):    {metrics.users_paid}
   Newsletter subs:           {metrics.newsletter_subs_total} ({metrics.newsletter_subs_24h:+d} 24h)
   UTM sources 24h:           {utm_block}
