@@ -107,6 +107,15 @@ class SignupBody(BaseModel):
     # Hostname only — never path/query. Written once at signup, never
     # updated.
     signup_referrer_host: str | None = Field(None, max_length=100)
+    # First-touch LANDING PATH on our own site, captured by lib/utm.ts at
+    # landing and forwarded here — e.g. "/glossary/rsi". Answers which of our
+    # ~4,750 SEO pages earned the signup, which the channel fields above
+    # can't. Path only; any query/hash is stripped by _normalise_landing_path
+    # below (defence in depth — the client strips it too). max_length is
+    # deliberately WIDER than the 200-char column so an unexpectedly long
+    # path truncates instead of 422-ing the whole signup — attribution must
+    # never be able to block an account being created.
+    signup_landing_path: str | None = Field(None, max_length=500)
     # Signup-form email consent — BOTH default False and the form renders
     # both boxes unchecked (explicit opt-in only; never pre-ticked).
     #   marketing_opt_in    → users.marketing_opt_in: consent for the weekly
@@ -124,6 +133,45 @@ class SignupBody(BaseModel):
 class SigninBody(BaseModel):
     email: EmailStr
     password: str
+
+
+_LANDING_PATH_MAX = 200  # matches users.signup_landing_path
+
+
+def _normalise_landing_path(raw: str | None) -> str | None:
+    """Normalise the client-supplied first-touch landing path, or None.
+
+    Contract (mirrors lib/utm.ts:normaliseLandingPath so client and server
+    agree on the bucket a page falls into):
+      - strip anything from the first `?` or `#` — the query string and hash
+        can carry search terms or identifiers, and they explode the
+        cardinality of the aggregation this column exists to feed
+      - lowercase, so /Glossary/RSI and /glossary/rsi are one row
+      - drop a trailing slash (root "/" kept as-is)
+      - reject anything that isn't a rooted, site-relative path. "//host" is
+        protocol-relative (an external URL) — a spoofed payload must not get
+        someone else's domain into our column
+      - truncate to the column width
+
+    Never raises: attribution must not be able to fail a signup.
+    """
+    if not raw:
+        return None
+    try:
+        path = raw.strip()
+        for sep in ("?", "#"):
+            idx = path.find(sep)
+            if idx >= 0:
+                path = path[:idx]
+        path = path.lower()
+        if not path.startswith("/") or path.startswith("//"):
+            return None
+        if len(path) > 1 and path.endswith("/"):
+            path = path[:-1]
+        path = path[:_LANDING_PATH_MAX]
+        return path or None
+    except Exception:
+        return None
 
 
 def _user_out(u: User) -> dict:
@@ -290,6 +338,11 @@ async def signup(
         # First-touch external referrer host — the only attribution trace
         # AI-assistant referrals leave (no utm_* params). Hostname only.
         signup_referrer_host=(body.signup_referrer_host or None),
+        # First-touch landing path on our own site — which PAGE earned the
+        # signup, complementing the channel columns above. Normalised +
+        # validated here (path only, no query/hash, must be rooted); a
+        # rejected value stores NULL rather than failing the signup.
+        signup_landing_path=_normalise_landing_path(body.signup_landing_path),
         # Weekly-digest consent from the signup form's unchecked-by-default
         # checkbox. False (no tick) writes the column default — nothing is
         # inferred from silence.

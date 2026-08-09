@@ -9,7 +9,12 @@ import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
-import { getStoredGclid, getStoredReferrerHost, getStoredUtm } from "@/lib/utm";
+import {
+  getStoredGclid,
+  getStoredLandingPath,
+  getStoredReferrerHost,
+  getStoredUtm,
+} from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import {
   FormAlert,
@@ -252,6 +257,10 @@ function SignUpForm() {
       // only attribution trace AI-assistant referrals (Copilot etc.) leave,
       // since they carry no utm_* params. Hostname only, never path/query.
       const referrer = getStoredReferrerHost();
+      // First-touch landing PATH — which of our own SEO pages pulled them in
+      // (/compare/finviz, /glossary/rsi, a ticker page…). The channel fields
+      // above can't answer that. Path only, never query/hash.
+      const landing = getStoredLandingPath();
       await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: token || undefined,
@@ -265,6 +274,7 @@ function SignUpForm() {
         ...utm,
         ...gclid,
         ...referrer,
+        ...landing,
       });
       // Funnel events: signup landed cleanly. Trial auto-starts on signup
       // (14-day Premium, no card — see tier.py:_start_trial), so we fire the

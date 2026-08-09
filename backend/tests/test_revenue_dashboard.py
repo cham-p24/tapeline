@@ -300,6 +300,55 @@ async def test_revenue_acquisition_channels_group_and_count_paid(client, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_revenue_landing_pages_group_by_channel_and_path(client, monkeypatch):
+    """Signups group by (channel, landing path) so a row reads
+    "organic → /compare/finviz → 3 signups". The channel slice alone can't say
+    WHICH of the ~4,750 SEO pages earned the signup; this one can."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        # Two organic signups off the SAME comparison page; one converted.
+        await _seed_user(signup_utm_source="organic", signup_landing_path="/compare/finviz")
+        await _seed_user(
+            signup_utm_source="organic",
+            signup_landing_path="/compare/finviz",
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        # Same channel, DIFFERENT page — must not collapse into the row above.
+        await _seed_user(signup_utm_source="organic", signup_landing_path="/glossary/rsi")
+        # Same page, DIFFERENT channel — must not collapse either.
+        await _seed_user(
+            signup_referrer_host="chat.openai.com", signup_landing_path="/compare/finviz"
+        )
+        # No landing path captured (a pre-column row) → excluded entirely.
+        await _seed_user(signup_utm_source="organic")
+
+        after = await _revenue(client, cookies)
+
+        def rows(payload) -> dict[tuple[str, str], dict]:
+            return {
+                (r["channel"], r["path"]): r
+                for r in payload["acquisition_landing_pages"]
+            }
+
+        b, a = rows(before), rows(after)
+
+        def d(channel: str, path: str, field: str) -> int:
+            key = (channel, path)
+            return a.get(key, {}).get(field, 0) - b.get(key, {}).get(field, 0)
+
+        assert d("organic", "/compare/finviz", "signups") == 2
+        assert d("organic", "/compare/finviz", "paid") == 1
+        assert d("organic", "/glossary/rsi", "signups") == 1
+        assert d("organic", "/glossary/rsi", "paid") == 0
+        # Same path, other channel — tracked as its own row.
+        assert d("chat.openai.com", "/compare/finviz", "signups") == 1
+        # A path is never reported as empty/None.
+        assert all(r["path"] for r in after["acquisition_landing_pages"])
+
+
+@pytest.mark.asyncio
 async def test_revenue_webhook_volume_by_type(client, monkeypatch):
     async with client:
         cookies = await _make_admin_cookies(client, monkeypatch)

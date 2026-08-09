@@ -75,6 +75,12 @@ type SignupExtras = {
   // they carry no utm_* params. Hostname only, never path/query. Backend
   // writes it once to users.signup_referrer_host; never updated.
   signup_referrer_host?: string;
+  // First-touch landing PATH on our own site — read from localStorage on
+  // submit via lib/utm.ts:getStoredLandingPath(). Tells us WHICH of the
+  // ~4,750 SEO pages earned the signup, which the channel fields above
+  // can't. Path only, never query/hash. Backend writes it once to
+  // users.signup_landing_path; never updated.
+  signup_landing_path?: string;
   // Signup-form consent boxes — both rendered UNCHECKED by default (explicit
   // opt-in only). `marketing_opt_in` is the weekly-market-digest consent
   // (users.marketing_opt_in); `daily_top10_opt_in` enrols the email in the
