@@ -16,6 +16,7 @@
  * editing any copy.
  */
 import Link from "next/link";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
@@ -122,9 +123,15 @@ export default function GlossaryIndexPage() {
             </Link>{" "}
             document what Tapeline itself measures, factor by factor, including
             each factor&rsquo;s known weaknesses. The{" "}
-            <Link href="/scorecard" className="link">
+            <ContentCtaLink
+              href="/scorecard"
+              className="link"
+              surface="glossary"
+              destination="scorecard"
+              slug="index"
+            >
               public scorecard
-            </Link>{" "}
+            </ContentCtaLink>{" "}
             is the unedited record of every daily top-10, and{" "}
             <Link href="/limitations" className="link">
               limitations
@@ -133,9 +140,15 @@ export default function GlossaryIndexPage() {
           </p>
           <p className="mt-4 text-sm text-muted leading-relaxed">
             To see the six factors applied to live tickers, browse the{" "}
-            <Link href="/stocks" className="link">
+            <ContentCtaLink
+              href="/stocks"
+              className="link"
+              surface="glossary"
+              destination="scanner"
+              slug="index"
+            >
               full scored universe
-            </Link>{" "}
+            </ContentCtaLink>{" "}
             or the{" "}
             <Link href="/sectors" className="link">
               per-sector rankings

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
 import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
@@ -229,10 +230,24 @@ export default function VsFinvizPage() {
           ({usd(PRICING.pro.annual)}/yr), with a {REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=finviz" className="btn-primary">
+          <ContentCtaLink
+            href="/signup?from=finviz"
+            className="btn-primary"
+            surface="compare"
+            destination="signup"
+            slug="finviz"
+          >
             Try the live scanner free — no card →
-          </Link>
-          <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
+          </ContentCtaLink>
+          <ContentCtaLink
+            href="/scorecard"
+            className="btn-ghost"
+            surface="compare"
+            destination="scorecard"
+            slug="finviz"
+          >
+            See the scorecard first
+          </ContentCtaLink>
         </div>
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.

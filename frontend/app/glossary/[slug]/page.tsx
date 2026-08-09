@@ -18,6 +18,8 @@
  */
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
+import type { ContentDestination } from "@/lib/gtag";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
@@ -38,6 +40,29 @@ import {
 
 export function generateStaticParams(): { slug: string }[] {
   return TERMS.map((t) => ({ slug: t.slug }));
+}
+
+/**
+ * Fold the term's "see this in the product" link into the closed
+ * content-CTA destination vocabulary (lib/gtag.ts). The href itself is never
+ * reported — only which family it belongs to — which is what keeps the GA4
+ * dimension low-cardinality across 45 term pages.
+ *
+ * A link back into the glossary is lateral browsing, not a funnel step, so it
+ * returns null and renders as a plain, untracked link.
+ */
+function relatedDestination(href: string): ContentDestination | null {
+  if (href.startsWith("/glossary")) return null;
+  if (href.startsWith("/scorecard")) return "scorecard";
+  if (
+    href.startsWith("/how-it-works") ||
+    href.startsWith("/limitations") ||
+    href.startsWith("/changelog") ||
+    href.startsWith("/legal")
+  ) {
+    return "methodology";
+  }
+  return "scanner";
 }
 
 export async function generateMetadata({
@@ -74,6 +99,7 @@ export default async function GlossaryTermPage({
   const url = `https://tapeline.io/glossary/${term.slug}`;
   const questions = termQuestions(term);
   const factor = term.factor ? FACTORS.find((f) => f.slug === term.factor) : undefined;
+  const relatedDest = relatedDestination(term.related.href);
   const siblings = term.see
     .map((s) => findTerm(s))
     .filter((t): t is GlossaryTerm => t !== undefined && t.slug !== term.slug);
@@ -178,9 +204,24 @@ export default async function GlossaryTermPage({
             See this in the product
           </h2>
           <p className="mt-4 text-sm text-muted leading-relaxed">
-            <Link href={term.related.href} className="link">
-              {term.related.label}
-            </Link>
+            {/* Instrumented, not restyled: this is the page's one product-ward
+                CTA, so it is the signal for whether a term page moves a reader
+                onward. See components/ContentCtaLink.tsx. */}
+            {relatedDest ? (
+              <ContentCtaLink
+                href={term.related.href}
+                className="link"
+                surface="glossary"
+                destination={relatedDest}
+                slug={term.slug}
+              >
+                {term.related.label}
+              </ContentCtaLink>
+            ) : (
+              <Link href={term.related.href} className="link">
+                {term.related.label}
+              </Link>
+            )}
             {factor ? (
               <>
                 {" "}

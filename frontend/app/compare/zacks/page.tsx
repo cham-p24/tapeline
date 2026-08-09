@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
 import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
@@ -226,10 +227,24 @@ export default function VsZacksPage() {
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=compare" className="btn-primary">
+          <ContentCtaLink
+            href="/signup?from=compare"
+            className="btn-primary"
+            surface="compare"
+            destination="signup"
+            slug="zacks"
+          >
             Try the live scanner free — no card →
-          </Link>
-          <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
+          </ContentCtaLink>
+          <ContentCtaLink
+            href="/scorecard"
+            className="btn-ghost"
+            surface="compare"
+            destination="scorecard"
+            slug="zacks"
+          >
+            See the scorecard first
+          </ContentCtaLink>
         </div>
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.

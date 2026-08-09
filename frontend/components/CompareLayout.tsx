@@ -4,6 +4,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { LandingCta } from "@/components/LandingCta";
 import { CompareIndex } from "@/components/CompareIndex";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { RelatedLinks } from "@/components/RelatedLinks";
 import { relatedForComparison } from "@/lib/internalLinks";
 import { PRICING, usd } from "@/lib/pricing";
@@ -249,11 +250,28 @@ export function CompareLayout({
           Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
+        {/* Instrumented, not restyled: these two CTAs are what tell us whether
+            a competitor comparison moves a reader onward or merely gets read.
+            See components/ContentCtaLink.tsx. */}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=compare" className="btn-primary">
+          <ContentCtaLink
+            href="/signup?from=compare"
+            className="btn-primary"
+            surface="compare"
+            destination="signup"
+            slug={slug}
+          >
             Try the live scanner free — no card →
-          </Link>
-          <Link href={ctaSecondaryHref} className="btn-ghost">See the scorecard first</Link>
+          </ContentCtaLink>
+          <ContentCtaLink
+            href={ctaSecondaryHref}
+            className="btn-ghost"
+            surface="compare"
+            destination="scorecard"
+            slug={slug}
+          >
+            See the scorecard first
+          </ContentCtaLink>
         </div>
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.

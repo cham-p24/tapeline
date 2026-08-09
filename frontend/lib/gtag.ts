@@ -67,7 +67,14 @@ export type TapelineEvent =
   | "cap_hit"              // A free user was refused MORE of a metered cap (client-observed)
   | "gate_encountered"     // A free user met a tier feature gate (the Paywall lock rendered)
   | "upgrade_prompt_shown" // An upgrade prompt/paywall actually became visible
-  | "upgrade_prompt_clicked"; // The upgrade CTA on that prompt was clicked
+  | "upgrade_prompt_clicked" // The upgrade CTA on that prompt was clicked
+  // Content → conversion attribution — GA4-only (deliberately absent from
+  // ADS_CONVERSION_LABEL below; these are on-site navigation diagnostics, not
+  // acquisition conversions). RouteAnalytics already fires page_view on every
+  // marketing route, so we know WHICH content pages get read. What was missing
+  // is which of them push a reader onward: a click on the page's primary
+  // product-ward CTA. See trackContentCtaClick + components/ContentCtaLink.
+  | "content_cta_click";
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
 // overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up
@@ -338,4 +345,72 @@ export function trackUpgradePromptClicked(
     "upgrade_prompt_clicked",
     feature ? { surface, feature } : { surface },
   );
+}
+
+/**
+ * The top-of-funnel CONTENT surfaces — the marketing pages a stranger lands on
+ * from search or an answer engine, before any account exists. Deliberately a
+ * closed union of four families rather than a free-form page name: GA4
+ * segments on this, and an unbounded string turns the report into a long tail
+ * nobody reads.
+ */
+export type ContentSurface = "glossary" | "compare" | "strategy" | "embed";
+
+/**
+ * Where a content CTA points. Also a closed union — the four conversion-ward
+ * destinations plus `methodology`, which is the dominant product-ward link on
+ * the glossary term pages and would otherwise be invisible.
+ */
+export type ContentDestination =
+  | "signup"
+  | "scanner"
+  | "pricing"
+  | "scorecard"
+  | "methodology";
+
+/** Longest slug we will report. Caps the payload; nothing legitimate is near it. */
+const MAX_CONTENT_SLUG = 48;
+
+/**
+ * Normalise the page identity into a safe, low-cardinality token.
+ *
+ * PRIVACY (mirrors the signup_referrer_host / signup_landing_path precedent):
+ * everything after `?` or `#` is dropped, so a query string can never ride
+ * along; the charset is reduced to `[a-z0-9/-]` so an email address or any
+ * other free text cannot survive intact; and the result is length-capped.
+ * Callers pass an internal slug already, but the sanitiser is what makes that
+ * a guarantee rather than a convention.
+ */
+function contentSlug(raw: string): string {
+  const cleaned = raw
+    .split(/[?#]/)[0]
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9/-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, MAX_CONTENT_SLUG);
+  return cleaned || "unknown";
+}
+
+/**
+ * A reader clicked the primary product-ward CTA on a content page.
+ *
+ * This is the missing half of content attribution. Pageviews say a glossary
+ * term or a competitor comparison got read; this says it moved someone. Pair
+ * it with the first-touch landing path captured at signup to close the loop
+ * from "which page was read" to "which page produced an account".
+ *
+ * GA4-only, fire-and-forget, and PII-free by construction — the payload is
+ * three closed-vocabulary strings and nothing else.
+ */
+export function trackContentCtaClick(
+  surface: ContentSurface,
+  destination: ContentDestination,
+  slug: string,
+): boolean {
+  return trackEvent("content_cta_click", {
+    surface,
+    destination,
+    slug: contentSlug(slug),
+  });
 }
