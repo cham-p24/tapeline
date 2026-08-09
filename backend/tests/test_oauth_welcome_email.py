@@ -99,6 +99,21 @@ async def _delete_user(email: str) -> None:
             await s.commit()
 
 
+def _sends_to(mock, recipient: str) -> list:
+    """The `send_email` calls addressed to `recipient`.
+
+    A new signup fires two sends: the user's welcome email, and the founder
+    alert — which falls back to email when the Telegram chat id is unset.
+    Filter by recipient so these assertions stay about the user's mail rather
+    than counting every send in the process. The welcome path passes `to`
+    positionally and the founder path by keyword, so check both.
+    """
+    return [
+        c for c in mock.await_args_list
+        if (c.args[0] if c.args else c.kwargs.get("to")) == recipient
+    ]
+
+
 @pytest.mark.asyncio
 async def test_new_oauth_user_gets_welcome_email(
     client, google_configured, monkeypatch,
@@ -120,8 +135,9 @@ async def test_new_oauth_user_gets_welcome_email(
         )
 
     assert r.status_code == 307
-    send.assert_awaited_once()
-    to, subject, html = send.call_args.args[:3]
+    user_sends = _sends_to(send, email)
+    assert len(user_sends) == 1
+    to, subject, html = user_sends[0].args[:3]
     assert to == email
     assert subject == "Welcome to Tapeline — your trial is live"
     # Rendered through render_welcome_email with the provider-supplied name.
@@ -181,7 +197,7 @@ async def test_welcome_email_failure_does_not_fail_signup(
 
     assert r.status_code == 307
     assert "/app/onboarding" in r.headers["location"]
-    send.assert_awaited_once()
+    assert len(_sends_to(send, email)) == 1
     # The user really was created despite the email failure.
     async with session_scope() as s:
         row = (await s.execute(select(User).where(User.email == email))).scalar_one()
