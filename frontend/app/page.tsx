@@ -379,7 +379,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
-              Try Premium free &rarr;
+              Sign up &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost text-base">
               See pricing
