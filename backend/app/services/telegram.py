@@ -1,4 +1,5 @@
-"""Telegram delivery — per-user watchlist digests + hourly market pulses."""
+"""Telegram delivery — per-user watchlist digests, hourly market pulses, and
+the real-time founder alerts (which fall back to email when Telegram is unset)."""
 from __future__ import annotations
 
 import logging
@@ -52,6 +53,47 @@ async def send_message(
     return True
 
 
+async def deliver_founder_alert(*, subject: str, text: str) -> None:
+    """Push a founder alert down whichever channel is actually configured.
+
+    Telegram is instant and preferred, but it needs
+    `INBOX_FOUNDER_TELEGRAM_CHAT_ID`, which is not always set — and when it
+    isn't, an alert that only knows how to reach Telegram is a silent no-op.
+    Resend is configured wherever the app can send mail at all, so it is the
+    fallback: the founder learns about a signup or a sale without having to
+    provision anything first.
+
+    Exactly ONE channel fires, so setting the chat id later swaps the delivery
+    route rather than doubling every notification. NEVER raises — a failed
+    notification must not fail the signup or the webhook that triggered it.
+    """
+    chat_id = getattr(settings, "inbox_founder_telegram_chat_id", "")
+    if chat_id and settings.telegram_bot_token:
+        try:
+            # parse_mode="" => plain text, so emails with _ / * survive intact.
+            await send_message(chat_id, text, parse_mode="")
+            return
+        except Exception:
+            logger.exception("telegram.founder_alert_failed subject=%s", subject)
+            return
+    try:
+        from html import escape
+
+        from app.services.email import send_email
+
+        recipient = getattr(settings, "growth_digest_to", "") or "tapeline.inbox@gmail.com"
+        body = escape(text).replace("\n", "<br>")
+        await send_email(
+            to=recipient,
+            subject=subject,
+            html=f'<div style="font:15px/1.6 ui-monospace,SFMono-Regular,monospace">{body}</div>',
+            text=text,
+            persona="sales",
+        )
+    except Exception:
+        logger.exception("founder_alert.email_fallback_failed subject=%s", subject)
+
+
 async def notify_founder_new_signup(
     *,
     email: str,
@@ -59,29 +101,52 @@ async def notify_founder_new_signup(
     trial_ends_at: datetime | None,
     source: str,
 ) -> None:
-    """Real-time Telegram ping to the founder on every new signup.
+    """Real-time ping to the founder on every new signup.
 
     Without this, signups (and the live trials they start) land silently in the
     DB and the founder only finds out by manually querying — so a 14-day trial
-    can lapse unconverted before anyone reaches out. No-op when the founder
-    chat id / bot token isn't configured. NEVER raises — a notification failure
-    must not affect the signup itself.
+    can lapse unconverted before anyone reaches out.
     """
-    chat_id = settings.inbox_founder_telegram_chat_id
-    if not chat_id or not settings.telegram_bot_token:
-        return
-    try:
-        te = trial_ends_at.date().isoformat() if trial_ends_at else "no trial"
-        text = (
+    te = trial_ends_at.date().isoformat() if trial_ends_at else "no trial"
+    await deliver_founder_alert(
+        subject=f"New Tapeline signup — {email}",
+        text=(
             "🎉 New Tapeline signup\n"
             f"{email}\n"
             f"tier: {tier} · trial ends: {te}\n"
             f"via: {source}"
-        )
-        # parse_mode="" => plain text, so emails with _ / * don't break Markdown.
-        await send_message(chat_id, text, parse_mode="")
-    except Exception:
-        logger.exception("telegram.signup_alert_failed email=%s", email)
+        ),
+    )
+
+
+async def notify_founder_new_subscription(
+    *,
+    email: str,
+    tier: str,
+    billing_period: str | None,
+    amount: float | None,
+    currency: str | None,
+) -> None:
+    """Real-time ping to the founder when someone actually starts paying.
+
+    The counterpart to `notify_founder_new_signup` and the more important half:
+    a signup is a maybe, a subscription is revenue. Called from the Stripe
+    webhook on the same once-per-subscription branch that sends the customer
+    their welcome email, so it inherits that branch's de-duplication and can't
+    fire twice for one subscription.
+    """
+    price = ""
+    if amount is not None:
+        price = f" · {amount:.2f} {(currency or 'usd').upper()}"
+    period = f" ({billing_period})" if billing_period else ""
+    await deliver_founder_alert(
+        subject=f"💰 New Tapeline subscription — {email}",
+        text=(
+            "💰 New Tapeline subscription\n"
+            f"{email}\n"
+            f"tier: {tier}{period}{price}"
+        ),
+    )
 
 
 async def answer_callback_query(callback_query_id: str, text: str = "") -> bool:
