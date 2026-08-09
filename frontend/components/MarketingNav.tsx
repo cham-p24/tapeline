@@ -16,12 +16,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+// Content links only. Sign in / Sign up are rendered separately as their own
+// account section (a muted "Sign in" text link + the primary "Sign up" button)
+// so returning users always have an obvious way in, on both desktop and mobile.
 const LINKS = [
   { href: "/pricing", label: "Pricing" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/scorecard", label: "Scorecard" },
   { href: "/signals", label: "Signals" },
-  { href: "/signin", label: "Sign in" },
 ];
 
 export function MarketingNav() {
@@ -66,20 +68,30 @@ export function MarketingNav() {
               </Link>
             ))}
             <ThemeToggle />
+            <Link href="/signin" className="text-sm text-muted hover:text-fg whitespace-nowrap">
+              Sign in
+            </Link>
             <Link href="/signup" className="btn-primary text-sm whitespace-nowrap">
-              Try Premium free
+              Sign up
             </Link>
           </div>
 
-          {/* Mobile compact bar — single primary CTA + hamburger. Theme
-              toggle and the link list move into the sheet to keep the bar
-              uncluttered at narrow widths. */}
+          {/* Mobile compact bar — Sign in + Sign up + hamburger. Both account
+              actions stay visible here (not just in the sheet) so returning
+              users can sign in without opening the menu. Theme toggle and the
+              content link list live in the sheet to keep the bar uncluttered. */}
           <div className="flex items-center gap-2 sm:hidden">
+            <Link
+              href="/signin"
+              className="whitespace-nowrap px-1 text-sm text-muted hover:text-fg"
+            >
+              Sign in
+            </Link>
             <Link
               href="/signup"
               className="btn-primary text-sm whitespace-nowrap"
             >
-              Try Premium free
+              Sign up
             </Link>
             <button
               type="button"
