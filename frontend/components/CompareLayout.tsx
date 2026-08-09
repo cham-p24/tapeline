@@ -4,6 +4,8 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { LandingCta } from "@/components/LandingCta";
 import { CompareIndex } from "@/components/CompareIndex";
+import { RelatedLinks } from "@/components/RelatedLinks";
+import { relatedForComparison } from "@/lib/internalLinks";
 import { PRICING, usd } from "@/lib/pricing";
 import {
   breadcrumbJsonLd,
@@ -281,6 +283,23 @@ export function CompareLayout({
         <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> —
         we update within 48 hours.
       </p>
+
+      {/* Cross-cluster links — three ranking pages picked for what this
+          specific competitor is actually used for (chart-first tools point
+          at the breakout/momentum lists, fundamentals-first tools at the
+          value/dividend lists, broker apps at the price bands). The compare
+          cluster is the highest-authority surface on the site and, before
+          2026-08, passed none of that along to the ranking pages sitting at
+          search position 11-12. Edge list in lib/internalLinks.ts. */}
+      <section className="mx-auto max-w-5xl px-6 pb-4">
+        <RelatedLinks
+          heading="See the ranked lists"
+          intro={`What the comparison above describes, applied. Each list is the live universe under a different sort and filter.`}
+          links={relatedForComparison(slug)}
+          ariaLabel="Tapeline ranked lists"
+          className="border-t border-border/60 pt-8"
+        />
+      </section>
 
       {/* Internal-linking cluster — graphs every /compare/* page to all
           the others. Per the 2026-05-21 GSC audit, the comparison cluster

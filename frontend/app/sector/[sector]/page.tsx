@@ -15,6 +15,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { RelatedLinks } from "@/components/RelatedLinks";
+import { relatedForSector } from "@/lib/internalLinks";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "../sectors";
@@ -263,6 +265,18 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
             ))}
           </div>
         </section>
+
+        {/* Cross-cluster links — the strategy rankings whose filter overlaps
+            this sector, plus the two factors the paragraph above already
+            names in prose (Relative Strength is measured against the
+            sector-ETF peer; Macro carries the rotation read). Before 2026-08
+            the sector cluster linked only to its own siblings. */}
+        <RelatedLinks
+          heading={`More ways to read ${sector.display}`}
+          intro={`Rankings whose filter overlaps this sector, and the two factors that treat it as their reference point.`}
+          links={relatedForSector(sector.slug)}
+          ariaLabel={`Rankings and factors related to ${sector.display}`}
+        />
 
         {/* Sister sectors — internal links spread crawl across the set */}
         <nav
