@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
 import { RelatedLinks } from "@/components/RelatedLinks";
 import { relatedForStrategy } from "@/lib/internalLinks";
@@ -435,13 +436,27 @@ export default async function BestStocksForStrategyPage({
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Full
             ~2,500-ticker live universe, every sort/filter combination, watchlist + alerts.
           </p>
+          {/* Instrumented, not restyled — see components/ContentCtaLink.tsx.
+              Tells us which strategy listicles move a reader onward. */}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup?from=screener" className="btn-primary">
+            <ContentCtaLink
+              href="/signup?from=screener"
+              className="btn-primary"
+              surface="strategy"
+              destination="signup"
+              slug={s.slug}
+            >
               Try the live scanner free — no card →
-            </Link>
-            <Link href="/scorecard" className="btn-ghost">
+            </ContentCtaLink>
+            <ContentCtaLink
+              href="/scorecard"
+              className="btn-ghost"
+              surface="strategy"
+              destination="scorecard"
+              slug={s.slug}
+            >
               See the public scorecard
-            </Link>
+            </ContentCtaLink>
           </div>
         </section>
 

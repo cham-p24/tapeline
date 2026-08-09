@@ -15,7 +15,7 @@
  * like "stock score badge", "stock score embed widget", "tapeline
  * embed", "free stock score api alternative".
  */
-import Link from "next/link";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
@@ -304,9 +304,17 @@ export default function EmbedDocsPage() {
             <a href="mailto:support@tapeline.io" className="btn-primary">
               Request a custom embed →
             </a>
-            <Link href="/scorecard" className="btn-ghost">
+            {/* Instrumented, not restyled — the badge hub's one internal CTA.
+                See components/ContentCtaLink.tsx. */}
+            <ContentCtaLink
+              href="/scorecard"
+              className="btn-ghost"
+              surface="embed"
+              destination="scorecard"
+              slug="hub"
+            >
               See the public scorecard
-            </Link>
+            </ContentCtaLink>
           </div>
         </section>
       </article>
