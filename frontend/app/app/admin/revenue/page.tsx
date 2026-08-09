@@ -21,6 +21,7 @@ type Revenue = {
   activation_rate: number;
   gclid_capture_count: number;
   acquisition_channels: Record<string, { signups: number; paid: number }>;
+  acquisition_landing_pages: LandingPageRow[];
   embed_impressions: EmbedImpressions;
   cancellations_scheduled: number;
   cancellation_reasons: Record<string, number>;
@@ -33,6 +34,21 @@ type Revenue = {
   drip_reach: Record<string, number>;
   webhook_events: Record<string, number>;
   generated_at: string;
+};
+
+/**
+ * Top landing pages by signup — the content-level cut of the channel readout.
+ * "organic brought 6 signups" isn't actionable across ~4,750 published URLs;
+ * this says WHICH page did the work, so the winning format can be repeated.
+ * First-touch path only (no query strings), cross-cut by channel, top 25.
+ * Users created before signup_landing_path shipped carry no path and are
+ * excluded server-side rather than bucketed as "unknown".
+ */
+type LandingPageRow = {
+  channel: string;
+  path: string;
+  signups: number;
+  paid: number;
 };
 
 /**
@@ -251,6 +267,10 @@ export default function RevenuePage() {
         )}
       </div>
 
+      {/* Top landing pages — the content-level cut of the channel table above.
+          Answers "which of the ~4,750 published pages actually earns signups". */}
+      <LandingPages rows={data.acquisition_landing_pages} />
+
       {/* Embed distribution loop — who renders our badge/widget, and on which
           tickers. Previously invisible: both embed surfaces were untracked. */}
       <EmbedDistribution data={data.embed_impressions} />
@@ -464,6 +484,67 @@ export function GrowthFunnelSection({
                   <td className="px-4 py-2 text-right">{t.watchlist_count}</td>
                   <td className="px-4 py-2 text-right text-muted">
                     {t.has_alert_rule ? "Yes" : "No"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Top landing pages readout. Same population as the channel table, cut by the
+ * page the visitor first landed on. The list is deliberately short at first:
+ * signup_landing_path is a recent column, so every pre-existing user carries
+ * no path and is excluded — the caption says so rather than letting a nearly
+ * empty table read as a broken section.
+ */
+function LandingPages({ rows }: { rows?: LandingPageRow[] }) {
+  // Tolerate an older/degraded payload rather than blanking the dashboard.
+  const items = rows ?? [];
+
+  return (
+    <>
+      <h2 className="mt-10 text-xl font-semibold">Top landing pages</h2>
+      <p className="text-xs text-muted">
+        The same signups as above, cut by the page each visitor first landed on
+        and cross-cut by channel. Path only &mdash; no query strings are stored.
+        Top 25 by signups. Only signups recorded since first-touch capture
+        shipped carry a path, so this list starts short and fills in over time.
+      </p>
+      <div className="card mt-4 overflow-x-auto">
+        {items.length === 0 ? (
+          <div className="p-4 text-sm text-subtle">
+            No landing pages recorded yet. Every account created before
+            first-touch capture shipped has no path stored, so rows appear here
+            as new signups arrive.
+          </div>
+        ) : (
+          <table className="w-full text-sm nums">
+            <thead>
+              <tr className="border-b border-border/50 text-xs uppercase text-muted">
+                <th className="px-4 py-2 text-left font-medium">Landing page</th>
+                <th className="px-4 py-2 text-left font-medium">Channel</th>
+                <th className="px-4 py-2 text-right font-medium">Signups</th>
+                <th className="px-4 py-2 text-right font-medium">Paid</th>
+                <th className="px-4 py-2 text-right font-medium">Conv.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((r) => (
+                <tr
+                  key={`${r.channel}|${r.path}`}
+                  className="border-b border-border/30 last:border-0"
+                >
+                  <td className="px-4 py-2 break-all font-mono text-xs">{r.path}</td>
+                  <td className="px-4 py-2">{r.channel}</td>
+                  <td className="px-4 py-2 text-right font-semibold">{r.signups}</td>
+                  <td className="px-4 py-2 text-right font-semibold">{r.paid}</td>
+                  <td className="px-4 py-2 text-right text-muted">
+                    {r.signups > 0 ? `${Math.round((r.paid / r.signups) * 100)}%` : "—"}
                   </td>
                 </tr>
               ))}
