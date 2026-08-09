@@ -16,6 +16,8 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { LandingCta } from "@/components/LandingCta";
+import { RelatedLinks } from "@/components/RelatedLinks";
+import { relatedForStrategy } from "@/lib/internalLinks";
 import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
@@ -349,6 +351,20 @@ export default async function BestStocksForStrategyPage({
             ))}
           </div>
         </section>
+
+        {/* Cross-cluster links — the factor pages this ranking's sort/filter
+            actually leans on, plus the sector rankings that overlap it. The
+            2026-08 audit found the strategy cluster linked only sideways (to
+            its own siblings) and downward (to feature pages); the methodology
+            and sector clusters were unreachable from here even though the
+            copy above names all six factors in bold. See lib/internalLinks.ts
+            for the edge list and why it is hand-picked rather than generated. */}
+        <RelatedLinks
+          heading={`What the ${s.display} ranking leans on`}
+          intro={`This list emphasises ${s.factorEmphasis}. Each factor page explains what that reading measures, how it is derived, and where it is weak.`}
+          links={relatedForStrategy(s.slug)}
+          ariaLabel="Factors and sectors behind this ranking"
+        />
 
         {/* Sister strategies — internal links spread crawl across the set */}
         <nav

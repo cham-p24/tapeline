@@ -21,6 +21,8 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { MethodologyCaveat } from "@/components/MethodologyCaveat";
+import { RelatedLinks } from "@/components/RelatedLinks";
+import { relatedForFactor } from "@/lib/internalLinks";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { FACTORS, MISSING_DATA_NOTE, findFactor } from "../factors";
@@ -221,6 +223,23 @@ export default async function FactorPage({
               </details>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Where the factor shows up in the product.
+          Before 2026-08 these pages were a terminal node: the only way out
+          was another methodology page. A reader who has just understood what
+          a factor measures wants to see it applied, and the ranking pages
+          that sort on it are the honest next click. */}
+      <section className="section py-8 sm:py-10">
+        <div className="mx-auto max-w-3xl">
+          <RelatedLinks
+            heading={`Where ${factor.name} does the work`}
+            intro={`Rankings whose sort or filter leans on the ${factor.name} reading. Every row on them carries the same per-factor breakdown described above.`}
+            links={relatedForFactor(factor.slug)}
+            ariaLabel={`Rankings that lean on ${factor.name}`}
+            className=""
+          />
         </div>
       </section>
 
