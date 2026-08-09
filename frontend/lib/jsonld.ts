@@ -750,6 +750,89 @@ export function tickerItemListJsonLd(a: ItemListTickerArgs) {
   };
 }
 
+/** Stable @id for the glossary as a single DefinedTermSet entity. */
+export const GLOSSARY_SET_ID = "https://tapeline.io/glossary#termset";
+
+export type DefinedTermArgs = {
+  /** Term name as a reader would say it, e.g. "Relative strength". */
+  name: string;
+  /** URL slug — the term lives at /glossary/{slug}. */
+  slug: string;
+  /** One-to-two-sentence plain-English definition. */
+  description: string;
+  /** Other names the same idea travels under. */
+  alternateNames?: string[];
+};
+
+/**
+ * Schema.org DefinedTerm for a single /glossary/{slug} page.
+ *
+ * Why DefinedTerm rather than Article: answer engines and Google's glossary
+ * handling both key off the term/definition pair, and DefinedTerm is the only
+ * type that expresses "this page IS the definition of this thing" rather than
+ * "this page is prose that mentions it". `inDefinedTermSet` points every term
+ * back at one set entity so the 45 pages read as a single coherent glossary
+ * instead of 45 unrelated definitions.
+ *
+ * Deliberately NOT paired with any rating, offer or recommendation markup —
+ * these pages define securities-market vocabulary, and dressing a definition
+ * in commercial schema would collide with the descriptive-only posture.
+ */
+export function definedTermJsonLd(a: DefinedTermArgs) {
+  const url = `https://tapeline.io/glossary/${a.slug}`;
+  return {
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "@id": `${url}#term`,
+    name: a.name,
+    description: a.description,
+    url,
+    ...(a.alternateNames?.length ? { alternateName: a.alternateNames } : {}),
+    inDefinedTermSet: {
+      "@type": "DefinedTermSet",
+      "@id": GLOSSARY_SET_ID,
+      name: "Tapeline Trading Glossary",
+      url: "https://tapeline.io/glossary",
+    },
+  };
+}
+
+export type DefinedTermSetArgs = {
+  description: string;
+  terms: { name: string; slug: string; description: string }[];
+};
+
+/**
+ * Schema.org DefinedTermSet for the /glossary index, with every term inlined
+ * as a hasDefinedTerm member. Same rationale as blogIndexJsonLd: the index
+ * page's structured data has to enumerate its members, or a crawler has no
+ * machine-readable route from the hub to the 45 leaves.
+ */
+export function definedTermSetJsonLd(a: DefinedTermSetArgs) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "DefinedTermSet",
+    "@id": GLOSSARY_SET_ID,
+    name: "Tapeline Trading Glossary",
+    description: a.description,
+    url: "https://tapeline.io/glossary",
+    inLanguage: "en",
+    publisher: {
+      "@type": "Organization",
+      name: "Tapeline",
+      url: "https://tapeline.io",
+      logo: { "@type": "ImageObject", url: "https://tapeline.io/favicon.svg" },
+    },
+    hasDefinedTerm: a.terms.map((t) => ({
+      "@type": "DefinedTerm",
+      "@id": `https://tapeline.io/glossary/${t.slug}#term`,
+      name: t.name,
+      description: t.description,
+      url: `https://tapeline.io/glossary/${t.slug}`,
+    })),
+  };
+}
+
 export type CompareArgs = {
   competitorName: string;
   competitorUrl: string;

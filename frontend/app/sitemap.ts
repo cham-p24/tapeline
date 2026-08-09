@@ -3,6 +3,7 @@ import { SECTORS } from "./sector/sectors";
 import { SIGNALS } from "./signal/signals";
 import { STRATEGIES } from "./best-stocks-for/[strategy]/strategies";
 import { FACTORS } from "./how-it-works/factors";
+import { TERMS } from "./glossary/terms";
 import { allComparePairs } from "@/lib/comparePairs";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
@@ -125,6 +126,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const HOWITWORKS_LAST_MODIFIED = new Date("2026-05-17");
   // Per-factor methodology pages, /why and /limitations shipped together.
   const TRUST_LAST_MODIFIED = new Date("2026-07-18");
+  // /glossary index + the per-term pages. Static definitional content, so
+  // lastmod tracks the writing, not the market.
+  const GLOSSARY_LAST_MODIFIED = new Date("2026-08-09");
 
   const staticEntries: MetadataRoute.Sitemap = [
     { url: base,                                lastModified: STATIC_LAST_MODIFIED, priority: 1.0 },
@@ -157,6 +161,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // ranking pages (and onward to per-ticker pages). Aggregates change as
     // scores re-tick, so daily.
     { url: `${base}/sectors`,                   lastModified: now, changeFrequency: "daily", priority: 0.8 },
+    // Glossary hub — definitional/AEO surface. Answer engines cite
+    // definition pages heavily, and the hub is the crawl entry point into
+    // the per-term set below.
+    { url: `${base}/glossary`,                  lastModified: GLOSSARY_LAST_MODIFIED, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
     { url: `${base}/blog`,                      lastModified: blogLastModified, priority: 0.7 },
@@ -240,6 +248,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "monthly" as const,
     priority: 0.8,
   }));
+  // One page per glossary term — /glossary/{slug}. Purely static prose (no
+  // live data), so lastModified tracks the definition, not the market. Same
+  // treatment as the per-factor methodology pages above.
+  const glossaryEntries: MetadataRoute.Sitemap = TERMS.map((t) => ({
+    url: `${base}/glossary/${t.slug}`,
+    lastModified: GLOSSARY_LAST_MODIFIED,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
   const signalEntries: MetadataRoute.Sitemap = SIGNALS.map((s) => ({
     url: `${base}/signal/${s.slug}`,
     lastModified: now,
@@ -316,6 +333,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticEntries,
     ...factorEntries,
+    ...glossaryEntries,
     ...sectorEntries,
     ...signalEntries,
     ...strategyEntries,
