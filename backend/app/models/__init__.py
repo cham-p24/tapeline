@@ -4,6 +4,7 @@ from app.models.calendar_events import EarningsEvent, IPOEvent
 from app.models.cap_events import CapEvent
 from app.models.congress import CongressTrade
 from app.models.email_verification_token import EmailVerificationToken
+from app.models.embed_impression import EmbedImpression
 from app.models.inbox import InboundMessage
 from app.models.inbox_classification_log import InboxClassificationLog
 from app.models.insider_transaction import InsiderTransaction
@@ -32,6 +33,7 @@ __all__ = [
     "DailyScorecardEntry",
     "EarningsEvent",
     "EmailVerificationToken",
+    "EmbedImpression",
     "IPOEvent",
     "InboundMessage",
     "InboxClassificationLog",

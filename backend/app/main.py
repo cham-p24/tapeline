@@ -20,6 +20,7 @@ from app.routers import (
     calendar_routes,
     congress,
     contact,
+    embed,
     export,
     heatmap,
     holdings,
@@ -150,9 +151,23 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_and_rate_limit(request: Request, call_next):
-    # Rate-limit all /api/* requests except health + webhooks (which have their own signature check)
+    # Rate-limit all /api/* requests except health + webhooks (which have their
+    # own signature check) + embed-impression counting.
+    #
+    # Why /api/embed/ is exempt: limit_api keys on the CLIENT IP, and every
+    # impression POST originates from the Fly frontend machine — one IP for the
+    # whole site. Sharing that 120/min bucket would let badge traffic starve the
+    # SSR calls that actually render pages (a hot README could 429 /api/ticker
+    # for everyone). The embed router applies its own per-embedding-host and
+    # global-write-volume buckets instead, which is the limit that's actually
+    # meaningful here.
     path = request.url.path
-    if path.startswith("/api/") and not path.startswith("/api/health") and not path.startswith("/api/webhooks/"):
+    if (
+        path.startswith("/api/")
+        and not path.startswith("/api/health")
+        and not path.startswith("/api/webhooks/")
+        and not path.startswith("/api/embed/")
+    ):
         from app.services.rate_limit import limit_api
         try:
             await limit_api(request)
@@ -751,6 +766,11 @@ app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(internal.router, prefix="/api/internal", tags=["internal"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+# Embed-impression counting for /badge/{sym} + /embed/score/{sym}. Public and
+# unauthenticated — it is called by the Next server on behalf of an anonymous
+# browser. It runs its own (host-keyed + global) rate limits, and is exempt from
+# the shared per-IP limiter below; see the note there.
+app.include_router(embed.router, prefix="/api/embed", tags=["embed"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
 app.include_router(calendar_routes.ipo_router, prefix="/api/ipos", tags=["calendar"])

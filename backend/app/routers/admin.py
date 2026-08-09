@@ -20,6 +20,7 @@ from app.models import (
     Subscription,
     User,
 )
+from app.services.embed_impressions import summarize_embed_impressions
 from app.services.tier import mrr_contribution
 
 logger = logging.getLogger(__name__)
@@ -397,6 +398,19 @@ async def revenue_dashboard(
         if row.path
     ]
 
+    # ── Embed distribution loop — the /badge/{sym} SVG (README embeds) and the
+    # /embed/score/{sym} iframe widget rendered on OTHER people's sites. Both
+    # were previously uninstrumented, so this loop was invisible: no way to
+    # tell whether it works, which sites carry us, or which tickers get
+    # embedded. Hostname-only, aggregated per day (see
+    # models/embed_impression.py), and DIRECTIONAL not exact — CDN-cached
+    # renders never reach our origin, so real impressions always exceed these.
+    # Rank with them; never quote them as an absolute count.
+    #
+    # Degrades to an empty summary on any error — this readout must never take
+    # the revenue dashboard down with it. ──
+    embed_impressions = await summarize_embed_impressions(session, days=30, top=15)
+
     # ── Churn / cancellation ──────────────────────────────────────────────
     cancellations_scheduled = (await session.execute(
         select(func.count()).select_from(Subscription).where(
@@ -487,6 +501,10 @@ async def revenue_dashboard(
         # signups, capped at 25. The content-level cut of the channel readout
         # above — which of the ~4,750 SEO pages actually earns signups.
         "acquisition_landing_pages": acquisition_landing_pages,
+        # Embed distribution: top embedding hosts / top embedded symbols /
+        # per-day totals over the last 30 days. Directional (CDN-cached renders
+        # are invisible to the origin) — for ranking and trend, not absolutes.
+        "embed_impressions": embed_impressions,
         "cancellations_scheduled": cancellations_scheduled,
         "cancellation_reasons": cancellation_reasons,
         "save_offers_redeemed": save_offers_redeemed,

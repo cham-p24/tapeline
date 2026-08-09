@@ -21,6 +21,7 @@ type Revenue = {
   activation_rate: number;
   gclid_capture_count: number;
   acquisition_channels: Record<string, { signups: number; paid: number }>;
+  embed_impressions: EmbedImpressions;
   cancellations_scheduled: number;
   cancellation_reasons: Record<string, number>;
   save_offers_redeemed: number;
@@ -32,6 +33,22 @@ type Revenue = {
   drip_reach: Record<string, number>;
   webhook_events: Record<string, number>;
   generated_at: string;
+};
+
+/**
+ * Embed distribution loop — renders of /badge/{sym} (README SVG) and
+ * /embed/score/{sym} (iframe widget) on OTHER people's sites, aggregated
+ * hostname-only per day. Directional, not exact: CDN-cached renders never
+ * reach our origin, so real impressions always exceed these.
+ */
+type EmbedImpressions = {
+  window_days: number;
+  impressions_total: number;
+  distinct_hosts: number;
+  by_surface: Record<string, number>;
+  top_hosts: { host: string; impressions: number; symbols: number }[];
+  top_symbols: { symbol: string; impressions: number; hosts: number }[];
+  by_day: { day: string; impressions: number }[];
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -169,6 +186,10 @@ export default function RevenuePage() {
         )}
       </div>
 
+      {/* Embed distribution loop — who renders our badge/widget, and on which
+          tickers. Previously invisible: both embed surfaces were untracked. */}
+      <EmbedDistribution data={data.embed_impressions} />
+
       {/* Subscription book */}
       <h2 className="mt-10 text-xl font-semibold">Subscription book</h2>
       <p className="text-xs text-muted">Tier &amp; billing-period counts are active subs only; status covers the whole book.</p>
@@ -219,6 +240,124 @@ export default function RevenuePage() {
 
       <p className="mt-8 text-xs text-subtle">Generated {new Date(data.generated_at).toLocaleString()}.</p>
     </div>
+  );
+}
+
+/**
+ * Embed distribution readout. The badge (/badge/{sym}) and the iframe widget
+ * (/embed/score/{sym}) are rendered on other people's sites; this is the only
+ * view of whether that loop actually works. Top hosts = outreach targets.
+ * Top symbols = which tickers people care enough about to embed.
+ */
+function EmbedDistribution({ data }: { data?: EmbedImpressions }) {
+  // Tolerate an older/degraded payload rather than blanking the dashboard.
+  if (!data) return null;
+  const hasData = data.impressions_total > 0;
+  // Peak day drives the sparkline scale.
+  const peak = Math.max(1, ...data.by_day.map((d) => d.impressions));
+
+  return (
+    <>
+      <h2 className="mt-10 text-xl font-semibold">Embed distribution</h2>
+      <p className="text-xs text-muted">
+        Renders of the README badge (<code className="rounded bg-panel px-1 py-0.5">/badge/SYM</code>)
+        and the iframe widget (<code className="rounded bg-panel px-1 py-0.5">/embed/score/SYM</code>)
+        on other people&apos;s sites, last {data.window_days} days. Hostname only &mdash; no URLs,
+        paths or query strings are stored. Counts are <strong>directional, not exact</strong>:
+        CDN-cached renders never reach our origin, so real impressions are higher.
+        Use them for ranking and trend.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          label="Impressions"
+          value={String(data.impressions_total)}
+          tone={hasData ? "accent" : undefined}
+        />
+        <Stat label="Embedding sites" value={String(data.distinct_hosts)} />
+        <Stat label="Badge (SVG)" value={String(data.by_surface.badge ?? 0)} />
+        <Stat label="Widget (iframe)" value={String(data.by_surface.iframe ?? 0)} />
+      </div>
+
+      {!hasData ? (
+        <div className="card mt-4 p-4 text-sm text-subtle">
+          No embed impressions recorded yet. Either nobody has embedded the badge
+          or widget on an external site, or every render so far has been served
+          from the CDN cache.
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <div className="card overflow-x-auto">
+              <div className="px-4 pt-4 text-xs uppercase text-muted">
+                Top embedding sites
+              </div>
+              <table className="mt-2 w-full text-sm nums">
+                <thead>
+                  <tr className="border-b border-border/50 text-xs uppercase text-muted">
+                    <th className="px-4 py-2 text-left font-medium">Host</th>
+                    <th className="px-4 py-2 text-right font-medium">Impr.</th>
+                    <th className="px-4 py-2 text-right font-medium">Tickers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.top_hosts.map((h) => (
+                    <tr key={h.host} className="border-b border-border/30 last:border-0">
+                      <td className="px-4 py-2 break-all">{h.host}</td>
+                      <td className="px-4 py-2 text-right font-semibold">{h.impressions}</td>
+                      <td className="px-4 py-2 text-right text-muted">{h.symbols}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card overflow-x-auto">
+              <div className="px-4 pt-4 text-xs uppercase text-muted">
+                Most-embedded tickers
+              </div>
+              <table className="mt-2 w-full text-sm nums">
+                <thead>
+                  <tr className="border-b border-border/50 text-xs uppercase text-muted">
+                    <th className="px-4 py-2 text-left font-medium">Symbol</th>
+                    <th className="px-4 py-2 text-right font-medium">Impr.</th>
+                    <th className="px-4 py-2 text-right font-medium">Sites</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.top_symbols.map((s) => (
+                    <tr key={s.symbol} className="border-b border-border/30 last:border-0">
+                      <td className="px-4 py-2 font-mono">{s.symbol}</td>
+                      <td className="px-4 py-2 text-right font-semibold">{s.impressions}</td>
+                      <td className="px-4 py-2 text-right text-muted">{s.hosts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Per-day bars — is the loop growing or flat? */}
+          <div className="card mt-3 p-4">
+            <div className="text-xs uppercase text-muted">Impressions by day</div>
+            <div className="mt-3 flex h-24 items-end gap-1">
+              {data.by_day.map((d) => (
+                <div
+                  key={d.day}
+                  className="flex-1 rounded-t bg-accent/70"
+                  style={{ height: `${Math.max(2, (d.impressions / peak) * 100)}%` }}
+                  title={`${d.day}: ${d.impressions}`}
+                />
+              ))}
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-subtle">
+              <span>{data.by_day[0]?.day ?? ""}</span>
+              <span>{data.by_day[data.by_day.length - 1]?.day ?? ""}</span>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
