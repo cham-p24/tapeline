@@ -45,6 +45,12 @@ type Source =
   | "friend"
   | "search"
   | "hacker_news"
+  | "ai_chatgpt"
+  | "ai_copilot"
+  | "ai_perplexity"
+  | "ai_claude"
+  | "ai_gemini"
+  | "ai_other"
   | "other";
 
 const STYLES: { value: Style; label: string; hint: string }[] = [
@@ -54,14 +60,24 @@ const STYLES: { value: Style; label: string; hint: string }[] = [
   { value: "mixed", label: "Mixed", hint: "Different bucket for different setups" },
 ];
 
+// Keep in sync with backend ReferralSource in routers/me.py.
+// The AI options are listed high because they're the channel that actually
+// converts — and because AI surfaces strip the referrer, this self-report is
+// frequently the only attribution signal that exists for those arrivals.
 const SOURCES: { value: Source; label: string }[] = [
+  { value: "ai_chatgpt", label: "ChatGPT" },
+  { value: "ai_copilot", label: "Microsoft Copilot" },
+  { value: "ai_perplexity", label: "Perplexity" },
+  { value: "ai_claude", label: "Claude" },
+  { value: "ai_gemini", label: "Gemini" },
+  { value: "ai_other", label: "Another AI assistant" },
+  { value: "search", label: "Search engine" },
   { value: "twitter_x", label: "Twitter / X" },
   { value: "reddit", label: "Reddit" },
   { value: "youtube", label: "YouTube" },
   { value: "podcast", label: "Podcast" },
-  { value: "friend", label: "A friend" },
-  { value: "search", label: "Search engine" },
   { value: "hacker_news", label: "Hacker News" },
+  { value: "friend", label: "A friend" },
   { value: "other", label: "Somewhere else" },
 ];
 

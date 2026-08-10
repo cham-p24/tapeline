@@ -67,9 +67,8 @@ export default function PrivacyPage() {
             <li><strong>Stripe</strong> — payment processing (PCI DSS Level 1). Sees your email and any billing data you provide directly to Stripe.</li>
             <li><strong>Resend</strong> — transactional email delivery. Sees your email, your name (if set), and the message content of emails we send you.</li>
             <li><strong>Cloudflare</strong> — DNS, Turnstile bot challenges, and Email Routing for inbound mail to <code>@tapeline.io</code>. Sees email metadata and the bot-challenge interaction.</li>
-            <li><strong>Vercel</strong> — frontend hosting and privacy-friendly Web Analytics (no cookies, no per-user identifiers, anonymised IPs).</li>
             <li><strong>Google (Analytics 4 &amp; Google Ads)</strong> — usage analytics and advertising measurement (US). Receives page views, in-app events, and signup/subscription conversion signals; sets analytics and advertising cookies (e.g. <code>_ga</code>, <code>_ga_*</code>, <code>_gcl_*</code>).</li>
-            <li><strong>PostHog</strong> — product analytics (US). Receives your user ID, email, account tier, and product-usage events to build a per-user product profile; sets analytics cookies.</li>
+            <li><strong>PostHog</strong> — product analytics. <em>Not currently enabled.</em> If we switch it on it receives your account ID, account tier, and product-usage events to build a per-user product profile, and sets analytics cookies. It is never sent your email address.</li>
             <li><strong>Fly.io</strong> — backend hosting in Sydney. Sees the full database state since they host the database.</li>
             <li><strong>Sentry</strong> — error tracking. May capture stack traces with limited non-PII context when something breaks.</li>
             <li><strong>Telegram</strong> — only if you connect your Telegram for alerts. Sees the chat ID you provided and the alert content.</li>
@@ -77,7 +76,7 @@ export default function PrivacyPage() {
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Cookies</h2>
-          <p>The only strictly-necessary cookie is a same-site, HTTP-only, secure <code>session</code> JWT with a 30-day expiry, used for authentication. In addition, Google Analytics 4, Google Ads, and PostHog set their own analytics and advertising cookies (for example <code>_ga</code>, <code>_ga_*</code>, <code>_gcl_*</code>, and PostHog session cookies) to measure product usage and advertising performance. We are adding a cookie-consent control so you can opt out of these non-essential cookies; until then you can block them with your browser's cookie settings or an extension.</p>
+          <p>The only strictly-necessary cookie is a same-site, HTTP-only, secure <code>session</code> JWT with a 30-day expiry, used for authentication. In addition, Google Analytics 4 and Google Ads set their own analytics and advertising cookies (for example <code>_ga</code>, <code>_ga_*</code>, <code>_gcl_*</code>) to measure product usage and advertising performance. PostHog would set its own session cookies, but is not currently enabled. We are adding a cookie-consent control so you can opt out of these non-essential cookies; until then you can block them with your browser's cookie settings or an extension.</p>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">Data retention</h2>
           <p><strong>Active accounts:</strong> data retained as long as the account is open. <strong>Cancelled or deleted accounts:</strong> 30 days, then permanent deletion from primary stores; backup snapshots roll off within 90 days. <strong>Stripe-side data</strong> follows Stripe's own retention policy (typically 7 years for tax purposes).</p>
