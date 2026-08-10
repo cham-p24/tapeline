@@ -63,6 +63,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // key, client-side nav reuses the same div and the animation only
   // runs once on first mount.
   const pathname = usePathname();
+  // Active-tab detection — the bar previously rendered every tab identically
+  // regardless of route, so a user had no "where am I" anchor.
+  const isActive = (href: string) =>
+    !!pathname && (pathname === href || pathname.startsWith(`${href}/`));
+  // Open the ⌘K ticker search without a keyboard (mobile has no physical one).
+  const openSearch = () =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
   return (
     <ToastProvider>
       <div className="min-h-screen">
@@ -74,43 +81,66 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
 
             <div className="hidden items-center gap-1 md:flex">
-              {tabs.map((t) => (
-                <Link
-                  key={t.href}
-                  href={t.href}
-                  className="rounded-md px-3 py-1.5 text-sm text-muted hover:bg-panel hover:text-fg"
-                >
-                  {t.label}
-                </Link>
-              ))}
+              {tabs.map((t) => {
+                const active = isActive(t.href);
+                return (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`rounded-md px-3 py-1.5 text-sm ${active ? "bg-panel font-medium text-fg" : "text-muted hover:bg-panel hover:text-fg"}`}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
               <SearchButton />
               <UserChip />
             </div>
 
-            <button
-              onClick={() => setMobileOpen((o) => !o)}
-              className="rounded-md px-3 py-2 text-muted md:hidden"
-              aria-label="Menu"
-            >
-              <span className="block h-0.5 w-5 bg-current"></span>
-              <span className="mt-1 block h-0.5 w-5 bg-current"></span>
-              <span className="mt-1 block h-0.5 w-5 bg-current"></span>
-            </button>
+            {/* Mobile bar: a visible search button (mobile has no ⌘K keyboard)
+                sits next to the menu, so ticker search is reachable without
+                opening the sheet or a keyboard. */}
+            <div className="flex items-center gap-1 md:hidden">
+              <button
+                onClick={openSearch}
+                className="rounded-md px-3 py-2 text-muted hover:text-fg"
+                aria-label="Search any ticker"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="8" r="5.25" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="M12 12l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setMobileOpen((o) => !o)}
+                className="rounded-md px-3 py-2 text-muted"
+                aria-label="Menu"
+              >
+                <span className="block h-0.5 w-5 bg-current"></span>
+                <span className="mt-1 block h-0.5 w-5 bg-current"></span>
+                <span className="mt-1 block h-0.5 w-5 bg-current"></span>
+              </button>
+            </div>
           </div>
 
           {mobileOpen && (
             <div className="md:hidden">
               <div className="mx-auto flex max-w-7xl flex-col gap-1 px-6 py-3">
-                {tabs.map((t) => (
-                  <Link
-                    key={t.href}
-                    href={t.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded-md px-3 py-2 text-sm text-muted hover:bg-panel hover:text-fg"
-                  >
-                    {t.label}
-                  </Link>
-                ))}
+                {tabs.map((t) => {
+                  const active = isActive(t.href);
+                  return (
+                    <Link
+                      key={t.href}
+                      href={t.href}
+                      onClick={() => setMobileOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={`rounded-md px-3 py-2 text-sm ${active ? "bg-panel font-medium text-fg" : "text-muted hover:bg-panel hover:text-fg"}`}
+                    >
+                      {t.label}
+                    </Link>
+                  );
+                })}
                 <MobileUserChip />
               </div>
             </div>
@@ -324,9 +354,17 @@ function MobileUserChip() {
       </Link>
     );
   }
+  // Mirrors the desktop UserChip link set. Account / Usage / Email preferences /
+  // API keys used to be desktop-only (this chip had just Billing + Referrals),
+  // so on a phone several destinations — including /app/usage, the page that
+  // explains a look-up wall — were unreachable exactly where a user hit them.
   return (
     <>
-      <div className="mt-2 pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
+      <div className="mt-2 border-t border-border pt-2 text-xs text-muted">{user.email} · {user.tier}</div>
+      <Link href="/app/account" className="px-3 py-2 text-sm text-muted">Account &amp; settings</Link>
+      <Link href="/app/usage" className="px-3 py-2 text-sm text-muted">Usage &amp; limits</Link>
+      <Link href="/app/settings/email" className="px-3 py-2 text-sm text-muted">Email preferences</Link>
+      <Link href="/app/api-keys" className="px-3 py-2 text-sm text-muted">API keys</Link>
       <Link href="/app/billing" className="px-3 py-2 text-sm text-muted">Billing &amp; plan</Link>
       <Link href="/app/referrals" className="px-3 py-2 text-sm text-muted">
         Refer a friend — you both get a free month
