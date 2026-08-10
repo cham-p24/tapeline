@@ -5,8 +5,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ScannerRow } from "@/lib/api";
 
 /**
- * ⌘K / Ctrl+K opens a ticker search. Matches on symbol prefix first, then name contains.
- * Enter jumps to /app/ticker/{symbol}. Escape closes.
+ * ⌘K / Ctrl+K opens a ticker search over the FULL active universe.
+ *
+ * Server-backed: each keystroke (debounced) hits the scanner endpoint's `q`
+ * symbol filter, so every ticker is reachable. The previous implementation
+ * preloaded 200 symbols alphabetically and filtered them in the browser, which
+ * silently hid ~92% of the ~2,500-ticker universe — anything past ~"B" was
+ * unfindable, with no way to tell "no match" from "not covered". Matches are
+ * re-ordered prefix-first for readability. Enter jumps to /app/ticker/{symbol}.
  */
 export function GlobalSearch() {
   const router = useRouter();
@@ -15,7 +21,9 @@ export function GlobalSearch() {
   const [results, setResults] = useState<ScannerRow[]>([]);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const universeRef = useRef<ScannerRow[]>([]);
+  // Monotonic id so an earlier keystroke's slower response can't overwrite a
+  // later one (out-of-order network races).
+  const searchSeq = useRef(0);
 
   // Global hotkey
   useEffect(() => {
@@ -30,26 +38,33 @@ export function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Preload universe when first opened
-  useEffect(() => {
-    if (!open || universeRef.current.length) return;
-    api.scanner({ limit: 200, sort: "symbol", order: "asc" })
-      .then((r) => { universeRef.current = r.items; })
-      .catch(() => {});
-  }, [open]);
-
   // Focus the input when the panel opens
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 10); }, [open]);
 
-  // Filter on every keystroke
+  // Server-backed search over the FULL active universe. Each keystroke is
+  // debounced ~160ms, then hits the scanner endpoint's `q` symbol filter — so
+  // any ticker is findable, not just the alphabetical first 200. A sequence
+  // guard drops stale (out-of-order) responses; matches are re-ordered
+  // prefix-first client-side so an exact/leading match sits at the top.
   useEffect(() => {
-    const s = q.trim().toUpperCase();
-    if (!s) { setResults([]); return; }
-    const u = universeRef.current;
-    const prefix = u.filter((t) => t.symbol.startsWith(s));
-    const contains = u.filter((t) => !t.symbol.startsWith(s) && (t.symbol.includes(s) || t.name.toUpperCase().includes(s)));
-    setResults([...prefix, ...contains].slice(0, 10));
-    setCursor(0);
+    const s = q.trim();
+    if (!s) { setResults([]); setCursor(0); return; }
+    let cancelled = false;
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(() => {
+      api.scanner({ q: s, limit: 12 })
+        .then((r) => {
+          if (cancelled || seq !== searchSeq.current) return;
+          const up = s.toUpperCase();
+          const items = r.items;
+          const prefix = items.filter((t) => t.symbol.toUpperCase().startsWith(up));
+          const rest = items.filter((t) => !t.symbol.toUpperCase().startsWith(up));
+          setResults([...prefix, ...rest].slice(0, 10));
+          setCursor(0);
+        })
+        .catch(() => { if (!cancelled && seq === searchSeq.current) setResults([]); });
+    }, 160);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [q]);
 
   const go = useCallback((sym: string) => {
