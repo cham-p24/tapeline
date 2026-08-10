@@ -56,7 +56,14 @@ export type TapelineEvent =
   // "Sign-up" conversion and pollute paid ROAS).
   | "newsletter_signup"    // Email opt-in to the daily digest (NOT an account signup)
   | "first_ticker_added"   // First watchlist add of the session
-  | "alert_armed"          // User enabled push + armed their first alert (activation)
+  | "alert_armed"          // User enabled push AND a real alert rule was created
+  // The three below decompose "nobody has ever armed an alert" into its actual
+  // causes. Without them a zero is unreadable: it could mean the prompt never
+  // rendered (discoverability), the browser refused permission (capability), or
+  // people saw it and said no (value). Those have completely different fixes.
+  | "alert_prompt_shown"      // The arm-alerts card actually became visible
+  | "alert_prompt_suppressed" // The card deliberately did NOT render (reason: …)
+  | "alert_arm_failed"        // Arming was attempted and did not complete (reason: …)
   // Free→paid micro-funnel — GA4-only (never forwarded to Google Ads; these are
   // on-site conversion diagnostics, not acquisition conversions). Closes the
   // chain cap_hit → upgrade_prompt_shown → upgrade_prompt_clicked →

@@ -5,6 +5,21 @@ app = "tapeline-web"
 primary_region = "syd"
 
 [build]
+  # NEXT_PUBLIC_* is inlined at BUILD time — a Fly *secret* by the same name is a
+  # runtime var and reaches the client bundle too late to do anything. Anything
+  # that gates a client feature belongs here, not in `fly secrets set`.
+  # These two keys are public by design (every browser receives them); the paired
+  # server-side secrets (CLOUDFLARE_TURNSTILE_SECRET_KEY) stay in Fly secrets.
+  [build.args]
+    # Cloudflare Turnstile site key. Empty = the signup widget never renders and
+    # bot protection is off. Paste the site key from the Cloudflare dashboard
+    # (Turnstile > your widget) to switch it on.
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY = ""
+    # PostHog project key (starts `phc_`) + region host. Empty = PostHog no-ops.
+    # Host is https://us.i.posthog.com or https://eu.i.posthog.com — must match
+    # the region chosen at project creation; it cannot be changed afterwards.
+    NEXT_PUBLIC_POSTHOG_KEY = ""
+    NEXT_PUBLIC_POSTHOG_HOST = ""
 
 [http_service]
   internal_port = 3000

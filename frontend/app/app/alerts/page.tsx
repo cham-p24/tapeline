@@ -6,6 +6,7 @@ import { api, type AlertEvent, type AlertRule, TierGateError, errorMessage } fro
 import { useUser } from "@/components/UserContext";
 import { TableSkeleton } from "@/components/Skeleton";
 import { getWebPushStatus, subscribeToWebPush } from "@/lib/webPush";
+import { trackEvent } from "@/lib/gtag";
 
 type RuleType = AlertRule["rule_type"];
 type Channel = AlertRule["channel"];
@@ -99,6 +100,13 @@ export default function AlertsPage() {
         symbol: def.needsSymbol ? symbol.toUpperCase().trim() : null,
         threshold: def.needsThreshold ? threshold : null,
         channel: effectiveChannel,
+      });
+      // This page is the OTHER way an alert rule gets created, and it had no
+      // instrumentation at all — so `alert_armed` only ever described the
+      // ArmAlerts card, while the event name implied it covered both.
+      trackEvent("alert_armed", {
+        surface: "alerts_page",
+        symbol: def.needsSymbol ? symbol.toUpperCase().trim() : "any",
       });
       if (def.needsSymbol) setSymbol("");
       // A web-push rule can only deliver once THIS browser has granted

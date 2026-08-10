@@ -151,7 +151,16 @@ async def me(
 TradingStyle = Literal["day", "swing", "longterm", "mixed"]
 ReferralSource = Literal[
     "twitter_x", "reddit", "youtube", "podcast", "friend", "search",
-    "hacker_news", "other",
+    "hacker_news",
+    # AI assistants are the only channel that has produced engaged users, and
+    # until now the survey had no option for them — so those signups self-
+    # reported as "search" or "other" and the best channel looked like noise.
+    # Most AI surfaces also strip the referrer, so this self-report is often the
+    # ONLY attribution signal available. No migration needed: users.referral_
+    # source is String(40) and the longest value here is 14 chars.
+    "ai_chatgpt", "ai_copilot", "ai_perplexity", "ai_claude", "ai_gemini",
+    "ai_other",
+    "other",
 ]
 
 # Sector slugs the frontend offers — anything outside this set is dropped

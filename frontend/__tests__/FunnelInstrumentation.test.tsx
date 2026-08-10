@@ -492,6 +492,72 @@ describe("no source file depends on the dead Vercel Analytics sink", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("gives every feature-gating NEXT_PUBLIC_* var a Dockerfile build arg", () => {
+    // The generalisation of the NEXT_PUBLIC_VERCEL bug. `NEXT_PUBLIC_*` is
+    // inlined by Next at BUILD time, so a var that gates a feature and has no
+    // Dockerfile ARG is permanently off in production — and fails silently:
+    // green deploy, passing smoke check, no effect. That is exactly how
+    // Turnstile shipped inert and how the analytics sink went unnoticed for
+    // months. `fly secrets set NEXT_PUBLIC_… -a tapeline-web` does NOT fix it;
+    // Fly secrets are runtime.
+    //
+    // Vars listed here are deliberately arg-less. Adding a var to this list is
+    // a decision that it may be absent in production forever — if the feature
+    // has to work, add an ARG to frontend/Dockerfile instead.
+    const KNOWN_NO_ARG: Record<string, string> = {
+      NEXT_PUBLIC_GA4_ID: "layout.tsx hardcodes the real ID as a ?? default",
+      NEXT_PUBLIC_GOOGLE_ADS_ID: "layout.tsx hardcodes the real ID as a ?? default",
+      NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL: "conversion label has an in-code default",
+      NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL: "conversion label has an in-code default",
+      NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL: "conversion label has an in-code default",
+      NEXT_PUBLIC_GOOGLE_ADS_BEGIN_CHECKOUT_LABEL: "conversion label has an in-code default",
+      NEXT_PUBLIC_FOUNDER_NAME: "cosmetic byline, safe in-code default",
+      NEXT_PUBLIC_FOUNDER_X: "cosmetic social link, safe when absent",
+      NEXT_PUBLIC_FOUNDER_GITHUB: "cosmetic social link, safe when absent",
+      NEXT_PUBLIC_FOUNDER_LINKEDIN: "cosmetic social link, safe when absent",
+      NEXT_PUBLIC_FOUNDER_HEADSHOT_URL: "cosmetic image, safe when absent",
+      NEXT_PUBLIC_FOUNDER_DISCLOSED: "cosmetic disclosure toggle, safe when absent",
+      NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "Plausible is deliberately not used — PostHog supersedes it",
+      NEXT_PUBLIC_PLAUSIBLE_SCRIPT: "Plausible is deliberately not used",
+      NEXT_PUBLIC_VERCEL: "the dead sink itself — guarded as absent by the test above",
+      NEXT_PUBLIC_VERCEL_ENV: "Vercel-injected, only read on Vercel PR previews",
+    };
+
+    const READ_RE = /process\.env\.(NEXT_PUBLIC_[A-Z0-9_]+)/g;
+    const used = new Set<string>();
+    for (const dir of SCAN_DIRS) {
+      for (const file of walk(join(ROOT, dir))) {
+        const src = readFileSync(file, "utf8");
+        for (const m of src.matchAll(READ_RE)) used.add(m[1]);
+      }
+    }
+    // middleware.ts sits at the frontend root, outside SCAN_DIRS.
+    for (const m of readFileSync(join(ROOT, "middleware.ts"), "utf8").matchAll(READ_RE)) {
+      used.add(m[1]);
+    }
+
+    const dockerfile = readFileSync(join(ROOT, "Dockerfile"), "utf8");
+    const declared = new Set(
+      [...dockerfile.matchAll(/^ARG\s+(NEXT_PUBLIC_[A-Z0-9_]+)/gm)].map((m) => m[1]),
+    );
+
+    const unbacked = [...used].filter(
+      (v) => !declared.has(v) && !(v in KNOWN_NO_ARG),
+    );
+    expect(unbacked).toEqual([]);
+  });
+
+  it("promotes every NEXT_PUBLIC_* build arg to ENV so the build actually sees it", () => {
+    // An ARG alone is invisible to `npm run build` — it has to be promoted to
+    // ENV in the same stage. Declaring the ARG and forgetting the ENV line
+    // reproduces the original bug while looking fixed.
+    const dockerfile = readFileSync(join(ROOT, "Dockerfile"), "utf8");
+    const args = [...dockerfile.matchAll(/^ARG\s+(NEXT_PUBLIC_[A-Z0-9_]+)/gm)].map((m) => m[1]);
+    expect(args.length).toBeGreaterThan(0);
+    const missing = args.filter((a) => !new RegExp(`${a}=\\$${a}\\b`).test(dockerfile));
+    expect(missing).toEqual([]);
+  });
+
   it("keeps the packages out of package.json", () => {
     const pkg = JSON.parse(
       readFileSync(join(ROOT, "package.json"), "utf8"),

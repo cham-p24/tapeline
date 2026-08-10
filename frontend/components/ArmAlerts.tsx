@@ -36,19 +36,31 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
     (async () => {
       if (!user) return;
       try {
-        if (localStorage.getItem(DISMISS_KEY)) return;
+        if (localStorage.getItem(DISMISS_KEY)) {
+          trackEvent("alert_prompt_suppressed", { surface, reason: "dismissed" });
+          return;
+        }
       } catch {
         /* private mode — treat as not dismissed */
       }
       const status = await getWebPushStatus();
-      if (status !== "default") return;
+      if (status !== "default") {
+        // Covers desktop Safari, iOS Safari outside an installed PWA, and
+        // anyone who previously granted or denied. Silent until now, which is
+        // why a zero armed-alert count was impossible to interpret.
+        trackEvent("alert_prompt_suppressed", { surface, reason: `push_${status}` });
+        return;
+      }
       try {
         const wl = await api.watchlist(null);
         if (alive && wl.items.length > 0) setTicker(wl.items[0].symbol);
       } catch {
         /* no watchlist yet — still offer, with generic copy */
       }
-      if (alive) setShow(true);
+      if (alive) {
+        setShow(true);
+        trackEvent("alert_prompt_shown", { surface });
+      }
     })();
     return () => {
       alive = false;
@@ -62,10 +74,12 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
     if (!sub.ok) {
       setPhase("error");
       setError(sub.reason);
+      trackEvent("alert_arm_failed", { surface, reason: sub.reason });
       return;
     }
     // Create a real score alert on a watched ticker so a LIVE alert follows the
     // sample. Best-effort: a duplicate or a cap-hit must not block the aha.
+    let ruleCreated = false;
     if (ticker) {
       try {
         await api.alertRuleCreate({
@@ -75,15 +89,28 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
           threshold: 5,
           channel: "web_push",
         });
+        ruleCreated = true;
       } catch {
         /* rule already exists or the free web-push cap was reached */
+        trackEvent("alert_arm_failed", { surface, reason: "rule_create_failed" });
       }
+    } else {
+      // No watched ticker, so no rule was even attempted. The old code still
+      // reported `alert_armed` here, which is how an "armed alerts" number
+      // could exceed the number of alert rules that exist.
+      trackEvent("alert_arm_failed", { surface, reason: "no_ticker" });
     }
     // The aha: feel a sample alert land right now.
     await testWebPush().catch(() => {
       /* subscription is registered; the sample is best-effort */
     });
-    trackEvent("alert_armed", ticker ? { surface, symbol: ticker } : { surface });
+    // Only claim activation when a rule genuinely exists. This event used to
+    // fire unconditionally — after a swallow-everything catch, and even when
+    // `ticker` was null — so it counted successes that never happened while the
+    // UI said "Alerts are on."
+    if (ruleCreated) {
+      trackEvent("alert_armed", { surface, symbol: ticker as string });
+    }
     setPhase("done");
   }, [ticker, surface]);
 
