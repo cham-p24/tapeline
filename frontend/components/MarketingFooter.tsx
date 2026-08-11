@@ -45,6 +45,7 @@ export function MarketingFooter() {
             <FooterLink href="/glossary">Glossary</FooterLink>
             <FooterLink href="/embed">Embed a score badge</FooterLink>
             <FooterLink href="/blog">Blog</FooterLink>
+            <FooterLink href="/whats-new">What&rsquo;s new</FooterLink>
             <FooterLink href="/changelog">Changelog</FooterLink>
           </FooterCol>
 
