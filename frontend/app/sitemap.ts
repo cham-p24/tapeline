@@ -172,6 +172,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/roadmap`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/status`,                    lastModified: now, changeFrequency: "hourly", priority: 0.4 },
     // Comparison pages — high commercial-investigation intent.
+    { url: `${base}/whats-new`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
     { url: `${base}/compare`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/compare/finviz`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/zacks`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
