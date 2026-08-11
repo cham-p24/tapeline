@@ -242,6 +242,32 @@ export default function ScannerPage() {
     if (typeof f.search === "string") setSearch(f.search);
   }, [changeSector]);
 
+  // Apply a saved screen linked from the sidebar (/app/scanner?preset=<id>).
+  // Read once on mount from the URL directly — avoids useSearchParams' Suspense
+  // requirement — then fetch the preset list, find the id, and apply its blob.
+  const presetApplied = useRef(false);
+  useEffect(() => {
+    if (presetApplied.current) return;
+    const presetId = new URLSearchParams(window.location.search).get("preset");
+    if (!presetId) return;
+    presetApplied.current = true;
+    let cancelled = false;
+    api.presets()
+      .then((r) => {
+        if (cancelled) return;
+        const p = r.items.find((x) => String(x.id) === presetId);
+        if (p) {
+          try {
+            applyPreset(JSON.parse(p.filters_json) as ScannerFilters);
+          } catch {
+            /* malformed blob — ignore, leave current filters */
+          }
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [applyPreset]);
+
   const savedScansCap = SAVED_SCANS_CAP_BY_TIER[user?.tier ?? "free"] ?? 0;
   // Symbol search — debounced 250ms so typing "NVDA" fires one request not 4.
   const [search, setSearch] = useState("");
