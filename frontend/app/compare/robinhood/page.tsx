@@ -64,7 +64,7 @@ const WINS = [
   },
   {
     label: "Watchlist alerts",
-    tapeline: "✓ Score-change alerts via email + Telegram + push",
+    tapeline: "✓ Score-change alerts via email + push",
     competitor: "Price alerts only, no score-based logic",
   },
 ];

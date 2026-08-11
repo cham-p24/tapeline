@@ -417,7 +417,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Set up alerts to replace your Finviz email digest",
-    text: "If you relied on Finviz's email alerts, make sure the new tool has alerts of comparable cadence. Tapeline Pro includes 10 email alerts/day; Premium is unlimited Telegram + email. TradingView's alert system is more granular but costs extra on free tier.",
+    text: "If you relied on Finviz's email alerts, make sure the new tool has alerts of comparable cadence. Tapeline Pro includes 10 email alerts/day; Premium is unlimited email. TradingView's alert system is more granular but costs extra on free tier.",
   },
   {
     name: "Migrate your saved watchlist",

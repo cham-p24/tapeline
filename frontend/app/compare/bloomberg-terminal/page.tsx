@@ -58,7 +58,7 @@ const WINS = [
     competitor: "All raw inputs available; user builds the composite manually via BQNT or EQS",
   },
   {
-    label: "Watchlist alerts via email + Telegram + push",
+    label: "Watchlist alerts via email + push",
     tapeline: "✓ Score-change alerts on Pro+",
     competitor: "Multi-channel alerts available but at institutional setup cost",
   },

@@ -82,21 +82,19 @@ describe("AlertsPage channel default", () => {
 });
 
 describe("AlertsPage locked delivery channels (show don't hide)", () => {
-  it("shows Email (Pro) and Telegram (Premium) as VISIBLE-but-locked for free users", async () => {
+  it("shows Email (Pro) as VISIBLE-but-locked for free users", async () => {
     mockedUseUser.mockReturnValue(asUser(freeUser));
     render(<AlertsPage />);
     await waitFor(() => expect(rulesMock).toHaveBeenCalled());
 
     const panel = screen.getByTestId("alerts-channels-locked");
-    // Both paid delivery channels are surfaced, not hidden, each with its tier.
+    // The paid delivery channel is surfaced, not hidden, with its tier.
     expect(within(panel).getByText("Email")).toBeInTheDocument();
     expect(within(panel).getByText("Pro")).toBeInTheDocument();
-    expect(within(panel).getByText("Telegram")).toBeInTheDocument();
-    expect(within(panel).getByText("Premium")).toBeInTheDocument();
     // Web push is shown as the included/free channel.
     expect(within(panel).getByText(/Web push/i)).toBeInTheDocument();
     // A descriptive upgrade CTA points at billing.
-    expect(within(panel).getByRole("link", { name: /Unlock email \+ Telegram/i }))
+    expect(within(panel).getByRole("link", { name: /Unlock email delivery/i }))
       .toHaveAttribute("href", "/app/billing?intent=pro");
   });
 
@@ -114,7 +112,7 @@ describe("AlertsPage tier-gate errors", () => {
     createMock.mockRejectedValue(
       new TierGateError(
         "Free web-push alert limit reached (2 on free). "
-        + "Upgrade for 10 alerts/day plus Telegram at /app/billing.",
+        + "Upgrade for 10 alerts/day at /app/billing.",
       ),
     );
     render(<AlertsPage />);

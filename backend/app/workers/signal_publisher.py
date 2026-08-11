@@ -61,7 +61,6 @@ def _spawn(coro) -> None:  # type: ignore[no-untyped-def]
 
 _last_news_refresh: datetime | None = None
 _last_backcheck: datetime | None = None
-_last_telegram_digest: datetime | None = None
 _last_calendar_seed: datetime | None = None
 _last_trial_check: datetime | None = None
 _last_drip_check: datetime | None = None  # set ONLY after a fully successful drip run
@@ -386,12 +385,6 @@ async def tick() -> None:
             _last_calendar_seed = started
         except Exception:
             logger.exception("calendar.seed_failed")
-
-    # Hourly Telegram digest to premium users
-    global _last_telegram_digest
-    if _last_telegram_digest is None or (started - _last_telegram_digest).total_seconds() >= 3600:
-        await _run_telegram_digest()
-        _last_telegram_digest = started
 
     # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
     # Without this the trial converts to free Premium forever (zero conversion).
@@ -1348,16 +1341,6 @@ async def _run_backcheck() -> None:
                 logger.info("watchlist_trackrecord.backcheck_scored total=%d", wl_scored)
         except Exception:
             logger.exception("watchlist_trackrecord.backcheck_failed")
-
-
-async def _run_telegram_digest() -> None:
-    """Hourly Telegram watchlist digest for premium users."""
-    from app.services.telegram import run_hourly_digest
-    async with session_scope() as session:
-        try:
-            await run_hourly_digest(session)
-        except Exception:
-            logger.exception("telegram.hourly_digest_failed")
 
 
 async def _maybe_run_daily_drips(started: datetime) -> None:

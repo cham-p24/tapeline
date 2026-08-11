@@ -2,7 +2,7 @@
 Alert evaluation engine.
 
 Runs after each worker tick. Evaluates four rule types and fires matching
-alerts via the user's configured channel (email, telegram, or web_push). Per-rule
+alerts via the user's configured channel (email or web_push). Per-rule
 debounce prevents spam.
 
 Rule types:
@@ -423,7 +423,6 @@ def _debounced(rule: AlertRule, now: datetime) -> bool:
 # create-time gate in routers/alerts.py:create_rule.
 _CHANNEL_FEATURE: dict[str, str] = {
     "email": "alerts.email",
-    "telegram": "alerts.telegram",
     "web_push": "alerts.web_push",
 }
 
@@ -432,8 +431,8 @@ def _channel_entitled(user: User, channel: str) -> bool:
     """Re-check the user's CURRENT tier against the rule's channel.
 
     Rule rows outlive the entitlement that created them: a trial user authors
-    a Telegram rule on Premium, the trial lapses to free via
-    `_downgrade_expired_trials`, and the rule kept delivering a Premium
+    an email rule on Premium, the trial lapses to free via
+    `_downgrade_expired_trials`, and the rule kept delivering a Pro+
     channel forever. The rule row is deliberately left untouched so delivery
     resumes automatically if they upgrade again.
     """
@@ -489,7 +488,7 @@ async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
     The meter is the SAME one /api/usage reads (routers/usage.py): delivered
     AlertEvent rows created since the current UTC midnight — no separate
     counter to drift out of sync. Scoped to `channel == "email"` because this
-    is the EMAIL cap; a Premium user's Telegram alerts must not eat into it.
+    is the EMAIL cap; a user's other-channel alerts must not eat into it.
 
     The cap was metered and marketed (Pro = 10/day) but never enforced at send
     time, so a noisy rule set could bill zero and email without limit.
@@ -522,37 +521,6 @@ async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
         .where(
             AlertEvent.user_id == user.id,
             AlertEvent.channel == "email",
-            AlertEvent.delivered.is_(True),
-            AlertEvent.created_at >= day_start,
-        )
-    )).scalar() or 0
-    return bool(sent_today >= cap)
-
-
-async def _telegram_cap_reached(session: AsyncSession, user: User) -> bool:
-    """True when the user has used their `telegram_alerts_per_day` cap.
-
-    Mirrors `_email_cap_reached` for the Telegram channel. Matters most for
-    no-card TRIAL Premium users, whom the trial throttle drops from ~unlimited
-    to 100/day (tier.py) — the cap was metered but never enforced at send time,
-    so a couple of symbol-less congress rules on a busy disclosure day (each
-    firing up to ~96x/day on the 15-min debounce) could blow well past it.
-    Real (paying) Premium sits at 10,000 ≈ unlimited, so this never bites them;
-    Free/Pro can't reach the telegram branch at all (`_channel_entitled` gates
-    alerts.telegram to Premium). Same flush caveat as the email cap.
-    """
-    from app.services.tier import effective_limit
-
-    cap = effective_limit(user, "telegram_alerts_per_day")
-    if cap is None:
-        return False
-    await session.flush()
-    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    sent_today = (await session.execute(
-        select(func.count()).select_from(AlertEvent)
-        .where(
-            AlertEvent.user_id == user.id,
-            AlertEvent.channel == "telegram",
             AlertEvent.delivered.is_(True),
             AlertEvent.created_at >= day_start,
         )
@@ -614,7 +582,7 @@ async def _fire(
 
     if rule.channel == "email":
         # Respect per-user email-prefs — alert emails are opt-out-able.
-        # Other channels (telegram, web push) keep their own opt-out logic
+        # Other channels (web push) keep their own opt-out logic
         # via the rule.channel field itself, so this gate is email-only.
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.ALERT_EMAILS):
@@ -652,32 +620,9 @@ async def _fire(
                 event.delivered = not res.get("skipped", False)
             except Exception:
                 logger.exception("alert.email_failed user=%s rule=%s", user.id, rule.id)
-    elif rule.channel == "telegram" and user.telegram_chat_id:
-        if await _telegram_cap_reached(session, user):
-            # Daily telegram-alert cap spent (chiefly the trial throttle of
-            # 100/day). Same posture as the email cap: keep the AlertEvent so
-            # /app/alerts/history shows the rule fired, just skip the send.
-            event.delivered = False
-            event.message = f"[suppressed: daily telegram alert cap reached] {message}"
-            logger.info(
-                "alert.suppressed_telegram_cap user=%s rule=%s tier=%s",
-                user.id, rule.id, user.tier,
-            )
-        else:
-            try:
-                from app.services.telegram import send_message
-                text = (
-                    f"*[Tapeline] {rule.name}*\n\n"
-                    f"{message}\n\n"
-                    f"_Open: tapeline.io/app/scanner_"
-                )
-                ok = await send_message(user.telegram_chat_id, text)
-                event.delivered = ok
-            except Exception:
-                logger.exception("alert.telegram_failed user=%s rule=%s", user.id, rule.id)
-    # SMS + Discord channels were retired 2026-05-04. The dispatch arms
-    # were removed but the underlying app.services.{sms,discord}.py service
-    # files + DB columns are kept so the channels can be re-enabled later
+    # SMS + Discord channels were retired 2026-05-04, and the Telegram channel
+    # was retired 2026-08-11. The dispatch arms were removed but the underlying
+    # service files + DB columns are kept so the channels can be re-enabled later
     # by re-adding entries to FEATURES in tier.py + restoring these arms.
     elif rule.channel == "web_push":
         try:

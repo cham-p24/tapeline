@@ -19,7 +19,6 @@ from app.models import (
     RoadmapVote,
     ScannerPreset,
     Subscription,
-    TelegramLinkToken,
     User,
     Watchlist,
     WatchlistItem,
@@ -140,7 +139,6 @@ async def delete_my_account(
     await session.execute(delete(Watchlist).where(Watchlist.user_id == user_id))
     await session.execute(delete(ScannerPreset).where(ScannerPreset.user_id == user_id))
     await session.execute(delete(WebPushSubscription).where(WebPushSubscription.user_id == user_id))
-    await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.user_id == user_id))
     await session.execute(delete(RoadmapVote).where(RoadmapVote.user_id == user_id))
     # watchlist_track_record (migration 0042) has a user_id FK with NO ON DELETE
     # CASCADE, and — unlike some sibling tables — it isn't cascaded from

@@ -61,7 +61,7 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Chart-condition alerts and automation",
-    tapeline: "Alerts fire on score, squeeze and regime thresholds via email, browser push and Telegram",
+    tapeline: "Alerts fire on score, squeeze and regime thresholds via email and browser push",
     competitor: "Dynamic alerts attached to auto-updating trendlines and indicator conditions, plus automation bots",
     note: "TrendSpider's alerts watch chart geometry — a trendline touch, an indicator cross — and its bots can chain conditions together. Tapeline's alerts watch the composite score and derived signals. If your triggers are chart-structural, TrendSpider is the right shape; if your triggers are 'this name's multi-factor picture changed', Tapeline is.",
   },

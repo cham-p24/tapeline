@@ -103,7 +103,7 @@ async def render_pricing(_body: str) -> str:
         "($9.99 monthly) for the full ~2,500-ticker live scan + smart "
         "watchlist alerts. Premium is $16.58/mo annual ($19.99 monthly) "
         "for everything in Pro + congressional trades + insider Form 4 "
-        "buys + unlimited Telegram alerts. Every signup gets a 14-day "
+        "buys. Every signup gets a 14-day "
         "Premium trial, no card. Full comparison at tapeline.io/pricing."
     )
 

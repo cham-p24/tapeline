@@ -560,7 +560,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Telegram unlimited and Congressional-trade alerts. The free tier shows live scores for the top ${FREE_LIMITS.scannerRows} scanner rows plus ${FREE_LIMITS.dailyLookups} look-ups a day, with ${FREE_LIMITS.webPushAlerts} browser push alerts; ${sym} email or Telegram alerts specifically require Pro or Premium.`,
+      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Congressional-trade alerts. The free tier shows live scores for the top ${FREE_LIMITS.scannerRows} scanner rows plus ${FREE_LIMITS.dailyLookups} look-ups a day, with ${FREE_LIMITS.webPushAlerts} browser push alerts; ${sym} email alerts specifically require Pro or Premium.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,

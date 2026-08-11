@@ -17,7 +17,6 @@ export type SessionUser = {
   // can never promise a discount checkout won't apply.
   trial_save_offer_available?: boolean;
   referral_code?: string | null;
-  telegram_chat_id?: string | null;
   phone_number?: string | null;
   discord_webhook_url?: string | null;
   created_at: string | null;
@@ -143,7 +142,6 @@ export const FEATURE_TIERS = {
   "alerts.email":       "pro" as const,
   "ticker.full":        "pro" as const,
   "congress":           "premium" as const,
-  "alerts.telegram":    "premium" as const,
   // Web push is the FREE "alert taste" channel. Mirrors backend
   // tier.FEATURES["alerts.web_push"] = Tier.FREE (deliberate activation bet,
   // 2026-07-04): free users may create up to FREE_WEB_PUSH_ALERTS web-push

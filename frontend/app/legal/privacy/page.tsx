@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <div className="prose prose-invert mt-8 max-w-none text-sm leading-relaxed text-muted">
           <h2 className="mt-8 text-lg font-semibold text-fg">Summary in one paragraph</h2>
           <p>
-            We collect the minimum personal data needed to run the product: your email and password for the account; your name, watchlist, alerts and subscription state for the features that need them; plus contextual identifiers when you opt in to extras like Telegram alerts. We do not store IP addresses or browser fingerprints to the database, and do not see your payment-card details (Stripe handles them). For product analytics and advertising measurement we use Google Analytics 4, Google Ads, and PostHog, which set cookies and receive limited usage and conversion data — detailed in the Cookies and Sub-processors sections below. We do not sell your personal data.
+            We collect the minimum personal data needed to run the product: your email and password for the account; your name, watchlist, alerts and subscription state for the features that need them. We do not store IP addresses or browser fingerprints to the database, and do not see your payment-card details (Stripe handles them). For product analytics and advertising measurement we use Google Analytics 4, Google Ads, and PostHog, which set cookies and receive limited usage and conversion data — detailed in the Cookies and Sub-processors sections below. We do not sell your personal data.
           </p>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">What we collect at signup</h2>
@@ -45,7 +45,6 @@ export default function PrivacyPage() {
             <li>Your <strong>watchlist tickers</strong>, <strong>alert rules</strong>, and any settings you configure.</li>
             <li>Your <strong>Stripe customer ID</strong> — linked on first checkout. We never receive or store card numbers; Stripe handles all payment data directly.</li>
             <li>Your <strong>referral code</strong> (your own shareable code) and the count of unused referral credits you've earned.</li>
-            <li>Your <strong>Telegram chat ID</strong> — only if you opt in to Telegram alerts.</li>
             <li>An internal <strong>drip-email state token list</strong> — a comma-separated string like <code>"3,7,end"</code> that records which lifecycle emails we've already sent so we don't double-send.</li>
             <li>Account <code>created_at</code> and <code>updated_at</code> timestamps for audit.</li>
           </ul>
@@ -71,7 +70,7 @@ export default function PrivacyPage() {
             <li><strong>PostHog</strong> — product analytics. <em>Not currently enabled.</em> If we switch it on it receives your account ID, account tier, and product-usage events to build a per-user product profile, and sets analytics cookies. It is never sent your email address.</li>
             <li><strong>Fly.io</strong> — backend hosting in Sydney. Sees the full database state since they host the database.</li>
             <li><strong>Sentry</strong> — error tracking. May capture stack traces with limited non-PII context when something breaks.</li>
-            <li><strong>Telegram</strong> — only if you connect your Telegram for alerts. Sees the chat ID you provided and the alert content.</li>
+            <li><strong>Telegram</strong> — used only for internal operational alerts to the Tapeline team (for example, a notification when someone signs up or subscribes). Those messages can include your email address. It is no longer offered as a user alert channel.</li>
             <li><strong>Third-party market-data feeds</strong> — power the scanner with prices, fundamentals, macro indicators, SEC filings, and news. <em>No user data is sent to any of them.</em> They power the scanner; they never see you.</li>
           </ul>
 
