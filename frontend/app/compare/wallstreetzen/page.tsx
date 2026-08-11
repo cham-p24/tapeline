@@ -76,7 +76,7 @@ const WINS = [
   },
   {
     label: "Smart watchlist alerts",
-    tapeline: "✓ Score-change alerts via email + Telegram + browser push",
+    tapeline: "✓ Score-change alerts via email + browser push",
     competitor: "Email digest only",
   },
   {

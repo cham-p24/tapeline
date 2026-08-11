@@ -512,7 +512,7 @@ export type AlertRule = {
   rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
   symbol: string | null;
   threshold: number | null;
-  channel: "email" | "telegram" | "web_push";
+  channel: "email" | "web_push";
   enabled: boolean;
   last_fired_at: string | null;
   created_at: string;

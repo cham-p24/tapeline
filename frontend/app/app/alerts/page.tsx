@@ -13,7 +13,6 @@ type Channel = AlertRule["channel"];
 
 const CHANNEL_HUMAN: Record<Channel, string> = {
   email: "Email alerts",
-  telegram: "Telegram alerts",
   web_push: "Web-push alerts",
 };
 
@@ -164,7 +163,7 @@ export default function AlertsPage() {
 
   const ruleTypeLabel = (t: RuleType) => RULE_TYPES.find((r) => r.value === t)?.label ?? t;
   const channelLabel = (c: Channel) =>
-    c === "telegram" ? "Telegram" : c === "web_push" ? "Web push" : "Email";
+    c === "web_push" ? "Web push" : "Email";
 
   const isPremium = user?.tier === "premium";
   const isPro = user?.tier === "pro" || isPremium;
@@ -174,7 +173,7 @@ export default function AlertsPage() {
   // actually feel an alert fire (activation lever). Kept in sync with the
   // backend single source of truth, tier.FREE_WEB_PUSH_ALERTS — if you tune
   // that constant, mirror it here. web_push is the ONLY channel free users can
-  // create; email/telegram stay paid, so their (Pro)/(Premium) tags remain.
+  // create; email stays paid, so its (Pro) tag remains.
   const FREE_WEB_PUSH_ALERTS = 2;
   const webPushRulesUsed = rules.filter((r) => r.channel === "web_push").length;
   const freeWebPushRemaining = Math.max(0, FREE_WEB_PUSH_ALERTS - webPushRulesUsed);
@@ -192,8 +191,8 @@ export default function AlertsPage() {
           <p className="mt-1 text-sm text-muted">
             Get notified when scores, setups, or regimes change.{" "}
             {isFree
-              ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro; Telegram on Premium.`
-              : "Email + Web push on Pro; Telegram on Premium."}
+              ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro.`
+              : "Email + Web push on Pro."}
           </p>
         </div>
       </div>
@@ -209,18 +208,18 @@ export default function AlertsPage() {
               : `You've used all ${FREE_WEB_PUSH_ALERTS} free web-push alerts`}
           </span>{" "}
           <span className="text-muted">
-            — upgrade for 10 alerts/day plus Telegram.{" "}
+            — upgrade for 10 alerts/day.{" "}
             <Link href="/app/billing" className="link">See plans →</Link>
           </span>
         </div>
       )}
 
       {/* "Show don't hide" delivery channels — free users can only CREATE
-          web-push rules, but the Email and Telegram delivery channels stay
-          VISIBLE here as locked (never removed from view) so a free user setting
-          up a web-push alert can SEE that those channels exist on a paid plan.
-          This changes nothing a free user can actually create; it only surfaces
-          the locked value. Descriptive only — no urgency, no performance claims. */}
+          web-push rules, but the Email delivery channel stays VISIBLE here as
+          locked (never removed from view) so a free user setting up a web-push
+          alert can SEE that channel exists on a paid plan. This changes nothing
+          a free user can actually create; it only surfaces the locked value.
+          Descriptive only — no urgency, no performance claims. */}
       {isFree && (
         <div
           className="card mt-4 px-4 py-3 text-sm"
@@ -231,7 +230,7 @@ export default function AlertsPage() {
               Delivery channels
             </h2>
             <Link href="/app/billing?intent=pro" className="link text-xs">
-              Unlock email + Telegram delivery →
+              Unlock email delivery →
             </Link>
           </div>
           <ul className="mt-3 flex flex-wrap gap-2">
@@ -248,19 +247,9 @@ export default function AlertsPage() {
                 Pro
               </span>
             </li>
-            <li
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2.5 py-1 text-xs text-muted"
-              title="Telegram delivery is a Premium feature"
-            >
-              <span aria-hidden>🔒</span> Telegram
-              <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                Premium
-              </span>
-            </li>
           </ul>
           <p className="mt-2 text-xs text-muted">
-            Web-push alerts are included on Free. Email delivery is on Pro;
-            Telegram delivery is on Premium.
+            Web-push alerts are included on Free. Email delivery is on Pro.
           </p>
         </div>
       )}
@@ -299,7 +288,6 @@ export default function AlertsPage() {
                   create up to FREE_WEB_PUSH_ALERTS of these, so it carries a
                   "(free)" tag for them rather than "(Pro)". */}
               <option value="web_push">Web push {isFree ? "(free)" : ""}</option>
-              <option value="telegram">Telegram {isPremium ? "" : "(Premium)"}</option>
             </select>
           </div>
 

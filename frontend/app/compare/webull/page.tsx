@@ -27,7 +27,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What's the 14-day Tapeline trial?",
-    a: "Sign up and you get 14 days of full Premium access (everything in Pro plus Congressional trades, insider buys via SEC Form 4, unlimited Telegram alerts). No credit card required. Cancel in one click. Plenty of users run it side-by-side with Webull during the trial to decide if the scoring layer is worth the subscription.",
+    a: "Sign up and you get 14 days of full Premium access (everything in Pro plus Congressional trades, insider buys via SEC Form 4). No credit card required. Cancel in one click. Plenty of users run it side-by-side with Webull during the trial to decide if the scoring layer is worth the subscription.",
   },
 ];
 

@@ -3,16 +3,16 @@
 Research: alerts are the #1 thing traders PAY for, but zero free users ever
 felt one fire, so nobody felt the gap. The lever: give FREE a SMALL web-push
 allowance (tier.FREE_WEB_PUSH_ALERTS = 2) so a free user can create up to the
-cap, feel an alert land, and hit an upgrade wall beyond it. Email/Telegram stay
+cap, feel an alert land, and hit an upgrade wall beyond it. Email stays
 fully paid.
 
 These tests pin three invariants:
 
   1. tier config — web_push is a FREE feature (binary gate), capped at 2 for
-     free and effectively unlimited for paid; email/telegram stay gated.
+     free and effectively unlimited for paid; email stays gated.
   2. rule creation — a FREE user can create web_push rules up to the cap, then
      the (cap+1)-th is rejected 403; and free users still CANNOT create
-     email/telegram rules at all.
+     email rules at all.
   3. paid unaffected — a Premium user sails past the free cap.
 
 If the bet is reverted (FREE_WEB_PUSH_ALERTS -> 0, or alerts.web_push -> PRO),
@@ -40,20 +40,17 @@ _AUTH = {"Authorization": "Bearer dev-bypass"}
 
 # ── tier config (pure) ────────────────────────────────────────────────────────
 
-def test_web_push_is_free_feature_email_and_telegram_stay_gated():
-    """web_push is the one alert channel a free user may use; the paid channels
-    stay gated to their tiers."""
+def test_web_push_is_free_feature_email_stays_gated():
+    """web_push is the one alert channel a free user may use; the paid email
+    channel stays gated to its tier."""
     assert has_feature(Tier.FREE, "alerts.web_push") is True
     assert has_feature(Tier.PRO, "alerts.web_push") is True
     assert has_feature(Tier.PREMIUM, "alerts.web_push") is True
 
-    # Email stays Pro+, Telegram stays Premium-only. The "taste" must not
-    # accidentally unlock the per-send-cost channels for free users.
+    # Email stays Pro+. The "taste" must not accidentally unlock the
+    # per-send-cost email channel for free users.
     assert has_feature(Tier.FREE, "alerts.email") is False
     assert has_feature(Tier.PRO, "alerts.email") is True
-    assert has_feature(Tier.FREE, "alerts.telegram") is False
-    assert has_feature(Tier.PRO, "alerts.telegram") is False
-    assert has_feature(Tier.PREMIUM, "alerts.telegram") is True
 
 
 def test_free_web_push_cap_is_the_named_constant():
@@ -146,10 +143,11 @@ async def test_free_user_creates_up_to_cap_then_blocked():
 
 
 @pytest.mark.asyncio
-async def test_free_user_still_blocked_from_email_and_telegram():
+async def test_free_user_blocked_from_email_and_telegram_channel_retired():
     """The taste is web-push ONLY. A free user must still be 403'd trying to
-    create email or telegram rules — those channels carry per-send cost and
-    stay paid."""
+    create an email rule (per-send cost, stays paid). The Telegram channel was
+    retired 2026-08-11, so a stale client posting channel="telegram" is now
+    rejected at validation (422)."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         try:
@@ -163,13 +161,15 @@ async def test_free_user_still_blocked_from_email_and_telegram():
             )
             assert email.status_code == 403, email.text
 
+            # Telegram is no longer a valid channel — the AlertRuleCreate
+            # pattern only accepts email|web_push, so this 422s at validation.
             tg = await c.post(
                 "/api/alerts/rules",
                 json={"name": "T", "rule_type": "score", "symbol": "AAPL",
                       "threshold": 70, "channel": "telegram"},
                 headers=_AUTH,
             )
-            assert tg.status_code == 403, tg.text
+            assert tg.status_code == 422, tg.text
         finally:
             await _restore_dev_user()
 

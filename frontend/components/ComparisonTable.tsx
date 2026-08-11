@@ -73,7 +73,6 @@ const SECTIONS: Section[] = [
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
       { label: "Browser push", free: `${FREE_LIMITS.webPushAlerts} alert rules`, pro: "✓", premium: "✓" },
-      { label: "Telegram alerts", free: "—", pro: "—", premium: "Unlimited · hourly digest" },
     ],
   },
   {

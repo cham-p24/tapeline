@@ -111,6 +111,15 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-08-12",
+    version: "0.1.16",
+    tag: "improvement",
+    title: "Telegram alerts retired; alerts consolidated on email + browser push",
+    body: [
+      "The Telegram alert channel has been retired. Score-change, squeeze and regime alerts now go out over email and browser push, which cover the same triggers. Existing rules keep firing on those channels — nothing about your watchlist, billing or the feeds changes.",
+    ],
+  },
+  {
     date: "2026-07-10",
     version: "0.1.15",
     tag: "improvement",

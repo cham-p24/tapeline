@@ -109,7 +109,7 @@ export function TrialEndedModal() {
           </ul>
           <p className="mt-3 text-xs text-muted">
             Premium adds unlimited look-ups, the full ~2,500-ticker scanner,
-            Telegram and email alerts, the congressional-trades and insider
+            email alerts, the congressional-trades and insider
             feeds, CSV export and API access.
           </p>
         </div>

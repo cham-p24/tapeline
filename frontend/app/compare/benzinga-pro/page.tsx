@@ -41,7 +41,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Asynchronous-first workflow",
-    tapeline: "Browser push + email + Telegram alerts when scores cross thresholds — no need to watch a feed",
+    tapeline: "Browser push + email alerts when scores cross thresholds — no need to watch a feed",
     competitor: "Real-time news squawk requires active listening / monitoring — fatigue-heavy if you have a day job",
   },
 ];
@@ -88,7 +88,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Does Tapeline have an audio squawk?",
-    a: "No. Tapeline is asynchronous-first — browser push + email + Telegram when scores cross thresholds. The thesis is that a daily-job retail trader can't actually act on a real-time squawk anyway, so the higher-leverage signal is 'this score just changed; here's why; act when you can.' If you want audio squawk, Benzinga or Trade Ideas is the right product.",
+    a: "No. Tapeline is asynchronous-first — browser push + email when scores cross thresholds. The thesis is that a daily-job retail trader can't actually act on a real-time squawk anyway, so the higher-leverage signal is 'this score just changed; here's why; act when you can.' If you want audio squawk, Benzinga or Trade Ideas is the right product.",
   },
   {
     q: "Should I use both?",

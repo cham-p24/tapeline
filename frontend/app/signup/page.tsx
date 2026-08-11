@@ -394,7 +394,7 @@ function SignUpForm() {
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push, Telegram</span>
+              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push</span>
             </li>
           </ul>
 

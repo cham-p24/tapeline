@@ -1,4 +1,4 @@
-"""Trial-state throttling — Premium during trial gets reduced api/telegram caps."""
+"""Trial-state throttling — Premium during trial gets reduced api caps."""
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -56,18 +56,10 @@ def test_effective_limit_throttles_api_during_trial():
     assert effective_limit(user, "api_requests_per_day") == 100
 
 
-def test_effective_limit_throttles_telegram_during_trial():
-    future = datetime.now(UTC) + timedelta(days=7)
-    user = _user("premium", future, None)
-    assert limit(Tier.PREMIUM, "telegram_alerts_per_day") == 10_000
-    assert effective_limit(user, "telegram_alerts_per_day") == 100
-
-
 def test_effective_limit_does_not_throttle_paid_premium():
     future = datetime.now(UTC) + timedelta(days=30)
     user = _user("premium", future, "cus_paid_123")
     assert effective_limit(user, "api_requests_per_day") == 1000
-    assert effective_limit(user, "telegram_alerts_per_day") == 10_000
 
 
 def test_effective_limit_unaffected_keys_unchanged_during_trial():

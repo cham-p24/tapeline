@@ -41,7 +41,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Smart watchlist alerts on score change",
-    tapeline: "✓ Email + Telegram + push when the score moves",
+    tapeline: "✓ Email + push when the score moves",
     competitor: "Price/indicator alerts only — no composite",
   },
   {

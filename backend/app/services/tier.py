@@ -7,8 +7,7 @@ Tier gating — three-tier model (Free / Pro / Premium).
 - Pro $9.99/mo ($99/yr): live scanner, full universe, squeeze + regime +
   heatmap, watchlist with smart alerts, email alerts, CSV export
 - Premium $19.99/mo ($199/yr): everything in Pro + Congressional trades,
-  unlimited Telegram alerts, unlimited email alerts, public API (1,000/day),
-  priority support
+  unlimited email alerts, public API (1,000/day), priority support
 
 Team / Enterprise / Lifetime sales map to 'premium' in the DB; per-account
 overrides handle larger seat counts or API caps if needed.
@@ -63,7 +62,6 @@ FEATURES: dict[str, Tier] = {
     "alerts.web_push": Tier.FREE,     # Browser push notifications (free-to-deliver; capped for free tier)
     # Premium-only features
     "congress.feed": Tier.PREMIUM,
-    "alerts.telegram": Tier.PREMIUM,
     "api.access": Tier.PREMIUM,
     "holdings.elite": Tier.PREMIUM,   # Recent insider buys feed (SEC Form 4 via Finnhub)
     "ratings.analyst": Tier.PREMIUM,  # Finnhub analyst consensus widget
@@ -299,7 +297,6 @@ def mrr_contribution(user_tier: str | None, billing_period: str | None) -> float
 # features), but we throttle the data-extraction-attractive caps:
 #
 #   - api_requests_per_day: 1,000 → 100
-#   - telegram_alerts_per_day: 10,000 → 100
 #
 # Paid Premium users (stripe_customer_id set) get the full cap. The reduction
 # applies only while the trial is active. When the trial expires the user
@@ -314,7 +311,6 @@ def mrr_contribution(user_tier: str | None, billing_period: str | None) -> float
 # stays at the regular Premium cap during trial — full conversion-test value.
 _TRIAL_PREMIUM_REDUCTIONS: dict[str, int] = {
     "api_requests_per_day": 100,        # vs 1,000 paid — abuse-resistant
-    "telegram_alerts_per_day": 100,     # vs 10,000 paid — still functional, less spammable
 }
 
 
