@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { api } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { TrialBanner } from "@/components/TrialBanner";
@@ -103,6 +104,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
+            <SavedScreens />
           </nav>
           <div className="border-t border-border p-3">
             <AccountMenu />
@@ -208,6 +210,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               ))}
+              <SavedScreens onNavigate={() => setMobileOpen(false)} />
             </nav>
             <div className="border-t border-border px-3 py-3">
               <MobileAccount onNavigate={() => setMobileOpen(false)} />
@@ -243,6 +246,46 @@ function SidebarLink({
     >
       {label}
     </Link>
+  );
+}
+
+/**
+ * "Saved screens" sidebar group — the user's saved scanner presets as nav
+ * objects (the plan's retention lever). Each links to /app/scanner?preset=<id>,
+ * which the scanner reads on mount and applies. Fetched once when the layout
+ * mounts (the app layout persists across route changes, so this is one call per
+ * session, not per page); renders nothing when there are no presets, and never
+ * throws — a saved-screens list is a nicety, not load-bearing chrome.
+ */
+function SavedScreens({ onNavigate }: { onNavigate?: () => void }) {
+  const { user } = useUser();
+  const [items, setItems] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => {
+    if (!user) { setItems([]); return; }
+    let cancelled = false;
+    api.presets()
+      .then((r) => { if (!cancelled) setItems(r.items.map((x) => ({ id: x.id, name: x.name }))); })
+      .catch(() => { /* nicety — never break the sidebar */ });
+    return () => { cancelled = true; };
+  }, [user]);
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="px-2 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle">
+        Saved screens
+      </div>
+      <div className="space-y-0.5">
+        {items.map((p) => (
+          <SidebarLink
+            key={p.id}
+            href={`/app/scanner?preset=${p.id}`}
+            label={p.name}
+            active={false}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
