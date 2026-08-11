@@ -210,7 +210,7 @@ export function CancelInterceptModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-border bg-panel p-6 shadow-2xl sm:p-7"
+        className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl sm:p-7"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (

@@ -174,7 +174,7 @@ export function PaywallModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="card max-w-md p-8" onClick={(e) => e.stopPropagation()}>
+      <div className="card !bg-surface max-w-md p-8" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2">
           <div className="h-2 w-6 rounded-full bg-accent" />
           <span className="text-sm font-semibold">Tapeline</span>

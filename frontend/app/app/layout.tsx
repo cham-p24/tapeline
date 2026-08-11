@@ -348,7 +348,7 @@ function AccountMenu() {
         <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${tierColor}`}>{user.tier}</span>
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-panel shadow-xl">
+        <div className="absolute bottom-full left-0 right-0 mb-2 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
           <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-panel-hover">Account &amp; settings</Link>
           <Link href="/app/usage" className="block px-4 py-2 text-sm hover:bg-panel-hover">Usage &amp; limits</Link>
           <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-panel-hover">Email preferences</Link>

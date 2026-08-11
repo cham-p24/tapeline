@@ -26,7 +26,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`card pointer-events-auto min-w-[260px] px-4 py-3 text-sm shadow-xl ${
+            className={`card !bg-surface pointer-events-auto min-w-[260px] px-4 py-3 text-sm shadow-xl ${
               t.kind === "success" ? "border-up/40" :
               t.kind === "error" ? "border-down/40" : ""
             }`}

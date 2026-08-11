@@ -247,6 +247,12 @@
    * `.card` was previously a hard-edged border box. Now: soft translucent
    * inset that blends into the page bg, with a hint of backdrop blur for
    * the iOS frosted-glass feel on overlapping surfaces.
+   *
+   * ⚠️ ON-PAGE USE ONLY. `.card` (and `bg-panel`) are TRANSLUCENT — over a
+   * modal backdrop they let the page bleed through and read as invisible.
+   * FLOATING OVERLAYS (modals, dropdown menus, popovers, the ⌘K palette,
+   * toasts, hover cards) MUST use the SOLID `bg-surface` token instead so
+   * they sit clearly above the page in both themes.
    */
   .card {
     background-color: rgb(var(--panel));
