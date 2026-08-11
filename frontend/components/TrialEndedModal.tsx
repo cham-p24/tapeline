@@ -69,7 +69,7 @@ export function TrialEndedModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-panel p-6 shadow-2xl sm:p-7">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl sm:p-7">
         <div className="text-xs font-medium uppercase tracking-wider text-muted">
           {daysSince === 0 ? "Trial ended overnight" : `Trial ended ${daysSince} day${daysSince === 1 ? "" : "s"} ago`}
         </div>

@@ -132,7 +132,7 @@ export function GlobalSearch() {
       className="fixed inset-0 z-[90] flex items-start justify-center bg-black/60 px-4 pt-[10vh]"
       onClick={() => setOpen(false)}
     >
-      <div className="card w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="card !bg-surface w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
           value={q}

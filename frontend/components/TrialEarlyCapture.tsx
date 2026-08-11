@@ -84,7 +84,7 @@ export function TrialEarlyCapture() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 hidden justify-end p-6 sm:flex">
-      <div className="pointer-events-auto max-w-sm rounded-xl border border-accent/40 bg-panel/95 p-4 shadow-2xl shadow-accent/10 backdrop-blur">
+      <div className="pointer-events-auto max-w-sm rounded-xl border border-accent/40 bg-surface p-4 shadow-2xl shadow-accent/10">
         <div className="flex items-start gap-3">
           <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
           <div className="flex-1">

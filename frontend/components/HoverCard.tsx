@@ -24,7 +24,7 @@ export function HoverCard({
     >
       {trigger}
       {open && (
-        <span className="absolute left-full top-0 z-50 ml-2 block rounded-lg border border-border bg-panel shadow-2xl">
+        <span className="absolute left-full top-0 z-50 ml-2 block rounded-lg border border-border bg-surface shadow-2xl">
           {content}
         </span>
       )}

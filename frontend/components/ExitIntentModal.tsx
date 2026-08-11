@@ -101,7 +101,7 @@ export function ExitIntentModal({
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-panel p-6 shadow-2xl sm:p-8">
+      <div className="relative w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl sm:p-8">
         <button
           type="button"
           onClick={close}
