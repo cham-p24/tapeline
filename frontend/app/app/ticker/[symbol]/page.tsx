@@ -19,6 +19,15 @@ import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
+import { SECTORS } from "@/app/sector/sectors";
+import { relatedMatchups, canonicalMatchup } from "@/lib/comparePairs";
+
+/** Public sector-hub path if the sector maps to a ranking, else null. */
+function sectorHubPath(sector: string | null): string | null {
+  if (!sector) return null;
+  const match = SECTORS.find((s) => s.api === sector);
+  return match ? `/sector/${match.slug}` : null;
+}
 
 type DetailTab = "financials" | "insider";
 
@@ -280,7 +289,24 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
                 Descriptive ("Reports in 3d"), never prescriptive. */}
             <EarningsPill reportDate={earningsBySymbol.get(data.symbol)} />
           </div>
-          <p className="mt-1 text-muted">{data.name} &middot; {data.sector}</p>
+          <p className="mt-1 text-muted">
+            {data.name}
+            {data.sector && (
+              <>
+                {" · "}
+                {sectorHubPath(data.sector) ? (
+                  <Link
+                    href={sectorHubPath(data.sector)!}
+                    className="underline-offset-4 hover:text-fg hover:underline"
+                  >
+                    {data.sector}
+                  </Link>
+                ) : (
+                  data.sector
+                )}
+              </>
+            )}
+          </p>
         </div>
         <div className="text-right">
           <div className="text-4xl font-bold nums">${data.price?.toFixed(2)}</div>
@@ -313,6 +339,33 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           </a>
         </div>
       </div>
+
+      {/* Compare — onward navigation from what was a near dead-end. Curated
+          head-to-heads that include this ticker; renders nothing when the
+          symbol isn't in a curated pair, so it never shows an empty row. */}
+      {(() => {
+        const pairs = relatedMatchups(data.symbol, 4);
+        if (pairs.length === 0) return null;
+        const self = data.symbol.toUpperCase();
+        return (
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-wider text-subtle">Compare</span>
+            {pairs.map(({ a, b }) => {
+              const other = a === self ? b : a;
+              const slug = canonicalMatchup(a, b);
+              return (
+                <Link
+                  key={slug}
+                  href={`/compare/${slug}`}
+                  className="rounded-full border border-border bg-panel px-3 py-1 font-mono text-xs text-muted transition-colors hover:border-accent hover:text-fg"
+                >
+                  {data.symbol} vs {other}
+                </Link>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Daily look-up meter — self-hiding unless a metered (free) caller is
           within LOOKUP_METER_REMAINING_THRESHOLD of the cap. Sits above the
