@@ -34,6 +34,7 @@ from app.routers import (
     roadmap,
     scanner,
     scorecard,
+    search,
     squeeze,
     stream,
     ticker,
@@ -719,6 +720,7 @@ async def status() -> dict[str, object]:
 
 
 app.include_router(scanner.router, prefix="/api/scanner", tags=["scanner"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(squeeze.router, prefix="/api/squeeze", tags=["squeeze"])
 app.include_router(regime.router, prefix="/api/regime", tags=["regime"])
 app.include_router(congress.router, prefix="/api/congress", tags=["congress"])
