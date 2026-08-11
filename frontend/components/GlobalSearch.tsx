@@ -1,28 +1,64 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type ScannerRow } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, type SearchResult } from "@/lib/api";
+import { canonicalMatchup } from "@/lib/comparePairs";
 
 /**
- * ⌘K / Ctrl+K opens a ticker search over the FULL active universe.
+ * ⌘K / Ctrl+K command palette.
  *
- * Server-backed: each keystroke (debounced) hits the scanner endpoint's `q`
- * symbol filter, so every ticker is reachable. The previous implementation
- * preloaded 200 symbols alphabetically and filtered them in the browser, which
- * silently hid ~92% of the ~2,500-ticker universe — anything past ~"B" was
- * unfindable, with no way to tell "no match" from "not covered". Matches are
- * re-ordered prefix-first for readability. Enter jumps to /app/ticker/{symbol}.
+ * Three kinds of action in one flat, keyboard-navigable list:
+ *  - Tickers — server-backed search over the FULL active universe by symbol OR
+ *    company name (/api/search, debounced). The old build preloaded 200 symbols
+ *    alphabetically and filtered client-side, hiding ~92% of the universe.
+ *  - Destinations — jump to Scanner / Watchlist / Alerts / … (shown when the
+ *    query is empty, filtered by name otherwise).
+ *  - Compare — type "AAPL vs MSFT" (or "AAPL MSFT") to open the head-to-head.
+ *
+ * Enter runs the highlighted action; Esc closes.
  */
+
+const DESTINATIONS: { label: string; href: string; hint: string }[] = [
+  { label: "Scanner", href: "/app/scanner", hint: "Rank the whole market" },
+  { label: "Watchlist", href: "/app/watchlist", hint: "Your saved tickers" },
+  { label: "Alerts", href: "/app/alerts", hint: "Score & price alerts" },
+  { label: "Heatmap", href: "/app/heatmap", hint: "Sector heatmap" },
+  { label: "Squeeze", href: "/app/squeeze", hint: "Short-squeeze setups" },
+  { label: "Scorecard", href: "/scorecard", hint: "Public track record" },
+  { label: "Billing & plan", href: "/app/billing", hint: "Manage subscription" },
+];
+
+type Action =
+  | { kind: "ticker"; symbol: string; name: string; score: number | null }
+  | { kind: "dest"; label: string; href: string; hint: string }
+  | { kind: "compare"; a: string; b: string };
+
+/** Detect a "X vs Y" / "X Y" / "X,Y" two-symbol compare intent. */
+function parseComparePair(q: string): { a: string; b: string } | null {
+  const tokens = q
+    .toUpperCase()
+    .split(/\s+|,|\bVS\b/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const syms = tokens.filter((t) => /^[A-Z][A-Z.]{0,5}$/.test(t));
+  if (syms.length === 2 && syms[0] !== syms[1]) return { a: syms[0], b: syms[1] };
+  return null;
+}
+
+function actionKey(a: Action): string {
+  if (a.kind === "ticker") return `t:${a.symbol}`;
+  if (a.kind === "dest") return `d:${a.href}`;
+  return `c:${a.a}-${a.b}`;
+}
+
 export function GlobalSearch() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<ScannerRow[]>([]);
+  const [tickers, setTickers] = useState<SearchResult[]>([]);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Monotonic id so an earlier keystroke's slower response can't overwrite a
-  // later one (out-of-order network races).
   const searchSeq = useRef(0);
 
   // Global hotkey
@@ -38,77 +74,113 @@ export function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Focus the input when the panel opens
-  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 10); }, [open]);
+  // Focus the input when the panel opens; reset on close.
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 10);
+    else { setQ(""); setTickers([]); setCursor(0); }
+  }, [open]);
 
-  // Server-backed search over the FULL active universe. Each keystroke is
-  // debounced ~160ms, then hits the scanner endpoint's `q` symbol filter — so
-  // any ticker is findable, not just the alphabetical first 200. A sequence
-  // guard drops stale (out-of-order) responses; matches are re-ordered
-  // prefix-first client-side so an exact/leading match sits at the top.
+  // Debounced server-backed ticker search (symbol OR name, full universe).
   useEffect(() => {
     const s = q.trim();
-    if (!s) { setResults([]); setCursor(0); return; }
+    if (!s) { setTickers([]); return; }
     let cancelled = false;
     const seq = ++searchSeq.current;
     const timer = setTimeout(() => {
-      api.scanner({ q: s, limit: 12 })
+      api.search(s, 8)
         .then((r) => {
           if (cancelled || seq !== searchSeq.current) return;
-          const up = s.toUpperCase();
-          const items = r.items;
-          const prefix = items.filter((t) => t.symbol.toUpperCase().startsWith(up));
-          const rest = items.filter((t) => !t.symbol.toUpperCase().startsWith(up));
-          setResults([...prefix, ...rest].slice(0, 10));
-          setCursor(0);
+          setTickers(r.results);
         })
-        .catch(() => { if (!cancelled && seq === searchSeq.current) setResults([]); });
+        .catch(() => { if (!cancelled && seq === searchSeq.current) setTickers([]); });
     }, 160);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [q]);
 
-  const go = useCallback((sym: string) => {
+  // Combined, ordered action list: compare intent → matching destinations →
+  // tickers. Empty query shows the destination quick-links.
+  const actions: Action[] = useMemo(() => {
+    const s = q.trim();
+    if (!s) return DESTINATIONS.map((d) => ({ kind: "dest", ...d } as Action));
+    const out: Action[] = [];
+    const pair = parseComparePair(s);
+    if (pair) out.push({ kind: "compare", a: pair.a, b: pair.b });
+    const ql = s.toLowerCase();
+    for (const d of DESTINATIONS) {
+      if (d.label.toLowerCase().includes(ql)) out.push({ kind: "dest", ...d });
+    }
+    for (const t of tickers) {
+      out.push({ kind: "ticker", symbol: t.symbol, name: t.name, score: t.score });
+    }
+    return out;
+  }, [q, tickers]);
+
+  // Keep the cursor in range as the list changes.
+  useEffect(() => { setCursor(0); }, [q]);
+
+  const run = useCallback((a: Action) => {
     setOpen(false);
-    setQ("");
-    router.push(`/app/ticker/${sym}`);
+    if (a.kind === "ticker") router.push(`/app/ticker/${a.symbol}`);
+    else if (a.kind === "dest") router.push(a.href);
+    else router.push(`/compare/${canonicalMatchup(a.a, a.b)}`);
   }, [router]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center bg-black/60 px-4 pt-[10vh]" onClick={() => setOpen(false)}>
+    <div
+      className="fixed inset-0 z-[90] flex items-start justify-center bg-black/60 px-4 pt-[10vh]"
+      onClick={() => setOpen(false)}
+    >
       <div className="card w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, results.length - 1)); }
+            if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, actions.length - 1)); }
             if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
-            if (e.key === "Enter" && results[cursor]) { e.preventDefault(); go(results[cursor].symbol); }
+            if (e.key === "Enter" && actions[cursor]) { e.preventDefault(); run(actions[cursor]); }
           }}
-          placeholder="Search ticker or company…"
+          placeholder="Search tickers, a page, or “AAPL vs MSFT”…"
           className="w-full bg-transparent px-5 py-4 text-lg outline-none"
         />
-        {results.length > 0 && (
+        {actions.length > 0 && (
           <ul className="max-h-[60vh] overflow-y-auto border-t border-border">
-            {results.map((r, i) => (
+            {actions.map((a, i) => (
               <li
-                key={r.symbol}
+                key={actionKey(a)}
                 onMouseEnter={() => setCursor(i)}
-                onClick={() => go(r.symbol)}
+                onClick={() => run(a)}
                 className={`flex cursor-pointer items-center justify-between gap-4 px-5 py-3 text-sm ${cursor === i ? "bg-panel" : ""}`}
               >
-                <div>
-                  <span className="font-mono font-semibold">{r.symbol}</span>
-                  <span className="ml-2 text-muted">{r.name}</span>
-                </div>
-                <div className="flex items-center gap-3 nums text-xs">
-                  <span className={r.score >= 75 ? "text-up" : r.score >= 45 ? "" : "text-muted"}>{r.score?.toFixed(0)}</span>
-                  <span className={(r.change_pct_1d ?? 0) > 0 ? "text-up" : (r.change_pct_1d ?? 0) < 0 ? "text-down" : "text-muted"}>
-                    {r.change_pct_1d != null ? `${r.change_pct_1d >= 0 ? "+" : ""}${r.change_pct_1d.toFixed(2)}%` : "—"}
-                  </span>
-                </div>
+                {a.kind === "ticker" ? (
+                  <>
+                    <div className="min-w-0">
+                      <span className="font-mono font-semibold">{a.symbol}</span>
+                      <span className="ml-2 text-muted">{a.name}</span>
+                    </div>
+                    <span className={`nums text-xs ${a.score != null && a.score >= 75 ? "text-up" : "text-muted"}`}>
+                      {a.score != null ? a.score.toFixed(0) : "—"}
+                    </span>
+                  </>
+                ) : a.kind === "compare" ? (
+                  <>
+                    <div>
+                      <span className="font-mono font-semibold">{a.a} vs {a.b}</span>
+                      <span className="ml-2 text-muted">head-to-head</span>
+                    </div>
+                    <span className="rounded bg-fg/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted">Compare</span>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <span className="font-medium">{a.label}</span>
+                      <span className="ml-2 text-muted">{a.hint}</span>
+                    </div>
+                    <span className="rounded bg-fg/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted">Go to</span>
+                  </>
+                )}
               </li>
             ))}
           </ul>

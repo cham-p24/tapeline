@@ -621,7 +621,20 @@ async function getAuth<T>(path: string, token: string): Promise<T> {
   return res.json();
 }
 
+export type SearchResult = {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  score: number | null;
+};
+
 export const api = {
+  // Lightweight ticker navigation search (symbol OR name), full universe,
+  // tier-agnostic. Backs the ⌘K palette + the public search box.
+  search: (q: string, limit = 10) =>
+    get<{ results: SearchResult[] }>(
+      `/api/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    ),
   scanner: (params: Record<string, string | number> = {}) => {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
