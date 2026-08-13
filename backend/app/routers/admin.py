@@ -327,13 +327,29 @@ async def revenue_dashboard(
         select(func.count()).select_from(User).where(User.stripe_customer_id.isnot(None))
     )).scalar() or 0
 
-    # ── Activation (Growth Playbook §4.2) — % of signups who hit milestone #1
-    # (first watchlist ticker added → User.activated_at stamped). The
-    # complementary leak metric to signup->paid: a low activation rate means
-    # the funnel is leaking BEFORE the trial→paid decision. ──
+    # ── Activation (Growth Playbook §4.2) — % of signups who experienced the
+    # core value: added a watchlist ticker OR viewed a ticker's full six-factor
+    # breakdown (whichever came first → User.activated_at). The complementary
+    # leak metric to signup->paid: a low activation rate means the funnel is
+    # leaking BEFORE the trial→paid decision. ──
     activated_users = (await session.execute(
         select(func.count()).select_from(User).where(User.activated_at.isnot(None))
     )).scalar() or 0
+
+    # ── Time-to-value — median hours from signup to activation over the
+    # activated cohort. Computed in Python (SQLite has no MEDIAN) so it works on
+    # both the test DB and prod. The onboarding target behind the activation %. ──
+    ttv_rows = (await session.execute(
+        select(User.created_at, User.activated_at).where(
+            User.activated_at.isnot(None), User.created_at.isnot(None)
+        )
+    )).all()
+    ttv_hours = sorted(
+        (r.activated_at - r.created_at).total_seconds() / 3600.0
+        for r in ttv_rows
+        if r.activated_at >= r.created_at
+    )
+    median_ttv_hours = round(ttv_hours[len(ttv_hours) // 2], 1) if ttv_hours else None
 
     # ── gclid capture (Growth Playbook §3.7) — signups arriving with a Google
     # Ads click ID stored. This is the population the founder-gated offline-
@@ -497,6 +513,9 @@ async def revenue_dashboard(
         # watchlist ticker. The raw count rides alongside so the % has context.
         "activated_users": activated_users,
         "activation_rate": round(activated_users / users_total * 100, 1) if users_total else 0.0,
+        # Time-to-value: median hours signup→activation over the activated cohort
+        # (null until anyone has activated). The onboarding target behind the rate.
+        "median_time_to_value_hours": median_ttv_hours,
         # gclid capture (§3.7): signups whose Google Ads click ID is stored and
         # therefore available for the (founder-gated) offline-conversion upload.
         "gclid_capture_count": gclid_capture_count,

@@ -367,6 +367,16 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                     },
                 )
             lookups_payload = _lookup_meter_payload(meter)
+            # Activation (Growth Playbook §4.2): viewing a ticker's full six-factor
+            # breakdown IS the core "aha" — seeing WHY a stock scores what it does —
+            # so it counts as activation, not only a watchlist add. Anonymous SSR
+            # renders never reach here (user is None above), so only real logged-in
+            # views stamp. Idempotent (guarded on NULL, never overwritten → measures
+            # time-to-value). Own commit: consume_ticker_lookup already committed any
+            # meter increment, and the main ticker fetch below doesn't commit.
+            if user.activated_at is None:
+                user.activated_at = datetime.now(UTC)
+                await session.commit()
 
         sq = (
             await session.execute(
