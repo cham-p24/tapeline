@@ -192,7 +192,7 @@ export function NewsletterCapture({
       <button
         type="submit"
         disabled={busy}
-        className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-50"
+        className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
         {busy ? "Subscribing…" : "Get free daily picks"}
       </button>

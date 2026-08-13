@@ -105,7 +105,7 @@ export function ExitIntentModal({
         <button
           type="button"
           onClick={close}
-          className="absolute right-3 top-3 rounded-md p-1 text-muted hover:bg-bg hover:text-fg"
+          className="absolute right-3 top-3 rounded-md p-1 text-muted hover:bg-panel hover:text-fg"
           aria-label="Close"
         >
           <svg
@@ -122,7 +122,7 @@ export function ExitIntentModal({
           </svg>
         </button>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
           Before you go
         </div>

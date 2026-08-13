@@ -421,7 +421,7 @@ export default function WatchlistPage() {
 
       {/* Items */}
       {(loading || items.length > 0) && (
-      <div className="card mt-6 overflow-hidden">
+      <div className="card mt-6 overflow-x-auto">
         <table className="w-full text-sm nums">
           <thead className="text-xs uppercase text-muted">
             <tr>

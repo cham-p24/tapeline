@@ -146,7 +146,7 @@ function NewsCard({ item }: { item: Headline }) {
   const sentTone = sentimentTone(item.sentiment);
   const linkTarget = singleTicker(item.tickers);
   return (
-    <div className="flex items-start gap-2 rounded-md bg-panel/60 px-2.5 py-2 transition hover:bg-panel-hover">
+    <div className="flex items-start gap-2 rounded-md bg-panel/60 px-2.5 py-2 transition hover:bg-panel2">
       <span
         className={`mt-1 flex-shrink-0 h-1.5 w-1.5 rounded-full ${sentTone.dot}`}
         title={sentTone.label}

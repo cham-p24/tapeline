@@ -95,7 +95,7 @@ export function TrialBanner() {
       </span>
       <Link
         href="/app/billing"
-        className="shrink-0 self-start rounded-md border border-border px-3 py-1 text-xs font-medium text-fg hover:bg-panel-hover sm:self-auto"
+        className="shrink-0 self-start rounded-md border border-border px-3 py-1 text-xs font-medium text-fg hover:bg-panel2 sm:self-auto"
       >
         View plans
       </Link>

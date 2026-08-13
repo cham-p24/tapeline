@@ -401,7 +401,7 @@ export default function LandingPage() {
       <section className="bg-panel/30">
         <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">
               Free · no card
             </div>
             <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">

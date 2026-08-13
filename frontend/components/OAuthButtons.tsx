@@ -116,7 +116,7 @@ export function OAuthButtons({
   const googlePrimary = variant === "primary";
   const googleClass = googlePrimary
     ? "flex h-11 w-full items-center justify-center gap-3 rounded-md border border-border bg-white px-4 text-sm font-semibold text-black shadow-sm transition-colors hover:bg-white/90"
-    : "flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover";
+    : "flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel2";
 
   const buttons = (
     <div className="grid gap-2">
@@ -133,7 +133,7 @@ export function OAuthButtons({
         <a
           href={startHref("microsoft")}
           onClick={() => onProviderClick?.("microsoft")}
-          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel-hover"
+          className="flex items-center justify-center gap-3 rounded-md border border-border bg-panel px-4 py-2 text-sm font-medium hover:bg-panel2"
         >
           <MicrosoftGlyph /> Continue with Microsoft
         </a>
