@@ -16,6 +16,7 @@ import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
+import { ScannerPeek } from "@/components/ScannerPeek";
 import { ScannerLegend } from "@/components/ScannerLegend";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
@@ -354,6 +355,102 @@ export default function ScannerPage() {
   // post-filter on the bucket here.
   const visibleRows = rows.filter((r) => matchesAssetBucket(assetClass, r.asset_class));
 
+  // ── Keyboard row navigation (j/k) + row "peek" slide-over ──────────────
+  // `focusedIdx` is the visually-highlighted row (not DOM focus); -1 = none.
+  // `peekSymbol` non-null renders the slide-over for that ticker.
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const [peekSymbol, setPeekSymbol] = useState<string | null>(null);
+
+  // Refs so the single window keydown listener can read the latest rows /
+  // focus / peek state without re-binding on every render (visibleRows is a
+  // fresh array each render).
+  const visibleRowsRef = useRef(visibleRows);
+  visibleRowsRef.current = visibleRows;
+  const focusedIdxRef = useRef(focusedIdx);
+  focusedIdxRef.current = focusedIdx;
+  const peekOpenRef = useRef(false);
+  peekOpenRef.current = peekSymbol != null;
+
+  // Element refs for the focused-row scrollIntoView.
+  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+
+  // Clamp the focused index if the row set shrinks (filters/search changed).
+  useEffect(() => {
+    if (focusedIdx > visibleRows.length - 1) {
+      setFocusedIdx(visibleRows.length - 1);
+    }
+  }, [visibleRows.length, focusedIdx]);
+
+  // Keep the focused row in view.
+  useEffect(() => {
+    if (focusedIdx < 0) return;
+    rowRefs.current.get(focusedIdx)?.scrollIntoView({ block: "nearest" });
+  }, [focusedIdx]);
+
+  // Open the peek for a given visible-row index (also marks it focused).
+  const openPeek = useCallback((idx: number) => {
+    const r = visibleRowsRef.current[idx];
+    if (!r) return;
+    setFocusedIdx(idx);
+    setPeekSymbol(r.symbol);
+  }, []);
+
+  // Single global keydown handler for j / k / Enter. Bound once.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Never hijack typing / modifier chords (⌘K search, filter typing, etc.).
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el) {
+        const tag = el.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          tag === "BUTTON" ||
+          tag === "A" ||
+          el.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (e.key === "j" || e.key === "k") {
+        const n = visibleRowsRef.current.length;
+        if (n === 0) return;
+        e.preventDefault();
+        const prev = focusedIdxRef.current;
+        const dir = e.key === "j" ? 1 : -1;
+        const next =
+          prev < 0
+            ? dir === 1
+              ? 0
+              : n - 1
+            : Math.min(Math.max(prev + dir, 0), n - 1);
+        setFocusedIdx(next);
+        // While the peek is open, j/k also moves the peek to the new symbol.
+        if (peekOpenRef.current) {
+          const sym = visibleRowsRef.current[next]?.symbol;
+          if (sym) setPeekSymbol(sym);
+        }
+      } else if (e.key === "Enter") {
+        const n = visibleRowsRef.current.length;
+        if (n === 0) return;
+        const prev = focusedIdxRef.current;
+        const idx = prev < 0 ? 0 : prev;
+        const sym = visibleRowsRef.current[idx]?.symbol;
+        if (sym) {
+          e.preventDefault();
+          setFocusedIdx(idx);
+          setPeekSymbol(sym);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+
   const filtersActive =
     (minScore !== "" && minScore !== 0) ||
     maxScore !== "" ||
@@ -679,15 +776,25 @@ export default function ScannerPage() {
                   </div>
                 )}
               </td></tr>
-            ) : visibleRows.map((r) => (
+            ) : visibleRows.map((r, i) => (
               <Fragment key={r.symbol}>
-              <tr className="group hover:bg-panel/60">
+              <tr
+                ref={(el) => {
+                  if (el) rowRefs.current.set(i, el);
+                  else rowRefs.current.delete(i);
+                }}
+                onClick={() => openPeek(i)}
+                aria-selected={focusedIdx === i}
+                className={`group cursor-pointer hover:bg-panel/60 ${
+                  focusedIdx === i ? "bg-panel ring-1 ring-inset ring-accent" : ""
+                }`}
+              >
                 <td className="px-2 sm:px-4 py-2">
                   {/* One-click watchlist add. Optimistic; checked (★) once the
                       symbol is on the list. Tap target is 40x40px. */}
                   <button
                     type="button"
-                    onClick={() => addToWatchlist(r.symbol)}
+                    onClick={(e) => { e.stopPropagation(); addToWatchlist(r.symbol); }}
                     disabled={added.has(r.symbol)}
                     aria-label={
                       added.has(r.symbol)
@@ -707,7 +814,7 @@ export default function ScannerPage() {
                 <td className="px-4 py-2 font-medium">
                   <div className="flex flex-col gap-0.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
+                      <Link href={`/app/ticker/${r.symbol}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{r.symbol}</Link>
                       {/* Earnings pill — only shows when a report is within
                           the next week. Descriptive ("Reports in 3d"), never
                           prescriptive. */}
@@ -841,6 +948,20 @@ export default function ScannerPage() {
         onClose={() => setCsvPaywallOpen(false)}
         feature="csv_export"
       />
+
+      {/* Row "peek" slide-over — a fast look at a ticker without navigating.
+          Opened by clicking a row or pressing Enter on the j/k-focused row;
+          j/k moves it through rows while open. `initial` paints instantly from
+          the row we already have while api.ticker() enriches it. */}
+      {peekSymbol && (
+        <ScannerPeek
+          symbol={peekSymbol}
+          initial={visibleRows.find((r) => r.symbol === peekSymbol)}
+          isAdded={added.has(peekSymbol)}
+          onAddToWatchlist={addToWatchlist}
+          onClose={() => setPeekSymbol(null)}
+        />
+      )}
     </div>
   );
 }

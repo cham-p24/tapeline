@@ -10,6 +10,7 @@ import { RecentTickers } from "@/components/RecentTickers";
 import { WatchlistTabs } from "@/components/WatchlistTabs";
 import { WatchlistTrackRecord } from "@/components/WatchlistTrackRecord";
 import { ArmAlerts } from "@/components/ArmAlerts";
+import { PageHeader } from "@/components/PageHeader";
 import { PaywallModal } from "@/components/Paywall";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
@@ -221,10 +222,7 @@ export default function WatchlistPage() {
     const n = items.length;
     return (
       <div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Watchlist</h1>
-          <p className="text-sm text-muted">Saved watchlists are a Pro feature.</p>
-        </div>
+        <PageHeader title="Watchlist" subtitle="Saved watchlists are a Pro feature." />
         <div className="mt-6 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
           <div className="flex items-start gap-4">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent text-xl">
@@ -290,32 +288,32 @@ export default function WatchlistPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Watchlist</h1>
-          <p className="text-sm text-muted">Track tickers you care about. Smart alerts fire when scores drift meaningfully.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* CSV export — downloads this watchlist with current scores (Pro+).
-              Shown-locked for Free: visible, labelled with the required tier,
-              opens the paywall on click. Never hidden — it's a sold feature. */}
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={exporting}
-            className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
-            title={
-              canExportCsv
-                ? "Download your watchlist as CSV"
-                : "CSV export is a Pro feature"
-            }
-            aria-label={canExportCsv ? "Export CSV" : "Export CSV (Pro feature)"}
-          >
-            {exporting ? "Exporting…" : canExportCsv ? "Export CSV" : "Export CSV · Pro"}
-          </button>
-          <LiveBadge status={status} lastUpdate={lastUpdate} />
-        </div>
-      </div>
+      <PageHeader
+        title="Watchlist"
+        subtitle="Track tickers you care about. Smart alerts fire when scores drift meaningfully."
+        actions={
+          <>
+            {/* CSV export — downloads this watchlist with current scores (Pro+).
+                Shown-locked for Free: visible, labelled with the required tier,
+                opens the paywall on click. Never hidden — it's a sold feature. */}
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={exporting}
+              className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                canExportCsv
+                  ? "Download your watchlist as CSV"
+                  : "CSV export is a Pro feature"
+              }
+              aria-label={canExportCsv ? "Export CSV" : "Export CSV (Pro feature)"}
+            >
+              {exporting ? "Exporting…" : canExportCsv ? "Export CSV" : "Export CSV · Pro"}
+            </button>
+            <LiveBadge status={status} lastUpdate={lastUpdate} />
+          </>
+        }
+      />
 
       {/* Alert-arming at the moment of intent. Production data: engaged
           trialists build 7-8 ticker watchlists here, yet zero users had ever
