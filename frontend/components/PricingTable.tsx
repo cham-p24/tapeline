@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
@@ -187,16 +188,13 @@ export function PricingTable() {
                   {(p as { footnote?: string }).footnote}
                 </p>
               )}
-              <Link
+              <Button
                 href={ctaHref}
-                className={`mt-8 flex h-11 w-full items-center justify-center rounded-md text-sm font-medium transition-all ${
-                  p.highlight
-                    ? "bg-gradient-to-r from-accent to-accent2 text-white hover:opacity-90 active:scale-[0.98]"
-                    : "border border-border2 text-fg hover:bg-panel2"
-                }`}
+                variant={p.highlight ? "gradient" : "secondary"}
+                className="mt-8 w-full"
               >
                 {p.cta}
-              </Link>
+              </Button>
             </div>
           );
         })}

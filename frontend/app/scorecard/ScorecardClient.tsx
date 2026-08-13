@@ -35,6 +35,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, type ScorecardEntry } from "@/lib/api";
+import { Input } from "@/components/Input";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { Skeleton } from "@/components/Skeleton";
 import { userLocale } from "@/lib/datetime";
@@ -125,13 +126,13 @@ export function ScorecardClient() {
       {/* Symbol search — jumps to /scorecard/[symbol] for the per-ticker history.
           Doubles as an SEO surface (one indexable page per ticker history). */}
       <form onSubmit={submitSearch} className="mt-5 flex max-w-md gap-2">
-        <input
+        <Input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value.toUpperCase().slice(0, 10))}
           placeholder="Look up any ticker (e.g. AAPL, TSLA)"
           aria-label="Search ticker history"
-          className="block h-11 w-full rounded-md border border-border bg-panel px-3 text-base focus:border-accent focus:outline-none nums uppercase"
+          className="nums uppercase"
           autoCapitalize="characters"
           autoComplete="off"
           spellCheck={false}

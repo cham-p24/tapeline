@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trackEvent } from "@/lib/gtag";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -89,6 +90,9 @@ export function CancelInterceptModal({
   const [reason, setReason] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [surveySent, setSurveySent] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useModalA11y(open, panelRef, onClose);
 
   const tierLabel = (tier || "your").replace(/^\w/, (c) => c.toUpperCase());
 
@@ -207,9 +211,11 @@ export function CancelInterceptModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8 backdrop-blur-sm overflow-y-auto"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="cancel-intercept-title"
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl sm:p-7"
         onClick={(e) => e.stopPropagation()}
       >
@@ -224,7 +230,7 @@ export function CancelInterceptModal({
               <div className="text-xs font-medium uppercase tracking-wider text-muted">
                 Cancellation scheduled
               </div>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight">Cancelled.</h2>
+              <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">Cancelled.</h2>
               <p className="mt-3 text-sm text-muted">
                 {done.detail
                   ? `You'll keep full access until ${fmtDate(done.detail)}, then drop to Free. No further charges.`
@@ -291,7 +297,7 @@ export function CancelInterceptModal({
           /* Already paused — reflect it, offer immediate resume. */
           <div>
             <div className="text-xs font-medium uppercase tracking-wider text-muted">Subscription paused</div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">
               Your plan is paused until {fmtDate(opts!.paused_until)}.
             </h2>
             <p className="mt-3 text-sm text-muted">
@@ -318,7 +324,7 @@ export function CancelInterceptModal({
             <div className="text-xs font-medium uppercase tracking-wider text-muted">
               {opts?.canceled_at ? "Scheduled to cancel" : "Cancel subscription"}
             </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">
               {opts?.canceled_at
                 ? `Your ${tierLabel} plan is set to cancel.`
                 : "Cancel now, or stay for less?"}
@@ -436,7 +442,7 @@ function DonePanel({ done, onClose }: { done: { kind: DoneKind; detail?: string 
   return (
     <div>
       <div className="text-xs font-medium uppercase tracking-wider text-up">All set</div>
-      <h2 className="mt-2 text-2xl font-bold tracking-tight">{c.title}</h2>
+      <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-3 text-sm text-muted">{c.body}</p>
       <div className="mt-6 flex justify-end">
         <button

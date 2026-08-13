@@ -20,6 +20,12 @@ type Revenue = {
   activated_users: number;
   activation_rate: number;
   median_time_to_value_hours: number | null;
+  activated_to_paid_pct: number;
+  active_7d: number;
+  active_28d: number;
+  w4_cohort: number;
+  w4_retained: number;
+  w4_retention_pct: number;
   gclid_capture_count: number;
   acquisition_channels: Record<string, { signups: number; paid: number }>;
   acquisition_landing_pages: LandingPageRow[];
@@ -224,6 +230,21 @@ export default function RevenuePage() {
         hours from signup to that moment. gclid captured =
         signups arriving with a Google Ads click ID stored (available for the
         offline-conversion upload once Ads API access is enabled).
+      </p>
+
+      {/* Stage-1 signal — activity + W4+ retention. Per the CEO brief this is
+          the single most honest early signal at pre-revenue: are signups still
+          showing up over time? */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Active last 7d" value={String(data.active_7d)} tone={data.active_7d > 0 ? "accent" : undefined} />
+        <Stat label="Active last 28d" value={String(data.active_28d)} />
+        <Stat label="Activated → paid" value={`${data.activated_to_paid_pct}%`} />
+        <Stat label="W4+ retention" value={data.w4_cohort ? `${data.w4_retention_pct}%` : "—"} tone="accent" />
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        W4+ retention = of the {data.w4_cohort} user{data.w4_cohort === 1 ? "" : "s"} who signed up 28+ days ago,
+        the share still active in the last 14 days ({data.w4_retained}/{data.w4_cohort}) — the most honest early
+        signal that the product sticks. If this flattens above zero as arrivals grow, you have PMF signal before revenue.
       </p>
 
       {/* Windowed cohort funnel — the one section on this page that is NOT
