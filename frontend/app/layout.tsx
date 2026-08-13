@@ -49,6 +49,12 @@ const PLAUSIBLE_SCRIPT =
 // GA4 shows what they did after (event "sign_up" on the success page).
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
 
+// Microsoft Clarity project ID — free session replay + heatmaps. Env-only, no
+// hardcoded default: set NEXT_PUBLIC_CLARITY_PROJECT_ID once a Clarity project
+// exists (clarity.microsoft.com) to switch it on. The highest-ROI tool for the
+// documented day-1 bounce — watch real sessions to see WHY visitors leave.
+const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || "";
+
 // Google Ads conversion tag (AW-XXXXXXXXXX). DISTINCT from GA4: this is what
 // makes ad clicks -> signups countable as conversions in the Google Ads
 // dashboard, which Smart Bidding / ROAS depend on. Without it a paid search
@@ -237,6 +243,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               }}
             />
           </>
+        )}
+        {/* Microsoft Clarity — session replay + heatmaps for the day-1 bounce.
+            Loads only when NEXT_PUBLIC_CLARITY_PROJECT_ID is set (env-gated, no
+            default), afterInteractive so it never blocks first paint. */}
+        {CLARITY_ID && (
+          <Script
+            id="ms-clarity"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function(c,l,a,r,i,t,y){
+                  c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                  t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                  y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+                })(window, document, "clarity", "script", "${CLARITY_ID}");
+              `,
+            }}
+          />
         )}
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)
