@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, type AlertEvent, type AlertRule, TierGateError, errorMessage } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
+import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/Skeleton";
 import { getWebPushStatus, subscribeToWebPush } from "@/lib/webPush";
 import { trackEvent } from "@/lib/gtag";
@@ -185,17 +186,17 @@ export default function AlertsPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Alert rules</h1>
-          <p className="mt-1 text-sm text-muted">
+      <PageHeader
+        title="Alert rules"
+        subtitle={
+          <>
             Get notified when scores, setups, or regimes change.{" "}
             {isFree
               ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro.`
               : "Email + Web push on Pro."}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Free "alert taste" hint — free users get a couple of real web-push
           alerts so they feel one fire, then a soft upgrade wall. Only shown to

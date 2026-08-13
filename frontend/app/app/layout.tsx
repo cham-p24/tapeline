@@ -133,7 +133,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           <GlobalSearch />
 
-          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6">
             {/* Account-health banners (always shown, action-required) sit OUTSIDE
                 the first-run provider so a welcome card can never hide a payment,
                 data, or verification warning. */}
@@ -166,6 +166,45 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </footer>
         </div>
       </div>
+
+      {/* ── Mobile bottom tab bar (<md) — primary destinations within thumb reach.
+          Floating overlay ⇒ bg-surface (solid), not bg-panel. Safe-area padding
+          keeps it clear of the iOS home indicator. "More" opens the same drawer
+          as the top-bar hamburger; Search fires the ⌘K palette. ────────────── */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        aria-label="Primary"
+      >
+        <BottomTab href="/app/scanner" label="Scanner" active={isActive("/app/scanner")}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </BottomTab>
+        <BottomTab href="/app/watchlist" label="Watchlist" active={isActive("/app/watchlist")}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M2.5 12.5l4-4 3 3 5-5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M13 6h3.5v3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </BottomTab>
+        <BottomTab href="/app/alerts" label="Alerts" active={isActive("/app/alerts")}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M6 8a4 4 0 018 0c0 4 1.5 5 1.5 5h-11S6 12 6 8z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M8.5 16a1.5 1.5 0 003 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </BottomTab>
+        <BottomTabButton label="Search" onClick={openSearch}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </BottomTabButton>
+        <BottomTabButton label="More" onClick={() => setMobileOpen(true)}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </BottomTabButton>
+      </nav>
 
       {/* ── Mobile drawer — the sidebar as a slide-over ───────────────────── */}
       {mobileOpen && (
@@ -219,6 +258,58 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
     </ToastProvider>
+  );
+}
+
+/**
+ * One item in the mobile bottom tab bar — a Link destination with a glyph over
+ * a label. Active state mirrors the sidebar (accent text). Sized for a thumb:
+ * min-h-14, even flex-1 columns.
+ */
+function BottomTab({
+  href,
+  label,
+  active,
+  children,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] transition-colors ${
+        active ? "text-accent" : "text-muted hover:text-fg"
+      }`}
+    >
+      {children}
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+/** Same footprint as BottomTab but fires an action (Search, More) instead of navigating. */
+function BottomTabButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] text-muted transition-colors hover:text-fg"
+    >
+      {children}
+      <span>{label}</span>
+    </button>
   );
 }
 
