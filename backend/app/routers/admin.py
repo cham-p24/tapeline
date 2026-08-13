@@ -335,6 +335,28 @@ async def revenue_dashboard(
         select(func.count()).select_from(User).where(User.activated_at.isnot(None))
     )).scalar() or 0
 
+    # ── Activity + cohort retention — the single most honest early signal (per
+    # the CEO strategy brief): are signups still showing up over time? active_7d/
+    # 28d count users seen in that window (last_seen_at). retained_w4 = of users
+    # who signed up ≥28 days ago, the share active in the last 14 days — a W4+
+    # retention proxy. At low volume it's directional; the point is that the
+    # instrument exists and can be watched as acquisition scales. ──
+    active_7d = (await session.execute(
+        select(func.count()).select_from(User).where(User.last_seen_at >= now - timedelta(days=7))
+    )).scalar() or 0
+    active_28d = (await session.execute(
+        select(func.count()).select_from(User).where(User.last_seen_at >= now - timedelta(days=28))
+    )).scalar() or 0
+    w4_cohort = (await session.execute(
+        select(func.count()).select_from(User).where(User.created_at <= now - timedelta(days=28))
+    )).scalar() or 0
+    w4_retained = (await session.execute(
+        select(func.count()).select_from(User).where(
+            User.created_at <= now - timedelta(days=28),
+            User.last_seen_at >= now - timedelta(days=14),
+        )
+    )).scalar() or 0
+
     # ── gclid capture (Growth Playbook §3.7) — signups arriving with a Google
     # Ads click ID stored. This is the population the founder-gated offline-
     # conversion upload (value-based bidding) will later be able to act on. ──
@@ -497,6 +519,15 @@ async def revenue_dashboard(
         # watchlist ticker. The raw count rides alongside so the % has context.
         "activated_users": activated_users,
         "activation_rate": round(activated_users / users_total * 100, 1) if users_total else 0.0,
+        # Activation → paid: of users who reached the aha (first watchlist add),
+        # the share that later paid. The complementary conversion to signup→paid.
+        "activated_to_paid_pct": round(paid_customers / activated_users * 100, 1) if activated_users else 0.0,
+        # Activity + W4+ retention (the most honest early signal).
+        "active_7d": active_7d,
+        "active_28d": active_28d,
+        "w4_cohort": w4_cohort,
+        "w4_retained": w4_retained,
+        "w4_retention_pct": round(w4_retained / w4_cohort * 100, 1) if w4_cohort else 0.0,
         # gclid capture (§3.7): signups whose Google Ads click ID is stored and
         # therefore available for the (founder-gated) offline-conversion upload.
         "gclid_capture_count": gclid_capture_count,

@@ -349,6 +349,27 @@ async def test_revenue_landing_pages_group_by_channel_and_path(client, monkeypat
 
 
 @pytest.mark.asyncio
+async def test_revenue_activity_and_w4_retention(client, monkeypatch):
+    """active_7d/28d key off last_seen_at; w4_cohort = signed up 28+ days ago;
+    w4_retained = those active in the last 14 days."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        now = datetime.now(UTC)
+        # Old signup, active 5 days ago → w4_cohort + w4_retained + active_7d + active_28d.
+        await _seed_user(created_at=now - timedelta(days=40), last_seen_at=now - timedelta(days=5))
+        # Old signup, active 20 days ago → w4_cohort + active_28d only (not retained, not 7d).
+        await _seed_user(created_at=now - timedelta(days=40), last_seen_at=now - timedelta(days=20))
+
+        after = await _revenue(client, cookies)
+        assert after["w4_cohort"] - before["w4_cohort"] == 2
+        assert after["w4_retained"] - before["w4_retained"] == 1
+        assert after["active_7d"] - before["active_7d"] == 1
+        assert after["active_28d"] - before["active_28d"] == 2
+
+
+@pytest.mark.asyncio
 async def test_revenue_webhook_volume_by_type(client, monkeypatch):
     async with client:
         cookies = await _make_admin_cookies(client, monkeypatch)
