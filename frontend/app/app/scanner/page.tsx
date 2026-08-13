@@ -742,15 +742,15 @@ export default function ScannerPage() {
                 <span className="sr-only">Add to watchlist</span>
               </th>
               <th className="px-2 sm:px-4 py-2 text-left">Ticker</th>
-              <th className="px-2 sm:px-4 py-2 text-left">Sector</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-left">Sector</th>
               <th className="px-2 sm:px-4 py-2 text-right">Score</th>
-              <th className="px-2 sm:px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
               <th className="px-2 sm:px-4 py-2 text-left">Signal</th>
               <th className="px-2 sm:px-4 py-2 text-right">Price</th>
               <th className="px-2 sm:px-4 py-2 text-right">1D</th>
-              <th className="px-2 sm:px-4 py-2 text-right">5D</th>
-              <th className="px-2 sm:px-4 py-2 text-right">1M</th>
-              <th className="px-2 sm:px-4 py-2 text-right">Volume</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">5D</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">1M</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">Volume</th>
               {/* `Why` is no longer a column. It was the widest one and got
                   pushed off the right edge, forcing a horizontal scroll to read
                   the reasoning (and it was hidden entirely on mobile). It now
@@ -847,7 +847,7 @@ export default function ScannerPage() {
                     </span>
                   </div>
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-muted text-xs">{r.sector}</td>
+                <td className="hidden sm:table-cell px-2 sm:px-4 py-2 text-muted text-xs">{r.sector}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right ${scoreColor(r.score)}`}>
                   <HoverCard
                     trigger={<span className="cursor-help underline decoration-dotted decoration-border underline-offset-2">{r.score?.toFixed(1)}</span>}
@@ -865,16 +865,16 @@ export default function ScannerPage() {
                     }
                   />
                 </td>
-                <td className={`px-2 sm:px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
+                <td className={`hidden sm:table-cell px-2 sm:px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
                     title={confidenceLabel(r.confidence_pct)}>
                   {r.confidence_pct == null ? "—" : `${r.confidence_pct.toFixed(0)}%`}
                 </td>
                 <td className="px-2 sm:px-4 py-2"><SignalPill v={r.signal} /></td>
                 <td className="px-2 sm:px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
-                <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
-                <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
-                <td className="px-2 sm:px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
+                <td className="px-2 sm:px-4 py-2 text-right hidden sm:table-cell text-base text-muted">{compactNum(r.volume)}</td>
               </tr>
               {/* Why — full-width row under the numbers. Wraps to the whole
                   table width, so the reasoning reads in one glance with no
