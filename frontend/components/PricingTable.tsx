@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
+import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
 const PLANS = [
@@ -24,6 +25,11 @@ const PLANS = [
     cta: "Start free",
     ctaHref: "/signup",
     highlight: false,
+    // Every new account opens on a 14-day Premium trial before settling here.
+    // Stating it on the Free card means the paid-only features disappearing at
+    // day 14 reads as the trial ending, not a bait-and-switch.
+    footnote:
+      "Every new account starts with 14 days of Premium, then settles on Free — no card, nothing to cancel.",
   },
   {
     name: "Pro",
@@ -43,7 +49,7 @@ const PLANS = [
       "Email alerts (10/day) · daily briefing",
       "TradingView charts · CSV export",
     ],
-    cta: "Start free trial",
+    cta: "Start 14-day Premium trial",
     ctaHref: "/signup?plan=pro",
     // Pro is the highlighted protagonist — the realistic first purchase.
     // "Best value" is a factual framing (cheapest paid tier per feature),
@@ -73,7 +79,7 @@ const PLANS = [
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
       "Priority support · same-day reply",
     ],
-    cta: "Try Premium free",
+    cta: "Start 14-day Premium trial",
     ctaHref: "/signup?plan=premium",
     highlight: false,
   },
@@ -131,9 +137,7 @@ export function PricingTable() {
               }`}
             >
               {p.highlight && p.badge && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-accent to-accent2 px-3 py-1 text-[11px] font-medium text-white shadow-md">
-                  {p.badge}
-                </span>
+                <BestValueBadge className="absolute -top-3 left-1/2 -translate-x-1/2" />
               )}
               <h3 className="text-xl font-semibold">{p.name}</h3>
               <p className="mt-1 text-sm text-muted">{p.tagline}</p>
@@ -171,13 +175,18 @@ export function PricingTable() {
               <ul className={`${isPower ? "mt-3" : "mt-6"} space-y-2.5 text-sm`}>
                 {p.highlights.map((f) => (
                   <li key={f} className="flex gap-3">
-                    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" viewBox="0 0 16 16" fill="none">
+                    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-up" viewBox="0 0 16 16" fill="none">
                       <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
+              {(p as { footnote?: string }).footnote && (
+                <p className="mt-4 text-xs text-muted leading-relaxed">
+                  {(p as { footnote?: string }).footnote}
+                </p>
+              )}
               <Link
                 href={ctaHref}
                 className={`mt-8 flex h-11 w-full items-center justify-center rounded-md text-sm font-medium transition-all ${

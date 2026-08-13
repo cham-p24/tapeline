@@ -116,7 +116,7 @@ export function MarketingNav() {
     </Link>
   ) : (
     <>
-      <Link href="/signin" className="whitespace-nowrap text-sm text-muted hover:text-fg">
+      <Link href="/signin" className="hidden min-[381px]:inline whitespace-nowrap text-sm text-muted hover:text-fg">
         Sign in
       </Link>
       <Link href="/signup" className="btn-primary text-sm whitespace-nowrap">
@@ -208,7 +208,7 @@ export function MarketingNav() {
             <Link
               href="/search"
               aria-label="Search any ticker"
-              className="inline-flex h-9 w-9 items-center justify-center text-muted hover:text-fg"
+              className="inline-flex h-11 w-11 items-center justify-center text-muted hover:text-fg"
             >
               <SearchIcon />
             </Link>

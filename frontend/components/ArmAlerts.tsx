@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { getWebPushStatus, subscribeToWebPush, testWebPush } from "@/lib/webPush";
-import { api } from "@/lib/api";
+import { api, errorMessage } from "@/lib/api";
 import { trackEvent } from "@/lib/gtag";
 
 const DISMISS_KEY = "tapeline_arm_alerts_dismissed";
@@ -70,48 +70,56 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
   const arm = useCallback(async () => {
     setPhase("working");
     setError(null);
-    const sub = await subscribeToWebPush();
-    if (!sub.ok) {
-      setPhase("error");
-      setError(sub.reason);
-      trackEvent("alert_arm_failed", { surface, reason: sub.reason });
-      return;
-    }
-    // Create a real score alert on a watched ticker so a LIVE alert follows the
-    // sample. Best-effort: a duplicate or a cap-hit must not block the aha.
-    let ruleCreated = false;
-    if (ticker) {
-      try {
-        await api.alertRuleCreate({
-          name: `${ticker} score move`,
-          rule_type: "score",
-          symbol: ticker,
-          threshold: 5,
-          channel: "web_push",
-        });
-        ruleCreated = true;
-      } catch {
-        /* rule already exists or the free web-push cap was reached */
-        trackEvent("alert_arm_failed", { surface, reason: "rule_create_failed" });
+    try {
+      const sub = await subscribeToWebPush();
+      if (!sub.ok) {
+        setPhase("error");
+        setError(sub.reason);
+        trackEvent("alert_arm_failed", { surface, reason: sub.reason });
+        return;
       }
-    } else {
-      // No watched ticker, so no rule was even attempted. The old code still
-      // reported `alert_armed` here, which is how an "armed alerts" number
-      // could exceed the number of alert rules that exist.
-      trackEvent("alert_arm_failed", { surface, reason: "no_ticker" });
+      // Create a real score alert on a watched ticker so a LIVE alert follows the
+      // sample. Best-effort: a duplicate or a cap-hit must not block the aha.
+      let ruleCreated = false;
+      if (ticker) {
+        try {
+          await api.alertRuleCreate({
+            name: `${ticker} score move`,
+            rule_type: "score",
+            symbol: ticker,
+            threshold: 5,
+            channel: "web_push",
+          });
+          ruleCreated = true;
+        } catch {
+          /* rule already exists or the free web-push cap was reached */
+          trackEvent("alert_arm_failed", { surface, reason: "rule_create_failed" });
+        }
+      } else {
+        // No watched ticker, so no rule was even attempted. The old code still
+        // reported `alert_armed` here, which is how an "armed alerts" number
+        // could exceed the number of alert rules that exist.
+        trackEvent("alert_arm_failed", { surface, reason: "no_ticker" });
+      }
+      // The aha: feel a sample alert land right now.
+      await testWebPush().catch(() => {
+        /* subscription is registered; the sample is best-effort */
+      });
+      // Only claim activation when a rule genuinely exists. This event used to
+      // fire unconditionally — after a swallow-everything catch, and even when
+      // `ticker` was null — so it counted successes that never happened while the
+      // UI said "Alerts are on."
+      if (ruleCreated) {
+        trackEvent("alert_armed", { surface, symbol: ticker as string });
+      }
+      setPhase("done");
+    } catch (e: unknown) {
+      // subscribeToWebPush (or a downstream await) can throw — without this the
+      // button stayed on "Turning on…" indefinitely and the error never showed.
+      setPhase("error");
+      setError(errorMessage(e));
+      trackEvent("alert_arm_failed", { surface, reason: "exception" });
     }
-    // The aha: feel a sample alert land right now.
-    await testWebPush().catch(() => {
-      /* subscription is registered; the sample is best-effort */
-    });
-    // Only claim activation when a rule genuinely exists. This event used to
-    // fire unconditionally — after a swallow-everything catch, and even when
-    // `ticker` was null — so it counted successes that never happened while the
-    // UI said "Alerts are on."
-    if (ruleCreated) {
-      trackEvent("alert_armed", { surface, symbol: ticker as string });
-    }
-    setPhase("done");
   }, [ticker, surface]);
 
   const dismiss = useCallback(() => {

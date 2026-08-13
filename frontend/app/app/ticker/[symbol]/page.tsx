@@ -21,12 +21,20 @@ import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
 import { SECTORS } from "@/app/sector/sectors";
 import { relatedMatchups, canonicalMatchup } from "@/lib/comparePairs";
+import { useTheme } from "@/components/ThemeProvider";
+import { useUser } from "@/components/UserContext";
 
-/** Public sector-hub path if the sector maps to a ranking, else null. */
-function sectorHubPath(sector: string | null): string | null {
+/**
+ * In-app scanner, pre-filtered to this sector, if it maps to a known GICS
+ * sector; else null. Deliberately points at /app/scanner (not the public
+ * /sector/<slug> marketing hub) so an authed user staring at a ticker isn't
+ * ejected out of the app shell. The scanner's sector filter keys on the
+ * canonical `api` string, which is exactly what Ticker.sector stores.
+ */
+function sectorScannerPath(sector: string | null): string | null {
   if (!sector) return null;
   const match = SECTORS.find((s) => s.api === sector);
-  return match ? `/sector/${match.slug}` : null;
+  return match ? `/app/scanner?sector=${encodeURIComponent(match.api)}` : null;
 }
 
 type DetailTab = "financials" | "insider";
@@ -109,6 +117,13 @@ export function LookupMeterPill({
 export default function TickerPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol: rawSymbol } = use(params);
   const symbol = rawSymbol.toUpperCase();
+  // Applied theme ("light" | "dark") for the embedded chart, so it tracks the
+  // user's light/dark choice instead of being pinned to dark.
+  const { resolved: resolvedTheme } = useTheme();
+  // Session user — drives the news-alert channel default (Free users can only
+  // create web_push rules; email is a paid channel and would 403 them).
+  const { user } = useUser();
+  const isFree = !!user && user.tier === "free";
   const [data, setData] = useState<TickerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Set when GET /api/ticker returns 402 (free/anon daily look-up cap). When
@@ -122,6 +137,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const [capMsg, setCapMsg] = useState<string | null>(null);
   const [newsAlerting, setNewsAlerting] = useState(false);
   const [newsAlertMsg, setNewsAlertMsg] = useState<string | null>(null);
+  // True when the news-alert failure was a tier gate — the message then gets a
+  // real billing <Link> appended after it (a plain "/app/billing" string isn't
+  // clickable).
+  const [newsAlertGate, setNewsAlertGate] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>("financials");
   // Upcoming-earnings lookup for the header pill. 14-day window matches the
   // earnings page; non-fatal if it fails (pill just won't show).
@@ -199,6 +218,11 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   async function subscribeNews() {
     setNewsAlerting(true);
     setNewsAlertMsg(null);
+    setNewsAlertGate(false);
+    // Pick the channel the caller can actually create: email is a paid channel,
+    // so defaulting a Free user to it walked them straight into a 403. web_push
+    // is free-tier, mirroring the /app/alerts create form.
+    const channel = isFree ? "web_push" : "email";
     try {
       await api.alertRuleCreate({
         name: `News on ${symbol}`,
@@ -207,14 +231,19 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         // No threshold — we want every fresh article. Users can later edit
         // the rule on /app/alerts to require sentiment >= 0.3 etc.
         threshold: null,
-        channel: "email",
+        channel,
       });
-      setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
+      setNewsAlertMsg(
+        channel === "web_push"
+          ? `✓ Browser alerts on for ${symbol} news — enable notifications on /app/alerts if prompted`
+          : `✓ Email alerts on for ${symbol} news`,
+      );
     } catch (e: unknown) {
       // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
       if (e instanceof TierGateError) {
-        // Backend's exact message — e.g. "Email alerts require Pro tier"
-        setNewsAlertMsg(`${e.message} — upgrade at /app/billing`);
+        // Strip any trailing "at /app/billing" — the JSX appends a real link.
+        setNewsAlertMsg(e.message.replace(/\s*at \/app\/billing\.?\s*$/i, "."));
+        setNewsAlertGate(true);
       } else {
         const m = errorMessage(e);
         if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
@@ -276,8 +305,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      {/* Header — stacks on phones so the two text-4xl blocks (symbol + price)
+          don't collide; side-by-side from sm up. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <div className="flex items-center gap-3">
             <Link href="/app/scanner" className="text-muted hover:text-fg text-sm">&larr; Scanner</Link>
@@ -294,9 +324,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
             {data.sector && (
               <>
                 {" · "}
-                {sectorHubPath(data.sector) ? (
+                {sectorScannerPath(data.sector) ? (
                   <Link
-                    href={sectorHubPath(data.sector)!}
+                    href={sectorScannerPath(data.sector)!}
                     className="underline-offset-4 hover:text-fg hover:underline"
                   >
                     {data.sector}
@@ -308,7 +338,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
             )}
           </p>
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <div className="text-4xl font-bold nums">${data.price?.toFixed(2)}</div>
           <div className={`nums ${data.change_pct_1d == null || data.change_pct_1d === 0 ? "text-muted" : data.change_pct_1d > 0 ? "text-up" : "text-down"}`}>
             {data.change_pct_1d == null
@@ -433,7 +463,19 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           >
             {newsAlerting ? "Subscribing…" : "📰 Notify me on news"}
           </button>
-          {newsAlertMsg && <p className="mt-2 text-xs text-muted">{newsAlertMsg}</p>}
+          {newsAlertMsg && (
+            <p className="mt-2 text-xs text-muted">
+              {newsAlertMsg}
+              {newsAlertGate && (
+                <>
+                  {" "}
+                  <Link href="/app/billing" className="text-accent hover:underline">
+                    See plans
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
@@ -540,8 +582,8 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         <h2 className="mb-3 font-semibold">Chart</h2>
         <div className="overflow-hidden rounded-md">
           <iframe
-            src={`https://s.tradingview.com/widgetembed/?frameElementId=tv_${data.symbol}&symbol=${data.symbol.replace(".", "-")}&interval=D&theme=dark&style=1&timezone=exchange&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&studies=%5B%22RSI@tv-basicstudies%22%5D`}
-            className="h-[500px] w-full border-0"
+            src={`https://s.tradingview.com/widgetembed/?frameElementId=tv_${data.symbol}&symbol=${data.symbol.replace(".", "-")}&interval=D&theme=${resolvedTheme}&style=1&timezone=exchange&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&studies=%5B%22RSI@tv-basicstudies%22%5D`}
+            className="h-[320px] w-full border-0 sm:h-[420px] lg:h-[500px]"
             title={`${data.symbol} chart`}
           />
         </div>

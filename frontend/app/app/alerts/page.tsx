@@ -139,13 +139,21 @@ export default function AlertsPage() {
   async function enablePush() {
     setPushBusy(true);
     setPushResult(null);
-    const r = await subscribeToWebPush();
-    setPushResult(
-      r.ok
-        ? { ok: true, msg: "Browser notifications enabled — your web-push alerts will land here." }
-        : { ok: false, msg: r.reason },
-    );
-    setPushBusy(false);
+    try {
+      const r = await subscribeToWebPush();
+      setPushResult(
+        r.ok
+          ? { ok: true, msg: "Browser notifications enabled — your web-push alerts will land here." }
+          : { ok: false, msg: r.reason },
+      );
+    } catch (e: unknown) {
+      // subscribeToWebPush can throw (e.g. the VAPID fetch body fails to parse,
+      // or handle401 redirects). Without this, pushBusy stuck on and the button
+      // read "Enabling…" forever with no surfaced error.
+      setPushResult({ ok: false, msg: errorMessage(e) });
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   async function remove(id: number) {
@@ -284,6 +292,9 @@ export default function AlertsPage() {
               onChange={(e) => setChannel(e.target.value as Channel)}
               className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm"
             >
+              {/* Email delivery is Pro-gated. Tag it AND disable it for Free so
+                  a Free user can't select it and only discover the 403 after
+                  hitting Create — the gate is now visible at the point of choice. */}
               <option value="email">Email {isPro ? "" : "(Pro)"}</option>
               {/* web_push is now the free "taste" channel — free users can
                   create up to FREE_WEB_PUSH_ALERTS of these, so it carries a

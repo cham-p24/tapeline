@@ -18,6 +18,7 @@ import { OnboardingTip } from "@/components/OnboardingTip";
 import { BreakingNewsBar } from "@/components/BreakingNewsBar";
 import { FirstRunTipProvider } from "@/components/FirstRunTip";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
+import { NAV_GROUPS } from "@/lib/appNav";
 
 /**
  * Platform-aware shortcut label for the search trigger. ⌘K on Mac, Ctrl K
@@ -35,41 +36,6 @@ function useShortcutLabel(): string {
   return label;
 }
 
-/**
- * App navigation, grouped for a left rail. The old flat 8-tab top bar was at
- * its width limit and left several built routes (News, Earnings, IPOs) with no
- * inbound link at all — a sidebar has room to surface them. "Alerts" stays a
- * top-group item since it's the #1 pay-driver and watchlist→alert is the flow.
- */
-const NAV_GROUPS: { label: string; items: { href: string; label: string }[] }[] = [
-  {
-    label: "Trade",
-    items: [
-      { href: "/app/scanner", label: "Scanner" },
-      { href: "/app/watchlist", label: "Watchlist" },
-      { href: "/app/alerts", label: "Alerts" },
-    ],
-  },
-  {
-    label: "Signals",
-    items: [
-      { href: "/app/heatmap", label: "Heatmap" },
-      { href: "/app/squeeze", label: "Squeeze" },
-      { href: "/app/regime", label: "Regime" },
-    ],
-  },
-  {
-    label: "Ownership & markets",
-    items: [
-      { href: "/app/congress", label: "Congress" },
-      { href: "/app/holdings", label: "Insider buys" },
-      { href: "/app/news", label: "News" },
-      { href: "/app/earnings", label: "Earnings" },
-      { href: "/app/ipos", label: "IPOs" },
-    ],
-  },
-];
-
 function openSearch() {
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
 }
@@ -79,6 +45,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isActive = (href: string) =>
     !!pathname && (pathname === href || pathname.startsWith(`${href}/`));
+
+  // Escape closes the mobile drawer (WAI-ARIA: a menu/dialog dismisses on Esc).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
 
   return (
     <ToastProvider>
@@ -119,6 +93,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setMobileOpen(true)}
               className="rounded-md p-2 text-muted hover:text-fg md:hidden"
               aria-label="Open menu"
+              aria-haspopup="menu"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-drawer"
             >
               <span className="block h-0.5 w-5 bg-current"></span>
               <span className="mt-1 block h-0.5 w-5 bg-current"></span>
@@ -133,7 +110,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           <GlobalSearch />
 
-          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6">
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6">
             {/* Account-health banners (always shown, action-required) sit OUTSIDE
                 the first-run provider so a welcome card can never hide a payment,
                 data, or verification warning. */}
@@ -199,7 +176,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </BottomTabButton>
-        <BottomTabButton label="More" onClick={() => setMobileOpen(true)}>
+        <BottomTabButton label="More" onClick={() => setMobileOpen(true)} hasPopup="menu" expanded={mobileOpen} controls="mobile-drawer">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
@@ -214,7 +191,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
             className="fixed inset-0 z-40 bg-black/50"
           />
-          <div className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col overflow-y-auto border-r border-border bg-background">
+          <div
+            id="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col overflow-y-auto border-r border-border bg-background"
+          >
             <div className="flex items-center justify-between px-5 py-4">
               <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
                 <div className="h-2 w-6 rounded-full bg-accent" />
@@ -296,15 +279,24 @@ function BottomTabButton({
   label,
   onClick,
   children,
+  hasPopup,
+  expanded,
+  controls,
 }: {
   label: string;
   onClick: () => void;
   children: React.ReactNode;
+  hasPopup?: "menu";
+  expanded?: boolean;
+  controls?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-haspopup={hasPopup}
+      aria-expanded={hasPopup ? expanded : undefined}
+      aria-controls={hasPopup ? controls : undefined}
       className="flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] text-muted transition-colors hover:text-fg"
     >
       {children}
@@ -426,8 +418,11 @@ function AccountMenu() {
       <button
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-panel"
         aria-label={`Account menu for ${displayName}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
       >
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-accent2 text-[11px] font-semibold text-white">
           {displayName.slice(0, 1).toUpperCase()}
@@ -480,13 +475,16 @@ function ThemeSwitcher() {
   ];
   return (
     <div className="px-4 py-2">
-      <div className="mb-1.5 text-[10px] uppercase tracking-wider text-subtle">Appearance</div>
-      <div className="flex gap-1 rounded-full bg-fg/5 p-1">
+      <div id="appearance-label" className="mb-1.5 text-[10px] uppercase tracking-wider text-subtle">Appearance</div>
+      <div role="radiogroup" aria-labelledby="appearance-label" className="flex gap-1 rounded-full bg-fg/5 p-1">
         {options.map((opt) => {
           const active = theme === opt.value;
           return (
             <button
               key={opt.value}
+              role="radio"
+              aria-checked={active}
+              aria-label={opt.label}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setTheme(opt.value)}
               className={`flex-1 rounded-full px-2 py-1 text-xs font-medium transition ${

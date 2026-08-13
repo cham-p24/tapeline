@@ -12,6 +12,7 @@ import { WatchlistTrackRecord } from "@/components/WatchlistTrackRecord";
 import { ArmAlerts } from "@/components/ArmAlerts";
 import { PageHeader } from "@/components/PageHeader";
 import { PaywallModal } from "@/components/Paywall";
+import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import { SearchBox, useDebounced } from "@/components/FilterBar";
@@ -35,6 +36,7 @@ const WATCHLISTS_CAP_BY_TIER: Record<string, number> = {
 
 export default function WatchlistPage() {
   const { user } = useUser();
+  const { push } = useToast();
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [symbol, setSymbol] = useState("");
@@ -151,9 +153,19 @@ export default function WatchlistPage() {
     }
   }
   async function remove(id: number) {
-    await api.watchlistRemove(id);
-    load();
-    loadLists();
+    // Optimistic: drop the row immediately so the click feels instant, then
+    // reconcile. On failure, roll back to the pre-removal snapshot and surface
+    // a toast — the old code had no try/catch, so a failed delete left the row
+    // visible while silently doing nothing.
+    const snapshot = items;
+    setItems((cur) => cur.filter((w) => w.id !== id));
+    try {
+      await api.watchlistRemove(id);
+      loadLists();  // refresh list counts in the tab strip
+    } catch (e) {
+      setItems(snapshot);
+      push(`Couldn't remove that ticker: ${errorMessage(e)}`, "error");
+    }
   }
 
   // Phase A: move an item between lists. Called by the Move dropdown
@@ -167,7 +179,14 @@ export default function WatchlistPage() {
       load();
       loadLists();
     } catch (e) {
-      console.error("watchlistMove failed", e);
+      // Surface the failure instead of swallowing it. A tier-gate 403 routes to
+      // the same upgrade paywall the add path uses; anything else gets a toast
+      // so the move visibly fails rather than silently no-op'ing.
+      if (e instanceof TierGateError) {
+        setCapMsg(e.message);
+      } else {
+        push(`Couldn't move that ticker: ${errorMessage(e)}`, "error");
+      }
     }
   }
 
@@ -198,19 +217,33 @@ export default function WatchlistPage() {
 
   async function seedStarter() {
     setSeeding(true);
+    let added = 0;
     try {
-      // Sequential because the watchlist endpoint creates one row per call;
-      // 8 fast requests is fine and we want any 409s ("already exists") to
-      // be silently swallowed without aborting the rest.
+      // Sequential because the watchlist endpoint creates one row per call.
+      // 409s ("already exists") are expected and skipped; a tier-gate 403 means
+      // we hit the watchlist cap — stop and open the upgrade paywall instead of
+      // silently swallowing every failure (the old catch hid 403s entirely, so
+      // a capped Free user clicked the button and saw nothing happen).
       for (const sym of starter) {
         try {
           await api.watchlistAdd(sym, threshold);
-        } catch {
-          /* ignore — likely already in list */
+          added++;
+        } catch (e: unknown) {
+          if (e instanceof TierGateError) {
+            setCapMsg(e.message);
+            trackCapHit("watchlist_tickers", "watchlist");
+            return;
+          }
+          const m = errorMessage(e);
+          if (m.includes("409")) continue;  // already in list — expected
+          push(`Couldn't add ${sym}: ${m}`, "error");
         }
       }
-      load();
+      if (added > 0) {
+        push(`Added ${added} ticker${added === 1 ? "" : "s"} to your watchlist.`, "success");
+      }
     } finally {
+      load();
       setSeeding(false);
     }
   }
@@ -480,7 +513,7 @@ export default function WatchlistPage() {
                         title="Move to a different list"
                       >
                         {lists.map((l) => (
-                          <option key={l.id} value={l.id}>
+                          <option key={l.id} value={l.id} disabled={l.id === w.watchlist_id}>
                             {l.id === w.watchlist_id ? `↳ ${l.name}` : `→ ${l.name}`}
                           </option>
                         ))}

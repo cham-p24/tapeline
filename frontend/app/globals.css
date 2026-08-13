@@ -68,7 +68,9 @@
   --panel-hover: 255 255 255 / 0.07;
   --fg:          244 244 245;
   --muted:       156 163 175;
-  --subtle:      113 113 122;
+  /* Tertiary text. Was #71717a (zinc-500, ~4.1:1 on #0a0a0a) which fails WCAG
+     AA on nav/section labels. Lightened to zinc-400 (#a1a1aa, ~6.4:1). */
+  --subtle:      161 161 170;
   --border:      255 255 255 / 0.06;
   --border2:     255 255 255 / 0.14;
   --accent:      10 132 255;          /* iOS systemBlue (dark mode tint) */
@@ -100,7 +102,8 @@
     --panel-hover: 255 255 255 / 0.07;
     --fg:          244 244 245;
     --muted:       156 163 175;
-    --subtle:      113 113 122;
+    /* zinc-400 (#a1a1aa, ~6.4:1 on #0a0a0a) — see [data-theme="dark"] above. */
+    --subtle:      161 161 170;
     --border:      255 255 255 / 0.06;
     --border2:     255 255 255 / 0.14;
     --accent:      10 132 255;
@@ -136,6 +139,11 @@
     /* Make body the positioning parent for the ::before atmospheric layer. */
     position: relative;
     min-height: 100vh;
+    /* Defensive backstop against horizontal page scroll — clips any child
+       that overflows the viewport width so the page body never scrolls
+       sideways. `clip` (unlike `hidden`) doesn't create a scroll container,
+       so it won't break position:sticky descendants. */
+    overflow-x: clip;
   }
 
   /*

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type SearchResult } from "@/lib/api";
 import { canonicalMatchup } from "@/lib/comparePairs";
+import { PALETTE_DESTINATIONS } from "@/lib/appNav";
 
 /**
  * ⌘K / Ctrl+K command palette.
@@ -13,25 +14,18 @@ import { canonicalMatchup } from "@/lib/comparePairs";
  *    company name (/api/search, debounced). The old build preloaded 200 symbols
  *    alphabetically and filtered client-side, hiding ~92% of the universe.
  *  - Destinations — jump to Scanner / Watchlist / Alerts / … (shown when the
- *    query is empty, filtered by name otherwise).
+ *    query is empty, filtered by name otherwise). Sourced from lib/appNav so the
+ *    palette can reach every sidebar destination and never drifts from the rail.
  *  - Compare — type "AAPL vs MSFT" (or "AAPL MSFT") to open the head-to-head.
  *
  * Enter runs the highlighted action; Esc closes.
  */
 
-const DESTINATIONS: { label: string; href: string; hint: string }[] = [
-  { label: "Scanner", href: "/app/scanner", hint: "Rank the whole market" },
-  { label: "Watchlist", href: "/app/watchlist", hint: "Your saved tickers" },
-  { label: "Alerts", href: "/app/alerts", hint: "Score & price alerts" },
-  { label: "Heatmap", href: "/app/heatmap", hint: "Sector heatmap" },
-  { label: "Squeeze", href: "/app/squeeze", hint: "Short-squeeze setups" },
-  { label: "Scorecard", href: "/scorecard", hint: "Public track record" },
-  { label: "Billing & plan", href: "/app/billing", hint: "Manage subscription" },
-];
+const DESTINATIONS = PALETTE_DESTINATIONS;
 
 type Action =
   | { kind: "ticker"; symbol: string; name: string; score: number | null }
-  | { kind: "dest"; label: string; href: string; hint: string }
+  | { kind: "dest"; label: string; href: string; hint?: string }
   | { kind: "compare"; a: string; b: string };
 
 /** Detect a "X vs Y" / "X Y" / "X,Y" two-symbol compare intent. */
@@ -60,6 +54,10 @@ export function GlobalSearch() {
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchSeq = useRef(0);
+  // Element focused before the palette opened, so focus can be restored on close.
+  const openerRef = useRef<HTMLElement | null>(null);
+  const listboxId = "gs-listbox";
+  const optionId = (i: number) => `gs-opt-${i}`;
 
   // Global hotkey
   useEffect(() => {
@@ -74,10 +72,16 @@ export function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Focus the input when the panel opens; reset on close.
+  // Focus the input when the panel opens; reset and restore focus on close.
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 10);
-    else { setQ(""); setTickers([]); setCursor(0); }
+    if (open) {
+      openerRef.current = (document.activeElement as HTMLElement) ?? null;
+      setTimeout(() => inputRef.current?.focus(), 10);
+    } else {
+      setQ(""); setTickers([]); setCursor(0);
+      openerRef.current?.focus();
+      openerRef.current = null;
+    }
   }, [open]);
 
   // Debounced server-backed ticker search (symbol OR name, full universe).
@@ -132,24 +136,41 @@ export function GlobalSearch() {
       className="fixed inset-0 z-[90] flex items-start justify-center bg-black/60 px-4 pt-[10vh]"
       onClick={() => setOpen(false)}
     >
-      <div className="card !bg-surface w-full max-w-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search"
+        className="card !bg-surface w-full max-w-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         <input
           ref={inputRef}
           value={q}
+          role="combobox"
+          aria-expanded={actions.length > 0}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={actions.length > 0 ? optionId(cursor) : undefined}
+          aria-label="Search tickers, a page, or a compare pair"
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, actions.length - 1)); }
             if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
             if (e.key === "Enter" && actions[cursor]) { e.preventDefault(); run(actions[cursor]); }
+            // Trap Tab inside the dialog — the input is its only focusable child.
+            if (e.key === "Tab") e.preventDefault();
           }}
           placeholder="Search tickers, a page, or “AAPL vs MSFT”…"
           className="w-full bg-transparent px-5 py-4 text-lg outline-none"
         />
         {actions.length > 0 && (
-          <ul className="max-h-[60vh] overflow-y-auto border-t border-border">
+          <ul id={listboxId} role="listbox" aria-label="Results" className="max-h-[60vh] overflow-y-auto border-t border-border">
             {actions.map((a, i) => (
               <li
                 key={actionKey(a)}
+                id={optionId(i)}
+                role="option"
+                aria-selected={cursor === i}
                 onMouseEnter={() => setCursor(i)}
                 onClick={() => run(a)}
                 className={`flex cursor-pointer items-center justify-between gap-4 px-5 py-3 text-sm ${cursor === i ? "bg-panel" : ""}`}
