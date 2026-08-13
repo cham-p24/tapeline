@@ -71,11 +71,15 @@ export function LookupWall({
             Your free look-ups reset tomorrow.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/pricing" className="btn-primary">
-              See plans &rarr;
+            {/* Upgrade is the primary action — it goes straight to the in-app
+                billing picker where the plan is chosen, not out to the
+                marketing /pricing page. "See plans" stays as the quieter
+                detour for anyone who wants the full comparison first. */}
+            <Link href="/app/billing" className="btn-primary">
+              Upgrade now &rarr;
             </Link>
-            <Link href="/app/billing" className="btn-ghost">
-              Upgrade now
+            <Link href="/pricing" className="btn-ghost">
+              See plans
             </Link>
           </div>
           <p className="mt-5 text-xs text-subtle">

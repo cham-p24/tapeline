@@ -87,6 +87,12 @@ const config: Config = {
         DEFAULT: "0 4px 12px rgb(var(--shadow))",
         md:  "0 6px 20px rgb(var(--shadow))",
         lg:  "0 12px 36px rgb(var(--shadow))",
+        // xl / 2xl were falling back to Tailwind's hardcoded non-theme
+        // shadows, so the 8 floating overlays that use them (modals,
+        // dropdowns, the ⌘K palette, toasts, etc.) didn't adapt to the
+        // active theme. Route them through the --shadow token too.
+        xl:  "0 20px 48px rgb(var(--shadow))",
+        "2xl": "0 28px 64px rgb(var(--shadow))",
       },
       borderRadius: {
         // iOS uses larger radii than typical web (corner radius 12-22px on

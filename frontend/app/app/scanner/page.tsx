@@ -142,6 +142,10 @@ export default function ScannerPage() {
   // belong in the server query and never triggers a refetch.
   const [assetClass, setAssetClass] = useState<AssetBucket>("");
   const [loading, setLoading] = useState(true);
+  // Distinct from the warming-up/empty state: true only when the last load()
+  // actually threw (network/500). Without this, a failed fetch fell through to
+  // the "warming up" copy with no way to retry.
+  const [loadError, setLoadError] = useState(false);
   // Symbols the user has added to their watchlist in this session — drives
   // the per-row star's added/checked state. Optimistic: a symbol lands here
   // the instant the button is clicked and is reverted only on a hard failure
@@ -296,6 +300,7 @@ export default function ScannerPage() {
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       const r = await api.scanner(params);
+      setLoadError(false);
       setRows(r.items);
       setMeta({
         tier: r.tier,
@@ -308,7 +313,7 @@ export default function ScannerPage() {
         totalMatched:
           (r as { total_matched?: number | null }).total_matched ?? null,
       });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setLoadError(true); }
     finally { setLoading(false); }
   }, [minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
 
@@ -600,7 +605,7 @@ export default function ScannerPage() {
           client-side post-filter. */}
       <FilterBar
         trailing={
-          <>Showing <strong className="text-fg">{visibleRows.length}</strong> · refresh every 10s</>
+          <>Showing <strong className="text-fg">{visibleRows.length}</strong> · updates live</>
         }
       >
         {/* Symbol/name search — widest, primary. Server-side substring match. */}
@@ -757,6 +762,19 @@ export default function ScannerPage() {
           <tbody>
             {loading && visibleRows.length === 0 ? (
               <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
+            ) : loadError && visibleRows.length === 0 ? (
+              <tr><td colSpan={11} className="px-4 py-12 text-center">
+                <div className="text-muted">
+                  <p>Couldn&apos;t load the scanner.</p>
+                  <button
+                    onClick={() => { setLoading(true); load(); }}
+                    className="mt-3 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20"
+                  >
+                    Retry
+                  </button>
+                  <p className="mt-2 text-xs text-subtle">Still stuck? Check <a href="/status" className="text-accent hover:underline">system status</a>.</p>
+                </div>
+              </td></tr>
             ) : visibleRows.length === 0 ? (
               <tr><td colSpan={11} className="px-4 py-12 text-center">
                 {filtersActive ? (
@@ -811,7 +829,7 @@ export default function ScannerPage() {
                     {added.has(r.symbol) ? "★" : "☆"}
                   </button>
                 </td>
-                <td className="px-4 py-2 font-medium">
+                <td className="px-2 sm:px-4 py-2 font-medium">
                   <div className="flex flex-col gap-0.5">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Link href={`/app/ticker/${r.symbol}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{r.symbol}</Link>
@@ -829,8 +847,8 @@ export default function ScannerPage() {
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-2 text-muted text-xs">{r.sector}</td>
-                <td className={`px-4 py-2 text-right ${scoreColor(r.score)}`}>
+                <td className="px-2 sm:px-4 py-2 text-muted text-xs">{r.sector}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right ${scoreColor(r.score)}`}>
                   <HoverCard
                     trigger={<span className="cursor-help underline decoration-dotted decoration-border underline-offset-2">{r.score?.toFixed(1)}</span>}
                     content={
@@ -847,33 +865,33 @@ export default function ScannerPage() {
                     }
                   />
                 </td>
-                <td className={`px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
+                <td className={`px-2 sm:px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
                     title={confidenceLabel(r.confidence_pct)}>
                   {r.confidence_pct == null ? "—" : `${r.confidence_pct.toFixed(0)}%`}
                 </td>
-                <td className="px-4 py-2"><SignalPill v={r.signal} /></td>
-                <td className="px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
-                <td className="px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
+                <td className="px-2 sm:px-4 py-2"><SignalPill v={r.signal} /></td>
+                <td className="px-2 sm:px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
+                <td className="px-2 sm:px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
               </tr>
               {/* Why — full-width row under the numbers. Wraps to the whole
                   table width, so the reasoning reads in one glance with no
                   horizontal scroll, on every screen size. The bottom border
                   sits here so each ticker (numbers + why) reads as one block. */}
-              <tr className="border-b border-border/20 group-hover:bg-panel/60 hover:bg-panel/60">
-                <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={11}>
-                  {r.reason ? (
+              {r.reason ? (
+                <tr className="border-b border-border/20 group-hover:bg-panel/60 hover:bg-panel/60">
+                  <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={11}>
                     <p className="text-xs text-muted leading-snug">
                       <span className="mr-2 align-baseline text-[10px] font-medium uppercase tracking-wide text-subtle">
                         Why
                       </span>
                       {r.reason}
                     </p>
-                  ) : null}
-                </td>
-              </tr>
+                  </td>
+                </tr>
+              ) : null}
               </Fragment>
             ))}
           </tbody>
