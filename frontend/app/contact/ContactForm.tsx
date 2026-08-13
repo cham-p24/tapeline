@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from "@/components/Input";
 
 type Status = "idle" | "submitting" | "sent" | "error";
 
@@ -134,14 +135,13 @@ function Field({
       <label htmlFor={name} className="block text-xs font-medium text-muted mb-1">
         {label} {required && <span className="text-fg">*</span>}
       </label>
-      <input
+      <Input
         id={name}
         name={name}
         type={type}
         required={required}
         autoComplete={autoComplete}
         maxLength={type === "email" ? 200 : 200}
-        className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-base focus:border-accent focus:outline-none"
       />
     </div>
   );

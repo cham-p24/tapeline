@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 /**
  * Last-chance email capture for visitors who scroll the pricing page
@@ -34,6 +35,14 @@ export function ExitIntentModal({
 }) {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setDismissed(true);
+  }, []);
+
+  useModalA11y(open, panelRef, close);
 
   useEffect(() => {
     // One-per-session — don't pester anyone who already saw it.
@@ -85,11 +94,6 @@ export function ExitIntentModal({
 
   if (dismissed || !open) return null;
 
-  function close() {
-    setOpen(false);
-    setDismissed(true);
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
@@ -101,7 +105,10 @@ export function ExitIntentModal({
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl sm:p-8">
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl sm:p-8"
+      >
         <button
           type="button"
           onClick={close}

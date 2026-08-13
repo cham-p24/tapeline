@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from "@/components/Input";
 import { trackEvent } from "@/lib/gtag";
 import { getStoredUtm } from "@/lib/utm";
 
@@ -178,7 +179,7 @@ export function NewsletterCapture({
       <label className="sr-only" htmlFor={`nl-email-${source}`}>
         Email address
       </label>
-      <input
+      <Input
         id={`nl-email-${source}`}
         type="email"
         autoComplete="email"
@@ -186,7 +187,7 @@ export function NewsletterCapture({
         placeholder="you@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="flex-1 rounded-md border border-border bg-panel px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        className="flex-1"
         disabled={busy}
       />
       <button
