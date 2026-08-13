@@ -221,7 +221,7 @@ export default async function DailyPicksPage() {
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-border bg-bg px-6 py-10 text-center text-sm text-muted">
+            <div className="rounded-lg border border-border bg-background px-6 py-10 text-center text-sm text-muted">
               <p>Picks loading. The page caches every 30 minutes — refresh shortly.</p>
               <p className="mt-2">
                 Or read the back-checked record at{" "}

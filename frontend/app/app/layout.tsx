@@ -349,18 +349,18 @@ function AccountMenu() {
       </button>
       {open && (
         <div className="absolute bottom-full left-0 right-0 mb-2 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
-          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-panel-hover">Account &amp; settings</Link>
-          <Link href="/app/usage" className="block px-4 py-2 text-sm hover:bg-panel-hover">Usage &amp; limits</Link>
-          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-panel-hover">Email preferences</Link>
-          <Link href="/app/api-keys" className="block px-4 py-2 text-sm hover:bg-panel-hover">API keys</Link>
+          <Link href="/app/account" className="block px-4 py-2 text-sm hover:bg-panel2">Account &amp; settings</Link>
+          <Link href="/app/usage" className="block px-4 py-2 text-sm hover:bg-panel2">Usage &amp; limits</Link>
+          <Link href="/app/settings/email" className="block px-4 py-2 text-sm hover:bg-panel2">Email preferences</Link>
+          <Link href="/app/api-keys" className="block px-4 py-2 text-sm hover:bg-panel2">API keys</Link>
           <div className="border-t border-border" />
           <ThemeSwitcher />
           <div className="border-t border-border" />
-          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-panel-hover">Billing &amp; plan</Link>
+          <Link href="/app/billing" className="block px-4 py-2 text-sm hover:bg-panel2">Billing &amp; plan</Link>
           {user.tier === "free" && (
-            <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-panel-hover">Upgrade to Pro →</Link>
+            <Link href="/app/billing" className="block px-4 py-2 text-sm text-accent hover:bg-panel2">Upgrade to Pro →</Link>
           )}
-          <Link href="/app/referrals" className="block px-4 py-2 text-sm hover:bg-panel-hover">
+          <Link href="/app/referrals" className="block px-4 py-2 text-sm hover:bg-panel2">
             Refer a friend
             <span className="block text-xs text-muted">You both get a free month</span>
           </Link>

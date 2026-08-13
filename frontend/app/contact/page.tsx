@@ -30,7 +30,7 @@ const ADDRESSES: { label: string; email: string; desc: string }[] = [
 
 export default function ContactPage() {
   return (
-    <div className="bg-bg text-fg min-h-screen">
+    <div className="bg-background text-fg min-h-screen">
       <MarketingNav />
 
       <main id="main" className="mx-auto max-w-3xl px-6 py-10">
@@ -44,7 +44,7 @@ export default function ContactPage() {
           </p>
         </header>
 
-        <section className="rounded-xl bg-elevated p-6 md:p-8">
+        <section className="rounded-xl bg-surface p-6 md:p-8">
           <h2 className="text-lg font-semibold mb-1">Send a message</h2>
           <p className="text-sm text-muted mb-6">
             Routed to <code className="text-accent">support@tapeline.io</code>. I&apos;ll reply from there.
@@ -58,7 +58,7 @@ export default function ContactPage() {
             {ADDRESSES.map((a) => (
               <li
                 key={a.email}
-                className="rounded-lg p-4 bg-bg-soft hover:bg-elevated transition-colors"
+                className="rounded-lg p-4 bg-surface hover:bg-surface transition-colors"
               >
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-subtle">{a.label}</div>
                 <a
@@ -73,7 +73,7 @@ export default function ContactPage() {
           </ul>
         </section>
 
-        <section className="mt-12 rounded-xl border border-border/60 bg-bg-soft px-6 py-5 text-sm text-muted leading-relaxed">
+        <section className="mt-12 rounded-xl border border-border/60 bg-surface px-6 py-5 text-sm text-muted leading-relaxed">
           <p>
             <strong className="text-fg">Not a place for investment advice.</strong>{" "}
             We can&apos;t answer &quot;should I buy X?&quot; or interpret the Tapeline Score for a specific

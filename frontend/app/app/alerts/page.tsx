@@ -371,14 +371,14 @@ export default function AlertsPage() {
       </h2>
 
       {loading ? (
-        <div className="card overflow-hidden"><TableSkeleton cols={6} rows={4} /></div>
+        <div className="card overflow-x-auto"><TableSkeleton cols={6} rows={4} /></div>
       ) : rules.length === 0 ? (
         <div className="card p-6 text-sm text-muted">
           No alert rules yet. Create one above, or visit the{" "}
           <Link href="/app/scanner" className="link">scanner</Link> and tap an alert button on any ticker.
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs uppercase text-muted">
               <tr>
@@ -421,7 +421,7 @@ export default function AlertsPage() {
           <h2 className="mt-8 mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
             Recent fires
           </h2>
-          <div className="card overflow-hidden">
+          <div className="card overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase text-muted">
                 <tr>
