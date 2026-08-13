@@ -829,7 +829,7 @@ export default function ScannerPage() {
                 onClick={() => openPeek(i)}
                 aria-selected={focusedIdx === i}
                 className={`group cursor-pointer hover:bg-panel/60 ${
-                  focusedIdx === i ? "bg-panel ring-1 ring-inset ring-accent" : ""
+                  focusedIdx === i ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""
                 }`}
               >
                 <td className="px-2 sm:px-4 py-2">
@@ -906,7 +906,12 @@ export default function ScannerPage() {
                   horizontal scroll, on every screen size. The bottom border
                   sits here so each ticker (numbers + why) reads as one block. */}
               {r.reason ? (
-                <tr className="border-b border-border/20 group-hover:bg-panel/60 hover:bg-panel/60">
+                <tr
+                  onClick={() => openPeek(i)}
+                  className={`cursor-pointer border-b border-border/20 hover:bg-panel/60 ${
+                    focusedIdx === i ? "bg-accent/10" : ""
+                  }`}
+                >
                   <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={11}>
                     <p className="text-xs text-muted leading-snug">
                       <span className="mr-2 align-baseline text-[10px] font-medium uppercase tracking-wide text-subtle">
