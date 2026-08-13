@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { COMPARE_INDEX } from "@/components/CompareIndex";
@@ -98,12 +99,9 @@ export default function CompareIndexPage() {
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             The same six-factor score on the full live scanner — top rows free, no card to look.
           </p>
-          <Link
-            href="/signup"
-            className="mt-5 inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
+          <Button href="/signup" variant="primary" className="mt-5">
             Sign up &rarr;
-          </Link>
+          </Button>
         </div>
       </div>
 

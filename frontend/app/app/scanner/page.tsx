@@ -36,7 +36,7 @@ import {
 } from "@/components/FilterBar";
 import { matchesAssetBucket, type AssetBucket } from "@/lib/filters";
 
-type SortKey = "score" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
+type SortKey = "score" | "confidence_pct" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
 
 // Shape of the filter blob saved into ScannerPreset.filters_json. Adding
 // new filter dimensions later is backwards-compatible — old presets just
@@ -473,6 +473,21 @@ export default function ScannerPage() {
     setSearch("");
   };
 
+  // Column-header sorting. Clicking a sortable header sets that key; clicking
+  // the active header again flips the direction. A newly-selected column
+  // defaults to descending — highest-first is the useful default for scores,
+  // confidence, changes and volume. Sorting is server-side (load() sends
+  // sort+order and refetches), so this only updates state; it shares the exact
+  // same `sort`/`order` state as the Sort-by dropdown, keeping the two in sync.
+  const toggleSort = useCallback((key: SortKey) => {
+    if (sort === key) {
+      setOrder((o) => (o === "desc" ? "asc" : "desc"));
+    } else {
+      setSort(key);
+      setOrder("desc");
+    }
+  }, [sort]);
+
   // Funnel event: activation = "did the user actually open the scanner".
   // localStorage flag dedupes across sessions per browser so we count the
   // first meaningful action exactly once. If they bounce before the scanner,
@@ -523,7 +538,16 @@ export default function ScannerPage() {
     meta && meta.tier === "free" && meta.totalMatched != null
       ? Math.max(0, meta.totalMatched - shownRows)
       : 0;
-  const showLockedRemainder = lockedRemainder > 0;
+  // Consistency guard against the "Showing N" line. total_matched is counted
+  // server-side and does NOT know about the asset-class filter, which is applied
+  // client-side after the fetch. So while that client-only filter is active,
+  // visibleRows.length (what "Showing N" reports) diverges from shownRows, and a
+  // remainder like "2,000 more match your filters" would contradict it. Suppress
+  // the locked band in that case; with no client-only filter, shownRows ===
+  // visibleRows.length and the two counts agree. (The server-side filters —
+  // score/sector/signal/search — are all reflected in total_matched, so they
+  // stay consistent and don't suppress the band.)
+  const showLockedRemainder = lockedRemainder > 0 && !assetClass;
 
   // Funnel: the locked-remainder band IS an upgrade prompt becoming visible.
   // Fire upgrade_prompt_shown when it first appears (keyed on the boolean so a
@@ -640,6 +664,7 @@ export default function ScannerPage() {
           onChange={(v) => setSort(v as SortKey)}
           options={[
             { value: "score", label: "Score" },
+            { value: "confidence_pct", label: "Confidence" },
             { value: "change_pct_1d", label: "1D change" },
             { value: "change_pct_5d", label: "5D change" },
             { value: "change_pct_1m", label: "1M change" },
@@ -743,14 +768,14 @@ export default function ScannerPage() {
               </th>
               <th className="px-2 sm:px-4 py-2 text-left">Ticker</th>
               <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-left">Sector</th>
-              <th className="px-2 sm:px-4 py-2 text-right">Score</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
+              <SortableTh label="Score" sortKey="score" activeKey={sort} order={order} onSort={toggleSort} className="px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="Conf" sortKey="confidence_pct" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" thTitle="Per-ticker confidence — varies with which underlying data feeds returned data" />
               <th className="px-2 sm:px-4 py-2 text-left">Signal</th>
               <th className="px-2 sm:px-4 py-2 text-right">Price</th>
-              <th className="px-2 sm:px-4 py-2 text-right">1D</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">5D</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">1M</th>
-              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">Volume</th>
+              <SortableTh label="1D" sortKey="change_pct_1d" activeKey={sort} order={order} onSort={toggleSort} className="px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="5D" sortKey="change_pct_5d" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="1M" sortKey="change_pct_1m" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="Volume" sortKey="volume" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
               {/* `Why` is no longer a column. It was the widest one and got
                   pushed off the right edge, forcing a horizontal scroll to read
                   the reasoning (and it was hidden entirely on mobile). It now
@@ -981,6 +1006,57 @@ export default function ScannerPage() {
         />
       )}
     </div>
+  );
+}
+
+// Sortable column header. Renders a real <button> inside the <th> (keyboard-
+// focusable, Enter/Space activate it) and reflects sort state via aria-sort on
+// the <th> — "ascending"/"descending" on the active column, "none" elsewhere.
+// The active column shows a filled caret (▲ asc / ▼ desc, in the accent colour);
+// inactive columns reveal a faint caret on hover to hint they're clickable.
+function SortableTh({
+  label,
+  sortKey,
+  activeKey,
+  order,
+  onSort,
+  className,
+  thTitle,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  order: "asc" | "desc";
+  onSort: (k: SortKey) => void;
+  className?: string;
+  thTitle?: string;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <th
+      className={className}
+      title={thTitle}
+      aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`group/sort inline-flex items-center gap-1 whitespace-nowrap uppercase transition-colors hover:text-fg ${active ? "text-fg" : ""}`}
+        aria-label={
+          active
+            ? `Sorted by ${label}, ${order === "asc" ? "ascending" : "descending"}. Activate to reverse the order.`
+            : `Sort by ${label}`
+        }
+      >
+        <span>{label}</span>
+        <span
+          aria-hidden
+          className={active ? "text-accent" : "text-subtle opacity-0 transition-opacity group-hover/sort:opacity-60"}
+        >
+          {active ? (order === "asc" ? "▲" : "▼") : "▲"}
+        </span>
+      </button>
+    </th>
   );
 }
 

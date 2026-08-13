@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button } from "@/components/Button";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
@@ -220,15 +220,12 @@ export default function WhatsNewPage() {
             everything; here&rsquo;s what changed and where to find it.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/signup"
-              className="inline-flex items-center rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            >
+            <Button href="/signup" variant="primary">
               Open Tapeline &rarr;
-            </Link>
-            <Link href="/changelog" className="inline-flex items-center rounded-md border border-border px-5 py-2.5 text-sm text-fg hover:bg-panel">
+            </Button>
+            <Button href="/changelog" variant="ghost">
               Full changelog
-            </Link>
+            </Button>
           </div>
         </div>
 
@@ -307,12 +304,9 @@ export default function WhatsNewPage() {
           <p className="mx-auto mt-2 max-w-md text-muted">
             The full scanner is free to look — top rows, live scores, no card required.
           </p>
-          <Link
-            href="/signup"
-            className="mt-6 inline-flex items-center rounded-md bg-accent px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
+          <Button href="/signup" variant="primary" className="mt-6">
             Open Tapeline &rarr;
-          </Link>
+          </Button>
         </div>
       </div>
 
