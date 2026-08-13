@@ -14,13 +14,15 @@ state at the top of each test so prior-suite leftovers don't taint the result.
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 from sqlalchemy import select
 
 from app.db import SessionLocal
 from app.main import app
-from app.models import User, WatchlistItem
+from app.models import Ticker, User, WatchlistItem
 
 
 @pytest.fixture
@@ -60,6 +62,23 @@ async def _get_activated_at():
         return u.activated_at
 
 
+async def _seed_ticker(symbol: str) -> None:
+    """A fresh, valid ticker so GET /api/ticker/{symbol} returns 200."""
+    async with SessionLocal() as s:
+        existing = (
+            await s.execute(select(Ticker).where(Ticker.symbol == symbol))
+        ).scalar_one_or_none()
+        if existing is None:
+            s.add(Ticker(
+                symbol=symbol, name=f"{symbol} Inc", asset_class="stock",
+                score=80.0, price=10.0, volume=1_000_000, change_pct_1d=1.0,
+                confidence_pct=90.0, sub_trend=70.0, sub_rs=65.0,
+                sub_fundamentals=60.0, sub_momentum=55.0, sub_macro=50.0,
+                sub_smart_money=45.0, updated_at=datetime.now(UTC),
+            ))
+            await s.commit()
+
+
 @pytest.mark.asyncio
 async def test_first_watchlist_add_stamps_activated_at(client):
     async with client:
@@ -79,6 +98,26 @@ async def test_first_watchlist_add_stamps_activated_at(client):
             # so later suites (e.g. test_watchlists) don't trip the
             # (user_id, symbol) UNIQUE constraint on this no-cleanup CI SQLite.
             await _wipe_dev_user_watchlist(client)
+            await _reset_dev_user_activation()
+
+
+@pytest.mark.asyncio
+async def test_first_ticker_view_stamps_activated_at(client):
+    """Viewing a ticker's full six-factor breakdown IS the core aha, so it stamps
+    activation too — not only a watchlist add. Broadens the definition so users
+    who see the scores but never add a watchlist ticker still count as activated."""
+    async with client:
+        await client.get("/api/watchlist", headers=HEADERS)  # ensure dev_user exists
+        await _seed_ticker("ACTV")
+        await _reset_dev_user_activation()
+        try:
+            assert await _get_activated_at() is None
+
+            r = await client.get("/api/ticker/ACTV", headers=HEADERS)
+            assert r.status_code == 200, r.text
+
+            assert await _get_activated_at() is not None
+        finally:
             await _reset_dev_user_activation()
 
 

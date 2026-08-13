@@ -19,6 +19,7 @@ type Revenue = {
   signup_to_paid_pct: number;
   activated_users: number;
   activation_rate: number;
+  median_time_to_value_hours: number | null;
   activated_to_paid_pct: number;
   active_7d: number;
   active_28d: number;
@@ -217,10 +218,16 @@ export default function RevenuePage() {
           tone="accent"
         />
         <Stat label="Activated users" value={String(data.activated_users)} />
+        <Stat
+          label="Median time-to-value"
+          value={data.median_time_to_value_hours == null ? "—" : `${data.median_time_to_value_hours}h`}
+        />
         <Stat label="gclid captured" value={String(data.gclid_capture_count)} />
       </div>
       <p className="mt-2 text-xs text-muted">
-        Activation = signup that added a first watchlist ticker. gclid captured =
+        Activation = signup that experienced core value — added a watchlist ticker
+        OR viewed a ticker&rsquo;s full six-factor breakdown. Time-to-value = median
+        hours from signup to that moment. gclid captured =
         signups arriving with a Google Ads click ID stored (available for the
         offline-conversion upload once Ads API access is enabled).
       </p>
