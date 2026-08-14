@@ -50,6 +50,7 @@ elif not os.environ.get("DATABASE_URL", "").startswith("sqlite"):
 import asyncio  # noqa: E402
 
 import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
 
 # Importing the models package registers all tables on Base.metadata
 import app.models  # noqa: E402,F401
@@ -63,6 +64,47 @@ def _create_tables() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     asyncio.run(_run())
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _drain_background_tasks():
+    """Reap detached fire-and-forget tasks before the event loop tears down.
+
+    THE root cause of the recurring `sqlite3.OperationalError: database is
+    locked` flake (seen on test_lookup_meter_surface, test_freemium_lookups,
+    test_watchlists — always on a *setup* write like `INSERT INTO users`).
+
+    Several endpoints spawn a detached `asyncio.create_task(...)` that opens its
+    OWN short-lived DB session and writes — most notably
+    `routers/ticker.py:_refresh_news_bg`, fired by every `GET /api/ticker/{sym}`.
+    On the shared, single-writer SQLite test DB that task becomes a second
+    connection racing the next request. It is *this* concurrent writer that the
+    diagnosed read→write upgrade deadlock needs: the request's session takes a
+    read lock on its first SELECT, the detached task grabs the write lock in
+    between, and the request's INSERT then fails to upgrade — immediately, so
+    `busy_timeout`/WAL can't help (both were tried and reverted). Under pytest's
+    function-scoped loops the task also outlives its test, leaking a locked
+    connection into the *next* test's first write.
+
+    Draining here removes the concurrent writer at the source instead of
+    fighting the lock: a brief grace lets quick tasks finish on their own, then
+    anything still running (e.g. a background news fetch mid `wait_for`, holding
+    no DB lock yet) is cancelled and reaped so the loop closes clean. Test
+    infrastructure only — production is Postgres and unaffected.
+    """
+    yield
+    current = asyncio.current_task()
+    leftover = [t for t in asyncio.all_tasks() if t is not current and not t.done()]
+    if not leftover:
+        return
+    # Grace period for fast tasks (a no-key news fetch returns near-instantly)
+    # to settle without cancellation; then cancel + reap whatever is still in
+    # flight so no detached DB writer survives into the next test.
+    _done, pending = await asyncio.wait(leftover, timeout=1.0)
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 @pytest.fixture(autouse=True)
