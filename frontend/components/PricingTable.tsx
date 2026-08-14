@@ -84,6 +84,30 @@ const PLANS = [
     ctaHref: "/signup?plan=premium",
     highlight: false,
   },
+  {
+    name: "Trader",
+    tagline: "Early access — for desks & power users.",
+    prices: {
+      monthly: PRICING.trader.monthly,
+      annual: PRICING.trader.annual,
+      annualPerMonth: PRICING.trader.annualPerMonth,
+    },
+    // Concierge / early-access tier — NOT self-serve. The differentiators are
+    // built with early customers, so the CTA is "Talk to us" (→ /contact), not
+    // a Stripe checkout. Its price is the high anchor that reframes Premium as
+    // the sensible choice. No proPlus strip (that hardcodes "Everything in
+    // Pro"); the first highlight states "Everything in Premium" instead.
+    highlights: [
+      "Everything in Premium",
+      "Your full track record + per-factor attribution",
+      "Get your data out — API, bulk export & webhooks",
+      "Desk-grade watchlists, scans & alerts",
+      "A hand in what we build next",
+    ],
+    cta: "Talk to us",
+    ctaHref: "/contact",
+    highlight: false,
+  },
 ];
 
 export function PricingTable() {
@@ -114,8 +138,9 @@ export function PricingTable() {
         <p className="mt-1 text-center text-xs text-up/90">Save 2 months · your rate, locked in</p>
       )}
 
-      {/* 3 main plans */}
-      <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3 md:gap-6">
+      {/* Plans — Free / Pro / Premium self-serve, plus the Trader early-access
+          anchor. 2-up on tablet, 4-up on desktop. */}
+      <div className="mx-auto mt-10 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
         {PLANS.map((p) => {
           const price = p.prices[billing];
           // Annual advertises the exact per-month equivalent from

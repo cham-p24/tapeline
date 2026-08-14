@@ -48,11 +48,15 @@ describe("LandingPage hero fold", () => {
 
   // ── Paired entry points ──────────────────────────────────────────────────
 
-  it("offers BOTH hero CTAs: start the trial, and browse with no account", () => {
+  it("offers BOTH hero CTAs: see the record, and browse with no account", () => {
+    // Proof-first repositioning (2026-08): the primary door is the public
+    // track record (/scorecard) for the newsletter-burned audience, with the
+    // no-account browse path alongside it. The trial stays reachable via the
+    // nav + the terms line below the fold.
     render(<LandingPage />);
     expect(
-      screen.getByRole("link", { name: /start the 14-day trial/i }),
-    ).toHaveAttribute("href", "/signup");
+      screen.getByRole("link", { name: /see the track record/i }),
+    ).toHaveAttribute("href", "/scorecard");
     expect(
       screen.getByRole("link", { name: /browse without an account/i }),
     ).toHaveAttribute("href", "/daily-picks");
@@ -60,14 +64,14 @@ describe("LandingPage hero fold", () => {
 
   it("gives both hero CTAs equal visual weight (neither is a muted btn-ghost)", () => {
     render(<LandingPage />);
-    const trial = screen.getByRole("link", { name: /start the 14-day trial/i });
+    const record = screen.getByRole("link", { name: /see the track record/i });
     const browse = screen.getByRole("link", { name: /browse without an account/i });
     // Both are full pill buttons...
-    expect(trial.className).toMatch(/\bbtn(-primary)?\b/);
+    expect(record.className).toMatch(/\bbtn(-primary)?\b/);
     expect(browse.className).toMatch(/\bbtn\b/);
     // ...and neither is the borderless, muted treatment that buried the
     // secondary path before. `btn-ghost` here is the regression to catch.
-    expect(trial.className).not.toMatch(/btn-ghost/);
+    expect(record.className).not.toMatch(/btn-ghost/);
     expect(browse.className).not.toMatch(/btn-ghost/);
     // The browse CTA carries a real border so it reads as a button, not text.
     expect(browse.className).toMatch(/border/);
