@@ -33,7 +33,14 @@ const VARIANT: Record<Variant, string> = {
   gradient: "btn text-white bg-gradient-to-r from-accent to-accent2 hover:opacity-90",
 };
 
-type BaseProps = { variant?: Variant; className?: string; children: ReactNode };
+/**
+ * Shape: "pill" (default, rounded-full — the nav/hero standard) or "rounded"
+ * (rounded-md rectangle — the marketing-page CTA look the founder prefers on
+ * pricing/compare/whats-new).
+ */
+type Shape = "pill" | "rounded";
+
+type BaseProps = { variant?: Variant; shape?: Shape; className?: string; children: ReactNode };
 
 type AsButton = BaseProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "children"> & { href?: undefined };
@@ -47,10 +54,16 @@ type AsLink = BaseProps &
   };
 
 export function Button(props: AsButton | AsLink) {
-  const cls = `${VARIANT[props.variant ?? "primary"]} ${props.className ?? ""}`.trim();
+  const cls = [
+    VARIANT[props.variant ?? "primary"],
+    props.shape === "rounded" ? "!rounded-md" : "",
+    props.className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   if (props.href !== undefined) {
-    const { variant: _v, className: _c, children, ...linkProps } = props;
+    const { variant: _v, shape: _s, className: _c, children, ...linkProps } = props;
     return (
       <Link className={cls} {...linkProps}>
         {children}
@@ -58,7 +71,7 @@ export function Button(props: AsButton | AsLink) {
     );
   }
 
-  const { variant: _v, className: _c, children, href: _h, ...btn } = props;
+  const { variant: _v, shape: _s, className: _c, children, href: _h, ...btn } = props;
   return (
     <button className={cls} {...btn}>
       {children}

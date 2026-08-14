@@ -220,10 +220,10 @@ export default function WhatsNewPage() {
             everything; here&rsquo;s what changed and where to find it.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button href="/signup" variant="primary">
+            <Button href="/signup" variant="primary" shape="rounded">
               Open Tapeline &rarr;
             </Button>
-            <Button href="/changelog" variant="ghost">
+            <Button href="/changelog" variant="secondary" shape="rounded">
               Full changelog
             </Button>
           </div>
@@ -304,7 +304,7 @@ export default function WhatsNewPage() {
           <p className="mx-auto mt-2 max-w-md text-muted">
             The full scanner is free to look — top rows, live scores, no card required.
           </p>
-          <Button href="/signup" variant="primary" className="mt-6">
+          <Button href="/signup" variant="primary" shape="rounded" className="mt-6">
             Open Tapeline &rarr;
           </Button>
         </div>

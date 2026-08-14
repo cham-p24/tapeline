@@ -191,6 +191,7 @@ export function PricingTable() {
               <Button
                 href={ctaHref}
                 variant={p.highlight ? "gradient" : "secondary"}
+                shape="rounded"
                 className="mt-8 w-full"
               >
                 {p.cta}

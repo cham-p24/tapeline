@@ -99,7 +99,7 @@ export default function CompareIndexPage() {
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             The same six-factor score on the full live scanner — top rows free, no card to look.
           </p>
-          <Button href="/signup" variant="primary" className="mt-5">
+          <Button href="/signup" variant="primary" shape="rounded" className="mt-5">
             Sign up &rarr;
           </Button>
         </div>
