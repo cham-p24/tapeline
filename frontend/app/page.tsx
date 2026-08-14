@@ -49,15 +49,16 @@ export default function LandingPage() {
               Live market scanning
             </div>
             <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">
-              A scanner that
+              Every pick on the public record.
               <br />
-              <span className="text-accent">shows its work.</span>
+              <span className="text-accent">Even the ones that missed.</span>
             </h1>
             <p className="mt-6 text-lg text-muted leading-relaxed">
-              The <span className="font-medium text-fg">Tapeline Score</span>{" "}
-              blends six named factors into one read on every
-              ticker. Every call goes on a permanent public record &mdash; same
-              day, no edits.
+              Newsletters show you the winners. The{" "}
+              <span className="font-medium text-fg">Tapeline Score</span> blends
+              six named factors into one read on every ticker &mdash; and every
+              call, win or miss, goes on a permanent public record you can check
+              before you ever pay. Same day, no edits.
             </p>
             {/* PAIRED ENTRY POINTS — two first-class doors, not one button
                 plus a ghost link.
@@ -73,8 +74,8 @@ export default function LandingPage() {
                 R6: states the trial's terms as fact — no countdown, no
                 deadline, no scarcity. */}
             <div className="mt-8 grid gap-3 sm:max-w-md sm:grid-cols-2">
-              <Link href="/signup" className="btn-primary text-base">
-                Start the 14-day trial &rarr;
+              <Link href="/scorecard" className="btn-primary text-base">
+                See the track record &rarr;
               </Link>
               <Link
                 href="/daily-picks"
@@ -83,13 +84,14 @@ export default function LandingPage() {
                 Browse without an account
               </Link>
             </div>
-            {/* Plain description of what each door leads to. The trial takes no
-                card, so there is nothing to cancel and no charge to avoid —
-                say that rather than implying a billing cliff. */}
+            {/* Proof-first: both doors need no account — the public record and
+                today's Top 10. The trial's terms are stated as fact below —
+                no countdown, no scarcity. */}
             <p className="mt-3 text-xs text-muted leading-relaxed">
-              The trial is 14 days of Premium. No credit card, no payment
+              The record and today&rsquo;s picks are open to everyone, no account
+              needed. The trial is 14 days of Premium. No credit card, no payment
               details, nothing charged &mdash; it simply ends and your account
-              stays on the Free tier. Browsing needs no account at all.
+              stays on the Free tier.
             </p>
             <p className="mt-2 text-xs text-muted">
               <Link

@@ -25,6 +25,12 @@ export const PRICING = {
   currency: "USD",
   pro: { monthly: 9.99, annual: 99, annualPerMonth: 8.25 },
   premium: { monthly: 19.99, annual: 199, annualPerMonth: 16.58 },
+  // Trader — early-access / concierge high tier. Not self-serve: sold by hand
+  // to early customers while the data-out differentiators (full record +
+  // attribution, higher API, bulk export/webhooks) are built with them, so no
+  // Stripe self-checkout and no unbuilt feature is billed. Its job on the
+  // pricing page is the high anchor that reframes Premium as the value choice.
+  trader: { monthly: 59, annual: 588, annualPerMonth: 49 },
 } as const;
 
 export type BillingPeriod = "monthly" | "annual";
