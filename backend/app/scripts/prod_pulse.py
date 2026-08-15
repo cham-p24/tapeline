@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import func, select
 
@@ -28,10 +29,15 @@ from app.db import SessionLocal
 from app.models import User
 from app.services.email import send_email
 
-try:  # watchlist size is the engagement proxy; degrade gracefully if renamed
-    from app.models import WatchlistItem
+# Watchlist size is the engagement proxy; degrade gracefully if the model
+# is ever renamed. Declared Any-typed so the optional import can rebind it.
+WatchlistItem: Any = None
+try:
+    from app.models import WatchlistItem as _WatchlistItem
+
+    WatchlistItem = _WatchlistItem
 except Exception:  # pragma: no cover - defensive
-    WatchlistItem = None
+    pass
 
 FOUNDER_EMAIL = os.environ.get("PULSE_TO", "cpiyatilaka@gmail.com")
 
@@ -39,11 +45,11 @@ FOUNDER_EMAIL = os.environ.get("PULSE_TO", "cpiyatilaka@gmail.com")
 async def gather() -> dict:
     async with SessionLocal() as s:
         total = (await s.execute(select(func.count()).select_from(User))).scalar() or 0
-        by_tier = dict(
-            (
-                await s.execute(select(User.tier, func.count()).group_by(User.tier))
-            ).all()
-        )
+        by_tier: dict[str, int] = {}
+        for _row in (
+            await s.execute(select(User.tier, func.count()).group_by(User.tier))
+        ).all():
+            by_tier[str(_row[0])] = int(_row[1])
         cards = (
             await s.execute(
                 select(func.count())
