@@ -19,10 +19,30 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  apexRedirectTarget,
   METADATA_ROUTE_RE,
   TICKER_PREFIX_RE,
   VALID_TICKER_RE,
 } from "../middleware";
+
+describe("legacy tapeline.app → canonical tapeline.io", () => {
+  it("308-redirects .app (and www.app) to the same path on .io, query preserved", () => {
+    expect(apexRedirectTarget("tapeline.app", "/pricing", "")).toBe("https://tapeline.io/pricing");
+    expect(apexRedirectTarget("www.tapeline.app", "/t/AAPL", "?ref=hn")).toBe(
+      "https://tapeline.io/t/AAPL?ref=hn",
+    );
+    expect(apexRedirectTarget("TAPELINE.APP", "/whats-new", "")).toBe(
+      "https://tapeline.io/whats-new",
+    );
+  });
+
+  it("leaves the canonical host and everything else alone (no redirect loop)", () => {
+    expect(apexRedirectTarget("tapeline.io", "/pricing", "")).toBeNull();
+    expect(apexRedirectTarget("www.tapeline.io", "/pricing", "")).toBeNull();
+    expect(apexRedirectTarget("localhost:3000", "/", "")).toBeNull();
+    expect(apexRedirectTarget(null, "/x", "")).toBeNull();
+  });
+});
 
 /**
  * Mirrors handleTickerRoute's branch order. The ORDER matters: ticker shape is
