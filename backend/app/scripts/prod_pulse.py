@@ -39,12 +39,11 @@ FOUNDER_EMAIL = os.environ.get("PULSE_TO", "cpiyatilaka@gmail.com")
 async def gather() -> dict:
     async with SessionLocal() as s:
         total = (await s.execute(select(func.count()).select_from(User))).scalar() or 0
-        by_tier = {
-            t: c
-            for t, c in (
+        by_tier = dict(
+            (
                 await s.execute(select(User.tier, func.count()).group_by(User.tier))
             ).all()
-        }
+        )
         cards = (
             await s.execute(
                 select(func.count())
