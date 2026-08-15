@@ -51,11 +51,14 @@ const nextConfig = {
       // Exact-match: never catches /badge/{symbol}, so the SVG keeps serving.
       { source: "/badge", destination: "/embed", permanent: true },
 
-      // Temporary (307) for these two: a proper /compare and /best-stocks-for
-      // index hub is a plausible future build, so don't let browsers/Google
-      // permanently cache the fallback target. /best-stock-scanners is the
-      // existing scanner-comparison roundup; /signals is the live universe.
-      { source: "/compare", destination: "/best-stock-scanners", permanent: false },
+      // Temporary (307): /best-stocks-for has only [strategy] children and no
+      // index hub yet, so the bare parent falls back to the live universe. Not
+      // permanent — a proper index is a plausible future build.
+      //
+      // NOTE: /compare's old fallback redirect (→ /best-stock-scanners) was
+      // REMOVED once app/compare/page.tsx shipped (#465). Next.js runs redirects
+      // before pages, so the fallback was SHADOWING that real index hub — the
+      // page 307'd away and was unreachable. /compare now serves its 200 hub.
       { source: "/best-stocks-for", destination: "/signals", permanent: false },
     ];
   },
