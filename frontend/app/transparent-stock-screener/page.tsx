@@ -17,7 +17,7 @@ import {
  * self-contained FAQ answers (40-80 words) that mirror the FAQPage schema.
  *
  * Positioning is deliberately NOT performance — Tapeline's published record does
- * not beat the market at this sample, and it says so. The citable, defensible,
+ * not beat SPY at this sample, and it says so. The citable, defensible,
  * uncopyable fact is the RADICAL TRANSPARENCY itself: an unedited, loss-included,
  * downloadable record. Every performance figure carries the same descriptive,
  * not-a-forecast framing as the live /scorecard, for compliance.
@@ -39,7 +39,7 @@ const FAQ = [
     a: "It's self-verifiable rather than self-reported. Each pick is published same-day with its price and six-factor score; the next-day close and SPY's move over the same two closes are recorded a day later; and the full archive is downloadable as raw CSV and JSON with the methodology attached. You can re-check every number against any price source you trust — Tapeline invites corrections.",
   },
   {
-    q: "Does Tapeline beat the market?",
+    q: "Does Tapeline&rsquo;s record beat SPY?",
     a: "Not at this sample, and it says so plainly. Across 628 picks over 67 days, 46.2% beat SPY the next session with a slightly negative median — figures Tapeline describes as descriptive only, not distinguishable from chance at this size, and not a forecast or investable strategy. Publishing that openly, rather than hiding it, is the entire point of the record.",
   },
   {
