@@ -1,0 +1,36 @@
+name: Prod pulse (weekly funnel report)
+
+# Emails the founder a first-party funnel + buying-signal readout once a week.
+# It answers the recurring questions — how many arrive, from where, who's
+# engaged, and has anyone reached checkout — straight from the production
+# database. No third-party analytics and no OAuth connector required.
+#
+# The script is sourced from this checkout and exec'd inside the prod backend's
+# Python via `flyctl ssh console`, so it runs against the live DB with the
+# Resend email service already configured, and always uses current code without
+# waiting for a backend deploy. Report-only: it never emails users.
+
+on:
+  schedule:
+    # Sunday 22:17 UTC ≈ Monday morning in Sydney — a start-of-week read.
+    # Off the :00 mark to avoid GitHub's cron peak (Actions cron is best-effort
+    # and often runs several minutes late; fine for a weekly digest).
+    - cron: "17 22 * * 0"
+  workflow_dispatch:        # Manual "send me one now" from the Actions tab
+
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Run prod pulse on the backend and email the founder
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          B64=$(base64 -w0 backend/app/scripts/prod_pulse.py)
+          flyctl ssh console -a tapeline-backend \
+            -C "python -c \"import base64;exec(base64.b64decode('$B64').decode())\""
