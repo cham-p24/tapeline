@@ -11,6 +11,14 @@
  * banks, …), then expanded to every within-group pair. Deliberately static — no
  * runtime fetch on the sitemap path — and canonicalised so each pair has exactly
  * one URL (alphabetical order), which kills duplicate-content on a-vs-b / b-vs-a.
+ *
+ * INVARIANT: every symbol here MUST resolve in Tapeline's active universe (i.e.
+ * /t/{SYM} returns 200). The /compare/[matchup] page 404s when either ticker is
+ * missing, but the sitemap emits ALL of these pairs unconditionally — so a dead
+ * symbol here becomes a 404 URL advertised to Google. Two were removed after
+ * exactly that: BYDDY (thin ADR, never in the top-2500 universe) from autos/EV,
+ * and PARA (Paramount — ticker retired post-Skydance merger) from media. Before
+ * adding a symbol, confirm /t/{SYM} 200s.
  */
 
 const GROUPS: string[][] = [
@@ -23,9 +31,9 @@ const GROUPS: string[][] = [
   ["XOM", "CVX", "COP", "OXY", "SLB"], // energy
   ["KO", "PEP", "MDLZ", "PG", "CL"], // consumer staples
   ["V", "MA", "PYPL", "AXP", "SOFI"], // payments / fintech
-  ["TSLA", "F", "GM", "RIVN", "LCID", "BYDDY"], // autos / EV
+  ["TSLA", "F", "GM", "RIVN", "LCID"], // autos / EV
   ["HD", "LOW", "TGT", "WMT", "COST"], // retail
-  ["DIS", "NFLX", "WBD", "PARA", "CMCSA"], // media / streaming
+  ["DIS", "NFLX", "WBD", "CMCSA"], // media / streaming
   ["UBER", "LYFT", "DASH", "ABNB"], // gig / travel
   ["PFE", "MRK", "LLY", "JNJ", "ABBV", "NVO"], // pharma
   ["BA", "LMT", "RTX", "GD", "NOC"], // defense / aerospace
