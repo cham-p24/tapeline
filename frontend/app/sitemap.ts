@@ -147,6 +147,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // screener you can verify / transparent screener with a downloadable
     // record" long-tail. Points skeptic-intent search at the raw CSV/JSON.
     { url: `${base}/verify`,                    lastModified: new Date("2026-07-25"), priority: 0.8 },
+    { url: `${base}/transparent-stock-screener`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
     // Daily-picks newsletter lead-magnet landing — preview of what
