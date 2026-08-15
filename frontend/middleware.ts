@@ -154,18 +154,16 @@ export const METADATA_ROUTE_RE =
   /^(opengraph-image|twitter-image|icon|apple-icon)(-[a-z0-9]+)?$/i;
 
 /**
- * Domain consolidation. The canonical host is tapeline.io; the legacy
- * tapeline.app domain must not serve a second, indexable copy — that splits
- * SEO/link equity across two hosts. Any request reaching the app on
- * tapeline.app (or www.tapeline.app) is 308'd (permanent) to the same path on
- * tapeline.io, query preserved. Inert for every other host, so it does nothing
- * unless .app is actually pointed at this deployment — at which point it fixes
- * the split with no DNS/redirect config elsewhere.
- */
-/**
- * Pure decision: the absolute tapeline.io target for a request that arrived on
- * the legacy tapeline.app host, or null for the canonical host (and everything
- * else). Exported so the redirect is unit-tested without HTTP plumbing.
+ * Canonical-host consolidation. The canonical host is bare `tapeline.io`.
+ * Non-canonical hosts must not serve a second indexable copy (that splits
+ * SEO/link equity):
+ *   - `www.tapeline.io` — resolves to the same Fly app and today returns a
+ *     200 duplicate; a canonical tag softens it, but a 308 is the proper fix.
+ *   - the legacy `tapeline.app` / `www.tapeline.app` domain.
+ * Any request that reaches the app on one of these is 308'd (permanent) to the
+ * same path on bare `tapeline.io`, query preserved. Returns null for the
+ * canonical host and everything else, so there is no redirect loop. Pure +
+ * exported so the decision is unit-tested without HTTP plumbing.
  */
 export function apexRedirectTarget(
   host: string | null,
@@ -173,7 +171,11 @@ export function apexRedirectTarget(
   search: string,
 ): string | null {
   const h = (host ?? "").toLowerCase();
-  if (h === "tapeline.app" || h === "www.tapeline.app") {
+  if (
+    h === "www.tapeline.io" ||
+    h === "tapeline.app" ||
+    h === "www.tapeline.app"
+  ) {
     return `https://tapeline.io${pathname}${search}`;
   }
   return null;
