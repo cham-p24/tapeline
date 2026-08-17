@@ -916,6 +916,17 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               </svg>
               Share on X
             </a>
+            {/* Embed CTA — surfaces the free iframe score badge so bloggers and
+                site owners can drop a live score on their own page. Each embed
+                is an evergreen backlink + a top-of-funnel arrival (the
+                distribution lever); previously it was only reachable from the
+                footer, so almost nobody found it. */}
+            <Link href="/embed" className="btn-ghost inline-flex items-center gap-2">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M8 9l-4 3 4 3M16 9l4 3-4 3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Embed this score
+            </Link>
           </div>
         </div>
 
