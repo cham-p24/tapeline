@@ -288,17 +288,16 @@ function SignUpForm() {
       // second GA4 name for the same instant would double-count the signup.
       trackEvent("sign_up", { method: "email" });
       trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
-      // Route through /app/onboarding first — captures use-case + attribution
-      // + marketing-opt-in before they hit the product. It does NOT capture
-      // suitability data (experience, portfolio size, capital, risk tolerance,
-      // holdings, goals): those questions were removed 2026-07-18 under
-      // compliance Rule 8, and this signup form has never collected any of
-      // them. Do not reintroduce them here or there. The
-      // onboarding page redirects to the post-auth destination after submit
-      // or skip: /app/billing (with plan intent restated) when the visitor
-      // arrived from a /pricing plan CTA, otherwise the default `next`.
-      // Existing users (signin) never pass through here.
-      router.push(`/app/onboarding?next=${encodeURIComponent(postAuthNext)}`);
+      // 2026-08-19: route STRAIGHT to the product (scanner, or /app/billing when
+      // a /pricing plan CTA carried intent) instead of interposing the onboarding
+      // survey. Getting a new user to value fast is the priority; the survey was a
+      // pre-product interstitial that delayed the first real screen. The `sign_up`
+      // + `start_trial` funnel events already fired above, so analytics is intact.
+      // The /app/onboarding page is KEPT (still linked from the in-app welcome) so
+      // referral-source self-report + the sector→watchlist seed aren't lost — they
+      // are just no longer a gate. Suitability questions were removed 2026-07-18
+      // under compliance Rule 8 and must not be reintroduced.
+      router.push(postAuthNext);
       router.refresh();
     } catch (e: unknown) {
       setErr(errorMessage(e) || "Sign up failed");

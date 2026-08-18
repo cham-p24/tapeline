@@ -388,7 +388,10 @@ async def test_google_callback_new_signup_still_works(
         )
     assert r.status_code == 307
     assert SESSION_COOKIE in _set_cookies(r)
-    assert "/app/onboarding" in r.headers["location"]
+    # New OAuth users route straight to the product now (no onboarding survey),
+    # tagged with oauth=1.
+    assert "/app/onboarding" not in r.headers["location"]
+    assert r.headers["location"].endswith("oauth=1")
     assert stub_mfa == []
 
     async with session_scope() as s:

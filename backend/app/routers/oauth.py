@@ -683,9 +683,14 @@ async def oauth_callback(
         # two describe the same user rather than two. Fire-and-forget,
         # env-gated, never raises — see services/analytics.
         try:
-            from app.services.analytics import track_sign_up
+            from app.services.analytics import track_sign_up, track_start_trial
 
             await track_sign_up(user_id=user.id, method=provider)
+            # The 14-day Premium trial auto-starts on signup. New OAuth users
+            # now route straight to the product (no onboarding interstitial),
+            # so the client-side start_trial beacon no longer fires — record it
+            # server-side here so the trial conversion still reaches GA4/Ads.
+            await track_start_trial(user_id=user.id, method=provider)
         except Exception:
             logger.exception("oauth.ga4_sign_up_failed user=%s", user.id)
 
@@ -736,10 +741,14 @@ async def oauth_callback(
             )
         except Exception:
             logger.exception("oauth.welcome_email_failed user=%s", user.id)
-        # oauth=1 marks a brand-new OAuth signup so the frontend can fire
-        # signup-funnel analytics events later (no frontend event work yet).
-        qs = urlencode({"next": next_path, "oauth": "1"})
-        redirect_url = f"{settings.app_url}/app/onboarding?{qs}"
+        # 2026-08-19: route NEW OAuth users straight to the product instead of
+        # the onboarding survey (parallels the email /signup change). sign_up +
+        # start_trial are now recorded server-side above, so no oauth=1 client
+        # handoff is needed. next_path is re-validated via _safe_next, so this
+        # is open-redirect-safe. oauth=1 is still appended for any destination
+        # that wants to know the signup channel (harmless if unread).
+        sep = "&" if "?" in next_path else "?"
+        redirect_url = f"{settings.app_url}{next_path}{sep}oauth=1"
     else:
         redirect_url = f"{settings.app_url}{next_path}"
     resp = RedirectResponse(redirect_url)

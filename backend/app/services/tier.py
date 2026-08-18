@@ -131,8 +131,15 @@ def free_watchlist_cap(today: date | None = None) -> int:
     enforcement (via `limit()`) and every copy surface, so the two can't drift.
     `today` is injectable for tests.
     """
-    d = today or datetime.now(UTC).date()
-    return 0 if d >= FREE_WATCHLIST_REMOVAL_DATE else FREE_WATCHLIST_TICKERS
+    # 2026-08-19: watchlist-to-Pro cutover REVERSED — the free saved-ticker cap
+    # is restored. The 0-cap orphaned the free web-push alert on-ramp (ArmAlerts
+    # seeds from wl.items[0], which the cutover left permanently empty) and
+    # tightened the free tier at a stage where the priority is arrivals +
+    # activation, not gating a feature no paying cohort yet exists to protect.
+    # `today` is retained for signature/test compatibility; the date gate below
+    # is intentionally no longer consulted (see FREE_WATCHLIST_REMOVAL_DATE).
+    _ = today
+    return FREE_WATCHLIST_TICKERS
 
 
 def free_has_watchlist(today: date | None = None) -> bool:

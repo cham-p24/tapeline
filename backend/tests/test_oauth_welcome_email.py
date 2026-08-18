@@ -196,7 +196,9 @@ async def test_welcome_email_failure_does_not_fail_signup(
         )
 
     assert r.status_code == 307
-    assert "/app/onboarding" in r.headers["location"]
+    # New OAuth users route straight to the product now (no onboarding survey).
+    assert "/app/onboarding" not in r.headers["location"]
+    assert "oauth=1" in r.headers["location"]
     assert len(_sends_to(send, email)) == 1
     # The user really was created despite the email failure.
     async with session_scope() as s:

@@ -193,3 +193,22 @@ async def track_sign_up(*, user_id: str, method: str) -> bool:
         client_id=synthetic_client_id(user_id),
         user_id=user_id,
     )
+
+
+async def track_start_trial(*, user_id: str, method: str) -> bool:
+    """Server-side `start_trial` conversion, keyed on our own user id.
+
+    The 14-day Premium trial auto-starts on signup, so this fires alongside
+    `track_sign_up`. It exists for the OAuth path: OAuth signups now route
+    straight to the product (the onboarding survey is no longer interposed),
+    so the client-side `start_trial` beacon that used to fire on the onboarding
+    page no longer runs — this server-side event keeps the trial conversion
+    visible to GA4/Ads regardless of client state. `method` matches the
+    client beacon's ("google" / "microsoft" / "apple").
+    """
+    return await send_event(
+        name="start_trial",
+        params={"method": method, "tier": "premium", "days": 14},
+        client_id=synthetic_client_id(user_id),
+        user_id=user_id,
+    )

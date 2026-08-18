@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import uuid as _uuid
 from types import SimpleNamespace
-from urllib.parse import urlencode
 
 import httpx
 import pytest
@@ -193,8 +192,10 @@ async def test_callback_new_user_carries_intent_and_oauth_flag(
         )
 
     assert r.status_code == 307
-    expected_qs = urlencode({"next": INTENT, "oauth": "1"})
-    assert r.headers["location"] == f"{settings.app_url}/app/onboarding?{expected_qs}"
+    # New OAuth users now land straight on the product (no onboarding survey),
+    # with purchase intent carried through and oauth=1 appended. INTENT already
+    # carries a query string, so oauth=1 joins with "&".
+    assert r.headers["location"] == f"{settings.app_url}{INTENT}&oauth=1"
 
     # The user really was created on the trial path (existing behaviour).
     async with session_scope() as s:
@@ -209,7 +210,7 @@ async def test_callback_new_user_carries_intent_and_oauth_flag(
 async def test_callback_new_user_defaults_to_scanner_with_oauth_flag(
     client, google_configured, monkeypatch,
 ):
-    """No intent cookie → same onboarding flow as before, plus oauth=1."""
+    """No intent cookie → straight to the scanner (no onboarding survey), plus oauth=1."""
     email = f"oauth_plain_{_uuid.uuid4().hex}@example.com"
     monkeypatch.setattr(oauth_module, "httpx", _fake_httpx(email))
 
@@ -221,8 +222,8 @@ async def test_callback_new_user_defaults_to_scanner_with_oauth_flag(
         )
 
     assert r.status_code == 307
-    expected_qs = urlencode({"next": "/app/scanner", "oauth": "1"})
-    assert r.headers["location"] == f"{settings.app_url}/app/onboarding?{expected_qs}"
+    # /app/scanner has no query string, so oauth=1 joins with "?".
+    assert r.headers["location"] == f"{settings.app_url}/app/scanner?oauth=1"
 
     async with session_scope() as s:
         row = (await s.execute(select(User).where(User.email == email))).scalar_one()

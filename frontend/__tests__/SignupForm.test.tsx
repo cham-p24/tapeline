@@ -153,9 +153,7 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
-    expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
-    );
+    expect(routerSpies.push).toHaveBeenCalledWith("/app/scanner");
   });
 
   it("makes the Name field optional (email + password are the only required inputs)", () => {
@@ -207,8 +205,8 @@ describe("SignUpPage", () => {
   // ── Plan-intent carry-through (?plan= / ?billing= from /pricing) ──────────
   // /pricing CTAs link to /signup?plan=pro|premium&billing=monthly|annual.
   // These params used to be silently dropped — the buyer's plan choice never
-  // survived signup. They must now be restated to /app/billing via the
-  // onboarding `next` param.
+  // survived signup. They must now route directly to /app/billing after signup
+  // (the onboarding survey interstitial was removed 2026-08-19).
 
   it("routes plan intent from /pricing into the billing page after signup", async () => {
     nav.search = new URLSearchParams("plan=premium&billing=annual");
@@ -216,7 +214,7 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/billing?intent=premium&billing=annual")}`,
+      "/app/billing?intent=premium&billing=annual",
     );
   });
 
@@ -226,7 +224,7 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/billing?intent=pro&billing=monthly")}`,
+      "/app/billing?intent=pro&billing=monthly",
     );
   });
 
@@ -234,9 +232,7 @@ describe("SignUpPage", () => {
     const { container } = render(<SignUpPage />);
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
-    expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
-    );
+    expect(routerSpies.push).toHaveBeenCalledWith("/app/scanner");
   });
 
   it("ignores a bogus ?plan= value (falls back to the default destination)", async () => {
@@ -244,9 +240,7 @@ describe("SignUpPage", () => {
     const { container } = render(<SignUpPage />);
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
-    expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
-    );
+    expect(routerSpies.push).toHaveBeenCalledWith("/app/scanner");
   });
 
   it("carries the plan intent through the Sign in link for existing users", () => {
