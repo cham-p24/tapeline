@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Tapeline — Ticker Score Overlay",
+  "version": "0.1.0",
+  "description": "See Tapeline's six-factor score and the one-line reason for any ticker, on the finance sites you already use. No account needed.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.tapeline.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tapeline"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://finance.yahoo.com/*",
+        "https://www.tradingview.com/*",
+        "https://www.google.com/finance/*",
+        "https://www.marketwatch.com/*",
+        "https://seekingalpha.com/*",
+        "https://stocktwits.com/*",
+        "https://finviz.com/*",
+        "https://www.barchart.com/*",
+        "https://www.cnbc.com/quotes/*",
+        "https://robinhood.com/*",
+        "https://www.nasdaq.com/market-activity/*"
+      ],
+      "js": [
+        "sites.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

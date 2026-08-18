@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tapeline</title>
+<style>
+  :root { color-scheme: dark light; }
+  body { margin: 0; width: 300px; font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #16181d; color: #e9e7e1; font-size: 13px; }
+  header { padding: 13px 14px 10px; border-bottom: 1px solid #2a2d35; display: flex; align-items: center; gap: 8px; }
+  .mark { font-weight: 800; font-size: 10px; letter-spacing: .06em; color: #0f1420; background: #6fa8e0;
+          border-radius: 5px; padding: 3px 4px; }
+  .title { font-weight: 600; }
+  form { display: flex; gap: 7px; padding: 12px 14px; }
+  input { flex: 1; background: #1f232b; border: 1px solid #333740; color: #e9e7e1; border-radius: 7px;
+          padding: 8px 10px; font-size: 13px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  input:focus { outline: 2px solid #6fa8e0; outline-offset: 1px; }
+  button { background: #6fa8e0; color: #0f1420; border: 0; border-radius: 7px; padding: 8px 12px;
+           font-weight: 600; font-size: 13px; cursor: pointer; }
+  #out { padding: 0 14px 14px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .sym { font-weight: 700; font-size: 15px; } .name { color: #9a978e; font-size: 12px; }
+  .score { font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .score span { font-size: 11px; color: #9a978e; font-weight: 500; }
+  .pos { color: #4ec98a } .neg { color: #e0796f } .mid { color: #e0ad4f }
+  .why { color: #c9c6bf; line-height: 1.5; margin: 9px 0 11px; font-size: 12.5px; }
+  .f { display: grid; grid-template-columns: 82px 1fr 24px; gap: 8px; align-items: center; margin-bottom: 5px; }
+  .fl { color: #9a978e; font-size: 11px; }
+  .bar { background: #262a32; height: 5px; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: #6fa8e0; }
+  .fv { text-align: right; font-size: 11px; color: #c9c6bf; font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 7px; margin-top: 12px; }
+  a.btn { flex: 1; text-align: center; text-decoration: none; font-size: 12px; font-weight: 600;
+          padding: 7px; border-radius: 7px; background: #6fa8e0; color: #0f1420; }
+  a.ghost { background: transparent; color: #c9c6bf; border: 1px solid #333740; }
+  .fine { color: #7c7a72; font-size: 10.5px; line-height: 1.45; margin: 11px 0 0; }
+  .msg { color: #9a978e; padding: 2px 0 6px; }
+  @media (prefers-color-scheme: light) {
+    body { background: #fff; color: #1a1a1a }
+    header { border-color: #e8e5df } input { background: #f6f5f2; border-color: #dcd8cf; color: #1a1a1a }
+    .name, .fl, .msg, .score span { color: #6b665d } .why, .fv, a.ghost { color: #333 }
+    .bar { background: #eceae5 } a.ghost { border-color: #dcd8cf } .fine { color: #8a857c }
+  }
+</style>
+<header><span class="mark">TL</span><span class="title">Tapeline</span></header>
+<form id="f">
+  <input id="q" placeholder="Ticker, e.g. NVDA" autofocus autocomplete="off" spellcheck="false" maxlength="10" aria-label="Ticker symbol">
+  <button type="submit">Look up</button>
+</form>
+<div id="out"></div>
+<script src="sites.js"></script>
+<script src="popup.js"></script>
