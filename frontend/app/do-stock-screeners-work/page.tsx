@@ -214,6 +214,21 @@ export default function DoStockScreenersWorkPage() {
           ))}
         </div>
 
+        {/* Topic cluster — interlink the transparency answer pages. */}
+        <div className="mt-12 border-t border-border pt-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted">Related</div>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link href="/stock-screener-track-record" className="text-accent hover:underline">Stock screener track record</Link>
+              <span className="text-muted"> &mdash; which screeners publish a record, and what a real one must contain.</span>
+            </li>
+            <li>
+              <Link href="/transparent-stock-screener" className="text-accent hover:underline">The most transparent stock screener</Link>
+              <span className="text-muted"> &mdash; every pick published, losses included, never edited.</span>
+            </li>
+          </ul>
+        </div>
+
         {/* CTA */}
         <div className="mt-12 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
           <h2 className="text-xl font-semibold">Check the picks against SPY yourself</h2>

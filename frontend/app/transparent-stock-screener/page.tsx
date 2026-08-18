@@ -147,6 +147,21 @@ export default function TransparentScreenerPage() {
           ))}
         </div>
 
+        {/* Topic cluster — interlink the transparency answer pages. */}
+        <div className="mt-12 border-t border-border pt-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted">Related</div>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link href="/do-stock-screeners-work" className="text-accent hover:underline">Do stock screeners actually work?</Link>
+              <span className="text-muted"> &mdash; how to judge whether any screener&rsquo;s picks are worth acting on.</span>
+            </li>
+            <li>
+              <Link href="/stock-screener-track-record" className="text-accent hover:underline">Stock screener track record</Link>
+              <span className="text-muted"> &mdash; what a real, checkable record has to contain, and how the landscape compares.</span>
+            </li>
+          </ul>
+        </div>
+
         {/* CTA */}
         <div className="mt-12 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
           <h2 className="text-xl font-semibold">See the transparent scores yourself</h2>

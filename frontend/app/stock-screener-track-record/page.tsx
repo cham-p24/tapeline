@@ -179,6 +179,21 @@ export default function StockScreenerTrackRecordPage() {
           ))}
         </div>
 
+        {/* Topic cluster — interlink the transparency answer pages. */}
+        <div className="mt-12 border-t border-border pt-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted">Related</div>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li>
+              <Link href="/do-stock-screeners-work" className="text-accent hover:underline">Do stock screeners actually work?</Link>
+              <span className="text-muted"> &mdash; a five-step way to check whether a screener&rsquo;s picks are worth acting on.</span>
+            </li>
+            <li>
+              <Link href="/transparent-stock-screener" className="text-accent hover:underline">The most transparent stock screener</Link>
+              <span className="text-muted"> &mdash; what &ldquo;transparent&rdquo; actually means, line by line.</span>
+            </li>
+          </ul>
+        </div>
+
         {/* CTA */}
         <div className="mt-12 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
           <h2 className="text-xl font-semibold">See the record, then the live scores</h2>
