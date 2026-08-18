@@ -40,6 +40,8 @@ export function MarketingFooter() {
             <FooterLink href="/daily-picks">Daily picks (no account)</FooterLink>
             <FooterLink href="/verify">Verify the record</FooterLink>
             <FooterLink href="/transparent-stock-screener">Transparent screener</FooterLink>
+            <FooterLink href="/stock-screener-track-record">Screener track record</FooterLink>
+            <FooterLink href="/do-stock-screeners-work">Do screeners work?</FooterLink>
             <FooterLink href="/signals">All signals</FooterLink>
             <FooterLink href="/sectors">Sectors</FooterLink>
             <FooterLink href="/stocks">Stock directory</FooterLink>
