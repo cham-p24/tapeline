@@ -36,10 +36,22 @@ primary_region = "syd"
   min_machines_running = 2
   processes = ["app"]
 
+  # Concurrency limits sized to what ONE machine can actually survive, not an
+  # arbitrary ceiling. These SSR ticker pages (/t/[symbol]) each render React +
+  # fetch the backend on a cold cache, so they are far heavier than a static
+  # hit. With the old soft_limit=200 the Fly proxy would pile up to 200 renders
+  # onto a single 512mb/1-CPU box before load-balancing — which buries it: a
+  # burst of ~25 concurrent cold renders was enough to drive the machine into
+  # 500s and then dropped connections (observed 2026-08-18 while crawling the
+  # sitemap; the same mechanism is behind Search Console's sporadic 5xx after a
+  # deploy wipes the per-machine ISR cache). soft_limit is ALSO the autostart
+  # trigger, so a low value makes Fly spread across the warm pair and wake burst
+  # machines (scale count 4, see deploy-frontend.yml) BEFORE any one box is
+  # overwhelmed; hard_limit queues the overflow instead of 500ing it.
   [http_service.concurrency]
     type = "requests"
-    soft_limit = 200
-    hard_limit = 250
+    soft_limit = 40
+    hard_limit = 60
 
 [[http_service.checks]]
   interval = "15s"
@@ -48,8 +60,14 @@ primary_region = "syd"
   method = "GET"
   path = "/how-it-works"
 
+# Bumped 2026-08-18 from shared-cpu-1x/512mb after the frontend was shown to OOM
+# and drop connections under a burst of concurrent cold SSR renders (each /t/
+# page renders React + fetches the backend). 2 vCPUs let the box render several
+# pages concurrently instead of starving the event loop; 1gb gives headroom so a
+# render burst no longer exhausts memory. Paired with the concurrency limits
+# above and autoscale (scale count 4 in deploy-frontend.yml) for launch spikes.
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = "shared-cpu-2x"
+  memory = "1024mb"
   cpu_kind = "shared"
-  cpus = 1
+  cpus = 2
