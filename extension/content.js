@@ -34,8 +34,11 @@
     padding: 7px 10px 7px 9px; box-shadow: 0 6px 22px rgba(0,0,0,.28); font-size: 13px;
     line-height: 1; user-select: none; }
   .tl-pill:hover { border-color: #4a505c; }
-  .tl-mark { font-weight: 800; font-size: 10px; letter-spacing: .06em; color: #0f1420;
-    background: #6fa8e0; border-radius: 5px; padding: 3px 4px; }
+  /* The brand mark itself — same geometry as frontend/public/favicon.svg, so the
+     pill carries the real logo rather than a lookalike badge. */
+  .tl-mark { width: 16px; height: 16px; border-radius: 3px; background: #0a0a0a; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .tl-mark i { display: block; width: 10px; height: 2.5px; border-radius: 999px; background: #3b82f6; }
   .tl-score { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
   .tl-sig { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #9a978e; }
   .tl-sym { font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -44,7 +47,7 @@
   .tl-mid .tl-score { color: #e0ad4f; }
   .tl-x { all: unset; cursor: pointer; color: #6e6b64; font-size: 15px; padding: 0 2px; }
   .tl-x:hover { color: #e9e7e1; }
-  .tl-dot { width: 7px; height: 7px; border-radius: 50%; background: #6fa8e0;
+  .tl-dot { width: 7px; height: 7px; border-radius: 50%; background: #3b82f6;
     animation: tl-p 1s ease-in-out infinite; }
   @keyframes tl-p { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
   .tl-panel { width: 292px; background: #16181d; color: #e9e7e1; border: 1px solid #333740;
@@ -61,11 +64,11 @@
   .tl-f { display: grid; grid-template-columns: 82px 1fr 24px; align-items: center; gap: 8px; }
   .tl-fl { color: #9a978e; font-size: 11px; }
   .tl-bar { background: #262a32; height: 5px; border-radius: 3px; overflow: hidden; }
-  .tl-bar i { display: block; height: 100%; background: #6fa8e0; border-radius: 3px; }
+  .tl-bar i { display: block; height: 100%; background: #3b82f6; border-radius: 3px; }
   .tl-fv { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; color: #c9c6bf; }
   .tl-actions { display: flex; gap: 8px; margin-top: 13px; }
   .tl-btn { flex: 1; text-align: center; text-decoration: none; font-size: 12px; font-weight: 600;
-    padding: 7px 9px; border-radius: 7px; background: #6fa8e0; color: #0f1420; }
+    padding: 7px 9px; border-radius: 7px; background: #3b82f6; color: #fff; }
   .tl-btn-ghost { background: transparent; color: #c9c6bf; border: 1px solid #333740; }
   .tl-btn:hover { opacity: .9; }
   .tl-fine { margin: 11px 0 0; color: #7c7a72; font-size: 10.5px; line-height: 1.45; }
@@ -145,7 +148,7 @@
 
       wrap.innerHTML = `
         <div class="tl-pill tl-${tone}" role="button" tabindex="0" aria-expanded="false">
-          <span class="tl-mark">TL</span>
+          <span class="tl-mark" aria-hidden="true"><i></i></span>
           <span class="tl-score">${score}</span>
           <span class="tl-sig">${esc(data.signal || "")}</span>
           <button class="tl-x" title="Hide">×</button>
