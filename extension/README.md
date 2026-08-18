@@ -93,3 +93,21 @@ Price/quote data of our own (the host page already shows it), watchlist writes,
 alerts, login, options/crypto, and any per-user framing of a holding — the last
 one drifts toward personal advice and needs the lawyer consult booked in
 `docs/COMPETITOR_GAP_ANALYSIS.md` first.
+
+## Icons
+
+`icons/*.png` are **generated** from the canonical brand mark, not hand-drawn —
+a `#0a0a0a` rounded square with a centred `#3b82f6` pill bar, the same geometry
+as `frontend/public/favicon.svg` and `frontend/app/icon.tsx`. The extension's
+in-UI mark (the pill badge and the popup header) is built from the same two
+shapes in CSS.
+
+If the brand mark ever changes, change it in `favicon.svg` / `icon.tsx` first,
+then re-render:
+
+```bash
+node extension/icons/make-icons.js
+```
+
+Chrome requires PNG for toolbar icons, which is why these are rasterised rather
+than referenced as SVG.
