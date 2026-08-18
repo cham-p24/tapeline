@@ -37,6 +37,15 @@ export function CitableRecord({ summary }: { summary: CitableSummary }) {
         The record so far
       </h2>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg">{sentence}</p>
+      {/* Above the figures, not below them. At this sample size the vs-SPY
+          values do not distinguish the ranking from chance, so the qualifier
+          has to frame them rather than trail them. Nothing is hidden, softened
+          or rounded — the same values follow, unedited, at the same weight. */}
+      <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted">
+        Descriptive measures of the raw archive below — not a return, a forecast, or the result of
+        any investable strategy. At this sample size they do not distinguish the ranking from
+        chance. Raw CSV and JSON are linked further down so the arithmetic is checkable off-site.
+      </p>
       <dl className="mt-3 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
         <div className="flex justify-between gap-4 sm:justify-start">
           <dt className="text-muted">Market days tracked</dt>
@@ -55,11 +64,6 @@ export function CitableRecord({ summary }: { summary: CitableSummary }) {
           <dd className="nums font-medium text-fg">{median}</dd>
         </div>
       </dl>
-      <p className="mt-3 text-xs text-subtle">
-        Descriptive measures of the raw archive below — not a return, a forecast, or the result of
-        any investable strategy. At this sample size they do not distinguish the ranking from
-        chance. Raw CSV and JSON are linked further down so the arithmetic is checkable off-site.
-      </p>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 
 /**
  * Landing-hero product shot — the REAL anonymous scanner top list.
@@ -50,6 +51,12 @@ const API_BASE =
     unchanged; the "See today's full Top 10" link under the card carries the
     rest. */
 const HERO_ROWS = 6;
+
+/** Below lg the "Why" sentence moves out of the table and onto its own line
+    under each row, where it gets the full card width. Sentences longer than
+    this are cut at the last word boundary before it and open on tap, so a
+    six-row card stays a six-row card until the reader asks for more. */
+const WHY_TEASER_CHARS = 70;
 
 /**
  * Build-time fallback ONLY — rendered when /api/scanner is unreachable
@@ -170,8 +177,10 @@ export function ScannerPreviewTable({ rows, real }: { rows: Row[]; real: boolean
         <tbody>
           {rows.map((r) => {
             const sig = (r.sig || "").toUpperCase();
+            const why = (r.why || "").trim();
             return (
-              <tr key={r.sym} className="border-b border-border/30 transition-colors hover:bg-panel/40">
+              <Fragment key={r.sym}>
+              <tr className="border-border/30 transition-colors hover:bg-panel/40 lg:border-b">
                 <td className="px-3 py-2 font-mono font-medium">
                   {/* Every ticker links to its real public page — ~8,400 of
                       them exist unmetered, so the hero doubles as a door
@@ -199,15 +208,56 @@ export function ScannerPreviewTable({ rows, real }: { rows: Row[]; real: boolean
                     finished thought rather than ".." mid-word. */}
                 <td className="hidden px-3 py-2 align-top text-xs text-muted lg:table-cell">
                   <span className="line-clamp-2 whitespace-normal break-words leading-snug">
-                    {(r.why || "").trim() || "—"}
+                    {why || "—"}
                   </span>
                 </td>
               </tr>
+              {/* WHY, phone + tablet — below lg the column above is dropped
+                  (seven columns do not fit a 375px viewport) and the sentence
+                  gets its own full-width line under the row instead, the same
+                  shape the auth'd /app/scanner uses. The one-sentence read is
+                  the product; it must not be the thing the layout hides on a
+                  phone. The row border sits here so the numbers and their
+                  sentence read as one block. */}
+              <tr className="border-b border-border/30 lg:hidden">
+                <td className="px-3 pb-2 pt-0" colSpan={6}>
+                  <WhyLine why={why} />
+                </td>
+              </tr>
+              </Fragment>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * The below-lg "Why" line. Long sentences show a word-boundary teaser that
+ * opens on tap — a native <details>, so this stays a server component with no
+ * client JS. Both states carry the same text; only the CSS differs.
+ */
+function WhyLine({ why }: { why: string }) {
+  if (!why) {
+    return <p className="text-xs text-muted leading-snug">&mdash;</p>;
+  }
+  if (why.length <= WHY_TEASER_CHARS) {
+    return <p className="text-xs text-muted leading-snug">{why}</p>;
+  }
+  const cut = why.slice(0, WHY_TEASER_CHARS);
+  const space = cut.lastIndexOf(" ");
+  const teaser = (space > 0 ? cut.slice(0, space) : cut).trimEnd();
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none py-0.5 text-xs text-muted leading-snug">
+        <span className="group-open:hidden">
+          {teaser}&hellip;{" "}
+          <span className="text-accent">more</span>
+        </span>
+        <span className="hidden group-open:inline">{why}</span>
+      </summary>
+    </details>
   );
 }
 

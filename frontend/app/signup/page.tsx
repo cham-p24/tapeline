@@ -288,16 +288,20 @@ function SignUpForm() {
       // second GA4 name for the same instant would double-count the signup.
       trackEvent("sign_up", { method: "email" });
       trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
-      // Route through /app/onboarding first — captures use-case + attribution
-      // + marketing-opt-in before they hit the product. It does NOT capture
-      // suitability data (experience, portfolio size, capital, risk tolerance,
-      // holdings, goals): those questions were removed 2026-07-18 under
-      // compliance Rule 8, and this signup form has never collected any of
-      // them. Do not reintroduce them here or there. The
-      // onboarding page redirects to the post-auth destination after submit
-      // or skip: /app/billing (with plan intent restated) when the visitor
-      // arrived from a /pricing plan CTA, otherwise the default `next`.
-      // Existing users (signin) never pass through here.
+      // Hand off through /app/onboarding, which ASKS NOTHING: it is a silent
+      // provisioning route that stamps the account, seeds the day-1 watchlist
+      // server-side, and forwards on. It used to be a four-question survey
+      // standing between signup and the first working screen — that was the
+      // single biggest reason a new account never saw the product; the
+      // questions were removed 2026-08-19. Do not send a new user to a form
+      // from here. It never captured suitability data (experience, portfolio
+      // size, capital, risk tolerance, holdings, goals) — those questions
+      // went 2026-07-18 under compliance Rule 8, and this signup form has
+      // never collected any of them. Do not reintroduce them here or there.
+      // The destination it forwards to is /app/billing (with plan intent
+      // restated) when the visitor arrived from a /pricing plan CTA,
+      // otherwise the default `next`. Existing users (signin) never pass
+      // through here.
       router.push(`/app/onboarding?next=${encodeURIComponent(postAuthNext)}`);
       router.refresh();
     } catch (e: unknown) {

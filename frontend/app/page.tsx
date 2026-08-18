@@ -28,19 +28,24 @@ export default function LandingPage() {
       <MarketingNav />
 
       {/* HERO — single-purpose fold.
-          Left: one sentence value prop + one primary CTA + one ghost CTA.
+          Left: one sentence value prop + the record/trial CTA pair + the
+          no-account browse pill.
           Right: the REAL anonymous top-scored table (ScannerPreview, server-
           fetched, 30-min ISR) with a zero-signup link to the full Top 10.
           Nothing else competes. The TickerSearch previously sat under the
           preview, doing the same job twice; removed so the eye lands on one
-          demo, not two. */}
-      <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
+          demo, not two.
+          Mobile top padding is half the old pt-8, and the column gap below is
+          halved too: on a 375x812 phone the entire left column stacks above
+          the product shot, so every pixel of hero padding pushes row one of
+          the table past the fold. sm+ keeps the original composition. */}
+      <section className="relative overflow-hidden px-6 pt-4 pb-10 sm:pt-20 sm:pb-16">
         {/* Decorative gradient blobs removed 2026-05-22 — too many ambient
             overlays were competing with the actual content + colliding with
             the body::before atmospheric tint, producing an unintentionally
             heavy stacked effect. Sections now use solid panel tints (below)
             for hierarchy rather than blurred colour halos. */}
-        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
+        <div className="mx-auto grid max-w-6xl gap-6 sm:gap-12 lg:grid-cols-5 lg:gap-10">
           <div className="lg:col-span-2 lg:pt-6">
             {/* Static dot on purpose — the hero table refreshes on a 30-min
                 ISR cadence, so nothing here should pulse like a stream. */}
@@ -60,46 +65,41 @@ export default function LandingPage() {
               call, win or miss, goes on a permanent public record you can check
               before you ever pay. Same day, no edits.
             </p>
-            {/* PAIRED ENTRY POINTS — two first-class doors, not one button
-                plus a ghost link.
-                The fold used to offer a single real path (/signup) with the
-                scorecard demoted to `btn-ghost` — borderless, muted, reading
-                as a footnote. That buried the two things a cold visitor
-                actually wants: (1) start the no-card trial, or (2) look at the
-                product without handing over anything at all.
-                Both CTAs now share the same pill size and weight; the second
-                is outlined rather than muted so neither reads as the
-                afterthought. Grid (not flex-wrap) so they stay equal width on
-                mobile instead of one stretching and the other shrinking.
-                R6: states the trial's terms as fact — no countdown, no
-                deadline, no scarcity. */}
+            {/* ENTRY POINTS — the proof door and the product door at equal
+                weight, with the no-account browse path under them.
+                The proof-first repositioning is deliberate and stays: the
+                public record leads. But it had left the fold with no way into
+                the product at all — both pills pointed at public pages and a
+                third text link went to /scorecard a SECOND time, so a visitor
+                who was already convinced had nothing to click. /signup is now
+                the second pill, outlined in accent rather than muted so
+                neither door reads as the afterthought, and the duplicate
+                scorecard link is gone. Grid (not flex-wrap) so the pills stay
+                equal width on mobile instead of one stretching and the other
+                shrinking.
+                R6: the trial's terms are stated as fact below — no countdown,
+                no deadline, no scarcity. */}
             <div className="mt-8 grid gap-3 sm:max-w-md sm:grid-cols-2">
               <Link href="/scorecard" className="btn-primary text-base">
                 See the track record &rarr;
               </Link>
               <Link
+                href="/signup"
+                className="btn border border-accent/60 text-base text-accent transition-colors hover:bg-accent/10"
+              >
+                Start the free trial
+              </Link>
+              <Link
                 href="/daily-picks"
-                className="btn border border-border bg-panel text-base text-fg transition-colors hover:border-accent/50 hover:bg-panel/70"
+                className="btn border border-border bg-panel text-base text-fg transition-colors hover:border-accent/50 hover:bg-panel/70 sm:col-span-2"
               >
                 Browse without an account
               </Link>
             </div>
-            {/* Proof-first: both doors need no account — the public record and
-                today's Top 10. The trial's terms are stated as fact below —
-                no countdown, no scarcity. */}
             <p className="mt-3 text-xs text-muted leading-relaxed">
-              The record and today&rsquo;s picks are open to everyone, no account
-              needed. The trial is 14 days of Premium. No credit card, no payment
+              The trial is 14 days of Premium. No credit card, no payment
               details, nothing charged &mdash; it simply ends and your account
               stays on the Free tier.
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              <Link
-                href="/scorecard"
-                className="text-accent underline-offset-2 hover:underline"
-              >
-                Or read the public record first &rarr;
-              </Link>
             </p>
           </div>
 
@@ -114,6 +114,17 @@ export default function LandingPage() {
               >
                 See today&rsquo;s full Top 10 &mdash; no signup &rarr;
               </Link>
+            </p>
+            {/* The differentiator, stated directly under the thing that
+                evidences it: the artefact itself — today's list and the whole
+                logged history, losses included — is readable before anyone
+                signs up, which is the one thing the paid rivals don't do.
+                Descriptive statement of what is published: no returns claim,
+                and no usage figure is asserted because this page carries no
+                server-side count to source a real one from. */}
+            <p className="mx-auto mt-2 max-w-md text-center text-sm leading-snug text-fg">
+              Today&rsquo;s picks and the entire logged history, losses
+              included, are readable before you sign up.
             </p>
           </div>
         </div>

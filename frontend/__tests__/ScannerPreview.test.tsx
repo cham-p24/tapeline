@@ -15,10 +15,15 @@
  *      tickers — forbidden).
  *   4. Compliance: signal labels stay descriptive (HIGH CONVICTION etc.),
  *      never prescriptive (BUY NOW etc.) — legal posture.
+ *   5. The "Why" sentence survives below the lg breakpoint. It used to be a
+ *      `lg:table-cell` column, i.e. CSS-hidden on every phone — the one thing
+ *      that makes this more than a worse Finviz, invisible on the viewport the
+ *      AI-assistant referrals land on. It now renders as a second row under
+ *      each ticker, truncated to a tap-to-expand teaser when it's long.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { ScannerPreview } from "@/components/ScannerPreview";
+import { ScannerPreview, SAMPLE_ROWS } from "@/components/ScannerPreview";
 
 const API_ITEMS = [
   { symbol: "ZZTOP", sector: "Tech", score: 93.4, signal: "HIGH CONVICTION", change_pct_1d: 2.31, confidence_pct: 90, reason: "Trend and relative strength lead the composite this session." },
@@ -64,10 +69,12 @@ describe("ScannerPreview — real data mode", () => {
     expect(link).toHaveAttribute("href", "/t/ZZTOP");
     // Every rendered row is a link into the zero-signup ticker pages.
     expect(screen.getByRole("link", { name: "BBB" })).toHaveAttribute("href", "/t/BBB");
-    // The real reason string from the API is shown, not an invented one.
+    // The real reason string from the API is shown, not an invented one —
+    // twice, because below lg the "Why" column is dropped and the sentence
+    // renders as a second line under the row instead (see #5 below).
     expect(
-      screen.getByText(/trend and relative strength lead the composite this session/i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/trend and relative strength lead the composite this session/i),
+    ).toHaveLength(2);
   });
 
   it("labels the data truthfully and caps the hero at 6 rows", async () => {
@@ -77,8 +84,9 @@ describe("ScannerPreview — real data mode", () => {
     expect(screen.getByText(/actual top-scoring tickers/i)).toBeInTheDocument();
     expect(screen.getByText(/refreshed every 30 min/i)).toBeInTheDocument();
     expect(screen.getByText(/top 6 of today.s top 10/i)).toBeInTheDocument();
-    // 7 API items in, 6 rendered (header row + 6 data rows).
-    expect(screen.getAllByRole("row")).toHaveLength(7);
+    // 7 API items in, 6 rendered. Each record is two <tr>s — the numbers row
+    // plus the phone-only "Why" line (lg:hidden) — so header + 6 x 2 = 13.
+    expect(screen.getAllByRole("row")).toHaveLength(13);
     expect(screen.queryByText("GGG")).toBeNull();
     // Not the sample fallback.
     expect(screen.queryByText(/sample data/i)).toBeNull();
@@ -138,6 +146,30 @@ describe("ScannerPreview — sample-data fallback (API unreachable)", () => {
     expect(screen.queryByText(/net buying/i)).toBeNull();
     // Methodology-descriptive sample copy is present instead.
     expect(screen.getAllByText(/sample row|scores of/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe("ScannerPreview — the Why sentence below the lg breakpoint", () => {
+  it("gives every row a phone-only Why line, truncated with a tap-to-expand", async () => {
+    mockFetch("reject");
+    const { container } = render(await ScannerPreview());
+
+    // One lg:hidden row per record — the sentence is no longer confined to a
+    // column that disappears under 1024px.
+    const whyRows = container.querySelectorAll("tr.lg\\:hidden");
+    expect(whyRows).toHaveLength(SAMPLE_ROWS.length);
+
+    // Every sample sentence is long, so each one sits behind a native
+    // <details> (no client JS on a server component) with a "more" affordance.
+    const summary = whyRows[0].querySelector("details > summary");
+    expect(summary).not.toBeNull();
+    expect(summary!.textContent).toContain("more");
+
+    // The teaser is a real prefix of the source sentence — cut at a word
+    // boundary, never rewritten and never ending mid-word.
+    const teaser = whyRows[0].textContent!.split("…")[0];
+    expect(teaser.length).toBeLessThanOrEqual(70);
+    expect(SAMPLE_ROWS[0].why!.startsWith(teaser)).toBe(true);
   });
 });
 
