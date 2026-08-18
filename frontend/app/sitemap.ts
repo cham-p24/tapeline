@@ -148,6 +148,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // record" long-tail. Points skeptic-intent search at the raw CSV/JSON.
     { url: `${base}/verify`,                    lastModified: new Date("2026-07-25"), priority: 0.8 },
     { url: `${base}/transparent-stock-screener`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // Answer-engine (AEO) pages for the winnable proof/evaluator query clusters
+    // — sibling intents to /transparent-stock-screener, each foregrounding the
+    // downloadable scorecard dataset. See growth/AEO_OFFSITE_KIT.
+    { url: `${base}/stock-screener-track-record`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/do-stock-screeners-work`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
     // Daily-picks newsletter lead-magnet landing — preview of what
