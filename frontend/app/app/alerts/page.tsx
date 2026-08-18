@@ -41,6 +41,10 @@ const RULE_TYPES: { value: RuleType; label: string; needsSymbol: boolean; needsT
   { value: "congress", label: "Congress trade disclosed", needsSymbol: true,  needsThreshold: false, help: "Fires when a politician discloses a trade on this ticker. Premium." },
 ];
 
+// How many tickers the picker offers. Enough to cover the names a user
+// actually watches without turning the create form into a second table.
+const TICKER_SUGGESTIONS = 8;
+
 export default function AlertsPage() {
   const { user } = useUser();
   const [rules, setRules] = useState<AlertRule[]>([]);
@@ -65,6 +69,12 @@ export default function AlertsPage() {
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushResult, setPushResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  // Ticker picker options + where they came from. The field used to be a bare
+  // free-text box, so arming an alert started from a blank screen and nobody
+  // ever finished. Suggestions are the user's OWN watched names first; an
+  // empty watchlist falls back to the current top-scored tickers.
+  const [tickerOptions, setTickerOptions] = useState<string[]>([]);
+  const [tickerSource, setTickerSource] = useState<"watchlist" | "top_scored" | null>(null);
 
   const def = RULE_TYPES.find((r) => r.value === ruleType)!;
 
@@ -87,6 +97,41 @@ export default function AlertsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Fill the ticker picker. Same endpoints already in use elsewhere — the
+  // watchlist item feed (api.watchlist, as ArmAlerts and /app/watchlist call
+  // it) and, when that comes back empty, the score-sorted scanner feed the
+  // onboarding seeder uses. No new data path. Failures are silent: the field
+  // still accepts any symbol typed by hand.
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    (async () => {
+      try {
+        const wl = await api.watchlist(null);
+        const syms = (wl.items ?? []).map((i) => i.symbol).filter(Boolean);
+        if (!alive) return;
+        if (syms.length > 0) {
+          setTickerOptions(syms.slice(0, TICKER_SUGGESTIONS));
+          setTickerSource("watchlist");
+          return;
+        }
+      } catch {
+        /* fall through to the top-scored fallback */
+      }
+      try {
+        const r = await api.scanner({ sort: "score", order: "desc", limit: TICKER_SUGGESTIONS });
+        const syms = (r.items ?? []).map((i) => i.symbol).filter(Boolean);
+        if (alive && syms.length > 0) {
+          setTickerOptions(syms.slice(0, TICKER_SUGGESTIONS));
+          setTickerSource("top_scored");
+        }
+      } catch {
+        /* no suggestions — the picker just falls back to free text */
+      }
+    })();
+    return () => { alive = false; };
+  }, [user]);
 
   async function create() {
     setCreating(true);
@@ -305,13 +350,55 @@ export default function AlertsPage() {
 
           {def.needsSymbol && (
             <div>
-              <label className="block text-xs text-muted">Ticker</label>
+              <label htmlFor="alert-symbol" className="block text-xs text-muted">Ticker</label>
+              {/* Picker, not a blank box. `list` binds the datalist so the
+                  suggestions surface as native autocomplete, and the pills
+                  below make the common case one click — while the field
+                  itself still takes any symbol typed by hand. */}
               <input
+                id="alert-symbol"
+                list="alert-symbol-options"
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
                 placeholder="AAPL"
                 className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm nums font-mono uppercase"
               />
+              <datalist id="alert-symbol-options">
+                {tickerOptions.map((s) => <option key={s} value={s} />)}
+              </datalist>
+              {tickerOptions.length > 0 && (
+                <>
+                  <div
+                    className="mt-2 flex flex-wrap items-center gap-1.5"
+                    role="group"
+                    aria-label="Suggested tickers"
+                  >
+                    {tickerOptions.map((s) => {
+                      const picked = symbol.trim().toUpperCase() === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setSymbol(s)}
+                          aria-pressed={picked}
+                          className={`rounded-full border px-3 py-1 text-xs font-mono transition-colors whitespace-nowrap ${
+                            picked
+                              ? "border-accent bg-accent/10 text-accent"
+                              : "border-border bg-panel hover:border-accent/50 hover:text-accent"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-subtle">
+                    {tickerSource === "watchlist"
+                      ? "From your watchlist — or type any symbol."
+                      : "Top-scored right now — or type any symbol."}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
