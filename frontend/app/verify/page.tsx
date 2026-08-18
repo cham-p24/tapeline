@@ -308,7 +308,16 @@ export default function VerifyPage() {
             on{" "}
             <Link href="/how-it-works" className="link">how it works</Link>, and
             the honest list of what this product is bad at is on{" "}
-            <Link href="/limitations" className="link">limitations</Link>.
+            <Link href="/limitations" className="link">limitations</Link>. Two
+            companion explainers go wider than Tapeline: whether{" "}
+            <Link href="/do-stock-screeners-work" className="link">
+              stock screeners actually work
+            </Link>{" "}
+            and how to judge one, and what a real{" "}
+            <Link href="/stock-screener-track-record" className="link">
+              stock screener track record
+            </Link>{" "}
+            has to contain.
           </p>
         </div>
       </section>
