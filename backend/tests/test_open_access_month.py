@@ -1,13 +1,17 @@
 """Open-access month (founder experiment 2026-08-08).
 
-Time-boxed: the FREE tier's usage CAPS lift to Pro level (the walls a free user
-actually hits — scanner rows, daily look-ups, web-push allowance) until
-PROMO_OPEN_ACCESS_UNTIL, then auto-revert. Deliberately NARROW:
+Time-boxed: the FREE tier's scanner ROW cap lifts to Pro level (top-10 → the
+full ~2,500-row universe — the single biggest, most visible Free wall) until
+PROMO_OPEN_ACCESS_UNTIL, then auto-reverts. Deliberately NARROW so it opens the
+core product without collateral:
+  - daily_lookups is NOT lifted — lifting it defeats the look-up meter's
+    cap-hit + stale-read guards (those tests assume Free hits its 12/day wall),
+  - web_push_alerts is NOT lifted (kept simple; not a wall anyone reports),
   - watchlist_tickers is NOT lifted (kept removed per the Aug-2 cutover), and
   - Pro FEATURES are NOT unlocked (has_feature unchanged — premium tools stay
     the paid moat).
 """
-from datetime import date, timedelta
+from datetime import timedelta
 
 from app.services.tier import (
     PROMO_OPEN_ACCESS_UNTIL,
@@ -26,17 +30,26 @@ def test_open_access_window_boundary():
     assert free_open_access(PROMO_OPEN_ACCESS_UNTIL + timedelta(days=1)) is False
 
 
-def test_during_window_free_caps_lift_to_pro():
+def test_during_window_free_scanner_rows_lift_to_pro():
     # Guarded so the test is correct whether CI runs inside or after the window.
     if not free_open_access():
         return
-    # scanner_rows/web_push have concrete Pro ints — lifted to exactly those.
     assert limit(Tier.FREE, "scanner_rows") == TIER_LIMITS[Tier.PRO]["scanner_rows"]
-    assert limit(Tier.FREE, "web_push_alerts") == TIER_LIMITS[Tier.PRO]["web_push_alerts"]
-    # daily_lookups: Pro is "unlimited" (None); Free is lifted to a large int
-    # (kept int so the meter/stale-read guards stay safe) — effectively no wall.
-    cap = limit(Tier.FREE, "daily_lookups")
-    assert isinstance(cap, int) and cap >= 1000
+
+
+def test_lookup_meter_is_NOT_lifted_by_open_access():
+    # daily_lookups must stay Free's finite cap so the look-up meter + its
+    # cap-hit/stale-read guards keep enforcing. During the window this is
+    # UNCHANGED from the static table.
+    if not free_open_access():
+        return
+    assert limit(Tier.FREE, "daily_lookups") == TIER_LIMITS[Tier.FREE]["daily_lookups"]
+
+
+def test_web_push_is_NOT_lifted_by_open_access():
+    if not free_open_access():
+        return
+    assert limit(Tier.FREE, "web_push_alerts") == TIER_LIMITS[Tier.FREE]["web_push_alerts"]
 
 
 def test_watchlist_is_NOT_lifted_by_open_access():

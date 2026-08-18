@@ -249,19 +249,14 @@ def limit(user_tier: Tier | str, key: str) -> int | None:
     callers that may receive None must handle the sentinel (see usage.py).
     """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
-    # Open-access month: lift the FREE usage CAPS to Pro level (the walls a free
-    # user actually hits — scanner rows, daily look-ups, web-push allowance),
-    # auto-reverting on PROMO_OPEN_ACCESS_UNTIL. Deliberately does NOT touch
-    # watchlist_tickers (kept removed per the Aug-2 cutover, so we don't yo-yo
-    # users) and does NOT unlock Pro FEATURES (has_feature is unchanged, so the
-    # premium tools stay the paid moat). Numeric-cap lift only.
-    if actual is Tier.FREE and free_open_access() and key != "watchlist_tickers":
-        pro = TIER_LIMITS[Tier.PRO].get(key, TIER_LIMITS[Tier.FREE].get(key, 0))
-        # Keep the lifted FREE cap a concrete positive int even where Pro is
-        # "unlimited" (None) — the look-up meter + stale-read guards assume an
-        # int cap for Free. 100k/day is effectively unlimited without changing
-        # the type those paths depend on.
-        return 100_000 if pro is None else pro
+    # Open-access month: lift the single biggest, safest FREE limitation — the
+    # scanner ROW cap (top-10 → the full ~2,500-row universe) — until
+    # PROMO_OPEN_ACCESS_UNTIL, then auto-revert. Scoped tightly on purpose:
+    # lifting daily_lookups defeats the lookup-metering guards, and unlocking Pro
+    # FEATURES / re-adding the watchlist removes the paid moat + yo-yos users. So
+    # this is the one lift that opens the core product without collateral.
+    if actual is Tier.FREE and free_open_access() and key == "scanner_rows":
+        return TIER_LIMITS[Tier.PRO]["scanner_rows"]
     # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
     # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
     # cutover needs no restart/redeploy. Paid tiers are unaffected.
