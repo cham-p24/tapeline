@@ -12,7 +12,7 @@
 
 ### Free — "Browser"
 **$0/mo**
-- Scanner: top 20 tickers only, **24-hour delayed**
+- Scanner: **top 10 tickers, live** (the freemium retune set `FREE_DATA_DELAY_MINUTES = 0` and `FREE_SCANNER_ROWS = 10` in `services/tier.py`; the earlier "top 20, 24-hour delayed" design is retired — conversion pressure now comes from breadth and the daily lookup meter, not stale data)
 - Market regime: basic view (bull/neutral/bear label only)
 - Watchlist: 5 tickers, no alerts
 - Public scorecard access
@@ -63,8 +63,7 @@ different primary use case (quant scanner vs. options flow).
 
 - **14-day Premium trial, no credit card** — every new signup starts in Premium for 14 days
 - At day 14, prompts to add card OR drops to Free
-- **Monthly is the default billing toggle** on /pricing and /app/billing (smaller
-  first yes); annual is one click away with its saving shown
+- **Annual is the default billing toggle** on /pricing and /app/billing (`BillingToggle.tsx` seeds the sitewide annual default so the plan cards and the always-annual comparison table can never disagree); monthly is one click away
 - **30-day money back** on every paid plan (was 7-day; extended 2026-07 —
   costless at zero customers, neutralizes the no-reviews trust gap)
 - Pro carries the **"Best value"** badge (factual framing); no popularity
