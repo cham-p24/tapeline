@@ -7,7 +7,8 @@ core product without collateral:
   - daily_lookups is NOT lifted — lifting it defeats the look-up meter's
     cap-hit + stale-read guards (those tests assume Free hits its 12/day wall),
   - web_push_alerts is NOT lifted (kept simple; not a wall anyone reports),
-  - watchlist_tickers is NOT lifted (kept removed per the Aug-2 cutover), and
+  - watchlist_tickers is NOT lifted (open-access is scanner-rows-only; the free
+    watchlist sits at its own restored cap, see free_watchlist_cap), and
   - Pro FEATURES are NOT unlocked (has_feature unchanged — premium tools stay
     the paid moat).
 """
@@ -53,7 +54,8 @@ def test_web_push_is_NOT_lifted_by_open_access():
 
 
 def test_watchlist_is_NOT_lifted_by_open_access():
-    # The just-removed watchlist must stay removed — no yo-yo for users.
+    # Open-access is scanner-rows-only, so the free watchlist stays at its own
+    # cap (free_watchlist_cap) rather than being lifted to the Pro 50.
     assert limit(Tier.FREE, "watchlist_tickers") == free_watchlist_cap()
 
 

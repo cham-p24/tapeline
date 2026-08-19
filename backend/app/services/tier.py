@@ -113,13 +113,15 @@ FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)
 # activation action. Raising to 5 + seeding to <= cap-1 leaves them a free slot.
 FREE_WATCHLIST_TICKERS = 5       # the FREE cap WHILE the free tier still has a watchlist — see the cutover below
 
-# ── Watchlist → Pro+ cutover (announced to all free users by email 2026-07-26) ──
-# On this date the saved watchlist becomes a Pro-and-up feature: the FREE cap
-# drops to 0. Date-gated on purpose so the cutover activates automatically — no
-# deploy, merge, or manual step is needed on the day, and enforcement + every
-# marketing/email/pricing surface stay in lock-step because they all read the
-# ONE function below. Non-destructive: existing free users' saved rows are kept
-# in the DB, just no longer addable/shown on Free, so upgrading RESTORES the list.
+# ── Watchlist → Pro+ cutover — REVERSED 2026-08-19 ──
+# The cutover (announced to free users by email 2026-07-26) dropped the FREE
+# saved-watchlist cap to 0 on 2026-08-02. It was reversed: the 0-cap orphaned
+# the free web-push alert on-ramp (ArmAlerts seeds from wl.items[0], which the
+# cutover left permanently empty) and tightened the free tier while the binding
+# priority is arrivals + activation, not gating a feature no paying cohort yet
+# exists to protect. The date below is retained for history but NO LONGER gates
+# anything (free_watchlist_cap now returns the cap unconditionally); keep the
+# frontend lib/pricing.ts freeHasWatchlist() in lock-step (also reversed).
 FREE_WATCHLIST_REMOVAL_DATE: Final[date] = date(2026, 8, 2)
 
 # "Everything unlocked" open-access month — FREE behaves like PRO until this
@@ -131,13 +133,14 @@ PROMO_OPEN_ACCESS_UNTIL: Final[date] = date(2026, 9, 8)
 def free_watchlist_cap(today: date | None = None) -> int:
     """Saved-ticker cap for the FREE tier.
 
-    Returns 0 on/after FREE_WATCHLIST_REMOVAL_DATE (watchlist is Pro+ from then
-    on), else FREE_WATCHLIST_TICKERS. The single source of truth for both
-    enforcement (via `limit()`) and every copy surface, so the two can't drift.
-    `today` is injectable for tests.
+    The single source of truth for both enforcement (via `limit()`) and every
+    copy surface, so the two can't drift. The 2026-08-02 watchlist→Pro cutover
+    was REVERSED 2026-08-19 (see FREE_WATCHLIST_REMOVAL_DATE), so this now
+    returns FREE_WATCHLIST_TICKERS unconditionally. `today` is retained for
+    signature/test compatibility; the removal-date gate is no longer consulted.
     """
-    d = today or datetime.now(UTC).date()
-    return 0 if d >= FREE_WATCHLIST_REMOVAL_DATE else FREE_WATCHLIST_TICKERS
+    _ = today
+    return FREE_WATCHLIST_TICKERS
 
 
 def free_open_access(today: date | None = None) -> bool:
