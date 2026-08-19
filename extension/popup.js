@@ -8,6 +8,7 @@ const TONE = {
   NEUTRAL: "mid", WATCH: "mid", CAUTION: "neg", AVOID: "neg",
 };
 const out = document.getElementById("out");
+const siteEl = document.getElementById("site");
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -47,6 +48,43 @@ async function lookup(symbol) {
     <p class="fine">Descriptive six-factor scoring — not investment advice. Every daily top-10 pick is logged publicly, including the ones that lose.</p>`);
 }
 
+/* ── Enable on this site ───────────────────────────────────────────────────
+   The built-in list covers public research sites. Brokers and the long tail
+   are reached here instead: the user grants access to THIS origin only. That
+   is both the honest ask — we read the ticker out of the URL and nothing else
+   — and the one Chrome Web Store review accepts, since requesting every site
+   up front is the single most common rejection reason. */
+
+function renderSite(host, origin, granted) {
+  if (granted) {
+    siteEl.innerHTML =
+      `<div class="site-card"><b>${esc(host)}</b><br>` +
+      `<span class="ok">Enabled</span> — the score shows on ticker pages here.</div>`;
+    return;
+  }
+  siteEl.innerHTML =
+    `<div class="site-card"><b>${esc(host)}</b> isn't covered yet.<br>` +
+    `Enable it and Tapeline reads the ticker from the page address — nothing else.` +
+    `<button id="enable">Enable on this site</button></div>`;
+
+  document.getElementById("enable").addEventListener("click", async () => {
+    let ok = false;
+    try {
+      ok = await chrome.permissions.request({ origins: [origin] });
+    } catch (_) {}
+    if (!ok) return;   // user declined — leave the card as-is
+    try {
+      await chrome.runtime.sendMessage({ type: "TAPELINE_SYNC_SITES" });
+    } catch (_) {}
+    renderSite(host, origin, true);
+    // The content script is registered from here on, but this tab predates it.
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.id) chrome.tabs.reload(tab.id);
+    } catch (_) {}
+  });
+}
+
 document.getElementById("f").addEventListener("submit", (e) => {
   e.preventDefault();
   const v = document.getElementById("q").value.trim().toUpperCase();
@@ -54,12 +92,24 @@ document.getElementById("f").addEventListener("submit", (e) => {
   else show('<p class="msg">Enter a ticker symbol, e.g. NVDA.</p>');
 });
 
-/* If the active tab is a supported quote page, pre-fill and look it up. */
-chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+/* Pre-fill from the active tab, and offer to enable the site when it's new. */
+chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
   if (!tab || !tab.url) return;
-  try {
-    const u = new URL(tab.url);
-    const sym = detectSymbol({ hostname: u.hostname, pathname: u.pathname, search: u.search });
-    if (sym) { document.getElementById("q").value = sym; lookup(sym); }
-  } catch (_) {}
+  let u;
+  try { u = new URL(tab.url); } catch (_) { return; }
+  if (!/^https?:$/.test(u.protocol)) return;   // chrome://, file://, extension pages
+
+  const known = isKnownHost(u.hostname);
+  const origin = `${u.protocol}//${u.hostname}/*`;
+  let granted = known;
+  if (!known) {
+    try { granted = await chrome.permissions.contains({ origins: [origin] }); } catch (_) {}
+    renderSite(u.hostname, origin, granted);
+  }
+
+  const sym = detectSymbol(
+    { hostname: u.hostname, pathname: u.pathname, search: u.search, hash: u.hash },
+    !known && granted
+  );
+  if (sym) { document.getElementById("q").value = sym; lookup(sym); }
 }).catch(() => {});

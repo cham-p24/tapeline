@@ -1,10 +1,29 @@
 # Tapeline browser extension
 
 Shows Tapeline's six-factor score, the one-line reason, and the factor
-breakdown for whatever ticker the user is already looking at — on Yahoo
-Finance, TradingView, Google Finance, MarketWatch, Seeking Alpha, Stocktwits,
-Finviz, Barchart, CNBC, Robinhood and Nasdaq — plus a manual lookup in the
-toolbar popup that works anywhere.
+breakdown for whatever ticker the user is already looking at.
+
+**Coverage is two layers**, because "works on every trading platform" and "does
+not ask to read your entire browsing history" pull against each other:
+
+1. **22 sites enabled out of the box** — Yahoo Finance, TradingView, Google
+   Finance, MarketWatch, Seeking Alpha, Stocktwits, Finviz, Barchart, CNBC,
+   Nasdaq, Robinhood, Investing.com, Zacks, Morningstar, TipRanks,
+   stockanalysis.com, Simply Wall St, StockCharts, Benzinga, Motley Fool, WSJ
+   market data and Reuters markets. All public research pages.
+2. **Anything else, one click** — open the popup on any site and press
+   *Enable on this site*. That grants access to **that origin only**, and the
+   generic URL patterns take over. This is how brokers are covered: Webull,
+   Fidelity, Schwab, E*TRADE, tastytrade, moomoo, Public and the long tail all
+   work once enabled, including hash-routed apps.
+
+Brokers are deliberately NOT bundled into layer 1. Asking for access to every
+brokerage at install time is the top Chrome Web Store rejection reason, and it
+reads as invasive on a logged-in account page. Letting the user grant a single
+origin is the honest version of the same capability.
+
+Plus a manual lookup in the toolbar popup that works anywhere, needing no
+site permission at all.
 
 **No account required.** That is deliberate: the extension is a top-of-funnel
 surface, and the score + reason are already public (`/daily-picks`, `/t/{symbol}`,
@@ -38,10 +57,24 @@ blocked. Service-worker fetches covered by `host_permissions` are exempt, so the
 backend needs no CORS change.
 
 **We read the ticker from the URL, never the host's data.** Detection is a regex
-over `location` (see `sites.js`), so it survives the host redesigning its markup,
-costs nothing on load, and keeps us clear of both the sites' terms and the Chrome
-Web Store single-purpose policy. We learn *which* symbol the user is viewing and
-show *our own* numbers for it.
+over `location` — path, query and hash (see `sites.js`) — so it survives the host
+redesigning its markup, costs nothing on load, and keeps us clear of both the
+sites' terms and the Chrome Web Store single-purpose policy. We learn *which*
+symbol the user is viewing and show *our own* numbers for it: no prices, no
+holdings, no balances. That is what makes enabling it on a broker defensible.
+
+**The loose patterns only run where the user opted in.** Built-in hosts use their
+own precise rule and never fall through to guessing, so an article slug can't be
+mistaken for a ticker. The generic patterns — `/quote/X`, `/symbol/X`,
+`?symbol=X`, `/stocks/X` — apply exclusively to hosts the user enabled, and a
+route-word list (`dashboard`, `watchlist`, `search`…) stops them inventing
+tickers out of navigation.
+
+**Enabled sites are re-registered on startup.** Dynamic content-script
+registrations do not survive a browser restart, but granted permissions do — so
+`syncEnabledSites()` replays them on install and on startup. Without it, someone
+who enabled Schwab last week would silently get nothing today, with the
+permission still showing as granted.
 
 **The UI is in a shadow root and collapsed by default.** Finance sites ship broad
 CSS that would restyle an open div within a release or two. And an overlay that

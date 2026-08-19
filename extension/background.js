@@ -97,7 +97,44 @@ async function fetchTicker(symbol) {
   return job;
 }
 
+/**
+ * Re-register the content script on every host the user has enabled.
+ *
+ * Called on install and on browser start: dynamic content-script registrations
+ * do NOT survive a browser restart, but the granted permissions DO. Without
+ * this replay, a user who enabled Schwab last week would silently get nothing
+ * today, with the permission still showing as granted — the worst kind of bug
+ * to diagnose from a review.
+ */
+async function syncEnabledSites() {
+  try {
+    const granted = await chrome.permissions.getAll();
+    const origins = (granted.origins || []).filter((o) => !o.includes("api.tapeline.io"));
+    const existing = await chrome.scripting.getRegisteredContentScripts();
+    const ids = existing.map((s) => s.id);
+    if (ids.length) await chrome.scripting.unregisterContentScripts({ ids });
+    if (!origins.length) return;
+    await chrome.scripting.registerContentScripts([
+      {
+        id: "tapeline-enabled-sites",
+        matches: origins,
+        js: ["sites.js", "content.js"],
+        runAt: "document_idle",
+      },
+    ]);
+  } catch (err) {
+    console.warn("tapeline: could not sync enabled sites", err);
+  }
+}
+
+chrome.runtime.onInstalled.addListener(syncEnabledSites);
+chrome.runtime.onStartup.addListener(syncEnabledSites);
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg && msg.type === "TAPELINE_SYNC_SITES") {
+    syncEnabledSites().then(() => sendResponse({ ok: true }));
+    return true;
+  }
   if (msg && msg.type === "TAPELINE_LOOKUP" && msg.symbol) {
     fetchTicker(String(msg.symbol).toUpperCase()).then(sendResponse);
     return true; // async response
