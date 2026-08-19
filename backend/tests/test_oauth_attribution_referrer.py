@@ -190,3 +190,127 @@ async def test_callback_drops_spoofed_referrer_and_external_landing(
         finally:
             await s.delete(row)
             await s.commit()
+
+
+# ── Mirror of test_signup_landing_path.py / test_signup_referrer.py ──────────
+#
+# The email path's persistence contract is pinned in those two files. These
+# pin the SAME contract for the OAuth path so the two can't drift:
+#   - untagged / empty → NULL, never ""
+#   - the cookie /start actually emits round-trips intact (quoting and all)
+#   - over-long values truncate to the column width and never fail the signup
+#   - a returning user's first-touch credit is never overwritten
+
+
+async def _row_and_cleanup(email: str) -> tuple[str | None, str | None]:
+    """Read back (signup_referrer_host, signup_landing_path), then delete."""
+    async with session_scope() as s:
+        row = (await s.execute(select(User).where(User.email == email))).scalar_one()
+        out = (row.signup_referrer_host, row.signup_landing_path)
+        await s.delete(row)
+        await s.commit()
+        return out
+
+
+async def _callback(monkeypatch, email: str, cookie_header: str) -> None:
+    """Drive the callback for `email` with the given Cookie header; the
+    signup must succeed whatever attribution was planted."""
+    monkeypatch.setattr(oauth_module, "httpx", _fake_httpx(email))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test",
+    ) as c:
+        r = await c.get(
+            "/api/auth/oauth/google/callback",
+            params={"code": "fake-code", "state": "st"},
+            headers={"cookie": cookie_header},
+        )
+    assert r.status_code == 307, r.text
+
+
+@pytest.mark.asyncio
+async def test_callback_without_attribution_stays_null(client, google_configured, monkeypatch):
+    """Direct/untagged traffic — the common case — writes NULL, not ""."""
+    email = f"oauth_direct_{_uuid.uuid4().hex}@example.com"
+    await _callback(monkeypatch, email, "oauth_state_google=st")
+    assert await _row_and_cleanup(email) == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_callback_empty_values_normalised_to_null(client, google_configured, monkeypatch):
+    """Empty strings planted in the cookie store NULL — same contract as the
+    utm_*/gclid keys and as the email path's empty-string tests."""
+    email = f"oauth_empty_{_uuid.uuid4().hex}@example.com"
+    planted = urlencode({"referrer_host": "", "landing_path": ""})
+    await _callback(monkeypatch, email, f"oauth_state_google=st; oauth_attr_google={planted}")
+    assert await _row_and_cleanup(email) == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_callback_persists_through_the_cookie_start_actually_emits(
+    client, google_configured, monkeypatch,
+):
+    """End-to-end: take the Set-Cookie /start REALLY emits (Starlette quotes
+    values containing reserved chars) and feed those exact bytes back to the
+    callback — the shape that catches a cookie-encoding round-trip bug, which
+    a hand-rolled cookie header cannot."""
+    email = f"oauth_e2e_{_uuid.uuid4().hex}@example.com"
+    async with client:
+        started = await client.get(
+            "/api/auth/oauth/google/start",
+            params={"referrer_host": "copilot.microsoft.com", "landing_path": "/glossary/rsi"},
+            follow_redirects=False,
+        )
+    attr_cookie = next(
+        c.split(";", 1)[0] for c in started.headers.get_list("set-cookie")
+        if c.startswith("oauth_attr_google=")
+    )
+    await _callback(monkeypatch, email, f"oauth_state_google=st; {attr_cookie}")
+    assert await _row_and_cleanup(email) == ("copilot.microsoft.com", "/glossary/rsi")
+
+
+@pytest.mark.asyncio
+async def test_callback_oversize_values_truncate_and_never_fail_signup(
+    client, google_configured, monkeypatch,
+):
+    """The cookie is client-writable. Values longer than the columns
+    (String(100) / String(200)) must be cut to width rather than raising a
+    DB error mid-signup. The host is multi-label so that its 100-char prefix
+    is still a well-formed hostname (a single 100-char label is not one, and
+    is rightly dropped by _clean_referrer_host instead)."""
+    email = f"oauth_long_{_uuid.uuid4().hex}@example.com"
+    planted = urlencode({
+        "referrer_host": ("a" * 60 + ".") * 3 + "com",  # 186 chars
+        "landing_path": "/" + "p" * 900,
+    })
+    await _callback(monkeypatch, email, f"oauth_state_google=st; oauth_attr_google={planted}")
+    host, landing = await _row_and_cleanup(email)
+    assert host is not None and len(host) == 100
+    assert landing is not None and len(landing) == 200
+
+
+@pytest.mark.asyncio
+async def test_returning_user_first_touch_is_not_overwritten(
+    client, google_configured, monkeypatch,
+):
+    """Write-once-at-signup: a later OAuth sign-IN off a different page must
+    not rewrite the first-touch referrer host or landing path."""
+    uid = f"oauth_ret_attr_{_uuid.uuid4().hex}"
+    email = f"{uid}@example.com"
+    async with session_scope() as s:
+        s.add(User(
+            id=uid, email=email, name="Returning", tier="free",
+            password_hash="not-used",
+            signup_referrer_host="chat.openai.com",
+            signup_landing_path="/compare/finviz",
+        ))
+        await s.commit()
+    planted = urlencode({"referrer_host": "copilot.microsoft.com", "landing_path": "/glossary/rsi"})
+    await _callback(monkeypatch, email, f"oauth_state_google=st; oauth_attr_google={planted}")
+    async with session_scope() as s:
+        row = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        try:
+            assert row.signup_referrer_host == "chat.openai.com", "first-touch host clobbered"
+            assert row.signup_landing_path == "/compare/finviz", "first-touch path clobbered"
+        finally:
+            await s.delete(row)
+            await s.commit()

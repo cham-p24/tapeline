@@ -15,6 +15,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OAuthButtons } from "@/components/OAuthButtons";
+import {
+  getStoredGclid,
+  getStoredLandingPath,
+  getStoredReferrerHost,
+  getStoredUtm,
+} from "@/lib/utm";
+
+// The four first-touch captures are mocked at the module boundary so these
+// tests pin what OAuthButtons FORWARDS, independent of lib/utm.ts's storage
+// details (covered by landingPathCapture / referrerHostCapture tests).
+vi.mock("@/lib/utm", () => ({
+  getStoredUtm: vi.fn(() => ({})),
+  getStoredGclid: vi.fn(() => ({})),
+  getStoredReferrerHost: vi.fn(() => ({})),
+  getStoredLandingPath: vi.fn(() => ({})),
+}));
 
 const ALL_PROVIDERS = { google: true, microsoft: true, apple: true };
 
@@ -26,6 +42,10 @@ beforeEach(() => {
       json: async () => ALL_PROVIDERS,
     }),
   );
+  vi.mocked(getStoredUtm).mockReturnValue({});
+  vi.mocked(getStoredGclid).mockReturnValue({});
+  vi.mocked(getStoredReferrerHost).mockReturnValue({});
+  vi.mocked(getStoredLandingPath).mockReturnValue({});
 });
 
 describe("OAuthButtons intent carry", () => {
@@ -51,6 +71,76 @@ describe("OAuthButtons intent carry", () => {
     const href = link.getAttribute("href") ?? "";
     expect(href.endsWith("/api/auth/oauth/google/start")).toBe(true);
     expect(href).not.toContain("?next=");
+  });
+});
+
+describe("OAuthButtons attribution carry", () => {
+  /**
+   * users.signup_referrer_host (PR #444) and users.signup_landing_path
+   * (PR #458) were NULL for 100% of production signups: every real account
+   * is Google OAuth, and this component only forwarded getStoredUtm() +
+   * getStoredGclid() to /start — so the two newer captures never reached the
+   * oauth_attr_{provider} cookie. PR #529 fixed the forwarding; these pin it
+   * at the component boundary. Wire keys are `referrer_host` /
+   * `landing_path` (renamed from the localStorage payload's signup_* keys to
+   * match routers/oauth.py:ATTRIBUTION_FIELDS). Server-side validation +
+   * the cookie round-trip are covered in
+   * backend/tests/test_oauth_attribution_referrer.py.
+   */
+  it("forwards referrer_host and landing_path to every provider start link", async () => {
+    vi.mocked(getStoredReferrerHost).mockReturnValue({
+      signup_referrer_host: "copilot.microsoft.com",
+    });
+    vi.mocked(getStoredLandingPath).mockReturnValue({
+      signup_landing_path: "/glossary/rsi",
+    });
+    render(<OAuthButtons />);
+
+    for (const provider of ["Google", "Microsoft", "Apple"]) {
+      const link = await screen.findByRole("link", {
+        name: new RegExp(`Continue with ${provider}`),
+      });
+      const href = link.getAttribute("href") ?? "";
+      const qs = new URLSearchParams(href.split("?")[1] ?? "");
+      expect(qs.get("referrer_host")).toBe("copilot.microsoft.com");
+      expect(qs.get("landing_path")).toBe("/glossary/rsi");
+    }
+  });
+
+  it("carries all four captures plus ?next= together without clobbering", async () => {
+    vi.mocked(getStoredUtm).mockReturnValue({
+      utm_source: "google",
+      utm_medium: "cpc",
+    });
+    vi.mocked(getStoredGclid).mockReturnValue({ gclid: "TeSt-GcLiD-123" });
+    vi.mocked(getStoredReferrerHost).mockReturnValue({
+      signup_referrer_host: "chat.openai.com",
+    });
+    vi.mocked(getStoredLandingPath).mockReturnValue({
+      signup_landing_path: "/compare/finviz",
+    });
+    const intent = "/app/billing?intent=premium";
+    render(<OAuthButtons postAuthNext={intent} />);
+
+    const link = await screen.findByRole("link", { name: /Continue with Google/ });
+    const href = link.getAttribute("href") ?? "";
+    const qs = new URLSearchParams(href.split("?")[1] ?? "");
+    expect(qs.get("utm_source")).toBe("google");
+    expect(qs.get("utm_medium")).toBe("cpc");
+    expect(qs.get("gclid")).toBe("TeSt-GcLiD-123");
+    expect(qs.get("referrer_host")).toBe("chat.openai.com");
+    expect(qs.get("landing_path")).toBe("/compare/finviz");
+    expect(qs.get("next")).toBe(intent);
+  });
+
+  it("omits the keys entirely when nothing is stored (direct traffic)", async () => {
+    render(<OAuthButtons />);
+
+    const link = await screen.findByRole("link", { name: /Continue with Google/ });
+    const href = link.getAttribute("href") ?? "";
+    expect(href).not.toContain("referrer_host");
+    expect(href).not.toContain("landing_path");
+    expect(href.endsWith("/api/auth/oauth/google/start")).toBe(true);
   });
 });
 
