@@ -41,7 +41,8 @@ def test_on_and_after_cutover_free_watchlist_is_gone():
 
 def test_limit_reads_the_date_gated_cap_not_the_static_table():
     # FREE/watchlist_tickers must delegate to free_watchlist_cap() so the
-    # cutover needs no restart/redeploy.
+    # cutover needs no restart/redeploy. The open-access month deliberately
+    # EXCLUDES watchlist_tickers, so this holds during the window too.
     assert limit(Tier.FREE, "watchlist_tickers") == free_watchlist_cap()
 
 

@@ -47,6 +47,7 @@ from app.services.tier import (
     FREE_WATCHLIST_TICKERS,
     FREE_WEB_PUSH_ALERTS,
     Tier,
+    free_open_access,
     free_watchlist_cap,
 )
 
@@ -362,6 +363,14 @@ async def _delete_scanner_universe() -> None:
 
 @pytest.mark.asyncio
 async def test_scanner_rows_cap_hit_persists(client, monkeypatch):
+    # Open-access month deliberately lifts the FREE scanner row cap to Pro
+    # (tier.limit), so for the length of the promo a free user does not hit this
+    # wall at all — there is no truncation to assert and no cap event to record.
+    # Skipping is the honest outcome: the contract below is the post-promo one
+    # and it re-arms by itself when the window closes. See
+    # tests/test_open_access_month.py for the in-window contract.
+    if free_open_access():
+        pytest.skip("scanner row cap is lifted during open-access month")
     try:
         async with client:
             # Comfortably more valid rows than the free cap so the page fills.

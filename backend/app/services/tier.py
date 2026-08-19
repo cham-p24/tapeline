@@ -122,6 +122,11 @@ FREE_WATCHLIST_TICKERS = 5       # the FREE cap WHILE the free tier still has a 
 # in the DB, just no longer addable/shown on Free, so upgrading RESTORES the list.
 FREE_WATCHLIST_REMOVAL_DATE: Final[date] = date(2026, 8, 2)
 
+# "Everything unlocked" open-access month — FREE behaves like PRO until this
+# date, then auto-reverts (see free_open_access). Keep in sync with the frontend
+# PROMO_OPEN_ACCESS_UNTIL in lib/pricing.ts.
+PROMO_OPEN_ACCESS_UNTIL: Final[date] = date(2026, 9, 8)
+
 
 def free_watchlist_cap(today: date | None = None) -> int:
     """Saved-ticker cap for the FREE tier.
@@ -133,6 +138,19 @@ def free_watchlist_cap(today: date | None = None) -> int:
     """
     d = today or datetime.now(UTC).date()
     return 0 if d >= FREE_WATCHLIST_REMOVAL_DATE else FREE_WATCHLIST_TICKERS
+
+
+def free_open_access(today: date | None = None) -> bool:
+    """True while the "everything unlocked" open-access month is running.
+
+    Founder experiment (2026-08-08): at 0 payers with engaged users who
+    activate but don't convert, drop ALL friction for a month — the FREE tier
+    gets full Pro-level access (caps + every Pro feature) — then auto-revert.
+    Premium-only feeds (congress, insider, Telegram, API) stay gated. Date-gated
+    so it reverts with no deploy. `today` injectable for tests.
+    """
+    d = today or datetime.now(UTC).date()
+    return d < PROMO_OPEN_ACCESS_UNTIL
 
 
 def free_has_watchlist(today: date | None = None) -> bool:
@@ -223,14 +241,43 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
 }
 
 
-def limit(user_tier: Tier | str, key: str) -> int | None:
+def limit(
+    user_tier: Tier | str, key: str, *, authenticated: bool = True,
+) -> int | None:
     """Return the configured cap for `key` on `user_tier`.
 
     Returns the UNLIMITED sentinel (None) for keys explicitly set to "no cap"
     (e.g. daily_lookups on Pro/Premium). Falls back to 0 for an unknown key —
     callers that may receive None must handle the sentinel (see usage.py).
+
+    `authenticated=False` marks a caller with no account at all. Anonymous
+    requests are scored against the FREE table, so a promo that lifts a FREE cap
+    would otherwise hand the same lift to logged-out visitors — see the
+    open-access branch below. Pass it from any endpoint that serves anonymous
+    traffic; it is a no-op outside a promo window.
     """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
+    # Open-access month: lift the single biggest, safest FREE limitation — the
+    # scanner ROW cap (top-10 → the full ~2,500-row universe) — until
+    # PROMO_OPEN_ACCESS_UNTIL, then auto-revert. Scoped tightly on purpose:
+    # lifting daily_lookups defeats the lookup-metering guards, and unlocking Pro
+    # FEATURES / re-adding the watchlist removes the paid moat + yo-yos users. So
+    # this is the one lift that opens the core product without collateral.
+    #
+    # AUTHENTICATED ONLY, and that is the point: anonymous callers resolve to the
+    # FREE table too, so without this guard the promo would serve the full
+    # universe to visitors with no account — removing the reason to sign up
+    # during the exact month the promo exists to drive signups, and re-opening
+    # the offset-walk the scanner's anonymous pagination guard closes. Logged-out
+    # visitors keep the standard Free top-10; the lift is the reward for having
+    # an account.
+    if (
+        actual is Tier.FREE
+        and authenticated
+        and free_open_access()
+        and key == "scanner_rows"
+    ):
+        return TIER_LIMITS[Tier.PRO]["scanner_rows"]
     # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
     # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
     # cutover needs no restart/redeploy. Paid tiers are unaffected.
