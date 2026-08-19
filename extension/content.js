@@ -15,7 +15,7 @@
  * 4. Dismissible, and it stays dismissed for the tab session.
  */
 
-(function () {
+(async function () {
   if (window.__tapelineInjected) return;
   window.__tapelineInjected = true;
 
@@ -285,8 +285,23 @@
   const allowGeneric = !isKnownHost(location.hostname);
 
 
+  /**
+   * Permanently muted hosts.
+   *
+   * The × on the pill only hides it for this page view; every overlay
+   * eventually appears somewhere the user does not want it, and the extensions
+   * that survive years (Dark Reader) make "off here, permanently" a first-class
+   * control rather than an uninstall. Read from storage.local so it persists
+   * across restarts, unlike the in-memory `dismissed` flag.
+   */
+  let muted = false;
+  try {
+    const got = await chrome.storage.local.get("mutedHosts");
+    muted = Array.isArray(got.mutedHosts) && got.mutedHosts.includes(location.hostname);
+  } catch (_) {}
+
   async function sync() {
-    if (dismissed) return;
+    if (muted || dismissed) return;
     const symbol = detectSymbol(window.location, allowGeneric);
     if (!symbol) { clear(); return; }
     if (symbol === current) return;

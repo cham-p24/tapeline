@@ -10,7 +10,8 @@
   },
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "activeTab"
   ],
   "host_permissions": [
     "https://api.tapeline.io/*"
@@ -34,7 +35,6 @@
         "https://finviz.com/*",
         "https://*.barchart.com/*",
         "https://www.cnbc.com/quotes/*",
-        "https://robinhood.com/*",
         "https://*.nasdaq.com/*",
         "https://*.investing.com/*",
         "https://*.zacks.com/*",

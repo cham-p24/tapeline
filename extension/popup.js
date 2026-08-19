@@ -98,6 +98,46 @@ async function loadRecord(symbol) {
    — and the one Chrome Web Store review accepts, since requesting every site
    up front is the single most common rejection reason. */
 
+/**
+ * Permanent per-site mute.
+ *
+ * The × on the pill only hides it for one page view. Every overlay eventually
+ * shows up somewhere the user doesn't want it, and the ones that survive years
+ * (Dark Reader) make "off here, permanently" a first-class control instead of
+ * letting that moment become an uninstall.
+ */
+async function getMuted() {
+  try {
+    const got = await chrome.storage.local.get("mutedHosts");
+    return Array.isArray(got.mutedHosts) ? got.mutedHosts : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+async function renderMute(host) {
+  const list = await getMuted();
+  const isMuted = list.includes(host);
+  const el = document.createElement("div");
+  el.className = "mute-row";
+  el.innerHTML = isMuted
+    ? `<span>Hidden on <b>${esc(host)}</b></span><button id="mute">Show again</button>`
+    : `<button id="mute">Hide on ${esc(host)}</button>`;
+  siteEl.appendChild(el);
+
+  document.getElementById("mute").addEventListener("click", async () => {
+    const cur = await getMuted();
+    const next = isMuted ? cur.filter((h) => h !== host) : cur.concat([host]);
+    try { await chrome.storage.local.set({ mutedHosts: next }); } catch (_) {}
+    siteEl.querySelector(".mute-row")?.remove();
+    await renderMute(host);
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.id) chrome.tabs.reload(tab.id);
+    } catch (_) {}
+  });
+}
+
 function renderSite(host, origin, granted) {
   if (granted) {
     siteEl.innerHTML =
@@ -135,9 +175,23 @@ document.getElementById("f").addEventListener("submit", (e) => {
   else show('<p class="msg">Enter a ticker symbol, e.g. NVDA.</p>');
 });
 
-/* Pre-fill from the active tab, and offer to enable the site when it's new. */
+/* Pre-fill from the active tab, and offer to enable the site when it's new.
+ *
+ * `tab.url` is only populated because the manifest declares `activeTab`, which
+ * Chrome grants the moment the user clicks the toolbar icon — i.e. exactly when
+ * this runs — and which costs no extra install warning. Without it Chrome
+ * redacts url/title on every host we lack permission for, this function
+ * returned early, and the "Enable on this site" card never rendered on any
+ * broker. The whole opt-in architecture was unreachable in production. */
 chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-  if (!tab || !tab.url) return;
+  if (!tab) return;
+  if (!tab.url) {
+    // Defensive: if a future manifest edit drops activeTab, fail loudly in the
+    // UI rather than silently pretending no site is open.
+    siteEl.innerHTML =
+      '<div class="site-card">Can\'t read the current tab. Use the box above to look up a ticker.</div>';
+    return;
+  }
   let u;
   try { u = new URL(tab.url); } catch (_) { return; }
   if (!/^https?:$/.test(u.protocol)) return;   // chrome://, file://, extension pages
@@ -149,6 +203,9 @@ chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
     try { granted = await chrome.permissions.contains({ origins: [origin] }); } catch (_) {}
     renderSite(u.hostname, origin, granted);
   }
+  // Mute control shows on every http(s) site, covered or not — it is the
+  // recovery path when the pill appears somewhere unwanted.
+  await renderMute(u.hostname);
 
   const sym = detectSymbol(
     { hostname: u.hostname, pathname: u.pathname, search: u.search, hash: u.hash },
