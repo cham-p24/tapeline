@@ -144,3 +144,32 @@ node extension/icons/make-icons.js
 
 Chrome requires PNG for toolbar icons, which is why these are rasterised rather
 than referenced as SVG.
+
+## Packaging for the Web Store
+
+```bash
+cd extension
+zip -r ../tapeline-extension.zip . -x@.storeignore
+```
+
+`.storeignore` keeps `test-detection.js` and `icons/make-icons.js` out of the
+uploaded package — they are development artefacts, and Google's guidance is that
+less code in the zip means less review surface.
+
+**Listing checklist** (the four things that get finance extensions rejected):
+
+1. Lead the description with the strongest true fact: *sends only the ticker
+   symbol, never reads the page*. Do not paste the site list into the
+   description — excessive site lists read as keyword stuffing.
+2. Point the privacy-policy link at `/legal/extension-privacy`, not
+   `/legal/privacy`. A reviewer who follows the link to a web-app policy has
+   found a mismatch.
+3. Use a `@tapeline.io` support address, not a personal Gmail.
+4. Justify each permission in the dashboard: `storage` (cache + your muted
+   sites), `scripting` (register the overlay on sites you enable), `activeTab`
+   (read the current tab's address when you open the popup), `contextMenus`
+   (the right-click lookup), and the single host `api.tapeline.io`.
+
+Do **not** add watchlists, alerts, news or portfolio import. Score overlay +
+manual lookup + published record is one purpose; bundling a second feature set
+is what trips the single-purpose policy.

@@ -24,6 +24,12 @@
           padding: 16px 18px; margin-top: 12px; }
   a { color: #6fa8e0; }
   .fine { color: #7c7a72; font-size: 12.5px; margin-top: 30px; line-height: 1.55; }
+  .accept { margin-top: 28px; }
+  .accept button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
+                   padding: 11px 18px; font-size: 15px; font-weight: 600; cursor: pointer;
+                   font-family: inherit; }
+  .accept button:hover { opacity: .92; }
+  .accept span { color: #4ec98a; font-size: 14px; }
   @media (prefers-color-scheme: light) {
     body { background: #fff; color: #1a1a1a; }
     .lede { color: #6b665d } h2 { color: #8a857c }
@@ -75,10 +81,16 @@
   <a href="https://tapeline.io/scorecard?utm_source=extension&utm_medium=welcome">tapeline.io</a>
   without any extension at all.</p>
 
+  <div class="accept">
+    <button id="ok">I understand — turn it on</button>
+    <span id="done" hidden>Turned on. You can close this tab.</span>
+  </div>
+
   <p class="fine">Tapeline's scores are descriptive readings of published data —
   not investment advice, price targets or forecasts. Every daily top-10 pick is
   written to a public record the day it prints and is never edited, including the
   ones that lose. Read the
-  <a href="https://tapeline.io/legal/privacy?utm_source=extension&utm_medium=welcome">privacy policy</a>
+  <a href="https://tapeline.io/legal/extension-privacy?utm_source=extension&utm_medium=welcome">privacy policy</a>
   or the <a href="https://tapeline.io/scorecard?utm_source=extension&utm_medium=welcome">full record</a>.</p>
 </main>
+<script src="welcome.js"></script>

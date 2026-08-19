@@ -140,11 +140,16 @@ async function syncEnabledSites() {
  */
 chrome.runtime.onInstalled.addListener((details) => {
   syncEnabledSites();
+  registerContextMenu();
   if (details && details.reason === "install") {
     chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
   }
 });
-chrome.runtime.onStartup.addListener(syncEnabledSites);
+chrome.runtime.onStartup.addListener(() => {
+  syncEnabledSites();
+  // Context menus do not survive a browser restart either.
+  registerContextMenu();
+});
 
 /**
  * This ticker's history in the published record.
@@ -192,7 +197,85 @@ async function fetchRecord(symbol) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+/**
+ * Consent gate.
+ *
+ * Chrome's 1 Aug 2026 policy change removed the "closely related to the single
+ * purpose" exemption, so a prominent in-product disclosure with an affirmative
+ * accept is required BEFORE the first network call — store-listing text does
+ * not satisfy it. The content script asks here rather than reading storage
+ * itself so there is exactly one definition of "has consented".
+ */
+async function hasConsent() {
+  try {
+    const got = await chrome.storage.local.get("consentAt");
+    return Boolean(got.consentAt);
+  } catch (_) {
+    return false;   // fail closed: no consent record, no network call
+  }
+}
+
+/**
+ * Right-click a highlighted ticker anywhere on the web → look it up.
+ *
+ * The best value-per-hour idea in the teardown: it delivers the "works
+ * anywhere" promise with ZERO host permissions, zero DOM reading and zero
+ * maintenance tax, because the selection is handed to us by the browser rather
+ * than scraped. Nothing here can rot when a host site redesigns.
+ */
+function registerContextMenu() {
+  try {
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({
+        id: "tapeline-lookup",
+        title: 'Look up "%s" in Tapeline',
+        contexts: ["selection"],
+      });
+    });
+  } catch (_) {}
+}
+
+chrome.contextMenus?.onClicked.addListener((info) => {
+  if (info.menuItemId !== "tapeline-lookup") return;
+  const raw = (info.selectionText || "").trim().toUpperCase();
+  // Accept a bare symbol or a $CASHTAG; anything else is a mis-click, and
+  // opening a junk page would be worse than doing nothing.
+  const m = raw.match(/^\$?([A-Z][A-Z0-9.\-]{0,9})$/);
+  if (!m) return;
+  chrome.tabs.create({ url: link(`/t/${encodeURIComponent(m[1])}`) });
+});
+
+/**
+ * Score in the toolbar badge — answers "is there anything here for me?" for
+ * zero pixels of page real estate, which is the discovery problem overlays die
+ * of. Per-tab so it never leaks one tab's ticker into another.
+ */
+function setBadge(tabId, text) {
+  if (!tabId) return;
+  try {
+    chrome.action.setBadgeText({ tabId, text: text || "" });
+    if (text) {
+      chrome.action.setBadgeBackgroundColor({ tabId, color: "#3b82f6" });
+      chrome.action.setBadgeTextColor?.({ tabId, color: "#ffffff" });
+    }
+  } catch (_) {}
+}
+
+// Grants made from Chrome's own "Site access" UI never touch our popup, so
+// without these the user (or a reviewer testing that path) grants access and
+// nothing happens.
+chrome.permissions.onAdded.addListener(syncEnabledSites);
+chrome.permissions.onRemoved.addListener(syncEnabledSites);
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "TAPELINE_CONSENT") {
+    hasConsent().then((ok) => sendResponse({ ok }));
+    return true;
+  }
+  if (msg && msg.type === "TAPELINE_BADGE") {
+    setBadge(sender && sender.tab && sender.tab.id, msg.text);
+    return false;
+  }
   if (msg && msg.type === "TAPELINE_RECORD" && msg.symbol) {
     fetchRecord(String(msg.symbol).toUpperCase()).then(sendResponse);
     return true;

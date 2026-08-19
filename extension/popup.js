@@ -175,6 +175,29 @@ document.getElementById("f").addEventListener("submit", (e) => {
   else show('<p class="msg">Enter a ticker symbol, e.g. NVDA.</p>');
 });
 
+/**
+ * Calibration first run.
+ *
+ * Opening the popup on a non-finance page used to show an empty input, which
+ * tells a stranger nothing about whether the product is any good. Showing a
+ * live score for a company they already hold a private opinion about lets them
+ * audit us in one glance — the single cheapest trust-building move available.
+ */
+const CALIBRATION = ["NVDA", "AAPL", "MSFT"];
+
+async function showCalibration() {
+  for (const sym of CALIBRATION) {
+    let res;
+    try { res = await chrome.runtime.sendMessage({ type: "TAPELINE_LOOKUP", symbol: sym }); }
+    catch (_) { return; }
+    if (res && res.ok) {
+      document.getElementById("q").value = sym;
+      await lookup(sym);
+      return;
+    }
+  }
+}
+
 /* Pre-fill from the active tab, and offer to enable the site when it's new.
  *
  * `tab.url` is only populated because the manifest declares `activeTab`, which
@@ -212,4 +235,18 @@ chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
     !known && granted
   );
   if (sym) { document.getElementById("q").value = sym; lookup(sym); }
+  else showCalibration();
+}).catch(() => {});
+
+/* Consent state, surfaced here too: someone who closed the welcome tab without
+   accepting would otherwise find a silently inert extension and assume it's
+   broken. The overlay genuinely does nothing until consent is recorded. */
+chrome.runtime.sendMessage({ type: "TAPELINE_CONSENT" }).then((c) => {
+  if (c && c.ok) return;
+  siteEl.innerHTML =
+    '<div class="site-card">Tapeline is installed but not switched on yet.' +
+    '<button id="consent">Review and turn on</button></div>';
+  document.getElementById("consent").addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+  });
 }).catch(() => {});

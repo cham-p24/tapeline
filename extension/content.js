@@ -273,6 +273,7 @@
   }
 
   function clear() {
+    try { chrome.runtime.sendMessage({ type: "TAPELINE_BADGE", text: "" }); } catch (_) {}
     if (root) {
       const w = root.querySelector(".tl-wrap");
       if (w) w.remove();
@@ -300,6 +301,20 @@
     muted = Array.isArray(got.mutedHosts) && got.mutedHosts.includes(location.hostname);
   } catch (_) {}
 
+  /**
+   * Nothing — not one network call — happens before the user has accepted the
+   * first-run disclosure. Chrome's 1 Aug 2026 policy removed the "related to
+   * single purpose" exemption, so consent must precede the first request, and
+   * this is also simply the correct behaviour for something that runs on
+   * finance pages. Fails closed: if the check errors, we stay silent.
+   */
+  let consented = false;
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "TAPELINE_CONSENT" });
+    consented = Boolean(res && res.ok);
+  } catch (_) {}
+  if (!consented) return;
+
   async function sync() {
     if (muted || dismissed) return;
     const symbol = detectSymbol(window.location, allowGeneric);
@@ -315,7 +330,15 @@
       res = { ok: false, reason: "unavailable" };
     }
     if (current !== symbol) return;           // navigated away mid-flight
-    if (res && res.ok) render("ok", res.data, symbol);
+    if (res && res.ok) {
+      render("ok", res.data, symbol);
+      // Badge answers "is there anything here for me?" without taking any page
+      // real estate — the discovery problem overlays otherwise die of.
+      try {
+        const n = res.data.score == null ? "" : String(Math.round(res.data.score));
+        chrome.runtime.sendMessage({ type: "TAPELINE_BADGE", text: n });
+      } catch (_) {}
+    }
     else render(res && res.reason === "not_covered" ? "missing" : "error", null, symbol);
   }
 

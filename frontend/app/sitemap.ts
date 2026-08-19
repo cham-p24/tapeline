@@ -156,6 +156,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // produced unprompted signups, and "stock screener MCP server" is an
     // uncontested query.
     { url: `${base}/mcp`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/legal/extension-privacy`, lastModified: STATIC_LAST_MODIFIED, priority: 0.3 },
     { url: `${base}/do-stock-screeners-work`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
