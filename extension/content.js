@@ -67,6 +67,15 @@
   .tl-bar { background: #262a32; height: 5px; border-radius: 3px; overflow: hidden; }
   .tl-bar i { display: block; height: 100%; background: #3b82f6; border-radius: 3px; }
   .tl-fv { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; color: #c9c6bf; }
+  .tl-rec { margin-top: 12px; padding-top: 11px; border-top: 1px solid #262a32; }
+  .tl-rec-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: #7c7a72; font-weight: 500; }
+  .tl-rec-n { font-size: 11.5px; color: #c9c6bf; margin-top: 4px; }
+  .tl-rec-empty { font-size: 11.5px; color: #9a978e; margin-top: 4px; }
+  .tl-rec-load { font-size: 11.5px; color: #7c7a72; margin-top: 12px; padding-top: 11px; border-top: 1px solid #262a32; }
+  .tl-rec-row { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: #9a978e; margin-top: 4px; }
+  .tl-rec-row b { color: #e9e7e1; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .tl-up { color: #4ec98a; } .tl-down { color: #e0796f; }
+  .tl-rec-note { font-size: 10px; color: #7c7a72; margin-top: 7px; line-height: 1.4; }
   .tl-actions { display: flex; gap: 8px; margin-top: 13px; }
   .tl-btn { flex: 1; text-align: center; text-decoration: none; font-size: 12px; font-weight: 600;
     padding: 7px 9px; border-radius: 7px; background: #3b82f6; color: #fff; }
@@ -75,7 +84,9 @@
   .tl-fine { margin: 11px 0 0; color: #7c7a72; font-size: 10.5px; line-height: 1.45; }
   @media (prefers-color-scheme: light) {
     .tl-pill, .tl-panel { background: #fff; color: #1a1a1a; border-color: #dcd8cf; }
-    .tl-muted, .tl-fl, .tl-h-name, .tl-h-score span { color: #6b665d; }
+    .tl-muted, .tl-fl, .tl-h-name, .tl-h-score span, .tl-rec-row { color: #6b665d; }
+    .tl-rec { border-top-color: #eceae5; } .tl-rec-load { border-top-color: #eceae5; }
+    .tl-rec-row b, .tl-rec-n { color: #1a1a1a; }
     .tl-why, .tl-fv, .tl-btn-ghost { color: #333; }
     .tl-bar { background: #eceae5; }
     .tl-btn-ghost { border-color: #dcd8cf; }
@@ -165,6 +176,7 @@
           </div>
           ${data.reason ? `<p class="tl-why">${esc(data.reason)}</p>` : ""}
           <div class="tl-factors">${factors}</div>
+          <div class="tl-record" data-symbol="${esc(data.symbol)}"></div>
           <div class="tl-actions">
             <a class="tl-btn" href="${esc(data.url)}" target="_blank" rel="noopener">Full breakdown</a>
             <a class="tl-btn tl-btn-ghost" href="${esc(data.scorecardUrl)}" target="_blank" rel="noopener">Public record</a>
@@ -191,12 +203,73 @@
         if (open) panel.setAttribute("hidden", "");
         else panel.removeAttribute("hidden");
         pill.setAttribute("aria-expanded", String(!open));
+        // Fetch the record on first expand only — most views never open the
+        // panel, and eager-loading would double origin load for nothing.
+        if (!open) loadRecord(panel.querySelector(".tl-record"));
       };
       pill.addEventListener("click", toggle);
       pill.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
       });
     }
+  }
+
+  /**
+   * This ticker's own history in the published record — the one thing no rival
+   * overlay can show, because no rival keeps a loss-inclusive forward log.
+   *
+   * "Never published" is a real answer and is stated plainly. Where there IS a
+   * history it is given whole: hit rate, median alpha, and the worst pick
+   * alongside the best. Showing the best without the worst would be exactly the
+   * selective-memory this product exists to argue against.
+   */
+  function recordHtml(rec) {
+    if (!rec) return "";
+    if (!rec.appearances) {
+      return (
+        '<div class="tl-rec"><div class="tl-rec-h">Tapeline\'s record on this ticker</div>' +
+        '<div class="tl-rec-empty">Never published in the daily top 10.</div></div>'
+      );
+    }
+    const pct = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+    const n = rec.appearances;
+    const parts = [];
+    if (rec.hitRate != null) {
+      parts.push(
+        `<div class="tl-rec-row"><span>Beat SPY next session</span><b>${Math.round(rec.hitRate)}%</b></div>`
+      );
+    }
+    if (rec.medianAlpha != null) {
+      const cls = rec.medianAlpha >= 0 ? "tl-up" : "tl-down";
+      parts.push(
+        `<div class="tl-rec-row"><span>Median vs SPY</span><b class="${cls}">${pct(rec.medianAlpha)}</b></div>`
+      );
+    }
+    if (rec.best != null && rec.worst != null) {
+      parts.push(
+        `<div class="tl-rec-row"><span>Best / worst</span><b><span class="tl-up">${pct(rec.best)}</span> · <span class="tl-down">${pct(rec.worst)}</span></b></div>`
+      );
+    }
+    return (
+      '<div class="tl-rec"><div class="tl-rec-h">Tapeline\'s record on this ticker</div>' +
+      `<div class="tl-rec-n">Published ${n}× in the daily top 10${rec.lastSeen ? ` · last ${esc(rec.lastSeen)}` : ""}</div>` +
+      parts.join("") +
+      `<div class="tl-rec-note">Descriptive measures of ${n} past published pick${n === 1 ? "" : "s"} — too small a sample to distinguish from chance.</div></div>`
+    );
+  }
+
+  async function loadRecord(slot) {
+    if (!slot || slot.dataset.loaded) return;
+    slot.dataset.loaded = "1";
+    const symbol = slot.dataset.symbol;
+    slot.innerHTML = '<div class="tl-rec-load">Loading the record…</div>';
+    let res;
+    try {
+      res = await chrome.runtime.sendMessage({ type: "TAPELINE_RECORD", symbol });
+    } catch (_) {
+      res = { ok: false };
+    }
+    slot.innerHTML = res && res.ok ? recordHtml(res.data) : "";
   }
 
   function clear() {

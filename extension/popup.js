@@ -45,7 +45,50 @@ async function lookup(symbol) {
       <a class="btn" href="${esc(d.url)}" target="_blank" rel="noopener">Full breakdown</a>
       <a class="btn ghost" href="${esc(d.scorecardUrl)}" target="_blank" rel="noopener">Public record</a>
     </div>
+    <div id="rec"></div>
     <p class="fine">Descriptive six-factor scoring — not investment advice. Every daily top-10 pick is logged publicly, including the ones that lose.</p>`);
+
+  // Eager here, unlike the overlay: opening the popup is explicit intent, so
+  // there is no wasted fetch to avoid.
+  loadRecord(d.symbol);
+}
+
+/**
+ * This ticker's own history in the published record — the thing no rival
+ * overlay can show. "Never published" is a real answer and is stated plainly;
+ * where there IS a history, the worst pick is shown next to the best, because
+ * showing only the best is the selective memory this product argues against.
+ */
+async function loadRecord(symbol) {
+  let res;
+  try { res = await chrome.runtime.sendMessage({ type: "TAPELINE_RECORD", symbol }); }
+  catch (_) { return; }
+  const slot = document.getElementById("rec");
+  if (!slot || !res || !res.ok) return;
+  const r = res.data;
+
+  if (!r.appearances) {
+    slot.innerHTML =
+      '<div class="rec"><div class="rec-h">Tapeline\'s record on this ticker</div>' +
+      '<div class="rec-empty">Never published in the daily top 10.</div></div>';
+    return;
+  }
+  const pct = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+  const rows = [];
+  if (r.hitRate != null) {
+    rows.push(`<div class="rec-row"><span>Beat SPY next session</span><b>${Math.round(r.hitRate)}%</b></div>`);
+  }
+  if (r.medianAlpha != null) {
+    rows.push(`<div class="rec-row"><span>Median vs SPY</span><b class="${r.medianAlpha >= 0 ? "up" : "down"}">${pct(r.medianAlpha)}</b></div>`);
+  }
+  if (r.best != null && r.worst != null) {
+    rows.push(`<div class="rec-row"><span>Best / worst</span><b><span class="up">${pct(r.best)}</span> · <span class="down">${pct(r.worst)}</span></b></div>`);
+  }
+  slot.innerHTML =
+    '<div class="rec"><div class="rec-h">Tapeline\'s record on this ticker</div>' +
+    `<div class="rec-n">Published ${r.appearances}× in the daily top 10${r.lastSeen ? ` · last ${esc(r.lastSeen)}` : ""}</div>` +
+    rows.join("") +
+    `<div class="rec-note">Descriptive measures of ${r.appearances} past published pick${r.appearances === 1 ? "" : "s"} — too small a sample to distinguish from chance.</div></div>`;
 }
 
 /* ── Enable on this site ───────────────────────────────────────────────────

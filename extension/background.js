@@ -22,6 +22,8 @@
 const API_BASE = "https://api.tapeline.io";
 const SITE = "https://tapeline.io";
 const TTL_MS = 15 * 60 * 1000;
+// The record only changes when a session resolves, so it can be cached longer.
+const RECORD_TTL_MS = 60 * 60 * 1000;
 const TIMEOUT_MS = 8000;
 
 /** In-flight requests, so concurrent tabs collapse to one fetch. */
@@ -130,7 +132,57 @@ async function syncEnabledSites() {
 chrome.runtime.onInstalled.addListener(syncEnabledSites);
 chrome.runtime.onStartup.addListener(syncEnabledSites);
 
+/**
+ * This ticker's history in the published record.
+ *
+ * Fetched LAZILY — only when the user expands the panel — for two reasons.
+ * Most page views never expand, so eager-fetching would double origin load for
+ * data nobody looks at; and the pill needs to appear instantly, which it can't
+ * if it waits on a second request. Cached longer than the score because the
+ * record only changes once a session resolves.
+ */
+async function fetchRecord(symbol) {
+  const key = `r:${symbol}`;
+  try {
+    const got = await chrome.storage.session.get(key);
+    const hit = got[key];
+    if (hit && Date.now() - hit.at < RECORD_TTL_MS) return { ok: true, data: hit.data };
+  } catch (_) {}
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/scorecard/symbol/${encodeURIComponent(symbol)}`,
+      { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: "application/json" } }
+    );
+    if (!res.ok) return { ok: false };
+    const raw = await res.json();
+    const s = (raw && raw.summary) || {};
+    const rows = (raw && raw.rows) || [];
+    const data = {
+      // appearances === 0 is a real, publishable answer ("never picked"), not a
+      // failure — the UI says so rather than hiding the block.
+      appearances: s.appearances_scored || 0,
+      hitRate: typeof s.hit_rate_beat_spy === "number" ? s.hit_rate_beat_spy : null,
+      medianAlpha: typeof s.median_alpha_vs_spy === "number" ? s.median_alpha_vs_spy : null,
+      best: typeof s.best_alpha === "number" ? s.best_alpha : null,
+      worst: typeof s.worst_alpha === "number" ? s.worst_alpha : null,
+      lastSeen: rows.length ? rows[0].as_of : null,
+      inUniverse: s.in_universe !== false,
+    };
+    try {
+      await chrome.storage.session.set({ [key]: { at: Date.now(), data } });
+    } catch (_) {}
+    return { ok: true, data };
+  } catch (_) {
+    return { ok: false };
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg && msg.type === "TAPELINE_RECORD" && msg.symbol) {
+    fetchRecord(String(msg.symbol).toUpperCase()).then(sendResponse);
+    return true;
+  }
   if (msg && msg.type === "TAPELINE_SYNC_SITES") {
     syncEnabledSites().then(() => sendResponse({ ok: true }));
     return true;
