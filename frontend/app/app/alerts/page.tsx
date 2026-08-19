@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { api, type AlertEvent, type AlertRule, type SearchResult, TierGateError, errorMessage } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
 import { PageHeader } from "@/components/PageHeader";
@@ -46,7 +46,18 @@ const RULE_TYPES: { value: RuleType; label: string; needsSymbol: boolean; needsT
 // actually watches without turning the create form into a second table.
 const TICKER_SUGGESTIONS = 8;
 
+// Outer page wraps the form in Suspense so useSearchParams() (used for the
+// ?symbol=/?type= pre-arm) doesn't break static prerender — same pattern the
+// signup page uses.
 export default function AlertsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AlertsPageInner />
+    </Suspense>
+  );
+}
+
+function AlertsPageInner() {
   const { user } = useUser();
   const searchParams = useSearchParams();
   const [rules, setRules] = useState<AlertRule[]>([]);
