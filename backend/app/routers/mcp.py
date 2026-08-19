@@ -247,7 +247,11 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         limit=limit,
         offset=0,
     )
-    rows = ((data or {}).get("rows") or [])[:limit]
+    # The scanner returns its rows under "items" — NOT "rows". Reading the
+    # wrong key fails silently as an empty list rather than raising, which is
+    # exactly how this shipped broken the first time; the test below seeds a
+    # ticker and asserts it comes back, so a future key rename can't repeat it.
+    rows = ((data or {}).get("items") or [])[:limit]
     return {
         "as_of": (data or {}).get("updated_at"),
         "count": len(rows),

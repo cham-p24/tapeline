@@ -134,25 +134,67 @@ async def test_invalid_symbol_reports_in_band_not_as_protocol_error(client):
 
 
 @pytest.mark.asyncio
-async def test_daily_picks_passes_real_values_not_query_objects():
-    """Regression guard for the FastAPI-handler-called-directly trap.
+async def test_daily_picks_actually_returns_seeded_rows():
+    """Guards two silent failure modes at once, which is why it seeds a row
+    rather than asserting on shape.
 
-    `list_scanner` defaults its filters to `Query(...)` objects, which only
-    become real values during request handling. Calling it directly without
-    passing them would compare scores against a Query instance. Exercising the
-    tool end-to-end is the only way to catch that.
+    1. The response-key trap. `list_scanner` returns its rows under `items`;
+       reading `rows` yields an empty list rather than raising. This shipped
+       broken exactly that way, and the original shape-only assertions
+       (`isinstance(..., list)`, `count <= 3`) all passed on the empty result.
+    2. The Query-object trap. `list_scanner` defaults its filters to
+       `Query(...)` objects that only become real values during request
+       handling; calling it directly without passing them compares scores
+       against a Query instance.
+
+    Both are invisible unless a known row is asserted to survive the round trip.
     """
+    import uuid
+
     from app.db import session_scope
+    from app.models import Ticker
 
+    symbol = f"ZZ{uuid.uuid4().hex[:4].upper()}"
     async with session_scope() as session:
-        out = await mcp_module._tool_daily_picks({"limit": 3}, session)
+        session.add(
+            # The scanner applies ticker_freshness.live_clauses on top of the
+            # explicit filters, so a partially-populated row is dropped as a
+            # data-quality corruption signature. To be rankable a row needs a
+            # score, 2+ populated factors, a non-null change_pct_1d and
+            # confidence_pct, a clean asset_class, and a recent updated_at.
+            Ticker(
+                symbol=symbol,
+                name="MCP Fixture Corp",
+                score=99.9,          # top of the ranking, so it survives the cap
+                signal="STRONG SETUP",
+                price=100.0,
+                volume=10_000,       # 1,000,000 dollar-volume, clears the floor
+                change_pct_1d=1.0,
+                confidence_pct=90.0,
+                asset_class="equity",
+                sub_trend=90.0,
+                sub_rs=90.0,
+                reason="seeded for the MCP daily-picks round trip",
+            )
+        )
+        await session.commit()
 
-    assert isinstance(out["picks"], list)
-    assert out["count"] == len(out["picks"])
-    assert out["count"] <= 3
-    for pick in out["picks"]:
-        assert isinstance(pick["symbol"], str) and pick["symbol"]
-        assert pick["url"].startswith("https://tapeline.io/t/")
+    try:
+        async with session_scope() as session:
+            out = await mcp_module._tool_daily_picks({"limit": 3}, session)
+
+        assert out["count"] == len(out["picks"])
+        assert out["count"] >= 1, "daily picks came back empty — wrong response key?"
+        assert symbol in {p["symbol"] for p in out["picks"]}
+        for pick in out["picks"]:
+            assert isinstance(pick["symbol"], str) and pick["symbol"]
+            assert pick["url"].startswith("https://tapeline.io/t/")
+    finally:
+        async with session_scope() as session:
+            row = await session.get(Ticker, symbol)
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
 
 
 @pytest.mark.asyncio
