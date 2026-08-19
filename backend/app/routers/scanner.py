@@ -126,7 +126,12 @@ async def list_scanner(
 ) -> dict:
     # Tier gating — free users get a capped row count + stale timestamps
     tier = Tier(user.tier) if user else Tier.FREE
-    row_cap = tier_limit(tier, "scanner_rows")  # free=10, pro/elite=1000
+    # `authenticated` matters only during an open-access promo: anonymous callers
+    # score against the FREE table, and the promo lift is deliberately reserved
+    # for people who actually have an account (see tier.limit).
+    row_cap = tier_limit(  # free=10, pro/elite=1000
+        tier, "scanner_rows", authenticated=user is not None,
+    )
     if limit > row_cap:
         limit = row_cap
     # Offset scrape guard: only Pro/Premium may paginate. Without this, a Free

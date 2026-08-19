@@ -67,3 +67,23 @@ def test_paid_tiers_unaffected():
     assert limit(Tier.PRO, "scanner_rows") == TIER_LIMITS[Tier.PRO]["scanner_rows"]
     assert limit(Tier.PREMIUM, "watchlist_tickers") == 200
     assert has_feature(Tier.PREMIUM, "congress.feed") is True
+
+
+def test_anonymous_callers_do_NOT_get_the_open_access_lift():
+    """The lift is the reward for having an account, not for showing up.
+
+    Anonymous requests are scored against the FREE table (scanner.py:
+    `tier = Tier(user.tier) if user else Tier.FREE`), so without an explicit
+    guard the promo would hand the full universe to logged-out visitors — during
+    the exact month the promo exists to drive signups, and re-opening the
+    offset-walk that the scanner's anonymous pagination guard closes.
+    """
+    if not free_open_access():
+        return
+    assert limit(Tier.FREE, "scanner_rows", authenticated=False) == (
+        TIER_LIMITS[Tier.FREE]["scanner_rows"]
+    )
+    # ...while a signed-in free user in the same window does get it.
+    assert limit(Tier.FREE, "scanner_rows", authenticated=True) == (
+        TIER_LIMITS[Tier.PRO]["scanner_rows"]
+    )

@@ -241,12 +241,20 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
 }
 
 
-def limit(user_tier: Tier | str, key: str) -> int | None:
+def limit(
+    user_tier: Tier | str, key: str, *, authenticated: bool = True,
+) -> int | None:
     """Return the configured cap for `key` on `user_tier`.
 
     Returns the UNLIMITED sentinel (None) for keys explicitly set to "no cap"
     (e.g. daily_lookups on Pro/Premium). Falls back to 0 for an unknown key —
     callers that may receive None must handle the sentinel (see usage.py).
+
+    `authenticated=False` marks a caller with no account at all. Anonymous
+    requests are scored against the FREE table, so a promo that lifts a FREE cap
+    would otherwise hand the same lift to logged-out visitors — see the
+    open-access branch below. Pass it from any endpoint that serves anonymous
+    traffic; it is a no-op outside a promo window.
     """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
     # Open-access month: lift the single biggest, safest FREE limitation — the
@@ -255,7 +263,20 @@ def limit(user_tier: Tier | str, key: str) -> int | None:
     # lifting daily_lookups defeats the lookup-metering guards, and unlocking Pro
     # FEATURES / re-adding the watchlist removes the paid moat + yo-yos users. So
     # this is the one lift that opens the core product without collateral.
-    if actual is Tier.FREE and free_open_access() and key == "scanner_rows":
+    #
+    # AUTHENTICATED ONLY, and that is the point: anonymous callers resolve to the
+    # FREE table too, so without this guard the promo would serve the full
+    # universe to visitors with no account — removing the reason to sign up
+    # during the exact month the promo exists to drive signups, and re-opening
+    # the offset-walk the scanner's anonymous pagination guard closes. Logged-out
+    # visitors keep the standard Free top-10; the lift is the reward for having
+    # an account.
+    if (
+        actual is Tier.FREE
+        and authenticated
+        and free_open_access()
+        and key == "scanner_rows"
+    ):
         return TIER_LIMITS[Tier.PRO]["scanner_rows"]
     # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
     # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
