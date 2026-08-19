@@ -476,6 +476,15 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
               )}
             </p>
           )}
+          {/* One-tap news alert above; this hands off to the full alerts form
+              pre-armed with this ticker + the news rule so the user can tune
+              the channel/threshold instead of starting from a blank screen. */}
+          <Link
+            href={`/app/alerts?symbol=${encodeURIComponent(symbol)}&type=news`}
+            className="mt-2 block text-xs text-muted hover:text-accent hover:underline"
+          >
+            Set a custom alert →
+          </Link>
         </div>
       </div>
 
