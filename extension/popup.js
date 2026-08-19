@@ -36,7 +36,7 @@ async function lookup(symbol) {
   }).join("");
   show(`
     <div class="row">
-      <div><div class="sym">${esc(d.symbol)}</div><div class="name">${esc(d.name || "")}</div></div>
+      <div><div class="sym">${esc(d.symbol)}</div><div class="name">${esc(d.name || "")}</div>${d.confidence != null ? `<div class="conf">${esc(d.signal || "")} · ${Math.round(d.confidence)}% confidence</div>` : ""}</div>
       <div class="score ${tone}">${d.score == null ? "–" : Math.round(d.score)}<span>/100</span></div>
     </div>
     ${d.reason ? `<p class="why">${esc(d.reason)}</p>` : ""}
