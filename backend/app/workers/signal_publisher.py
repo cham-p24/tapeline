@@ -170,7 +170,13 @@ async def tick() -> None:
     # Await the async ones so we get actual data instead of a coroutine object.
     import inspect
     snapshots = await fetch_snapshots() if inspect.iscoroutinefunction(fetch_snapshots) else fetch_snapshots()
-    regime = await fetch_regime() if inspect.iscoroutinefunction(fetch_regime) else fetch_regime()
+    # Pass this tick's snapshots so fetch_regime derives REAL market breadth
+    # (advancers vs decliners from change_pct_1d) instead of a placeholder.
+    regime = (
+        await fetch_regime(snapshots)
+        if inspect.iscoroutinefunction(fetch_regime)
+        else fetch_regime()
+    )
 
     # Squeezes + congress trades are FABRICATED by mock_feed (no real source is
     # wired for either). Don't even generate them in production — see
@@ -186,14 +192,9 @@ async def tick() -> None:
             else fetch_congress_trades()
         )
 
-    # Live breadth: % of universe with sub_trend > 50 (proxy for "above
-    # the 200DMA" since the trend factor incorporates that). Replaces the
-    # last hardcoded macro indicator. Computed from the snapshots we just
-    # fetched — no extra DB round-trip.
-    trends = [s.get("sub_trend") for s in snapshots if s.get("sub_trend") is not None]
-    if trends:
-        above_mid = sum(1 for t in trends if t > 50)
-        regime["breadth_pct"] = round(100 * above_mid / len(trends), 1)
+    # Breadth is now computed inside fetch_regime(snapshots) above, from the
+    # real advancers/decliners in this tick's change_pct_1d — no separate
+    # sub_trend proxy override here.
 
     # Live sector_leaders: top 3 sectors ranked by average composite score.
     # Replaces the second hardcoded regime placeholder. Joins each snapshot to
@@ -238,6 +239,12 @@ async def tick() -> None:
                 "change_pct_5d": snap["change_pct_5d"],
                 "change_pct_1m": snap["change_pct_1m"],
                 "volume": snap["volume"],
+                # Absolute-dollar market cap (GAP #10). .get so a snapshot that
+                # predates the field (or a sheet-only row) doesn't KeyError; a
+                # missing/None value leaves the column null (em-dash in the UI).
+                # Applied on both the market-only (sheet-owned) and full-update
+                # branches, so sheet-governed tickers still get a cap read.
+                "market_cap": snap.get("market_cap"),
             }
             is_sheet_owned = snap["symbol"] in sheet_owned
             if is_sheet_owned:
@@ -1043,8 +1050,14 @@ async def _ensure_daily_scorecard(today: date) -> None:
         _cand_stmt = select(Ticker)
         for _clause in await live_clauses(session):
             _cand_stmt = _cand_stmt.where(_clause)
+        # Deterministic ordering (GAP #8): score alone is not a total order —
+        # tickers tie on score every day, and the candidate pool cutoff at 80
+        # (and the top-10 freeze below) then depended on whatever order the
+        # planner happened to return tied rows in, so the PERMANENT public
+        # scorecard did not reproduce run to run. Break ties on symbol asc so
+        # identical data always freezes the same, alphabetically-ordered set.
         candidates = await session.execute(
-            _cand_stmt.order_by(desc(Ticker.score)).limit(80)
+            _cand_stmt.order_by(desc(Ticker.score), Ticker.symbol.asc()).limit(80)
         )
 
         sector_counts: dict[str, int] = {}

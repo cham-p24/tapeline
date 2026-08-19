@@ -40,7 +40,7 @@ import re
 from typing import Any
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -975,9 +975,33 @@ def parse_market_intelligence_csv(text: str) -> dict[str, Any]:
     }
 
 
+async def _compute_breadth_pct(session: AsyncSession, default: float) -> float:
+    """Real market breadth from the Ticker table: advancers as a % of the names
+    that actually moved today (100 * count(change_pct_1d > 0) / count(change_pct_1d
+    != 0)). The sheet has no breadth column, so this replaces the frozen 50.0
+    default. NULL change_pct_1d rows are excluded by the SQL comparisons; falls
+    back to ``default`` only when nothing has moved (empty/just-seeded universe).
+    """
+    advancers = (
+        await session.execute(
+            select(func.count()).select_from(Ticker).where(Ticker.change_pct_1d > 0)
+        )
+    ).scalar_one()
+    moving = (
+        await session.execute(
+            select(func.count()).select_from(Ticker).where(Ticker.change_pct_1d != 0)
+        )
+    ).scalar_one()
+    if not moving:
+        return default
+    return round(100 * advancers / moving, 1)
+
+
 async def upsert_market_regime(session: AsyncSession, parsed: dict[str, Any]) -> dict[str, int]:
     """Update the single-row RegimeState table from the parsed sheet values."""
     from app.models import RegimeState
+
+    breadth_pct = await _compute_breadth_pct(session, parsed["breadth_pct_default"])
 
     existing = (await session.execute(select(RegimeState))).scalar_one_or_none()
     if existing is None:
@@ -988,7 +1012,7 @@ async def upsert_market_regime(session: AsyncSession, parsed: dict[str, Any]) ->
             dxy=parsed["dxy"],
             yield_10y=parsed["yield_10y"],
             rate_direction=parsed["rate_direction"],
-            breadth_pct=parsed["breadth_pct_default"],
+            breadth_pct=breadth_pct,
             sector_leaders=parsed["sector_leaders_default"],
         )
         session.add(rs)
@@ -1000,6 +1024,10 @@ async def upsert_market_regime(session: AsyncSession, parsed: dict[str, Any]) ->
     existing.dxy = parsed["dxy"]
     existing.yield_10y = parsed["yield_10y"]
     existing.rate_direction = parsed["rate_direction"]
+    # Set breadth on UPDATE too (GAP #11b) — previously only the INSERT branch
+    # wrote breadth_pct, so on every steady-state update it stayed frozen at
+    # whatever the first insert set. Now it tracks the live advancers/decliners.
+    existing.breadth_pct = breadth_pct
     await session.commit()
     return {"inserted": 0, "updated": 1, "total": 1}
 

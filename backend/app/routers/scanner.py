@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import desc, func, or_, select, text
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, is_sqlite
@@ -28,13 +28,15 @@ SCANNER_QUERY_TIMEOUT_MS = 8000
 # Default liquidity floor for the ranked scanner view. A high Tapeline Score on
 # a near-untradeable instrument (e.g. a bond/strategy ETF trading a few hundred
 # dollars a day — BBBL at ~$800/day, AETH at ~$21k) was floating to the TOP of
-# the list, a first-impression killer on the core product surface. We drop rows
-# whose dollar-volume (price*volume) is KNOWN and below this floor; rows missing
-# price or volume are KEPT, so the filter can only ever remove obvious junk,
-# never hide a name we simply lack a volume read for. Conservative on purpose so
-# the price-anchored listicle pages (penny stocks / under-$5) keep their long
-# tail. Pass min_dollar_volume=0 to disable.
-SCANNER_MIN_DOLLAR_VOLUME = 50_000.0
+# the list, a first-impression killer on the core product surface. On the
+# DEFAULT ranked view we now REQUIRE a known, liquid dollar-volume: a row with
+# a NULL price or volume (no read) is EXCLUDED, and any row whose known
+# dollar-volume (price*volume) is below this floor is dropped too. This keeps an
+# unpriced ghost off the top of the core surface a new visitor first lands on.
+# The price-anchored listicle pages (penny stocks / under-$5) are unaffected
+# because they pass min_dollar_volume=0, which skips the filter entirely and
+# preserves their long tail. Pass min_dollar_volume=0 to disable.
+SCANNER_MIN_DOLLAR_VOLUME = 1_000_000.0
 
 # Module-level cache for /popular — recomputed every hour. The query is cheap
 # but we'd rather not run it on every empty-state render in /app/watchlist.
@@ -174,16 +176,18 @@ async def list_scanner(
     for clause in await live_clauses(session):
         stmt = stmt.where(clause)
 
-    # Liquidity floor — keep rows with an unknown (null) price/volume, but drop
-    # any whose KNOWN dollar-volume is below the floor so a high score on a
-    # near-untradeable ETF can't top the ranked list. See SCANNER_MIN_DOLLAR_VOLUME.
+    # Liquidity floor — on the DEFAULT ranked view REQUIRE a known, liquid
+    # dollar-volume: exclude rows with a NULL price or volume (no read) AND rows
+    # whose known dollar-volume is below the floor, so a high score on a
+    # near-untradeable — or entirely unpriced — name can't top the ranked list a
+    # new visitor first sees. Skipped entirely when min_dollar_volume == 0, which
+    # preserves the price-anchored listicle pages' long tail. See
+    # SCANNER_MIN_DOLLAR_VOLUME.
     if min_dollar_volume > 0:
         stmt = stmt.where(
-            or_(
-                Ticker.price.is_(None),
-                Ticker.volume.is_(None),
-                Ticker.price * Ticker.volume >= min_dollar_volume,
-            )
+            Ticker.price.isnot(None),
+            Ticker.volume.isnot(None),
+            Ticker.price * Ticker.volume >= min_dollar_volume,
         )
 
     # Snapshot the fully-filtered SELECT — every filter, freshness and liquidity
@@ -286,6 +290,7 @@ async def list_scanner(
                 "change_pct_5d": r.change_pct_5d,
                 "change_pct_1m": r.change_pct_1m,
                 "volume": r.volume,
+                "market_cap": r.market_cap,
                 "sub_trend": r.sub_trend,
                 "sub_rs": r.sub_rs,
                 "sub_fundamentals": r.sub_fundamentals,

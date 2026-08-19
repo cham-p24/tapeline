@@ -27,6 +27,11 @@ class Ticker(Base):
     # BigInteger: 32-bit INTEGER overflowed on high-turnover names (e.g. ADTX
     # ~5.28B shares > 2.147B int max), failing the whole scan-tick bulk write.
     volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Absolute market cap in dollars (nullable — many rows have no read yet).
+    # Sourced from the Finnhub company profile, which reports it in MILLIONS,
+    # so the populator multiplies by 1e6 before storing. Displayed compactly in
+    # the scanner ("Mkt Cap" column); an em-dash renders when null.
+    market_cap: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Score breakdown — the synthesis moat. Always sums (weighted) to `score`.
     sub_trend: Mapped[float | None] = mapped_column(Float, nullable=True)
