@@ -87,7 +87,27 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
     raise RuntimeError(f"polygon request failed after retries: {path}")
 
 
-async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, Any]]:
+def _composite_from_subs(r: dict[str, Any]) -> float:
+    """Weighted composite from the six sub-scores, clamped to 0..100.
+
+    Weights mirror mock_feed/signal_publisher:
+    trend .25  rs .20  fund .15  smart .15  macro .15  mom .10
+    """
+    composite = (
+        r["sub_trend"] * 0.25
+        + r["sub_rs"] * 0.20
+        + r["sub_fundamentals"] * 0.15
+        + r["sub_smart_money"] * 0.15
+        + r["sub_macro"] * 0.15
+        + r["sub_momentum"] * 0.10
+    )
+    return round(max(0, min(100, composite)), 1)
+
+
+async def fetch_snapshots(
+    symbols: list[str] | None = None,
+    macro_score: float | None = None,
+) -> list[dict[str, Any]]:
     """
     Latest snapshots — returns rows in the same schema as mock_feed.fetch_snapshots
     so the worker's upsert path stays unchanged.
@@ -95,15 +115,30 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     Strategy (hybrid until the full per-factor pipeline lands):
     - **Real**: price, change_pct_1d, volume — from Massive snapshot endpoint
     - **Real**: sub_fundamentals — from Finnhub cache (if pre-fetched), else mock
-    - **Mock**: sub_trend, sub_rs, sub_momentum, sub_macro, sub_smart_money,
+    - **Real**: sub_macro — regime-derived, deterministic (see below)
+    - **Real**: market_cap — from the Finnhub company-profile cache (absolute $)
+    - **Mock**: sub_trend, sub_rs, sub_momentum, sub_smart_money,
       reason, confidence_pct — until each factor's real source is wired
 
+    sub_macro determinism: the mock base fills sub_macro with a random.gauss
+    value and nothing here used to override it, so a RANDOM macro flowed into
+    the composite and could be frozen onto the permanent public scorecard. We
+    now override it with a regime-derived, deterministic score on EVERY path
+    (including the no-key mock fallback). Pass ``macro_score`` to reuse a value
+    the caller already computed; otherwise the regime is fetched once here. An
+    unknown/unreachable regime maps to NEUTRAL 50, never a random number.
+
     The composite `score` gets recomputed after merging so real fundamentals
-    actually move the needle (they're 15% of the total weight).
+    (and the deterministic macro) actually move the needle.
     """
-    from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
+    from app.services.finnhub_feed import (
+        get_cached_market_cap,
+        get_cached_score,
+        get_cached_smart_money_score,
+    )
     from app.services.mock_feed import _signal_from_score
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots
+    from app.services.score import regime_to_macro_score
     from app.services.universe import active_universe
     # Trend / RS / Momentum caches live in this same module (populated by worker)
 
@@ -117,8 +152,31 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     # with real Massive + Finnhub data per row.
     base_rows = _mock_snapshots(universe_override=universe_list)
 
+    # Deterministic macro (GAP #11a): derive a regime-mapped macro score once
+    # and stamp it on EVERY row, replacing the random mock value. Fetch the
+    # regime here only if the caller didn't already supply a macro_score; a
+    # failed/unknown regime falls back to NEUTRAL 50, never random.
+    if macro_score is None:
+        try:
+            regime_row = await fetch_regime()
+            macro_score = regime_to_macro_score(regime_row.get("regime"))
+        except Exception:
+            logger.exception("polygon.macro_regime_failed — using NEUTRAL 50")
+            macro_score = 50.0
+    macro_score = round(float(macro_score), 1)
+    for r in base_rows:
+        r["sub_macro"] = macro_score
+        # Real market cap (GAP #10) from the Finnhub profile cache (absolute $).
+        # None when the symbol has no cached profile yet — renders em-dash in UI.
+        r["market_cap"] = get_cached_market_cap(r["symbol"])
+        # Keep the composite consistent with the deterministic macro even on the
+        # no-key mock path below. The with-key branch recomputes again after
+        # merging real factors (which already reads this deterministic sub_macro).
+        r["score"] = _composite_from_subs(r)
+        r["signal"] = _signal_from_score(r["score"])
+
     if not _api_key():
-        # No Massive key — pure mock fallback
+        # No Massive key — pure mock fallback (now with deterministic macro).
         return base_rows
 
     # Pull real prices + volumes from Massive in one batched call
@@ -176,17 +234,9 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
         if mom is not None:
             r["sub_momentum"] = mom
 
-        # Recompute composite from updated sub_* — keeps all 6 factors blended.
-        # Weights mirror mock_feed/signal_publisher: trend .25 rs .20 fund .15 smart .15 macro .15 mom .10
-        composite = (
-            r["sub_trend"] * 0.25
-            + r["sub_rs"] * 0.20
-            + r["sub_fundamentals"] * 0.15
-            + r["sub_smart_money"] * 0.15
-            + r["sub_macro"] * 0.15
-            + r["sub_momentum"] * 0.10
-        )
-        r["score"] = round(max(0, min(100, composite)), 1)
+        # Recompute composite from updated sub_* — keeps all 6 factors blended
+        # (sub_macro is the deterministic regime-derived value stamped above).
+        r["score"] = _composite_from_subs(r)
         r["signal"] = _signal_from_score(r["score"])
 
     return base_rows
@@ -444,13 +494,19 @@ async def fetch_squeezes() -> list[dict[str, Any]]:
     return await detect_squeezes_batch(DEFAULT_UNIVERSE)
 
 
-async def fetch_regime() -> dict[str, Any]:
+async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """
-    Classify market regime from VIX, breadth (% of S&P above 200DMA),
+    Classify market regime from VIX, breadth (advancers vs decliners),
     rate direction (10Y yield slope), and sector leader rotation.
 
     Macro indicators come from FRED when FRED_API_KEY is set; falls back
     to hardcoded values otherwise. Polygon is used for the live VIX index.
+
+    ``snapshots`` (this tick's rows, same shape as fetch_snapshots) drives a
+    REAL market-breadth read: the % of moving names that advanced today,
+    100 * advancers / (advancers + decliners) from each row's change_pct_1d.
+    Replaces the long-standing hardcoded 55.0 placeholder. NEUTRAL 50 only when
+    no snapshots are supplied or none moved.
     """
     # Try FRED first (free + reliable for daily series)
     from app.services.fred_feed import fetch_macro_indicators
@@ -485,9 +541,19 @@ async def fetch_regime() -> dict[str, Any]:
     # Defaults to SIDEWAYS when no FRED key is configured (graceful no-op).
     rate_direction = fred_data.get("rate_direction") or "SIDEWAYS"
 
-    # Placeholder — breadth requires sector-constituent walk; on Starter tier
-    # this is expensive. Schedule it as a hourly job rather than per-tick.
-    breadth_pct = 55.0
+    # Real breadth from this tick's snapshots: advancers as a % of the names
+    # that actually moved today. NEUTRAL 50 when no snapshots or nothing moved.
+    breadth_pct = 50.0
+    if snapshots:
+        changes = [
+            s.get("change_pct_1d")
+            for s in snapshots
+            if s.get("change_pct_1d") is not None
+        ]
+        moving = [c for c in changes if c != 0]
+        if moving:
+            advancers = sum(1 for c in moving if c > 0)
+            breadth_pct = 100 * advancers / len(moving)
 
     regime = (
         "BULL" if vix < 15

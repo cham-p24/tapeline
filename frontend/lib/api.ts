@@ -212,6 +212,7 @@ export type ScannerRow = {
   change_pct_5d: number;
   change_pct_1m: number;
   volume: number;
+  market_cap?: number | null;
   sub_trend?: number | null;
   sub_rs?: number | null;
   sub_fundamentals?: number | null;

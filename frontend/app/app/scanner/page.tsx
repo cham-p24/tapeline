@@ -776,6 +776,7 @@ export default function ScannerPage() {
               <SortableTh label="5D" sortKey="change_pct_5d" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
               <SortableTh label="1M" sortKey="change_pct_1m" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
               <SortableTh label="Volume" sortKey="volume" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">Mkt Cap</th>
               {/* `Why` is no longer a column. It was the widest one and got
                   pushed off the right edge, forcing a horizontal scroll to read
                   the reasoning (and it was hidden entirely on mobile). It now
@@ -786,9 +787,9 @@ export default function ScannerPage() {
           </thead>
           <tbody>
             {loading && visibleRows.length === 0 ? (
-              <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
+              <tr><td colSpan={12}><TableSkeleton cols={12} rows={8} /></td></tr>
             ) : loadError && visibleRows.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center">
+              <tr><td colSpan={12} className="px-4 py-12 text-center">
                 <div className="text-muted">
                   <p>Couldn&apos;t load the scanner.</p>
                   <button
@@ -801,7 +802,7 @@ export default function ScannerPage() {
                 </div>
               </td></tr>
             ) : visibleRows.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center">
+              <tr><td colSpan={12} className="px-4 py-12 text-center">
                 {filtersActive ? (
                   <div className="text-muted">
                     <p>No tickers match these filters.</p>
@@ -900,6 +901,7 @@ export default function ScannerPage() {
                 <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
                 <td className="px-2 sm:px-4 py-2 text-right hidden sm:table-cell text-base text-muted">{compactNum(r.volume)}</td>
+                <td className="px-2 sm:px-4 py-2 text-right hidden sm:table-cell text-base text-muted">{compactUsd(r.market_cap)}</td>
               </tr>
               {/* Why — full-width row under the numbers. Wraps to the whole
                   table width, so the reasoning reads in one glance with no
@@ -912,7 +914,7 @@ export default function ScannerPage() {
                     focusedIdx === i ? "bg-accent/10" : ""
                   }`}
                 >
-                  <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={11}>
+                  <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={12}>
                     <p className="text-xs text-muted leading-snug">
                       <span className="mr-2 align-baseline text-[10px] font-medium uppercase tracking-wide text-subtle">
                         Why
@@ -1118,4 +1120,13 @@ function compactNum(n: number | null) {
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
   return String(n);
+}
+// Compact dollar amounts (absolute $) for market cap — em-dash when unknown.
+function compactUsd(n: number | null | undefined) {
+  if (n == null) return "—";
+  if (n >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
+  if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return "$" + (n / 1e3).toFixed(1) + "K";
+  return "$" + String(n);
 }

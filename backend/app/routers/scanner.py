@@ -291,6 +291,7 @@ async def list_scanner(
                 "change_pct_5d": r.change_pct_5d,
                 "change_pct_1m": r.change_pct_1m,
                 "volume": r.volume,
+                "market_cap": r.market_cap,
                 "sub_trend": r.sub_trend,
                 "sub_rs": r.sub_rs,
                 "sub_fundamentals": r.sub_fundamentals,

@@ -103,6 +103,30 @@ def fund_cache_size() -> int:
     return len(_FUND_SCORE_CACHE)
 
 
+# ---- In-memory market-cap cache (absolute dollars) ---------------------
+# Same pattern as _FUND_SCORE_CACHE — populated when the worker fetches a
+# company profile (daily sector backfill), read per-tick by
+# polygon_feed.fetch_snapshots so the cheap dict lookup — not an HTTP call —
+# runs 60×/min. Values are ABSOLUTE DOLLARS (Finnhub reports market cap in
+# MILLIONS; the populator multiplies by 1e6 before storing here).
+_MARKET_CAP_CACHE: dict[str, float] = {}
+
+
+def get_cached_market_cap(symbol: str) -> float | None:
+    """Per-tick lookup. Returns None if the symbol has no profile yet."""
+    return _MARKET_CAP_CACHE.get(symbol.upper())
+
+
+def set_cached_market_cap(symbol: str, market_cap: float | None) -> None:
+    """Worker-side setter — call with ABSOLUTE DOLLARS (already ×1e6)."""
+    if market_cap is not None:
+        _MARKET_CAP_CACHE[symbol.upper()] = market_cap
+
+
+def market_cap_cache_size() -> int:
+    return len(_MARKET_CAP_CACHE)
+
+
 # ---- In-memory smart-money score cache (insider Form 4) ----------------
 # Same pattern as _FUND_SCORE_CACHE — populated daily by the worker,
 # read per-tick by polygon_feed.fetch_snapshots.
@@ -667,6 +691,12 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
         "ipo":         data.get("ipo") or "",
     }
     _save_cache(cache_key, profile)
+    # Populate the per-tick market-cap cache. Finnhub reports market cap in
+    # MILLIONS, so multiply by 1e6 to store absolute dollars — the unit the
+    # scanner column + Ticker.market_cap expect.
+    mc_millions = _f(data.get("marketCapitalization"))
+    if mc_millions is not None:
+        set_cached_market_cap(sym, mc_millions * 1e6)
     return profile
 
 
