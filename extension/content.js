@@ -204,10 +204,15 @@
     }
     current = null;
   }
+  // Generic URL patterns are deliberately loose, so they run ONLY where the
+  // user explicitly enabled us. If this script is executing on a host that is
+  // not in the built-in list, that can only be because they granted it.
+  const allowGeneric = !isKnownHost(location.hostname);
+
 
   async function sync() {
     if (dismissed) return;
-    const symbol = detectSymbol();
+    const symbol = detectSymbol(window.location, allowGeneric);
     if (!symbol) { clear(); return; }
     if (symbol === current) return;
     current = symbol;
