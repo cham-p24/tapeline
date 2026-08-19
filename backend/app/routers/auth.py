@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import User
+from app.services.attribution import normalise_landing_path
 from app.services.bot_protection import (
     is_disposable_email,
     is_honeypot_tripped,
@@ -135,43 +136,11 @@ class SigninBody(BaseModel):
     password: str
 
 
-_LANDING_PATH_MAX = 200  # matches users.signup_landing_path
-
-
-def _normalise_landing_path(raw: str | None) -> str | None:
-    """Normalise the client-supplied first-touch landing path, or None.
-
-    Contract (mirrors lib/utm.ts:normaliseLandingPath so client and server
-    agree on the bucket a page falls into):
-      - strip anything from the first `?` or `#` — the query string and hash
-        can carry search terms or identifiers, and they explode the
-        cardinality of the aggregation this column exists to feed
-      - lowercase, so /Glossary/RSI and /glossary/rsi are one row
-      - drop a trailing slash (root "/" kept as-is)
-      - reject anything that isn't a rooted, site-relative path. "//host" is
-        protocol-relative (an external URL) — a spoofed payload must not get
-        someone else's domain into our column
-      - truncate to the column width
-
-    Never raises: attribution must not be able to fail a signup.
-    """
-    if not raw:
-        return None
-    try:
-        path = raw.strip()
-        for sep in ("?", "#"):
-            idx = path.find(sep)
-            if idx >= 0:
-                path = path[:idx]
-        path = path.lower()
-        if not path.startswith("/") or path.startswith("//"):
-            return None
-        if len(path) > 1 and path.endswith("/"):
-            path = path[:-1]
-        path = path[:_LANDING_PATH_MAX]
-        return path or None
-    except Exception:
-        return None
+# Landing-path normalisation lives in services/attribution.py so the email
+# signup (here) and the OAuth callback (routers/oauth.py) apply the identical
+# contract — same page, same bucket, whichever button was clicked. Re-exported
+# under the private name this module has always used.
+_normalise_landing_path = normalise_landing_path
 
 
 def _user_out(u: User) -> dict:

@@ -50,6 +50,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import get_session
 from app.models import User
+from app.services.attribution import LANDING_PATH_MAX, normalise_landing_path
 from app.services.session import issue_session_token, session_cookie_kwargs
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,19 @@ def _safe_next(next_param: str | None, fallback: str = "/app/scanner") -> str:
 #
 # Lengths mirror the DB columns in models/user.py so a hostile cookie can't
 # overflow the insert; anything longer is truncated, not rejected.
+#
+# `signup_referrer_host` (PR #444) and `signup_landing_path` (PR #458) were
+# added to the email path only; every real production signup is Google OAuth
+# (password_hash IS NULL), so both columns sat 100% NULL. They ride the same
+# cookie now. The landing path additionally goes through the shared
+# normaliser (path only, no query/hash, rooted, lowercase) below, exactly as
+# routers/auth.py does — the length cap here is just the overflow guard.
+#
+# Cookie budget: the caps sum to 1,420 chars raw; urlencoded (the values are
+# ASCII — hostnames, paths, click IDs) that stays well inside the 4 KB
+# per-cookie limit even in the all-fields-maxed hostile case, and real
+# traffic carries a few hundred bytes at most. Oversize values are cut to
+# the cap, never rejected.
 ATTRIBUTION_FIELDS: dict[str, int] = {
     "utm_source": 80,
     "utm_medium": 80,
@@ -120,13 +134,24 @@ ATTRIBUTION_FIELDS: dict[str, int] = {
     "gclid": 200,
     "gbraid": 200,
     "wbraid": 200,
+    "signup_referrer_host": 100,
+    "signup_landing_path": LANDING_PATH_MAX,
 }
 
 
 def _clean_attribution(raw: dict[str, str | None]) -> dict[str, str]:
     """Keep only known attribution keys, stripped, truncated to the column
     width, and free of control characters (these round-trip through a
-    client-writable cookie, same threat model as `_safe_next`)."""
+    client-writable cookie, same threat model as `_safe_next`).
+
+    `signup_landing_path` is additionally run through the shared
+    `normalise_landing_path` (services/attribution.py) — the SAME function the
+    email signup applies — so a query string or hash never reaches the
+    column, an external URL is dropped, and /Glossary/RSI/ and /glossary/rsi
+    land in one aggregation bucket regardless of which signup path was used.
+    A value the normaliser rejects is simply omitted (→ NULL), never an error:
+    attribution must not be able to fail a signup.
+    """
     out: dict[str, str] = {}
     for key, max_len in ATTRIBUTION_FIELDS.items():
         val = (raw.get(key) or "").strip()
@@ -134,6 +159,11 @@ def _clean_attribution(raw: dict[str, str | None]) -> dict[str, str]:
             continue
         if any(ord(c) < 0x20 or ord(c) == 0x7F for c in val):
             continue
+        if key == "signup_landing_path":
+            normalised = normalise_landing_path(val)
+            if not normalised:
+                continue
+            val = normalised
         out[key] = val[:max_len]
     return out
 
@@ -597,6 +627,13 @@ async def oauth_callback(
             signup_gclid=attr.get("gclid"),
             signup_gbraid=attr.get("gbraid"),
             signup_wbraid=attr.get("wbraid"),
+            # First-touch external referrer HOSTNAME + first-touch landing
+            # PATH on our own site — the two columns every real (Google)
+            # signup was leaving NULL. Hostname only / path only; the landing
+            # path was normalised by _clean_attribution above via the shared
+            # services/attribution.normalise_landing_path, same as auth.py.
+            signup_referrer_host=attr.get("signup_referrer_host"),
+            signup_landing_path=attr.get("signup_landing_path"),
             # OAuth providers proved ownership of this address — auto-stamp
             # email_verified_at so the user doesn't see a redundant
             # "verify your email" banner.
@@ -606,9 +643,12 @@ async def oauth_callback(
         await session.commit()
         await session.refresh(user)
         logger.info(
-            "oauth.user_created provider=%s email=%s trial_ends=%s utm_source=%s gclid=%s",
+            "oauth.user_created provider=%s email=%s trial_ends=%s utm_source=%s "
+            "gclid=%s referrer_host=%s landing_path=%s",
             provider, email, trial_ends.isoformat(),
             attr.get("utm_source") or "-", "y" if attr.get("gclid") else "-",
+            attr.get("signup_referrer_host") or "-",
+            attr.get("signup_landing_path") or "-",
         )
     else:
         # Returning user matched by email. The provider (with a verified email,

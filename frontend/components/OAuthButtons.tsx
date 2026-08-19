@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import { getStoredGclid, getStoredUtm } from "@/lib/utm";
+import {
+  getStoredGclid,
+  getStoredLandingPath,
+  getStoredReferrerHost,
+  getStoredUtm,
+} from "@/lib/utm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -54,14 +59,19 @@ export function OAuthButtons({
 } = {}) {
   const [providers, setProviders] = useState<Providers | null>(null);
   /**
-   * Marketing attribution (UTMs + Google click IDs) captured on the landing
-   * visit by lib/utm.ts and held in localStorage for 30 days. The EMAIL
-   * signup path forwards these in its POST body, so the User row gets
-   * signup_utm_* / signup_gclid populated. OAuth — the primary signup path —
-   * dropped them entirely, which made channel ROI uncomputable for most
-   * signups. Appending them to the /start URL lets the backend stash them in
-   * the same short-lived cookie it already uses for `?next=` and write them
-   * onto the User row in the callback.
+   * Marketing attribution captured on the landing visit by lib/utm.ts and
+   * held in localStorage for 30 days: UTMs + Google click IDs, plus the
+   * first-touch external referrer HOSTNAME (the only trace AI-assistant
+   * referrals leave) and the first-touch landing PATH on our own site (which
+   * of our SEO pages earned the signup). The EMAIL signup path forwards all
+   * of these in its POST body (signup/page.tsx), so the User row gets
+   * signup_utm_* / signup_gclid / signup_referrer_host / signup_landing_path
+   * populated. OAuth — the primary signup path, every real production
+   * signup so far — dropped them, which made channel ROI uncomputable and
+   * left referrer_host + landing_path 100% NULL. Appending them to the
+   * /start URL lets the backend stash them in the same short-lived cookie it
+   * already uses for `?next=` and write them onto the User row in the
+   * callback.
    *
    * Read in an effect rather than during render: localStorage doesn't exist
    * on the server, and computing the href inline would make the prerendered
@@ -86,7 +96,17 @@ export function OAuthButtons({
   useEffect(() => {
     try {
       const params = new URLSearchParams();
-      for (const [k, v] of Object.entries({ ...getStoredUtm(), ...getStoredGclid() })) {
+      // Same four captures, same spread order, as the email form's signup
+      // POST (signup/page.tsx) — keys are the backend's column-facing names
+      // (signup_referrer_host / signup_landing_path), which is what
+      // routers/oauth.py ATTRIBUTION_FIELDS expects on the /start URL.
+      const stored = {
+        ...getStoredUtm(),
+        ...getStoredGclid(),
+        ...getStoredReferrerHost(),
+        ...getStoredLandingPath(),
+      };
+      for (const [k, v] of Object.entries(stored)) {
         if (typeof v === "string" && v.length > 0) params.set(k, v);
       }
       setAttribution(params.toString());
