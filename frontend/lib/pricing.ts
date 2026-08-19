@@ -82,17 +82,18 @@ export const FREE_LIMITS = {
 } as const;
 
 /**
- * Watchlist → Pro+ cutover. On this date the saved watchlist becomes a Pro-and-up
- * feature and the Free tier loses it (announced to all free users by email
- * 2026-07-26). Mirrors backend tier.py `FREE_WATCHLIST_REMOVAL_DATE` — keep the two
- * in sync. Date-gated so pricing copy flips automatically; `freeHasWatchlist()` is
- * the single guard every Free-tier surface should use before quoting the watchlist.
+ * Watchlist → Pro+ cutover — REVERSED 2026-08-19. The 2026-08-02 cutover (email
+ * 2026-07-26) that made the saved watchlist Pro-only was reversed to un-break the
+ * free web-push alert on-ramp and stop tightening the free tier while arrivals +
+ * activation are the priority. Mirrors backend tier.py — kept in lock-step: the
+ * date is retained for history but `freeHasWatchlist()` no longer consults it.
+ * `freeHasWatchlist()` stays the single guard every Free-tier surface reads.
  */
 export const FREE_WATCHLIST_REMOVAL_DATE = new Date("2026-08-02T00:00:00Z");
 
-/** True while the Free tier still includes a saved watchlist. */
-export function freeHasWatchlist(now: Date = new Date()): boolean {
-  return now < FREE_WATCHLIST_REMOVAL_DATE;
+/** True while the Free tier still includes a saved watchlist (restored 2026-08-19). */
+export function freeHasWatchlist(_now: Date = new Date()): boolean {
+  return true;
 }
 
 /**
