@@ -1,6 +1,6 @@
 # Feed-coverage audit — 2026-08-19
 
-*Playbook item 3 / lever G16 (`docs/SAAS_OPTIMISATION_PLAYBOOK.md` §5.1). Read-only queries against prod at 13:51 UTC. This is the finding; the fix is a separate, small PR.*
+*Playbook item 3 / lever G16 (`docs/SAAS_OPTIMISATION_PLAYBOOK.md` §5.1). Read-only queries against prod at 2026-08-19 13:51 UTC. Corrected 2026-08-20 — see the Correction section; the first version overstated how exposed the ranked surfaces were, and understated the one surface that actually was.*
 
 ## The question
 
@@ -27,11 +27,44 @@
 
 **3. The 771 stale rows are the actual defect.** Rows last written on 2026-05-21 — three months ago — still carry scores. Because they were written under an older scoring scale, 37 of them carry scores **above 100** on a 0–100 scale, every one labelled HIGH CONVICTION. They are not in the active universe, not in the sheet, and nothing ever retires them. Raw `ORDER BY score DESC` on the table returns APLS 129, MCBS 126, TPH 121 — all stale.
 
-### Why the public surface is only partly protected
+### Correction (2026-08-20): the defence is deliberate, not accidental — with one real hole
 
-`routers/scanner.py` applies `SCANNER_MIN_DOLLAR_VOLUME = 50_000` (price × volume), which **happens** to exclude every stale and sheet-only row because their volume is NULL. So the live API top-10 today is ASMG 82.6, BIB 80.3, MPC, AMLX … — all fresh, all real-volume. The scanner is defended **by accident**: the rows fail the floor, not a freshness check. Any surface that reads `tickers` without that floor — the ticker page for `/t/APLS`, the public API's per-symbol endpoint, an alert evaluator, an embed, a future "HIGH CONVICTION" filter — can serve a 129-score stale row as current.
+The first version of this audit said the scanner was "defended by accident" by the
+dollar-volume floor. **That was wrong**, and it is corrected here so the record is right.
 
-`#507` dropped the dollar-volume-floor change as "infeasible" because 72% of rows have NULL volume. Right call, wrong reason: the NULLs are not a feed limitation, they are sheet-path rows and stale rows. Retire the stale rows and exclude sheet-only rows from the *ranked* list (they can stay for lookup), and the floor question becomes simple.
+`routers/scanner.py`'s liquidity floor explicitly *keeps* NULL-volume rows
+(`or_(price IS NULL, volume IS NULL, price*volume >= floor)`), so it never excluded the
+ghosts. What actually excludes them is `services/ticker_freshness.live_clauses()` — a
+deliberate, well-designed module that applies (a) a **relative** 7-day freshness window
+measured back from the latest refresh, so a holiday weekend can never empty a surface, and
+(b) deterministic data-quality predicates: `score <= 100`, no space in `symbol`, ≥2 of 6
+factors populated, `change_pct_1d` + `confidence_pct` present, clean `asset_class`. Its
+docstring records the original incident (2026-05-31, ghosts with raw ≥98 scores topping the
+front door) and the write-time clamp that followed. It is wired into **12 surfaces**: the
+scanner, `/popular`, the public `/signals` SEO view, search, export, the welcome-email picks,
+the briefing, the newsletter, the growth bot, and the worker. The in-app ticker page
+(`routers/ticker.py`) independently 404s on ghosts. So the 771 stale rows and 37 over-100
+scores exist **in the table** but are already filtered from every one of those views.
+
+**The one real hole was the paid Premium public API.** `routers/api_v1.py` did not import
+`live_clauses`. Its `/signals` endpoint ranked the raw table — `ORDER BY score DESC` with no
+freshness or quality floor — so a Premium customer paging it got **APLS 129 / MCBS 126 /
+TPH 121, all three-month-old ghosts labelled HIGH CONVICTION, at the top of page 1.** And
+`/ticker/{symbol}` would return the stale 129 row as if current. This is the worst surface
+for a stale score: it is the one customers pipe into their own tooling. Fixed in the same PR
+as this correction by applying the shared `live_clauses()` to both endpoints, with three
+regression tests that fail without the fix (the fresh-row test also proves the data-quality
+floor is doing its job — an incomplete row is correctly rejected).
+
+Other surfaces that read `Ticker` without `live_clauses` and were checked: `heatmap.py` has
+its own local wall-clock freshness floor (the docstring notes `ticker_freshness` generalises
+it); `watchlist.py` and `alerts.py` read rows the user explicitly chose, by symbol, so a user
+can only see a stale row for a ticker they added themselves — still worth tightening later,
+but not a ranking leak; `scorecard.py` and `regime.py` do not rank by score.
+
+`#507` dropped the dollar-volume-floor change as "infeasible" because 72% of rows have NULL
+volume. That remains the right call for the reason given in the fix below — but note the
+NULLs are sheet-path and stale rows, not a feed limitation.
 
 ## What this is NOT
 
@@ -42,8 +75,8 @@
 ## The fix (small — one PR, ~0.25 engineering-days)
 
 1. **Retire stale rows.** In the worker's universe refresh: any ticker with `updated_at < now() - 7 days` and not in the current active universe gets `score = NULL, signal = NULL`. Keep the row for lookup and history; just stop it ranking. This alone removes all 37 over-100 scores and the 771-row tail.
-2. **Sheet-only rows don't rank.** Rows whose only writer is `sheet_feed` (price present, volume NULL, not in the active universe) are lookup-only — excluded from every ranked/top-N query by a freshness + `volume IS NOT NULL` predicate, not by the accidental dollar-volume floor.
-3. **Clamp the score.** An upsert-time clamp to 0–100 (or a `CHECK` constraint), so a scale change can never write 129 again.
+2. **Sheet-only rows don't rank.** Rows whose only writer is `sheet_feed` (price present, volume NULL, not in the active universe) are lookup-only. `live_clauses()` already keeps them off every ranked surface it is wired into *if* they are stale or incomplete; the open question is whether a fresh, complete sheet-only row (price from the sheet, no volume) should rank at all — it currently can. Adding `Ticker.volume.isnot(None)` to `valid_composite_clauses()` would settle it in one place, and is the right follow-up once the interview gate is met.
+3. **Clamp the score.** The write-time clamp already exists (`ticker_freshness` docstring: `score.compute_tapeline_composite` + a 0–100 clamp at every `Ticker.score` write in `sheet_feed`). The 37 over-100 rows pre-date it (2026-05-21) and are caught by the read-time floor; a one-off `UPDATE ... SET score = NULL WHERE score > 100` would retire them from the table, but it is not urgent — nothing that applies `live_clauses()` can serve them.
 4. **Then** the dollar-volume floor question from `#507` reopens on a clean table. With the ranked list already restricted to real-volume rows, a modest raise (e.g. $500k/day) is feasible and moves the Top-10 toward names a $10–50k account can actually trade.
 
 ## Verification used
