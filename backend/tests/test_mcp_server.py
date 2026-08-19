@@ -157,6 +157,11 @@ async def test_daily_picks_actually_returns_seeded_rows():
     symbol = f"ZZ{uuid.uuid4().hex[:4].upper()}"
     async with session_scope() as session:
         session.add(
+            # The scanner applies ticker_freshness.live_clauses on top of the
+            # explicit filters, so a partially-populated row is dropped as a
+            # data-quality corruption signature. To be rankable a row needs a
+            # score, 2+ populated factors, a non-null change_pct_1d and
+            # confidence_pct, a clean asset_class, and a recent updated_at.
             Ticker(
                 symbol=symbol,
                 name="MCP Fixture Corp",
@@ -164,6 +169,11 @@ async def test_daily_picks_actually_returns_seeded_rows():
                 signal="STRONG SETUP",
                 price=100.0,
                 volume=10_000,       # 1,000,000 dollar-volume, clears the floor
+                change_pct_1d=1.0,
+                confidence_pct=90.0,
+                asset_class="equity",
+                sub_trend=90.0,
+                sub_rs=90.0,
                 reason="seeded for the MCP daily-picks round trip",
             )
         )
