@@ -37,10 +37,12 @@ export function CitableRecord({ summary }: { summary: CitableSummary }) {
         The record so far
       </h2>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg">{sentence}</p>
-      {/* Above the figures, not below them. At this sample size the vs-SPY
-          values do not distinguish the ranking from chance, so the qualifier
-          has to frame them rather than trail them. Nothing is hidden, softened
-          or rounded — the same values follow, unedited, at the same weight. */}
+      {/* Order: h2, citable sentence, THEN this sample-size caveat, THEN the
+          numbers. The qualifier has to frame the vs-SPY figures rather than
+          trail them: at this sample size they do not distinguish the ranking
+          from chance, so the reader meets the caveat before the values, not
+          after. Nothing is hidden, softened or rounded — the same values
+          follow, unedited, at the same weight. */}
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted">
         Descriptive measures of the raw archive below — not a return, a forecast, or the result of
         any investable strategy. At this sample size they do not distinguish the ranking from

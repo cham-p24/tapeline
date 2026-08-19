@@ -4,22 +4,29 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Landing page", () => {
-  test("loads with hero, scanner preview, and trust bar", async ({ page }) => {
+  test("loads with hero, scanner preview, and proof line", async ({ page }) => {
     await page.goto("/");
 
-    // Hero
-    await expect(page.getByRole("heading", { name: /a scanner that.*shows its work/i })).toBeVisible();
-    await expect(page.getByText(/six factors/i)).toBeVisible();
-    await expect(page.getByRole("link", { name: /start 14-day trial/i })).toBeVisible();
+    // Hero — proof-first copy (2026-08): the public record leads, the six-factor
+    // value prop, and the track-record CTA.
+    await expect(
+      page.getByRole("heading", { name: /every pick on the public record/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/six named factors/i).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /see the track record/i })).toBeVisible();
+    // GAP #6 — the subtle tertiary trial link is above the fold alongside the pills.
+    await expect(page.getByRole("link", { name: /start free — no card/i })).toBeVisible();
 
-    // Trust bar
-    await expect(page.getByText(/polygon.*licensed data/i)).toBeVisible();
-    await expect(page.getByText(/public scorecard/i)).toBeVisible();
-    await expect(page.getByText(/not investment advice/i).first()).toBeVisible();
+    // Openness line vs the paid rivals (GAP #22) — static, server-rendered.
+    await expect(page.getByText(/most scanners keep their picks behind a paywall/i)).toBeVisible();
+    // Legal disclaimer lives in the footer (asserted in its own test below).
 
-    // How it works section
-    await expect(page.getByRole("heading", { name: /how it works/i })).toBeVisible();
-    await expect(page.getByText(/six named factors/i)).toBeVisible();
+    // How it works section — the eyebrow label + its heading.
+    await expect(page.getByText(/how it works/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /from data to decision/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/six named factors/i).first()).toBeVisible();
 
     // ScannerPreview renders the real anonymous top-scored rows (or the
     // clearly-labeled sample fallback when the API is unreachable), so
