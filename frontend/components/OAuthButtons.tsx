@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import { getStoredGclid, getStoredUtm } from "@/lib/utm";
+import {
+  getStoredGclid,
+  getStoredLandingPath,
+  getStoredReferrerHost,
+  getStoredUtm,
+} from "@/lib/utm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -89,6 +94,16 @@ export function OAuthButtons({
       for (const [k, v] of Object.entries({ ...getStoredUtm(), ...getStoredGclid() })) {
         if (typeof v === "string" && v.length > 0) params.set(k, v);
       }
+      // First-touch referrer host (#444) + landing path (#458). The email form
+      // has forwarded these since they shipped; this path never did — and since
+      // every real signup arrives via OAuth, both columns were empty for 100% of
+      // real users. AI-assistant and social referrals carry no UTM, so the
+      // referrer host is the ONLY trace of the channel that actually converts.
+      // Keys are renamed to match oauth.py:ATTRIBUTION_FIELDS.
+      const ref = getStoredReferrerHost().signup_referrer_host;
+      if (typeof ref === "string" && ref.length > 0) params.set("referrer_host", ref);
+      const landing = getStoredLandingPath().signup_landing_path;
+      if (typeof landing === "string" && landing.length > 0) params.set("landing_path", landing);
       setAttribution(params.toString());
     } catch {
       // Attribution is nice-to-have — never block the signup buttons.

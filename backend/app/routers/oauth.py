@@ -33,6 +33,7 @@ Sign In with Apple capability). Set these env vars:
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import string
 import time
@@ -120,7 +121,49 @@ ATTRIBUTION_FIELDS: dict[str, int] = {
     "gclid": 200,
     "gbraid": 200,
     "wbraid": 200,
+    # First-touch referrer host (#444) and landing path (#458). The email path
+    # has written these since they shipped; OAuth never did — and because every
+    # real signup to date arrived via Google OAuth, both columns were NULL for
+    # 100% of real users (audit 2026-08-20). AI-assistant and social referrals,
+    # which carry no UTM, were therefore invisible on the only path anyone uses.
+    # Same cookie round-trip as the fields above; hostname-only / path-only by
+    # construction (see _clean_attribution + auth._normalise_landing_path).
+    "referrer_host": 100,
+    "landing_path": 200,
 }
+
+
+# Hostname shape only: letters, digits, dots, hyphens. The client already
+# reduces document.referrer to `new URL(ref).hostname`, so a well-formed value
+# looks like "chatgpt.com" or "l.facebook.com". Anything else — a path, a
+# scheme, a query, a stray quote — is a spoofed or mangled cookie and is
+# dropped rather than written into an aggregation column.
+_HOSTNAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)*$")
+
+
+def _clean_referrer_host(raw: str | None) -> str | None:
+    """Lower-cased hostname or None. Never raises — attribution must not be
+    able to fail a signup."""
+    if not raw:
+        return None
+    try:
+        host = raw.strip().lower()
+        if not host or len(host) > 100 or not _HOSTNAME_RE.match(host):
+            return None
+        return host
+    except Exception:
+        return None
+
+
+def _normalise_landing_path(raw: str | None) -> str | None:
+    """Same contract as routers/auth._normalise_landing_path — imported lazily
+    to avoid a router-to-router import at module load. Never raises."""
+    try:
+        from app.routers.auth import _normalise_landing_path as _norm
+
+        return _norm(raw)
+    except Exception:
+        return None
 
 
 def _clean_attribution(raw: dict[str, str | None]) -> dict[str, str]:
@@ -597,6 +640,8 @@ async def oauth_callback(
             signup_gclid=attr.get("gclid"),
             signup_gbraid=attr.get("gbraid"),
             signup_wbraid=attr.get("wbraid"),
+            signup_referrer_host=_clean_referrer_host(attr.get("referrer_host")),
+            signup_landing_path=_normalise_landing_path(attr.get("landing_path")),
             # OAuth providers proved ownership of this address — auto-stamp
             # email_verified_at so the user doesn't see a redundant
             # "verify your email" banner.
