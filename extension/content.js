@@ -55,6 +55,7 @@
   .tl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
   .tl-h-sym { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
   .tl-h-name { color: #9a978e; font-size: 12px; margin-top: 1px; }
+  .tl-h-conf { color: #7c7a72; font-size: 11px; margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
   .tl-h-score { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
   .tl-h-score span { font-size: 11px; color: #9a978e; font-weight: 500; }
   .tl-h-score.tl-pos { color: #4ec98a; } .tl-h-score.tl-neg { color: #e0796f; }
@@ -158,6 +159,7 @@
             <div>
               <div class="tl-h-sym">${esc(data.symbol)}</div>
               <div class="tl-h-name">${esc(data.name || "")}</div>
+              ${data.confidence != null ? `<div class="tl-h-conf">${esc(data.signal || "")} · ${Math.round(data.confidence)}% confidence</div>` : ""}
             </div>
             <div class="tl-h-score tl-${tone}">${score}<span>/100</span></div>
           </div>
