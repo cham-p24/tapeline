@@ -694,7 +694,7 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
     # Populate the per-tick market-cap cache. Finnhub reports market cap in
     # MILLIONS, so multiply by 1e6 to store absolute dollars — the unit the
     # scanner column + Ticker.market_cap expect.
-    mc_millions = profile["market_cap"]
+    mc_millions = _f(data.get("marketCapitalization"))
     if mc_millions is not None:
         set_cached_market_cap(sym, mc_millions * 1e6)
     return profile
