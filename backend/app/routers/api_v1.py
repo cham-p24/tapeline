@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import ApiKey, RegimeState, Ticker, User
 from app.services.api_keys import api_key_context, api_key_header, api_key_user
+from app.services.ticker_freshness import live_clauses
 from app.services.tier import effective_limit
 
 router = APIRouter()
@@ -110,11 +111,17 @@ async def api_signals(
     and/or `signal` (descriptive label, e.g. 'HIGH CONVICTION'); page with
     `limit` (max 2000) + `offset`."""
     capped = max(1, min(limit, 2000))
-    stmt = (
-        select(Ticker)
-        .where(Ticker.score.is_not(None))
-        .where(Ticker.score >= min_score)
-    )
+    # Same freshness + data-quality floor as every other ranked surface
+    # (services/ticker_freshness). Without it this endpoint ranked the raw
+    # table, and the raw table carries "ghost" rows that dropped out of the
+    # active universe months ago but kept their last score — including 37
+    # rows above 100 on a 0-100 scale, every one labelled HIGH CONVICTION.
+    # A Premium customer paging /signals got APLS 129 / MCBS 126 / TPH 121 at
+    # the top of page 1 (audit 2026-08-19). This is the surface customers pipe
+    # into their own tooling, so it is the worst place for a stale score.
+    stmt = select(Ticker).where(Ticker.score >= min_score)
+    for clause in await live_clauses(session):
+        stmt = stmt.where(clause)
     if signal:
         # Case-insensitive, whitespace-tolerant exact match so 'high conviction'
         # and 'HIGH CONVICTION' both resolve to the same descriptive label.
@@ -138,11 +145,13 @@ async def api_ticker(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """One ticker's current score, signal, and the six sub-scores."""
-    row = (
-        await session.execute(
-            select(Ticker).where(Ticker.symbol == symbol.upper().strip())
-        )
-    ).scalar_one_or_none()
+    # Apply the shared freshness floor here too: a stale ghost row must 404
+    # (the in-app ticker page already behaves this way) rather than return a
+    # months-old score as if it were current.
+    stmt = select(Ticker).where(Ticker.symbol == symbol.upper().strip())
+    for clause in await live_clauses(session):
+        stmt = stmt.where(clause)
+    row = (await session.execute(stmt)).scalar_one_or_none()
     if row is None:
         raise HTTPException(404, f"No ticker {symbol.upper().strip()!r} in the scored universe.")
     return _ticker_dict(row)
