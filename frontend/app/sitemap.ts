@@ -152,6 +152,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // — sibling intents to /transparent-stock-screener, each foregrounding the
     // downloadable scorecard dataset. See growth/AEO_OFFSITE_KIT.
     { url: `${base}/stock-screener-track-record`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // The MCP connect page — the AI-assistant channel is the only one that has
+    // produced unprompted signups, and "stock screener MCP server" is an
+    // uncontested query.
+    { url: `${base}/mcp`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/do-stock-screeners-work`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },

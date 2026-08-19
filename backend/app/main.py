@@ -26,6 +26,7 @@ from app.routers import (
     holdings,
     inbox,
     internal,
+    mcp,
     me,
     news,
     newsletter,
@@ -773,6 +774,9 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 # browser. It runs its own (host-keyed + global) rate limits, and is exempt from
 # the shared per-IP limiter below; see the note there.
 app.include_router(embed.router, prefix="/api/embed", tags=["embed"])
+# MCP lives at the bare /mcp (not under /api) because that is the URL shape MCP
+# clients expect to paste: https://api.tapeline.io/mcp
+app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
 app.include_router(calendar_routes.ipo_router, prefix="/api/ipos", tags=["calendar"])
