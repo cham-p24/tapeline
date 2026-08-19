@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api, type AlertEvent, type AlertRule, TierGateError, errorMessage } from "@/lib/api";
+import { api, type AlertEvent, type AlertRule, type SearchResult, TierGateError, errorMessage } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/Skeleton";
@@ -47,14 +48,25 @@ const TICKER_SUGGESTIONS = 8;
 
 export default function AlertsPage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [ruleType, setRuleType] = useState<RuleType>("score");
-  const [symbol, setSymbol] = useState("");
+  // Pre-arm from context: a deep link like /app/alerts?symbol=NVDA&type=news
+  // (e.g. from a ticker page) drops the user onto this form already filled in.
+  // Read once for the INITIAL state only — later edits are the user's, so this
+  // must not fight their typing. `?type=` is guarded against the RULE_TYPES
+  // whitelist so a junk value can't wedge the form into an unknown rule.
+  const [ruleType, setRuleType] = useState<RuleType>(() => {
+    const t = searchParams.get("type");
+    return t && RULE_TYPES.some((r) => r.value === t) ? (t as RuleType) : "score";
+  });
+  const [symbol, setSymbol] = useState(() =>
+    (searchParams.get("symbol") ?? "").toUpperCase(),
+  );
   const [threshold, setThreshold] = useState<number>(70);
   // null = user hasn't touched the channel select yet → default by tier
   // below. Free users default to web_push (the ONE channel they can actually
@@ -75,6 +87,13 @@ export default function AlertsPage() {
   // empty watchlist falls back to the current top-scored tickers.
   const [tickerOptions, setTickerOptions] = useState<string[]>([]);
   const [tickerSource, setTickerSource] = useState<"watchlist" | "top_scored" | null>(null);
+  // Live typeahead results from the full-universe search (api.search) — the
+  // same endpoint the ⌘K palette and public search box use. Lets the user find
+  // ANY ticker by symbol or name, not just the watchlist/top-scored shortlist
+  // in the pills below. `searchOpen` gates the dropdown so it doesn't linger
+  // after a pick or when the field is empty.
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const def = RULE_TYPES.find((r) => r.value === ruleType)!;
 
@@ -132,6 +151,28 @@ export default function AlertsPage() {
     })();
     return () => { alive = false; };
   }, [user]);
+
+  // Ticker typeahead. Debounced ~200ms so a burst of keystrokes fires one
+  // request, then api.search(q, 8) returns full-universe matches. Failures are
+  // silent — the field still accepts any symbol typed by hand (free-text
+  // fallback), which is why the create button only needs a non-empty symbol.
+  useEffect(() => {
+    const q = symbol.trim();
+    if (q.length < 1) {
+      setSearchResults([]);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.search(q, TICKER_SUGGESTIONS);
+        if (alive) setSearchResults(r.results ?? []);
+      } catch {
+        if (alive) setSearchResults([]);
+      }
+    }, 200);
+    return () => { alive = false; clearTimeout(t); };
+  }, [symbol]);
 
   async function create() {
     setCreating(true);
@@ -349,23 +390,60 @@ export default function AlertsPage() {
           </div>
 
           {def.needsSymbol && (
-            <div>
+            <div className="relative">
               <label htmlFor="alert-symbol" className="block text-xs text-muted">Ticker</label>
-              {/* Picker, not a blank box. `list` binds the datalist so the
-                  suggestions surface as native autocomplete, and the pills
-                  below make the common case one click — while the field
-                  itself still takes any symbol typed by hand. */}
+              {/* Typeahead, not a blank box. Keystrokes hit api.search (the same
+                  full-universe search behind ⌘K), so the user can find ANY
+                  ticker by symbol or name; the dropdown below lists matches with
+                  their name + sector and one click sets the symbol. The field
+                  itself still takes any symbol typed by hand (free-text
+                  fallback), uppercased/trimmed on submit. */}
               <input
                 id="alert-symbol"
-                list="alert-symbol-options"
                 value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
+                onChange={(e) => {
+                  setSymbol(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                // Delay the close so a mousedown on a result still registers as
+                // a click before the dropdown unmounts.
+                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
                 placeholder="AAPL"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-controls="alert-symbol-results"
+                aria-expanded={searchOpen && searchResults.length > 0}
                 className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm nums font-mono uppercase"
               />
-              <datalist id="alert-symbol-options">
-                {tickerOptions.map((s) => <option key={s} value={s} />)}
-              </datalist>
+              {searchOpen && searchResults.length > 0 && (
+                <ul
+                  id="alert-symbol-results"
+                  role="listbox"
+                  aria-label="Ticker search results"
+                  className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-panel shadow-lg"
+                >
+                  {searchResults.map((r) => (
+                    <li key={r.symbol} role="option" aria-selected={symbol.trim().toUpperCase() === r.symbol}>
+                      <button
+                        type="button"
+                        // onMouseDown (not onClick) so the pick lands before the
+                        // input's onBlur closes the dropdown.
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSymbol(r.symbol);
+                          setSearchOpen(false);
+                        }}
+                        className="flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent/10"
+                      >
+                        <span className="font-mono font-medium">{r.symbol}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-muted">{r.name}</span>
+                        {r.sector && <span className="whitespace-nowrap text-xs text-subtle">{r.sector}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {tickerOptions.length > 0 && (
                 <>
                   <div

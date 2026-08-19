@@ -17,11 +17,19 @@ vi.mock("@/components/UserContext", () => ({
   useUser: vi.fn(),
 }));
 
+// The alerts page reads ?symbol= / ?type= once for initial form state
+// (pre-arm from context). `nav.search` is swapped per-test before render.
+const nav = vi.hoisted(() => ({ search: new URLSearchParams() }));
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => nav.search,
+}));
+
 // importActual keeps the REAL TierGateError class so the page's `instanceof`
 // check works against the errors we reject with.
 const rulesMock = vi.fn();
 const eventsMock = vi.fn();
 const createMock = vi.fn();
+const searchMock = vi.fn();
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -32,6 +40,7 @@ vi.mock("@/lib/api", async () => {
       alertEvents: () => eventsMock(),
       alertRuleCreate: (body: unknown) => createMock(body),
       alertRuleDelete: vi.fn(),
+      search: (q: string, limit?: number) => searchMock(q, limit),
     },
   };
 });
@@ -54,15 +63,20 @@ const asUser = (user: object | null) => ({
 });
 
 // The two comboboxes render in source order: rule type first, channel second.
+// (The ticker typeahead is a plain <input>, not a combobox role, so it does
+// not change this count or order.)
 const channelSelect = () => screen.getAllByRole("combobox")[1] as HTMLSelectElement;
+const ruleTypeSelect = () => screen.getAllByRole("combobox")[0] as HTMLSelectElement;
 
 beforeEach(() => {
   mockedUseUser.mockReset();
+  nav.search = new URLSearchParams();
   rulesMock.mockReset().mockResolvedValue({ count: 0, items: [] });
   eventsMock.mockReset().mockResolvedValue({ count: 0, items: [] });
   createMock.mockReset();
   statusMock.mockReset().mockResolvedValue("default");
   subscribeMock.mockReset();
+  searchMock.mockReset().mockResolvedValue({ results: [] });
 });
 
 describe("AlertsPage channel default", () => {
@@ -172,5 +186,53 @@ describe("AlertsPage web-push enable prompt", () => {
 
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /Enable browser notifications/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("AlertsPage pre-arm from context (deep link)", () => {
+  it("pre-fills the ticker field from ?symbol=NVDA (uppercased)", async () => {
+    mockedUseUser.mockReturnValue(asUser(proUser));
+    nav.search = new URLSearchParams("symbol=nvda");
+    render(<AlertsPage />);
+    await waitFor(() => expect(rulesMock).toHaveBeenCalled());
+    expect(screen.getByPlaceholderText("AAPL")).toHaveValue("NVDA");
+  });
+
+  it("preselects the news rule from ?type=news", async () => {
+    mockedUseUser.mockReturnValue(asUser(proUser));
+    nav.search = new URLSearchParams("type=news");
+    render(<AlertsPage />);
+    await waitFor(() => expect(rulesMock).toHaveBeenCalled());
+    expect(ruleTypeSelect().value).toBe("news");
+  });
+
+  it("ignores an invalid ?type= value and keeps the default rule", async () => {
+    mockedUseUser.mockReturnValue(asUser(proUser));
+    nav.search = new URLSearchParams("type=bogus");
+    render(<AlertsPage />);
+    await waitFor(() => expect(rulesMock).toHaveBeenCalled());
+    expect(ruleTypeSelect().value).toBe("score");
+  });
+});
+
+describe("AlertsPage ticker typeahead (api.search)", () => {
+  it("sets the symbol when a search result is selected", async () => {
+    mockedUseUser.mockReturnValue(asUser(proUser));
+    searchMock.mockResolvedValue({
+      results: [
+        { symbol: "TSLA", name: "Tesla Inc", sector: "Consumer Cyclical", score: 88 },
+      ],
+    });
+    render(<AlertsPage />);
+    await waitFor(() => expect(rulesMock).toHaveBeenCalled());
+
+    const field = screen.getByPlaceholderText("AAPL");
+    await userEvent.type(field, "tesl");
+    // Debounced search resolves and renders the result option.
+    const option = await screen.findByRole("option", { name: /TSLA/ });
+    await userEvent.click(within(option).getByRole("button"));
+
+    expect(screen.getByPlaceholderText("AAPL")).toHaveValue("TSLA");
+    expect(searchMock).toHaveBeenCalledWith(expect.stringMatching(/tesl/i), 8);
   });
 });
