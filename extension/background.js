@@ -129,7 +129,21 @@ async function syncEnabledSites() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(syncEnabledSites);
+/**
+ * First run: show what the extension reads before it reads anything.
+ *
+ * Chrome Web Store policy (from 1 Aug 2026) requires data-use disclosure in the
+ * PRODUCT UI — store-listing text explicitly does not satisfy it. This also
+ * happens to be the right thing to do: a finance overlay that silently starts
+ * touching pages is exactly what makes people distrust the category.
+ * Only on a genuine install, never on update or Chrome refresh.
+ */
+chrome.runtime.onInstalled.addListener((details) => {
+  syncEnabledSites();
+  if (details && details.reason === "install") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+  }
+});
 chrome.runtime.onStartup.addListener(syncEnabledSites);
 
 /**
