@@ -73,7 +73,29 @@ def parse_token(token: str | None) -> tuple[str, int] | None:
     body = token[len(_PREFIX) :]
     try:
         pad = "=" * (-len(body) % 4)
-        decoded = base64.urlsafe_b64decode(body + pad).decode()
+        raw = base64.urlsafe_b64decode(body + pad)
+        # Base64 is malleable at the tail: when the payload length is not a
+        # multiple of 3, the final character carries "don't care" low bits, so
+        # several distinct characters decode to the SAME bytes. Without this
+        # check a token whose last character has been altered still decodes to
+        # a valid payload and passes the HMAC — the signature covers the
+        # decoded payload, not the string that encoded it.
+        #
+        # That is not privilege escalation (the decoded identity is unchanged),
+        # but it means one session can be expressed as several distinct token
+        # strings, which defeats anything that treats the token string as an
+        # identifier — a revocation list, a dedupe key, a rate-limit bucket.
+        # Requiring the canonical encoding makes the string and the identity
+        # one-to-one.
+        #
+        # It also removes a latent, date-dependent test flake: the payload
+        # embeds today's date, so whether the tail character has spare bits
+        # changes with the length of the encoded payload — making
+        # test_tampered_signature_is_rejected pass or fail depending on the day
+        # it runs.
+        if base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=") != body:
+            return None
+        decoded = raw.decode()
         user_id, epoch_s, issued, sig = decoded.split("|")
     except Exception:
         return None
