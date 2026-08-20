@@ -57,13 +57,15 @@
 
   <h2>What it reads</h2>
   <ul>
-    <li class="yes">The <b>ticker symbol in the page address</b>. That is all. On
+    <li class="yes">The <b>ticker symbol in the page address</b>, plus the token
+      linking the extension to your account. On
       <code>finance.yahoo.com/quote/NVDA</code> it reads <code>NVDA</code>.</li>
     <li class="no">It does <b>not</b> read the page itself — no prices, no
       holdings, no balances, no account numbers, no form fields.</li>
     <li class="no">It does <b>not</b> track your browsing, and there is no
       analytics or advertising code in it.</li>
-    <li class="no">It has <b>no account</b>. Nothing identifies you.</li>
+    <li class="yes">It uses your <b>Tapeline account</b> — you connect it once from
+      the toolbar icon. Disconnecting removes the token from this browser.</li>
   </ul>
 
   <h2>Where it runs</h2>
@@ -82,10 +84,12 @@
   permanently, open the popup there and press <b>Hide on this site</b>.</p>
 
   <h2>What it sends</h2>
-  <p>One request to <code>api.tapeline.io</code> containing the ticker symbol, to
-  fetch that stock's public score and record. The same data is on
+  <p>One request to <code>api.tapeline.io</code> containing the ticker symbol and
+  your account token, to fetch that stock&rsquo;s score and record. The same data is
+  public on
   <a href="https://tapeline.io/scorecard?utm_source=extension&utm_medium=welcome">tapeline.io</a>
-  without any extension at all.</p>
+  with no account and no extension at all &mdash; the extension asks for an account
+  because that is how we run it, not because the numbers are secret.</p>
 
   <div class="accept">
     <button id="ok">I understand — turn it on</button>

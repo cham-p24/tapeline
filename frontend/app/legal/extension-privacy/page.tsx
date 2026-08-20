@@ -17,7 +17,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline browser extension — privacy",
   description:
-    "What the Tapeline browser extension reads, what it sends, and what it never touches. It sends only a ticker symbol; it never reads the page, your prices, holdings or balances, and it has no account.",
+    "What the Tapeline browser extension reads, what it sends, and what it never touches. It sends a ticker symbol and your account token; it never reads the page, your prices, holdings or balances.",
   path: "/legal/extension-privacy",
 });
 
@@ -46,8 +46,9 @@ export default function ExtensionPrivacyPage() {
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-muted">
           The Tapeline browser extension sends <strong className="text-fg">one thing</strong> to
-          our servers: the ticker symbol shown in the address bar of the page you&rsquo;re on. It
-          does not read the page, and it has no account, so nothing it sends identifies you.
+          our servers: the ticker symbol shown in the address bar of the page you&rsquo;re on,
+          together with the token that links it to your Tapeline account. It does not read the
+          page.
         </p>
 
         <section className="mt-12">
@@ -75,22 +76,26 @@ export default function ExtensionPrivacyPage() {
                   content at all — detection is a pattern match against the address bar.
                 </Row>
                 <Row label="Accounts">
-                  None. The extension has no login, no user ID, and no way to associate
-                  requests with a person.
+                  Required. You paste a connect code once, and the extension sends that token
+                  with each lookup, so requests are associated with your account. The token
+                  expires after 180 days, signing out of all devices revokes it immediately,
+                  and disconnecting in the popup removes it from your browser.
                 </Row>
                 <Row label="Tracking">
                   No analytics, no advertising, no tracking pixels, no third-party scripts.
                   Nothing is sold or shared.
                 </Row>
                 <Row label="Stored on your device">
-                  Fetched scores are cached briefly so the same stock isn&rsquo;t requested
-                  repeatedly, plus the sites you&rsquo;ve muted and whether you&rsquo;ve accepted
-                  the first-run notice. All local; uninstalling removes it.
+                  Your connect token and the email of the account it belongs to, fetched scores
+                  cached briefly so the same stock isn&rsquo;t requested repeatedly, the sites
+                  you&rsquo;ve muted, and whether you&rsquo;ve accepted the first-run notice.
+                  All local; uninstalling removes it.
                 </Row>
                 <Row label="Server logs">
                   Requests reach our API like any web request and appear in standard server
-                  logs (symbol, timestamp, IP) used for reliability and abuse prevention. They
-                  are not used to build a profile.
+                  logs (symbol, timestamp, IP, and the account the token belongs to) used for
+                  reliability and abuse prevention. They are not used to build a profile, and
+                  are never sold or shared.
                 </Row>
               </tbody>
             </table>
@@ -113,6 +118,20 @@ export default function ExtensionPrivacyPage() {
             overlay on any site from the same popup.
           </p>
         </section>
+        <section className="mt-12">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
+            Why an account, when the data is public
+          </h2>
+          <p className="mt-3 leading-relaxed text-muted">
+            Worth saying plainly: the scores and the track record are already public on this
+            site. You can read them at{" "}
+            <a className="text-accent" href="/daily-picks">/daily-picks</a> and{" "}
+            <a className="text-accent" href="/scorecard">/scorecard</a> with no account and no
+            extension. The extension asks for an account because that is how we have chosen to
+            run it, not because the numbers are secret.
+          </p>
+        </section>
+
 
         <section className="mt-12">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">

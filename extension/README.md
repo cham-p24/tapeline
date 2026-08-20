@@ -25,9 +25,15 @@ origin is the honest version of the same capability.
 Plus a manual lookup in the toolbar popup that works anywhere, needing no
 site permission at all.
 
-**No account required.** That is deliberate: the extension is a top-of-funnel
-surface, and the score + reason are already public (`/daily-picks`, `/t/{symbol}`,
-`/badge/{symbol}`). Gating it behind a login would defeat its purpose.
+**A free Tapeline account is required.** The user connects once from the popup
+(`Get my connect code` → tapeline.io/extension/connect → paste). Without a token
+the content script renders nothing at all, and the popup shows the connect screen.
+
+Worth stating in the code as well as the copy: the score and record are already
+public (`/daily-picks`, `/t/{symbol}`, `/badge/{symbol}`). The gate exists because
+the product requires an account, **not** because the data is secret. This was a
+deliberate reversal — the extension was originally account-free as a top-of-funnel
+surface, and the trade-off is fewer installs for captured leads.
 
 ## Try it in 60 seconds
 
@@ -173,3 +179,32 @@ less code in the zip means less review surface.
 Do **not** add watchlists, alerts, news or portfolio import. Score overlay +
 manual lookup + published record is one purpose; bundling a second feature set
 is what trips the single-purpose policy.
+
+## How the account gate works
+
+```
+popup ──"Get my connect code"──▶ tapeline.io/extension/connect
+                                   (same-site: CAN use the session cookie)
+                                        │ POST /api/extension/token
+                                        ▼
+                                   tlx_… connect code
+                                        │  user pastes into popup
+                                        ▼
+background.js ──Bearer tlx_…──▶ /api/extension/{ticker,record,me}
+```
+
+**Why a token and not the session cookie.** `tapeline_session` is `SameSite=Lax`.
+tapeline.io and api.tapeline.io share a registrable domain, so the web app is
+*same-site* and its cookie travels. A `chrome-extension://` origin is not, so Lax
+withholds it from the extension's fetches. Relaxing the cookie to `SameSite=None`
+for one feature would weaken CSRF posture product-wide.
+
+**Why the token is stateless.** It signs `user_id + session_epoch + issue date`
+with the existing HMAC secret — no table, no migration. Binding to `session_epoch`
+is what makes it revocable: "sign out everywhere" already bumps that value and
+invalidates every token the user ever minted. Tokens also expire after 180 days.
+
+**Why a separate `/api/extension/*` namespace.** The shortcut would be to require
+auth on `/api/ticker/{symbol}` — but that endpoint backs the public SSR `/t/`
+pages, the embeddable badge and the daily SEO audit. Gating it would put the
+public site behind a login. A test asserts `/api/ticker` stays anonymous.
