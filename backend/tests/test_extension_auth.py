@@ -89,9 +89,23 @@ def test_round_trip_carries_user_and_epoch():
 def test_tampered_signature_is_rejected():
     token = make_token("u_123", 7)
     assert token is not None
-    # Flip the last character of the payload; the HMAC must not verify.
-    broken = token[:-1] + ("A" if token[-1] != "A" else "B")
-    assert parse_token(broken) is None
+    # Tamper the DECODED payload, not the base64 tail. Flipping the last
+    # base64 character only changes trailing bits that decode() discards when
+    # the body length is not a multiple of 4 — the decoded payload comes back
+    # byte-identical, the HMAC verifies correctly, and the test failed while the
+    # signing code was perfectly sound. (It passed or failed depending on the
+    # signing secret, which is what made it look flaky.) Flip a byte inside the
+    # signature itself so the tampering is real on every run.
+    import base64 as _b64
+
+    body = token[len("tlx_"):]
+    decoded = _b64.urlsafe_b64decode(body + "=" * (-len(body) % 4)).decode()
+    user_id, epoch_s, issued, sig = decoded.split("|")
+    forged_sig = ("0" if sig[0] != "0" else "1") + sig[1:]
+    forged = "tlx_" + _b64.urlsafe_b64encode(
+        f"{user_id}|{epoch_s}|{issued}|{forged_sig}".encode()
+    ).decode().rstrip("=")
+    assert parse_token(forged) is None
 
 
 def test_junk_and_missing_tokens_are_rejected():

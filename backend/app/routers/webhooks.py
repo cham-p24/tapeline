@@ -298,6 +298,12 @@ async def stripe_webhook(
         # Upsert subscription
         sub_result = await session.execute(select(Subscription).where(Subscription.id == p["id"]))
         existing = sub_result.scalar_one_or_none()
+        # Snapshot the status BEFORE the upsert overwrites it. A card-required
+        # trial converting to paid is a trialing -> active transition, and that
+        # moment is the customer's first real charge — the only honest place to
+        # send the paid receipt. Without this we cannot tell it apart from any
+        # other .updated event.
+        prior_status = existing.status if existing else None
         if existing:
             existing.status = p["status"]
             existing.tier = p["tier"]
@@ -447,12 +453,69 @@ async def stripe_webhook(
         # downstream change). Replay protection at the top of the handler
         # already covers duplicate webhook deliveries.
         # Fire-and-forget — a Resend outage must not fail the webhook.
-        if (
+        # A trial START is not a purchase. `customer.subscription.created` fires
+        # with status "trialing" the moment a card-required trial begins, and the
+        # welcome-to-paid receipt below would tell someone who has paid nothing
+        # that they are "in" on a paid plan — a receipt for a charge that never
+        # happened, and the shortest path to an "I never agreed to pay" dispute.
+        # Trials get the terms restated instead; the receipt waits for real money.
+        is_trial_start = (
             evt_type == "customer.subscription.created"
             and existing is None
-            and p["status"] in ("active", "trialing")
-            and user.email
-        ):
+            and p["status"] == "trialing"
+        )
+        # The first REAL charge: either a straight purchase, or a trial that
+        # just converted (trialing -> active on an .updated event).
+        is_paid_start = (
+            evt_type == "customer.subscription.created"
+            and existing is None
+            and p["status"] == "active"
+        ) or (prior_status == "trialing" and p["status"] == "active")
+
+        if is_trial_start and user.email:
+            try:
+                from app.services.email import (
+                    render_trial_started_email,
+                    send_email,
+                )
+                item = obj.get("items", {}).get("data", [{}])[0]
+                price = item.get("price", {}) or {}
+                unit_amount = price.get("unit_amount")
+                currency = (price.get("currency") or "usd").upper()
+                interval = ((price.get("recurring") or {}).get("interval")) or "month"
+                amount_label = (
+                    f"${unit_amount / 100:.2f} {currency}/{interval}"
+                    if unit_amount else "your plan's price"
+                )
+                trial_end_ts = obj.get("trial_end")
+                if trial_end_ts:
+                    from datetime import UTC as _UTC
+                    from datetime import datetime as _dt
+                    _end = _dt.fromtimestamp(int(trial_end_ts), tz=_UTC)
+                    charge_date_label = f"{_end:%A, %B} {_end.day}"
+                else:
+                    charge_date_label = "when your trial ends"
+                html = render_trial_started_email(
+                    (user.name or "trader"),
+                    tier=p["tier"],
+                    amount_label=amount_label,
+                    charge_date_label=charge_date_label,
+                )
+                await send_email(
+                    user.email,
+                    f"Your Tapeline {p['tier'].capitalize()} trial has started",
+                    html,
+                    persona="billing",
+                    skip_if_undeliverable=False,
+                )
+                logger.info(
+                    "stripe.trial_started_email user=%s tier=%s first_charge=%s",
+                    user.id, p["tier"], charge_date_label,
+                )
+            except Exception:
+                logger.exception("stripe.trial_started_email_failed user=%s", user.id)
+
+        if is_paid_start and user.email:
             try:
                 from app.services.email import (
                     render_subscription_started_email,
@@ -528,11 +591,40 @@ async def stripe_webhook(
             )
             cancelled_row = sub_result.scalar_one_or_none()
             if cancelled_row is not None:
+                # Was this cancelled DURING the trial, i.e. before any money
+                # moved? That changes the only thing the person actually wants
+                # to know right now, so capture it before we overwrite status.
+                cancelled_before_any_charge = cancelled_row.status == "trialing"
+                cancelled_tier = cancelled_row.tier
                 cancelled_row.status = str(obj.get("status") or "canceled")
                 cancelled_row.cancel_at_period_end = False
+            else:
+                cancelled_before_any_charge = False
+                cancelled_tier = "premium"
 
         result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
+        if user and user.email and cancelled_before_any_charge:
+            # Cancelled mid-trial: no charge was ever taken. Confirming that in
+            # writing, immediately, is the difference between a person who might
+            # come back and one who watches their statement expecting a charge.
+            try:
+                from app.services.email import (
+                    render_trial_canceled_email,
+                    send_email,
+                )
+                await send_email(
+                    user.email,
+                    "Your trial is cancelled — nothing was charged",
+                    render_trial_canceled_email(
+                        (user.name or "trader"), tier=cancelled_tier,
+                    ),
+                    persona="billing",
+                    skip_if_undeliverable=False,
+                )
+                logger.info("stripe.trial_canceled_email user=%s", user.id)
+            except Exception:
+                logger.exception("stripe.trial_canceled_email_failed user=%s", user.id)
         if not user:
             # Same metadata fallback as the created/updated branch above: in
             # the duplicate-checkout case the older subscription's customer no

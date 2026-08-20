@@ -2444,6 +2444,93 @@ def render_annual_renewal_reminder_email(
     )
 
 
+def render_trial_started_email(
+    user_name: str,
+    *,
+    tier: str,
+    amount_label: str,
+    charge_date_label: str,
+) -> str:
+    """Confirmation that a CARD-REQUIRED trial has started.
+
+    Deliberately NOT the welcome-to-paid receipt. `customer.subscription.created`
+    fires with status "trialing" the moment a card trial begins, and sending the
+    purchase receipt there would tell someone who has paid nothing that they are
+    "in" on a $19.99/mo plan — a receipt for a charge that never happened. That
+    is precisely the confusion that produces "I never agreed to pay" disputes,
+    and it would be a self-inflicted wound for a product whose whole claim is
+    that it does not misstate things.
+
+    So this email does the opposite of a receipt: it repeats the terms the user
+    just agreed to, in the same words the checkout used, and makes the exit
+    obvious. The paid receipt fires later, when the first real charge clears.
+    """
+    tier_label = tier.capitalize()
+    return shell(
+        h1(f"Your {tier_label} trial has started.")
+        + lead(
+            f"{user_name}, everything is unlocked for the next 14 days. "
+            f"<strong>Nothing has been charged.</strong>"
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;'
+            f'letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">The terms, in full</div>'
+            f'<div class="tl-fg" style="margin-top:8px;color:{LIGHT_FG};font-size:14px;'
+            f'line-height:1.7;font-family:{FONT_SANS};">'
+            f"Charged today: <strong>$0</strong>.<br>"
+            f"First charge: <strong>{charge_date_label}</strong>, for {amount_label}.<br>"
+            f"Cancel before then and you are charged <strong>nothing at all</strong>."
+            f"</div>",
+            accent=True,
+        )
+        + muted_paragraph(
+            "We will email you three days before that date, so the charge will "
+            "not arrive unannounced. Cancelling takes one click in Billing — no "
+            "email, no phone call, no retention questions."
+        )
+        + button("Open the scanner", "https://tapeline.io/app/scanner")
+        + footnote(
+            'Your card is held by Stripe; we never see the number. '
+            '<a href="https://tapeline.io/app/billing" '
+            f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">Manage or cancel</a>.'
+        ),
+        preheader=(
+            f"Nothing charged today. First charge {charge_date_label} — "
+            f"cancel before then and you pay nothing."
+        ),
+    )
+
+
+def render_trial_canceled_email(user_name: str, *, tier: str) -> str:
+    """Sent when a trial is cancelled BEFORE the first charge.
+
+    The one thing a person wants confirmed at this moment is that no money will
+    be taken. Say it first, say it plainly, and do not spend the email trying to
+    win them back — a cancellation confirmation that argues with you is how a
+    company earns a chargeback instead of a second look later.
+    """
+    tier_label = tier.capitalize()
+    return shell(
+        h1("Cancelled — you have not been charged.")
+        + lead(
+            f"{user_name}, your {tier_label} trial is cancelled and "
+            f"<strong>no payment was taken</strong>. There is nothing "
+            f"outstanding and nothing scheduled."
+        )
+        + muted_paragraph(
+            "Your account stays on the Free tier, so the scanner, the daily "
+            "top-10 and the public record are all still open to you. Anything "
+            "you saved is where you left it."
+        )
+        + button("Open the scanner", "https://tapeline.io/app/scanner")
+        + footnote(
+            "If it was something we got wrong, replying to this email reaches "
+            "me directly. — Christian, founder."
+        ),
+        preheader="Cancelled — no payment was taken, and nothing is scheduled.",
+    )
+
+
 def render_trial_precharge_reminder_email(
     user_name: str,
     *,
