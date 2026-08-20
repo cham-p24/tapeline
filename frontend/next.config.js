@@ -110,8 +110,8 @@ const nextConfig = {
       "img-src 'self' data: https:",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
-      "connect-src 'self' https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.googletagmanager.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "connect-src 'self' https://www.facebook.com https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
       "frame-src https://challenges.cloudflare.com https://s.tradingview.com",
     ].join("; ");
     const securityHeaders = [

@@ -80,7 +80,13 @@ async def _send_purchase_conversion(
     tier: str | None = None,
     billing_period: str | None = None,
 ) -> None:
-    """Fire the server-side GA4 `purchase` event for a completed checkout.
+    """Fire the server-side `purchase` conversion for a completed checkout.
+
+    Two destinations, each independently env-gated: GA4 Measurement Protocol
+    (`services/analytics`) and the Meta Conversions API (`services/meta_capi`).
+    Either, both, or neither may be configured; the shared latch below means a
+    subscription is reported once per platform, and turning Meta on later
+    cannot replay historical purchases.
 
     Once per SUBSCRIPTION, not once per event. The event-id dedup at the top
     of the webhook already blocks Stripe redelivering the *same* event, but a
@@ -102,9 +108,15 @@ async def _send_purchase_conversion(
     + GA4_API_SECRET are set.
     """
     try:
+        from app.services import meta_capi
         from app.services.analytics import is_configured, track_purchase
 
-        if not is_configured():
+        # Two independent destinations, each separately env-gated. The latch
+        # below is shared so a subscription is reported once per platform, and
+        # so enabling Meta later cannot replay historical purchases.
+        ga4_on = is_configured()
+        meta_on = meta_capi.is_configured()
+        if not ga4_on and not meta_on:
             return
 
         checkout_session_id = obj.get("id")
@@ -143,14 +155,32 @@ async def _send_purchase_conversion(
             else None
         )
         currency = str(obj.get("currency") or "usd").upper()
-        await track_purchase(
-            user_id=user_id,
-            transaction_id=str(checkout_session_id),
-            value=value,
-            currency=currency,
-            tier=tier,
-            billing_period=billing_period,
-        )
+        if ga4_on:
+            await track_purchase(
+                user_id=user_id,
+                transaction_id=str(checkout_session_id),
+                value=value,
+                currency=currency,
+                tier=tier,
+                billing_period=billing_period,
+            )
+        if meta_on:
+            # Meta needs a hashed email for match quality; the webhook has the
+            # user id, so read the address here rather than threading it
+            # through every call site. Hashing happens inside meta_capi — the
+            # raw address never leaves this process.
+            email = (
+                await session.execute(select(User.email).where(User.id == user_id))
+            ).scalar_one_or_none()
+            await meta_capi.track_purchase(
+                user_id=user_id,
+                transaction_id=str(checkout_session_id),
+                email=email,
+                value=value,
+                currency=currency,
+                tier=tier,
+                billing_period=billing_period,
+            )
     except Exception:
         # Analytics must never fail a money-path webhook.
         logger.exception("stripe.ga4_purchase_failed user=%s", user_id)
@@ -373,7 +403,8 @@ async def stripe_webhook(
                     user.trial_ends_at = datetime.fromtimestamp(
                         int(raw_trial_end), UTC,
                     )
-                if user.trial_started_at is None:
+                first_trial = user.trial_started_at is None
+                if first_trial:
                     raw_trial_start = obj.get("trial_start") or obj.get("start_date")
                     user.trial_started_at = (
                         datetime.fromtimestamp(int(raw_trial_start), UTC)
@@ -384,6 +415,25 @@ async def stripe_webhook(
                     "stripe.trial_started user=%s sub=%s trial_ends_at=%s",
                     user.id, p["id"], user.trial_ends_at,
                 )
+                # Meta CAPI `StartTrial` — the event a paid campaign should
+                # OPTIMISE toward. It is the earliest high-intent signal (a
+                # card was entered) and the only one with any chance of
+                # reaching the ~50 events/ad-set/week smart bidding needs;
+                # `Purchase` is for reporting and value, not optimisation.
+                #
+                # Gated on `first_trial` so the write-once trial_started_at
+                # column doubles as the dedupe key — every subsequent
+                # `.updated` on the same subscription leaves it set and sends
+                # nothing. Fire-and-forget, env-gated, never raises.
+                if first_trial:
+                    try:
+                        from app.services import meta_capi
+
+                        await meta_capi.track_start_trial(
+                            user_id=user.id, email=user.email,
+                        )
+                    except Exception:
+                        logger.exception("stripe.meta_start_trial_failed user=%s", user.id)
         elif p["status"] == "past_due":
             # Dunning grace window. A failed renewal flips the sub to
             # past_due while Stripe retries the card on its Smart Retries

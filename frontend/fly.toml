@@ -20,6 +20,10 @@ primary_region = "syd"
     # the region chosen at project creation; it cannot be changed afterwards.
     NEXT_PUBLIC_POSTHOG_KEY = ""
     NEXT_PUBLIC_POSTHOG_HOST = ""
+    # Meta pixel id. Empty = no pixel renders and no Meta JS is fetched.
+    # Pair with META_PIXEL_ID + META_CAPI_ACCESS_TOKEN on the BACKEND app
+    # (services/meta_capi) so browser and server events dedupe on event_id.
+    NEXT_PUBLIC_META_PIXEL_ID = ""
 
 [http_service]
   internal_port = 3000
