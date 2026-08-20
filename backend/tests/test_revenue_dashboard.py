@@ -127,6 +127,9 @@ def test_mrr_contribution_matches_marketed_rates():
     assert mrr_contribution("pro", "annual") == 8.25
     assert mrr_contribution("premium", "monthly") == 19.99
     assert mrr_contribution("premium", "annual") == 16.58
+    # Trader concierge tier — booked, not silently $0 (a hand-sold Trader sub).
+    assert mrr_contribution("trader", "monthly") == 59.0
+    assert mrr_contribution("trader", "annual") == 49.0
 
 
 def test_mrr_contribution_null_or_unknown_period_falls_back_to_monthly():
