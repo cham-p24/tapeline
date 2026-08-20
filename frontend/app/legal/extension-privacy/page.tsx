@@ -81,7 +81,6 @@ export default function ExtensionPrivacyPage() {
                   expires after 180 days, signing out of all devices revokes it immediately,
                   and disconnecting in the popup removes it from your browser.
                 </Row>
-                </Row>
                 <Row label="Tracking">
                   No analytics, no advertising, no tracking pixels, no third-party scripts.
                   Nothing is sold or shared.
