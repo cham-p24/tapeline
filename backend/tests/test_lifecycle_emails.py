@@ -691,14 +691,17 @@ def test_activation_arm_alerts_renderer_carries_no_urgency():
 
 
 def test_activation_arm_alerts_renderer_trial_note_is_optional_and_calm():
-    """The trial line is the single permitted time statement, and it must not
-    read as a billing event — the trial takes no card."""
+    """The trial line is the single permitted time statement. The trial now
+    runs on a card, so the note must name the first-charge date and the
+    one-click way out — calmly, with no countdown."""
     ends = datetime(2026, 8, 1, tzinfo=UTC)
     with_note = render_activation_arm_alerts_email(
         "Alex", watchlist_count=7, trial_ends_at=ends,
     )
     assert "1 Aug 2026" in with_note
-    assert "no card on file" in with_note.lower()
+    lowered_note = with_note.lower()
+    assert "first charge" in lowered_note
+    assert "cancel in one click" in lowered_note
     without = render_activation_arm_alerts_email("Alex", watchlist_count=7)
     assert "trial runs to" not in without.lower()
 

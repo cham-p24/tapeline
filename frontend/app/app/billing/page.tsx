@@ -15,7 +15,7 @@ import {
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { PRICING, FREE_LIMITS, REFUND, usd, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
@@ -50,6 +50,66 @@ const TIER_META = {
 
 type TierKey = keyof typeof TIER_META;
 
+/**
+ * Length of the Premium trial. Mirrors the backend grant and every "14-day"
+ * figure on the pricing surfaces. The first-charge date shown on the offer
+ * below is derived from this, so it is the same arithmetic the Stripe session
+ * performs (`subscription_data.trial_end = now + TRIAL_DAYS`).
+ */
+const TRIAL_DAYS = 14;
+
+/**
+ * Local record that the checkout we are about to leave for is a TRIAL start,
+ * not a purchase.
+ *
+ * The primary signal is `trial=1` on the success_url, which the backend owns.
+ * This is the belt-and-braces half, and it exists because the failure mode is
+ * expensive and silent: if a $0 trial start comes back looking like an ordinary
+ * success, the page fires `subscribe` with the full plan price, booking revenue
+ * nobody paid and feeding Google Ads Smart Bidding a conversion worth $199 for
+ * a customer who has been charged nothing. Written immediately before the
+ * redirect, read once on the way back, and cleared either way.
+ *
+ * Scoped tightly so it cannot mislabel a later real purchase: it carries the
+ * tier it was minted for and expires after two hours.
+ */
+const TRIAL_CHECKOUT_INTENT_KEY = "tapeline_trial_checkout_intent";
+const TRIAL_INTENT_TTL_MS = 2 * 3_600_000;
+
+function rememberTrialCheckout(tier: string) {
+  try {
+    window.sessionStorage.setItem(
+      TRIAL_CHECKOUT_INTENT_KEY,
+      JSON.stringify({ tier, at: Date.now() }),
+    );
+  } catch {
+    // Storage blocked — we simply fall back to the `trial=1` URL param.
+  }
+}
+
+/** Consume the flag. Returns true only for a fresh, tier-matching record. */
+function takeTrialCheckoutIntent(tier: string): boolean {
+  try {
+    const raw = window.sessionStorage.getItem(TRIAL_CHECKOUT_INTENT_KEY);
+    window.sessionStorage.removeItem(TRIAL_CHECKOUT_INTENT_KEY);
+    if (!raw) return false;
+    const rec = JSON.parse(raw) as { tier?: string; at?: number };
+    if (rec.tier !== tier) return false;
+    return typeof rec.at === "number" && Date.now() - rec.at < TRIAL_INTENT_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** Long-form date for the disclosure, e.g. "4 September 2026". */
+function longDate(d: Date): string {
+  return d.toLocaleDateString(userLocale(), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function BillingPage() {
   const { user, refresh } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
@@ -83,6 +143,19 @@ export default function BillingPage() {
   // Which tier they were part-way through, when we know it — upgrades the
   // resume button from "pick a plan" to one click back into the same checkout.
   const [cancelledTier, setCancelledTier] = useState<"pro" | "premium" | null>(null);
+  // TRIAL-START INTENT (?trial=start). Set by the post-signup hand-off and by
+  // any surface that wants to present the 14-day Premium trial. It opens the
+  // picker pre-armed on Premium and renders the offer panel at the top of the
+  // page — a two-option fork the user resolves themselves. It NEVER redirects
+  // into Stripe on its own: the panel's button is the only thing that starts a
+  // checkout, exactly like every other plan CTA on this page.
+  const [trialIntent, setTrialIntent] = useState(false);
+  // The date Stripe will take the first charge if the trial starts right now.
+  // Computed once per mount so it can't drift mid-session, and mirrors the
+  // trial_end the backend sets on the Checkout session.
+  const [trialFirstCharge] = useState(
+    () => new Date(Date.now() + TRIAL_DAYS * 86_400_000),
+  );
   // Failed-renewal state from GET /api/billing/retention-options (mirrors the
   // billing.past_due that /api/me feeds the global DunningBanner). Drives the
   // in-page recovery panel and suppresses the "Next charge" quote, which is
@@ -99,13 +172,24 @@ export default function BillingPage() {
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
     : 0;
   const isOnTrial = !!trialEndsAt && trialDaysLeft > 0;
-  // The no-card 14-day Premium trial every signup gets. These users hold
-  // tier="premium" but own nothing yet — the whole point of this page is to
-  // get a card from them, so the Premium card must stay CLICKABLE for them
-  // (the old `disabled={tier === "premium"}` dead-ended every trial user's
-  // conversion path). hasBilling === true flips this off for the rare user
-  // who already added a card mid-trial.
+  // LEGACY no-card trial: accounts auto-granted a 14-day Premium trial at
+  // signup, before the trial required a card (changed 2026-08). They hold
+  // tier="premium" but own nothing, so the Premium card must stay CLICKABLE
+  // for them (the old `disabled={tier === "premium"}` dead-ended every trial
+  // user's conversion path). hasBilling === true flips this off.
   const isCardlessTrial = tier === "premium" && isOnTrial && hasBilling !== true;
+  // The CURRENT shape of a trial: started through Stripe Checkout, so a card
+  // is on file and a real first charge is scheduled for the trial-end date.
+  // This is a billing event and the page owes the user its date and amount.
+  const isCardTrial = tier === "premium" && isOnTrial && hasBilling === true;
+  // Who may be offered a trial. Deliberately conservative on the client — the
+  // authoritative "has this account already had its trial?" gate lives in the
+  // backend checkout path; this only decides whether to render the offer.
+  const trialEligible = tier === "free" && !user?.trial_ends_at && hasBilling !== true;
+  // Render the offer when it was asked for AND the account can actually take
+  // it. An already-trialled or paying account that lands on ?trial=start just
+  // sees the normal billing page rather than an offer it cannot accept.
+  const showTrialOffer = trialIntent && trialEligible;
 
   // Stripe defers the first charge to the trial-end date ONLY when that date is
   // >= 48h out (backend routers/billing.py); inside 48h it falls back to a
@@ -176,6 +260,59 @@ export default function BillingPage() {
     if (qp.get("checkout") === "success") {
       const paidTier = qp.get("tier") || tier;
       const period = qp.get("billing_period") || "annual";
+      // TRIAL START, not a purchase. The backend appends `trial=1` to the
+      // success_url when the session was minted with subscription_data
+      // .trial_end for a NEW trial, because $0 moved: firing `subscribe` here
+      // would report revenue that does not exist and feed Google Ads a
+      // conversion worth $199 for a customer who has paid nothing yet. Fire
+      // `start_trial` instead — the trial genuinely did start — and let the
+      // real `subscribe` fire when the first charge lands 14 days later.
+      //
+      // Two signals, either of which is enough: the URL param the backend
+      // appends, and the local record this page wrote before redirecting. The
+      // second exists so a backend that has not (yet) added the param cannot
+      // silently turn every trial start into $199 of phantom GA4/Ads revenue.
+      // `takeTrialCheckoutIntent` is called unconditionally so the record is
+      // always consumed, never left to colour a later purchase.
+      const localTrialIntent = takeTrialCheckoutIntent(paidTier);
+      if (qp.get("trial") === "1" || localTrialIntent) {
+        const sid = qp.get("session_id") || "";
+        const fire = () =>
+          trackEvent("start_trial", {
+            tier: paidTier,
+            billing_period: period,
+            days: TRIAL_DAYS,
+            method: "checkout",
+          });
+        if (sid) {
+          trackEventOnce(`tapeline_start_trial_fired_${sid}`, "start_trial", {
+            tier: paidTier,
+            billing_period: period,
+            days: TRIAL_DAYS,
+            method: "checkout",
+          });
+        } else {
+          fire();
+        }
+        setMsg({
+          kind: "ok",
+          text: `Your ${TRIAL_DAYS}-day Premium trial is running — nothing was charged. Your first charge is on ${longDate(
+            trialFirstCharge,
+          )}, and Cancel subscription below ends it before then with nothing taken.`,
+        });
+        setHasBilling(true);
+        refresh();
+        // Drop the payment identifier from the address bar, same as the paid
+        // path below, so a shared/bookmarked link carries no session id.
+        qp.delete("session_id");
+        const qs = qp.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+        );
+        return;
+      }
       // Stripe's checkout session id, injected by the success_url template in
       // backend/app/routers/billing.py. Doubles as the GA4/Ads transaction_id
       // AND the dedupe key: without it, every reload/bookmark of this success
@@ -264,6 +401,16 @@ export default function BillingPage() {
       const period = (qp.get("billing") || "").toLowerCase();
       if (period === "monthly" || period === "annual") setBillingPeriod(period);
     }
+    // Trial-start intent (?trial=start, or ?intent=trial). Arms the picker on
+    // Premium and renders the offer panel. Nothing is fired, nothing is
+    // redirected — the user reads the terms and presses one of two buttons.
+    if (qp.get("trial") === "start" || intent === "trial") {
+      setTrialIntent(true);
+      setIntentPlan("premium");
+      setShowPlans(true);
+      const period = (qp.get("billing") || "").toLowerCase();
+      if (period === "monthly" || period === "annual") setBillingPeriod(period);
+    }
     // Win-back landing — the day-90 cancellation email links here with
     // ?winback=1. Surface the returning-customer banner + open the plan
     // picker. The 40%-off coupon itself is minted server-side at checkout,
@@ -302,7 +449,23 @@ export default function BillingPage() {
     }
   }, [user]);
 
-  async function startCheckout(target: "pro" | "premium") {
+  /**
+   * Open Stripe Checkout for `target`.
+   *
+   * `startTrial` asks the backend to mint the SAME session shape the mid-trial
+   * add-a-card flow already uses — mode=subscription with
+   * subscription_data.trial_end — dated TRIAL_DAYS out instead of at an
+   * existing trial's expiry. That is the whole mechanism: $0 authorised today,
+   * first charge on the trial-end date, cancellable in one click from this
+   * page or the Stripe portal, and every webhook / dunning / portal behaviour
+   * a normal subscription has. (Setup-mode would need a cron + a
+   * SetupIntent→Subscription path and would lose all of that.)
+   */
+  async function startCheckout(
+    target: "pro" | "premium",
+    opts: { startTrial?: boolean } = {},
+  ) {
+    const startTrial = opts.startTrial === true;
     setBusy(target);
     setMsg(null);
     // Funnel event: user clicked Upgrade. Fired before the fetch so we capture
@@ -316,12 +479,17 @@ export default function BillingPage() {
     // checkout intent. `begin_checkout` is the GA4 standard name for this
     // moment; value is the price the user is about to be charged (Stripe bills
     // USD), so GA4's funnel exploration can weight checkout intent by plan.
+    //
+    // `start_trial` is NOT fired here. A click is not a trial: the user can
+    // still abandon the Stripe page. It fires on the confirmed return
+    // (?checkout=success&trial=1), deduped on the Stripe session id.
     const targetMeta = TIER_META[target];
     trackEvent("begin_checkout", {
       tier: target,
       billing_period: billingPeriod,
       current_tier: tier,
       on_trial: isOnTrial,
+      start_trial: startTrial,
       value: billingPeriod === "annual" ? targetMeta.annual : targetMeta.monthly,
       currency: "USD",
     });
@@ -330,10 +498,21 @@ export default function BillingPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: target, billing_period: billingPeriod }),
+        body: JSON.stringify({
+          tier: target,
+          billing_period: billingPeriod,
+          // Backend contract: when true, mint the session with
+          // subscription_data.trial_end = now + 14d and append `trial=1` to
+          // the success_url so the return handler above reports a trial
+          // start rather than a purchase.
+          start_trial: startTrial,
+        }),
       });
       const body = await res.json();
       if (res.ok && body.url) {
+        // Record the trial intent BEFORE navigating away — see
+        // TRIAL_CHECKOUT_INTENT_KEY. Only ever set for a trial start.
+        if (startTrial) rememberTrialCheckout(target);
         window.location.href = body.url;
       } else if (res.status === 401) {
         handle401(res.status);
@@ -401,6 +580,21 @@ export default function BillingPage() {
         }`}>
           {msg.text}
         </div>
+      )}
+
+      {/* ── Trial offer (?trial=start) ─────────────────────────────────────
+          The one place the 14-day Premium trial is actually offered. It is a
+          fork, not a funnel: two same-sized buttons, the full charge terms in
+          plain body text above them, and no way for the page to walk into
+          Stripe on its own. See TrialOfferPanel for the rules it has to obey. */}
+      {showTrialOffer && (
+        <TrialOfferPanel
+          billingPeriod={billingPeriod}
+          onBillingPeriod={setBillingPeriod}
+          firstCharge={trialFirstCharge}
+          busy={busy === "premium"}
+          onStartTrial={() => startCheckout("premium", { startTrial: true })}
+        />
       )}
 
       {/* ── Failed-renewal recovery ────────────────────────────────────────
@@ -555,9 +749,11 @@ export default function BillingPage() {
             <div className="mt-6">
               {/* Authenticated free users already HAVE an account — the old
                   <Link href="/signup"> dead-ended on a duplicate-signup
-                  rejection. Open the in-page plan picker instead. */}
+                  rejection. Open the in-page plan picker instead. The label
+                  splits on whether they have ever held Premium: "Re-activate"
+                  is nonsense to a brand-new free account that never had it. */}
               <button onClick={openPlanPicker} className="btn-accent text-sm">
-                Re-activate Premium →
+                {trialEligible ? "See plans and the 14-day trial →" : "Re-activate Premium →"}
               </button>
             </div>
           )}
@@ -568,6 +764,8 @@ export default function BillingPage() {
           <div className="text-[11px] uppercase tracking-wider text-muted">
             {isCardlessTrial
               ? "When the trial ends"
+              : isCardTrial
+              ? "First charge"
               : tier === "free"
               ? "What you get on Premium"
               : pastDue
@@ -585,6 +783,25 @@ export default function BillingPage() {
                 The last renewal charge didn&rsquo;t complete. Your next charge date
                 depends on when it succeeds, so there isn&rsquo;t a reliable one to
                 show yet.
+              </p>
+            </>
+          ) : isCardTrial ? (
+            /* Card-on-file trial. A real charge is scheduled, so this tile
+               states the date, the amount, and the one-click exit — never a
+               bare "Next charge $199/year", which would read as though the
+               money is already moving. */
+            <>
+              <div className="mt-2 text-2xl font-bold nums">
+                {trialEndsAt!.toLocaleDateString(userLocale(), { month: "short", day: "numeric", year: "numeric" })}
+              </div>
+              <p className="mt-2 text-xs text-muted leading-relaxed">
+                Nothing has been charged yet. On that date your card is charged
+                for the {meta.name} plan you started &mdash;{" "}
+                {usdCompact(meta.annual)}/yr on annual billing, or{" "}
+                {usd(meta.monthly)}/mo on monthly; the Stripe portal shows which
+                one is on your subscription. Cancel any time before then and you
+                are not charged at all &mdash; the trial ends and the account
+                moves to Free.
               </p>
             </>
           ) : isCardlessTrial ? (
@@ -752,12 +969,33 @@ export default function BillingPage() {
               // human could ever reach /api/billing/checkout. A cardless
               // trial keeps the button live with an add-a-card CTA; only a
               // genuinely-paid Premium sees the disabled Current state.
-              cta={isCardlessTrial ? "Keep Premium — add a card" : "Upgrade to Premium"}
+              //
+              // A trial-eligible free account gets the TRIAL from this card
+              // rather than an immediate charge, so the picker and the offer
+              // panel above can never mean two different things. The
+              // disclosure below the button carries the same four facts the
+              // panel does, because this card is reachable without it.
+              cta={
+                trialEligible
+                  ? `Start the ${TRIAL_DAYS}-day trial`
+                  : isCardlessTrial
+                  ? "Keep Premium — add a card"
+                  : "Upgrade to Premium"
+              }
+              disclosure={
+                trialEligible
+                  ? `$0 today · first charge ${longDate(trialFirstCharge)} (${
+                      billingPeriod === "annual"
+                        ? `${usdCompact(TIER_META.premium.annual)}/yr`
+                        : `${usd(TIER_META.premium.monthly)}/mo`
+                    }) · cancel in one click before then and you are never charged`
+                  : undefined
+              }
               highlight={tier === "premium" && !isCardlessTrial}
               intent={intentPlan === "premium" && (tier !== "premium" || isCardlessTrial)}
               disabled={tier === "premium" && !isCardlessTrial}
               busy={busy === "premium"}
-              onUpgrade={() => startCheckout("premium")}
+              onUpgrade={() => startCheckout("premium", { startTrial: trialEligible })}
             />
           </div>
 
@@ -869,6 +1107,163 @@ export default function BillingPage() {
         tier={tier}
       />
     </div>
+  );
+}
+
+/**
+ * The 14-day Premium trial offer — the ONE surface that asks for a card in
+ * exchange for a trial, and therefore the one that has to be beyond reproach.
+ *
+ * NON-NEGOTIABLES, all enforced by __tests__/TrialStartOffer.test.tsx:
+ *
+ *   1. FULL DISCLOSURE BEFORE THE CARD. Four facts as real body text (not an
+ *      image, not a tooltip, not behind a <details>): $0 charged today, the
+ *      exact calendar date of the first charge, the amount that will be
+ *      charged, and that one click cancels before then. If the user only reads
+ *      the buttons they have still been told the price and the date.
+ *   2. THE DECLINE IS EQUAL. "Continue on the Free plan" is the same size and
+ *      the same typographic weight as the trial button, sits beside it, is not
+ *      a greyed-out afterthought, and is not preceded by a guilt line. Free is
+ *      a real outcome here, not a punishment.
+ *   3. NO DARK PATTERNS. No auto-redirect into Stripe (the button is the only
+ *      thing that navigates), nothing pre-ticked, no countdown, no scarcity,
+ *      no "N spots left", no fake discount. Compliance rule 6 — and the copy
+ *      linter (scripts/lint-copy-compliance.mjs) will fail the build for most
+ *      of them anyway.
+ *   4. KEYBOARD OPERABLE. Everything interactive is a real <button> or <a>,
+ *      in reading order, with the global :focus-visible ring plus an explicit
+ *      focus ring here so it stays visible on the tinted panel.
+ *
+ * The billing-period choice lives inside the panel because the AMOUNT in the
+ * disclosure has to be the amount for the period actually selected. It shares
+ * state with the plan picker's toggle below, so the two can never disagree.
+ */
+function TrialOfferPanel({
+  billingPeriod,
+  onBillingPeriod,
+  firstCharge,
+  busy,
+  onStartTrial,
+}: {
+  billingPeriod: "monthly" | "annual";
+  onBillingPeriod: (p: "monthly" | "annual") => void;
+  firstCharge: Date;
+  busy: boolean;
+  onStartTrial: () => void;
+}) {
+  const chargeDate = longDate(firstCharge);
+  const amount =
+    billingPeriod === "annual"
+      ? `${usdCompact(PRICING.premium.annual)} for the year`
+      : `${usd(PRICING.premium.monthly)} for the month`;
+  const FOCUS =
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+  return (
+    <section
+      data-testid="trial-offer"
+      aria-labelledby="trial-offer-heading"
+      className="rounded-2xl border border-border bg-panel p-6"
+    >
+      <h2 id="trial-offer-heading" className="text-xl font-semibold">
+        Start your {TRIAL_DAYS}-day Premium trial &mdash; or don&rsquo;t
+      </h2>
+      <p className="mt-1.5 text-sm text-muted">
+        Every Premium feature for {TRIAL_DAYS} days: the full ~2,500-ticker live
+        universe, score breakdowns, Congressional trades and insider buys,
+        watchlist of 200 and unlimited email alerts. Starting the trial takes a
+        card, because it becomes a paid subscription if you keep it. Here is
+        exactly what that means.
+      </p>
+
+      {/* Billing period — nothing is pre-ticked beyond the site-wide default,
+          and switching it rewrites the amount in the disclosure below. */}
+      <div className="mt-5">
+        <div id="trial-period-label" className="text-[11px] uppercase tracking-wider text-muted">
+          Plan after the trial
+        </div>
+        <div
+          role="group"
+          aria-labelledby="trial-period-label"
+          className="mt-2 inline-flex rounded-full border border-border bg-surface p-1"
+        >
+          {(["annual", "monthly"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={billingPeriod === p}
+              onClick={() => onBillingPeriod(p)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${FOCUS} ${
+                billingPeriod === p ? "bg-fg text-background" : "text-muted hover:text-fg"
+              }`}
+            >
+              {p === "annual"
+                ? `Annual · ${usdCompact(PRICING.premium.annual)}/yr`
+                : `Monthly · ${usd(PRICING.premium.monthly)}/mo`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* THE DISCLOSURE. Plain text, always visible, never collapsed. */}
+      <ul data-testid="trial-disclosure" className="mt-5 space-y-2 text-sm text-fg">
+        <li className="flex gap-2">
+          <span aria-hidden="true" className="text-muted">·</span>
+          <span>
+            <strong className="font-semibold">$0 today.</strong> Starting the
+            trial charges you nothing now.
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span aria-hidden="true" className="text-muted">·</span>
+          <span>
+            <strong className="font-semibold">Your first charge is on {chargeDate}</strong>{" "}
+            &mdash; {amount}, and then {billingPeriod === "annual" ? "every year" : "every month"}{" "}
+            until you cancel.
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span aria-hidden="true" className="text-muted">·</span>
+          <span>
+            <strong className="font-semibold">Cancel in one click</strong> from this
+            page any time before {chargeDate} and you are never charged.
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span aria-hidden="true" className="text-muted">·</span>
+          <span>
+            Card details are entered on Stripe&rsquo;s own checkout page. Your
+            card number never reaches a Tapeline server.
+          </span>
+        </li>
+      </ul>
+
+      {/* THE FORK. Same height, same width behaviour, same font weight. */}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          onClick={onStartTrial}
+          disabled={busy}
+          className={`flex h-11 flex-1 items-center justify-center rounded-md border border-accent bg-accent/15 px-4 text-sm font-medium text-fg transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
+        >
+          {busy ? "Opening Stripe…" : `Start the ${TRIAL_DAYS}-day trial`}
+        </button>
+        <Link
+          href="/app/scanner"
+          className={`flex h-11 flex-1 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-fg transition-colors hover:bg-panel2 ${FOCUS}`}
+        >
+          Continue on the Free plan
+        </Link>
+      </div>
+
+      <p className="mt-4 text-xs text-muted leading-relaxed">
+        The Free plan costs nothing and never asks for a card: live scores,
+        top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups a day
+        {freeHasWatchlist() ? `, and a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
+        You can start the trial later from this page &mdash; it is here whenever
+        you want it.
+      </p>
+    </section>
   );
 }
 
@@ -1022,10 +1417,18 @@ function WebPushCard() {
 
 
 function Plan({
-  name, price, items, note, cta, highlight, intent, disabled, busy, onUpgrade, proPlus,
+  name, price, items, note, cta, disclosure, highlight, intent, disabled, busy, onUpgrade, proPlus,
 }: {
   name: string; price: string; items: string[]; note?: string;
-  cta?: string; highlight?: boolean; intent?: boolean; disabled?: boolean; busy?: boolean;
+  cta?: string;
+  /**
+   * Charge terms printed directly under the CTA, as body text. Used by the
+   * trial CTA so the four disclosure facts ($0 today / first-charge date /
+   * amount / one-click cancel) travel with the button even when the user
+   * reached this card without passing the offer panel.
+   */
+  disclosure?: string;
+  highlight?: boolean; intent?: boolean; disabled?: boolean; busy?: boolean;
   onUpgrade?: () => void; proPlus?: boolean;
 }) {
   // `highlight` = the plan the user actually owns ("Current" badge).
@@ -1061,6 +1464,9 @@ function Plan({
         >
           {disabled ? "Current plan" : busy ? "Redirecting…" : cta}
         </button>
+      )}
+      {cta && disclosure && !disabled && (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">{disclosure}</p>
       )}
     </div>
   );

@@ -61,8 +61,15 @@ different primary use case (quant scanner vs. options flow).
 
 ## Trial / conversion strategy
 
-- **14-day Premium trial, no credit card** — every new signup starts in Premium for 14 days
-- At day 14, prompts to add card OR drops to Free
+- **14-day Premium trial, card required** — creating an account is email + password
+  only and lands on Free; starting the trial is a separate, opt-in step through
+  Stripe Checkout (`mode=subscription` + `subscription_data.trial_end`)
+- Disclosed before the card is entered: $0 charged today, the exact first-charge
+  date (day 14), the amount, and one-click cancel before then
+- Declining the trial is a normal outcome — the account stays on Free, and the
+  Free tier is never gated behind a card
+- At day 14, the subscription starts and the card is charged, unless cancelled
+  first (one click in Billing) — in which case the account stays on Free
 - **Annual is the default billing toggle** on /pricing and /app/billing (`BillingToggle.tsx` seeds the sitewide annual default so the plan cards and the always-annual comparison table can never disagree); monthly is one click away
 - **30-day money back** on every paid plan (was 7-day; extended 2026-07 —
   costless at zero customers, neutralizes the no-reviews trust gap)

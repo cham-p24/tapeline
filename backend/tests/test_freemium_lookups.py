@@ -225,18 +225,28 @@ async def test_paid_user_unlimited(client, monkeypatch, tier):
 
 @pytest.mark.asyncio
 async def test_active_trial_user_unlimited(client, monkeypatch):
-    """A signup auto-starts a 14-day Premium trial (tier=premium, no stripe
-    customer, future trial_ends_at). That user must be unmetered."""
+    """A user inside a Premium trial must be unmetered.
+
+    Signup no longer auto-starts the trial (it is card-required and opt-in
+    now — see test_card_required_trial.py), so the trial state is written
+    directly here. The STATE under test is unchanged: tier=premium, a future
+    trial_ends_at, and no Stripe customer, which is exactly what
+    services/tier.is_on_trial keys on.
+    """
     async with client:
         await _seed_ticker()
         cookies, uid = await _signup(client, monkeypatch)
-        # Leave the auto-started trial intact (premium + future trial_ends_at,
-        # no stripe customer) — this is the active-trial state.
         async with session_scope() as s:
             u = (await s.execute(select(User).where(User.id == uid))).scalar_one()
-            assert u.tier == "premium"
-            assert u.trial_ends_at is not None
+            # A fresh signup is FREE with nothing billable attached.
+            assert u.tier == "free"
+            assert u.trial_ends_at is None
             assert u.stripe_customer_id is None
+            # Put them inside a live trial.
+            u.tier = "premium"
+            u.trial_ends_at = datetime.now(UTC) + timedelta(days=14)
+            u.trial_started_at = datetime.now(UTC)
+            await s.commit()
 
         for _ in range(FREE_DAILY_LOOKUPS + 5):
             r = await client.get(f"/api/ticker/{SEEDED}", cookies=cookies)

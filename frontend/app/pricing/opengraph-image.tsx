@@ -69,7 +69,7 @@ export default async function OG() {
             Live scanner. Public scorecard.
           </div>
           <div style={{ fontSize: "30px", color: "#a1a1aa", lineHeight: 1.4, display: "flex" }}>
-            Three tiers. 14-day Premium trial. No credit card. Prices in USD.
+            Three tiers. Free forever, no card. 14-day Premium trial. Prices in USD.
           </div>
         </div>
 

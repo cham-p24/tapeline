@@ -45,8 +45,9 @@ const WINS: CompareRow[] = [
     competitor: "Price/indicator alerts only — no composite",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Free tier exists; paid tiers prompt for card",
   },
 ];
@@ -97,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Many active traders do — TradingView for chart analysis and community ideas, Tapeline for the multi-factor scoring and the public scorecard back-checking every call. Try Tapeline free for 14 days, no credit card, and keep your existing TradingView setup.",
+    a: "Many active traders do — TradingView for chart analysis and community ideas, Tapeline for the multi-factor scoring and the public scorecard back-checking every call. Run Tapeline alongside your existing TradingView setup — the Free tier costs nothing and asks for no card, and the 14-day Premium trial takes a card but charges $0 until day 14 and cancels in one click.",
   },
 ];
 

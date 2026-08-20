@@ -117,12 +117,13 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
           <h2 className="text-xl font-semibold tracking-tight">See it live.</h2>
           <p className="mt-2 text-sm text-muted">
-            14-day Premium trial. No credit card. The scoring formula above runs
-            on every US ticker every minute.
+            14-day Premium trial — $0 charged today, cancel in one click before
+            the day-14 charge. Or stay on Free, which never asks for a card. The
+            scoring formula above runs on every US ticker every minute.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/signup" className="btn-accent">
-              Try Premium free &rarr;
+              Start the 14-day trial &rarr;
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

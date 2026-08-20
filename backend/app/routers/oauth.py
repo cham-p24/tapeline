@@ -38,7 +38,7 @@ import secrets
 import string
 import time
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from urllib.parse import parse_qsl, urlencode
 
 import httpx
@@ -603,12 +603,11 @@ async def oauth_callback(
     user = result.scalar_one_or_none()
     is_new = user is None
     if user is None:
-        # Mirror the native-signup trial grant — OAuth signups land on Premium
-        # for 14 days with no card, then get dropped to Free by
-        # `_downgrade_expired_trials` if they never add a Stripe customer.
-        # Without this, Google/Microsoft/Apple signups land directly on Free
-        # and never see the product the marketing copy promised.
-        trial_ends = datetime.now(UTC) + timedelta(days=14)
+        # Mirrors the native-signup path in routers/auth.py: an account starts
+        # on FREE with no trial. The 14-day Premium trial is card-required and
+        # is granted by the Stripe `trialing` webhook, so an OAuth signup must
+        # NOT hand one out for free — otherwise Google/Microsoft/Apple is a
+        # side door around the card requirement the email path enforces.
         ref_code = _generate_referral_code()
         for _ in range(5):  # retry on the (unlikely) referral-code collision
             conflict = await session.execute(
@@ -628,9 +627,9 @@ async def oauth_callback(
             id=f"u_{uuid.uuid4().hex}",
             email=email,
             name=name,
-            tier="premium",
+            tier="free",
             password_hash=None,  # OAuth-only account
-            trial_ends_at=trial_ends,
+            trial_ends_at=None,
             referral_code=ref_code,
             signup_utm_source=attr.get("utm_source"),
             signup_utm_medium=attr.get("utm_medium"),
@@ -651,8 +650,8 @@ async def oauth_callback(
         await session.commit()
         await session.refresh(user)
         logger.info(
-            "oauth.user_created provider=%s email=%s trial_ends=%s utm_source=%s gclid=%s",
-            provider, email, trial_ends.isoformat(),
+            "oauth.user_created provider=%s email=%s tier=free utm_source=%s gclid=%s",
+            provider, email,
             attr.get("utm_source") or "-", "y" if attr.get("gclid") else "-",
         )
     else:
@@ -776,7 +775,7 @@ async def oauth_callback(
             ]
             await send_email(
                 user.email,
-                "Welcome to Tapeline — your trial is live",
+                "Welcome to Tapeline — your account is live",
                 render_welcome_email(user.name or "trader", picks=picks),
             )
         except Exception:

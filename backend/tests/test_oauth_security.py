@@ -393,7 +393,9 @@ async def test_google_callback_new_signup_still_works(
 
     async with session_scope() as s:
         row = (await s.execute(select(User).where(User.email == email))).scalar_one()
-        assert row.tier == "premium"
+        # The trial is card-required and is granted by the Stripe `trialing`
+        # webhook, so a fresh OAuth account starts on FREE with no trial.
+        assert row.tier == "free"
         await s.delete(row)
         await s.commit()
 

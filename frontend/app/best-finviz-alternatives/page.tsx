@@ -92,7 +92,7 @@ const TOOLS: Tool[] = [
       "Plain-English Why on every row, free tier included",
       "Congressional trades + recent insider buys on Premium",
       "Sub-60s refresh cadence during US market hours",
-      "14-day Premium trial, no credit card",
+      "Free tier needs no card; 14-day Premium trial is $0 today, cancel in one click",
     ],
     cons: [
       "Younger brand — launched 2026 (Finviz dates to 2007)",
@@ -409,7 +409,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Run both tools in parallel for two weeks",
-    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's 14-day Premium trial requires no credit card; TradingView and Stockanalysis.com both have free tiers.",
+    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's free tier needs no card and has no clock on it; its 14-day Premium trial does take a card, charges $0 today, and cancels in one click before the day-14 charge. TradingView and Stockanalysis.com both have free tiers.",
   },
   {
     name: "Recreate your screener filters in the new tool",
@@ -621,7 +621,8 @@ export default function BestFinvizAlternativesPage() {
             <li>
               <strong>Best overall Finviz alternative:</strong> Tapeline — public 6-factor
               formula, per-pick scorecard, plain-English Why. $8.25/mo annual,{" "}
-              <Link href="/signup?from=finviz" className="text-accent hover:underline">14-day Premium trial, no card</Link>.
+              free tier with{" "}
+              <Link href="/signup?from=finviz" className="text-accent hover:underline">no card</Link>, or a 14-day Premium trial for $0 today.
             </li>
             <li>
               <strong>Best for charting:</strong> TradingView — best-in-class charts and a 60M-strong community.

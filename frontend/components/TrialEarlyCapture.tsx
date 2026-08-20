@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { useCardOnFile, type CardOnFile } from "@/components/TrialBanner";
 import { FREE_LIMITS } from "@/lib/pricing";
 import { trackEvent } from "@/lib/gtag";
 
@@ -11,6 +12,21 @@ import { trackEvent } from "@/lib/gtag";
  * left. Sits bottom-right on desktop, hidden on mobile (TrialBanner already
  * does the heavy lifting there — adding a second floating card on a small
  * viewport is hostile).
+ *
+ * WHAT THIS COMPONENT IS FOR: capturing a card from a trial that does not have
+ * one. That makes the card state a hard gate, not a copy detail.
+ *
+ *   cardOnFile === true  → renders NOTHING. Since 2026-08 the 14-day Premium
+ *       trial is started through Stripe Checkout, so the ordinary trialist
+ *       already has a card on file and their first charge is already
+ *       scheduled. Showing them "Add a card" would be asking for something
+ *       they have already given, and the sheet has no other job.
+ *   cardOnFile === false → the full legacy nudge (an account from the old
+ *       auto-granted card-free trial). Copy unchanged.
+ *   cardOnFile === null  → card state unknown (API unreachable). The sheet
+ *       still states the Premium → Free delta, but drops BOTH the add-a-card
+ *       ask and the "nothing to cancel" claim, because neither can be
+ *       supported without knowing whether a charge is scheduled.
  *
  * The body NAMES the Premium → Free feature delta (what Free keeps vs what
  * Pro/Premium add), derived from FREE_LIMITS so it can't drift from the
@@ -37,19 +53,34 @@ import { trackEvent } from "@/lib/gtag";
  *   - user.tier === "premium"
  *   - user.trial_ends_at is set and in the future
  *   - days remaining is between 5 and 9 inclusive
+ *   - the account does NOT have a card on file (see the gate above)
  *   - localStorage flag not set (one impression per trial per user)
  *
  * Dismissal sets the flag for the rest of the trial. The persistent
- * TrialBanner in the page header keeps the upgrade prompt visible.
+ * TrialBanner in the page header keeps the plan link visible.
  */
-export function TrialEarlyCapture() {
+export function TrialEarlyCapture({
+  cardOnFile: cardOnFileProp,
+}: {
+  /** Test/preview override for the /api/me-derived card state. */
+  cardOnFile?: CardOnFile;
+} = {}) {
   const { user } = useUser();
   const [open, setOpen] = useState(false);
   const [daysLeft, setDaysLeft] = useState(0);
 
+  // Cheap "might be on a trial" gate for the card lookup — deliberately does
+  // NOT read the clock (that would make the render impure); the effect below
+  // still does the real expiry check before anything is shown.
+  const maybeOnTrial = !!user && user.tier === "premium" && !!user.trial_ends_at;
+  const fetched = useCardOnFile(maybeOnTrial && cardOnFileProp === undefined);
+  const cardOnFile = cardOnFileProp === undefined ? fetched : cardOnFileProp;
+
   useEffect(() => {
     if (!user || user.tier !== "premium" || !user.trial_ends_at) return;
     if (typeof window === "undefined") return;
+    // Hard gate: nothing to capture from an account that already has a card.
+    if (cardOnFile === true) return;
     const endsAt = new Date(user.trial_ends_at).getTime();
     if (!Number.isFinite(endsAt) || endsAt <= Date.now()) return;
     const dl = Math.ceil((endsAt - Date.now()) / 86_400_000);
@@ -63,7 +94,7 @@ export function TrialEarlyCapture() {
     } catch {
       // localStorage failures are non-fatal
     }
-  }, [user]);
+  }, [user, cardOnFile]);
 
   function dismiss(reason: "x" | "later" | "clicked") {
     try {
@@ -80,11 +111,16 @@ export function TrialEarlyCapture() {
     setOpen(false);
   }
 
-  if (!open) return null;
+  if (!open || cardOnFile === true) return null;
+
+  const knownCardless = cardOnFile === false;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 hidden justify-end p-6 sm:flex">
-      <div className="pointer-events-auto max-w-sm rounded-xl border border-accent/40 bg-surface p-4 shadow-2xl shadow-accent/10">
+      <div
+        data-testid="trial-early-capture"
+        className="pointer-events-auto max-w-sm rounded-xl border border-accent/40 bg-surface p-4 shadow-2xl shadow-accent/10"
+      >
         <div className="flex items-start gap-3">
           <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
           <div className="flex-1">
@@ -96,9 +132,18 @@ export function TrialEarlyCapture() {
               Free keeps the top {FREE_LIMITS.scannerRows} scored rows and{" "}
               {FREE_LIMITS.dailyLookups}{" "}look-ups a day &mdash; the full
               real-time universe and unlimited look-ups are Pro and Premium.
-              Adding a card keeps them on; it doesn&rsquo;t charge you or
-              shorten the trial, and if you&rsquo;d rather not, the account
-              moves to Free on its own &mdash; nothing to cancel.
+              {knownCardless ? (
+                <>
+                  {" "}Adding a card keeps them on; it doesn&rsquo;t charge you or
+                  shorten the trial, and if you&rsquo;d rather not, the account
+                  moves to Free on its own &mdash; nothing to cancel.
+                </>
+              ) : (
+                <>
+                  {" "}Billing shows your current plan and exactly what happens
+                  when the trial ends.
+                </>
+              )}
             </p>
             <div className="mt-3 flex items-center gap-3">
               <Link
@@ -109,7 +154,7 @@ export function TrialEarlyCapture() {
                 }}
                 className="flex h-8 items-center justify-center rounded-md bg-accent px-3 text-xs font-medium text-white hover:opacity-90"
               >
-                Add a card
+                {knownCardless ? "Add a card" : "Open billing"}
               </Link>
               <button
                 onClick={() => dismiss("later")}

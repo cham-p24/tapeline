@@ -13,7 +13,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Free Stock Scanner — No Credit Card, No Signup | Tapeline",
   description:
-    "Free stock scanners with a real no-credit-card path — Tapeline's free-forever tier and 14-day no-card trial. Public formula, public scorecard.",
+    "Free stock scanners with a real no-credit-card path — Tapeline's free-forever tier needs no card, ever. Public formula, public scorecard.",
   path: "/free-stock-scanner-no-credit-card",
 });
 
@@ -33,12 +33,14 @@ const SCANNERS: Scanner[] = [
   {
     name: "Tapeline",
     access:
-      "Free-forever tier with no card, plus a 14-day Premium trial that also needs no credit card",
-    cardNeeded: "None",
+      "Free-forever tier with no card and no clock; the optional 14-day Premium trial does take a card",
+    // "None" would over-claim now that the Premium trial runs on Stripe
+    // Checkout: the card-free path is the free tier, and only the free tier.
+    cardNeeded: "None (free tier)",
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     summary:
-      "The only US scanner that publishes its full 6-factor formula AND keeps every losing day on a public scorecard. Both the free-forever tier and the 14-day Premium trial start with no credit card — nothing to cancel, no dark-pattern billing. Be clear-eyed about the record: the public scorecard currently trails SPY, and we leave it up unedited because an auditable track record is the whole point.",
+      "The only US scanner that publishes its full 6-factor formula AND keeps every losing day on a public scorecard. The free-forever tier needs no card at all — nothing stored, nothing to cancel. The optional 14-day Premium trial does take a card: $0 is charged when you start it, the first charge is on day 14, and one click cancels before then. Be clear-eyed about the record: the public scorecard currently trails SPY, and we leave it up unedited because an auditable track record is the whole point.",
   },
   {
     name: "StockAnalysis.io",
@@ -85,7 +87,7 @@ const SCANNERS: Scanner[] = [
 const FAQ = [
   {
     q: "What's the best free stock scanner with no credit card?",
-    a: "For a synthesised composite score with a published formula, Tapeline — its free-forever tier and its 14-day Premium trial both start with no card. For a friction-free filter screener with no account at all, StockAnalysis.io. For raw filter fields with no signup, the free Finviz screener. For charting plus a free screener (free account, no card), TradingView. Each is honest about exactly what the no-card path includes.",
+    a: "For a synthesised composite score with a published formula, Tapeline — its free-forever tier never asks for a card (the optional Premium trial does). For a friction-free filter screener with no account at all, StockAnalysis.io. For raw filter fields with no signup, the free Finviz screener. For charting plus a free screener (free account, no card), TradingView. Each is honest about exactly what the no-card path includes.",
   },
   {
     q: "Which stock scanners genuinely need no signup?",
@@ -93,7 +95,7 @@ const FAQ = [
   },
   {
     q: "Is Tapeline's free tier really free forever, or a trial?",
-    a: "Free forever — no card, no countdown. The free tier gives you live composite scores on the top scanner rows plus a handful of ticker look-ups a day. Separately, there's an optional 14-day Premium trial that also needs no credit card if you want to test the deeper features. Neither path stores a card, so there's nothing to cancel.",
+    a: "Free forever — no card, no countdown. The free tier gives you live composite scores on the top scanner rows plus a handful of ticker look-ups a day, and nothing about it expires. Separately, there's an optional 14-day Premium trial for the deeper features; that one does take a card — $0 charged when you start it, first charge on day 14, cancel in one click before then. Declining it changes nothing about the free tier.",
   },
   {
     q: "Does the no-card scanner still show a real track record?",
@@ -144,8 +146,9 @@ export default function FreeStockScannerNoCreditCardPage() {
         </h1>
         <p className="mt-4 text-lg text-muted">
           Tapeline is the only US scanner that publishes its full 6-factor formula
-          <em> and</em> keeps every losing day on a public scorecard — and both its free-forever
-          tier and its 14-day Premium trial start with no credit card. Be clear-eyed about the
+          <em> and</em> keeps every losing day on a public scorecard — and its free-forever tier
+          needs no credit card, ever. (The optional 14-day Premium trial does take a card: $0
+          today, first charge on day 14, one click to cancel.) Be clear-eyed about the
           record: that scorecard currently trails SPY, and we leave it up unedited, because a
           track record you can audit beats a marketing number you can&apos;t. Below is an honest,
           feature-only look at the scanners with a real no-card (and mostly no-signup) path — what
@@ -306,8 +309,9 @@ export default function FreeStockScannerNoCreditCardPage() {
           </h2>
           <p className="mt-3 text-sm text-muted">
             Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
-            ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. The 14-day
-            Premium trial needs no card either.
+            ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. The optional
+            14-day Premium trial does take a card — $0 today, cancel in one click before the
+            day-14 charge.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">

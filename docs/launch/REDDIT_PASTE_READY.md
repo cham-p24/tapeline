@@ -45,7 +45,7 @@ What costs $19.99/mo (Premium):
 - + Recent insider buys (SEC Form 4) across the active universe
 - + Unlimited Telegram alerts
 
-14-day Premium trial, no card.
+14-day Premium trial — card required, $0 charged today, cancel in one click before the day-14 charge. Free tier needs no card.
 
 Try it on any ticker you like — tapeline.io/t/AAPL, tapeline.io/t/NVDA, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 

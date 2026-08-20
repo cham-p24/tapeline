@@ -644,14 +644,14 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering ~2,500 US tickers is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
           </p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            Tapeline Free covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever — enough to evaluate the methodology, not enough for daily trading. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~2,500-ticker real-time universe with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4). 14-day Premium trial, no card.
+            Tapeline Free covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever — enough to evaluate the methodology, not enough for daily trading. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~2,500-ticker real-time universe with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4). The 14-day Premium trial takes a card: $0 charged today, first charge on day 14, cancel in one click before then.
           </p>
         </section>
 
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
           <h2 className="text-xl font-semibold tracking-tight">See {t.symbol}'s live score now.</h2>
           <p className="mt-2 text-sm text-muted">
-            14-day Premium trial. No credit card. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
+            14-day Premium trial — $0 charged today, cancel in one click before the day-14 charge. Or stay on Free, which never asks for a card. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/t/${t.symbol}`} className="btn-accent">

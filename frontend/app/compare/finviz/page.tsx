@@ -36,7 +36,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Can I try Tapeline before paying?",
-    a: `Yes — 14-day Premium trial, no credit card required, cancel in one click. Free tier (live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day) is free forever.`,
+    a: `Two ways. The Free tier (live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day) is free forever and never asks for a card. Or start the 14-day Premium trial, which does take a card — $0 charged today, first charge on day 14, cancel in one click before then.`,
   },
 ];
 
@@ -89,8 +89,9 @@ const WINS = [
     competitor: "Late-90s table aesthetic",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Direct paid signup, no trial",
   },
 ];

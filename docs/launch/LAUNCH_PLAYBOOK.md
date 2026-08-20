@@ -31,7 +31,7 @@ The thing I care most about: a public scorecard. Every day I log the top 10 name
 Free tier: top 20 tickers, 24-hour delay, 5-name watchlist.
 Pro $9.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
 Premium $19.99/mo: + Congress trades, insider Form 4 activity, Telegram alerts.
-14-day Premium trial, no card required.
+14-day Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click. The free tier never asks for a card.
 
 Stack: Next.js 14 + FastAPI + Polygon (now Massive) + Finnhub + FRED. Deployed on Vercel + Fly.io.
 
@@ -111,7 +111,7 @@ What costs $19.99/mo (Premium):
 - + Elite 13F holdings (Buffett, Burry, Ackman, etc.)
 - + Unlimited Telegram alerts
 
-14-day Premium trial, no card.
+14-day Premium trial — card required, $0 charged today, cancel in one click before the day-14 charge. Free tier needs no card.
 
 Try it on any ticker you like — `tapeline.io/t/AAPL`, `tapeline.io/t/NVDA`, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 
@@ -200,7 +200,7 @@ Pro $9.99/mo: full ~2,500-ticker live scan + smart watchlist alerts + IPO/earnin
 
 Premium $19.99/mo: + Congress + 13F + unlimited Telegram alerts.
 
-14-day Premium trial, no card.
+14-day Premium trial — card required, $0 charged today, cancel in one click before the day-14 charge. Free tier needs no card.
 
 5/ Three things I care about most:
 

@@ -85,8 +85,9 @@ const WINS = [
     competitor: "Intentionally long-term: \"buy and hold for the next 5+ years\"",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Annual subscription only on Premium",
   },
   {

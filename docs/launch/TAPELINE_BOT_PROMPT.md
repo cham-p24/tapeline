@@ -128,11 +128,13 @@ TEMPLATES = {
         "Free tier covers the top 20 tickers (24h delayed) + the public scorecard + a 5-ticker watchlist. "
         "Pro is $8.25/mo annual ($9.99 monthly) for the full ~2,500-ticker live scan + smart watchlist alerts. "
         "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + congressional trades + insider Form 4 buys + unlimited Telegram alerts. "
-        "Every signup gets a 14-day Premium trial, no card. tapeline.io/pricing has the full comparison."
+        "Signup is email + password and lands on the free tier — no card. The 14-day Premium trial is opt-in and does take a card: $0 charged today, first charge on day 14, one click to cancel before then. tapeline.io/pricing has the full comparison."
     ),
     "trial": lambda: (
-        "Yep — every signup gets 14 days of Premium free, no card required. "
-        "tapeline.io/signup. The full ~2,500-ticker universe, scorecard, watchlist alerts, congressional/insider feeds, all included for the trial window."
+        "There's a 14-day Premium trial — it takes a card, but nothing is charged today. "
+        "The first charge is on day 14 and one click cancels before then. tapeline.io/signup. "
+        "The full ~2,500-ticker universe, scorecard, watchlist alerts, congressional/insider feeds, all included for the trial window. "
+        "If you'd rather not put a card down, the free tier never asks for one."
     ),
     "thanks": lambda: (
         "Thanks for the kind words. If you want to put it through its paces, drop a ticker and I'll send you its current score + the 6-factor breakdown."

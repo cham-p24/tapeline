@@ -196,11 +196,13 @@ async def test_callback_new_user_carries_intent_and_oauth_flag(
     expected_qs = urlencode({"next": INTENT, "oauth": "1"})
     assert r.headers["location"] == f"{settings.app_url}/app/onboarding?{expected_qs}"
 
-    # The user really was created on the trial path (existing behaviour).
+    # The user really was created (now on the free path — see below).
     async with session_scope() as s:
         row = (await s.execute(select(User).where(User.email == email))).scalar_one()
-        assert row.tier == "premium"
-        assert row.trial_ends_at is not None
+        # The trial is card-required and is granted by the Stripe `trialing`
+        # webhook, so a fresh OAuth account starts on FREE with no trial.
+        assert row.tier == "free"
+        assert row.trial_ends_at is None
         await s.delete(row)
         await s.commit()
 

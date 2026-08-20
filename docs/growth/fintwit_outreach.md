@@ -130,7 +130,7 @@ For those narrow cases the original DM template (preserved in git history if nee
 | "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the live forward-test — every miss stays on the page."                                                                |
 | "What about $[other ticker]?"           | Run the curl, paste the breakdown in the thread. Be willing to spend 2-3 replies going deep on their actual ticker of interest before any soft CTA.                                   |
 | "Are you the founder?"                  | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula."                                                             |
-| "How do I try it?"                      | "Free tier covers top 20 tickers (24h delayed). 14-day Premium trial for the full universe, no card. tapeline.io if you want to give it a shot."                                      |
+| "How do I try it?"                      | "Free tier covers top 20 tickers (24h delayed) and never asks for a card. 14-day Premium trial for the full universe — that one takes a card, charges $0 today, cancels in one click. tapeline.io if you want to give it a shot."                                      |
 | Pushback / methodological critique      | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently."           |
 | Silence after the OP reads it           | Move on. The followers who saw the exchange got the value either way.                                                                                                                 |
 

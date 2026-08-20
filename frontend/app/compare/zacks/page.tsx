@@ -92,8 +92,9 @@ const WINS = [
     competitor: "Late-2000s table UI, weak on phone",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Direct paid signup",
   },
 ];

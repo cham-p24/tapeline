@@ -63,7 +63,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   | Headquarters | Melbourne, Victoria, Australia |
   | Funding | Bootstrapped — no external investment |
   | Pricing | Free · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
-  | Free trial | 14-day Premium, no credit card required |
+  | Free trial | 14-day Premium — card required, $0 charged today, first charge on day 14, one-click cancel (free tier needs no card) |
   | Universe | ~2,500 active US tickers (top by daily $-volume) · 5,757 tracked |
   | Update cadence | Sub-60 seconds during US market hours |
   | Press contact | press@tapeline.io |
@@ -130,7 +130,7 @@ bottom of Part A.
   *(51 chars. Alt: `Stock scanner that shows its work` — 33 chars.)*
 - **Description (short — ~260 chars):**
   ```
-  A transparent quantitative stock scanner. Every US ticker gets one 0-100 score from a public 6-factor formula, plus a plain-English "why." Every top-10 daily pick is logged to a public, back-checked scorecard vs SPY. Bootstrapped. Free tier + 14-day Premium trial, no card.
+  A transparent quantitative stock scanner. Every US ticker gets one 0-100 score from a public 6-factor formula, plus a plain-English "why." Every top-10 daily pick is logged to a public, back-checked scorecard vs SPY. Bootstrapped. Free tier, no card; 14-day Premium trial takes one.
   ```
 - **Topics:** `Fintech`, `Stock trading`, `Investing`, `SaaS`, `Analytics`
 - **Links:** Website `https://tapeline.io` · Pricing `https://tapeline.io/pricing`
@@ -151,7 +151,9 @@ bottom of Part A.
   receipts.
 
   It's descriptive, not advice — six labels, no buy/sell language. Free tier is
-  the real product (delayed); 14-day Premium trial, no card. Would genuinely
+  the real product (delayed) and never asks for a card; the 14-day Premium
+  trial does take one — $0 today, first charge at day 14, one click to cancel.
+  Would genuinely
   love feedback on the scoring methodology: https://tapeline.io/how-it-works
   ```
 - **Launch timing:** schedule for a **Tuesday, 12:01am PT** (per `OFFSITE.md`).

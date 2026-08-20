@@ -30,10 +30,10 @@ Self-skeptical tone matches the rest of the thread.
 ## Tweet 5 (~210 chars)
 
 ```
-Free tier: top 20 names, 24h delayed. Pro $8.25/mo billed annually = full live universe + smart alerts. Premium $19.99 adds Congress trades + SEC Form 4 + Telegram. 14-day Premium trial, no card. Built solo from Melbourne.
+Free tier: top 20 names, 24h delayed. Pro $8.25/mo billed annually = full live universe + smart alerts. Premium $19.99 adds Congress trades + SEC Form 4 + Telegram. Free tier needs no card; the 14-day Premium trial takes one and charges $0 today. Built solo from Melbourne.
 ```
 
-**Why this works:** transparent pricing with the "no card" hook. "Built solo
+**Why this works:** transparent pricing with the card-free free tier as the hook, and the trial's terms stated rather than buried. "Built solo
 from Melbourne" adds founder context without being self-promotional. No CTA
 verb — the URL reply that follows IS the CTA.
 
@@ -74,7 +74,7 @@ Sums to 100. Doesn't change retroactively. Open for arguing about on /how-it-wor
 
 **Tweet 5:**
 ```
-Free tier shows the real product (top 20, 24h delayed). Pro $8.25/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $19.99/mo adds Congressional trades + SEC Form 4 insider feed + unlimited Telegram. 14-day trial, no card.
+Free tier shows the real product (top 20, 24h delayed). Pro $8.25/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $19.99/mo adds Congressional trades + SEC Form 4 insider feed + unlimited Telegram. Free tier needs no card; the 14-day trial takes one and charges $0 today.
 ```
 
 **URL reply:** `https://tapeline.io`

@@ -1,7 +1,11 @@
 /**
  * Signup page tests:
  *   - the offscreen honeypot field (bot-protection layer depends on it)
- *   - core fields + trial commitment copy
+ *   - core fields, and the CARD RULE stated honestly. Since 2026-08 this form
+ *     creates a FREE account and nothing else: no card, no trial. The 14-day
+ *     Premium trial is a separate opt-in on the next screen and it DOES take a
+ *     card, so every "no credit card" line here must qualify the account, not
+ *     the trial. The page must also contain NO card input of any kind.
  *   - source-aware (message-match) headlines driven by ?from=, the funnel
  *     fix that carries an ad/landing-page promise through to the signup H1
  *     instead of showing cold traffic a generic form.
@@ -32,6 +36,14 @@ vi.mock("@/lib/fingerprint", () => ({
   deviceFingerprint: vi.fn().mockResolvedValue("aabbccddeeff0011"),
 }));
 
+// Analytics: only `trackEvent` is intercepted, so the funnel assertions below
+// see real calls without the rest of lib/gtag being stubbed out.
+const trackEventMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/gtag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/gtag")>();
+  return { ...actual, trackEvent: trackEventMock };
+});
+
 // Override the global next/navigation stub so each test can drive the
 // ?from=/?plan= search params and assert on router.push. vi.hoisted keeps
 // `nav`/`routerSpies` reachable inside the hoisted mock factory; tests
@@ -58,6 +70,7 @@ let oauthProviders = { google: true, microsoft: false, apple: false };
 beforeEach(() => {
   nav.search = new URLSearchParams();
   routerSpies.push.mockClear();
+  trackEventMock.mockClear();
   oauthProviders = { google: true, microsoft: false, apple: false };
   vi.stubGlobal(
     "fetch",
@@ -129,11 +142,62 @@ describe("SignUpPage", () => {
     );
   });
 
-  it("renders the coherent value strip (free forever + money-back, not just the trial)", () => {
+  it("renders the coherent value strip, with the card rule attached to the right thing", () => {
     render(<SignUpPage />);
+    // CHANGED with the card-required trial: the strip used to read
+    // "Free forever · No credit card · 14-day Premium trial", which now reads
+    // as a promise that the TRIAL takes no card. It does. So "no credit card"
+    // has to qualify signup, and the trial has to carry its own qualifier.
     expect(
-      screen.getByText(/Free forever.*No credit card.*14-day Premium trial.*30-day money-back/i),
+      screen.getByText(
+        /Free forever.*No credit card to sign up.*14-day Premium trial \(card required, \$0 today\).*30-day money-back/i,
+      ),
     ).toBeInTheDocument();
+  });
+
+  // ── The card rule, stated before an account exists ────────────────────────
+
+  it("contains NO card input of any kind", () => {
+    const { container } = render(<SignUpPage />);
+    const inputs = Array.from(container.querySelectorAll("input, select, textarea"));
+    const cardish = /card|cc-|cvc|cvv|expiry|exp-|postal|billing/i;
+    for (const el of inputs) {
+      expect(el.getAttribute("name") ?? "").not.toMatch(cardish);
+      expect(el.getAttribute("id") ?? "").not.toMatch(cardish);
+      expect(el.getAttribute("autocomplete") ?? "").not.toMatch(cardish);
+    }
+  });
+
+  it("never promises a card-free TRIAL (the free account is what takes no card)", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    // The exact claim that stopped being true.
+    expect(text).not.toMatch(/(?:14[- ]day|Premium) trial[^.]{0,40}no (?:credit )?card/i);
+    expect(text).not.toMatch(/no (?:credit )?card[^.]{0,25}(?:14[- ]day|Premium) trial/i);
+  });
+
+  it("states the trial's charge terms up front: card required, $0 today, first charge at day 14, one-click exit", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toMatch(/card required/i);
+    expect(text).toMatch(/\$0 is charged today/i);
+    expect(text).toMatch(/first charge is 14 days later/i);
+    expect(text).toMatch(/one click ends it before then/i);
+    // And the free fallback is named as a real, unpunished outcome.
+    expect(text).toMatch(/stay on Free/i);
+  });
+
+  it("keeps the Free-tier no-card promise literally true", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toMatch(/free forever and never needing a card/i);
+  });
+
+  it("labels the submit button as account creation, not a trial start", () => {
+    render(<SignUpPage />);
+    const submit = screen.getByRole("button", { name: /create my free account/i });
+    expect(submit).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start my free trial/i })).toBeNull();
   });
 
   it("falls back to an email-first, unbroken page when no providers are enabled", async () => {
@@ -153,8 +217,12 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
+    // CHANGED: the default destination is now the trial OFFER rather than the
+    // scanner. Signup no longer starts a trial, so if nothing presented the
+    // choice the trial would never be offered to anyone. The offer is a
+    // two-button fork, one of which is "Continue on the Free plan" → scanner.
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
   });
 
@@ -166,17 +234,22 @@ describe("SignUpPage", () => {
     expect((screen.getByLabelText(/password/i) as HTMLInputElement).required).toBe(true);
   });
 
-  it("shows the 14-day trial commitment", () => {
+  it("shows the card-transparency block", () => {
     render(<SignUpPage />);
-    // Trial is 14-day Premium; the after-trial transparency footer headlines
-    // the commitment as "After your 14 days" (signup/page.tsx).
-    expect(screen.getByText(/After your 14 days/i)).toBeInTheDocument();
+    // CHANGED: the footer used to headline "After your 14 days", which assumed
+    // a trial had already started. It now explains what this form creates
+    // (a free account) and where a card does come in.
+    expect(
+      screen.getByText(/Free account, and where a card does come in/i),
+    ).toBeInTheDocument();
   });
 
   it("uses the default headline when no ?from= source is set", () => {
     render(<SignUpPage />);
+    // CHANGED: "Try Premium free for 14 days" over an email+password form is
+    // now a mis-promise — the form creates a free account, not a trial.
     expect(
-      screen.getByRole("heading", { name: /Try Premium free for 14 days/i }),
+      screen.getByRole("heading", { name: /Create your free Tapeline account/i }),
     ).toBeInTheDocument();
   });
 
@@ -200,8 +273,20 @@ describe("SignUpPage", () => {
     nav.search = new URLSearchParams("from=bogus");
     render(<SignUpPage />);
     expect(
-      screen.getByRole("heading", { name: /Try Premium free for 14 days/i }),
+      screen.getByRole("heading", { name: /Create your free Tapeline account/i }),
     ).toBeInTheDocument();
+  });
+
+  it("keeps every source headline honest about the card (no source promises a card-free trial)", () => {
+    for (const from of ["", "finviz", "screener", "scorecard", "compare", "bogus"]) {
+      nav.search = new URLSearchParams(from ? `from=${from}` : "");
+      const { container, unmount } = render(<SignUpPage />);
+      const head = (container.querySelector("h1")?.textContent ?? "") +
+        " " + (container.querySelector("h1")?.nextElementSibling?.textContent ?? "");
+      expect(head).not.toMatch(/(?:14[- ]days? )?free[^.]{0,20}no credit card/i);
+      expect(head).not.toMatch(/Premium free/i);
+      unmount();
+    }
   });
 
   // ── Plan-intent carry-through (?plan= / ?billing= from /pricing) ──────────
@@ -230,12 +315,12 @@ describe("SignUpPage", () => {
     );
   });
 
-  it("keeps the default scanner destination when no plan intent is present", async () => {
+  it("falls back to the trial offer when no plan intent is present", async () => {
     const { container } = render(<SignUpPage />);
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
   });
 
@@ -245,8 +330,32 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
+  });
+
+  it("still honours an explicit ?next= deep link over the trial offer", async () => {
+    nav.search = new URLSearchParams("next=/app/watchlist");
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
+    expect(routerSpies.push).toHaveBeenCalledWith(
+      `/app/onboarding?next=${encodeURIComponent("/app/watchlist")}`,
+    );
+  });
+
+  it("does NOT fire start_trial — this form no longer starts a trial", async () => {
+    // CHANGED with the card-required trial. `start_trial` used to fire on the
+    // same beat as `sign_up` because signup auto-granted a trial. Leaving it
+    // here would report a trial that hasn't started, and would hand Google Ads
+    // a trial conversion for every account created. It now fires from
+    // /app/billing on the confirmed return from a trial checkout.
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() =>
+      expect(trackEventMock.mock.calls.some((c) => c[0] === "sign_up")).toBe(true),
+    );
+    expect(trackEventMock.mock.calls.some((c) => c[0] === "start_trial")).toBe(false);
   });
 
   it("carries the plan intent through the Sign in link for existing users", () => {

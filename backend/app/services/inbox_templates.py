@@ -103,18 +103,22 @@ async def render_pricing(_body: str) -> str:
         "($9.99 monthly) for the full ~2,500-ticker live scan + smart "
         "watchlist alerts. Premium is $16.58/mo annual ($19.99 monthly) "
         "for everything in Pro + congressional trades + insider Form 4 "
-        "buys. Every signup gets a 14-day "
-        "Premium trial, no card. Full comparison at tapeline.io/pricing."
+        "buys. Signup is email + password and lands on the free tier — no "
+        "card. The 14-day Premium trial is opt-in and does take a card: $0 "
+        "charged today, first charge on day 14, one click to cancel before "
+        "then. Full comparison at tapeline.io/pricing."
     )
 
 
 async def render_trial(_body: str) -> str:
     """Canonical trial answer."""
     return (
-        "Yep — every signup gets 14 days of Premium free, no card required. "
-        "tapeline.io/signup. The full ~2,500-ticker universe, scorecard, "
-        "watchlist alerts, congressional/insider feeds — all included for "
-        "the trial window."
+        "There's a 14-day Premium trial — it takes a card, but nothing is "
+        "charged today. The first charge is on day 14 and one click cancels "
+        "before then. tapeline.io/signup. The full ~2,500-ticker universe, "
+        "scorecard, watchlist alerts, congressional/insider feeds — all "
+        "included for the trial window. If you'd rather not put a card down, "
+        "the free tier never asks for one."
     )
 
 

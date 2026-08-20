@@ -26,11 +26,12 @@ const PLANS = [
     cta: "Start free",
     ctaHref: "/signup",
     highlight: false,
-    // Every new account opens on a 14-day Premium trial before settling here.
-    // Stating it on the Free card means the paid-only features disappearing at
-    // day 14 reads as the trial ending, not a bait-and-switch.
+    // Free is the only tier that never asks for a card, and the card-free
+    // path has to be stated HERE — on the tier it is actually true of —
+    // now that starting the Premium trial requires one. A reader who
+    // declines the trial lands on this card and loses nothing.
     footnote:
-      "Every new account starts with 14 days of Premium, then settles on Free — no card, nothing to cancel.",
+      "Signing up asks for an email and a password — no card, and Free stays that way for as long as you want it. The 14-day Premium trial is a separate, optional step that does ask for a card.",
   },
   {
     name: "Pro",
@@ -226,20 +227,23 @@ export function PricingTable() {
         })}
       </div>
 
-      {/* ── Risk reversals ────────────────────────────────────────────────
-          Only the two that are unconditionally true and cost the user nothing
-          to verify: the trial genuinely takes no card, and cancellation is
-          genuinely one button (POST /api/billing/cancel, no survey gate). Both
-          are stated as mechanisms — what happens, and what does NOT happen —
-          because "no card required" only reassures if the reader can tell it
-          means "we cannot charge you". No urgency, no deadline, no scarcity. */}
+      {/* ── The trial, stated plainly ─────────────────────────────────────
+          The Premium trial takes a card (Stripe Checkout, subscription mode
+          with trial_end), so the honest thing is not a risk-reversal badge —
+          it is the mechanism: what Stripe takes today, what it takes on day
+          14, and the one button that stops it. Cancellation is genuinely one
+          click (POST /api/billing/cancel, no survey gate). Creating an
+          account is still email + password only; that claim now lives on the
+          Free card, where it is true. No urgency, no deadline, no scarcity. */}
       <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-panel/60 px-4 py-3">
-          <div className="text-xs font-medium text-fg">14 days of Premium, no card</div>
+          <div className="text-xs font-medium text-fg">14-day Premium trial — $0 today</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
-            Signup asks for an email and a password — no card fields. Nothing to
-            charge means nothing can auto-renew: at day 14 the account moves to
-            Free on its own unless you choose to add a card.
+            Starting the trial asks for a card. Stripe charges $0 today and shows
+            you the exact first-charge date before you confirm: day 14, at the
+            plan and billing period you picked. One click stops it before that
+            date and you are charged nothing. Skip the trial and you stay on
+            Free, which never asks for a card.
           </p>
         </div>
         <div className="rounded-lg bg-panel/60 px-4 py-3">

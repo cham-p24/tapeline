@@ -1,7 +1,7 @@
 """Stripe billing endpoints."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
@@ -45,9 +45,74 @@ _CANCEL_REASONS = frozenset(
 )
 
 
+# ── Card-required 14-day trial ──────────────────────────────────────────────
+#
+# Creating an account is email + password only and lands on FREE, which stays
+# completely card-free. STARTING the trial is a separate, deliberate act that
+# requires a card: we open the same Stripe Checkout the paid flow uses, in
+# mode=subscription with subscription_data.trial_end 14 days out. Stripe
+# charges $0 today, bills the first real amount at trial_end, and the
+# subscription is cancellable in one click from the customer portal before
+# then. That mechanism (rather than setup-mode + a cron + SetupIntent →
+# Subscription) is what keeps dunning, the portal and the whole existing
+# webhook path working for trialists.
+#
+# TRIAL_DAYS is the single source of truth: the endpoint that SHOWS the user
+# their first-charge date (GET /trial-offer) and the endpoint that SENDS the
+# date to Stripe (POST /checkout) both read it, so the disclosed date cannot
+# drift from the billed date.
+TRIAL_DAYS = 14
+
+# Why a given account may not start a trial. Machine-readable code → the plain
+# sentence we're willing to show. One trial per account, and never as a
+# substitute for a purchase someone has already made.
+_TRIAL_INELIGIBLE_MESSAGES: dict[str, str] = {
+    "lifetime": "Your account already has lifetime access — there's nothing to trial.",
+    "already_trialed": "This account has already used its 14-day trial.",
+    "has_billing_account": (
+        "This account already has a billing history with us, so the trial "
+        "doesn't apply. You can subscribe directly at any time."
+    ),
+    "already_paid_tier": "You're already on a paid plan.",
+}
+
+
+def _trial_ineligible_reason(user: User) -> str | None:
+    """None when `user` may start the card-required trial; else a key of
+    _TRIAL_INELIGIBLE_MESSAGES.
+
+    One trial per account, forever. The two trial columns answer different
+    questions and BOTH are checked:
+      • trial_started_at — stamped by the subscription webhook the first time a
+        trial actually begins. Null for accounts that never trialled.
+      • trial_ends_at    — also set by every LEGACY no-card auto-trial from
+        before this change. Those rows have a null trial_started_at, so without
+        this second check every pre-existing user would be handed a fresh
+        14-day trial on top of the one they already had.
+
+    A user who has ever had a Stripe customer record has been through billing
+    (subscriber or churned) and buys directly rather than re-trialling; the
+    win-back path deliberately still lets them check out normally, just without
+    a free window.
+    """
+    if user.is_lifetime:
+        return "lifetime"
+    if user.trial_started_at is not None or user.trial_ends_at is not None:
+        return "already_trialed"
+    if user.stripe_customer_id is not None:
+        return "has_billing_account"
+    if user.tier in ("pro", "premium"):
+        return "already_paid_tier"
+    return None
+
+
 class CheckoutRequest(BaseModel):
     tier: str = "pro"                     # "pro" or "premium"
     billing_period: str = "monthly"        # "monthly" or "annual"
+    # Opt-in: open this checkout as a 14-day trial instead of an immediate
+    # purchase. Defaults False so every pre-existing caller (paid upgrade,
+    # mid-trial card-add, win-back re-subscribe) behaves exactly as before.
+    start_trial: bool = False
 
 
 @router.post("/checkout", dependencies=[Depends(limit_strict)])
@@ -74,6 +139,37 @@ async def create_checkout(
             409,
             "You already have an active subscription — contact support to switch plans.",
         )
+
+    # Which trial_end (if any) this session carries. Exactly one of the two
+    # branches can apply, and both end up as subscription_data.trial_end on the
+    # SAME Stripe mechanism:
+    #
+    #   start_trial=True  → a NEW 14-day trial. Gated on never-trialled; a
+    #     second attempt is refused here rather than quietly minting a second
+    #     free window. The instant is computed once and returned to the caller
+    #     so the confirmation UI states the same date Stripe was given.
+    #
+    #   start_trial=False → the pre-existing mid-trial card-add: forward the
+    #     user's REMAINING trial so adding a card doesn't charge today and
+    #     silently forfeit the free days already promised. Unchanged.
+    trial_end: datetime | None
+    if body.start_trial:
+        reason = _trial_ineligible_reason(user)
+        if reason is not None:
+            raise HTTPException(409, _TRIAL_INELIGIBLE_MESSAGES[reason])
+        trial_end = datetime.now(UTC) + timedelta(days=TRIAL_DAYS)
+    else:
+        trial_end = (
+            user.trial_ends_at
+            if is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
+            else None
+        )
+        # SQLite (dev/tests) hands back naive datetimes for tz-aware columns;
+        # stored values are UTC. Normalise so the instant we echo to the caller
+        # is unambiguous. Same idiom as services/tier.is_on_trial.
+        if trial_end is not None and trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=UTC)
+
     url = await create_checkout_session(
         user_id=user.id,
         user_email=user.email,
@@ -107,14 +203,13 @@ async def create_checkout(
         # in services/billing.trial_save_offer_eligible; redeemed-at is set by
         # the subscription webhook so an abandoned checkout doesn't burn it.
         trial_save_offer=trial_save_offer_eligible(user),
-        # Mid-trial card-add: forward the user's remaining trial so Stripe
-        # starts billing when the trial was always going to end, instead of
-        # charging today and silently forfeiting the free days the "Keep
-        # Premium — add a card" emails promised. The service drops it when
-        # under Stripe's 48h trial_end minimum.
-        trial_end=user.trial_ends_at
-        if is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
-        else None,
+        # Either a brand-new 14-day trial or the remainder of an in-flight one
+        # — see the branch above. Forwarded as subscription_data.trial_end, so
+        # Stripe collects the card, charges nothing today, and bills the first
+        # real amount on that date. The service drops it when under Stripe's
+        # 48h trial_end minimum (only reachable on the mid-trial card-add
+        # branch; a fresh trial is always 14 days out).
+        trial_end=trial_end,
     )
     # Mark the checkout as in-flight for abandonment recovery. If the user
     # never completes, the hourly worker (run_checkout_abandonment_recovery)
@@ -130,7 +225,15 @@ async def create_checkout(
         t for t in (user.drip_state or "").split(",") if t and t != "abandon1"
     )
     await session.commit()
-    return {"url": url}
+    # `trial_end` is echoed back so the caller can restate the first-charge
+    # date it is about to send the user to Stripe for, from the exact instant
+    # Stripe was given rather than a second local "now + 14 days". Null for a
+    # plain purchase. Nothing else about the response shape changed.
+    return {
+        "url": url,
+        "trial_end": trial_end.isoformat() if trial_end else None,
+        "trial_days": TRIAL_DAYS if body.start_trial else None,
+    }
 
 
 @router.get("/email-checkout", dependencies=[Depends(limit_strict)])
@@ -327,6 +430,62 @@ async def charge_disclosure() -> dict:
     pricing, and the pre-signup /pricing cards need it too.
     """
     return await get_charge_disclosure()
+
+
+@router.get("/trial-offer")
+async def trial_offer(
+    user: User = Depends(current_user_required),
+) -> dict:
+    """The facts the trial-start screen has to state BEFORE the card is asked for.
+
+    Every field here is a statement about what Stripe will actually do, derived
+    from the same TRIAL_DAYS constant POST /checkout sends, so the date on the
+    screen is the date on the subscription. The point of the endpoint is that
+    the disclosure cannot be assembled client-side from a second local clock
+    and quietly disagree with the charge.
+
+      eligible / ineligible_reason / message
+          Whether this account can start a trial, and — when it can't — the
+          plain sentence explaining why. Declining is a normal outcome: the
+          free tier is unchanged and needs no card.
+      trial_days / first_charge_at
+          14, and the exact UTC instant of the FIRST charge if the trial were
+          started now. Nothing is charged before it.
+      amount_charged_today
+          0. Stated as a number so the UI can't drift from it.
+      cancel_in_one_click
+          True — the subscription is cancellable from the billing page / Stripe
+          portal at any point before first_charge_at.
+      current_trial_ends_at
+          Set once a trial is actually running, read from the subscription's
+          own trial_end (written by the webhook). This is the authoritative
+          date for in-app "your first charge is on ..." copy.
+
+    No countdowns, no scarcity, nothing time-pressured: a factual date only.
+    """
+    reason = _trial_ineligible_reason(user)
+    ends = user.trial_ends_at
+    if ends is not None and ends.tzinfo is None:
+        ends = ends.replace(tzinfo=UTC)
+    return {
+        "eligible": reason is None,
+        "ineligible_reason": reason,
+        "message": _TRIAL_INELIGIBLE_MESSAGES.get(reason) if reason else None,
+        "trial_days": TRIAL_DAYS,
+        "first_charge_at": (
+            datetime.now(UTC) + timedelta(days=TRIAL_DAYS)
+        ).isoformat() if reason is None else None,
+        "amount_charged_today": 0,
+        "cancel_in_one_click": True,
+        "card_required": True,
+        # The FREE tier is not behind any of this — restated here so a client
+        # rendering the trial card can say so from server-supplied state.
+        "free_tier_requires_card": False,
+        "current_trial_ends_at": ends.isoformat() if ends else None,
+        "trial_started_at": (
+            user.trial_started_at.isoformat() if user.trial_started_at else None
+        ),
+    }
 
 
 @router.post("/save-offer", dependencies=[Depends(limit_strict)])

@@ -26,7 +26,7 @@ export const revalidate = 21600;
 export const metadata = pageMeta({
   title: `Tapeline Pricing: Pro from ${usd(PRICING.pro.annualPerMonth)}/mo · Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (billed annually) · 14-Day Free Trial`,
   description:
-    `Tapeline pricing: Free forever (live scores, ${FREE_LIMITS.dailyLookups} look-ups/day, top-${FREE_LIMITS.scannerRows} scanner), Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial, no card.`,
+    `Tapeline pricing: Free forever (live scores, ${FREE_LIMITS.dailyLookups} look-ups/day, top-${FREE_LIMITS.scannerRows} scanner), Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial: card required, $0 charged today, cancel in one click before it ends.`,
   path: "/pricing",
 });
 
@@ -36,8 +36,12 @@ export const metadata = pageMeta({
 // in lib/pricing.ts (which mirror backend tier.py and /legal/refund).
 const FAQ_ITEMS = [
   {
+    q: "Do I need a card to use Tapeline?",
+    a: `Not for Free. Creating an account asks for an email and a password only, and the Free tier — live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} — never asks for one. Starting the 14-day Premium trial does require a card, because the trial rolls into a paid subscription unless you cancel first.`,
+  },
+  {
     q: "What happens when my trial ends?",
-    a: `Your account moves to Free forever — live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner,${freeHasWatchlist() ? ` a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} the top-${FREE_LIMITS.squeezePreviewRows} squeeze preview, and ${FREE_LIMITS.webPushAlerts} browser push alerts. ${freeHasWatchlist() ? "Watchlists and settings stay intact." : "Your settings stay intact, and anything you saved to a watchlist is kept — upgrade to Pro any time to use it again."} Add a card any time to keep Premium.`,
+    a: `On day 14 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to Free forever (live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner,${freeHasWatchlist() ? ` a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} the top-${FREE_LIMITS.squeezePreviewRows} squeeze preview, and ${FREE_LIMITS.webPushAlerts} browser push alerts). ${freeHasWatchlist() ? "Watchlists and settings stay intact." : "Your settings stay intact, and anything you saved to a watchlist is kept."}`,
   },
   {
     q: "Can I switch plans later?",
@@ -84,9 +88,10 @@ export default function PricingPage() {
             </span>
           </h1>
           <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
-            Every signup starts with a 14-day Premium trial &mdash; no credit
-            card, cancel in one click. Subscribers keep their price for as
-            long as the subscription stays active.
+            Free is free forever and never asks for a card. The 14-day Premium
+            trial does ask for one &mdash; $0 is charged today, the first charge
+            is on day 14, and one click cancels before then. Subscribers keep
+            their price for as long as the subscription stays active.
           </p>
         </div>
 
@@ -168,10 +173,10 @@ export default function PricingPage() {
 
           <div className="mt-10 text-center">
             <Link href="/signup" className="btn-accent inline-flex h-11 px-6 text-base">
-              Try Premium free for 14 days &rarr;
+              Start the 14-day Premium trial &rarr;
             </Link>
             <p className="mt-3 text-xs text-subtle">
-              No credit card required ·{" "}
+              Card required · $0 today · cancel in one click ·{" "}
               <Link href="/support" className="hover:text-muted underline-offset-2 hover:underline">
                 more questions
               </Link>
