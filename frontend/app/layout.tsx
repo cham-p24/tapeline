@@ -54,6 +54,16 @@ const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
 // exists (clarity.microsoft.com) to switch it on. The highest-ROI tool for the
 // documented day-1 bounce — watch real sessions to see WHY visitors leave.
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || "";
+// Meta pixel. Deliberately NO default — unset means no Meta JS is fetched at
+// all, which is the correct state until an ad account actually exists. The
+// conversion events that matter (StartTrial, Purchase) are sent server-side
+// by backend/app/services/meta_capi.py; this base code exists for PageView
+// and for the _fbp/_fbc cookies that raise CAPI match quality.
+// NOTE: NEXT_PUBLIC_* is inlined at BUILD time — setting a Fly *secret* of
+// this name does nothing. The value comes from frontend/fly.toml [build.args]
+// via the Dockerfile ARG. See the "build-arg hole" suite in
+// frontend/__tests__/FunnelInstrumentation.test.tsx.
+const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
 
 // Google Ads conversion tag (AW-XXXXXXXXXX). DISTINCT from GA4: this is what
 // makes ad clicks -> signups countable as conversions in the Google Ads
@@ -243,6 +253,33 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               }}
             />
           </>
+        )}
+        {/* Meta pixel base code. Renders only when NEXT_PUBLIC_META_PIXEL_ID is
+            set, so no Meta request is made until an ad account exists.
+            afterInteractive so it never blocks first paint — AEO is the one
+            channel that works and it depends on fast server-rendered HTML.
+            PageView only: StartTrial and Purchase are sent server-side by
+            services/meta_capi, which survives ad-blockers and the off-session
+            first charge 14 days after the click. */}
+        {META_PIXEL_ID && (
+          <Script
+            id="meta-pixel"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                !function(f,b,e,v,n,t,s)
+                {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+                if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+                n.queue=[];t=b.createElement(e);t.async=!0;
+                t.src=v;s=b.getElementsByTagName(e)[0];
+                s.parentNode.insertBefore(t,s)}(window,document,'script',
+                'https://connect.facebook.net/en_US/fbevents.js');
+                fbq('init', '${META_PIXEL_ID}');
+                fbq('track', 'PageView');
+              `,
+            }}
+          />
         )}
         {/* Microsoft Clarity — session replay + heatmaps for the day-1 bounce.
             Loads only when NEXT_PUBLIC_CLARITY_PROJECT_ID is set (env-gated, no
