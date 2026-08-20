@@ -83,7 +83,15 @@ describe("TrialEarlyCapture — card gate", () => {
     render(<TrialEarlyCapture />);
     const sheet = await screen.findByTestId("trial-early-capture");
     expect(sheet.textContent).toMatch(/7 days left/i);
-    expect(screen.getByRole("link", { name: /add a card/i })).toBeInTheDocument();
+    // The sheet mounts as soon as the trial-window check passes, which can be
+    // BEFORE the stubbed /api/me resolves cardOnFile to false. Until it does,
+    // cardOnFile is null and the component correctly renders its unknown-card
+    // variant ("Open billing", no no-charge claim). So awaiting the sheet is
+    // not enough — await the resolved variant itself, or this races the stub.
+    // Asserting synchronously here failed in CI on 2026-08-20 (run 32411097915).
+    expect(await screen.findByRole("link", { name: /add a card/i })).toBeInTheDocument();
+    // Only assert the no-charge copy AFTER the card state has resolved: it is
+    // rendered by the same knownCardless branch as the link above.
     expect(sheet.textContent).toMatch(/nothing to cancel/i);
   });
 
