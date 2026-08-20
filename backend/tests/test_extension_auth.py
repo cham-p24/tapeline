@@ -89,13 +89,6 @@ def test_round_trip_carries_user_and_epoch():
 def test_tampered_signature_is_rejected():
     token = make_token("u_123", 7)
     assert token is not None
-    # Tamper the DECODED payload, not the base64 tail. Flipping the last
-    # base64 character only changes trailing bits that decode() discards when
-    # the body length is not a multiple of 4 — the decoded payload comes back
-    # byte-identical, the HMAC verifies correctly, and the test failed while the
-    # signing code was perfectly sound. (It passed or failed depending on the
-    # signing secret, which is what made it look flaky.) Flip a byte inside the
-    # signature itself so the tampering is real on every run.
     import base64 as _b64
 
     body = token[len("tlx_"):]
@@ -106,6 +99,54 @@ def test_tampered_signature_is_rejected():
         f"{user_id}|{epoch_s}|{issued}|{forged_sig}".encode()
     ).decode().rstrip("=")
     assert parse_token(forged) is None
+
+
+def test_non_canonical_base64_is_rejected():
+    """A token string that is not the encoding we minted must not validate.
+
+    Base64 is malleable at the tail: when the payload length is not a multiple
+    of 3, the last character carries bits the decoder throws away, so several
+    distinct strings decode to identical bytes. The HMAC covers the DECODED
+    payload, so without a canonicality check every one of those strings
+    verifies — one session, many valid token strings, which breaks anything
+    keyed on the token string (revocation list, dedupe key, rate-limit bucket).
+
+    This walks every alternative final character rather than assuming one
+    exists: whether the tail has spare bits depends on the payload length, and
+    the payload embeds today's date, so a hard-coded mutation would pass or
+    fail depending on the day the suite runs. That date-dependence is exactly
+    what made the sibling test above look flaky.
+    """
+    import base64 as _b64
+    import string
+
+    alphabet = string.ascii_uppercase + string.ascii_lowercase + string.digits + "-_"
+
+    # Cover all three length-mod-3 cases so at least one has a malleable tail
+    # regardless of what today's date does to the payload length.
+    checked_variants = 0
+    for user_id in ("u_1", "u_12", "u_123"):
+        token = make_token(user_id, 7)
+        assert token is not None
+        assert parse_token(token) is not None, "canonical token must still work"
+
+        body = token[len("tlx_"):]
+        canonical = _b64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
+        for ch in alphabet:
+            if ch == body[-1]:
+                continue
+            variant = body[:-1] + ch
+            try:
+                decoded = _b64.urlsafe_b64decode(variant + "=" * (-len(variant) % 4))
+            except Exception:
+                continue
+            if decoded != canonical:
+                continue  # a real payload change — the HMAC already catches it
+            # Same bytes, different string: only the canonicality check rejects it.
+            checked_variants += 1
+            assert parse_token("tlx_" + variant) is None
+
+    assert checked_variants > 0, "no malleable tail found — test proved nothing"
 
 
 def test_junk_and_missing_tokens_are_rejected():
