@@ -137,20 +137,19 @@ async def test_bumping_session_epoch_revokes_the_token(client):
     """
     uid, epoch = await _make_user(epoch=1)
     token = make_token(uid, epoch)
+    headers = {"Authorization": f"Bearer {token}"}
 
+    # One client context for both calls: httpx refuses to reopen a closed
+    # instance, so the before/after assertions have to share the block.
     async with client as c:
-        assert (
-            await c.get("/api/extension/me", headers={"Authorization": f"Bearer {token}"})
-        ).status_code == 200
+        assert (await c.get("/api/extension/me", headers=headers)).status_code == 200
 
-    async with session_scope() as s:
-        user = (await s.execute(select(User).where(User.id == uid))).scalar_one()
-        user.session_epoch = 2          # "sign out of all devices"
-        await s.commit()
+        async with session_scope() as s:
+            user = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+            user.session_epoch = 2      # "sign out of all devices"
+            await s.commit()
 
-    async with client as c:
-        r = await c.get("/api/extension/me", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 401
+        assert (await c.get("/api/extension/me", headers=headers)).status_code == 401
 
 
 @pytest.mark.asyncio
