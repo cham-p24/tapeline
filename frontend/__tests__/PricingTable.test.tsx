@@ -77,13 +77,15 @@ describe("PricingTable", () => {
     expect(screen.getByText(/sales@tapeline\.io/i)).toBeInTheDocument();
   });
 
-  it("advertises the no-card trial as a mechanism, not just a label", () => {
-    // The two genuinely-true risk reversals are stated as mechanisms — WHY
-    // the reader is safe, not merely that they are. "No card" only reassures
-    // if it's clear that nothing can be auto-charged.
+  it("states the card-required trial as a mechanism, not just a label", () => {
+    // The trial takes a card, so the disclosure has to say WHAT is charged
+    // and WHEN — $0 today, first charge on day 14 — plus the fact that
+    // declining leaves you on the card-free Free tier. A vague "free trial"
+    // label here would be the exact failure this test exists to catch.
     render(<PricingTable />);
-    expect(screen.getByText(/14 days of Premium, no card/i)).toBeInTheDocument();
-    expect(screen.getByText(/nothing can auto-renew/i)).toBeInTheDocument();
+    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
+    expect(screen.getByText(/day 14, at the plan and billing period you picked/i)).toBeInTheDocument();
+    expect(screen.getByText(/never asks for a card/i)).toBeInTheDocument();
   });
 
   it("advertises one-click cancel with no survey gate", () => {

@@ -27,7 +27,7 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 - **Pro** — $9.99/mo OR $8.25/mo billed annually ($99/yr) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push.
 - **Premium** — $19.99/mo OR $16.58/mo billed annually ($199/yr) — everything in Pro plus Congressional trades, recent insider buys (SEC Form 4), unlimited Telegram + email, public API (1,000/day), priority support.
 
-14-day Premium trial on signup, no credit card required.
+Creating an account is email + password only and lands on Free — the Free tier never asks for a card. The optional 14-day Premium trial DOES require a card (Stripe Checkout): $0 is charged when it starts, the first charge is at the end of day 14 at the plan price chosen, and one click cancels before then.
 
 ## Key URLs
 

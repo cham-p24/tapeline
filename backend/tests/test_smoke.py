@@ -180,8 +180,14 @@ def _random_email() -> str:
 async def test_signup_signin_me_full_flow(client, monkeypatch):
     """The most critical revenue path — signup creates a user, returns a
     session cookie, and /api/me with that cookie reflects the authenticated
-    state including the auto-started Premium trial. If this test breaks,
-    no new user can convert.
+    state. If this test breaks, no new user can convert.
+
+    Signup is FREE and card-free: it no longer auto-grants a Premium trial.
+    The 14-day trial is a separate, opt-in, card-required step (POST
+    /api/billing/checkout {"start_trial": true}) — pinned in
+    test_card_required_trial.py. Asserted here too, because "the account we
+    just created cannot be billed for anything" is part of what this
+    critical-path test exists to guarantee.
     """
     # Bypass Turnstile in tests — local .env may have the secret set.
     # The actual Turnstile flow is exercised by the e2e signup test in
@@ -205,8 +211,13 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert r.status_code == 200, f"signup failed: {r.status_code} {r.text}"
         body = r.json()
         assert body["user"]["email"] == email
-        assert body["user"]["tier"] == "premium", "trial should auto-start at Premium"
-        assert body["user"]["trial_ends_at"] is not None
+        assert body["user"]["tier"] == "free", (
+            "signup must land on FREE — the Premium trial is card-required "
+            "and opt-in, never granted by account creation"
+        )
+        assert body["user"]["trial_ends_at"] is None, (
+            "no trial, therefore no first-charge date, at signup"
+        )
         assert body["user"]["referral_code"] is not None
         # Session cookie set
         assert "tapeline_session" in r.cookies or any(
@@ -220,7 +231,8 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert r2.status_code == 200
         me = r2.json()
         assert me["authenticated"] is True
-        assert me["tier"] == "premium"
+        assert me["tier"] == "free"
+        assert me["on_trial"] is False
 
         # 3. Signin with the same creds returns a fresh cookie + user dict
         r3 = await client.post(

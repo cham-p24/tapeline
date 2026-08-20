@@ -7,7 +7,7 @@ import secrets
 import string
 import time
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from fastapi import (
     APIRouter,
@@ -298,8 +298,21 @@ async def signup(
         referrer = ref_q.scalar_one_or_none()
     referred_by_id = referrer.id if referrer else None
 
-    # Every new user starts a 14-day Pro trial automatically
-    trial_ends = datetime.now(UTC) + timedelta(days=14)
+    # NO trial is granted here. Creating an account is email + password only,
+    # and it lands on FREE — which stays completely card-free and is never
+    # gated behind a card (the /free-stock-scanner-no-credit-card promise is
+    # about THIS tier and remains literally true).
+    #
+    # The 14-day Premium trial is now card-required: the user starts it
+    # deliberately from POST /api/billing/checkout {"start_trial": true}, which
+    # opens a Stripe Checkout that charges $0 today and states the exact
+    # first-charge date. tier/trial_ends_at/trial_started_at are then written by
+    # the `trialing` subscription webhook (routers/webhooks.py) from the
+    # SUBSCRIPTION's own trial_end, so the date we show is the date Stripe will
+    # actually bill. Declining leaves the account exactly as created here.
+    #
+    # Why the old auto-grant went: every account got Premium for 14 days with
+    # no card, so no account has ever produced a payment signal.
 
     # Generate a unique referral code for the new user
     ref_code = _generate_referral_code()
@@ -313,11 +326,12 @@ async def signup(
         id=f"u_{uuid.uuid4().hex}",
         email=email,
         name=(body.name or "").strip() or None,
-        # Trial gives PREMIUM (the best tier) so loss aversion bites at expiry.
-        # On day 14 the trial-downgrade task drops un-paid users straight to FREE.
-        tier="premium",
+        # FREE, card-free, and no trial. See the block above: the Premium trial
+        # is opt-in and card-required now, and is stamped by the subscription
+        # webhook — never here.
+        tier="free",
         password_hash=pw,
-        trial_ends_at=trial_ends,
+        trial_ends_at=None,
         referral_code=ref_code,
         referred_by=referred_by_id,
         referral_credit_months=1 if referrer else 0,
@@ -412,8 +426,10 @@ async def signup(
     # Day-0 email. Fire-and-forget — failures don't block signup.
     # send_email is a no-op if RESEND_API_KEY isn't set, so this is safe in dev.
     # Referred users get a credit-acknowledgement email instead of the standard
-    # welcome — both carry the same trial-is-live framing, but the referral
-    # version surfaces the earned bonus front-and-centre.
+    # welcome — both carry the same "account is ready" framing, but the referral
+    # version surfaces the earned bonus front-and-centre. (The credit is real
+    # and unchanged by the card-required-trial move: it is minted as a Stripe
+    # coupon at the user's next checkout, trial or paid.)
     # The referrer's "+1 month credited" note is NOT sent here: their credit
     # doesn't exist yet. It goes out from _consume_verification at the moment
     # the balance actually moves, so the email can't claim a credit that was
@@ -453,9 +469,14 @@ async def signup(
                 {"symbol": r[0], "score": r[1], "signal": r[2], "reason": r[3]}
                 for r in top_result.all()
             ]
+            # Subject states what actually happened. Signup no longer starts a
+            # trial, so the old "your trial is live" line would be false for
+            # every native signup from here on. Kept in step with the body
+            # (services/email.render_welcome_email, "Your Tapeline account is
+            # live") — subject and body must not tell different stories.
             await send_email(
                 user.email,
-                "Welcome to Tapeline — your trial is live",
+                "Welcome to Tapeline — your account is live",
                 render_welcome_email(user.name or "trader", picks=picks),
             )
         except Exception:

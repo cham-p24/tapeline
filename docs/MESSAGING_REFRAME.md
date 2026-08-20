@@ -54,7 +54,7 @@ Replace the recommendation-flavored "picks" with score-flavored language everywh
 > # A scanner that shows its work.
 > Scan **~2,500 US tickers in under 60 seconds** on one transparent 0–100 score — six factors, published weights, no black box. Then check the receipts: **every score we publish is back-checked against SPY and stays on the record — the misses too.**
 
-CTAs stay: **"Try Premium free for 14 days →"** / **"See the record"**. Subline stays ("no credit card · cancel in one click").
+CTAs stay: **"Start the 14-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click") — the free tier is where "no card" still belongs.
 
 *Why:* leads with the concrete time-saving (the benefit a burned audience actually buys), keeps the transparency wedge, drops "every call" (prescriptive) for "every score we publish" (descriptive), and pre-frames the negative record as honesty ("the misses too") instead of letting a visitor discover it as a gotcha.
 
@@ -80,7 +80,7 @@ This is your strongest single line and it's nowhere on the site. It does double 
 
 **Current:** "One score. One sentence. One public record." / "See your watchlist scored the same way..."
 **Add one line under the subhead:**
-> No hype, no hidden track record, no "trust me." Just the formula and the receipts — free for 14 days, no card.
+> No hype, no hidden track record, no "trust me." Just the formula and the receipts — free tier with no card, or 14 days of Premium for $0 today.
 
 ### B5. Scorecard page (`/scorecard`) — frame the number honestly *before* the visitor reads it
 Add a one-line framing at the top of the scorecard:

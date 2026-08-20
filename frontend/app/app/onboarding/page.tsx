@@ -23,10 +23,16 @@
  *      cap so the user's own first add — the activation action — never 403s.
  *      So killing the survey does NOT produce a blanker first screen: the
  *      pre-population survives, it just stops being conditional on an answer.
- *   2. The OAuth `sign_up` / `start_trial` conversion pair, which fires
- *      nowhere else (OAuth signups never touch the /signup form).
- *   3. Forwarding to `next` — /app/billing with the plan intent restated when
- *      the visitor arrived from a /pricing plan CTA, otherwise the scanner.
+ *   2. The OAuth `sign_up` conversion, which fires nowhere else (OAuth
+ *      signups never touch the /signup form). It used to fire PAIRED with
+ *      `start_trial`, because account creation auto-granted a 14-day Premium
+ *      trial. It no longer does: since 2026-08 the trial is a separate,
+ *      card-required opt-in through Stripe Checkout, so `start_trial` moved to
+ *      the moment the user actually starts one (app/app/billing/page.tsx).
+ *      Firing it here would count a trial that does not exist.
+ *   3. Forwarding to `next` — /app/billing with the intent restated when the
+ *      visitor arrived from a /pricing plan CTA or from signup (where `next`
+ *      carries the trial offer), otherwise the scanner.
  *
  * Consent is never touched here: `marketing_opt_in: null` means "no answer"
  * and the backend leaves the stored value alone, so consent granted on the
@@ -42,8 +48,10 @@ import { safeNext } from "@/lib/safeNext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-// Dedupe key: the OAuth signup/trial conversion pair must fire at most once
-// per browser. New Google users land here at /app/onboarding?oauth=1.
+// Dedupe key: the OAuth signup conversion must fire at most once per browser.
+// New Google users land here at /app/onboarding?oauth=1. The key name is kept
+// as-is on purpose — renaming it would re-fire `sign_up` for every browser
+// that already converted under the old (signup + start_trial) pair.
 const OAUTH_CONVERSION_FIRED_KEY = "tapeline_oauth_conversion_fired";
 
 export default function OnboardingPage() {
@@ -66,9 +74,9 @@ function OnboardingHandoff() {
 
   // OAuth signup conversion. The backend redirects NEW Google/OAuth users to
   // /app/onboarding?oauth=1, but OAuth signups never touch the /signup form
-  // where `sign_up` / `start_trial` fire — so without this they're invisible
-  // to GA4/Ads. Fire both once, deduped per browser (localStorage) with a ref
-  // guard for React strict-mode double-mount.
+  // where `sign_up` fires — so without this they're invisible to GA4/Ads.
+  // Fire it once, deduped per browser (localStorage) with a ref guard for
+  // React strict-mode double-mount.
   //
   // The localStorage flag is now written by trackEventOnce AFTER a confirmed
   // dispatch, never before. The old order set the flag first and then called
@@ -83,13 +91,11 @@ function OnboardingHandoff() {
     if (qp.get("oauth") == null) return;
     if (oauthFiredRef.current) return;
     oauthFiredRef.current = true;
-    // OAuth account creation === same conversion bucket as an email signup;
-    // the 14-day trial auto-starts, so start_trial fires alongside it (mirrors
-    // the email /signup flow). Both share one dedupe key: they are two halves
-    // of the same moment, so they must never fire independently of each other.
-    if (trackEventOnce(OAUTH_CONVERSION_FIRED_KEY, "sign_up", { method: "oauth" })) {
-      trackEvent("start_trial", { method: "oauth" });
-    }
+    // OAuth account creation === same conversion bucket as an email signup.
+    // Creating the account no longer starts a trial (the trial is a separate,
+    // card-required opt-in), so this is a single event now — `start_trial`
+    // fires from the billing page when a trial is actually started.
+    trackEventOnce(OAUTH_CONVERSION_FIRED_KEY, "sign_up", { method: "oauth" });
   }, [qp]);
 
   // Provision the account, then forward. Runs once per mount (ref guard for

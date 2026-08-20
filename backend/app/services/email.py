@@ -314,6 +314,20 @@ def render_watchlist_alert_email(
 
 # ── Welcome / day-0 ─────────────────────────────────────────────────────────
 
+# The one paragraph that has to draw the line between the two things people
+# confuse. Creating an account is email + password and lands on Free, which
+# never asks for a card. Starting the 14-day Premium trial is a separate,
+# opt-in step that DOES take a card through Stripe Checkout — $0 is captured
+# on the day, the first real charge is at the end of day 14, and one click
+# stops it. Stated in full here because the welcome mail is the first place a
+# reader forms a belief about whether we can charge them.
+_FREE_VS_TRIAL_FOOTNOTE = (
+    "The Free plan needs no card and there is nothing to cancel. The 14-day "
+    "Premium trial does ask for a card: $0 is charged when you start it, the "
+    "first charge is at the end of day 14, and one click cancels before then."
+)
+
+
 def render_welcome_email(
     user_name: str, picks: list[dict[str, Any]] | None = None,
 ) -> str:
@@ -338,8 +352,8 @@ def render_welcome_email(
         body = (
             h1(f"Welcome, {user_name}.")
             + lead(
-                "Your <strong>14-day Premium trial</strong> is live — everything's "
-                "unlocked. Three live scores from the scanner right now:"
+                "Your <strong>Tapeline account</strong> is live. Three live "
+                "scores from the scanner right now:"
             )
             + picks_html
             + button(
@@ -351,13 +365,13 @@ def render_welcome_email(
                 'is public — see <a href="https://tapeline.io/how-it-works" '
                 f'style="color:{ACCENT};">how it works</a>.'
             )
-            + footnote("No card on file. We'll remind you before the trial ends.")
+            + footnote(_FREE_VS_TRIAL_FOOTNOTE)
         )
     else:
         body = (
             h1(f"Welcome, {user_name}.")
             + lead(
-                "Your <strong>14-day Premium trial</strong> is live. Everything's unlocked."
+                "Your <strong>Tapeline account</strong> is live."
             )
             + muted_paragraph("Three things to try in the first five minutes:")
             + card(
@@ -373,13 +387,13 @@ def render_welcome_email(
                 "Open the scanner",
                 "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=welcome&utm_medium=transactional",
             )
-            + footnote("No card on file. We'll remind you before the trial ends.")
+            + footnote(_FREE_VS_TRIAL_FOOTNOTE)
         )
     return shell(
         body,
         preheader=(
-            "Your 14-day Premium trial is live — three live scores inside."
-            if picks else "Your 14-day Premium trial is live — open the scanner."
+            "Your Tapeline account is live — three live scores inside."
+            if picks else "Your Tapeline account is live — open the scanner."
         ),
     )
 
@@ -2115,8 +2129,9 @@ def render_activation_alert_email(user_name: str) -> str:
 #
 # Rule 6 also binds here: no countdowns, no scarcity, no deadline framing. A
 # factual mention of the user's OWN real trial end date is permitted, styled
-# calmly, and must never be described as a billing event — the trial takes no
-# card, so nothing is charged when it ends.
+# calmly. It IS now a billing event — the Premium trial takes a card and the
+# first charge lands at expiry — so the note states that plainly. Rule 6 bans
+# manufactured urgency, not the disclosure a card-required trial owes.
 #
 # Enforced mechanically by scripts/lint-copy-compliance.mjs (rules
 # `personalised-performance` and `urgency-scarcity`) and by
@@ -2126,9 +2141,9 @@ def _calm_trial_note(trial_ends_at: datetime | None) -> str:
     """A factual, non-urgent note about the user's own trial end date.
 
     Rule 6 permits exactly this one time statement. Rendered as a muted
-    footnote — no colour, no countdown, no ticking clock — and deliberately
-    worded so it cannot read as a billing event: the trial takes no card, so
-    nothing is charged and nothing lapses into a payment.
+    footnote — no colour, no countdown, no ticking clock. Because the trial
+    now runs on a card, the note names the first-charge date and the one-click
+    way out: a reader must never learn about a charge from their statement.
 
     Returns "" when the user has no trial, which is the common case for the
     6h nudge (free signups) and keeps the template branch-free.
@@ -2137,9 +2152,9 @@ def _calm_trial_note(trial_ends_at: datetime | None) -> str:
         return ""
     return footnote(
         "For reference, your Premium trial runs to "
-        f"{trial_ends_at.strftime('%d %b %Y')}. There's no card on file, so "
-        "nothing is charged either way — the account simply stays on Free "
-        "afterwards."
+        f"{trial_ends_at.strftime('%d %b %Y')}, which is also the date of the "
+        "first charge on the card you added. Cancel in one click before then "
+        "and nothing is charged — the account simply stays on Free."
     )
 
 
@@ -2426,6 +2441,69 @@ def render_annual_renewal_reminder_email(
         )
         + footnote("Questions about your bill? Reply to this email — billing@tapeline.io reads every one."),
         preheader=preheader_copy,
+    )
+
+
+def render_trial_precharge_reminder_email(
+    user_name: str,
+    *,
+    tier: str,
+    amount_label: str,
+    charge_date_label: str,
+) -> str:
+    """T-3 pre-charge notice for a CARD-REQUIRED trial.
+
+    This email is not optional and it is not marketing. A trial that collects a
+    card up front and then charges it without warning is the exact pattern that
+    generates chargebacks and the billing-dispute complaints that dominate this
+    category's reviews — and it would be indefensible for a product whose whole
+    claim is that it does not misstate things. So: state the date, state the
+    amount, and make stopping it one click.
+
+    Deliberately NOT part of `run_daily_drip`. That drip is filtered to
+    `stripe_customer_id IS NULL` and its day-11/13 CTAs are signed Stripe
+    *Checkout* links — pointed at someone who already has a subscription they
+    would open a second one. This is fired from the Stripe
+    `customer.subscription.trial_will_end` webhook instead, so the date quoted
+    is Stripe's own trial_end and cannot drift from what will actually be
+    charged. The CTA goes to billing (portal/cancel), never to checkout.
+
+    No urgency language, no scarcity, no retention pitch. If someone wants to
+    stop, the job of this email is to help them stop.
+    """
+    tier_label = tier.capitalize()
+    return shell(
+        h1("Your trial ends in 3 days.")
+        + lead(
+            f"{user_name}, a heads-up before anything is charged: your "
+            f"<strong>{tier_label}</strong> trial ends on "
+            f"<strong>{charge_date_label}</strong>."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;'
+            f'letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">What happens next</div>'
+            f'<div class="tl-fg" style="margin-top:8px;color:{LIGHT_FG};font-size:14px;'
+            f'line-height:1.7;font-family:{FONT_SANS};">'
+            f"On {charge_date_label} the card you added is charged "
+            f"<strong>{amount_label}</strong> and {tier_label} continues.<br>"
+            f"Cancel before then and you are charged <strong>nothing at all</strong>."
+            f"</div>",
+            accent=True,
+        )
+        + button("Manage or cancel", "https://tapeline.io/app/billing")
+        + muted_paragraph(
+            "Cancelling takes one click on that page — no email, no phone call, "
+            "no retention questions. If you keep it, there is nothing to do."
+        )
+        + footnote(
+            "You are getting this because you started a trial with a card on "
+            "file. It is a billing notice, so it is sent whether or not you "
+            "receive our other email."
+        ),
+        preheader=(
+            f"Your trial ends {charge_date_label} — {amount_label} then, "
+            f"or cancel in one click and pay nothing."
+        ),
     )
 
 

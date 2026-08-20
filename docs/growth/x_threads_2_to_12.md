@@ -203,7 +203,7 @@ That's the entire upgrade decision.
 
 **Tweet 4** (~270 chars):
 ```
-The 14-day Premium trial gives the full live universe + Congressional trades + insider Form 4 + Telegram unlimited. No card required.
+The 14-day Premium trial gives the full live universe + Congressional trades + insider Form 4 + Telegram unlimited. It takes a card, charges $0 today, and cancels in one click.
 
 I'd rather you understand what Tapeline does, decide it doesn't fit, and not pay than have you upgrade because the free tier was deliberately broken.
 ```

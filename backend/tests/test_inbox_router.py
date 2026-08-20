@@ -175,10 +175,19 @@ async def test_pricing_template_returns_string():
 
 
 @pytest.mark.asyncio
-async def test_trial_template_mentions_no_card():
+async def test_trial_template_discloses_the_card_and_the_first_charge():
+    """The trial takes a card, so the canonical inbox answer must say so AND
+    say what happens: nothing charged today, first charge on day 14, one-click
+    cancel. A bare "free trial" reply here would be the misstatement."""
     result = await inbox_templates.render("trial", "free trial?")
     assert isinstance(result, str)
-    assert "no card" in result.lower() or "no credit" in result.lower()
+    lowered = result.lower()
+    assert "takes a card" in lowered
+    assert "nothing is charged today" in lowered
+    assert "day 14" in lowered
+    assert "one click cancels" in lowered
+    # The card-free path still has to be offered, on the tier where it is true.
+    assert "free tier never asks for one" in lowered
 
 
 @pytest.mark.asyncio

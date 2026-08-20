@@ -163,10 +163,27 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     expect(current).toBeDisabled();
   });
 
-  it("gives authenticated free users an in-page re-activation button, not a /signup link", () => {
-    render(<BillingPage />); // default ctx.user = free
-    expect(screen.getByRole("button", { name: /re-activate premium/i })).toBeInTheDocument();
+  it("gives authenticated free users an in-page plan button, not a /signup link", () => {
+    // CHANGED with the card-required trial: a brand-new free account has never
+    // held Premium, so "Re-activate Premium" was nonsense to it — and it is
+    // also exactly the account the 14-day trial is for. The label now splits
+    // on whether the trial has been used; the point of the original test (an
+    // in-page button, never a dead /signup link) is unchanged.
+    render(<BillingPage />); // default ctx.user = free, never trialled
+    expect(
+      screen.getByRole("button", { name: /see plans and the 14-day trial/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /try premium free/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign ?up/i })).not.toBeInTheDocument();
+  });
+
+  it("still says Re-activate Premium once the trial has been used", () => {
+    ctx.user = {
+      ...freeUser(),
+      trial_ends_at: new Date(Date.now() - 5 * 86_400_000).toISOString(),
+    };
+    render(<BillingPage />);
+    expect(screen.getByRole("button", { name: /re-activate premium/i })).toBeInTheDocument();
   });
 
   it("shows a success message and refreshes the session on ?checkout=success", async () => {

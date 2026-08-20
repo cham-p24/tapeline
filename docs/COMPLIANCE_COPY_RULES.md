@@ -88,8 +88,15 @@ No countdown timers, no "only N left", no "X people subscribed today", no
 deadline pricing.
 
 **One exception:** a factual statement about the user's *own real* trial expiry.
-Style it calmly — no red, no ticking seconds — and never describe it as a
-billing event (the trial takes no card).
+Style it calmly — no red, no ticking seconds, no countdown.
+
+The trial now runs on a card (Stripe Checkout, `mode=subscription` with
+`subscription_data.trial_end`), so the expiry date *is* the first-charge date.
+Rule 6 bans manufactured urgency, not the disclosure a card-required trial
+owes: the expiry note must state the first-charge date and the one-click
+cancel path. Disclose it plainly and calmly — the failure mode this rule
+guards against is theatre, and the failure mode Rule 6 must never create is a
+user learning about a charge from their bank statement.
 
 ### 7. Personalised content reports activity only
 

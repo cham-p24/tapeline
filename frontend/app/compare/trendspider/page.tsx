@@ -40,8 +40,9 @@ const WINS: CompareRow[] = [
     competitor: "Individual indicators are standard TA and transparent per chart, but there is no composite ranking methodology to audit",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Trial has historically required a card on file — check their site for current terms",
   },
 ];
@@ -92,7 +93,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Can I try both before deciding?",
-    a: "Easily. The Tapeline trial is 14 days of full Premium with no credit card required, and cancelling is one click. TrendSpider's trial has historically required a card on file — check their current terms. Running both for a week against your own watchlist is the fastest way to see which output you actually reach for.",
+    a: "Easily. Tapeline's Free tier costs nothing and never asks for a card, so you can run it beside TrendSpider indefinitely. The 14-day full-Premium trial does take a card — $0 charged today, first charge on day 14, cancel in one click before then. TrendSpider's trial has historically required a card on file too — check their current terms. Running both for a week against your own watchlist is the fastest way to see which output you actually reach for.",
   },
 ];
 

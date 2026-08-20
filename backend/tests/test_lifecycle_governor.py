@@ -713,19 +713,21 @@ def test_activation_templates_name_no_specific_securities(name, render):
         assert ticker not in html, f"{name}: names a security — {ticker}"
 
 
-def test_trial_note_is_factual_and_not_a_billing_event():
-    """Rule 6's one permitted exception. The trial takes no card, so the note
-    must not read as a charge, a renewal, or a lapse into billing."""
+def test_trial_note_discloses_the_first_charge_without_urgency():
+    """Rule 6's one permitted exception. The trial runs on a card, so the note
+    MUST disclose the first-charge date and the one-click cancel — and must
+    still carry no countdown, deadline theatre or scarcity."""
     ends = datetime(2026, 8, 1, tzinfo=UTC)
     html = render_activation_first_scan_email("Sam", trial_ends_at=ends)
 
     assert "1 Aug 2026" in html
-    assert "no card on file" in html.lower()
-
     lowered = html.lower()
-    for phrase in ("you'll be charged", "will be billed", "auto-renew",
-                   "payment due", "card will be charged"):
-        assert phrase not in lowered, f"trial note reads as billing — {phrase!r}"
+    assert "first charge" in lowered
+    assert "cancel in one click" in lowered
+
+    for phrase in ("hurry", "last chance", "act now", "don't miss out",
+                   "limited time", "spots left", "countdown"):
+        assert phrase not in lowered, f"trial note manufactures urgency — {phrase!r}"
 
 
 def test_trial_note_is_omitted_for_users_without_a_trial():

@@ -338,6 +338,52 @@ async def stripe_webhook(
                 user.winback_state = ""
             if not obj.get("pause_collection"):
                 user.subscription_paused_until = None
+
+            if p["status"] == "trialing":
+                # ── Card-required trial: this is where the trial is GRANTED ──
+                #
+                # Signup no longer hands out a trial (routers/auth.py); a card
+                # completed through Checkout does, and Stripe reports it back
+                # as a `trialing` subscription. `user.tier` was already set to
+                # the subscription's tier above, so all that remains is to
+                # anchor the DATES to Stripe rather than to a local clock.
+                #
+                # trial_ends_at is copied from the SUBSCRIPTION's own
+                # trial_end, which is the instant Stripe will raise the first
+                # invoice. Anything in-app that states "your first charge is
+                # on ..." reads this column, so the promised date and the
+                # billed date are the same value by construction — even if the
+                # user (or support) later shifts the trial in the dashboard,
+                # because .updated lands here too.
+                #
+                # trial_started_at is the never-cleared "has this account ever
+                # trialled" marker that gates the one-per-account check in
+                # routers/billing.py. Written only when null so the mid-trial
+                # card-add and every subsequent .updated leave the original
+                # start instant intact.
+                #
+                # Replay-safe on both counts: the event-id dedupe at the top of
+                # this handler drops redelivered events outright, and these two
+                # writes are idempotent anyway — the same trial_end re-lands on
+                # the same column, and trial_started_at is write-once.
+                from datetime import UTC, datetime
+
+                raw_trial_end = obj.get("trial_end")
+                if raw_trial_end:
+                    user.trial_ends_at = datetime.fromtimestamp(
+                        int(raw_trial_end), UTC,
+                    )
+                if user.trial_started_at is None:
+                    raw_trial_start = obj.get("trial_start") or obj.get("start_date")
+                    user.trial_started_at = (
+                        datetime.fromtimestamp(int(raw_trial_start), UTC)
+                        if raw_trial_start
+                        else datetime.now(UTC)
+                    )
+                logger.info(
+                    "stripe.trial_started user=%s sub=%s trial_ends_at=%s",
+                    user.id, p["id"], user.trial_ends_at,
+                )
         elif p["status"] == "past_due":
             # Dunning grace window. A failed renewal flips the sub to
             # past_due while Stripe retries the card on its Smart Retries
@@ -589,6 +635,76 @@ async def stripe_webhook(
                     logger.exception("stripe.payment_failed_email_error user=%s", user.id)
         else:
             logger.warning("stripe.payment_failed_without_user customer=%s", customer_id)
+
+    elif evt_type == "customer.subscription.trial_will_end":
+        # Stripe fires this ~3 days before a trial converts to a paid charge.
+        # It is the ONLY pre-charge notice a card-required trialist gets:
+        # run_daily_drip is filtered to `stripe_customer_id IS NULL` (its
+        # day-11/13 CTAs are signed Stripe *Checkout* links, which would open a
+        # SECOND subscription for someone who already has one), so a trialist
+        # with a card on file is invisible to it by design. Without this branch
+        # we would collect a card and charge it with zero warning — the pattern
+        # that produces chargebacks, and one this product cannot defend.
+        #
+        # The date and amount are read off Stripe's own subscription object, so
+        # what we quote is exactly what will be charged. Replays are already
+        # blocked by the StripeWebhookEvent id-dedup at the top of the handler.
+        customer_id = obj.get("customer")
+        result = await session.execute(
+            select(User).where(User.stripe_customer_id == customer_id)
+        )
+        user = result.scalar_one_or_none()
+        if user and user.email:
+            try:
+                from datetime import datetime as _dt
+
+                from app.services.email import (
+                    render_trial_precharge_reminder_email,
+                    send_email,
+                )
+
+                trial_end_ts = obj.get("trial_end")
+                if trial_end_ts:
+                    end_dt = _dt.fromtimestamp(int(trial_end_ts), tz=UTC)
+                    charge_date_label = f"{end_dt:%A, %B} {end_dt.day}"
+                else:
+                    charge_date_label = "when your trial ends"
+
+                # Price/currency off the subscription item; fall back to a
+                # non-committal phrase rather than inventing a number.
+                items = ((obj.get("items") or {}).get("data") or [])
+                price = (items[0].get("price") or {}) if items else {}
+                unit_amount = price.get("unit_amount")
+                currency = str(price.get("currency") or "usd").upper()
+                interval = ((price.get("recurring") or {}).get("interval")) or "month"
+                if unit_amount:
+                    amount_label = f"${unit_amount / 100:.2f} {currency}/{interval}"
+                else:
+                    amount_label = "your plan's price"
+
+                html = render_trial_precharge_reminder_email(
+                    user.name or "trader",
+                    tier=(user.tier or "premium"),
+                    amount_label=amount_label,
+                    charge_date_label=charge_date_label,
+                )
+                await send_email(
+                    user.email,
+                    f"Your Tapeline trial ends {charge_date_label}",
+                    html,
+                    persona="billing",
+                    skip_if_undeliverable=False,
+                )
+                logger.info(
+                    "stripe.trial_will_end_email user=%s ends=%s amount=%s",
+                    user.id, charge_date_label, amount_label,
+                )
+            except Exception:
+                logger.exception("stripe.trial_will_end_email_error user=%s", user.id)
+        else:
+            logger.warning(
+                "stripe.trial_will_end_without_user customer=%s", customer_id,
+            )
 
     elif evt_type == "customer.source.expiring":
         # The card on file expires at month-end. Proactively nudge an update

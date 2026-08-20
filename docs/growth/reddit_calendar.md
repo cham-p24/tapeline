@@ -61,7 +61,7 @@ What surprised me from two weeks of running this:
 
 3. Insider clusters (multiple Form 4 buys in the same window) are the single best leading signal. I underweighted Smart Money on launch; the data is pushing me to revisit.
 
-Free tier is still top 20 tickers, 24h delayed. Pro is $9.99/mo for the full ~2,500-ticker universe. 14-day Premium trial, no card needed.
+Free tier is still top 20 tickers, 24h delayed, and needs no card. Pro is $9.99/mo for the full ~2,500-ticker universe. The 14-day Premium trial does take a card — $0 charged today, one click to cancel before day 14.
 
 What signals or factors would you want me to add weight to? The formula is versioned in the changelog so factor changes ship with a written rationale.
 ```

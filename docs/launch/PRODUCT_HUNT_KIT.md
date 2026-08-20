@@ -42,7 +42,7 @@ The stock scanner that publishes its track record
 
 **Description** (260 char max):
 ```
-Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY the next day — wins and losses, never edited. Free tier + 14-day trial, no card.
+Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY next day — wins and losses, never edited. Free tier, no card; trial takes one.
 ```
 
 ---
@@ -62,7 +62,7 @@ So Tapeline does the opposite three ways:
 
 3. You can download the whole record and check my math (/verify).
 
-Free tier is genuinely usable (live scores, 12 look-ups/day, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys + Telegram). 14-day Premium trial, no credit card.
+Free tier is genuinely usable (live scores, 12 look-ups/day, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys + Telegram). The free tier never asks for a card; the 14-day Premium trial does — $0 charged today, first charge on day 14, one click to cancel.
 
 Built solo from Melbourne. I'd genuinely love for this crowd to tear apart the methodology — which factor am I under-weighting? What would make the back-check defensible over a 1-year horizon instead of 1-day?
 ```

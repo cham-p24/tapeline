@@ -9,17 +9,29 @@
  *      the red loss token (`down`) at <= 3 days and amber (`warn`) at <= 7.
  *      The class list must be identical on day 14 and day 1.
  *   2. NO urgency language, ever.
- *   3. The trial is NEVER framed as a billing event — it takes no card, so
- *      nothing is charged and there is nothing to cancel.
+ *   3. The banner must tell the truth about the CARD, and the truth now has
+ *      two shapes:
+ *        - CARD ON FILE (the 2026-08 card-required trial): a real charge is
+ *          scheduled, so the date of it and the one-click exit must be stated.
+ *          "No card was taken" / "nothing to cancel" would be a lie, and
+ *          "add a card" would nag someone who already gave us one.
+ *        - NO CARD ON FILE (legacy auto-granted trial): trial end is not a
+ *          billing event — nothing charged, nothing to cancel.
+ *      The card state comes from the API, so there is also an UNKNOWN state,
+ *      and the rule there is that the banner asserts NEITHER story.
+ *
+ * These tests changed with the card-required-trial work: the old file asserted
+ * the no-card copy unconditionally, which is exactly the claim that can no
+ * longer be made unconditionally.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@/components/UserContext", () => ({
   useUser: vi.fn(),
 }));
 
-import { TrialBanner } from "@/components/TrialBanner";
+import { TrialBanner, __resetCardOnFileCache } from "@/components/TrialBanner";
 import { useUser } from "@/components/UserContext";
 
 const mockedUseUser = useUser as ReturnType<typeof vi.fn>;
@@ -39,9 +51,34 @@ const trialingUser = (daysLeft: number) => ({
   signout: vi.fn(),
 });
 
+/** The banner's own date format, so assertions can't drift from the render. */
+const endLabel = (daysLeft: number) =>
+  new Date(Date.now() + (daysLeft - 0.5) * 86_400_000).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+
 /** Tokens that signal alarm/urgency treatment in this design system. */
 const ALARM_CLASS = /\b(?:bg|text|border|from|to|ring)-(?:down|warn|red|danger|destructive)/;
 const MOTION_CLASS = /animate-(?:pulse|ping|bounce)/;
+
+/**
+ * Stub the card-state lookup. `null` leaves both endpoints answering an empty
+ * object, which is what the component sees when the API can't tell it.
+ */
+function stubCardOnFile(value: boolean | null) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve(value === null ? {} : { has_card_on_file: value }),
+      }),
+    ),
+  );
+}
 
 const render_ = (daysLeft: number) => {
   mockedUseUser.mockReturnValue(trialingUser(daysLeft));
@@ -50,6 +87,12 @@ const render_ = (daysLeft: number) => {
 
 beforeEach(() => {
   mockedUseUser.mockReset();
+  __resetCardOnFileCache();
+  stubCardOnFile(null);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("TrialBanner — Rule 6 calm styling", () => {
@@ -71,23 +114,48 @@ describe("TrialBanner — Rule 6 calm styling", () => {
     expect(screen.getByTestId("trial-banner").className).toBe(early);
   });
 
-  it("never uses urgency or loss-aversion language", () => {
-    for (const daysLeft of [14, 3, 1]) {
-      const { container, unmount } = render_(daysLeft);
-      const text = container.textContent ?? "";
-      for (const phrase of [
-        /hurry/i,
-        /last chance/i,
-        /act (?:now|fast)/i,
-        /don'?t (?:lose|miss)/i,
-        /before it'?s too late/i,
-        /expir\w+ in \d+ (?:hour|minute|second)/i,
-        /countdown/i,
-        /final (?:day|hours?)/i,
-      ]) {
-        expect(text).not.toMatch(phrase);
+  it("keeps the SAME class list whether or not a card is on file", async () => {
+    // A card on file must not buy the banner a louder treatment either.
+    stubCardOnFile(false);
+    const { unmount } = render_(3);
+    await screen.findByText(/no card on file/i);
+    const cardless = screen.getByTestId("trial-banner").className;
+    unmount();
+
+    __resetCardOnFileCache();
+    stubCardOnFile(true);
+    render_(3);
+    await screen.findByText(/first charge is on/i);
+    expect(screen.getByTestId("trial-banner").className).toBe(cardless);
+  });
+
+  it("never uses urgency or loss-aversion language, in any card state", async () => {
+    for (const cardOnFile of [true, false, null] as const) {
+      for (const daysLeft of [14, 3, 1]) {
+        __resetCardOnFileCache();
+        stubCardOnFile(cardOnFile);
+        const { container, unmount } = render_(daysLeft);
+        await waitFor(() =>
+          expect(container.querySelector("[data-card-on-file]")).toHaveAttribute(
+            "data-card-on-file",
+            String(cardOnFile === null ? "unknown" : cardOnFile),
+          ),
+        );
+        const text = container.textContent ?? "";
+        for (const phrase of [
+          /hurry/i,
+          /last chance/i,
+          /act (?:now|fast)/i,
+          /don'?t (?:lose|miss)/i,
+          /before it'?s too late/i,
+          /expir\w+ in \d+ (?:hour|minute|second)/i,
+          /countdown/i,
+          /final (?:day|hours?)/i,
+        ]) {
+          expect(text).not.toMatch(phrase);
+        }
+        unmount();
       }
-      unmount();
     }
   });
 
@@ -98,34 +166,124 @@ describe("TrialBanner — Rule 6 calm styling", () => {
   });
 });
 
-describe("TrialBanner — trial-start clarity", () => {
-  it("states that Premium is active, for 14 days, with no card taken", () => {
+// ── CARD ON FILE — the current, card-required trial ────────────────────────
+// A charge really is coming. Honest disclosure is mandatory, and nagging for
+// a card the user has already given is forbidden.
+
+describe("TrialBanner — card on file", () => {
+  beforeEach(() => {
+    __resetCardOnFileCache();
+    stubCardOnFile(true);
+  });
+
+  it("states nothing charged yet, the first-charge date, and the one-click exit", async () => {
     const { container } = render_(14);
+    await screen.findByText(/first charge is on/i);
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/premium is active/i);
+    expect(text).toMatch(/nothing has been charged/i);
+    expect(text).toMatch(new RegExp(`first charge is on ${endLabel(14)}`, "i"));
+    expect(text).toMatch(/one click/i);
+    expect(text).toMatch(/not charged at all/i);
+  });
+
+  it("keeps the same disclosure mid-trial, not only on day one", async () => {
+    const { container } = render_(3);
+    await screen.findByText(/first charge is on/i);
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/3 days left/i);
+    expect(text).toMatch(/nothing has been charged/i);
+    expect(text).toMatch(new RegExp(`first charge is on ${endLabel(3)}`, "i"));
+  });
+
+  it("NEVER claims no card was taken or that there is nothing to cancel", async () => {
+    for (const daysLeft of [14, 7, 1]) {
+      __resetCardOnFileCache();
+      stubCardOnFile(true);
+      const { container, unmount } = render_(daysLeft);
+      await screen.findByText(/first charge is on/i);
+      const text = container.textContent ?? "";
+      expect(text).not.toMatch(/no card (?:was taken|on file)/i);
+      expect(text).not.toMatch(/nothing to cancel/i);
+      unmount();
+    }
+  });
+
+  it("never tells a card-on-file trialist to add a card", async () => {
+    const { container } = render_(7);
+    await screen.findByText(/first charge is on/i);
+    expect(container.textContent ?? "").not.toMatch(/add(?:ing)? a card/i);
+    // …and the action is management, not capture.
+    expect(screen.getByRole("link").textContent).toMatch(/manage plan/i);
+  });
+});
+
+// ── NO CARD ON FILE — the legacy auto-granted trial ────────────────────────
+
+describe("TrialBanner — no card on file (legacy trial)", () => {
+  beforeEach(() => {
+    __resetCardOnFileCache();
+    stubCardOnFile(false);
+  });
+
+  it("states that Premium is active, for 14 days, with no card taken", async () => {
+    const { container } = render_(14);
+    await screen.findByText(/no card was taken/i);
     const text = container.textContent ?? "";
     expect(text).toMatch(/premium is active/i);
     expect(text).toMatch(/14 days/);
-    expect(text).toMatch(/no card was taken/i);
     expect(text).toMatch(/nothing to cancel/i);
   });
 
-  it("keeps the no-card / nothing-charged reassurance mid-trial too", () => {
+  it("keeps the no-card / nothing-charged reassurance mid-trial too", async () => {
     const { container } = render_(3);
+    await screen.findByText(/no card on file/i);
     const text = container.textContent ?? "";
-    expect(text).toMatch(/no card on file/i);
     expect(text).toMatch(/nothing is charged/i);
     expect(text).toMatch(/nothing to cancel/i);
   });
 
-  it("never frames trial expiry as a billing event", () => {
+  it("never frames trial expiry as a billing event", async () => {
     for (const daysLeft of [14, 3, 1]) {
+      __resetCardOnFileCache();
+      stubCardOnFile(false);
       const { container, unmount } = render_(daysLeft);
+      await waitFor(() =>
+        expect(container.textContent ?? "").toMatch(/no card (?:was taken|on file)/i),
+      );
       const text = container.textContent ?? "";
       expect(text).not.toMatch(/you (?:will|'ll) be (?:charged|billed)/i);
-      expect(text).not.toMatch(/cancel (?:before|by|now)/i);
-      expect(text).not.toMatch(/add a card to (?:keep|avoid)/i);
       expect(text).not.toMatch(/(?:card|payment method) (?:will be )?charged/i);
       unmount();
     }
+  });
+});
+
+// ── UNKNOWN — the API could not answer ─────────────────────────────────────
+
+describe("TrialBanner — unknown card state", () => {
+  it("asserts NEITHER story rather than defaulting to the no-card copy", () => {
+    const { container } = render_(14);
+    const text = container.textContent ?? "";
+    // Only what the session payload proves.
+    expect(text).toMatch(/premium is active/i);
+    expect(text).toMatch(/14 days/);
+    // No claim in either direction.
+    expect(text).not.toMatch(/no card (?:was taken|on file)/i);
+    expect(text).not.toMatch(/nothing to cancel/i);
+    expect(text).not.toMatch(/first charge is on/i);
+    expect(text).not.toMatch(/add(?:ing)? a card/i);
+  });
+
+  it("survives an API failure without throwing or asserting a card claim", async () => {
+    __resetCardOnFileCache();
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
+    const { container } = render_(6);
+    await waitFor(() => expect(screen.getByTestId("trial-banner")).toBeInTheDocument());
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/6 days left/i);
+    expect(text).not.toMatch(/no card (?:was taken|on file)/i);
+    expect(text).not.toMatch(/first charge is on/i);
   });
 });
 
@@ -144,5 +302,20 @@ describe("TrialBanner — render conditions", () => {
   it("renders nothing once the trial has expired", () => {
     const { container } = render_(-2);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("makes no network call when nobody is on a trial", () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    mockedUseUser.mockReturnValue({
+      user: { id: "u_3", email: "f@example.com", name: null, tier: "free", created_at: null },
+      loading: false,
+      refresh: vi.fn(),
+      signout: vi.fn(),
+    });
+    render(<TrialBanner />);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

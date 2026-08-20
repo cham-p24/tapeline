@@ -102,7 +102,7 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > **12.**
 > The Tapeline Free tier shows the top 20 tickers with 24-hour delayed
 > data. That's the entire free product.
-> No "free for 7 days then $99/mo." No card required for the trial.
+> No "free for 7 days then $99/mo." The free tier has no clock and no card.
 > No marketing pop-ups. The product is the funnel.
 
 > **13.**
@@ -121,7 +121,8 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > Pricing test: Tapeline Pro is $8.25/mo annual ($99/yr).
 > Premium is $16.58/mo annual ($199/yr) and includes the full
 > live universe + Congressional trades + insider Form 4.
-> Both have a 14-day Premium trial. No card.
+> Both have a 14-day Premium trial. It takes a card — $0 charged
+> today, first charge on day 14, one click to cancel.
 > tapeline.io/pricing
 
 ---
@@ -259,7 +260,7 @@ That's ~15 signups over 30 days from outreach alone — at zero cost.
 > [name] — I see you trade [setup type]. I built Tapeline (stock scanner
 > with a public scorecard, every pick back-checked vs SPY). 30-day hit
 > rate is at [X]%. Curious if you'd find the regime + smart-money factors
-> useful. No card trial, link in bio.
+> useful. Free tier, no card — link in bio.
 
 ### Quant-curious / engineer persona
 

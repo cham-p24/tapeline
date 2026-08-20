@@ -1091,8 +1091,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>Want to see RSI in context for every US ticker? The Tapeline
       composite blends RSI into a single 0–100 score along with five other
-      factors. <a href="/signup">Try the 14-day Premium trial</a> — no
-      credit card.</p>
+      factors. <a href="/signup">Try the 14-day Premium trial</a> — it takes
+      a card, charges $0 today, and cancels in one click before the day-14
+      charge. The free tier stays card-free.</p>
     `,
     howToTime: "PT8M",
     howToSteps: [
@@ -1355,9 +1356,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       is built to answer the first question. The second question
       mostly takes care of itself once the first one is settled.</p>
 
-      <p><a href="/signup">Try the 14-day Premium trial</a> — no card,
-      cancel in one click. Read every score the same way our public
-      scorecard does.</p>
+      <p><a href="/signup">Try the 14-day Premium trial</a> — $0 charged
+      today, first charge on day 14, cancel in one click before then. Read
+      every score the same way our public scorecard does.</p>
     `,
     howToTime: "PT7M",
     howToSteps: [
@@ -1560,7 +1561,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       numbers don't hold up, we're not the right product for you. If
       they do, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=best_scanner_under_30">14-day
-      Premium trial</a> is the no-card way to see it from the inside.</p>
+      Premium trial</a> is the way to see it from the inside — a card, $0
+      charged today, and one click to cancel before the day-14 charge.</p>
     `,
   },
   {
@@ -1743,8 +1745,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       (2) raw filtered transactions at /app/holdings.</p>
 
       <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">14-day
-      Premium trial — no card</a>. Read 90 days of filtered Form 4
-      activity across the full universe. Cancel in one click.</p>
+      Premium trial — $0 today</a>. Read 90 days of filtered Form 4
+      activity across the full universe. The trial takes a card; the first
+      charge is on day 14 and one click cancels before then.</p>
     `,
   },
   {
@@ -1887,7 +1890,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Data freshness</td>
               <td>60s composite refresh on Pro+; live scores on Free too (gated on breadth, not freshness)</td></tr>
           <tr><td>Cancel friction</td>
-              <td>One-click cancel, 30-day refund, no card required for trial</td></tr>
+              <td>One-click cancel, 30-day refund, card-free free tier (the trial does take a card, and charges $0 until day 14)</td></tr>
         </tbody>
       </table>
 
@@ -1916,8 +1919,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       product that fits you better than win it via misleading
       claims. If the scorecard convinces you, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">14-day
-      Premium trial</a> is the no-card way to see the rest. If it
-      doesn't, that's useful information too.</p>
+      Premium trial</a> is the way to see the rest — $0 charged today, one
+      click to cancel before the day-14 charge. If it doesn't, that's useful
+      information too.</p>
     `,
   },
 ];

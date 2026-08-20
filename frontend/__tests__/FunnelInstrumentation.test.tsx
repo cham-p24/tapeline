@@ -395,8 +395,13 @@ describe("signup funnel reaches GA4", () => {
         trackEventMock.mock.calls.filter((c) => c[0] === "sign_up"),
       ).toHaveLength(1),
     );
-    // start_trial is the trial counterpart; the old `trial_started` twin is gone.
-    expect(trackEventMock.mock.calls.some((c) => c[0] === "start_trial")).toBe(true);
+    // CHANGED with the card-required trial: `start_trial` must NOT fire here
+    // any more. Creating an account no longer starts a trial — the trial is a
+    // separate, card-required opt-in — so firing it at signup would report a
+    // trial that does not exist and would tell Google Ads that every signup is
+    // a trial start. It now fires from /app/billing on the confirmed return
+    // from a trial checkout (see the billing suite above).
+    expect(trackEventMock.mock.calls.some((c) => c[0] === "start_trial")).toBe(false);
     expect(
       trackEventMock.mock.calls.some(
         (c) => c[0] === "signup_completed" || c[0] === "trial_started",

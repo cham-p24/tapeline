@@ -12,8 +12,12 @@
  *     pre-population survives the survey's removal.
  *   - `marketing_opt_in: null` — "no answer", so consent granted on the
  *     /signup form is never destroyed.
- *   - The OAuth `sign_up` / `start_trial` conversion pair (fires nowhere else).
- *   - Forward to `next`, preserving the /pricing plan intent (/app/billing).
+ *   - The OAuth `sign_up` conversion (fires nowhere else). It is a SINGLE
+ *     event now: account creation no longer starts a trial, so the old
+ *     `start_trial` half of the pair moved to the billing page, where a trial
+ *     is actually started.
+ *   - Forward to `next`, preserving the intent carried in from signup
+ *     (/app/billing?trial=start) or a /pricing plan CTA.
  *
  * The "renders no questions" cases below are the regression guard: a form on
  * this route is the defect, not a feature.
@@ -45,9 +49,11 @@ vi.mock("@/components/UserContext", () => ({
   useUser: () => session,
 }));
 
+// Variadic signatures so `mock.calls[n][i]` stays typed as a real argument
+// list rather than an empty tuple.
 const gtag = vi.hoisted(() => ({
-  trackEvent: vi.fn(() => true),
-  trackEventOnce: vi.fn(() => true),
+  trackEvent: vi.fn((..._args: unknown[]) => true),
+  trackEventOnce: vi.fn((..._args: unknown[]) => true),
 }));
 vi.mock("@/lib/gtag", () => gtag);
 
@@ -244,7 +250,7 @@ describe("OnboardingPage forwarding", () => {
 });
 
 describe("OnboardingPage OAuth conversion", () => {
-  it("fires the sign_up / start_trial pair once for a new OAuth signup", async () => {
+  it("fires sign_up once for a new OAuth signup", async () => {
     nav.search = new URLSearchParams("oauth=1");
     stubFetch();
     render(<OnboardingPage />);
@@ -255,12 +261,29 @@ describe("OnboardingPage OAuth conversion", () => {
         { method: "oauth" },
       ),
     );
-    expect(gtag.trackEvent).toHaveBeenCalledWith("start_trial", {
-      method: "oauth",
-    });
   });
 
-  it("does not fire the OAuth pair on the email path", async () => {
+  it("does NOT fire start_trial — creating an account no longer starts a trial", async () => {
+    // CHANGED with the card-required trial. This used to fire a
+    // sign_up / start_trial PAIR, because account creation auto-granted a
+    // 14-day Premium trial. It no longer does: the trial is a separate,
+    // card-required opt-in through Stripe Checkout, so counting one here
+    // would report a trial that does not exist — and would teach Google Ads
+    // that every OAuth signup is a trial start. `start_trial` now fires from
+    // the billing page on the confirmed return from a trial checkout.
+    nav.search = new URLSearchParams("oauth=1");
+    stubFetch();
+    render(<OnboardingPage />);
+    await waitFor(() => expect(gtag.trackEventOnce).toHaveBeenCalled());
+    expect(
+      gtag.trackEvent.mock.calls.some((c) => c[0] === "start_trial"),
+    ).toBe(false);
+    expect(
+      gtag.trackEventOnce.mock.calls.some((c) => c[1] === "start_trial"),
+    ).toBe(false);
+  });
+
+  it("does not fire the OAuth conversion on the email path", async () => {
     stubFetch();
     render(<OnboardingPage />);
     await waitFor(() => expect(routerSpies.replace).toHaveBeenCalled());
