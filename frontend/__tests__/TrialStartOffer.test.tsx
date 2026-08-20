@@ -57,12 +57,22 @@ vi.mock("@/lib/webPush", () => ({
 }));
 
 /** The date the panel must quote, in the same format it renders. */
-const firstChargeLabel = () =>
-  new Date(Date.now() + TRIAL_DAYS * 86_400_000).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+/** Asserts the first-charge date is present as real text, in ANY locale.
+ *
+ * The component formats this with the VIEWER's locale — a UK reader sees
+ * "3 September 2026", a US one "September 3, 2026". Both are correct for a
+ * billing date, so the test must not demand one of them (CI runs a different
+ * default locale from a typical dev machine, and pinning US format failed there
+ * while the rendered date was perfectly right). Assert the PARTS: the phrase,
+ * the month name, the day and the year.
+ */
+const expectFirstChargeDate = (text: string) => {
+  const d = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
+  expect(text).toMatch(/first charge/i);
+  expect(text).toContain(d.toLocaleDateString("en-US", { month: "long" }));
+  expect(text).toContain(String(d.getDate()));
+  expect(text).toContain(String(d.getFullYear()));
+};
 
 /** Records every POST body sent to the checkout endpoint. */
 let checkoutBodies: Array<Record<string, unknown>>;
@@ -131,7 +141,7 @@ describe("trial offer — disclosure", () => {
     const text = (disclosure.textContent ?? "").replace(/\s+/g, " ");
 
     expect(text).toMatch(/\$0 today/i);
-    expect(text).toMatch(new RegExp(`first charge is on ${firstChargeLabel()}`, "i"));
+    expectFirstChargeDate(text);
     // Annual is the site-wide default period.
     expect(text).toMatch(
       new RegExp(`${usdCompact(PRICING.premium.annual).replace("$", "\\$")} for the year`, "i"),
@@ -350,7 +360,7 @@ describe("trial offer — eligibility", () => {
     const note = cta.nextElementSibling;
     const text = (note?.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toMatch(/\$0 today/i);
-    expect(text).toMatch(new RegExp(`first charge ${firstChargeLabel()}`, "i"));
+    expectFirstChargeDate(text);
     expect(text).toMatch(/cancel in one click/i);
     expect(text).toMatch(/never charged/i);
   });
@@ -380,7 +390,7 @@ describe("trial start — the return from Stripe", () => {
     );
     const banner = await screen.findByText(/nothing was charged/i);
     const text = (banner.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(new RegExp(`first charge is on ${firstChargeLabel()}`, "i"));
+    expectFirstChargeDate(text);
     expect(text).toMatch(/ends it before then/i);
   });
 
