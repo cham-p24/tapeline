@@ -305,6 +305,12 @@ TIER_PRICES: dict[tuple[str, str], float] = {
     ("pro", "annual"): 99.0,
     ("premium", "monthly"): 19.99,
     ("premium", "annual"): 199.0,
+    # Trader is a CONCIERGE tier — sold by hand via the "Talk to us" CTA, not a
+    # self-serve Stripe checkout (see frontend/lib/pricing.ts). Priced here so a
+    # manually-created Trader subscription is charged/booked correctly instead of
+    # silently treated as an unknown $0 tier. $59/mo, $588/yr.
+    ("trader", "monthly"): 59.0,
+    ("trader", "annual"): 588.0,
 }
 
 # Per-recognized-month revenue (what an accountant books each month). Annual
@@ -316,6 +322,12 @@ _MRR_CONTRIBUTION: dict[tuple[str, str], float] = {
     ("pro", "annual"): 8.25,
     ("premium", "monthly"): 19.99,
     ("premium", "annual"): 16.58,
+    # Trader concierge tier — annual books at the advertised $49/mo equivalent
+    # ($588 / 12 = $49), monthly at $59. Without this a hand-sold Trader
+    # subscription under-counts MRR as $0 on the revenue dashboard. Not
+    # self-serve; see TIER_PRICES above.
+    ("trader", "monthly"): 59.0,
+    ("trader", "annual"): 49.0,
 }
 
 
