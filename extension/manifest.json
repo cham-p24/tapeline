@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tapeline — Ticker Score Overlay",
-  "version": "1.0.0",
-  "description": "Shows Tapeline's six-factor score and published track record for the stock you are viewing. Sends only the ticker symbol — never the page, your prices, holdings or balances.",
+  "version": "1.1.0",
+  "description": "Shows Tapeline's six-factor score and published track record for the stock you are viewing. Requires a free Tapeline account. Sends only the ticker symbol — never the page.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

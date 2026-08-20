@@ -50,26 +50,6 @@ async function writeCache(symbol, data) {
   } catch (_) {}
 }
 
-/** Keep only what the overlay renders — the full payload carries news + history. */
-function trim(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const b = raw.breakdown || {};
-  const factors = ["trend", "rs", "fundamentals", "smart_money", "macro", "momentum"]
-    .filter((k) => b[k] && typeof b[k].value === "number")
-    .map((k) => ({ key: k, value: b[k].value, label: b[k].label || null }));
-  return {
-    symbol: raw.symbol,
-    name: raw.name || null,
-    score: typeof raw.score === "number" ? raw.score : null,
-    signal: raw.signal || null,
-    confidence: typeof raw.confidence_pct === "number" ? raw.confidence_pct : null,
-    reason: raw.reason || null,
-    factors,
-    url: link(`/t/${encodeURIComponent(raw.symbol || "")}`),
-    scorecardUrl: link("/scorecard"),
-  };
-}
-
 async function fetchTicker(symbol) {
   const cached = await readCache(symbol);
   if (cached) return { ok: true, data: cached, cached: true };
@@ -78,13 +58,16 @@ async function fetchTicker(symbol) {
 
   const job = (async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/ticker/${encodeURIComponent(symbol)}`, {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: { Accept: "application/json" },
-      });
+      const headers = await authHeaders();
+      if (!headers) return { ok: false, reason: "connect_required" };
+      const res = await fetch(
+        `${API_BASE}/api/extension/ticker/${encodeURIComponent(symbol)}`,
+        { signal: AbortSignal.timeout(TIMEOUT_MS), headers }
+      );
+      if (res.status === 401) return { ok: false, reason: "connect_required" };
       if (res.status === 404) return { ok: false, reason: "not_covered" };
       if (!res.ok) return { ok: false, reason: "unavailable" };
-      const data = trim(await res.json());
+      const data = await res.json();
       if (!data || data.score === null) return { ok: false, reason: "not_covered" };
       await writeCache(symbol, data);
       return { ok: true, data, cached: false };
@@ -169,25 +152,16 @@ async function fetchRecord(symbol) {
   } catch (_) {}
 
   try {
+    const headers = await authHeaders();
+    if (!headers) return { ok: false };
     const res = await fetch(
-      `${API_BASE}/api/scorecard/symbol/${encodeURIComponent(symbol)}`,
-      { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: "application/json" } }
+      `${API_BASE}/api/extension/record/${encodeURIComponent(symbol)}`,
+      { signal: AbortSignal.timeout(TIMEOUT_MS), headers }
     );
     if (!res.ok) return { ok: false };
-    const raw = await res.json();
-    const s = (raw && raw.summary) || {};
-    const rows = (raw && raw.rows) || [];
-    const data = {
-      // appearances === 0 is a real, publishable answer ("never picked"), not a
-      // failure — the UI says so rather than hiding the block.
-      appearances: s.appearances_scored || 0,
-      hitRate: typeof s.hit_rate_beat_spy === "number" ? s.hit_rate_beat_spy : null,
-      medianAlpha: typeof s.median_alpha_vs_spy === "number" ? s.median_alpha_vs_spy : null,
-      best: typeof s.best_alpha === "number" ? s.best_alpha : null,
-      worst: typeof s.worst_alpha === "number" ? s.worst_alpha : null,
-      lastSeen: rows.length ? rows[0].as_of : null,
-      inUniverse: s.in_universe !== false,
-    };
+    // appearances === 0 is a real, publishable answer ("never picked"), not a
+    // failure — the UI says so rather than hiding the block.
+    const data = await res.json();
     try {
       await chrome.storage.session.set({ [key]: { at: Date.now(), data } });
     } catch (_) {}
@@ -206,6 +180,56 @@ async function fetchRecord(symbol) {
  * not satisfy it. The content script asks here rather than reading storage
  * itself so there is exactly one definition of "has consented".
  */
+/**
+ * The connect token. The extension requires a Tapeline account, so every data
+ * call carries this bearer credential; without it we render nothing at all.
+ *
+ * It is NOT the session cookie: tapeline_session is SameSite=Lax, and while
+ * tapeline.io and api.tapeline.io are same-site, a chrome-extension:// origin
+ * is not — so the cookie never reaches us. The user pastes this once from
+ * tapeline.io/extension/connect.
+ */
+async function getToken() {
+  try {
+    const got = await chrome.storage.local.get("connectToken");
+    return got.connectToken || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function authHeaders() {
+  const token = await getToken();
+  return token
+    ? { Accept: "application/json", Authorization: `Bearer ${token}` }
+    : null;
+}
+
+/** Verify a pasted code and remember it. Returns the account it belongs to. */
+async function connect(token) {
+  try {
+    const res = await fetch(`${API_BASE}/api/extension/me`, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { ok: false, reason: "invalid" };
+    const who = await res.json();
+    await chrome.storage.local.set({ connectToken: token, account: who.email });
+    return { ok: true, account: who };
+  } catch (_) {
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+async function disconnect() {
+  try {
+    await chrome.storage.local.remove(["connectToken", "account"]);
+  } catch (_) {}
+  // Cached scores were fetched under the old account; drop them with it.
+  try { await chrome.storage.session.clear(); } catch (_) {}
+  return { ok: true };
+}
+
 async function hasConsent() {
   try {
     const got = await chrome.storage.local.get("consentAt");
@@ -268,6 +292,21 @@ chrome.permissions.onAdded.addListener(syncEnabledSites);
 chrome.permissions.onRemoved.addListener(syncEnabledSites);
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "TAPELINE_CONNECT" && msg.token) {
+    connect(String(msg.token).trim()).then(sendResponse);
+    return true;
+  }
+  if (msg && msg.type === "TAPELINE_DISCONNECT") {
+    disconnect().then(sendResponse);
+    return true;
+  }
+  if (msg && msg.type === "TAPELINE_ACCOUNT") {
+    chrome.storage.local
+      .get("account")
+      .then((g) => sendResponse({ account: g.account || null }))
+      .catch(() => sendResponse({ account: null }));
+    return true;
+  }
   if (msg && msg.type === "TAPELINE_CONSENT") {
     hasConsent().then((ok) => sendResponse({ ok }));
     return true;

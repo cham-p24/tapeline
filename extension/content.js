@@ -315,6 +315,19 @@
   } catch (_) {}
   if (!consented) return;
 
+  /**
+   * The extension requires a Tapeline account. Without a connect token we
+   * render nothing at all rather than showing a nag on every stock page —
+   * the popup is where the user is told how to connect, because an overlay
+   * that pesters on someone else's site is the fastest route to an uninstall.
+   */
+  try {
+    const acct = await chrome.runtime.sendMessage({ type: "TAPELINE_ACCOUNT" });
+    if (!acct || !acct.account) return;
+  } catch (_) {
+    return;
+  }
+
   async function sync() {
     if (muted || dismissed) return;
     const symbol = detectSymbol(window.location, allowGeneric);
