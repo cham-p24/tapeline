@@ -20,10 +20,40 @@ import httpx
 import pytest
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.db import session_scope
 from app.main import app
 from app.models import Ticker, User
 from app.services.extension_auth import TOKEN_DAYS, make_token, parse_token
+
+
+@pytest.fixture(autouse=True)
+def _ensure_secret():
+    """Force a known session_secret so the HMAC actually runs.
+
+    Without this the signing secret is empty in CI, make_token returns None by
+    design (it refuses to mint an unsigned credential), and every assertion
+    here fails on None rather than on the behaviour under test. Same pattern as
+    test_email_checkout / test_unsubscribe. Settings is lru_cached, so mutate
+    the live instance.
+    """
+    s = get_settings()
+    prior = s.session_secret
+    s.session_secret = "test-secret-for-hmac-only-do-not-use-in-prod"
+    yield
+    s.session_secret = prior
+
+
+def test_refuses_to_mint_without_a_secret():
+    """Fail closed: no secret must mean no credential, never an unsigned one."""
+    s = get_settings()
+    prior = s.session_secret
+    s.session_secret = ""
+    try:
+        assert make_token("u_1", 0) is None
+        assert parse_token("tlx_anything") is None
+    finally:
+        s.session_secret = prior
 
 
 @pytest.fixture
