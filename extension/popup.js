@@ -21,9 +21,13 @@ async function lookup(symbol) {
   catch (_) { res = { ok: false, reason: "unavailable" }; }
 
   if (!res || !res.ok) {
-    show(`<p class="msg">${res && res.reason === "not_covered"
-      ? esc(symbol) + " isn't in Tapeline's covered universe."
-      : "Couldn't reach Tapeline just now."}</p>`);
+    const why =
+      res && res.reason === "connect_required"
+        ? "Connect your Tapeline account to look up tickers."
+        : res && res.reason === "not_covered"
+          ? esc(symbol) + " isn't in Tapeline's covered universe."
+          : "Couldn't reach Tapeline just now.";
+    show(`<p class="msg">${why}</p>`);
     return;
   }
   const d = res.data;
@@ -97,6 +101,67 @@ async function loadRecord(symbol) {
    is both the honest ask — we read the ticker out of the URL and nothing else
    — and the one Chrome Web Store review accepts, since requesting every site
    up front is the single most common rejection reason. */
+
+/**
+ * Account state. The extension requires a Tapeline account, so this is the
+ * first thing the popup resolves — everything else is meaningless without it.
+ */
+async function renderAccount() {
+  let acct = null;
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "TAPELINE_ACCOUNT" });
+    acct = res && res.account;
+  } catch (_) {}
+
+  if (acct) {
+    const row = document.createElement("div");
+    row.className = "acct-row";
+    row.innerHTML =
+      `<span>Connected as <b>${esc(acct)}</b></span><button id="disconnect">Disconnect</button>`;
+    siteEl.appendChild(row);
+    document.getElementById("disconnect").addEventListener("click", async () => {
+      try { await chrome.runtime.sendMessage({ type: "TAPELINE_DISCONNECT" }); } catch (_) {}
+      location.reload();
+    });
+    return true;
+  }
+
+  siteEl.innerHTML =
+    '<div class="site-card"><b>Connect your Tapeline account</b><br>' +
+    'The extension works with a free Tapeline account. Get your connect code, ' +
+    'paste it below, and you are done.' +
+    '<button id="getcode">Get my connect code</button>' +
+    '<input id="code" placeholder="Paste your connect code" autocomplete="off" spellcheck="false">' +
+    '<button id="doconnect">Connect</button>' +
+    '<span id="cerr" class="cerr" hidden></span></div>';
+
+  document.getElementById("getcode").addEventListener("click", () => {
+    chrome.tabs.create({
+      url: "https://tapeline.io/extension/connect?utm_source=extension&utm_medium=popup",
+    });
+  });
+
+  const err = document.getElementById("cerr");
+  document.getElementById("doconnect").addEventListener("click", async () => {
+    const token = document.getElementById("code").value.trim();
+    err.hidden = true;
+    if (!token) {
+      err.textContent = "Paste the code from tapeline.io first.";
+      err.hidden = false;
+      return;
+    }
+    let res;
+    try { res = await chrome.runtime.sendMessage({ type: "TAPELINE_CONNECT", token }); }
+    catch (_) { res = { ok: false, reason: "unavailable" }; }
+    if (res && res.ok) { location.reload(); return; }
+    err.textContent =
+      res && res.reason === "invalid"
+        ? "That code wasn't accepted. Get a fresh one and try again."
+        : "Couldn't reach Tapeline. Check your connection.";
+    err.hidden = false;
+  });
+  return false;
+}
 
 /**
  * Permanent per-site mute.
@@ -207,6 +272,13 @@ async function showCalibration() {
  * returned early, and the "Enable on this site" card never rendered on any
  * broker. The whole opt-in architecture was unreachable in production. */
 chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+  const connected = await renderAccount();
+  if (!connected) {
+    // Hide the lookup form too — it would 401 without a token.
+    const form = document.getElementById("f");
+    if (form) form.hidden = true;
+    return;
+  }
   if (!tab) return;
   if (!tab.url) {
     // Defensive: if a future manifest edit drops activeTab, fail loudly in the
