@@ -733,6 +733,18 @@ async def oauth_callback(
         except Exception:
             logger.exception("oauth.ga4_sign_up_failed user=%s", user.id)
 
+        # Same event to Meta. Kept as its own try/except rather than sharing
+        # the one above so a GA4 outage cannot suppress the Meta conversion,
+        # and vice versa — two independently env-gated destinations.
+        try:
+            from app.services import meta_capi
+
+            await meta_capi.track_complete_registration(
+                user_id=user.id, email=user.email, method=provider
+            )
+        except Exception:
+            logger.exception("oauth.meta_complete_registration_failed user=%s", user.id)
+
         # Real-time founder ping (same as native signup) so a new OAuth signup /
         # live trial never goes unnoticed. Self-guarding + never raises.
         from app.services.telegram import notify_founder_new_signup
