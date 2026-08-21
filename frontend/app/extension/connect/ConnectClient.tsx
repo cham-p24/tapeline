@@ -120,12 +120,15 @@ export default function ConnectClient() {
           <strong className="text-fg">1.</strong> Copy the code above.
         </li>
         <li>
-          <strong className="text-fg">2.</strong> Click the Tapeline icon in your browser
-          toolbar.
+          <strong className="text-fg">2.</strong> Click the{" "}
+          <strong className="text-fg">puzzle-piece icon</strong> at the top-right of your
+          browser, then <strong className="text-fg">Tapeline</strong>. A newly installed
+          extension sits in there until you pin it.
         </li>
         <li>
           <strong className="text-fg">3.</strong> Paste the code and press{" "}
-          <strong className="text-fg">Connect</strong>. That&rsquo;s it.
+          <strong className="text-fg">Connect</strong>. That&rsquo;s it &mdash; the score
+          appears on stock pages from then on.
         </li>
       </ol>
     </div>
