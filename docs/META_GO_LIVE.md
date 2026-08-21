@@ -146,3 +146,41 @@ Write these down before spending, because the failure mode of a message test is 
 ## 9. What this test cannot tell you
 
 Trial→paid. That is the broken step (`META_ADS_DECISION.md` §2), 0 conversions ever, and no amount of Meta spend measures it. The instrument for that remains the ≥6 customer interviews that `OPERATING_RULES.md` gates engineering behind — still 0 recorded — and the 17 emails already sitting unread in `christian@tapeline.io`.
+
+---
+
+## 10. Questions for the Holley Nethercote consult
+
+Enabling Meta turns several open questions into live ones. These are written so counsel can answer them quickly; they are **not** things to guess at, and the privacy policy deliberately does not assert an answer to any of them.
+
+1. Article 3(2) GDPR: does buying Meta ads that reach EU or UK users bring Tapeline within scope as "offering goods or services to data subjects in the Union"? Several of the questions below collapse or harden on this answer, so please take it first.
+
+2. If Article 3(2) applies, is an Article 27 representative required in the EU and the UK, or does the 27(2)(a) exemption survive? Note that GA4 and a live Google Ads conversion tag already run continuously on the site alongside an ongoing subscription service, so please assess "occasional" against the current stack, not against Meta alone — and note that appointing representatives takes weeks and a fee, so this is on the pre-launch path.
+
+3. Privacy Act 1988 (Cth) s 6D: is Tapeline an APP entity? Turnover is well under A$3M, but s 6D(4)(c) removes the small-business exemption from an operator that discloses personal information about an individual to anyone else for a benefit, service or advantage. Does sending hashed customer emails to Meta in exchange for ad optimisation fall inside that provision?
+
+4. CCPA/CPRA s 1798.140(d): does Tapeline meet the "business" threshold? Specifically, does the 100,000-consumer limb count every visitor whose PI is shared via a pixel, or only account holders? I can supply California visitor counts from GA4 — tell me which number you need.
+
+5. Is hashed-email conversion measurement a "sale" or a "sharing" under CPRA, or neither? If it is sharing, must we ship a "Do Not Sell or Share My Personal Information" link AND Global Privacy Control handling before the pixel goes live, or does honouring GPC alone satisfy s 1798.135(b)? Please also say whether Regs s 7026(f)(2) obliges us to notify Google/Meta downstream on an opt-out.
+
+6. Controller status: are Google Ads and Meta joint controllers with us for the collection-and-transmission step (Wirtschaftsakademie / Fashion ID), or separate controllers only? If joint, do we need an executed Article 26 arrangement, and must its essence be published in the policy? We currently accept their standard business-tools terms rather than negotiating anything.
+
+7. Legal basis: is consent required for the server-side Conversions API half, which sets nothing on the user's device, or is legitimate interests available for that half while the browser pixel needs consent under ePrivacy Art 5(3)? Is running two different bases across the two halves of one measurement system defensible in practice?
+
+8. Article 21(2)-(3): does server-side advertising measurement count as processing for direct marketing, attracting the absolute right to object? If yes, we need a per-user suppression flag in code before the policy promises an opt-out — please confirm so I build it before, not after.
+
+9. APP 7: under OAIC guidance, is matching customer identifiers so a specific individual is shown ads "direct marketing" rather than analytics? If so, does APP 7.3(c) require a prominent opt-out statement in the ad-facing surfaces as well as the policy?
+
+10. APP 8 and s 16C: what counts as "reasonable steps" when the recipient will not contract to APP-equivalent terms — the large ad platforms do not offer them. Is accepting their published business-tools terms sufficient, or should we not make the disclosure at all?
+
+11. Is our own 14-day material-change notice promise contractually binding as drafted, and does enabling a new sub-processor trigger it? Separately: can the notice clause itself be narrowed without first serving 14 days' notice, or would doing that be a bad-faith pattern we should avoid regardless?
+
+12. Australian Consumer Law s 18: the live policy currently says "We do not sell data, so the opt-out of sale right is moot but still respected" while a Google Ads tag has been running and no opt-out mechanism exists. Is there misleading-conduct exposure for the period that wording was live, and does correcting it prospectively suffice, or should we do anything more?
+
+13. Which written arrangements should we have on file with each ad platform, and under which terms — Google Ads Controller-Controller Data Protection Terms vs the Ads Data Processing Terms for GA4, and Meta's Business Tools Terms / Controller Addendum? Is there anything we must actively accept rather than passively rely on?
+
+14. Publisher exemption: Tapeline's AFSL posture rests on being a publisher of descriptive general information. Does paid, audience-targeted advertising change that analysis — i.e. does targeting a communication to a selected audience move it from general publication toward a communication capable of being financial product advice? If so, what constraints on targeting (not just copy) should we adopt?
+
+15. Should the "not yet reviewed by qualified counsel" banner come down once you have reviewed it, and is there anything in the revised policy you would not want published as drafted — particularly the passages where we state plainly that we are not currently meeting an EU/UK cookie-consent standard?
+
+**The sharpest one is #14.** Tapeline's entire AFSL posture rests on being a publisher of descriptive general information. If paid, audience-targeted advertising changes that analysis, it affects far more than Meta.
