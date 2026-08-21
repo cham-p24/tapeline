@@ -19,7 +19,7 @@ So run this as a **message test with a hard stop**, not as a growth channel. The
 | Piece | State | Where |
 |---|---|---|
 | Server-side Conversions API | ✅ shipped (#538) | `backend/app/services/meta_capi.py` |
-| Browser pixel (PageView) | ✅ shipped (#538) | `frontend/app/layout.tsx` |
+| Browser pixel (PageView) | ✅ shipped (#538), **scoped to marketing pages** | `frontend/components/MetaPixel.tsx` |
 | `Purchase` event | ✅ wired | `routers/webhooks.py` — behind the GA4 latch |
 | `StartTrial` event | ✅ wired | `routers/webhooks.py` — on write-once `trial_started_at` |
 | `CompleteRegistration` event | ✅ wired | `routers/auth.py` (email) + `routers/oauth.py` (Google) |
@@ -36,6 +36,16 @@ So run this as a **message test with a hard stop**, not as a growth channel. The
 1. **🔴 Privacy policy updated** to name Meta and describe exactly what is sent. `META_ADS_DECISION.md` §8 calls this out: a third-party advertising tracker on a finance site touches CCPA and the AU Privacy Act. Tracked separately — do not set the secret before it ships.
 2. **🔴 Geo excludes Australia and every other verification-regime country.** See §4. This is the one mistake that is genuinely hard to undo.
 3. **🔴 FPS Special Ad Category declared** on the campaign. Undeclared financial ads get rejected, and a rejection history is not free.
+
+---
+
+## 2b. 🔴 Two settings that can undo all of this from a dashboard
+
+**Leave Automatic Advanced Matching OFF.** It is a per-pixel toggle in Events Manager. Switching it on makes `fbevents.js` scrape visible form fields — email, phone, name — off the page and send hashed values to Meta, **with no change to this repo and no deploy**. We deliberately pass no advanced-matching object to `fbq('init', …)`, but the dashboard toggle overrides that intent. If you enable it, the privacy policy becomes inaccurate the moment you click save.
+
+**The pixel is scoped to marketing pages and must stay that way.** `components/MetaPixel.tsx` refuses to render on `/app/*`. This is not cosmetic. Meta's beacon reports the full current URL as its `dl` parameter — a payload field, so `Referrer-Policy` does not trim it — and the request goes to facebook.com, so the browser may attach Facebook cookies it already holds. An unscoped pixel would therefore tell Meta **which specific tickers a user researches, linkable to their real Facebook account**. Nothing is lost by scoping: every conversion is sent server-side by `meta_capi`, which needs no browser.
+
+*Honest limit:* scoping prevents the script from ever being inserted on an `/app/*` page, which covers hard loads and bookmarks — the normal case for a logged-in user. It does not unload a script already inserted if someone client-side-navigates from a marketing page into `/app` in the same tab. No new PageView is sent in that case, but the script is present.
 
 ---
 
@@ -81,6 +91,12 @@ Tapeline's entire legal posture is an unlitigated publisher exemption. Putting a
 ## 6. Creative
 
 Use the five lint-clean variants in `META_ADS_DECISION.md` §9. **Re-verified against the current linter on 2026-08-22: 0 blocking findings.**
+
+⚠️ **That check was manual, and it has to be.** CI runs `scripts/lint-copy-compliance.mjs` with no path arguments, so it falls through to the `include` globs in `copy-compliance.allow.json` — which cover `frontend/app/**`, `frontend/components/**`, `frontend/lib/**` and a few backend template modules, but **not `docs/**`**. The ad copy bank has therefore never been checked by CI, and any edit to it won't be either. Re-run the linter by hand over any copy you change:
+
+```bash
+node scripts/lint-copy-compliance.mjs docs/META_ADS_DECISION.md
+```
 
 Point each at `/signup?from=<key>` so the landing H1 restates the ad's promise (message-match is the highest-confidence funnel lever there is, and the mechanism already exists):
 

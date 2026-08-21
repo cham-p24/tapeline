@@ -8,6 +8,7 @@ import { UtmCapture } from "@/components/UtmCapture";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { GeneralInformationNotice } from "@/components/GeneralInformationNotice";
+import { MetaPixel } from "@/components/MetaPixel";
 import { PRICING, usd } from "@/lib/pricing";
 import {
   jsonLdScript,
@@ -261,26 +262,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             PageView only: StartTrial and Purchase are sent server-side by
             services/meta_capi, which survives ad-blockers and the off-session
             first charge 14 days after the click. */}
-        {META_PIXEL_ID && (
-          <Script
-            id="meta-pixel"
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                !function(f,b,e,v,n,t,s)
-                {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-                if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-                n.queue=[];t=b.createElement(e);t.async=!0;
-                t.src=v;s=b.getElementsByTagName(e)[0];
-                s.parentNode.insertBefore(t,s)}(window,document,'script',
-                'https://connect.facebook.net/en_US/fbevents.js');
-                fbq('init', '${META_PIXEL_ID}');
-                fbq('track', 'PageView');
-              `,
-            }}
-          />
-        )}
+        {/* Scoped to marketing pages — MetaPixel refuses to render on /app/*.
+            This layout is the only one carrying <html>, so an unscoped pixel
+            here would run on the whole logged-in surface and report which
+            tickers a user researches to Meta. See components/MetaPixel.tsx. */}
+        <MetaPixel pixelId={META_PIXEL_ID} />
         {/* Microsoft Clarity — session replay + heatmaps for the day-1 bounce.
             Loads only when NEXT_PUBLIC_CLARITY_PROJECT_ID is set (env-gated, no
             default), afterInteractive so it never blocks first paint. */}
