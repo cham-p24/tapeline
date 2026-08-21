@@ -101,13 +101,23 @@ export function ScoreRadial({
 
   // Score-tier colour echoes /how-it-works tier system. Defaults to accent
   // when score isn't provided.
+  //
+  // The design tokens are space-separated RGB TRIPLETS (globals.css:
+  // `--accent: 0 122 255`), so they must be consumed as `rgb(var(--token))`
+  // like every other call site. Passing the bare `var(--accent)` yields
+  // `fill="0 122 255"`, which is not a valid <color>: the browser discards it
+  // and falls back to the SVG initial values — fill:black, stroke:none — so the
+  // whole factor polygon rendered invisible against the dark card (verified in
+  // prod: computed fill was rgb(0,0,0), stroke none). The `#3b82f6`-style
+  // fallbacks never fired either, because the tokens ARE defined; the fallback
+  // now lives inside rgb() as a triplet so it works if a token is ever missing.
   const tone =
-    score == null            ? "var(--accent, #3b82f6)" :
-    score >= 70              ? "var(--up, #22c55e)" :
-    score >= 55              ? "var(--accent, #3b82f6)" :
-    score >= 40              ? "var(--muted, #94a3b8)" :
+    score == null            ? "rgb(var(--accent, 0 122 255))" :
+    score >= 70              ? "rgb(var(--up, 26 127 55))" :
+    score >= 55              ? "rgb(var(--accent, 0 122 255))" :
+    score >= 40              ? "rgb(var(--muted, 113 113 122))" :
     score >= 25              ? "rgb(250, 204, 21)" :
-                               "var(--down, #ef4444)";
+                               "rgb(var(--down, 193 18 31))";
 
   const labelRadius = (size / 2) * (1 - labelGutter * 0.4);
   function labelPos(i: number) {
@@ -135,7 +145,10 @@ export function ScoreRadial({
           d={hexPath(r)}
           fill="none"
           stroke="currentColor"
-          strokeOpacity={r === 1 ? 0.25 : 0.08}
+          // 0.08 was far too faint to read as a grid on the dark card — the
+          // hexagonal "web" is the whole point of the visual, so lift the inner
+          // rings and the outer frame to where they're actually legible.
+          strokeOpacity={r === 1 ? 0.35 : 0.14}
           strokeWidth={r === 1 ? 1 : 0.75}
           className="text-muted"
         />
@@ -152,7 +165,7 @@ export function ScoreRadial({
             x2={p.x}
             y2={p.y}
             stroke="currentColor"
-            strokeOpacity={0.1}
+            strokeOpacity={0.16}
             strokeWidth={0.75}
             className="text-muted"
           />
