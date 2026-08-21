@@ -2444,6 +2444,122 @@ def render_annual_renewal_reminder_email(
     )
 
 
+def render_free_trial_invite_email(
+    user_name: str, *, open_access: bool = False, open_access_until: str = "",
+) -> str:
+    """Day ~3: the first (and usually only) invitation to start a trial.
+
+    This exists because the card-required trial left a hole: `run_daily_drip`
+    keys on `trial_ends_at IS NOT NULL`, and a new account now has no trial, so
+    nobody was ever asked. Activation nudges still fire (they key on
+    `activated_at`), but nothing invited the person to try Premium.
+
+    Two accuracy rules bind this copy, and both are easy to get wrong:
+
+    1. **Do not claim the scanner is locked while open access is running.** Until
+       PROMO_OPEN_ACCESS_UNTIL a signed-in Free user gets the same 1,000 scanner
+       rows Pro does. "Upgrade to unlock the full scanner" is *false* for them
+       today and true again on Sept 9 — so the promo case says so plainly and
+       sells only what Premium genuinely adds on top.
+    2. **State the trial terms here, not at the checkout wall.** The trial takes
+       a card. Someone should learn that from us, in the email doing the asking,
+       not discover it after clicking.
+    """
+    if open_access:
+        access_line = muted_paragraph(
+            f"Right now your Free account has the <strong>full scanner</strong> — "
+            f"every scored row, not the top ten — because open access is running "
+            f"until {open_access_until}. Nothing to do to get it; it is already on."
+        )
+        adds_intro = "What a trial adds on top of that:"
+    else:
+        access_line = muted_paragraph(
+            "Free gives you the top ten scored rows, the daily picks and the "
+            "whole public record, with no card and no expiry."
+        )
+        adds_intro = "What a trial adds:"
+
+    return shell(
+        h1(f"{user_name}, here's what else your account can do.")
+        + lead(
+            "You signed up a few days ago, so this is the one note explaining "
+            "what sits behind the Premium trial — and exactly what it costs to try."
+        )
+        + access_line
+        + muted_paragraph(adds_intro)
+        + card(
+            f"""
+            <ul style="margin:0;padding-left:18px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.75;">
+              <li><strong>Congressional trades</strong> — disclosed House and Senate buys and sells, by ticker</li>
+              <li><strong>Insider filings</strong> — SEC Form 4 transactions: date, insider, shares, value</li>
+              <li><strong>Analyst consensus</strong> per ticker</li>
+              <li><strong>Email alerts and the daily briefing</strong> — Free carries browser push only</li>
+              <li><strong>Your watchlist's own record</strong> — how each name you saved has scored since you added it</li>
+              <li><strong>CSV export and API access</strong></li>
+            </ul>
+            """
+        )
+        + paragraph(
+            "The trial runs 14 days and <strong>takes a card</strong>: "
+            "<strong>$0 is charged today</strong>, the first charge lands 14 days "
+            "later, and one click ends it before then with nothing taken. We email "
+            "you three days before that date, so it cannot arrive unannounced. "
+            "Say no and nothing changes — your Free account stays exactly as it is."
+        )
+        + button("See what's included", "https://tapeline.io/app/billing")
+        + footnote(
+            'Every daily pick we have ever published, including the ones that '
+            'lost, is at <a href="https://tapeline.io/scorecard" '
+            f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">tapeline.io/scorecard</a> — '
+            'readable without an account, before you decide anything.'
+        ),
+        preheader=(
+            "What the Premium trial adds, and exactly what it costs to try "
+            "($0 today, card required, one click to stop)."
+        ),
+    )
+
+
+def render_free_trial_last_invite_email(user_name: str) -> str:
+    """Day ~12: the second and final invitation. Then the series stops.
+
+    Deliberately not a harder sell than the first. The lesson already learned
+    here is that saturation is the failure mode — the three most engaged early
+    users each received six to ten automated touches and none of them converted.
+    So this leads with the least flattering fact we have, which is also the most
+    honest reason to trust the product, and then gets out of the way.
+    """
+    return shell(
+        h1("Last note about the trial.")
+        + lead(
+            f"{user_name}, this is the final message in this series — after it, "
+            f"you'll only hear from us for the things you asked for."
+        )
+        + paragraph(
+            "Most screeners show you a score and never mention what happened "
+            "next. We publish every daily top-ten pick the day it prints, append "
+            "the following session's move against SPY, and never edit it — losses "
+            "included."
+        )
+        + muted_paragraph(
+            "The honest state of that record is on the page: at the current "
+            "sample the picks do not beat SPY, and we label it as not "
+            "distinguishable from chance rather than hiding it. That is the "
+            "thing worth judging us on, and you can read it without an account."
+        )
+        + button("Read the record", "https://tapeline.io/scorecard")
+        + muted_paragraph(
+            "If it holds up for you, the 14-day Premium trial is on the billing "
+            "page — card required, $0 today, one click to stop before the first "
+            "charge. If not, your Free account stays open and unchanged."
+        )
+        + footnote(
+            "That's the end of this series. — Christian, founder."
+        ),
+        preheader="The last note — our published record, losses included.",
+    )
+
+
 def render_trial_started_email(
     user_name: str,
     *,
@@ -4246,6 +4362,140 @@ async def run_activation_nudge_drip(
             except Exception:
                 logger.exception(
                     "activation_nudge.send_failed user=%s stage=%s",
+                    user.id, token,
+                )
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_free_trial_invite_drip(
+    session, *, governor: FrequencyGovernor | None = None, now=None,
+) -> dict[str, int]:
+    """Invite a FREE account to start the (card-required) Premium trial.
+
+    This closes a hole the card-required change opened. `run_daily_drip` keys on
+    `trial_ends_at IS NOT NULL`; a new account no longer has a trial, so every
+    conversion message in that drip became unreachable for new signups — nobody
+    was ever asked. It cannot be fixed by relaxing that filter either: the day
+    11/13 stages say "add a card" and their CTAs are signed Stripe *Checkout*
+    links, which for a card-on-file user would open a SECOND subscription.
+
+    So this is a separate, deliberately SHORT series — two messages, then it
+    stops:
+
+      "free_invite1"  ~3-6 days after signup. What Premium adds, and the trial's
+                      real terms (card, $0 today, one click to stop).
+      "free_invite2"  ~12-16 days. One last note led by the published record,
+                      then silence.
+
+    Two messages is the whole design, not a starting point. The three most
+    engaged early users received six to ten automated touches each and none
+    converted; saturation is the demonstrated failure mode here, not
+    under-messaging.
+
+    Audience is strictly the un-asked: tier FREE, never started a trial
+    (`trial_started_at IS NULL`), and no Stripe customer. Anyone who has trialled
+    or holds a card is excluded — they are already in a different conversation.
+    Windows are bounded on BOTH ends so a worker that was down for a fortnight
+    cannot wake up and mail a backlog at once.
+
+    Gated on EmailPref.TRIAL_DRIP, unsubscribe-aware via the governor, and a
+    no-op without RESEND_API_KEY (send_email returns skipped:True, so no token
+    is stamped and the user is simply retried next tick).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+    from app.services.tier import PROMO_OPEN_ACCESS_UNTIL, free_open_access
+
+    now = now or datetime.now(UTC)
+    counts = {"free_invite1": 0, "free_invite2": 0}
+
+    # Only people who have never been asked. A trial-starter or card-holder is
+    # in another sequence entirely and must not receive an invitation to do the
+    # thing they already did.
+    never_trialled = [
+        User.tier == "free",
+        User.trial_started_at.is_(None),
+        User.stripe_customer_id.is_(None),
+        User.trial_ends_at.is_(None),
+    ]
+
+    open_access = free_open_access()
+    open_until = f"{PROMO_OPEN_ACCESS_UNTIL:%B} {PROMO_OPEN_ACCESS_UNTIL.day}"
+
+    stages = [
+        (
+            "free_invite1",
+            now - timedelta(days=6), now - timedelta(days=3),
+            lambda name: render_free_trial_invite_email(
+                name, open_access=open_access, open_access_until=open_until,
+            ),
+            "What else your Tapeline account can do",
+        ),
+        (
+            "free_invite2",
+            now - timedelta(days=16), now - timedelta(days=12),
+            render_free_trial_last_invite_email,
+            "Last note — our published record",
+        ),
+    ]
+
+    any_sent = False
+    for token, lower, upper, renderer, subject in stages:
+        users = (
+            await session.execute(
+                select(User).where(
+                    User.created_at >= lower,
+                    User.created_at < upper,
+                    *never_trialled,
+                )
+            )
+        ).scalars().all()
+
+        for user in users:
+            if not user.email:
+                continue
+            sent_tokens = set((user.drip_state or "").split(",")) - {""}
+            if token in sent_tokens:
+                continue
+            # Never send the second note to someone who never got the first —
+            # a worker outage across the first window would otherwise make the
+            # "last note" the only note, which reads as a non-sequitur.
+            if token == "free_invite2" and "free_invite1" not in sent_tokens:
+                continue
+            if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=token,
+            ):
+                continue
+            try:
+                html = renderer(user.name or "trader")
+                res = await send_email(
+                    user.email, subject, html,
+                    persona="sales",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="trial_drip",
+                )
+                if not res.get("skipped", False):
+                    sent_tokens.add(token)
+                    user.drip_state = ",".join(sorted(sent_tokens))
+                    # Per-user commit; a deploy SIGTERM must not roll back a
+                    # delivered send and re-mail the person tomorrow.
+                    await session.commit()
+                    counts[token] += 1
+                    any_sent = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
+            except Exception:
+                logger.exception(
+                    "free_trial_invite.send_failed user=%s stage=%s",
                     user.id, token,
                 )
 
