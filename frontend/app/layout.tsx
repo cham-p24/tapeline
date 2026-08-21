@@ -9,6 +9,13 @@ import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { GeneralInformationNotice } from "@/components/GeneralInformationNotice";
 import { MetaPixel } from "@/components/MetaPixel";
+import {
+  GA4_ID,
+  GOOGLE_ADS_ID,
+  META_PIXEL_ID,
+  CLARITY_ID,
+  PLAUSIBLE_DOMAIN,
+} from "@/lib/trackers";
 import { PRICING, usd } from "@/lib/pricing";
 import {
   jsonLdScript,
@@ -38,7 +45,7 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
 // (or your custom Plausible host via NEXT_PUBLIC_PLAUSIBLE_SCRIPT) to flip
 // on. No personal data, GDPR-friendly, ~1KB script.
-const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "";
+// PLAUSIBLE_DOMAIN now comes from lib/trackers — see the import above.
 const PLAUSIBLE_SCRIPT =
   process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT || "https://plausible.io/js/script.js";
 
@@ -48,13 +55,13 @@ const PLAUSIBLE_SCRIPT =
 // to disable on a specific environment. GA4 powers the GSC ↔ signup
 // attribution loop — Search Console shows what query brought a visitor,
 // GA4 shows what they did after (event "sign_up" on the success page).
-const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
+// GA4_ID now comes from lib/trackers — see the import above.
 
 // Microsoft Clarity project ID — free session replay + heatmaps. Env-only, no
 // hardcoded default: set NEXT_PUBLIC_CLARITY_PROJECT_ID once a Clarity project
 // exists (clarity.microsoft.com) to switch it on. The highest-ROI tool for the
 // documented day-1 bounce — watch real sessions to see WHY visitors leave.
-const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || "";
+// CLARITY_ID now comes from lib/trackers — see the import above.
 // Meta pixel. Deliberately NO default — unset means no Meta JS is fetched at
 // all, which is the correct state until an ad account actually exists. The
 // conversion events that matter (StartTrial, Purchase) are sent server-side
@@ -64,7 +71,7 @@ const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || "";
 // this name does nothing. The value comes from frontend/fly.toml [build.args]
 // via the Dockerfile ARG. See the "build-arg hole" suite in
 // frontend/__tests__/FunnelInstrumentation.test.tsx.
-const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
+// META_PIXEL_ID now comes from lib/trackers — see the import above.
 
 // Google Ads conversion tag (AW-XXXXXXXXXX). DISTINCT from GA4: this is what
 // makes ad clicks -> signups countable as conversions in the Google Ads
@@ -76,7 +83,7 @@ const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
 // gtag.js loader with GA4 below; per-event send_to labels live in lib/gtag.ts
 // (NEXT_PUBLIC_GOOGLE_ADS_*_LABEL — still unset until the conversion label is
 // pulled from the Ads conversion action, at which point signups start counting).
-const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
+// GOOGLE_ADS_ID now comes from lib/trackers — see the import above.
 
 // Title template is "%s" so each page owns its full <title>. Putting the
 // brand suffix in the template double-applies it on pages that already

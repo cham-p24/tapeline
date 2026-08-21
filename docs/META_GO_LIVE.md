@@ -27,7 +27,20 @@ So run this as a **message test with a hard stop**, not as a growth channel. The
 | Ad copy, lint-clean | ✅ 5 variants | `META_ADS_DECISION.md` §9 |
 | Landing message-match | ✅ exists | `?from=` on `/signup` |
 
-**Verified inert today:** `curl -s https://tapeline.io | grep -c connect.facebook.net` → `0`. The CSP permits Meta, but no Facebook script is emitted because `NEXT_PUBLIC_META_PIXEL_ID` is unset. Nothing is tracked until you deliberately turn it on.
+**Verified inert today** — on live tapeline.io in a real browser: `window.fbq` is `undefined`, zero network requests to any facebook host, and no `_fb*` cookies. The CSP permits Meta, but nothing loads because `NEXT_PUBLIC_META_PIXEL_ID` is unset.
+
+> ⚠️ **Do not verify this with `curl | grep connect.facebook.net`.** I used that check first and it was wrong. The pixel loads with `strategy="afterInteractive"`, so Next injects it **client-side after hydration** — it never appears in server HTML whether the pixel is on or off. That grep returns `0` in both states and proves nothing.
+>
+> Valid checks, after you enable it:
+> ```bash
+> # the pixel id DOES appear in the RSC payload when set
+> curl -s https://tapeline.io | grep -c "<your-pixel-id>"
+> ```
+> or, definitively, open the site and run in the browser console:
+> ```js
+> typeof window.fbq          // "function" once live
+> document.cookie.match(/_fbp/)
+> ```
 
 ---
 
