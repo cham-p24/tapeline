@@ -30,7 +30,15 @@ from app.services.sector import (
     TAPE_COMMODITIES,
     TAPE_ETF,
 )
-from app.services.tier import FEATURES, Tier, effective_limit, has_feature, is_on_trial, limit
+from app.services.tier import (
+    FEATURES,
+    Tier,
+    effective_limit,
+    has_feature,
+    is_on_trial,
+    limit,
+    must_add_card,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -100,6 +108,17 @@ async def me(
         "name": user.name,
         "tier": user.tier,
         "on_trial": on_trial,
+        # Card gate. True when this account has to put a card on file before
+        # using the /app product — see services/tier.must_add_card, which is the
+        # single source of truth for the wall (accounts created BEFORE
+        # CARD_GATE_START are grandfathered and always get False here, as do
+        # admins, lifetime accounts, anyone with a card, and anyone who already
+        # trialled). The frontend routes off this flag, so it must be right for
+        # every state; the anonymous branch above deliberately omits it —
+        # logged-out visitors aren't gated at all, and the public surface
+        # (/scorecard, /daily-picks, the record export, the public API) stays
+        # open with no account and no card.
+        "must_add_card": must_add_card(user),
         "billing": billing,
         # One-time 50%-off-3-months offer for expired card-less trialists —
         # drives the offer line in TrialEndedModal. Gate shared with checkout

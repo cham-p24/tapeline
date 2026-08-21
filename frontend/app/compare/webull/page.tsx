@@ -27,7 +27,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What's the 14-day Tapeline trial?",
-    a: "14 days of full Premium access (everything in Pro plus Congressional trades, insider buys via SEC Form 4). Starting it takes a card: $0 is charged today, the first charge is on day 14, and one click cancels before then. Creating the account itself is email and password only, and the Free tier never asks for a card. Plenty of users run it side-by-side with Webull during the trial to decide if the scoring layer is worth the subscription.",
+    a: "14 days of full Premium access (everything in Pro plus Congressional trades, insider buys via SEC Form 4). It starts when you add a card at first sign-in: $0 is charged that day, the first charge is on day 14, and one click cancels before then. Plenty of users run it side-by-side with Webull during the trial to decide if the scoring layer is worth the subscription. If you'd rather not put a card down, the daily Top 10 and the full public scorecard are readable with no account.",
   },
 ];
 

@@ -420,3 +420,89 @@ def effective_limit(user: User, key: str) -> int | None:
     if not is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id):
         return base
     return _TRIAL_PREMIUM_REDUCTIONS[key]
+
+
+# ---- Card gate (new accounts add a card before using the /app product) ------
+#
+# From CARD_GATE_START a NEW account has to put a card on file before it can
+# use the logged-in product: Stripe Checkout, $0 charged today, 14-day trial,
+# first charge at trial end, one click to cancel before then. `must_add_card`
+# below is the ONE predicate every surface reads (it is exposed on /api/me and
+# the frontend routes off that flag), so the wall can never be computed two
+# different ways in two places.
+#
+# GRANDFATHERING IS THE LOAD-BEARING PART OF THIS RULE. Every account created
+# BEFORE this date signed up under "free account, no card" and keeps that deal
+# forever — those users must NEVER see the wall. That is a promise made to real
+# people, not a tunable knob: do not "simplify" the created_at comparison away,
+# and do not move the date backwards over accounts that already exist.
+#
+# What this gate does NOT touch, deliberately: the public surface. /scorecard,
+# /daily-picks, the record CSV/JSON export, the marketing pages and the public
+# API stay open with no account and no card. Anonymous callers have no User row
+# at all, so this predicate never runs for them.
+#
+# Same dated-cutover shape as FREE_WATCHLIST_REMOVAL_DATE / PROMO_OPEN_ACCESS_
+# UNTIL above (free_open_access / free_watchlist_cap are the local precedent):
+# one constant, one predicate, an injectable date so tests can pin it.
+CARD_GATE_START: Final[date] = date(2026, 8, 22)
+
+
+def must_add_card(user: User, gate_start: date | None = None) -> bool:
+    """True when this account must add a card before using the /app product.
+
+    ALL of the following must hold:
+
+      1. the account was created ON OR AFTER `gate_start` (default
+         CARD_GATE_START) — the grandfather clause. This is the condition that
+         protects every user who signed up under the old "free, no card" deal;
+         it is checked against the account's own creation timestamp, never
+         against "is this user currently free",
+      2. there is no card on file (`stripe_customer_id` is None) — a user who
+         has been through Stripe has already been asked,
+      3. the account has never trialled (`trial_started_at` is None) — asking a
+         second time would re-wall someone who already made the decision,
+      4. the account is neither an admin nor a lifetime purchase, and is not
+         already on a paid tier — a hand-comped pro/premium account has no
+         Stripe customer and no trial stamp, and must not be walled out of
+         access someone deliberately granted it.
+
+    `gate_start` is injectable so tests can pin the cutover without depending on
+    the wall-clock date (mirrors the `today`/`d` argument on free_open_access
+    and free_watchlist_cap). Note the gate compares the ACCOUNT's creation date
+    to the cutover — there is deliberately no "is the promo running today"
+    branch, because the wall is permanent from the cutover onwards.
+
+    FAIL-OPEN on an unknown creation date: a User whose `created_at` is not
+    populated (the column is a server_default, so a freshly-inserted row that
+    has not been re-read — e.g. the dev-bypass user — or a bare in-memory
+    object reads None) is treated as grandfathered. Wrongly walling an existing
+    user is a bait-and-switch on a real person; wrongly letting a new one in
+    costs one card. We take the second every time.
+    """
+    # Exemptions first — cheap, and true regardless of when the account was made.
+    if user.is_admin or user.is_lifetime:
+        return False
+    # Card already on file → they have been through Stripe; never re-wall.
+    if user.stripe_customer_id is not None:
+        return False
+    # Already trialled → the ask has been made once; one ask per account.
+    if user.trial_started_at is not None:
+        return False
+    # Hand-comped account → never wall it. A paid tier granted by DB update or
+    # the admin tier-override endpoint carries no Stripe customer and no trial
+    # stamp, so without this clause the founder's own design partners and comped
+    # accounts would be created after the cutover and then walled out of the
+    # product they were just given. The normal paid paths always set
+    # stripe_customer_id, so this only ever catches a deliberate manual grant.
+    if user.tier in ("pro", "premium"):
+        return False
+    created = user.created_at
+    if created is None:
+        return False  # unknown creation date → grandfathered (see docstring)
+    # SQLite (dev/tests) hands back naive datetimes for tz-aware columns; treat
+    # naive as UTC — same idiom as is_on_trial above.
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    # GRANDFATHER CLAUSE: created BEFORE the cutover → never gated, forever.
+    return created.astimezone(UTC).date() >= (gate_start or CARD_GATE_START)

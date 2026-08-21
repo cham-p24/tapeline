@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Many active traders do — TradingView for chart analysis and community ideas, Tapeline for the multi-factor scoring and the public scorecard back-checking every call. Run Tapeline alongside your existing TradingView setup — the Free tier costs nothing and asks for no card, and the 14-day Premium trial takes a card but charges $0 until day 14 and cancels in one click.",
+    a: "Many active traders do — TradingView for chart analysis and community ideas, Tapeline for the multi-factor scoring and the public scorecard back-checking every call. Run Tapeline alongside your existing TradingView setup: the 14-day Premium trial takes a card at first sign-in but charges $0 until day 14 and cancels in one click, and if you'd rather not put a card down the daily Top 10 and the full scorecard are readable with no account.",
   },
 ];
 

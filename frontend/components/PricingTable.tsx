@@ -2,36 +2,50 @@
 
 import Link from "next/link";
 import { Button } from "@/components/Button";
-import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
+// FREE_LIMITS / freeHasWatchlist are no longer read here: the $0 column
+// describes the public record (which has no per-account limits), not a
+// logged-in free tier. The constants still exist for the surfaces that
+// legitimately describe grandfathered Free accounts.
+import { PRICING, REFUND, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
 const PLANS = [
   {
-    name: "Free",
-    tagline: "Free forever — live scores",
+    // ── The card-free column, restated (2026-08-22, card gate) ────────────
+    // This card used to be "Free — free forever, live scores" with a "Start
+    // free" button into /signup. A new account now requires a card at first
+    // sign-in, so a self-serve free TIER is no longer something a visitor can
+    // sign up for, and selling one here would be the single most expensive
+    // false claim on the site.
+    //
+    // What is still completely true — and is what this column now shows — is
+    // the PUBLIC record: the daily Top 10, the whole scorecard, a page per
+    // scored ticker and the raw CSV/JSON export are open to anyone with no
+    // account, no card and no email. That is a real $0 offer, so it keeps the
+    // $0 column; it just stops pretending to be a logged-in plan.
+    name: "Public record",
+    tagline: "Open to everyone — no account",
     prices: { monthly: 0, annual: 0, annualPerMonth: 0 },
-    // Free-tier numbers derive from FREE_LIMITS (mirrors backend tier.py) so
-    // this card always sells the tier the backend actually enforces.
     highlights: [
-      "Live scores — no delay",
-      `${FREE_LIMITS.dailyLookups} ticker look-ups per day — unmetered your first ${FREE_LIMITS.firstSessionGraceHours}h`,
-      `Top-${FREE_LIMITS.scannerRows} scanner rows`,
-      ...(freeHasWatchlist() ? [`Watchlist (${FREE_LIMITS.watchlistTickers} tickers)`] : []),
-      `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
-      `${FREE_LIMITS.webPushAlerts} browser push alerts`,
-      "Public scorecard, fully open",
+      "The daily Top 10, live",
+      "The full scorecard — every pick, back-checked vs SPY",
+      "A page per scored ticker, all six factors",
+      "The raw record as CSV and JSON",
+      "The scoring formula, named and weighted",
+      "No account, no card, no email",
     ],
-    cta: "Start free",
-    ctaHref: "/signup",
+    cta: "Read the record",
+    ctaHref: "/scorecard",
+    skipBillingParam: true,
     highlight: false,
-    // Free is the only tier that never asks for a card, and the card-free
-    // path has to be stated HERE — on the tier it is actually true of —
-    // now that starting the Premium trial requires one. A reader who
-    // declines the trial lands on this card and loses nothing.
+    // The grandfather clause, stated where a returning free user will look
+    // first. Accounts created before the cutover keep what they signed up
+    // for; nobody is asked for a card to get back into an account they
+    // already have.
     footnote:
-      "Signing up asks for an email and a password — no card, and Free stays that way for as long as you want it. The 14-day Premium trial is a separate, optional step that does ask for a card.",
+      "Nothing here asks for anything. Signing in to the app is separate and does take a card — see the trial terms below. Accounts created before 22 August 2026 keep the free access they signed up for and are never asked for a card.",
   },
   {
     name: "Pro",
@@ -149,7 +163,12 @@ export function PricingTable() {
           // Monthly stays as-is.
           const perMonth = billing === "annual" ? p.prices.annualPerMonth : price;
           const isPower = (p as { proPlus?: boolean }).proPlus === true;
-          const ctaHref = p.ctaHref.includes("?")
+          // The public-record column links to a shared, indexable public URL;
+          // it carries no plan and no billing period, so it does not get a
+          // ?billing= param bolted on.
+          const ctaHref = (p as { skipBillingParam?: boolean }).skipBillingParam
+            ? p.ctaHref
+            : p.ctaHref.includes("?")
             ? `${p.ctaHref}&billing=${billing}`
             : `${p.ctaHref}?billing=${billing}`;
           return (
@@ -232,18 +251,27 @@ export function PricingTable() {
           with trial_end), so the honest thing is not a risk-reversal badge —
           it is the mechanism: what Stripe takes today, what it takes on day
           14, and the one button that stops it. Cancellation is genuinely one
-          click (POST /api/billing/cancel, no survey gate). Creating an
-          account is still email + password only; that claim now lives on the
-          Free card, where it is true. No urgency, no deadline, no scarcity. */}
+          click (POST /api/billing/cancel, no survey gate).
+
+          2026-08-22: the last sentence used to read "Skip the trial and you
+          stay on Free, which never asks for a card." A new account now adds a
+          card at first sign-in, so there is no skip — and the honest
+          replacement is the way out that actually exists: read the public
+          record, which costs nothing and asks for nothing.
+          No urgency, no deadline, no scarcity. */}
       <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-panel/60 px-4 py-3">
           <div className="text-xs font-medium text-fg">14-day Premium trial — $0 today</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
-            Starting the trial asks for a card. Stripe charges $0 today and shows
-            you the exact first-charge date before you confirm: day 14, at the
-            plan and billing period you picked. One click stops it before that
-            date and you are charged nothing. Skip the trial and you stay on
-            Free, which never asks for a card.
+            A new account adds a card at first sign-in, and that starts the trial.
+            Stripe charges $0 that day and shows you the exact first-charge date
+            before you confirm: day 14, at the plan and billing period you picked.
+            One click stops it before that date and you are charged nothing. If
+            you would rather not put a card down at all, the{" "}
+            <Link href="/scorecard" className="text-accent hover:underline">
+              public record
+            </Link>{" "}
+            stays open with no account.
           </p>
         </div>
         <div className="rounded-lg bg-panel/60 px-4 py-3">

@@ -4,7 +4,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
 import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
-import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -36,7 +36,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Can I try Tapeline before paying?",
-    a: `Two ways. The Free tier (live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day) is free forever and never asks for a card. Or start the 14-day Premium trial, which does take a card — $0 charged today, first charge on day 14, cancel in one click before then.`,
+    a: "Two ways. Read it for free with no account at all — the daily Top 10, the whole scorecard, a page per scored ticker and the raw CSV/JSON export. Or run it yourself: a new account adds a card at first sign-in, which starts the 14-day Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then. Accounts created before 22 August 2026 keep the free access they signed up for.",
   },
 ];
 
@@ -163,7 +163,7 @@ export default function VsFinvizPage() {
             comparison. from="finviz" message-matches the signup H1 for
             Finviz-intent visitors. showPreview off: the comparison table below
             is the proof on this page. */}
-        <LandingCta from="finviz" showPreview={false} />
+        <LandingCta from="finviz" showPreview={false} primaryLabel="Start the 14-day Premium trial" />
         {/* Hype pill removed 2026-05 — counting categories Tapeline "wins
             outright" reads as marketing not honesty. The table below speaks
             for itself; the tradeoffs section names the places Finviz wins. */}
@@ -225,9 +225,9 @@ export default function VsFinvizPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a {REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -238,7 +238,7 @@ export default function VsFinvizPage() {
             destination="signup"
             slug="finviz"
           >
-            Try the live scanner free — no card →
+            Start the 14-day Premium trial →
           </ContentCtaLink>
           <ContentCtaLink
             href="/scorecard"

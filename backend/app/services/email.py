@@ -314,17 +314,28 @@ def render_watchlist_alert_email(
 
 # ── Welcome / day-0 ─────────────────────────────────────────────────────────
 
-# The one paragraph that has to draw the line between the two things people
-# confuse. Creating an account is email + password and lands on Free, which
-# never asks for a card. Starting the 14-day Premium trial is a separate,
-# opt-in step that DOES take a card through Stripe Checkout — $0 is captured
-# on the day, the first real charge is at the end of day 14, and one click
-# stops it. Stated in full here because the welcome mail is the first place a
-# reader forms a belief about whether we can charge them.
+# The one paragraph that has to be exactly right, because the welcome mail is
+# the first place a reader forms a belief about whether we can charge them.
+#
+# CHANGED 2026-08-22 (card gate — see services/tier.CARD_GATE_START). This used
+# to open "The Free plan needs no card and there is nothing to cancel", which
+# was true while signup landed on a card-free Free tier. From the cutover a NEW
+# account adds a card at first sign-in before it can use /app, so that sentence
+# would now be a false statement made to the exact person it is false about.
+#
+# Only render_welcome_email uses this, and welcome is day-0 — grandfathered
+# accounts (created before the cutover) never receive it again, so it is written
+# for the new-account case without a date branch.
+#
+# Three things it must state before any card is asked for: $0 today, when the
+# first charge lands, and that one click stops it — plus a real way out that is
+# not punished (the public record, which needs no account at all).
 _FREE_VS_TRIAL_FOOTNOTE = (
-    "The Free plan needs no card and there is nothing to cancel. The 14-day "
-    "Premium trial does ask for a card: $0 is charged when you start it, the "
-    "first charge is at the end of day 14, and one click cancels before then."
+    "A new account adds a card at first sign-in, on Stripe's own checkout page. "
+    "That starts the 14-day Premium trial: $0 is charged that day, the first "
+    "charge is at the end of day 14, and one click cancels before then with "
+    "nothing taken. If you would rather not, the daily picks and the whole "
+    "public scorecard stay readable at tapeline.io/scorecard with no account."
 )
 
 

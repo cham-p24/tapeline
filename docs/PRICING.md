@@ -8,15 +8,51 @@
 > locked in for early subscribers"** — truthful (subscribers keep their price);
 > never a fake countdown or a fabricated "N left" counter.
 
+## Card gate (2026-08-22)
+
+**A new account must put a card on file at first sign-in before it can use the
+logged-in product.** Single source of truth: `CARD_GATE_START = date(2026, 8, 22)`
+and `must_add_card()` in `backend/app/services/tier.py`; `/api/me` exposes the
+flag and the `/app` layout routes off it. The wall is Stripe Checkout — $0 today,
+14-day Premium trial, first charge at trial end, one click to cancel before then.
+
+Two things this does **not** touch, deliberately:
+
+- **Grandfathered accounts.** Every account created BEFORE 2026-08-22 signed up
+  under "free account, no card" and keeps that deal forever. They never see the
+  wall. Admins and lifetime accounts are exempt too, as is anyone who already has
+  a card on file or has already trialled — the ask is made once per account.
+- **The public surface.** `/scorecard`, `/daily-picks`, the record CSV/JSON
+  export (`/api/scorecard.csv`, `/api/scorecard.json`), the per-ticker pages, the
+  marketing pages and the public API stay open with no account and no card.
+
+Copy rule that falls out of this: **do not describe an account as free or
+card-free anywhere.** Descriptions of the PUBLIC record as free and account-free
+stay true and should stay.
+
 ## Tiers
 
-### Free — "Browser"
+### Public record — free, no account
+**$0**
+- The daily Top 10 at `/daily-picks`, live
+- The complete scorecard at `/scorecard` — every pick, back-checked vs SPY
+- A page per scored ticker at `/t/{TICKER}`, all six factor sub-scores
+- The raw record as CSV and JSON
+- Purpose: the trust asset and the only card-free entry point. Not a trial and
+  does not expire.
+
+### Free — "Browser" (grandfathered accounts only)
 **$0/mo**
-- Scanner: **top 10 tickers, live** (the freemium retune set `FREE_DATA_DELAY_MINUTES = 0` and `FREE_SCANNER_ROWS = 10` in `services/tier.py`; the earlier "top 20, 24-hour delayed" design is retired — conversion pressure now comes from breadth and the daily lookup meter, not stale data)
+- Scanner: **top 10 tickers, live** (`FREE_DATA_DELAY_MINUTES = 0`,
+  `FREE_SCANNER_ROWS = 10` in `services/tier.py`)
 - Market regime: basic view (bull/neutral/bear label only)
 - Watchlist: 5 tickers, no alerts
 - Public scorecard access
-- Purpose: lead magnet + landing-page demo + loss-aversion lever at trial expiry
+- **No longer self-serve.** From 2026-08-22 a new visitor cannot sign up for
+  this tier. It remains the tier for accounts created before the cutover, and
+  the tier an account lands on after cancelling a trial (a card is already on
+  file at that point, so `must_add_card` stays false and they are never
+  re-walled). Marketing surfaces must not advertise it as an available plan.
 
 ### Pro — "Scanner"
 **$9.99/mo** or **$8.25/mo billed annually** ($99/yr · save $20)
@@ -53,23 +89,28 @@ Competitive set:
 - Zacks Premium: $250/yr — rankings, no scanner
 
 Founding pricing puts Tapeline at the bottom of the live-scanner category on
-purpose: an unknown tool with no reviews earns trust with a low ask, a real
-free tier, and a 30-day money-back guarantee — not with a mid-pack sticker.
+purpose: an unknown tool with no reviews earns trust with a low ask, a fully
+public and downloadable track record that needs no account, and a 30-day
+money-back guarantee — not with a mid-pack sticker.
 Pro at $9.99 is an impulse-priced entry; Premium at $19.99 undercuts Unusual
 Whales (~$48/mo) and Trade Ideas (~$170/mo) by a wide margin while covering a
 different primary use case (quant scanner vs. options flow).
 
 ## Trial / conversion strategy
 
-- **14-day Premium trial, card required** — creating an account is email + password
-  only and lands on Free; starting the trial is a separate, opt-in step through
-  Stripe Checkout (`mode=subscription` + `subscription_data.trial_end`)
+- **14-day Premium trial, card required at first sign-in** — signup is email +
+  password, and the first sign-in puts the account in front of the card wall
+  (`/app/start`). Adding a card there runs Stripe Checkout
+  (`mode=subscription` + `subscription_data.trial_end`) and starts the trial.
+  Grandfathered accounts skip the wall entirely.
 - Disclosed before the card is entered: $0 charged today, the exact first-charge
   date (day 14), the amount, and one-click cancel before then
-- Declining the trial is a normal outcome — the account stays on Free, and the
-  Free tier is never gated behind a card
+- Declining is a normal outcome and must not be punished: the wall carries a
+  link to the free public record and a sign-out. No auto-redirect into Stripe,
+  nothing pre-ticked.
 - At day 14, the subscription starts and the card is charged, unless cancelled
-  first (one click in Billing) — in which case the account stays on Free
+  first (one click in Billing) — in which case the account lands on Free and is
+  never asked for a card again
 - **Annual is the default billing toggle** on /pricing and /app/billing (`BillingToggle.tsx` seeds the sitewide annual default so the plan cards and the always-annual comparison table can never disagree); monthly is one click away
 - **30-day money back** on every paid plan (was 7-day; extended 2026-07 —
   costless at zero customers, neutralizes the no-reviews trust gap)

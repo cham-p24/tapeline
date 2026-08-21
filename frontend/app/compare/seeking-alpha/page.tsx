@@ -47,7 +47,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Plain-English Why on every row",
-    tapeline: "✓ Default sentence, every ticker, free tier included",
+    tapeline: "✓ Default sentence, every ticker — public ticker pages included",
     competitor: "Editorial articles where available; many tickers have only Quant grades, no human read",
   },
   {

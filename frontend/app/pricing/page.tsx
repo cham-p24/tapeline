@@ -9,7 +9,10 @@ import { LiveCounters } from "@/components/LiveCounters";
 import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
-import { PRICING, FREE_LIMITS, REFUND, usd, annualRateLabel, freeHasWatchlist } from "@/lib/pricing";
+// FREE_LIMITS / freeHasWatchlist are no longer read on this page: the $0
+// column now describes the public record (no account, no per-account limits)
+// rather than a self-serve logged-in free tier.
+import { PRICING, REFUND, usd, annualRateLabel } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 
 // ISR: regenerate periodically so the date-gated FREE_WATCHLIST_REMOVAL_DATE
@@ -26,22 +29,33 @@ export const revalidate = 21600;
 export const metadata = pageMeta({
   title: `Tapeline Pricing: Pro from ${usd(PRICING.pro.annualPerMonth)}/mo · Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (billed annually) · 14-Day Free Trial`,
   description:
-    `Tapeline pricing: Free forever (live scores, ${FREE_LIMITS.dailyLookups} look-ups/day, top-${FREE_LIMITS.scannerRows} scanner), Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial: card required, $0 charged today, cancel in one click before it ends.`,
+    `Tapeline pricing: Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial: card required at first sign-in, $0 charged today, cancel in one click before it ends. The public scorecard and daily picks stay free with no account.`,
   path: "/pricing",
 });
 
 // FAQs — the visible accordion AND the FAQPage JSON-LD both render from this
 // one array, so what Google shows can never drift from what the page says.
-// Free-tier numbers and the refund guarantee derive from FREE_LIMITS / REFUND
-// in lib/pricing.ts (which mirror backend tier.py and /legal/refund).
+// The refund guarantee derives from REFUND in lib/pricing.ts (single-sourced
+// from /legal/refund). These answers deliberately no longer enumerate
+// FREE_LIMITS: a new visitor cannot sign up for that tier, so quoting its
+// caps here would sell a plan that is not on offer.
 const FAQ_ITEMS = [
   {
     q: "Do I need a card to use Tapeline?",
-    a: `Not for Free. Creating an account asks for an email and a password only, and the Free tier — live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} — never asks for one. Starting the 14-day Premium trial does require a card, because the trial rolls into a paid subscription unless you cancel first.`,
+    // 2026-08-22 card gate. This answer used to open "Not for Free" and
+    // describe a card-free self-serve tier. A new account now adds a card at
+    // first sign-in, so the honest answer splits by surface: reading costs
+    // nothing and asks for nothing; the signed-in app takes a card.
+    a: "To read Tapeline, no. The daily Top 10, the whole public scorecard, a page per scored ticker and the raw CSV/JSON export are open to anyone with no account and no card. To use the signed-in app, yes: a new account adds a card at first sign-in through Stripe Checkout, which starts the 14-day Premium trial. $0 is charged that day, the first charge is on day 14 at the plan you picked, and one click cancels before then. Accounts created before 22 August 2026 keep the free access they signed up for and are never asked for a card.",
   },
   {
     q: "What happens when my trial ends?",
-    a: `On day 14 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to Free forever (live scores, ${FREE_LIMITS.dailyLookups} ticker look-ups a day, the top-${FREE_LIMITS.scannerRows} scanner,${freeHasWatchlist() ? ` a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} the top-${FREE_LIMITS.squeezePreviewRows} squeeze preview, and ${FREE_LIMITS.webPushAlerts} browser push alerts). ${freeHasWatchlist() ? "Watchlists and settings stay intact." : "Your settings stay intact, and anything you saved to a watchlist is kept."}`,
+    // The "you are not re-walled" sentence is checked against the code, not
+    // assumed: backend/app/services/tier.py::must_add_card returns False as
+    // soon as `stripe_customer_id` is set (and again once `trial_started_at`
+    // is set), so an account that has been through Stripe once is never asked
+    // again — cancelling drops it to Free rather than back behind the wall.
+    a: "On day 14 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to Free, and because you have already been through the card step once you are never asked for a card again. Your settings and anything you saved are kept, and the public record — the daily Top 10, the full scorecard, the raw CSV and JSON — stays open either way.",
   },
   {
     q: "Can I switch plans later?",
@@ -88,10 +102,12 @@ export default function PricingPage() {
             </span>
           </h1>
           <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
-            Free is free forever and never asks for a card. The 14-day Premium
-            trial does ask for one &mdash; $0 is charged today, the first charge
-            is on day 14, and one click cancels before then. Subscribers keep
-            their price for as long as the subscription stays active.
+            The published record is free to read and always will be &mdash; no
+            account, no card. The app itself asks for a card at first sign-in,
+            which starts the 14-day Premium trial: $0 is charged that day, the
+            first charge is on day 14, and one click cancels before then.
+            Subscribers keep their price for as long as the subscription stays
+            active.
           </p>
         </div>
 

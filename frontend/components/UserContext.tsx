@@ -3,9 +3,75 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { authApi, type SessionUser } from "@/lib/auth";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
+/**
+ * The session user, plus the card-gate verdict if the session endpoint happens
+ * to carry it.
+ *
+ * `must_add_card` is computed ENTIRELY server-side (backend
+ * services/tier.must_add_card, keyed on the single CARD_GATE_START constant)
+ * and simply reported here. The browser deliberately does NOT re-derive it
+ * from `created_at`: the grandfather rule — accounts created before the
+ * cutover keep their access forever and must never meet the wall — is the one
+ * rule that cannot be allowed to differ between two implementations, so it has
+ * exactly one implementation, and it is not this one.
+ *
+ * Optional on purpose. `/api/auth/session` does not return the field today
+ * (see `resolveCardGate` below), and absent means NOT gated: a payload that
+ * predates the field can never wall anybody.
+ */
+export type SessionUserWithGate = SessionUser & {
+  must_add_card?: boolean;
+};
+
+/**
+ * Resolve the card gate for a signed-in user.
+ *
+ * `/api/me` is the endpoint that owns this flag — it is where the backend
+ * exposes `must_add_card`, and routers/auth.py's `_user_out` (which feeds
+ * `/api/auth/session`) does not carry it. So we read the session first, and
+ * then ask the endpoint that actually knows.
+ *
+ * The session payload takes precedence whenever it DOES carry the field, so
+ * the day `_user_out` starts returning it this second request disappears on
+ * its own with no further change here.
+ *
+ * Every failure path returns false. An unreachable API, a non-200, a body
+ * without the field — none of them are evidence that somebody owes us a card,
+ * and wrongly walling a grandfathered user is the single worst outcome this
+ * feature has. Fail open, always.
+ */
+async function resolveCardGate(user: SessionUserWithGate | null): Promise<boolean> {
+  if (user === null) return false;
+  if (user.must_add_card !== undefined) return user.must_add_card === true;
+  try {
+    const res = await fetch(`${API_BASE}/api/me`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    const body = await res.json();
+    return body?.must_add_card === true;
+  } catch {
+    return false;
+  }
+}
+
 type Ctx = {
-  user: SessionUser | null;
+  user: SessionUserWithGate | null;
   loading: boolean;
+  /**
+   * True only when the server says this account must add a card before it can
+   * reach /app. Read it as `mustAddCard === true`, never as truthiness of a
+   * possibly-absent field.
+   *
+   * OPTIONAL in the type so that consumers which build a Ctx value by hand —
+   * today, the non-production preview harness in app/preview-trial-welcome —
+   * keep compiling without having to opt into a gate they don't model. Those
+   * consumers get `undefined`, i.e. not gated, which is the safe direction.
+   */
+  mustAddCard?: boolean;
   refresh: () => Promise<void>;
   signout: () => Promise<void>;
 };
@@ -14,21 +80,29 @@ type Ctx = {
 // session (see app/preview-trial-welcome) to render auth-gated components like
 // OnboardingTip / TrialEarlyCapture without a real logged-in user.
 export const UserCtx = createContext<Ctx>({
-  user: null, loading: true, refresh: async () => {}, signout: async () => {},
+  user: null, loading: true, mustAddCard: false,
+  refresh: async () => {}, signout: async () => {},
 });
 
 export function useUser() { return useContext(UserCtx); }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const [user, setUser] = useState<SessionUserWithGate | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mustAddCard, setMustAddCard] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const { user } = await authApi.session();
       setUser(user);
+      // Resolved BEFORE `loading` clears, deliberately. Consumers treat
+      // `loading: false` as "the verdict is in"; publishing the user while the
+      // gate is still unknown would flash the product at a gated account for a
+      // beat, and the app shell would mount and fire its authed fetches.
+      setMustAddCard(await resolveCardGate(user));
     } catch {
       setUser(null);
+      setMustAddCard(false);
     } finally {
       setLoading(false);
     }
@@ -37,6 +111,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const signout = useCallback(async () => {
     try { await authApi.signout(); } catch {}
     setUser(null);
+    setMustAddCard(false);
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -72,7 +147,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   return (
-    <UserCtx.Provider value={{ user, loading, refresh, signout }}>
+    <UserCtx.Provider value={{ user, loading, mustAddCard, refresh, signout }}>
       {children}
     </UserCtx.Provider>
   );

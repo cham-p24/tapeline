@@ -817,9 +817,13 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <h2>4. Is the cheapest tier real?</h2>
       <p>Test it. If the free or cheapest paid tier strips out so many
       features the product is unusable, the team is incentivised to
-      upgrade-trap rather than retain. Tapeline Free shows live scores for
-      the top 10 scanner rows plus 5 look-ups a day, free forever — the real
-      product, just narrower — because that's the most honest preview.</p>
+      upgrade-trap rather than retain. Tapeline's answer is to put the whole
+      published record outside the paywall entirely: the daily Top 10, every
+      pick ever made with its next-session result vs SPY, a page per scored
+      ticker, and the raw CSV/JSON — no account, no card. The signed-in app
+      itself takes a card at first sign-in and starts a 14-day Premium trial
+      ($0 that day, first charge on day 14, one click to cancel). Judge the
+      product on the record before you decide whether to open an account.</p>
 
       <h2>5. Can you cancel in one click?</h2>
       <p>If you have to email support to cancel, that's a tell about how
@@ -1091,9 +1095,11 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>Want to see RSI in context for every US ticker? The Tapeline
       composite blends RSI into a single 0–100 score along with five other
-      factors. <a href="/signup">Try the 14-day Premium trial</a> — it takes
-      a card, charges $0 today, and cancels in one click before the day-14
-      charge. The free tier stays card-free.</p>
+      factors. <a href="/signup">Try the 14-day Premium trial</a> — a new
+      account adds a card at first sign-in, $0 is charged that day, and one
+      click cancels before the day-14 charge. If you'd rather not put a card
+      down, the <a href="/scorecard">public record</a> and the daily Top 10
+      stay open with no account.</p>
     `,
     howToTime: "PT8M",
     howToSteps: [
@@ -1851,8 +1857,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       slightly different: how often does the SCORE refresh, not just
       the underlying price? Tapeline's worker ticks every 60 seconds
       during market hours, recomputing the composite from fresh
-      snapshot data. Free tier is 24-hour-delayed (intentional
-      gating); Pro is 60-second freshness.</p>
+      snapshot data — and the public ticker pages show that live score
+      without an account.</p>
 
       <h2>Test 5: What's the unsubscribe / cancel friction?</h2>
 
@@ -1888,9 +1894,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Public scoring methodology</td>
               <td>Yes — six named factors at <a href="/how-it-works">/how-it-works</a>, contribution shown per ticker</td></tr>
           <tr><td>Data freshness</td>
-              <td>60s composite refresh on Pro+; live scores on Free too (gated on breadth, not freshness)</td></tr>
+              <td>60s composite refresh; the public ticker pages show the same live score with no account</td></tr>
           <tr><td>Cancel friction</td>
-              <td>One-click cancel, 30-day refund, card-free free tier (the trial does take a card, and charges $0 until day 14)</td></tr>
+              <td>One-click cancel, 30-day refund. The trial takes a card at first sign-in and charges $0 until day 14; the published record needs no account at all</td></tr>
         </tbody>
       </table>
 
