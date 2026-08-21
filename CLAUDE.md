@@ -32,7 +32,7 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03, founding reprice 2026-07-03):
-- **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
+- **Free** $0 — **top-10 scanner rows, LIVE (no delay)**, 12 ticker-detail lookups/UTC day, watchlist (5 tickers, 1 list), 2 web-push alert rules; no email/Telegram alerts, no CSV, no API. The old "top 20, 24-hour delayed" framing is **dead** — the 2026-06-20 freemium retune set `FREE_DATA_DELAY_MINUTES = 0` and `FREE_SCANNER_ROWS = 10`, so conversion pressure comes from breadth + the lookup meter, not stale data. The Free watchlist survives: the 2026-08-02 cutover to 0 was **reversed 2026-08-19** (#525) and `free_watchlist_cap()` now returns 5 unconditionally.
 - **Pro** $9.99/mo OR **$8.25/mo billed annually** ($99/yr · save $20) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
 - **Premium** $19.99/mo OR **$16.58/mo billed annually** ($199/yr · save $40) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing is now surfaced: `ComparisonTable.tsx` + `PricingTable.tsx` both show the "Public API access · 1,000 requests/day" Premium line, and a public `/developers` landing page (2026-06-06) documents the live endpoints — added to the sitemap + footer, with a tailored OG card.)
 
@@ -40,7 +40,13 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
-**Trial:** auto-started on signup gives **PREMIUM** for 14 days, no card. At expiry, hourly worker task `_downgrade_expired_trials` drops users with no `stripe_customer_id` straight to `free` (skip the Pro middle so loss aversion bites hardest). `TrialBanner.tsx` shows the countdown.
+**Trial (card-required since PR #536 — read this before writing any copy):** signup grants **no trial at all**. Creating an account is email + password and lands on **Free, forever, with no card** (see the "NO trial is granted here" block in `backend/app/routers/auth.py`; the row is written `tier="free", trial_ends_at=None`).
+
+The 14-day **Premium** trial is a separate, explicitly-chosen, **card-required** step: `POST /api/billing/checkout {"start_trial": true}` opens a Stripe Checkout that collects a card, charges **$0 today**, and states the exact first-charge date. It's gated on never-having-trialled, and returns `trial_end` + `trial_days` so the confirmation UI restates the same instant Stripe was given. `tier` / `trial_ends_at` / `trial_started_at` are written by the `trialing` subscription webhook in `backend/app/routers/webhooks.py` from the subscription's own `trial_end` — never at signup. Declining the checkout leaves the account exactly as created.
+
+**Never write "14-day trial, no credit card" in marketing, ad, or email copy.** "No card" is true of the Free account and the Free tier only — never of the trial. This is a financial product; the claim would be false advertising. The CARD HONESTY block in `frontend/app/signup/page.tsx` is the canonical statement of the rule. `TrialBanner.tsx` likewise branches on card-on-file (first charge lands at trial end, one click cancels before then) vs the legacy card-free trial (nothing charged, the account just moves to Free).
+
+The hourly `_downgrade_expired_trials` worker task still drops expired-trial users with no `stripe_customer_id` straight to `free` (skipping the Pro middle so loss aversion bites hardest) — but it is now a **legacy safety net** for the old auto-granted trials, since a card-required trial always has a `stripe_customer_id` and lapses through Stripe instead.
 
 ## Pricing source-of-truth (all kept in sync as of 2026-05-03)
 - `backend/app/services/tier.py` — feature gating + caps (no $ amounts here)
@@ -204,7 +210,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
   marketing trust signal don't degrade. Gate lives in
   `backend/app/routers/scorecard.py` (`_FREE_DELAY_DAYS`).
 - Three-tier price points (founding pricing 2026-07: $9.99 Pro / $19.99 Premium, framed "locked in for early subscribers"; 30-day money back) — only revisit with conversion data
-- Free tier shows real product (delayed) — not a feature-stripped version
+- Free tier shows the real product, LIVE — not a feature-stripped version, and not a delayed one (the 24h delay cliff went 2026-06-20; the Free caps are row count, lookups/day, and watchlist size)
 - Owner login mechanism (only seeded via `seed_owner.py`, never via signup form)
 
 ## Critical file map
