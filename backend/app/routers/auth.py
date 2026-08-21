@@ -423,6 +423,30 @@ async def signup(
     response.set_cookie(value=token, **session_cookie_kwargs())
     logger.info("auth.signup user=%s referred_by=%s", user.id, referred_by_id or "none")
 
+    # Server-side `CompleteRegistration` for Meta. Same reasoning as the GA4
+    # sign_up beacon in routers/oauth.py: the client-side pixel is the only
+    # other record, and this audience runs ad-blockers well above web average,
+    # so a browser-only signup event under-counts real conversions — which is
+    # precisely the signal an ad account would be optimising against.
+    #
+    # Why this event and not just StartTrial: since #536 the 14-day trial is a
+    # SEPARATE, card-required step, so StartTrial is now genuinely scarce.
+    # Meta's smart bidding wants ~50 events per ad set per week; at Tapeline's
+    # volume only the free-account signup has any chance of approaching that.
+    # Both are sent — which one a campaign OPTIMISES toward is a campaign
+    # setting, not a code decision. See docs/META_GO_LIVE.md.
+    #
+    # Fire-and-forget, env-gated, never raises — a Meta hiccup must not cost
+    # someone their account.
+    try:
+        from app.services import meta_capi
+
+        await meta_capi.track_complete_registration(
+            user_id=user.id, email=user.email, method="email"
+        )
+    except Exception:
+        logger.exception("auth.meta_complete_registration_failed user=%s", user.id)
+
     # Day-0 email. Fire-and-forget — failures don't block signup.
     # send_email is a no-op if RESEND_API_KEY isn't set, so this is safe in dev.
     # Referred users get a credit-acknowledgement email instead of the standard
