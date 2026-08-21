@@ -1396,6 +1396,7 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             run_annual_renewal_reminder_drip,
             run_daily_drip,
             run_founder_touch_drip,
+            run_free_trial_invite_drip,
             run_re_engagement_drip,
             run_referral_milestone_drip,
             run_winback_drip,
@@ -1421,6 +1422,14 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             renewal_counts = await run_annual_renewal_reminder_drip(
                 drip_session, governor=governor,
             )
+            # The card-required trial made run_daily_drip unreachable for new
+            # signups (it keys on trial_ends_at, and an account no longer starts
+            # with one), so without this nobody is ever invited to try Premium.
+            # Same governor, so these two touches count against the same
+            # per-user frequency cap as everything else in this block.
+            invite_counts = await run_free_trial_invite_drip(
+                drip_session, governor=governor,
+            )
             ft_counts = await run_founder_touch_drip(drip_session, governor=governor)
             refm_counts = await run_referral_milestone_drip(
                 drip_session, governor=governor,
@@ -1430,6 +1439,11 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
                 "drip.sent day3=%d day7=%d day13=%d lapse30=%d",
                 counts["day3"], counts["day7"], counts["day13"],
                 counts.get("lapse30", 0),
+            )
+        if any(invite_counts.values()):
+            logger.info(
+                "drip.free_trial_invite_sent first=%d last=%d",
+                invite_counts["free_invite1"], invite_counts["free_invite2"],
             )
         if any(re_counts.values()):
             logger.info(
