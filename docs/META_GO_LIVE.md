@@ -117,7 +117,7 @@ Point each at `/signup?from=<key>` so the landing H1 restates the ad's promise (
 |---|---|
 | "One number. One sentence." | `/signup?from=screener` |
 | "We publish the record, misses included." | `/signup?from=scorecard` |
-| "See what the scanner read — free." | `/signup` |
+| "See what the scanner read — no account needed." *(corrected 2026-08-22: the "— free." form predated the #548 card gate; the public pages are the true no-account surface)* | `/scorecard` |
 | "Built for the 20-minute trader." | `/signup` |
 | "Six factors. Plain-English labels. Public methodology." | `/signup` |
 
