@@ -15,7 +15,7 @@ import {
 } from "@/lib/webPush";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
@@ -881,7 +881,11 @@ export default function BillingPage() {
           />
           <UsageTile
             label="Scanner rows"
-            limit={tier === "free" ? FREE_LIMITS.scannerRows : 2500}
+            // This tile states the signed-in user's OWN current cap, so it is
+            // one of the two surfaces that must follow the open-access lift
+            // (freeScannerRows, lib/pricing.ts). Everything else on this page
+            // describes the steady-state plan and stays on FREE_LIMITS.
+            limit={tier === "free" ? freeScannerRows({ authenticated: true }) : 2500}
             unit="rows"
           />
         </div>

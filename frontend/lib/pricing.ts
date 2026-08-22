@@ -82,6 +82,52 @@ export const FREE_LIMITS = {
 } as const;
 
 /**
+ * Open-access month — mirrors backend tier.py `PROMO_OPEN_ACCESS_UNTIL` +
+ * `free_open_access()`, which explicitly asks to be kept in lock-step with this
+ * file. Founder experiment (2026-08-08): the Free tier's scanner ROW cap lifts
+ * to the Pro cap until this date, then auto-reverts with no deploy. Last open
+ * day is 2026-09-07; the boundary matches the backend's `d < UNTIL` exactly.
+ */
+export const PROMO_OPEN_ACCESS_UNTIL = new Date("2026-09-08T00:00:00Z");
+
+/** True while the open-access month is running. */
+export function freeOpenAccess(now: Date = new Date()): boolean {
+  return now.getTime() < PROMO_OPEN_ACCESS_UNTIL.getTime();
+}
+
+/** Pro's scanner row cap — mirrors backend TIER_LIMITS[PRO]["scanner_rows"]. */
+export const PRO_SCANNER_ROWS = 1000;
+
+/**
+ * Scanner rows a Free user ACTUALLY gets right now — the audience-aware
+ * accessor for `FREE_LIMITS.scannerRows`.
+ *
+ * The backend gates the open-access lift on `authenticated` (see the
+ * `limit()` body in tier.py), so the honest number depends on who is reading:
+ *
+ *   - `authenticated: true`  → a signed-in Free user, who really does get the
+ *     Pro cap while the window is open. Use this wherever the copy states that
+ *     user's OWN CURRENT entitlement: the /app/billing "Plan limits" tile, the
+ *     post-trial "what your Free account keeps" list.
+ *   - default (`false`)      → logged-out visitors, for whom the backend
+ *     returns the standard cap, AND every steady-state PLAN DESCRIPTION:
+ *     pricing cards, the comparison matrix, signup and public ticker copy.
+ *     These describe the product on sale, not a promo entitlement, and the
+ *     promo expires — quoting 1,000 on a forward-looking surface (cancel
+ *     intercept, trial-ending nudge) would over-promise to anyone whose
+ *     cancellation or trial lands after the revert date.
+ *
+ * Defaulting to the conservative number is deliberate: a new call site that
+ * forgets the flag understates rather than over-promises.
+ */
+export function freeScannerRows(
+  opts: { authenticated?: boolean; now?: Date } = {},
+): number {
+  const { authenticated = false, now = new Date() } = opts;
+  return authenticated && freeOpenAccess(now) ? PRO_SCANNER_ROWS : FREE_LIMITS.scannerRows;
+}
+
+/**
  * Watchlist → Pro+ cutover — REVERSED 2026-08-19. The 2026-08-02 cutover (email
  * 2026-07-26) that made the saved watchlist Pro-only was reversed to un-break the
  * free web-push alert on-ramp and stop tightening the free tier while arrivals +

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { trackEvent } from "@/lib/gtag";
-import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist } from "@/lib/pricing";
+import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 
 /**
  * One-time blocking modal that fires the first time a user lands on /app
@@ -30,17 +30,27 @@ import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist } fro
  * What a Free account genuinely retains after the trial. Post-#343 this is a
  * real product, not a stub, so the modal states it in full rather than
  * implying the user has lost everything. Numbers come from FREE_LIMITS.
+ *
+ * A FUNCTION, not a module-level const: the row count is window-aware (see
+ * below), and a const would freeze whatever the answer was at import time.
  */
-const FREE_TIER_KEEPS = [
-  `${FREE_LIMITS.dailyLookups} ticker look-ups a day`,
-  // Watchlist is Pro-and-up from the 2026-08-02 cutover — only list it as a
-  // Free "keep" while the Free tier still includes one.
-  ...(freeHasWatchlist() ? [`A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`] : []),
-  `The top ${FREE_LIMITS.scannerRows} scanner rows, live — no delay`,
-  `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
-  `${FREE_LIMITS.webPushAlerts} browser push alerts`,
-  "The full public scorecard",
-];
+function freeTierKeeps(): string[] {
+  return [
+    `${FREE_LIMITS.dailyLookups} ticker look-ups a day`,
+    // Watchlist is Pro-and-up from the 2026-08-02 cutover — only list it as a
+    // Free "keep" while the Free tier still includes one.
+    ...(freeHasWatchlist() ? [`A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`] : []),
+    // This modal only renders for a signed-in user already on tier "free"
+    // (see the effect below), so it describes their CURRENT entitlement —
+    // which follows the open-access lift while that window is open. Saying
+    // "top 10" to someone who can see 1,000 rows would read as a lie about
+    // the product they are looking at.
+    `The top ${freeScannerRows({ authenticated: true })} scanner rows, live — no delay`,
+    `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
+    `${FREE_LIMITS.webPushAlerts} browser push alerts`,
+    "The full public scorecard",
+  ];
+}
 
 export function TrialEndedModal() {
   const { user } = useUser();
@@ -98,7 +108,7 @@ export function TrialEndedModal() {
             What your Free account keeps
           </div>
           <ul className="mt-2 space-y-1 text-sm text-muted">
-            {FREE_TIER_KEEPS.map((item) => (
+            {freeTierKeeps().map((item) => (
               <li key={item} className="flex gap-2">
                 <span aria-hidden="true" className="text-muted">
                   &middot;

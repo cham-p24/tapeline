@@ -16,7 +16,7 @@ vi.mock("@/components/UserContext", () => ({
 }));
 import { TrialEndedModal } from "@/components/TrialEndedModal";
 import { useUser } from "@/components/UserContext";
-import { FREE_LIMITS, REFUND, freeHasWatchlist } from "@/lib/pricing";
+import { FREE_LIMITS, REFUND, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 
 const mockedUseUser = useUser as ReturnType<typeof vi.fn>;
 
@@ -53,7 +53,11 @@ describe("TrialEndedModal", () => {
     } else {
       expect(text).not.toContain("-ticker watchlist");
     }
-    expect(text).toContain(`top ${FREE_LIMITS.scannerRows} scanner rows`);
+    // Window-aware: lifts to the Pro cap while open access runs, back to
+    // FREE_LIMITS.scannerRows after. Asserting through the same helper the
+    // component uses keeps this correct on both sides of the revert date —
+    // same idiom as backend tests/test_upgrade_nudge.py.
+    expect(text).toContain(`top ${freeScannerRows({ authenticated: true })} scanner rows`);
     expect(text).toContain(`top-${FREE_LIMITS.squeezePreviewRows} preview`);
     expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);
     expect(text).toMatch(/full public scorecard/i);
