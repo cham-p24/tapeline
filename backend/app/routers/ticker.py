@@ -10,13 +10,20 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, date, datetime, timedelta
+from statistics import median
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, get_session, is_sqlite
-from app.models import EarningsEvent, NewsItem, SqueezeSetup, Ticker
+from app.models import (
+    DailyScorecardEntry,
+    EarningsEvent,
+    NewsItem,
+    SqueezeSetup,
+    Ticker,
+)
 from app.models.news import exclude_mock_clause, tickers_match_clause
 from app.services.auth import current_user_optional, current_user_required
 from app.services.finnhub_feed import (
@@ -25,6 +32,7 @@ from app.services.finnhub_feed import (
     fetch_insider_transactions,
 )
 from app.services.news_feed import fetch_news_for_ticker
+from app.services.percentile import peer_percentiles
 from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
 
@@ -295,6 +303,136 @@ def _key_stats_payload(t: Ticker, next_earnings_date: date | None) -> dict:
     }
 
 
+# ── This ticker on our public record ───────────────────────────────────────
+# `daily_scorecard` is the frozen record of what the algo flagged each day: one
+# row per (date, symbol) for that day's top-10, plus the next session's outcome
+# written afterwards by the back-check job. Competitors all converge on the
+# same peer-relative grammar for the market's facts; none of them publishes
+# what its OWN calls did next. This block is that, for one ticker.
+#
+# HORIZON — the table stores a NEXT-SESSION outcome and nothing else
+# (price_next_day / change_pct_1d_after / spy_change_pct_1d / alpha_vs_spy).
+# There is no 1-week, 1-month or 3-month column anywhere in the schema, so the
+# payload names the horizon explicitly and never implies a longer one.
+#
+# LOSSES ARE NEVER FILTERED. A record that drops its losers is marketing, not a
+# record: `resolved_count`, `beat_spy_count` and `median_alpha_vs_spy` are
+# taken over EVERY resolved row, and every row is present in `flags`.
+
+# Rows read per symbol. Mirrors the per-symbol scorecard endpoint's default;
+# one flag per trading day is the ceiling, so a year of history fits.
+_FLAG_ROWS_READ_CAP = 365
+# Rows serialised inline on the ticker page. The full history lives on
+# /scorecard; this block is a decision aid, not an archive. Truncation is
+# disclosed (`flags_truncated`) rather than silent.
+_FLAG_ROWS_SERIALISED_CAP = 60
+
+
+def _flag_record_payload(
+    rows: list[DailyScorecardEntry], *, can_see_live: bool
+) -> dict:
+    """Our own record on ONE ticker: every flag, most recent first, + a summary.
+
+    `rows` is already ordered as_of DESC. `can_see_live` mirrors the scorecard
+    router's tier gate — see the row-visibility note below.
+
+    The never-flagged case (~8,400 of 8,879 symbols) is the COMMON one, not an
+    error: it returns flag_count 0, an empty `flags` list, and a null median.
+    Zero is a true count here; the median is genuinely unknown, so it is null.
+
+    ARITHMETIC — deliberately UNFILTERED, and deliberately different from
+    /api/scorecard/*. That endpoint drops rows whose 1-day move exceeds
+    scorecard._OUTLIER_PCT_THRESHOLD from its averages, because raw vendor
+    closes occasionally carry unadjusted-split prices that produce
+    market-impossible moves. Here the summary counts every resolved row and
+    takes the median over all of them — the median is already robust to a lone
+    bad print, and this block's entire claim is that nothing is filtered out of
+    it. The suspect rows are COUNTED and disclosed instead
+    (`suspect_outlier_count`, with the shared threshold echoed alongside it) so
+    a reader can see when a number leans on a print we ourselves distrust. The
+    threshold is imported, not re-declared, so the two surfaces can never drift
+    on what "suspect" means.
+
+    ROW VISIBILITY — the summary is tier-invariant (it is the trust signal, and
+    it is already public on /api/scorecard/symbol/{symbol}), but the row list
+    reuses the scorecard router's delay for non-paying viewers. Without it this
+    public, anonymous, un-metered endpoint would be a way to read today's
+    top-10 by walking ticker pages, silently undoing the gate that keeps the
+    live scanner the actual product. The delay is on RECENCY, never on outcome:
+    a losing flag inside the window is shown exactly like a winning one. Both
+    the delay and the number of rows it withholds are stated in the payload
+    (`flags_delay_days`, `flags_hidden_recent`) so the page can say what is
+    missing instead of looking broken.
+    """
+    # Imported from the scorecard router rather than re-declared so the delay
+    # window, the entitlement test and the suspect-move threshold have exactly
+    # one definition each across the two surfaces that publish this record.
+    from app.routers.scorecard import _FREE_DELAY_DAYS, _OUTLIER_PCT_THRESHOLD
+
+    resolved = [r for r in rows if r.alpha_vs_spy is not None]
+    # Strictly greater: an alpha of exactly 0.0 matched SPY, it did not beat
+    # it. Same test the scorecard summary uses.
+    beat = [r for r in resolved if r.alpha_vs_spy > 0]
+    suspect = [
+        r
+        for r in resolved
+        if r.change_pct_1d_after is not None
+        and abs(r.change_pct_1d_after) > _OUTLIER_PCT_THRESHOLD
+    ]
+
+    if can_see_live:
+        visible = rows
+    else:
+        cutoff = datetime.now(UTC).date() - timedelta(days=_FREE_DELAY_DAYS)
+        visible = [r for r in rows if r.as_of <= cutoff]
+    shown = visible[:_FLAG_ROWS_SERIALISED_CAP]
+
+    dates = [r.as_of for r in rows]
+    return {
+        # Structured + a printable label. The record covers ONE session after
+        # the flag and nothing beyond it.
+        "horizon": "next_session",
+        "horizon_label": "next trading session",
+        "flag_count": len(rows),
+        "resolved_count": len(resolved),
+        "beat_spy_count": len(beat),
+        "median_alpha_vs_spy": (
+            median([r.alpha_vs_spy for r in resolved]) if resolved else None
+        ),
+        "suspect_outlier_count": len(suspect),
+        "suspect_outlier_threshold_pct": _OUTLIER_PCT_THRESHOLD,
+        "first_flagged_on": min(dates).isoformat() if dates else None,
+        "last_flagged_on": max(dates).isoformat() if dates else None,
+        "flags": [
+            {
+                "as_of": r.as_of.isoformat(),
+                "rank": r.rank,
+                # Belt-and-suspenders clamp, mirroring the scorecard router:
+                # corrupt legacy rows stored raw factor values > 100 here.
+                "score_at_flag": (
+                    min(r.score_at_flag, 100.0)
+                    if r.score_at_flag is not None
+                    else None
+                ),
+                "price_at_flag": r.price_at_flag,
+                "price_next_day": r.price_next_day,
+                "change_pct_1d_after": r.change_pct_1d_after,
+                "spy_change_pct_1d": r.spy_change_pct_1d,
+                "alpha_vs_spy": r.alpha_vs_spy,
+                # None = the next session has not been back-checked yet, which
+                # is NOT the same as "did not beat SPY".
+                "beat_spy": None if r.alpha_vs_spy is None else r.alpha_vs_spy > 0,
+            }
+            for r in shown
+        ],
+        # 0 is a real value here (no delay applies to this caller), not a
+        # stand-in for unknown.
+        "flags_delay_days": 0 if can_see_live else _FREE_DELAY_DAYS,
+        "flags_hidden_recent": len(rows) - len(visible),
+        "flags_truncated": len(visible) > len(shown),
+    }
+
+
 def _client_ip(request: Request) -> str | None:
     """Real client IP behind Fly's edge proxy. Mirrors routers/auth +
     services/rate_limit: request.client.host is the proxy's internal peer (the
@@ -332,6 +470,29 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     the block costs no extra query; the earnings date is one indexed LIMIT 1
     against calendar_events.earnings_events inside the same short txn, which
     keeps the rev2 connection discipline intact.
+
+    `peer_percentiles` and `flag_record` (added 2026-08-22) are what turn this
+    from a grid of raw fields into a decision aid. key_stats states the
+    market's facts; these two locate them.
+
+      • `peer_percentiles` places the composite and each of the six
+        sub-factors against the ticker's sector peers, and ALWAYS prints the
+        denominator it used ("91st percentile of Health Care, n=763"). Where
+        we cannot rank honestly — too few covered peers, or no value of our
+        own — the percentile is null and carries a `reason` instead of a
+        manufactured number. Tickers whose sector is null / "Uncategorized" /
+        "Unknown" / "N/A" are compared against the whole covered universe and
+        the label says exactly that. One aggregate query; see
+        services/percentile.py for the peer rule, the MIN_PEERS floor and the
+        measured cost.
+
+      • `flag_record` is this ticker's history on our own public scorecard —
+        every time we flagged it, most recent first, with the next session's
+        outcome, plus a summary (how many times, how many resolved, how many
+        beat SPY, median alpha). Losses are never filtered out. The record
+        holds a NEXT-SESSION outcome only and says so; ~8,400 of 8,879 symbols
+        return the clean never-flagged state. One indexed read; see
+        _flag_record_payload for the arithmetic and the row-visibility gate.
 
     Connection + latency discipline (incident fix 2026-05-31, rev 2): this
     endpoint backs the SSR'd public /t/{symbol} page and the daily SEO audit
@@ -481,6 +642,57 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                 .limit(1)
             )
         ).scalar_one_or_none()
+
+        # ── The two decision-aid blocks ─────────────────────────────────────
+        # Both run LAST in this txn and both degrade to None rather than
+        # raising. This endpoint backs the SSR'd public /t/{symbol} page; a
+        # 500 there is the documented disaster mode (see the connection +
+        # latency note above), and neither block is load-bearing for the
+        # market facts the page already has in hand. In Postgres a failed
+        # statement aborts the whole transaction, so nothing that matters may
+        # follow these — which is why they are last.
+        #
+        # NOTE for the renderer: `flag_record: null` means "we could not read
+        # the record", which is NOT the same as a record with flag_count 0 —
+        # that one means "we have never flagged this ticker". Do not collapse
+        # the two into one empty state.
+
+        # Our own record on this ticker. Indexed read:
+        # ix_daily_scorecard_symbol_as_of serves the equality on `symbol` AND
+        # the as_of DESC ordering out of one B-tree, so it stays cheap as the
+        # table grows. 720 rows across 408 symbols today, so the 365-row cap is
+        # nowhere near binding; it is a ceiling, not a filter.
+        flag_record: dict | None = None
+        try:
+            from app.routers.scorecard import _can_see_live_picks
+
+            flag_rows = list(
+                (
+                    await session.execute(
+                        select(DailyScorecardEntry)
+                        .where(DailyScorecardEntry.symbol == symbol)
+                        .order_by(desc(DailyScorecardEntry.as_of))
+                        .limit(_FLAG_ROWS_READ_CAP)
+                    )
+                ).scalars().all()
+            )
+            flag_record = _flag_record_payload(
+                flag_rows, can_see_live=_can_see_live_picks(user)
+            )
+        except Exception:
+            logger.warning("ticker.flag_record_degraded symbol=%s", symbol)
+
+        # Where this ticker sits among its peers. ONE aggregate pass over the
+        # peer group yields the percentile AND the denominator for the
+        # composite plus all six sub-factors; see services/percentile.py for
+        # the peer-group rule, the MIN_PEERS floor and the measured cost. A
+        # page that cannot locate its numbers must still render the numbers.
+        percentiles: dict | None = None
+        try:
+            percentiles = await peer_percentiles(session, t)
+        except Exception:
+            logger.warning("ticker.percentiles_degraded symbol=%s", symbol)
+
         # News is fetched separately, AFTER this core read txn closes (see
         # _fetch_ticker_news) — its own bounded session so a slow/timed-out
         # headline scan can never hold THIS pooled connection or affect the
@@ -515,6 +727,18 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # value is a null here and an em-dash on the page, never a zero. See
         # _key_stats_payload for what is deliberately omitted and why.
         "key_stats": _key_stats_payload(t, next_earnings_date),
+        # Where each of those readings SITS. A number is only a decision aid
+        # once it is locatable, and every entry here carries the denominator it
+        # was computed against plus the peer group actually used. None with a
+        # `reason` where we refuse to rank — see services/percentile.py. The
+        # whole block is null if the aggregate failed; the page still renders
+        # the raw values.
+        "peer_percentiles": percentiles,
+        # What our own calls on this ticker did next — wins and losses, never
+        # filtered, next-session horizon only. See _flag_record_payload. Null
+        # here means the read failed, NOT "never flagged" (that is a present
+        # block with flag_count 0).
+        "flag_record": flag_record,
         "breakdown": {
             "trend": {"value": t.sub_trend, "weight": 25, "label": "Trend"},
             "rs": {"value": t.sub_rs, "weight": 20, "label": "Relative strength"},
