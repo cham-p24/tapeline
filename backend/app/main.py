@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -157,6 +158,37 @@ app.add_middleware(
 )
 
 
+INTERNAL_SSR_HEADER = "x-tapeline-internal"
+
+
+def _is_trusted_ssr(request: Request) -> bool:
+    """True when this request carries our own SSR shared secret.
+
+    Server-side rendering funnels EVERY page render for the whole site through
+    a single Fly egress IP, so it shares one limit_api bucket (120/min). A
+    single ticker page fans out to ~3 upstream calls, so roughly 40 cold page
+    renders a minute drains it — after which the backend 429s its OWN frontend
+    and frontend/app/t/[symbol]/page.tsx turns that into a 500. Any bulk crawl
+    trips it: the weekly SEO audit reported ~1,534 "broken" URLs it had broken
+    itself, and Googlebot walking the ~8,400-page ticker sitemap would see the
+    same 500s — a real deindexing risk on the site's biggest crawl surface.
+    (main.py already exempts /api/embed/ for exactly this one-shared-IP reason;
+    this closes the same gap for the SSR reads themselves.)
+
+    Constant-time compare, and an unset token disables the exemption entirely,
+    so a missing/mis-set secret degrades to today's behaviour rather than
+    removing rate limiting. The token is server-only on the frontend (never
+    NEXT_PUBLIC_*), so it is not reachable from a browser bundle.
+    """
+    token = settings.internal_ssr_token
+    if not token:
+        return False
+    presented = request.headers.get(INTERNAL_SSR_HEADER)
+    if not presented:
+        return False
+    return secrets.compare_digest(presented, token)
+
+
 @app.middleware("http")
 async def log_and_rate_limit(request: Request, call_next):
     # Rate-limit all /api/* requests except health + webhooks (which have their
@@ -178,7 +210,8 @@ async def log_and_rate_limit(request: Request, call_next):
     ):
         from app.services.rate_limit import limit_api
         try:
-            await limit_api(request)
+            if not _is_trusted_ssr(request):
+                await limit_api(request)
         except Exception as exc:
             status = getattr(exc, "status_code", 429)
             from fastapi.responses import JSONResponse
