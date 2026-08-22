@@ -14,6 +14,7 @@ import { Paywall, PaywallModal } from "@/components/Paywall";
 import { LookupWall } from "@/components/LookupWall";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
 import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 import { EarningsPill } from "@/components/EarningsPill";
@@ -303,6 +304,17 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const lookups =
     (data as TickerDetail & { lookups?: LookupMeter | null }).lookups ?? null;
 
+  // Key statistics — the `key_stats` group the ticker endpoint returns (see
+  // _key_stats_payload in backend/app/routers/ticker.py). Read structurally for
+  // the same reason `lookups` above is: TickerDetail lives in lib/api.ts, which
+  // is outside this change's file lane. Folding both into TickerDetail is the
+  // follow-up.
+  //
+  // Defaults to an empty object, so a frontend that deploys ahead of the
+  // backend renders a block of em-dashes instead of throwing.
+  const keyStats =
+    (data as TickerDetail & { key_stats?: KeyStats | null }).key_stats ?? {};
+
   return (
     <div>
       {/* Header — stacks on phones so the two text-4xl blocks (symbol + price)
@@ -486,6 +498,13 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
             Set a custom alert →
           </Link>
         </div>
+      </div>
+
+      {/* Key statistics — the summary block a reader expects before they read
+          anything interpretive. Sits above the score breakdown so the plain
+          facts about the instrument come first and our synthesis second. */}
+      <div className="mt-6">
+        <KeyStatistics stats={keyStats} />
       </div>
 
       {/* Score breakdown panel */}
