@@ -362,6 +362,13 @@ def compute_smart_money_score(transactions: list[dict[str, Any]] | None) -> floa
 
 # ---- Earnings calendar -----------------------------------------------------
 
+# One /calendar/earnings request is capped by the vendor at ~1,500 rows, and an
+# over-long range returns the tail of the window rather than the head. 30 days
+# of US earnings sits well under that even in peak reporting season.
+_EARNINGS_CHUNK_DAYS = 30
+_EARNINGS_ROWS_CAP = 1500
+
+
 async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] | None:
     """
     Returns earnings events scheduled in the next `days_ahead` days.
@@ -380,24 +387,65 @@ async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] 
         return cached
 
     today = date.today()
+
+    # Fetch in CHUNKS, and merge. Finnhub caps a single /calendar/earnings
+    # response at roughly 1,500 rows, and when the requested range overflows
+    # that cap the rows we get back are the FAR END of it. Asking for 90 days in
+    # one call produced exactly 1500 rows dated 2026-11-05..11-20 with NOTHING
+    # in the intervening ten weeks — so "next earnings" was silently wrong for
+    # every company reporting sooner, which is the only case the field exists to
+    # answer. Chunking keeps each request comfortably under the cap, so the
+    # near-term dates (the ones that matter) are always present.
+    #
+    # Cost is 1 request per chunk instead of 1 total, on a 12h cache — a
+    # rounding error against the per-tick symbol calls this module already makes.
+    chunks: list[tuple[date, date]] = []
+    cursor = today
     end = today + timedelta(days=days_ahead)
-    params = {
-        "from": today.isoformat(),
-        "to": end.isoformat(),
-        "token": _api_key(),
-    }
+    while cursor <= end:
+        chunk_end = min(cursor + timedelta(days=_EARNINGS_CHUNK_DAYS - 1), end)
+        chunks.append((cursor, chunk_end))
+        cursor = chunk_end + timedelta(days=1)
+
+    raw_rows: list[dict[str, Any]] = []
     try:
         async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.get(f"{BASE_URL}/calendar/earnings", params=params)
-            if r.status_code != 200:
-                logger.warning("finnhub.earnings_failed status=%s body=%s", r.status_code, r.text[:200])
-                return None
-            data = r.json()
+            for chunk_from, chunk_to in chunks:
+                # `resp`, not `r`: the row loop further down binds `r` to each
+                # calendar entry, and reusing the name makes the response type
+                # leak into it.
+                resp = await c.get(
+                    f"{BASE_URL}/calendar/earnings",
+                    params={
+                        "from": chunk_from.isoformat(),
+                        "to": chunk_to.isoformat(),
+                        "token": _api_key(),
+                    },
+                )
+                if resp.status_code != 200:
+                    logger.warning(
+                        "finnhub.earnings_failed status=%s from=%s to=%s body=%s",
+                        resp.status_code, chunk_from, chunk_to, resp.text[:200],
+                    )
+                    # A partial calendar beats no calendar: keep what we have.
+                    continue
+                part = (resp.json() or {}).get("earningsCalendar", []) or []
+                if len(part) >= _EARNINGS_ROWS_CAP:
+                    # Still truncating. Say so loudly rather than shipping a
+                    # window that silently starts late again.
+                    logger.warning(
+                        "finnhub.earnings_chunk_at_cap rows=%d from=%s to=%s "
+                        "— shrink _EARNINGS_CHUNK_DAYS",
+                        len(part), chunk_from, chunk_to,
+                    )
+                raw_rows.extend(part)
     except Exception:
         logger.exception("finnhub.earnings_exception")
         return None
 
-    raw_rows = data.get("earningsCalendar", []) or []
+    if not raw_rows:
+        return None
+
     rows: list[dict[str, Any]] = []
     for r in raw_rows:
         sym = r.get("symbol", "")
