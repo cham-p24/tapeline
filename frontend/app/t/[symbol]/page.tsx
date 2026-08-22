@@ -27,6 +27,7 @@ import {
   tickerDatasetJsonLd,
 } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 
 // ISR: regenerate at most hourly. This route has ~8,400 ticker pages and is
@@ -119,17 +120,26 @@ type TickerFetch =
 // transient blips (most resolve within ~1s). Each attempt is time-bounded
 // so a wedged backend can't hang the whole render up to the platform
 // function timeout.
-const TICKER_FETCH_ATTEMPTS = 2;
+const TICKER_FETCH_ATTEMPTS = 4;
 const TICKER_FETCH_TIMEOUT_MS = 7000;
+// Base backoff between attempts. Grows linearly (0.5s, 1s, 1.5s) so a burst
+// rides out the limiter's refill instead of being converted into a 500: the
+// backend bucket refills at capacity/per_seconds = 2 tokens/sec, so a couple
+// of seconds of patience is the difference between a rendered page and a 500.
+const TICKER_FETCH_BACKOFF_MS = 500;
 
 async function fetchTicker(symbol: string): Promise<TickerFetch> {
   const url = `${API_BASE}/api/ticker/${symbol.toUpperCase()}`;
+  let retryAfterMs: number | null = null;
   for (let attempt = 1; attempt <= TICKER_FETCH_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(url, {
         // Cache for 60s — matches the worker tick cadence so the page is fresh
         // without hammering the API on every social-card crawl.
         next: { revalidate: 1800 },
+        // Identify this as our own SSR so the backend skips the per-IP limit
+        // that all server rendering would otherwise share (see lib/ssrHeaders).
+        headers: ssrInternalHeaders(),
         // Bound each attempt; AbortSignal is not part of Next's fetch cache
         // key, so the 60s ISR cache above is preserved.
         signal: AbortSignal.timeout(TICKER_FETCH_TIMEOUT_MS),
@@ -138,12 +148,25 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
       // this symbol isn't in the scanner universe.
       if (res.status === 404) return { status: "missing" };
       if (res.ok) return { status: "ok", data: (await res.json()) as TickerData };
+      // 429 = WE exhausted the shared SSR budget, not a broken ticker. It is
+      // the single likeliest non-ok status here (all SSR shares one per-IP
+      // bucket), and it is fully recoverable — so honour Retry-After when the
+      // backend sends one, capped so a bad value can't stall the render.
+      if (res.status === 429) {
+        const hinted = Number(res.headers.get("retry-after"));
+        if (Number.isFinite(hinted) && hinted > 0) {
+          retryAfterMs = Math.min(hinted * 1000, 2000);
+        }
+      }
       // 5xx / other non-ok → transient; fall through to retry.
     } catch {
       // Timeout / network error → transient; fall through to retry.
     }
     if (attempt < TICKER_FETCH_ATTEMPTS) {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) =>
+        setTimeout(r, retryAfterMs ?? TICKER_FETCH_BACKOFF_MS * attempt),
+      );
+      retryAfterMs = null;
     }
   }
   return { status: "error" };

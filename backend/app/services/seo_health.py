@@ -56,6 +56,11 @@ SITEMAP_URL = f"{PUBLIC_BASE}/sitemap.xml"
 # more than a handful of concurrent origin fetches. Finishes ~1k URLs in a few
 # minutes — fine for a once-daily task.
 AUDIT_CONCURRENCY = 4
+# Re-check tuning. The backend's per-IP bucket refills at 2 tokens/sec, so a
+# 30s pause is many times what a self-inflicted 429 needs to clear, while
+# still finishing a re-check of a realistic broken list well inside one run.
+RECHECK_PAUSE_SECONDS = 30
+RECHECK_SPACING_SECONDS = 0.25
 
 # We treat any HTTP status outside this set as a problem. 200-299 = OK.
 # 3xx = redirect (still resolves, fine for SEO). 4xx/5xx = broken.
@@ -179,10 +184,41 @@ async def run_stale_link_audit(
 
         await asyncio.gather(*[_check(u) for u in urls])
 
+        # Re-check pass. The first sweep's "broken" list is NOT trustworthy on
+        # its own: crawling the sitemap is itself a load spike, and every SSR
+        # page render funnels through one Fly egress IP that shares the
+        # backend's per-IP limit_api bucket. Sustained crawling therefore makes
+        # the backend 429 its own frontend, which the ticker page turns into a
+        # 500 — so the audit reports URLs *it* broke. That is exactly what
+        # produced the "1,534 URLs returning non-2xx/3xx" alert while every one
+        # of those pages served fine to a normal visitor moments later.
+        #
+        # A single serial re-check after a pause separates the two cases: a
+        # genuinely broken URL fails again, a self-inflicted 429/timeout
+        # recovers. Serial (not concurrent) and rate-limited so the re-check
+        # cannot re-trigger the very condition it is measuring.
+        if broken:
+            await asyncio.sleep(RECHECK_PAUSE_SECONDS)
+            confirmed: list[dict] = []
+            for item in broken:
+                u, status, err = await audit_one(item["url"], client)
+                if status in HEALTHY_STATUSES:
+                    healthy_count += 1          # recovered — was transient
+                else:
+                    confirmed.append({"url": u, "status": status, "error": err})
+                await asyncio.sleep(RECHECK_SPACING_SECONDS)
+            transient = len(broken) - len(confirmed)
+            broken = confirmed
+        else:
+            transient = 0
+
     return {
         "checked": len(urls),
         "healthy": healthy_count,
         "broken": broken,
+        # How many first-pass failures cleared on re-check. A large number here
+        # means the sweep is load-limiting itself, not that the site is broken.
+        "transient": transient,
         "ran_at": datetime.now(UTC).isoformat(),
     }
 
@@ -244,6 +280,7 @@ async def render_weekly_digest(
     healthy = stale_audit.get("healthy", 0)
     broken_list = stale_audit.get("broken", []) or []
     broken_count = len(broken_list)
+    transient_count = int(stale_audit.get("transient", 0) or 0)
 
     iso_year, iso_week, _ = now.isocalendar()
     lines = [
@@ -252,7 +289,15 @@ async def render_weekly_digest(
         "*Sitemap*",
         f"  • {sitemap_total} URLs in sitemap.xml",
         f"  • {healthy} returning 2xx/3xx",
-        f"  • {broken_count} broken {'⚠️' if broken_count else '✅'}",
+        f"  • {broken_count} broken {'⚠️' if broken_count else '✅'}"
+        + (
+            # Confirmed on a second pass, so this is a real defect list rather
+            # than the crawl tripping the SSR rate limit and reporting itself.
+            f" (confirmed on re-check; {transient_count} first-pass "
+            f"failures cleared and were self-inflicted)"
+            if transient_count
+            else ""
+        ),
         "",
         "*Ticker universe*",
         f"  • {total:,} tickers tracked",
