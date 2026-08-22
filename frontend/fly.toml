@@ -23,7 +23,7 @@ primary_region = "syd"
     # Meta pixel id. Empty = no pixel renders and no Meta JS is fetched.
     # Pair with META_PIXEL_ID + META_CAPI_ACCESS_TOKEN on the BACKEND app
     # (services/meta_capi) so browser and server events dedupe on event_id.
-    NEXT_PUBLIC_META_PIXEL_ID = ""
+    NEXT_PUBLIC_META_PIXEL_ID = "28351455154543230"
 
 [http_service]
   internal_port = 3000
