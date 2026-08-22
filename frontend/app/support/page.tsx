@@ -71,11 +71,19 @@ export default function SupportPage() {
             q="My scanner only shows 10 tickers."
             a={
               <>
+                {/* CARD HONESTY. This answer used to say the trial starts
+                    "automatically (no card)" and that trial end drops you back
+                    to Free — both were true before #536/#548 and are false now.
+                    A reader sitting on Free inside the app is a pre-2026-08-22
+                    account, so the honest answer is: nothing changes unless you
+                    choose the trial, and the trial takes a card. */}
                 Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
-                by design — it's the same product, just narrower. Sign up gets you a 14-day Premium trial
-                automatically (no card). At trial end, no card on file = back to Free forever (live scores,
-                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}).{" "}
-                <Link href="/app/billing" className="text-accent hover:underline">Add a card →</Link>
+                by design — it's the same product, just narrower, and it stays that way at no cost:
+                top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
+                The 14-day Premium trial is a separate step you choose, and it does take a card:
+                $0 is charged that day, the first charge is on day 14 at the plan you pick, and one
+                click cancels before then. It is never started automatically.{" "}
+                <Link href="/app/billing" className="text-accent hover:underline">See plans →</Link>
               </>
             }
           />
