@@ -144,13 +144,29 @@ def free_watchlist_cap(today: date | None = None) -> int:
 
 
 def free_open_access(today: date | None = None) -> bool:
-    """True while the "everything unlocked" open-access month is running.
+    """True while the open-access month is running.
 
     Founder experiment (2026-08-08): at 0 payers with engaged users who
-    activate but don't convert, drop ALL friction for a month — the FREE tier
-    gets full Pro-level access (caps + every Pro feature) — then auto-revert.
-    Premium-only feeds (congress, insider, Telegram, API) stay gated. Date-gated
-    so it reverts with no deploy. `today` injectable for tests.
+    activate but don't convert, widen the FREE tier for a month, then
+    auto-revert. Date-gated so the revert needs no deploy; `today` is
+    injectable for tests.
+
+    SCOPE — read the `limit()` body before quoting this anywhere. The lift is
+    ONE numeric cap, NOT "Free becomes Pro":
+
+      * `scanner_rows` lifts 10 -> the Pro cap, and only for AUTHENTICATED
+        callers. Anonymous requests score against the FREE table too, so
+        without that guard the promo would serve the full universe to
+        logged-out visitors during the exact month it exists to drive signups.
+      * `daily_lookups`, `watchlist_tickers` and `web_push_alerts` are NOT
+        lifted.
+      * `has_feature()` is untouched — every Pro and Premium feature stays
+        gated.
+
+    An earlier version of this docstring described the ORIGINAL plan ("caps +
+    every Pro feature"), which was never implemented, and a downstream doc was
+    written off it. `backend/tests/test_open_access_month.py` asserts each
+    exclusion by name and is the authority if this comment drifts again.
     """
     d = today or datetime.now(UTC).date()
     return d < PROMO_OPEN_ACCESS_UNTIL
