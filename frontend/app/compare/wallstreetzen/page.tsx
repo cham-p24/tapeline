@@ -4,7 +4,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
 import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
-import { PRICING, FREE_LIMITS, REFUND, usd, freeHasWatchlist } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -99,10 +99,10 @@ const WINS = [
 
 const TRADEOFFS = [
   {
-    label: "Free tier strength",
-    tapeline: `Live scores, top-${FREE_LIMITS.scannerRows} scanner,${freeHasWatchlist() ? ` ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} ${FREE_LIMITS.dailyLookups} look-ups/day`,
+    label: "Free access",
+    tapeline: "Daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON — no account; the app itself takes a card",
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
-    note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is narrower on purpose but free forever — same product, smaller window.",
+    note: "This one goes to WallStreetZen and it isn't close: their free tier is the strongest in the category and you can screen with it. Tapeline's free surface is a published record you can read and download, not a screener you can run — from 22 August 2026 a new Tapeline account takes a card at first sign-in.",
   },
   {
     label: "Cheapest paid tier",
@@ -162,8 +162,9 @@ export default function VsWallStreetZenPage() {
           Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline names all six
           factors and how they're weighted, recomputes the score sub-60s, and pairs every top-10
           with a per-pick public scorecard. If you trade on a sub-week timescale,
-          Tapeline is built for you. If you buy-and-hold for 5+ years and the strong
-          free tier is enough, WallStreetZen is the right choice.
+          Tapeline is built for you. If you buy-and-hold for 5+ years, or you want a free
+          screener you can run yourself, WallStreetZen is the right choice — Tapeline&apos;s
+          app takes a card at first sign-in.
         </p>
         {/* Hype pill removed 2026-06-16 — counting categories Tapeline "wins
             outright" reads as marketing, not honesty (matches the finviz
@@ -173,7 +174,7 @@ export default function VsWallStreetZenPage() {
             until the very bottom, so a comparison-shopper who skimmed the
             intro and left never saw the offer. showPreview off: the
             comparison table below is the proof on compare pages. */}
-        <LandingCta from="compare" showPreview={false} secondaryLabel="See the scorecard first" />
+        <LandingCta from="compare" showPreview={false} primaryLabel="Start the 14-day Premium trial" secondaryLabel="See the scorecard first" />
       </section>
 
       <section className="mx-auto max-w-5xl px-6 pb-8">
@@ -229,9 +230,11 @@ export default function VsWallStreetZenPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier (live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day) — no card.
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with
+          no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial,
+          first charge on day 14, one click to cancel.
           Pro from {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr), with a
           {" "}{REFUND.windowDays}-day money-back guarantee.
         </p>
@@ -243,7 +246,7 @@ export default function VsWallStreetZenPage() {
             destination="signup"
             slug="wallstreetzen"
           >
-            Try the live scanner free — no card →
+            Start the 14-day Premium trial →
           </ContentCtaLink>
           <ContentCtaLink
             href="/scorecard"

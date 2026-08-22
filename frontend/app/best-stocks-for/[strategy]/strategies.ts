@@ -146,7 +146,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Dividend Stocks — Quality Scored by the Six-Factor Composite",
     metaTitle: "Best Dividend Stocks 2026 — Utilities Ranked by Tapeline Score",
     metaDescription:
-      "Live ranking of US Utilities-sector dividend names — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free tier; Pro at $8.25/mo annual.",
+      "Live ranking of US Utilities-sector dividend names — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free to read, no account; Pro at $8.25/mo annual.",
     lede:
       "Dividend investing fails when 'high yield' is the only filter — high yields are often the market pricing in dividend risk. The right filter is yield in the context of quality: are the fundamentals strong, is the trend confirming, is the sector regime supportive? The list below ranks US tickers in the Utilities sector — the classic income-oriented, dividend-rich corner of the market — by Tapeline composite, the same six-factor formula that prices in trend, fundamentals, and macro alongside the yield. High score in a dividend sector means yield WITH durability.",
     apiParams: { sort: "score", order: "desc", min_score: "55", sector: "Utilities", limit: "30" },
@@ -176,7 +176,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Value Stocks — Quality Composite at Reasonable Multiples",
     metaTitle: "Best Value Stocks 2026 — Tapeline Score Confluence on Quality Names",
     metaDescription:
-      "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free tier, no card; 14-day Premium trial, $0 today.",
+      "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 14-day Premium trial takes a card, $0 today.",
     lede:
       "Value investing fails when you buy a stock just because it's cheap. The market is usually cheap-for-a-reason; the trick is separating temporarily cheap from structurally broken. Tapeline's composite is built on six factors with Fundamentals weighted at 15% — strong fundamentals score combined with a constructive overall composite (score 55-75 — the upper-middle of the distribution, not the top) is where value setups actually live. Top of the distribution is already-priced-in; bottom is broken. The middle, filtered to quality, is the value-investor zone.",
     apiParams: { sort: "score", order: "desc", min_score: "55", limit: "30" },

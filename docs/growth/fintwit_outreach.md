@@ -1,5 +1,23 @@
 # Fintwit Outreach — Companion Guide for `fintwit_list.csv`
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 Drafted 2026-05-14. Refreshed 2026-05-17 after a live audit invalidated the original "30 cold DMs in 6 days" plan.
 
 **Goal**: drive trial signups by reaching the small-fund and analyst tier of fintwit (5K-100K followers) where one substantive engagement compounds via that account's followers seeing Tapeline mentioned.

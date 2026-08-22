@@ -93,7 +93,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Can I try both before deciding?",
-    a: "Easily. Tapeline's Free tier costs nothing and never asks for a card, so you can run it beside TrendSpider indefinitely. The 14-day full-Premium trial does take a card — $0 charged today, first charge on day 14, cancel in one click before then. TrendSpider's trial has historically required a card on file too — check their current terms. Running both for a week against your own watchlist is the fastest way to see which output you actually reach for.",
+    a: "Easily. The 14-day full-Premium trial is how you run Tapeline beside TrendSpider: a new account adds a card at first sign-in, $0 is charged that day, the first charge is on day 14, and one click cancels before then. TrendSpider's trial has historically required a card on file too — check their current terms. If you'd rather not put a card down at all, Tapeline's daily Top 10 and full scorecard are readable with no account. Running both for a week against your own watchlist is the fastest way to see which output you actually reach for.",
   },
 ];
 

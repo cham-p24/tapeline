@@ -92,7 +92,7 @@ Tier 1 = high-value, NEEDS FOUNDER VOICE. Examples:
 
 Tier 2 = templatable, AUTO-REPLY SAFE. Examples:
 - "What's the score for $TICKER?"  → reply with live API curl + breakdown
-- "How does the free tier work?" → canonical pricing reply
+- "Is there a free version?" / pricing questions → canonical pricing reply
 - "Can I get a free trial?" → trial signup reply
 - Generic "cool product" / "interesting tool" → short thanks + invite
 
@@ -124,17 +124,23 @@ TEMPLATES = {
         f"Full breakdown + chart at tapeline.io/t/{symbol.upper()}. "
         "Drop another ticker if you want me to pull it."
     ),
+    # NOTE: the live implementations are in
+    # backend/app/services/inbox_templates.py — that module is what actually
+    # ships, and it is the copy to change first. These are kept in sync as
+    # documentation. Both were corrected on 2026-08-22 for the card gate: they
+    # used to end "Signup is email + password and lands on the free tier — no
+    # card", which is false for every stranger these replies go to.
     "pricing": lambda: (
-        "Free tier covers the top 20 tickers (24h delayed) + the public scorecard + a 5-ticker watchlist. "
-        "Pro is $8.25/mo annual ($9.99 monthly) for the full ~2,500-ticker live scan + smart watchlist alerts. "
-        "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + congressional trades + insider Form 4 buys + unlimited Telegram alerts. "
-        "Signup is email + password and lands on the free tier — no card. The 14-day Premium trial is opt-in and does take a card: $0 charged today, first charge on day 14, one click to cancel before then. tapeline.io/pricing has the full comparison."
+        "The published record is free with no account at all: the daily top 10, the full scorecard back-checked vs SPY, a page per scored ticker, and the raw CSV/JSON. "
+        "For the live scanner: Pro is $8.25/mo annual ($9.99 monthly) for the full ~2,500-ticker live scan + smart watchlist alerts. "
+        "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + congressional trades + insider Form 4 buys. "
+        "A new account puts a card on file at first sign-in, which starts the 14-day Premium trial: $0 charged that day, first charge on day 14, one click to cancel before then. tapeline.io/pricing has the full comparison."
     ),
     "trial": lambda: (
-        "There's a 14-day Premium trial — it takes a card, but nothing is charged today. "
+        "There's a 14-day Premium trial — a new account adds a card at first sign-in, but nothing is charged that day. "
         "The first charge is on day 14 and one click cancels before then. tapeline.io/signup. "
         "The full ~2,500-ticker universe, scorecard, watchlist alerts, congressional/insider feeds, all included for the trial window. "
-        "If you'd rather not put a card down, the free tier never asks for one."
+        "If you'd rather not put a card down, the daily top 10 and the whole public record are readable with no account at tapeline.io/scorecard."
     ),
     "thanks": lambda: (
         "Thanks for the kind words. If you want to put it through its paces, drop a ticker and I'll send you its current score + the 6-factor breakdown."

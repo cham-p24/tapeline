@@ -88,7 +88,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Can I trial Tapeline before paying?",
-    a: "Yes, two ways. The Free tier is free forever and never asks for a card. Or start the 14-day Premium trial, which takes a card — $0 charged today, first charge on day 14, cancel in one click before then. Trade Ideas offers a free 7-day trial that also requires a card on file.",
+    a: "Reading it, yes — the daily Top 10, the full scorecard and the raw CSV/JSON record are free with no account. Running the signed-in scanner takes a card: a new account adds one at first sign-in, which starts the 14-day Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then. Trade Ideas offers a free 7-day trial that also requires a card on file.",
   },
   {
     q: "Should I use both?",

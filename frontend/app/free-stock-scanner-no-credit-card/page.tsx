@@ -2,27 +2,35 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
-import { LandingCta } from "@/components/LandingCta";
 import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 // Title front-loads "Free Stock Scanner — No Credit Card" (the exact query) and
 // folds in the adjacent "no signup" cluster, with the | Tapeline brand suffix.
-// Description leads with the no-card promise and ends with the transparency hook.
+// Route, title and H1 are unchanged — this page is a priority-0.8 sitemap entry
+// and the query it ranks for is still a real query with a real answer.
+//
+// What CHANGED (2026-08-22, card gate): the description used to promise a
+// "free-forever tier [that] needs no card, ever". Creating a Tapeline account
+// now requires a card at first sign-in, so that sentence became false and had
+// to go. What is still true — and is what this page now sells — is the PUBLIC
+// surface: the daily Top 10, the whole scorecard, the per-ticker pages and the
+// raw CSV/JSON record are readable by anyone with no account and no card.
 export const metadata = pageMeta({
   title: "Free Stock Scanner — No Credit Card, No Signup | Tapeline",
   description:
-    "Free stock scanners with a real no-credit-card path — Tapeline's free-forever tier needs no card, ever. Public formula, public scorecard.",
+    "Stock scanners you can actually read without a card. Tapeline's daily Top 10, full scorecard and raw CSV/JSON record are open to everyone — no account, no card.",
   path: "/free-stock-scanner-no-credit-card",
 });
 
 type Scanner = {
   name: string;
-  // The genuinely no-card path, described honestly.
+  // What you get with no card at all, described honestly.
   access: string;
-  // Feature flags — never performance. "No card at all" / "No card for trial".
-  cardNeeded: "None" | "None (free tier)" | "Card for trial";
+  // Feature flags — never performance. Describes only what a card is needed
+  // FOR, never how a tool performs.
+  cardNeeded: "None" | "None (free tier)" | "Card to sign in" | "Card for trial";
   publicFormula: "Yes" | "No score";
   trackRecord: "Public scorecard" | "None";
   summary: string;
@@ -33,14 +41,15 @@ const SCANNERS: Scanner[] = [
   {
     name: "Tapeline",
     access:
-      "Free-forever tier with no card and no clock; the optional 14-day Premium trial does take a card",
-    // "None" would over-claim now that the Premium trial runs on Stripe
-    // Checkout: the card-free path is the free tier, and only the free tier.
-    cardNeeded: "None (free tier)",
+      "Daily Top 10, the full scorecard, every per-ticker page and the raw CSV/JSON record — all readable with no account; the signed-in app takes a card",
+    // Honest label. Reading Tapeline's output takes no card and no account.
+    // OPENING AN ACCOUNT does — a card is required at first sign-in — so this
+    // column cannot say "None" any more.
+    cardNeeded: "Card to sign in",
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     summary:
-      "The only US scanner that publishes its full 6-factor formula AND keeps every losing day on a public scorecard. The free-forever tier needs no card at all — nothing stored, nothing to cancel. The optional 14-day Premium trial does take a card: $0 is charged when you start it, the first charge is on day 14, and one click cancels before then. Be clear-eyed about the record: the public scorecard currently trails SPY, and we leave it up unedited because an auditable track record is the whole point.",
+      "The only US scanner here that publishes its full 6-factor formula AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Where a card IS needed: opening an account. New accounts add a card at first sign-in through Stripe Checkout — $0 charged that day, a 14-day Premium trial, the first charge on day 14, one click to cancel before then. Accounts created before 22 August 2026 keep the access they signed up for and are never asked for a card.",
   },
   {
     name: "StockAnalysis.io",
@@ -87,23 +96,23 @@ const SCANNERS: Scanner[] = [
 const FAQ = [
   {
     q: "What's the best free stock scanner with no credit card?",
-    a: "For a synthesised composite score with a published formula, Tapeline — its free-forever tier never asks for a card (the optional Premium trial does). For a friction-free filter screener with no account at all, StockAnalysis.io. For raw filter fields with no signup, the free Finviz screener. For charting plus a free screener (free account, no card), TradingView. Each is honest about exactly what the no-card path includes.",
+    a: "It depends what you want to do with no card. To READ a scanner's output and its track record without an account, Tapeline — the daily Top 10, the whole scorecard and the raw CSV/JSON record are open to everyone, and it is the only one here that publishes its scoring formula. To RUN your own screens with no card, StockAnalysis.io (no account at all), the free Finviz screener (no account), or TradingView (a free account, no card). Tapeline's own signed-in app is the one thing on this page that does take a card.",
   },
   {
     q: "Which stock scanners genuinely need no signup?",
-    a: "StockAnalysis.io and the free Finviz screener both let you screen without creating an account. TradingView and Tapeline require a free account but never a credit card on the free path. If your hard requirement is 'no card, ever,' all four qualify — Tapeline is the only one that also publishes its scoring formula and a public scorecard.",
+    a: "StockAnalysis.io and the free Finviz screener both let you screen without creating an account. TradingView needs a free account but never a card. Tapeline needs no account to read the daily Top 10, the scorecard, the per-ticker pages or the raw CSV/JSON record — but its signed-in app does require a card. If your hard requirement is running your own filters with no card, the first three qualify.",
   },
   {
-    q: "Is Tapeline's free tier really free forever, or a trial?",
-    a: "Free forever — no card, no countdown. The free tier gives you live composite scores on the top scanner rows plus a handful of ticker look-ups a day, and nothing about it expires. Separately, there's an optional 14-day Premium trial for the deeper features; that one does take a card — $0 charged when you start it, first charge on day 14, cancel in one click before then. Declining it changes nothing about the free tier.",
+    q: "Does Tapeline still have a free tier?",
+    a: "The published record is free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. What changed on 22 August 2026 is the account itself — a new Tapeline account now adds a card at first sign-in and starts a 14-day Premium trial. $0 is charged that day, the first charge is on day 14 at the plan price you pick, and one click cancels before then. Accounts created before that date keep the free access they signed up for and are never asked for a card.",
   },
   {
-    q: "Does the no-card scanner still show a real track record?",
-    a: "Tapeline does, and it's important to be straight about it: every top-10 daily pick is logged to a public scorecard at /scorecard and back-checked against SPY the next session, with no edits. Right now that record trails SPY. We keep it public anyway — an honest, auditable record is the point, not a flattering headline. The other no-card scanners publish no first-party track record.",
+    q: "Does the no-card record still show real results?",
+    a: "Yes, and it's important to be straight about it: every top-10 daily pick is logged to a public scorecard at /scorecard and back-checked against SPY the next session, with no edits. Right now that record trails SPY. We keep it public anyway — an honest, auditable record is the point, not a flattering headline. You can download the whole thing as CSV or JSON and check the arithmetic yourself, without an account. The other scanners on this page publish no first-party track record at all.",
   },
   {
     q: "How did you decide which scanners qualify?",
-    a: "On features only, never on returns: is there a real no-credit-card path (free tier or no-card trial), does the tool publish the formula behind any score, and does it keep a public track record. We include Trade Ideas even though it fails the no-card test, so the comparison is complete. We never rank scanners by claimed performance — descriptive analytics only.",
+    a: "On features only, never on returns: what you can reach with no credit card, whether the tool publishes the formula behind any score it shows, and whether it keeps a public track record. We list tools that fail the no-card test — Trade Ideas, and Tapeline's own signed-in app — so the comparison is complete rather than cherry-picked. We never rank scanners by claimed performance; descriptive analytics only.",
   },
 ];
 
@@ -112,7 +121,7 @@ const ITEM_LIST_JSON_LD = {
   "@type": "ItemList",
   name: "Free Stock Scanners — No Credit Card",
   description:
-    "Feature comparison of stock scanners with a genuine no-credit-card path, compared on free access, formula transparency, and public track record.",
+    "Feature comparison of stock scanners on what they let you reach without a credit card, formula transparency, and public track record.",
   numberOfItems: SCANNERS.length,
   itemListElement: SCANNERS.map((s, i) => ({
     "@type": "ListItem",
@@ -123,7 +132,7 @@ const ITEM_LIST_JSON_LD = {
 };
 
 function cardChip(v: Scanner["cardNeeded"]) {
-  return v === "Card for trial" ? "text-warn" : "text-up";
+  return v === "Card for trial" || v === "Card to sign in" ? "text-warn" : "text-up";
 }
 function formulaChip(v: Scanner["publicFormula"]) {
   return v === "Yes" ? "text-up" : "text-subtle";
@@ -140,30 +149,44 @@ export default function FreeStockScannerNoCreditCardPage() {
       <MarketingNav />
 
       <article className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
-        <p className="eyebrow">Buyer's guide</p>
+        <p className="eyebrow">Buyer&apos;s guide</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
           Free Stock Scanner — No Credit Card
         </h1>
         <p className="mt-4 text-lg text-muted">
           Tapeline is the only US scanner that publishes its full 6-factor formula
-          <em> and</em> keeps every losing day on a public scorecard — and its free-forever tier
-          needs no credit card, ever. (The optional 14-day Premium trial does take a card: $0
-          today, first charge on day 14, one click to cancel.) Be clear-eyed about the
-          record: that scorecard currently trails SPY, and we leave it up unedited, because a
-          track record you can audit beats a marketing number you can&apos;t. Below is an honest,
-          feature-only look at the scanners with a real no-card (and mostly no-signup) path — what
-          each free route includes, no performance claims attached.
+          <em> and</em> leaves every losing day on a public scorecard — and you can read
+          all of it without an account or a card: the daily Top 10, the whole record, a
+          page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about the
+          record: it currently trails SPY, and we leave it up unedited, because a track
+          record you can audit beats a marketing number you can&apos;t. Below is an honest,
+          feature-only look at what each scanner lets you reach with no card — including
+          where a card is required, ours included.
         </p>
 
-        {/* Above-the-fold conversion block. from="screener" message-matches the
-            signup H1; the no-card offer and live scanner preview sit up top. */}
-        <LandingCta from="screener" />
+        {/* Above-the-fold CTA into the genuinely card-free surface. This used
+            to be <LandingCta from="screener" />, whose primary button read
+            "Try the live scanner free — no card" into /signup. Signup takes a
+            card now, so that button is gone from this page rather than
+            relabelled: the honest above-the-fold offer on a "no credit card"
+            page is the public record, not a checkout. */}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/daily-picks" className="btn-primary">
+            Read today&apos;s Top 10 — no account &rarr;
+          </Link>
+          <Link
+            href="/scorecard"
+            className="btn border border-border bg-panel text-fg transition-colors hover:border-accent/50 hover:bg-panel/70"
+          >
+            See the public scorecard
+          </Link>
+        </div>
 
         <section className="mt-10">
-          <h2 className="text-xl font-semibold">At a glance — the no-card path</h2>
+          <h2 className="text-xl font-semibold">At a glance — what you get with no card</h2>
           <p className="mt-2 text-sm text-muted">
-            Features only. We compare no-card access, formula transparency, and track record —
-            never claimed returns.
+            Features only. We compare card-free access, formula transparency, and track
+            record — never claimed returns.
           </p>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
@@ -204,6 +227,71 @@ export default function FreeStockScannerNoCreditCardPage() {
           </div>
         </section>
 
+        {/* The card-free surface, itemised. This is the page's real payload
+            now: five links, none of which ask for anything. */}
+        <section className="mt-10 rounded-2xl border border-border bg-panel p-6">
+          <h2 className="text-xl font-semibold">
+            What Tapeline gives you with no account and no card
+          </h2>
+          <p className="mt-2 text-sm text-muted leading-relaxed">
+            None of the following asks for an email, an account or a card. They are the
+            same numbers the signed-in product runs on.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm">
+            <li>
+              <Link href="/daily-picks" className="text-accent hover:underline">
+                The daily Top 10 &rarr;
+              </Link>{" "}
+              <span className="text-muted">
+                — the ten highest-scoring US tickers, live, with the one-sentence read on each.
+              </span>
+            </li>
+            <li>
+              <Link href="/scorecard" className="text-accent hover:underline">
+                The public scorecard &rarr;
+              </Link>{" "}
+              <span className="text-muted">
+                — every top-10 pick ever published, back-checked against SPY the next
+                session, unedited (it trails SPY).
+              </span>
+            </li>
+            <li>
+              <a
+                href="/api/scorecard.csv"
+                className="text-accent hover:underline"
+              >
+                The raw record as CSV
+              </a>{" "}
+              <span className="text-subtle">/</span>{" "}
+              <a
+                href="/api/scorecard.json"
+                className="text-accent hover:underline"
+              >
+                as JSON
+              </a>{" "}
+              <span className="text-muted">
+                — the whole dataset, so you can re-run the arithmetic yourself instead of
+                trusting ours.
+              </span>
+            </li>
+            <li>
+              <Link href="/stocks" className="text-accent hover:underline">
+                A page per scored ticker &rarr;
+              </Link>{" "}
+              <span className="text-muted">
+                — composite score, all six factor sub-scores and the plain-English read,
+                open to everyone.
+              </span>
+            </li>
+            <li>
+              <Link href="/how-it-works" className="text-accent hover:underline">
+                The formula itself &rarr;
+              </Link>{" "}
+              <span className="text-muted">— all six factors named, and how they are weighted.</span>
+            </li>
+          </ul>
+        </section>
+
         {SCANNERS.map((s) => (
           <section
             key={s.name}
@@ -233,26 +321,29 @@ export default function FreeStockScannerNoCreditCardPage() {
         <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we compared them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Three feature criteria, no performance criteria: is there a{" "}
-            <strong>real no-credit-card path</strong> (a free tier or a no-card trial);
-            does the tool <strong>publish the formula</strong> behind any score it shows;
-            and does it keep a <strong>public track record</strong>. We list Trade Ideas even
-            though it fails the first test, so the comparison is complete rather than
-            cherry-picked.
+            Three feature criteria, no performance criteria:{" "}
+            <strong>what you can reach with no credit card</strong>; whether the tool{" "}
+            <strong>publishes the formula</strong> behind any score it shows; and whether it
+            keeps a <strong>public track record</strong>. We list tools that fail the first
+            test — Trade Ideas, and our own signed-in app — so the comparison is complete
+            rather than cherry-picked.
           </p>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Tapeline is the only tool here that answers &quot;yes&quot; to no-card access, a public
-            formula, and a public scorecard together. That scorecard trailing SPY is stated plainly
-            on the{" "}
-            <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link>{" "}
-            itself — the trust hook, not a footnote. The raw filter screeners don&apos;t produce a
-            composite score, so the formula and scorecard columns simply don&apos;t apply to them —
-            a difference in design, not a criticism.
+            The split worth understanding on Tapeline: <strong>reading</strong> costs nothing
+            and asks for nothing — the picks, the record, the per-ticker pages and the raw
+            CSV/JSON are open to anyone. <strong>Running</strong> the scanner yourself,
+            signed in, takes a card at first sign-in: $0 that day, a 14-day Premium trial,
+            first charge on day 14, one click to cancel before then. Accounts created before
+            22 August 2026 keep the free access they signed up for and are never asked for a
+            card. The raw filter screeners don&apos;t produce a composite score, so the
+            formula and scorecard columns simply don&apos;t apply to them — a difference in
+            design, not a criticism.
           </p>
         </section>
 
-        {/* Mid-page email capture — lower-commitment step for a reader not yet
-            ready to open even a free account. */}
+        {/* Mid-page email capture — the genuinely card-free way to keep getting
+            the picks. Now the lowest-commitment step on the page by some
+            distance, since the account itself takes a card. */}
         <section className="mt-12 border-t border-border/60 pt-8">
           <NewsletterCapture source="blog" heading="" sub="" />
         </section>
@@ -305,20 +396,22 @@ export default function FreeStockScannerNoCreditCardPage() {
 
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">
-            Start free — no credit card, nothing to cancel.
+            Read the whole record — no account, no card.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
-            ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. The optional
-            14-day Premium trial does take a card — $0 today, cancel in one click before the
-            day-14 charge.
+            The picks, the scorecard and the raw CSV/JSON stay open to everyone, with
+            nothing to sign up for. The signed-in app is the part that takes a card: you
+            add one at first sign-in, $0 is charged that day, the 14-day Premium trial
+            runs, the first charge is on day 14, and one click cancels before then. Pro is{" "}
+            {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr) with a
+            30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup?from=screener" className="btn-primary">
-              Start free — no card →
+            <Link href="/scorecard" className="btn-primary">
+              See the public scorecard →
             </Link>
-            <Link href="/scorecard" className="btn-ghost">
-              See the public scorecard
+            <Link href="/pricing" className="btn-ghost">
+              What the app costs
             </Link>
           </div>
         </section>

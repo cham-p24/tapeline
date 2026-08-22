@@ -405,5 +405,5 @@ These don't block launch but should land within the first month:
 - **Public scorecard** — never gate it. It's the trust mechanism. Free users see it; paying users see the live data.
 - **Owner login** — only created via `seed_owner.py`. Never expose admin promotion via the signup form.
 - **Three-tier price points** — Pro $29 / Premium $49. Don't revisit until 500+ paying users with conversion data.
-- **Free tier shows real product** — 24h delayed and 20 tickers, but real data. Not a feature-stripped mock.
+- **The public record shows real product** — the daily Top 10, the full scorecard and every per-ticker page are live, real data, readable with no account and no card. Not a feature-stripped mock. (The signed-in app takes a card at first sign-in from 2026-08-22 — see docs/PRICING.md.)
 - **Trial tier is Premium** — gives users the best, takes it away on expiry. Don't drop to Pro-trial without an A/B.

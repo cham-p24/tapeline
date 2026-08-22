@@ -39,6 +39,7 @@ from app.services.session import (
     session_epoch_matches,
     verify_password,
 )
+from app.services.tier import must_add_card
 from app.services.trial_abuse import normalise_email
 
 logger = logging.getLogger(__name__)
@@ -193,6 +194,13 @@ def _user_out(u: User) -> dict:
         "email_verified_at": (
             u.email_verified_at.isoformat() if u.email_verified_at else None
         ),
+        # Drives the card wall at /app/start. This MUST ship on the session
+        # payload, not only on /api/me: UserContext boots from
+        # GET /api/auth/session, and without the field here the doorman in
+        # app/layout.tsx reads undefined and the wall never fires at all.
+        # Computed server-side from the single dated CARD_GATE_START constant so
+        # the browser never re-derives who is grandfathered — see tier.py.
+        "must_add_card": must_add_card(u),
     }
 
 

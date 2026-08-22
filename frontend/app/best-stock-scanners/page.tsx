@@ -151,7 +151,7 @@ const FAQ = [
   },
   {
     q: "What's the best free stock scanner?",
-    a: "Stockanalysis.com offers the most usable free tier — full screener access, clean fundamental tables, ETF coverage, no paywall on basics. TradingView's free tier covers charting and a basic screener well. Tapeline's free tier covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever. Each is honest about what's included.",
+    a: "Stockanalysis.com offers the most usable free tier — full screener access, clean fundamental tables, ETF coverage, no paywall on basics. TradingView's free tier covers charting and a basic screener well. Tapeline is a different shape and worth being plain about: its published output is free to read with no account — the daily Top 10, the full scorecard, a page per scored ticker and the raw CSV/JSON — but the signed-in scanner takes a card at first sign-in, so it is not a free screener you can run yourself. Each is honest about what's included.",
   },
   {
     q: "What's the best stock scanner with a public track record?",
@@ -220,7 +220,7 @@ export default function BestStockScannersPage() {
             scanner preview (the product proof), and the founding price up top
             where the visitor already is. from="screener" message-matches the
             signup H1 ("the scanner that shows its receipts"). */}
-        <LandingCta from="screener" />
+        <LandingCta from="screener" primaryLabel="Start the 14-day Premium trial" />
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance</h2>
@@ -326,14 +326,14 @@ export default function BestStockScannersPage() {
         </section>
 
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner, free.</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner.</h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">
-              Try the live scanner free — no card →
+              Start the 14-day Premium trial →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

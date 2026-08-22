@@ -222,7 +222,7 @@ export default async function BestStocksForStrategyPage({
             The live ranking table right below is the product proof, so
             showPreview is off here. from="screener" message-matches the
             signup H1 for scanner-intent visitors. */}
-        <LandingCta from="screener" showPreview={false} />
+        <LandingCta from="screener" showPreview={false} primaryLabel="Start the 14-day Premium trial" />
 
         <section className="mt-10">
           {rows.length === 0 ? (
@@ -432,7 +432,7 @@ export default async function BestStocksForStrategyPage({
             Run this scan live + every other strategy.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Full
             ~2,500-ticker live universe, every sort/filter combination, watchlist + alerts.
           </p>
@@ -446,7 +446,7 @@ export default async function BestStocksForStrategyPage({
               destination="signup"
               slug={s.slug}
             >
-              Try the live scanner free — no card →
+              Start the 14-day Premium trial →
             </ContentCtaLink>
             <ContentCtaLink
               href="/scorecard"

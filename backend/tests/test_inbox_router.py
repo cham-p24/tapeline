@@ -176,18 +176,26 @@ async def test_pricing_template_returns_string():
 
 @pytest.mark.asyncio
 async def test_trial_template_discloses_the_card_and_the_first_charge():
-    """The trial takes a card, so the canonical inbox answer must say so AND
-    say what happens: nothing charged today, first charge on day 14, one-click
-    cancel. A bare "free trial" reply here would be the misstatement."""
+    """A new account now adds a card at FIRST SIGN-IN, so the canonical inbox
+    answer — which replies to strangers, i.e. exactly the people the gate
+    applies to — must say so AND say what happens: nothing charged that day, a
+    dated first charge, one-click cancel, and the genuinely card-free way to
+    look. A bare "free trial" reply here would be the misstatement.
+
+    Asserted by SUBSTANCE, not by one phrasing: the wording will keep moving as
+    the offer is tuned, and a test that pins a sentence fails on an improvement
+    instead of on a lie."""
     result = await inbox_templates.render("trial", "free trial?")
     assert isinstance(result, str)
     lowered = result.lower()
-    assert "takes a card" in lowered
-    assert "nothing is charged today" in lowered
-    assert "day 14" in lowered
-    assert "one click cancels" in lowered
-    # The card-free path still has to be offered, on the tier where it is true.
-    assert "free tier never asks for one" in lowered
+    assert "card" in lowered                      # the card is disclosed at all
+    assert "sign-in" in lowered or "sign in" in lowered  # ...and WHEN
+    assert "nothing is charged" in lowered        # what happens that day
+    assert "day 14" in lowered or "14 days" in lowered   # when it does charge
+    assert "cancel" in lowered                    # how to stop it
+    # The genuinely card-free path — the public record — must still be offered,
+    # because that claim is still true and it is the honest alternative.
+    assert "scorecard" in lowered or "no account" in lowered
 
 
 @pytest.mark.asyncio

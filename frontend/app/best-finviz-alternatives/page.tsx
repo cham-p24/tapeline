@@ -74,7 +74,7 @@ const TOOLS: Tool[] = [
     rank: 1,
     name: "Tapeline",
     bestFor: "Multi-factor composite scoring with public methodology + scorecard",
-    price: "Free · $8.25/mo Pro · $16.58/mo Premium (annual)",
+    price: "$8.25/mo Pro · $16.58/mo Premium (annual) · 14-day trial, card required",
     rating: 5,
     capability: {
       composite: "yes",
@@ -83,21 +83,27 @@ const TOOLS: Tool[] = [
       charting: "limited",
       fundamentals: "yes",
       aiSignals: "limited",
-      freeTier: "yes",
+      // "limited", not "yes": from 2026-08-22 a new Tapeline account takes a
+      // card at first sign-in, so there is no self-serve free logged-in tier
+      // to claim. What stays free is the published record — the daily Top 10,
+      // the whole scorecard and the raw CSV/JSON — which needs no account at
+      // all. That is real free access, but it is not a free tier of the app.
+      freeTier: "limited",
       mobile: "yes",
     },
     pros: [
       "Six named scoring factors, published methodology — no black-box",
       "Public scorecard back-checking every top-10 pick vs SPY",
-      "Plain-English Why on every row, free tier included",
+      "Plain-English Why on every row — no upgrade gates the reasoning",
       "Congressional trades + recent insider buys on Premium",
       "Sub-60s refresh cadence during US market hours",
-      "Free tier needs no card; 14-day Premium trial is $0 today, cancel in one click",
+      "Daily picks, full scorecard and raw CSV/JSON readable with no account",
     ],
     cons: [
       "Younger brand — launched 2026 (Finviz dates to 2007)",
       "~2,500 actively scored tickers (top by $-volume), not the full 9,000+ Finviz indexes",
       "No raw-filter screener with 60+ technical fields — synthesis-first approach",
+      "A new account takes a card at first sign-in — no card-free logged-in tier",
     ],
     verdict:
       "If your reason for using Finviz is 'I want a synthesised picture of which names are worth looking at this week', Tapeline is the upgrade — the score does the synthesis Finviz makes you do manually. Honest about what it doesn't do: if your job-to-be-done is raw filter density across 9,000+ tickers, stay on Finviz.",
@@ -381,7 +387,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want plain-English explanations, not just data",
-    body: "Finviz shows you the numbers. You interpret. That's correct for power users but it's a steep learning curve and a constant cognitive load. Tapeline includes a one-sentence Why on every row — what's driving the score right now — generated from the same six-factor synthesis. The Why is on the free tier too; nothing gated about the reasoning.",
+    body: "Finviz shows you the numbers. You interpret. That's correct for power users but it's a steep learning curve and a constant cognitive load. Tapeline includes a one-sentence Why on every row — what's driving the score right now — generated from the same six-factor synthesis. The Why shows on the public ticker pages too, with no account; nothing gated about the reasoning.",
   },
   {
     title: "You want intraday speed without paying Trade Ideas pricing",
@@ -409,7 +415,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Run both tools in parallel for two weeks",
-    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's free tier needs no card and has no clock on it; its 14-day Premium trial does take a card, charges $0 today, and cancels in one click before the day-14 charge. TradingView and Stockanalysis.com both have free tiers.",
+    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's 14-day Premium trial is the way to run it in parallel: a new account adds a card at first sign-in, $0 is charged that day, the first charge is on day 14, and one click cancels before then. If you'd rather not put a card down, read the daily Top 10 and the full scorecard instead — those need no account. TradingView and Stockanalysis.com both have free tiers.",
   },
   {
     name: "Recreate your screener filters in the new tool",
@@ -436,7 +442,7 @@ const MIGRATION_STEPS = [
 const FAQ = [
   {
     q: "What's the closest free alternative to Finviz Elite?",
-    a: "Stockanalysis.com offers the closest free experience — full screener access without a paywall, fundamental data tables, and ETF/IPO coverage. Tapeline's free tier covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever. TradingView's free tier covers charting and a basic screener. None of these match Finviz Elite's 60+ raw screener fields, but each is honest about what it provides.",
+    a: "Stockanalysis.com offers the closest free experience — full screener access without a paywall, fundamental data tables, and ETF/IPO coverage. TradingView's free tier covers charting and a basic screener. Tapeline no longer has a card-free logged-in tier — a new account takes a card at first sign-in — but its published output is free to read with no account at all: the daily Top 10, the whole scorecard, a page per scored ticker, and the raw CSV/JSON record. None of these match Finviz Elite's 60+ raw screener fields, but each is honest about what it provides.",
   },
   {
     q: "Why isn't Finviz the right tool for everyone?",
@@ -620,9 +626,15 @@ export default function BestFinvizAlternativesPage() {
           <ul className="mt-3 space-y-2 text-sm text-fg leading-relaxed">
             <li>
               <strong>Best overall Finviz alternative:</strong> Tapeline — public 6-factor
-              formula, per-pick scorecard, plain-English Why. $8.25/mo annual,{" "}
-              free tier with{" "}
-              <Link href="/signup?from=finviz" className="text-accent hover:underline">no card</Link>, or a 14-day Premium trial for $0 today.
+              formula, per-pick scorecard, plain-English Why. $8.25/mo annual, starting with a{" "}
+              <Link href="/signup?from=finviz" className="text-accent hover:underline">
+                14-day Premium trial
+              </Link>{" "}
+              — card at first sign-in, $0 today, one click to cancel. The{" "}
+              <Link href="/scorecard" className="text-accent hover:underline">
+                published record
+              </Link>{" "}
+              is readable with no account.
             </li>
             <li>
               <strong>Best for charting:</strong> TradingView — best-in-class charts and a 60M-strong community.
@@ -648,7 +660,7 @@ export default function BestFinvizAlternativesPage() {
             top (only an inline text link inside the TL;DR). from="finviz"
             message-matches the signup H1 for Finviz-switchers; the live
             scanner preview lets a switcher SEE the alternative immediately. */}
-        <LandingCta from="finviz" />
+        <LandingCta from="finviz" primaryLabel="Start the 14-day Premium trial" />
 
         {/* Quick-pick by intent — decision tree. Targets specific user intents
             like "best finviz alternative for [X]" long-tail. */}
@@ -757,6 +769,17 @@ export default function BestFinvizAlternativesPage() {
               </tbody>
             </table>
           </div>
+          {/* The Free-tier cell for Tapeline reads "limited" rather than "yes"
+              since the 2026-08-22 card gate, and a half-filled circle with no
+              explanation is exactly the kind of thing a reader is entitled to
+              be suspicious of. Say why, in the same place they see it. */}
+          <p className="mt-3 text-xs text-subtle leading-relaxed">
+            On the Free tier column: Tapeline reads &quot;limited&quot; because a new
+            account takes a card at first sign-in — there is no card-free logged-in
+            tier to sign up for. Its published output is still free to read with no
+            account (the daily Top 10, the full scorecard, a page per scored ticker,
+            and the raw CSV/JSON), which is why it isn&apos;t a &quot;no&quot;.
+          </p>
         </section>
 
         {/* Summary table — at-a-glance recap */}
@@ -938,15 +961,15 @@ export default function BestFinvizAlternativesPage() {
 
         {/* CTA */}
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner, free.</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner.</h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Keep your
             existing Finviz subscription if you want — they solve different problems.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=finviz" className="btn-primary">
-              Try the live scanner free — no card →
+              Start the 14-day Premium trial →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { api } from "@/lib/api";
@@ -40,11 +40,63 @@ function openSearch() {
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
 }
 
+/* ─── Card gate ──────────────────────────────────────────────────────────────
+ *
+ * An account created on or after the cutover has to put a card on file before
+ * it can use the logged-in product. The verdict itself is the server's —
+ * `must_add_card`, derived from the backend's single CARD_GATE_START constant
+ * and surfaced by UserContext — and this layout is only the doorman.
+ *
+ * Three things it must never do, in order of how much damage they'd cause:
+ *
+ *  1. Wall a grandfathered account. Accounts that predate the cutover signed
+ *     up under "free, no card"; making them pay to log back in would be a
+ *     bait-and-switch on real people. The server never sets the flag for them
+ *     (nor for admins or lifetime accounts), and everything here fails OPEN —
+ *     no flag, no session, no field at all ⇒ the normal app renders.
+ *  2. Flash the wall at somebody who isn't gated. While the session fetch is
+ *     in flight we know nothing, so we render a neutral frame rather than
+ *     guessing in either direction.
+ *  3. Flash the PRODUCT at somebody who is. A gated route renders the same
+ *     neutral frame while the redirect to the wall lands, so the scanner never
+ *     mounts and never fires its authed fetches.
+ */
+export const CARD_GATE_ROUTE = "/app/start";
+
+/**
+ * The /app routes a gated account may still load.
+ *
+ * `/app/start` is the wall itself. `/app/onboarding` is the one carve-out and
+ * it is not a product surface: it renders no data, asks nothing, and exists to
+ * run the once-per-account provisioning (stamping onboarding_completed_at and
+ * seeding the starter watchlist server-side) before forwarding itself onward —
+ * where the gate catches it one hop later. Walling it would silently strand
+ * that provisioning for every account that later does add a card.
+ */
+// Routes a gated account may still reach. /app/billing is load-bearing, not a
+// convenience: Stripe returns from checkout to /app/billing?checkout=success,
+// but the tier flip is webhook-driven, so for the seconds before that webhook
+// lands the account still reads must_add_card. Without billing here we would
+// bounce someone back to the card wall immediately after they handed over a
+// card — the surest way to make a person try to pay twice.
+const CARD_GATE_PASSTHROUGH = new Set<string>([
+  CARD_GATE_ROUTE,
+  "/app/onboarding",
+  "/app/billing",
+]);
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { loading: sessionLoading, mustAddCard } = useUser();
   const isActive = (href: string) =>
     !!pathname && (pathname === href || pathname.startsWith(`${href}/`));
+
+  const gated = !sessionLoading && mustAddCard === true;
+  const gatePassthrough = !!pathname && CARD_GATE_PASSTHROUGH.has(pathname);
+  // A gated account on a walled route. Everything below reads this one flag.
+  const redirectingToWall = gated && !gatePassthrough;
 
   // Escape closes the mobile drawer (WAI-ARIA: a menu/dialog dismisses on Esc).
   useEffect(() => {
@@ -53,6 +105,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
+
+  // Send a gated account to the wall. `replace`, not `push`: the route they
+  // aimed at is not somewhere Back should return them to.
+  useEffect(() => {
+    if (!redirectingToWall) return;
+    router.replace(CARD_GATE_ROUTE);
+  }, [redirectingToWall, router]);
+
+  // ── Gate render decisions. All hooks above have already run, so these early
+  //    returns can't change hook order between renders. ────────────────────
+  //
+  // Session unknown: render a frame, not a verdict. Rendering the app here
+  // would flash the product at a gated account; rendering the wall would flash
+  // a paywall at a paying or grandfathered one. It resolves once per session
+  // (UserContext clears `loading` only after the gate verdict is in, and never
+  // sets it back to true), so this is one boot round trip, not a per-page cost.
+  if (sessionLoading) return <AppFrame />;
+
+  if (gated) {
+    // The wall (and the invisible provisioning hop) render in a bare shell —
+    // no sidebar, no tab bar, no nav into pages this account can't open yet.
+    // Anything else renders the same neutral frame until `replace` lands.
+    return redirectingToWall ? <AppFrame /> : <GateShell>{children}</GateShell>;
+  }
 
   return (
     <ToastProvider>
@@ -240,6 +316,62 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+    </ToastProvider>
+  );
+}
+
+/**
+ * The neutral frame. Rendered while the session verdict is unknown, and while
+ * a gated account's redirect to the wall is in flight.
+ *
+ * It asserts NOTHING — no nav, no product, no paywall — because at this point
+ * we either don't know which of those is correct or we know the current route
+ * is the wrong one. The pulse placeholders keep the page from reading as a
+ * blank error while it lasts (one session fetch, once per session).
+ */
+function AppFrame() {
+  return (
+    <div className="flex min-h-screen" data-testid="app-frame">
+      <div className="hidden h-screen w-56 shrink-0 border-r border-border bg-panel/30 md:block" aria-hidden="true" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="h-12 border-b border-border" aria-hidden="true" />
+        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+          <div className="h-6 w-48 animate-pulse rounded bg-panel" aria-hidden="true" />
+          <div className="mt-4 h-40 animate-pulse rounded-lg bg-panel" aria-hidden="true" />
+        </div>
+      </div>
+      <span role="status" aria-live="polite" className="sr-only">Loading</span>
+    </div>
+  );
+}
+
+/**
+ * The shell a card-gated account sees. Deliberately bare: the Tapeline
+ * wordmark links OUT to the public site (which stays free and account-free),
+ * and there is no in-app navigation, because there is nothing in the app this
+ * account can open yet. Showing a full sidebar of links that all bounce back
+ * to the wall would be a maze, not a menu.
+ *
+ * ToastProvider stays so anything the wall renders can surface a message; the
+ * page inside supplies its own <main id="main">, exactly as /app/onboarding
+ * already does.
+ */
+function GateShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ToastProvider>
+      <div className="flex min-h-screen flex-col" data-testid="card-gate-shell">
+        <header className="border-b border-border px-4 py-3 sm:px-6">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="h-2 w-6 rounded-full bg-accent" />
+            <span className="text-base font-semibold tracking-tight">Tapeline</span>
+          </Link>
+        </header>
+        <div className="flex-1">{children}</div>
+        <footer className="px-6 py-4 text-xs text-muted">
+          Not investment advice. For informational purposes only.&nbsp;
+          <Link href="/legal/risk" className="hover:text-fg">Risk disclosure</Link>
+        </footer>
+      </div>
     </ToastProvider>
   );
 }

@@ -166,7 +166,7 @@ export default function VsZacksPage() {
             until the very bottom, so a comparison-shopper who skimmed the
             intro and left never saw the offer. showPreview off: the
             comparison table below is the proof on compare pages. */}
-        <LandingCta from="compare" showPreview={false} secondaryLabel="See the scorecard first" />
+        <LandingCta from="compare" showPreview={false} primaryLabel="Start the 14-day Premium trial" secondaryLabel="See the scorecard first" />
       </section>
 
       <section className="mx-auto max-w-5xl px-6 pb-8">
@@ -224,7 +224,7 @@ export default function VsZacksPage() {
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -235,7 +235,7 @@ export default function VsZacksPage() {
             destination="signup"
             slug="zacks"
           >
-            Try the live scanner free — no card →
+            Start the 14-day Premium trial →
           </ContentCtaLink>
           <ContentCtaLink
             href="/scorecard"
