@@ -1,11 +1,22 @@
 /**
  * Key statistics block on the ticker page.
  *
- * The load-bearing property is honesty about absence: ~72% of the universe has
- * no price or volume read, so a value we don't hold must render as an em-dash
- * — never 0, never "N/A", never a derived stand-in. These tests pin that, plus
- * the human formatting (grouped volume, abbreviated market cap, "low – high"
- * ranges, readable dates, signed EPS) and the definition-list semantics.
+ * Two load-bearing properties:
+ *
+ *   1. HONESTY ABOUT ABSENCE. ~72% of the universe has no price or volume
+ *      read, so a value we don't hold must render as an em-dash — never 0,
+ *      never "N/A", never a derived stand-in.
+ *
+ *   2. RANKED, NOT FLAT. The block was a grid of twelve equal figures; a
+ *      figure with nothing to locate it against is furniture. Relative volume
+ *      is now the headline (it answers "is today unusual?", which the two raw
+ *      volumes never did), the raws and the session microstructure are demoted
+ *      to quiet lines, beta/P-E/EPS sit in an explicitly unranked group, and
+ *      dividend yield renders for payers only.
+ *
+ * These tests pin both, plus the human formatting (grouped volume, abbreviated
+ * market cap, "low – high" ranges, readable dates, signed EPS) and the
+ * definition-list semantics.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
@@ -13,21 +24,25 @@ import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
 
 const EM_DASH = "—";
 
-/** Every label the block promises to show, in render order. */
-const LABELS = [
-  "Previous close",
-  "Open",
-  "Day's range",
+/** The promoted figures — the ones a reader is meant to land on first. */
+const PRIMARY_LABELS = [
+  "Relative volume",
   "52-week range",
+  "Market cap",
+  "Earnings date",
+];
+
+/** Demoted, but still present and still auditable. */
+const QUIET_LABELS = [
   "Volume",
   "Avg. volume (30d)",
-  "Market cap",
-  "Beta",
-  "P/E (TTM)",
-  "EPS (TTM)",
-  "Earnings date",
-  "Dividend yield",
+  "Open",
+  "Previous close",
+  "Day's range",
 ];
+
+/** Rendered, but explicitly not presented as judgements. */
+const UNRANKED_LABELS = ["Beta", "P/E (TTM)", "EPS (TTM)"];
 
 /** A fully-populated ticker — the mega-cap case, where every feed has a read. */
 const FULL: KeyStats = {
@@ -59,29 +74,53 @@ function valueFor(label: string): string {
 describe("KeyStatistics", () => {
   it("renders every promised label", () => {
     render(<KeyStatistics stats={FULL} />);
-    for (const label of LABELS) {
+    for (const label of [...PRIMARY_LABELS, ...QUIET_LABELS, ...UNRANKED_LABELS]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    // Payer, so the yield row is present too.
+    expect(screen.getByText("Dividend yield")).toBeInTheDocument();
   });
 
   it("uses definition-list semantics rather than a grid of divs", () => {
     const { container } = render(<KeyStatistics stats={FULL} />);
-    expect(container.querySelector("dl")).not.toBeNull();
-    expect(container.querySelectorAll("dt")).toHaveLength(LABELS.length);
-    expect(container.querySelectorAll("dd")).toHaveLength(LABELS.length);
+    const dts = container.querySelectorAll("dt");
+    const dds = container.querySelectorAll("dd");
+    // 4 primary + dividend + 5 quiet + 3 unranked.
+    expect(dts).toHaveLength(13);
+    expect(dds).toHaveLength(13);
+    // Every pair lives inside a <dl>, not a bare div.
+    for (const dt of Array.from(dts)) {
+      expect(dt.closest("dl")).not.toBeNull();
+    }
   });
 
-  it("formats prices, ranges, volume and market cap for a human", () => {
+  it("leads with relative volume, the figure that answers a question", () => {
+    render(<KeyStatistics stats={FULL} />);
+    // 51,847,301 / 48,213,004 = 1.0753… → "1.08×".
+    expect(valueFor("Relative volume")).toBe("1.08× 30-day average");
+    // The raws are still there to check the ratio against.
+    expect(valueFor("Volume")).toBe("51,847,301");
+    expect(valueFor("Avg. volume (30d)")).toBe("48,213,004");
+  });
+
+  it("refuses a relative volume it cannot compute, rather than approximating", () => {
+    render(<KeyStatistics stats={{ ...FULL, avg_volume_30d: null }} />);
+    expect(valueFor("Relative volume")).toBe(EM_DASH);
+  });
+
+  it("never divides by a zero average volume", () => {
+    render(<KeyStatistics stats={{ ...FULL, avg_volume_30d: 0 }} />);
+    // Not "Infinity×", not "0.00×" — no number at all.
+    expect(valueFor("Relative volume")).toBe(EM_DASH);
+  });
+
+  it("formats prices, ranges and market cap for a human", () => {
     render(<KeyStatistics stats={FULL} />);
     expect(valueFor("Previous close")).toBe("212.34");
     expect(valueFor("Open")).toBe("213.50");
     // "low – high", low first regardless of prop order.
     expect(valueFor("Day's range")).toBe("211.87 – 216.02");
     expect(valueFor("52-week range")).toBe("196.21 – 260.10");
-    // Thousands separators, not a rounded "51.85M" — volume is compared
-    // against average volume and the rounding would destroy the comparison.
-    expect(valueFor("Volume")).toBe("51,847,301");
-    expect(valueFor("Avg. volume (30d)")).toBe("48,213,004");
     // 2dp, matching the scanner's "Mkt Cap" column exactly so the same
     // company reads identically on both surfaces. (8.485 is not exactly
     // representable in binary floating point and rounds down, hence .48.)
@@ -89,6 +128,23 @@ describe("KeyStatistics", () => {
     expect(valueFor("Beta")).toBe("1.24");
     expect(valueFor("P/E (TTM)")).toBe("31.07");
     expect(valueFor("Dividend yield")).toBe("0.43%");
+  });
+
+  it("says plainly that beta and P/E carry no peer ranking", () => {
+    const { container } = render(<KeyStatistics stats={FULL} />);
+    expect(container.textContent).toMatch(/Shown without a peer ranking/i);
+  });
+
+  it("renders dividend yield only for a payer", () => {
+    // A non-payer reports 0.00%, which is noise on every non-dividend stock.
+    render(<KeyStatistics stats={{ ...FULL, dividend_yield: 0 }} />);
+    expect(screen.queryByText("Dividend yield")).toBeNull();
+  });
+
+  it("omits the dividend row when we hold no yield at all", () => {
+    // A dashed yield row reads as a broken feed rather than "no dividend".
+    render(<KeyStatistics stats={{ ...FULL, dividend_yield: null }} />);
+    expect(screen.queryByText("Dividend yield")).toBeNull();
   });
 
   it("renders dates as a readable day, not the raw ISO string", () => {
@@ -101,7 +157,7 @@ describe("KeyStatistics", () => {
     expect(earnings).toMatch(/29/);
     expect(earnings).toMatch(/2026/);
     // Off-by-one guard: a bare YYYY-MM-DD parsed as UTC midnight renders as
-    // the previous day west of Greenwich. Must stay on the 8th.
+    // the previous day west of Greenwich. Must stay on the 29th.
     expect(earnings).not.toMatch(/28/);
     // Ex-dividend date is deliberately NOT rendered: /stock/dividend is a
     // premium endpoint we are not on, so it could never populate for ANY
@@ -133,7 +189,7 @@ describe("KeyStatistics", () => {
       Object.keys(FULL).map((k) => [k, null]),
     ) as KeyStats;
     const { container } = render(<KeyStatistics stats={empty} />);
-    for (const label of LABELS) {
+    for (const label of [...PRIMARY_LABELS, ...QUIET_LABELS, ...UNRANKED_LABELS]) {
       expect(valueFor(label)).toBe(EM_DASH);
     }
     // Nothing fabricated slipped in anywhere in the block.
@@ -141,14 +197,16 @@ describe("KeyStatistics", () => {
     expect(text).not.toMatch(/\bN\/A\b/);
     expect(text).not.toMatch(/\bNaN\b/);
     expect(text).not.toMatch(/undefined|null/);
+    expect(text).not.toMatch(/Infinity/);
   });
 
   it("does not crash when the payload carries no key-stats keys at all", () => {
     // A frontend deploy that lands ahead of the backend: the fields are absent
     // rather than null. Same render, no throw.
     const { container } = render(<KeyStatistics stats={{}} />);
-    expect(container.querySelectorAll("dd")).toHaveLength(LABELS.length);
-    for (const label of LABELS) {
+    // 12 pairs — the dividend row is absent along with the yield.
+    expect(container.querySelectorAll("dd")).toHaveLength(12);
+    for (const label of [...PRIMARY_LABELS, ...QUIET_LABELS, ...UNRANKED_LABELS]) {
       expect(valueFor(label)).toBe(EM_DASH);
     }
   });
