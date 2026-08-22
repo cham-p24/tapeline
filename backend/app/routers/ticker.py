@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, get_session, is_sqlite
-from app.models import NewsItem, SqueezeSetup, Ticker
+from app.models import EarningsEvent, NewsItem, SqueezeSetup, Ticker
 from app.models.news import exclude_mock_clause, tickers_match_clause
 from app.services.auth import current_user_optional, current_user_required
 from app.services.finnhub_feed import (
@@ -239,6 +239,62 @@ def _lookup_meter_payload(meter: dict) -> dict:
     }
 
 
+def _key_stats_payload(t: Ticker, next_earnings_date: date | None) -> dict:
+    """The summary block a reader expects at the top of a ticker page.
+
+    One flat, ordered group so the frontend can render it directly instead of
+    reaching into the root payload for some rows and a nested object for the
+    rest. The order here IS the display order (previous close → open → day
+    range → 52-week range → volumes → market cap → valuation → earnings →
+    dividend). price / volume / market_cap are repeated from the root rather
+    than moved, so no existing consumer breaks.
+
+    EVERY field is nullable and stays nullable end-to-end. ~72% of the universe
+    has no price or volume read at all, so the bar-derived values are
+    legitimately absent for most rows, and Finnhub has no fundamentals coverage
+    for most ETFs and funds. Null renders as an em-dash. Substituting 0 for "we
+    don't have it" would publish a fabricated statistic, which this product must
+    never do — so there is no `or 0` anywhere below, deliberately.
+
+    Three rows a reader might expect are ABSENT rather than approximated:
+      • bid / ask — needs a level-1 quote feed we don't subscribe to,
+      • the 1-year analyst price target — not on our Finnhub plan,
+      • the forward dividend AMOUNT — we source the yield, not the declared
+        rate; multiplying yield by price would be a number we invented rather
+        than one we were given, so only `dividend_yield` is reported.
+
+    `next_earnings_date` is passed in because it is the only stat here that does
+    not live on the ticker row — see the earnings read in ticker_detail.
+    """
+    return {
+        "price": t.price,
+        "previous_close": t.previous_close,
+        "day_open": t.day_open,
+        # Day range and 52-week range stay as flat low/high pairs rather than
+        # nested objects: either bound can be present without the other, and the
+        # "low – high" string is the frontend's to compose.
+        "day_low": t.day_low,
+        "day_high": t.day_high,
+        "week52_low": t.week52_low,
+        "week52_high": t.week52_high,
+        "volume": t.volume,
+        "avg_volume_30d": t.avg_volume_30d,
+        "market_cap": t.market_cap,
+        "beta": t.beta,
+        "pe_ttm": t.pe_ttm,
+        "eps_ttm": t.eps_ttm,
+        # Dates are ISO strings, matching how updated_at and news.published_at
+        # are already serialised on this endpoint.
+        "next_earnings_date": (
+            next_earnings_date.isoformat() if next_earnings_date is not None else None
+        ),
+        "dividend_yield": t.dividend_yield,
+        "ex_dividend_date": (
+            t.ex_dividend_date.isoformat() if t.ex_dividend_date is not None else None
+        ),
+    }
+
+
 def _client_ip(request: Request) -> str | None:
     """Real client IP behind Fly's edge proxy. Mirrors routers/auth +
     services/rate_limit: request.client.host is the proxy's internal peer (the
@@ -267,6 +323,15 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     (used / limit / remaining / resets_at) so the client can show the count
     approaching the cap rather than only discovering it at the 402. See
     _lookup_meter_payload.
+
+    `key_stats` (added 2026-08-22) is the summary block a reader expects at the
+    top of a ticker page — previous close, open, day range, 52-week range,
+    volumes, market cap, beta, P/E, EPS, next earnings date, dividend yield,
+    ex-dividend date. Every field is nullable; see _key_stats_payload. All but
+    the earnings date read straight off the ticker row already loaded above, so
+    the block costs no extra query; the earnings date is one indexed LIMIT 1
+    against calendar_events.earnings_events inside the same short txn, which
+    keeps the rev2 connection discipline intact.
 
     Connection + latency discipline (incident fix 2026-05-31, rev 2): this
     endpoint backs the SSR'd public /t/{symbol} page and the daily SEO audit
@@ -383,6 +448,39 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                 select(SqueezeSetup).where(SqueezeSetup.symbol == symbol)
             )
         ).scalar_one_or_none()
+
+        # Next scheduled earnings date — the one key stat that does NOT live on
+        # the ticker row. calendar_events.earnings_events has been populated in
+        # prod all along (the worker's _seed_calendar replaces the whole window
+        # daily) and was simply never joined here, so the ticker page had no
+        # earnings date at all.
+        #
+        # `>= today` is the whole point: the table holds a rolling window, and
+        # the row a caller wants is the NEXT report, never the last one. Taking
+        # the earliest remaining row is what makes it "next"; without the filter
+        # a ticker that reported yesterday would show yesterday as upcoming.
+        # UTC to match every other date boundary on this endpoint (the lookup
+        # meter's reset, the news window) — the machines run UTC.
+        #
+        # Read from the events table rather than tickers.next_earnings_date:
+        # that column is the denormalized mirror for bulk scanner reads, while
+        # this endpoint serves one symbol and can afford the authoritative read,
+        # so it can never serve a value the mirror hasn't caught up on. Indexed
+        # equality on `symbol` then an ordered LIMIT 1 — cheap enough to stay
+        # inside this same short txn, adding no connection and no round trip
+        # beyond the two already here.
+        today = datetime.now(UTC).date()
+        next_earnings_date = (
+            await session.execute(
+                select(EarningsEvent.report_date)
+                .where(
+                    EarningsEvent.symbol == symbol,
+                    EarningsEvent.report_date >= today,
+                )
+                .order_by(EarningsEvent.report_date)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
         # News is fetched separately, AFTER this core read txn closes (see
         # _fetch_ticker_news) — its own bounded session so a slow/timed-out
         # headline scan can never hold THIS pooled connection or affect the
@@ -413,6 +511,10 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         "change_pct_1m": t.change_pct_1m,
         "volume": t.volume,
         "reason": t.reason,
+        # The key-statistics summary block. Nullable throughout — a missing
+        # value is a null here and an em-dash on the page, never a zero. See
+        # _key_stats_payload for what is deliberately omitted and why.
+        "key_stats": _key_stats_payload(t, next_earnings_date),
         "breakdown": {
             "trend": {"value": t.sub_trend, "weight": 25, "label": "Trend"},
             "rs": {"value": t.sub_rs, "weight": 20, "label": "Relative strength"},

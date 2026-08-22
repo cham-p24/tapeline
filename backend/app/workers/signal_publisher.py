@@ -245,6 +245,23 @@ async def tick() -> None:
                 # Applied on both the market-only (sheet-owned) and full-update
                 # branches, so sheet-governed tickers still get a cap read.
                 "market_cap": snap.get("market_cap"),
+                # Key statistics. Market-feed data, so they live in market_only
+                # and reach sheet-governed rows too — the sheet owns the
+                # composite and the sub-scores, never the tape. `.get` for the
+                # same reason as market_cap: mock rows and sheet-only rows carry
+                # no such key, and a missing value must stay NULL (em-dash in
+                # the UI) rather than become a zero.
+                # From the snapshot payload, refreshed every tick:
+                "previous_close": snap.get("previous_close"),
+                "day_open": snap.get("day_open"),
+                "day_high": snap.get("day_high"),
+                "day_low": snap.get("day_low"),
+                # From the daily bars, refreshed by _refresh_aggregates_cache.
+                # Blank until that pass has run after a worker start, exactly as
+                # market_cap is blank until the profile pass has run.
+                "week52_high": snap.get("week52_high"),
+                "week52_low": snap.get("week52_low"),
+                "avg_volume_30d": snap.get("avg_volume_30d"),
             }
             is_sheet_owned = snap["symbol"] in sheet_owned
             if is_sheet_owned:
@@ -620,12 +637,15 @@ async def tick() -> None:
             logger.exception("active_universe.refresh_failed")
         _last_active_universe_refresh = started
 
-    # Daily Finnhub refreshes (fundamentals, insider Form 4, sector backfill).
-    # All three hit the same Finnhub free-tier 60-calls/min budget — so we
-    # serialize them inside a single background task instead of spawning
-    # three concurrent tasks that combined would 3x the budget and trigger
-    # 429s. Latches are set BEFORE the task runs so subsequent ticks don't
-    # re-fire while the in-flight run is still working.
+    # Daily Finnhub refreshes (fundamentals, insider Form 4, sector backfill,
+    # market-cap backfill, key statistics). All of them hit the same Finnhub
+    # free-tier 60-calls/min budget — so we serialize them inside a single
+    # background task instead of spawning concurrent tasks that combined would
+    # multiply the budget and trigger 429s. Latches are set BEFORE the task
+    # runs so subsequent ticks don't re-fire while the in-flight run is still
+    # working. The two backfills added for key statistics share the existing
+    # latches rather than adding their own: they are stages of this one daily
+    # chain, not independently schedulable jobs.
     global _last_fundamentals_refresh, _last_insider_refresh, _last_sector_backfill
     needs_finnhub = settings.finnhub_api_key and (
         _last_fundamentals_refresh is None
@@ -641,9 +661,12 @@ async def tick() -> None:
         _last_sector_backfill = started
 
         async def _serial_finnhub_refreshes() -> None:
-            """Run the three Finnhub-using refreshes back-to-back.
-            Combined wall time at 1.1s/req × 500 + 500 + ~rare-sector backfill
-            is ~18-20 min — long, but always under the per-minute API limit."""
+            """Run the Finnhub-using refreshes back-to-back.
+            Combined wall time at 1.1s/req is a few hours at the caps — long,
+            but always under the per-minute API limit, and two of the five
+            stages (sector + market-cap backfill) converge towards no-ops as
+            their columns fill. Key statistics runs last so it reads the
+            /stock/metric blobs the fundamentals stage has already cached."""
             try:
                 await _refresh_fundamentals_cache()
             except Exception:
@@ -656,6 +679,14 @@ async def tick() -> None:
                 await _backfill_sectors()
             except Exception:
                 logger.exception("sectors.backfill_failed")
+            try:
+                await _backfill_market_cap()
+            except Exception:
+                logger.exception("market_cap.backfill_failed")
+            try:
+                await _backfill_key_statistics()
+            except Exception:
+                logger.exception("key_statistics.backfill_failed")
 
         asyncio.create_task(_serial_finnhub_refreshes())
 
@@ -1640,7 +1671,8 @@ async def _refresh_aggregates_cache() -> bool:
     Strategy:
     1. Fetch SPY first (needed for RS comparisons across all other tickers)
     2. For each ticker, fetch 250 days of daily bars from Massive
-    3. Compute trend / rs / momentum scores
+    3. Compute trend / rs / momentum scores, plus the bar-derived key
+       statistics (52-week range, 30-day average volume) off the same bars
     4. Store in module-level caches in polygon_feed
 
     Massive Stocks Starter is unlimited API calls so the 870 calls take
@@ -1652,10 +1684,12 @@ async def _refresh_aggregates_cache() -> bool:
 
     from app.services.polygon_feed import (
         aggregate_cache_sizes,
+        compute_bar_stats,
         compute_momentum_score,
         compute_rs_score,
         compute_trend_score,
         fetch_aggregates,
+        set_cached_bar_stats,
         set_cached_momentum,
         set_cached_rs,
         set_cached_trend,
@@ -1726,6 +1760,12 @@ async def _refresh_aggregates_cache() -> bool:
                 set_cached_trend(sym, t)
                 set_cached_rs(sym, r)
                 set_cached_momentum(sym, m)
+                # Key statistics off the SAME bars — 52-week range and 30-day
+                # average volume, zero extra API calls. Deliberately NOT part
+                # of the `refreshed` count below: that counter gates the 24h
+                # success latch on the factor scores, and a run that produced
+                # only bar stats must still be retried.
+                set_cached_bar_stats(sym, compute_bar_stats(bars))
                 if any(v is not None for v in (t, r, m)):
                     refreshed += 1
         except Exception:
@@ -1734,8 +1774,9 @@ async def _refresh_aggregates_cache() -> bool:
 
     sizes = aggregate_cache_sizes()
     logger.info(
-        "aggregates.refreshed scored=%d trend_cache=%d rs_cache=%d mom_cache=%d",
-        refreshed, sizes["trend"], sizes["rs"], sizes["momentum"],
+        "aggregates.refreshed scored=%d trend_cache=%d rs_cache=%d mom_cache=%d "
+        "bar_stats_cache=%d",
+        refreshed, sizes["trend"], sizes["rs"], sizes["momentum"], sizes["bar_stats"],
     )
     # An empty result is a failure, not a successful no-op — don't let it latch
     # the 24h window and leave the caches stranded.
@@ -1884,6 +1925,185 @@ async def _backfill_sectors(cap: int = 2500) -> None:
 
     logger.info("sector_backfill.done backfilled=%d candidates=%d cap=%d",
                 backfilled, len(rows), cap)
+
+
+_MARKET_CAP_BACKFILL_BATCH = 20
+"""Rows written per short-lived transaction in _backfill_market_cap.
+Same size and same reason as _SECTOR_BACKFILL_BATCH — see its note."""
+
+
+async def _backfill_market_cap(cap: int = 2500) -> None:
+    """
+    Fill Ticker.market_cap for rows that have none, from Finnhub
+    /stock/profile2.
+
+    WHY THIS EXISTS: market_cap reaches the DB through the per-tick snapshot
+    write — polygon_feed.fetch_snapshots reads finnhub_feed's in-memory
+    _MARKET_CAP_CACHE — and that cache was only ever filled as a SIDE EFFECT
+    of fetch_company_profile, which the worker called from exactly one place:
+    _backfill_sectors, a query for rows whose SECTOR is missing. Once sectors
+    were filled that query matched nothing, no profile was fetched, the cache
+    stayed empty, and every tick wrote market_cap=NULL over the whole
+    universe. In production the column was populated for 0 of 8,846 rows.
+    Market cap now gets its own selection criterion instead of riding on an
+    unrelated one. (The cache also had a second hole on its cached-profile
+    path — fixed in finnhub_feed._seed_market_cap_from_profile.)
+
+    Selection is `market_cap IS NULL`, liquid first, capped — so each run
+    fills the next slice and the candidate set converges to ~zero once the
+    universe is covered, the same shape as _backfill_sectors. Ordering uses
+    the coalesce(...) NULLS-LAST idiom (see _refresh_fundamentals_cache) so
+    the names users actually look at are filled on day one rather than
+    thousands of NULL-volume microcaps.
+
+    FRESHNESS: a cap is price × shares and moves daily, but
+    fetch_company_profile caches 7 days, so this can only ever be as fresh as
+    that cache no matter how often it runs. Filling NULLs is this function's
+    job; refresh cadence is the profile cache's.
+    """
+    from app.services.finnhub_feed import fetch_company_profile, get_cached_market_cap
+
+    async with session_scope() as session:
+        result = await session.execute(
+            select(Ticker.symbol)
+            .where(Ticker.market_cap.is_(None))
+            # NULLS LAST across dialects — see _refresh_fundamentals_cache.
+            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
+            .limit(cap)
+        )
+        symbols = [row[0] for row in result.all()]
+
+    if not symbols:
+        logger.info("market_cap_backfill.no_null_rows")
+        return
+
+    async def _flush(batch: list[tuple[str, float]]) -> int:
+        """Write one small batch in its own short-lived transaction."""
+        if not batch:
+            return 0
+        try:
+            async with session_scope() as session:
+                for sym, cap_usd in batch:
+                    await session.execute(
+                        update(Ticker).where(Ticker.symbol == sym)
+                        .values(market_cap=cap_usd)
+                    )
+            return len(batch)
+        except Exception:
+            logger.exception("market_cap_backfill.flush_failed size=%d", len(batch))
+            return 0
+
+    # Fetch + sleep OUTSIDE any session, results into short batched
+    # transactions — same shape as _backfill_sectors, same reason (a ~46 min
+    # loop must not pin a pooled connection or hold a write txn open on Neon).
+    backfilled = 0
+    pending: list[tuple[str, float]] = []
+    for sym in symbols:
+        try:
+            # fetch_company_profile seeds _MARKET_CAP_CACHE as a side effect;
+            # read the value back from there rather than off the returned
+            # profile, so the MILLIONS → absolute-dollars conversion stays in
+            # exactly one place (finnhub_feed._seed_market_cap_from_profile).
+            await fetch_company_profile(sym)
+            cap_usd = get_cached_market_cap(sym)
+            if cap_usd is not None:
+                pending.append((sym, cap_usd))
+            # No else branch on purpose: a symbol Finnhub has no cap for keeps
+            # its NULL and renders an em-dash. A 0 would be a number nobody
+            # gave us.
+        except Exception:
+            logger.exception("market_cap_backfill.fetch_failed symbol=%s", sym)
+        await asyncio.sleep(1.1)  # stay well under 60/min
+        if len(pending) >= _MARKET_CAP_BACKFILL_BATCH:
+            backfilled += await _flush(pending)
+            pending = []
+    backfilled += await _flush(pending)
+
+    logger.info("market_cap_backfill.done backfilled=%d candidates=%d cap=%d",
+                backfilled, len(symbols), cap)
+
+
+_KEY_STATS_BACKFILL_BATCH = 20
+"""Rows written per short-lived transaction in _backfill_key_statistics."""
+
+
+async def _backfill_key_statistics(cap: int = 2500) -> None:
+    """
+    Persist the Finnhub half of the per-ticker key-statistics block — beta,
+    EPS (TTM), P/E (TTM), dividend yield, ex-dividend date — onto the Ticker
+    row.
+
+    ZERO extra Finnhub calls. fetch_key_statistics reads the same
+    /stock/metric?metric=all blob that _refresh_fundamentals_cache already
+    pulls for this exact slice of the universe earlier in the serial chain,
+    now that finnhub_feed caches the raw blob for 7 days instead of the six
+    derived scoring keys. The rest of that payload used to be parsed and
+    dropped on the floor.
+
+    Cache-only would not have been enough: these are per-ticker page fields,
+    the api and worker run on separate Fly machines, and an in-process dict is
+    invisible across that boundary — the same reason the insider feed became
+    DB-backed. So they land on the row.
+
+    Same liquidity cap as _refresh_fundamentals_cache (every ticker we score
+    gets stats) and the same 1.1s pacing as its siblings. The sleep is
+    unconditional even though most reads are disk-cache hits, because
+    backend/.cache lives on Fly's ephemeral disk: after any deploy the blobs
+    are cold and this loop is a live 2,500-call pass that has to stay under
+    the free tier's 60/min.
+    """
+    from app.services.universe import ACTIVE_UNIVERSE_SIZE
+    KEY_STATS_CAP = min(cap, ACTIVE_UNIVERSE_SIZE)
+
+    from app.services.finnhub_feed import fetch_key_statistics
+
+    async with session_scope() as session:
+        result = await session.execute(
+            select(Ticker.symbol)
+            # NULLS LAST across dialects — see _refresh_fundamentals_cache.
+            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
+            .limit(KEY_STATS_CAP)
+        )
+        symbols = [row[0] for row in result.all()]
+
+    async def _flush(batch: list[dict]) -> int:
+        """Write one small batch in its own short-lived transaction."""
+        if not batch:
+            return 0
+        try:
+            async with session_scope() as session:
+                # Bulk UPDATE ... WHERE symbol = :symbol, executemany'd —
+                # same primary-key-keyed form the tick loop uses.
+                await session.execute(update(Ticker), batch)
+            return len(batch)
+        except Exception:
+            logger.exception("key_stats_backfill.flush_failed size=%d", len(batch))
+            return 0
+
+    logger.info("key_stats_backfill.started count=%d", len(symbols))
+    backfilled = 0
+    pending: list[dict] = []
+    for sym in symbols:
+        try:
+            stats = await fetch_key_statistics(sym)
+            if stats:
+                # Every field is written, Nones included: a figure Finnhub
+                # has stopped reporting must go back to an em-dash rather
+                # than linger as a stale number under a fresh timestamp. A
+                # whole row can't be blanked by one thin payload because
+                # fetch_key_statistics returns None when all five are absent,
+                # which the `if` above skips.
+                pending.append({"symbol": sym, **stats})
+        except Exception:
+            logger.exception("key_stats_backfill.fetch_failed symbol=%s", sym)
+        await asyncio.sleep(1.1)  # stay well under 60/min
+        if len(pending) >= _KEY_STATS_BACKFILL_BATCH:
+            backfilled += await _flush(pending)
+            pending = []
+    backfilled += await _flush(pending)
+
+    logger.info("key_stats_backfill.done backfilled=%d candidates=%d cap=%d",
+                backfilled, len(symbols), KEY_STATS_CAP)
 
 
 async def _refresh_universe() -> None:
