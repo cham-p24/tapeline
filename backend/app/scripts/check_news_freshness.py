@@ -1,12 +1,31 @@
-"""Regression check — alert if production news goes stale.
+"""Regression check — alert if the production news PIPELINE stalls.
 
-Hits https://api.tapeline.io/api/news?limit=1 and asserts the latest
-article is younger than a market-hours-aware threshold:
+Reads https://api.tapeline.io/api/status and keys off two distinct signals
+exposed by the news probe there. The server owns the thresholds and publishes
+them in the same payload, so this script holds no copy of its own to drift
+(it runs standalone on a GitHub Actions runner and cannot import app code).
 
-    Active session  (NYSE 9:30 AM – 4:00 PM ET, Mon–Fri):  < 30 min
-    Extended hours  (pre-market + after-hours):            < 90 min
-    Overnight       (1 AM – 4 AM ET, Mon–Fri):             < 5 h
-    Weekend:                                               < 16 h
+    PRIMARY   ingest heartbeat — `ingest_age_seconds`, i.e. how long since WE
+              last wrote a news row. Driven by our own 5-min refresh loop and
+              therefore phase-independent. Stale => the worker, the vendor
+              credentials, or the DB write is genuinely broken. THIS is the
+              condition worth waking someone for.
+
+    SECONDARY wire-dead canary — `latest_article_age_seconds`, how old the
+              newest VENDOR-published article is. Dominated by vendor delivery
+              lag, not our health, so it is bounded loosely and reported at a
+              lower severity.
+
+Retuned 2026-08: the old check alerted purely on vendor publish age against a
+30/60-min market-hours bar, which fired on ~25% of runs while ingestion was
+perfectly healthy. Measured over 21 days of production, even the freshest
+articles arrive p50 44 min / p90 96 min after their own published_at, so that
+bar sat below the vendor's own p90 delivery lag and could never be met. See
+app/services/news_health.py for the full derivation.
+
+Falls back to the legacy /api/news?limit=1 publish-age check (against the
+loosened bars) when the API predates the ingest-heartbeat fields, so a
+mid-deploy runner still reports something sane.
 
 Designed to be run as a Fly cron (or GitHub Actions cron) every 15
 minutes. Exits 0 when fresh, 1 when stale. The 0 / 1 is the signal a
@@ -92,13 +111,16 @@ def threshold_seconds(now_utc: datetime) -> int:
     """Pick the right freshness threshold based on the current session phase."""
     phase = session_phase(now_utc)
     if phase == "active":
-        # 60 min: the 30-min bar cried wolf on routine ingestion lag (e.g. a
-        # 35-min-old article during a slow news-wire minute), emailing a CI
-        # failure each time. 60 min still catches a genuine stall within the
-        # hour without alerting on normal jitter.
-        return 60 * 60
+        # 240 min. Successively 30 -> 60 -> 240: the earlier bars were set from
+        # intuition about how often news breaks, but the binding constraint is
+        # the VENDOR's delivery lag, which we measured at p50 44 min / p90 96
+        # min / p99 117 min for the freshest articles we receive. A 60-min bar
+        # is below the vendor's own p90, so it fired constantly with nothing
+        # wrong (122 false alerts across 1,992 simulated ticks; 0 at 240 min).
+        # Real pipeline stalls are caught by the ingest heartbeat instead.
+        return 240 * 60
     if phase == "extended":
-        return 90 * 60        # 90 min during pre/post-market (sparser news)
+        return 240 * 60       # same vendor lag applies pre/post-market
     if phase == "overnight":
         # 5 h weekday overnight. 1–4 AM ET is the deepest US news quiet window:
         # the news wire has zero output for hours on a normal weekday morning and a
@@ -252,61 +274,137 @@ def main() -> int:
     prev_status = prev.get("last_status", "fresh")
     prev_failures = int(prev.get("consecutive_failures", 0) or 0)
 
-    url = args.base.rstrip("/") + "/api/news?limit=1"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "tapeline-cron"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
-    except Exception as e:
-        print(f"FAIL — could not fetch {url}: {e}", file=sys.stderr)
-        new_status = "fetch_failed"
-        if args.no_hysteresis or _should_alert(prev_status, new_status):
-            _maybe_alert(args.webhook, new_status, str(e))
-        _save_state(args.state_path, new_status, prev_failures + 1)
-        return 1
-
-    items = body.get("items") or []
-    if not items:
-        print("FAIL — /api/news returned 0 items", file=sys.stderr)
-        new_status = "empty_feed"
-        if args.no_hysteresis or _should_alert(prev_status, new_status):
-            _maybe_alert(args.webhook, new_status, "no items in response")
-        _save_state(args.state_path, new_status, prev_failures + 1)
-        return 1
-
+    base = args.base.rstrip("/")
     now = datetime.now(UTC)
-    pub = datetime.fromisoformat(items[0]["published_at"].replace("Z", "+00:00"))
-    age_sec = int((now - pub).total_seconds())
-    threshold = threshold_seconds(now)
-    fresh = age_sec < threshold
+    interval_sec = max(int(args.interval_minutes), 0) * 60
+    realert_sec = int(max(args.realert_hours, 0) * 3600)
 
-    label = "OK" if fresh else "FAIL"
-    phase = session_phase(now)
-    print(
-        f"{label} — latest article age {age_sec}s "
-        f"(threshold {threshold}s, phase={phase}, "
-        f"weekday={now.weekday()})"
-    )
-    if not fresh:
-        new_status = "stale_news"
-        detail = (
-            f"age={age_sec}s threshold={threshold}s "
-            f"title={items[0].get('title', '')[:60]!r}"
-        )
-        interval_sec = max(int(args.interval_minutes), 0) * 60
-        realert_sec = int(max(args.realert_hours, 0) * 3600)
-        if args.no_hysteresis or should_alert_stale(
-            age_sec, threshold, interval_sec, realert_sec
-        ):
-            _maybe_alert(args.webhook, new_status, detail)
-        else:
-            stale_for = age_sec - threshold
+    # ── PRIMARY: /api/status ingest heartbeat ────────────────────────────
+    # The server computes health and publishes the thresholds it used, so this
+    # script keeps no copy of them. If /api/status is unreachable or predates
+    # the ingest fields we fall through to the legacy publish-age probe rather
+    # than reporting a false all-clear.
+    news: dict = {}
+    try:
+        status_body = _fetch_json(base + "/api/status")
+        news = (status_body.get("checks") or {}).get("news") or {}
+    except Exception as e:
+        print(f"  (/api/status unavailable: {e}; falling back)", file=sys.stderr)
+
+    ingest_age = news.get("ingest_age_seconds")
+    if ingest_age is not None:
+        ingest_age = int(ingest_age)
+        ingest_limit = int(news.get("ingest_stale_after_seconds") or 7200)
+        wire_age = news.get("latest_article_age_seconds")
+        wire_limit = news.get("wire_stale_after_seconds")
+        wire_dark = bool(news.get("wire_stale"))
+
+        wire_note = ""
+        if wire_age is not None and wire_limit:
+            wire_note = f", wire {int(wire_age)}s/{int(wire_limit)}s"
+
+        # Real pipeline stall — we have not written a row in too long.
+        if ingest_age >= ingest_limit:
             print(
-                f"  (alert suppressed — already stale for {stale_for}s; "
-                f"next re-alert after {realert_sec}s stale)"
+                f"FAIL — news INGEST stalled: last write {ingest_age}s ago "
+                f"(limit {ingest_limit}s{wire_note})",
+                file=sys.stderr,
             )
-        _save_state(args.state_path, new_status, prev_failures + 1)
-        return 1
+            detail = (
+                f"no news row written for {ingest_age}s (limit {ingest_limit}s). "
+                f"Worker, vendor credentials or DB write is likely broken{wire_note}."
+            )
+            if args.no_hysteresis or should_alert_stale(
+                ingest_age, ingest_limit, interval_sec, realert_sec
+            ):
+                _maybe_alert(args.webhook, "stale_ingest", detail)
+            else:
+                print(
+                    f"  (alert suppressed — stalled for "
+                    f"{ingest_age - ingest_limit}s already)"
+                )
+            _save_state(args.state_path, "stale_ingest", prev_failures + 1)
+            return 1
+
+        # Ingestion is healthy; the vendor wire itself looks dark. Lower
+        # severity — nothing of ours is broken, but it is worth knowing.
+        if wire_dark:
+            print(
+                f"FAIL — news wire looks dark: newest article {int(wire_age)}s old "
+                f"(limit {int(wire_limit)}s), but ingestion is healthy "
+                f"({ingest_age}s since last write)",
+                file=sys.stderr,
+            )
+            if args.no_hysteresis or should_alert_stale(
+                int(wire_age), int(wire_limit), interval_sec, realert_sec
+            ):
+                _maybe_alert(
+                    args.webhook,
+                    "wire_dark",
+                    f"no NEW vendor article for {int(wire_age)}s "
+                    f"(limit {int(wire_limit)}s); our ingestion is healthy "
+                    f"(last write {ingest_age}s ago)",
+                )
+            _save_state(args.state_path, "wire_dark", prev_failures + 1)
+            return 1
+
+        print(
+            f"OK — ingest heartbeat {ingest_age}s (limit {ingest_limit}s"
+            f"{wire_note}, phase={session_phase(now)})"
+        )
+        # fall through to the shared recovery/exit path below
+
+    else:
+        # ── FALLBACK: legacy publish-age probe ───────────────────────────
+        url = base + "/api/news?limit=1"
+        try:
+            body = _fetch_json(url)
+        except Exception as e:
+            print(f"FAIL — could not fetch {url}: {e}", file=sys.stderr)
+            new_status = "fetch_failed"
+            if args.no_hysteresis or _should_alert(prev_status, new_status):
+                _maybe_alert(args.webhook, new_status, str(e))
+            _save_state(args.state_path, new_status, prev_failures + 1)
+            return 1
+
+        items = body.get("items") or []
+        if not items:
+            print("FAIL — /api/news returned 0 items", file=sys.stderr)
+            new_status = "empty_feed"
+            if args.no_hysteresis or _should_alert(prev_status, new_status):
+                _maybe_alert(args.webhook, new_status, "no items in response")
+            _save_state(args.state_path, new_status, prev_failures + 1)
+            return 1
+
+        pub = datetime.fromisoformat(
+            items[0]["published_at"].replace("Z", "+00:00")
+        )
+        age_sec = int((now - pub).total_seconds())
+        threshold = threshold_seconds(now)
+
+        label = "OK" if age_sec < threshold else "FAIL"
+        print(
+            f"{label} — [legacy probe] latest article age {age_sec}s "
+            f"(threshold {threshold}s, phase={session_phase(now)}, "
+            f"weekday={now.weekday()})"
+        )
+        if age_sec >= threshold:
+            detail = (
+                f"age={age_sec}s threshold={threshold}s "
+                f"title={items[0].get('title', '')[:60]!r}"
+            )
+            if args.no_hysteresis or should_alert_stale(
+                age_sec, threshold, interval_sec, realert_sec
+            ):
+                _maybe_alert(args.webhook, "stale_news", detail)
+            else:
+                print(
+                    f"  (alert suppressed — already stale for "
+                    f"{age_sec - threshold}s; next re-alert after "
+                    f"{realert_sec}s stale)"
+                )
+            _save_state(args.state_path, "stale_news", prev_failures + 1)
+            return 1
 
     # Fresh path — log recovery if we were previously stale.
     if prev_status != "fresh" and prev_status:
@@ -318,6 +416,13 @@ def main() -> int:
         )
     _save_state(args.state_path, "fresh", 0)
     return 0
+
+
+def _fetch_json(url: str) -> dict:
+    """GET `url` and parse JSON. Raises on any transport/parse failure."""
+    req = urllib.request.Request(url, headers={"User-Agent": "tapeline-cron"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode())
 
 
 def _maybe_alert(webhook: str | None, kind: str, detail: str) -> None:
