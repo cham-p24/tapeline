@@ -181,11 +181,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
     { url: `${base}/blog`,                      lastModified: blogLastModified, priority: 0.7 },
-    { url: `${base}/changelog`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
+    // Refreshed with the late-August wave (MCP server, ticker decision aid,
+    // card-backed trial, open-access month) — see PR for this date.
+    { url: `${base}/changelog`,                 lastModified: new Date("2026-08-23"), priority: 0.6 },
     { url: `${base}/roadmap`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/status`,                    lastModified: now, changeFrequency: "hourly", priority: 0.4 },
     // Comparison pages — high commercial-investigation intent.
-    { url: `${base}/whats-new`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
+    { url: `${base}/whats-new`,                 lastModified: new Date("2026-08-23"), priority: 0.7 },
     { url: `${base}/compare`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/compare/finviz`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/zacks`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
