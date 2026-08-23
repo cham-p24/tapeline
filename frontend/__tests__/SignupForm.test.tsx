@@ -288,7 +288,7 @@ describe("SignUpPage", () => {
   });
 
   it("keeps every source headline honest about the card (no source promises a card-free trial)", () => {
-    for (const from of ["", "finviz", "screener", "scorecard", "compare", "bogus"]) {
+    for (const from of ["", "finviz", "screener", "scorecard", "compare", "trial", "bogus"]) {
       nav.search = new URLSearchParams(from ? `from=${from}` : "");
       const { container, unmount } = render(<SignUpPage />);
       const head = (container.querySelector("h1")?.textContent ?? "") +
@@ -300,6 +300,117 @@ describe("SignUpPage", () => {
       expect(head).not.toMatch(/no card/i);
       unmount();
     }
+  });
+
+  // ── from=trial: the card-objection ad's landing key ──────────────────────
+  // Ad variant 9 ("$0 today. The charge date is on the page.") sells the
+  // SAFETY of the card trial instead of talking around it. Without this key
+  // it lands on the generic hero and the test measures the page's
+  // translation of the message rather than the message.
+
+  it("restates the trial-transparency promise in the H1 when from=trial", () => {
+    nav.search = new URLSearchParams("from=trial");
+    render(<SignUpPage />);
+    expect(
+      screen.getByRole("heading", { name: /\$0 today\. The charge date is on the page\./i }),
+    ).toBeInTheDocument();
+  });
+
+  it("states the whole card-trial rule in the from=trial subhead", () => {
+    nav.search = new URLSearchParams("from=trial");
+    const { container } = render(<SignUpPage />);
+    const sub = (container.querySelector("h1")?.nextElementSibling?.textContent ?? "")
+      .replace(/\s+/g, " ");
+    // Every clause is something the codebase can actually produce: Stripe
+    // Checkout ($0 today + the exact date), the cancel flow, and the T-3
+    // render_trial_precharge_reminder_email fired from trial_will_end.
+    expect(sub).toMatch(/takes a card/i);
+    expect(sub).toMatch(/\$0 today/i);
+    expect(sub).toMatch(/exact date of the first charge/i);
+    expect(sub).toMatch(/three days ahead/i);
+    expect(sub).toMatch(/one click ends the trial/i);
+    // The escape hatch that keeps "read the record first" true.
+    expect(sub).toMatch(/public record needs no account/i);
+    // And the claim that has been false since #548 must not reappear here of
+    // all places — this is the variant about the card.
+    expect(sub).not.toMatch(/no (?:credit )?card/i);
+  });
+
+  // ── HDYHAU: optional free-text self-reported attribution (gap G2) ─────────
+  // The only instrument that can ever credit AI-assistant and dark-social
+  // referrals — both arrive with no referrer and no UTM, so every automatic
+  // capture in lib/utm.ts is blind to them.
+
+  it("renders an optional free-text 'How did you hear about us?' field", () => {
+    render(<SignUpPage />);
+    const field = screen.getByLabelText(/how did you hear about us/i) as HTMLInputElement;
+    // FREE TEXT, not a dropdown. A fixed option list can only count the
+    // channels we already thought of, and the ones worth finding are the
+    // ones we can't see.
+    expect(field.tagName).toBe("INPUT");
+    expect(field.type).toBe("text");
+    expect(field.required).toBe(false);
+  });
+
+  it("submits fine with the attribution field left blank, sending nothing", async () => {
+    const { authApi } = await import("@/lib/auth");
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+    const extras = (authApi.signup as ReturnType<typeof vi.fn>).mock.calls.at(-1)![3];
+    // undefined, not "" — an empty string would become its own row in the
+    // GROUP BY this field exists to feed.
+    expect(extras.referral_source).toBeUndefined();
+  });
+
+  it("forwards the typed answer verbatim on the signup POST", async () => {
+    const { authApi } = await import("@/lib/auth");
+    const { container } = render(<SignUpPage />);
+    fireEvent.change(screen.getByLabelText(/how did you hear about us/i), {
+      target: { value: "  Claude suggested it  " },
+    });
+    fillAndSubmit(container);
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+    const extras = (authApi.signup as ReturnType<typeof vi.fn>).mock.calls.at(-1)![3];
+    expect(extras.referral_source).toBe("Claude suggested it");
+  });
+
+  // ── Meta click identifiers on the signup POST (gap G4) ───────────────────
+
+  it("forwards the stored fbclid and the _fbp cookie", async () => {
+    const { authApi } = await import("@/lib/auth");
+    window.localStorage.setItem(
+      "tapeline_fbclid_v1",
+      JSON.stringify({ fbclid: "IwAR0-TeSt", captured_at: Date.now() }),
+    );
+    Object.defineProperty(document, "cookie", {
+      value: "_fbp=fb.1.1755900000000.987654321",
+      configurable: true,
+      writable: true,
+    });
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+    const extras = (authApi.signup as ReturnType<typeof vi.fn>).mock.calls.at(-1)![3];
+    expect(extras.fbclid).toBe("IwAR0-TeSt");
+    expect(extras.fbp).toBe("fb.1.1755900000000.987654321");
+    window.localStorage.clear();
+  });
+
+  it("omits both Meta keys for organic traffic", async () => {
+    const { authApi } = await import("@/lib/auth");
+    window.localStorage.clear();
+    Object.defineProperty(document, "cookie", {
+      value: "",
+      configurable: true,
+      writable: true,
+    });
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+    const extras = (authApi.signup as ReturnType<typeof vi.fn>).mock.calls.at(-1)![3];
+    expect(extras.fbclid).toBeUndefined();
+    expect(extras.fbp).toBeUndefined();
   });
 
   // ── Plan-intent carry-through (?plan= / ?billing= from /pricing) ──────────

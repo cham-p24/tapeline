@@ -7,6 +7,7 @@ and must never put a raw email on the wire.
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 from typing import ClassVar
 
 import pytest
@@ -99,6 +100,92 @@ async def test_raw_email_never_leaves_the_process(configured, capture):
     # The opaque user id is hashed too, so it is not reversible even by Meta.
     assert "u_42" not in body
     assert hashlib.sha256(b"u_42").hexdigest() in body
+
+
+# ── fbc / fbp: the identifiers that must NOT be hashed ───────────────────────
+#
+# This is the failure mode with no error attached. Meta accepts a hashed fbc
+# or fbp exactly as it accepts a real one — the payload is valid, the response
+# is 200, and the identifier simply never matches anything. The account ends
+# up with a permanently mediocre Event Match Quality that reads as bad luck
+# rather than a bug. Hence a test, not a comment.
+
+
+async def test_fbc_and_fbp_are_sent_unhashed(configured, capture):
+    fbc = "fb.1.1755900000000.IwAR0-TeSt-FbCliD"
+    fbp = "fb.1.1755900000000.987654321"
+    await meta_capi.send_event(
+        event_name="CompleteRegistration",
+        event_id="e_1",
+        fbc=fbc,
+        fbp=fbp,
+    )
+    user_data = capture.calls[0]["json"]["data"][0]["user_data"]
+    # Verbatim on the wire — not hashed, and not wrapped in a list the way the
+    # hashed identifiers are.
+    assert user_data["fbc"] == fbc
+    assert user_data["fbp"] == fbp
+    body = str(capture.calls[0]["json"])
+    assert hashlib.sha256(fbc.encode()).hexdigest() not in body
+    assert hashlib.sha256(fbp.encode()).hexdigest() not in body
+
+
+async def test_email_stays_hashed_when_fbc_rides_alongside(configured, capture):
+    """The two rules hold at once — this is the mix a real event carries."""
+    await meta_capi.track_complete_registration(
+        user_id="u_9",
+        email="secret@example.com",
+        fbc="fb.1.1755900000000.CLICK",
+        fbp="fb.1.1755900000000.111",
+    )
+    payload = capture.calls[0]["json"]
+    body = str(payload)
+    user_data = payload["data"][0]["user_data"]
+    assert "secret@example.com" not in body
+    assert user_data["em"] == [hashlib.sha256(b"secret@example.com").hexdigest()]
+    assert user_data["fbc"] == "fb.1.1755900000000.CLICK"
+    assert user_data["fbp"] == "fb.1.1755900000000.111"
+
+
+async def test_fbc_and_fbp_keys_omitted_when_absent(configured, capture):
+    """Organic traffic — no click id, and the pixel may never have run. The
+    keys must be absent rather than present-and-empty, which Meta reads as a
+    failed match instead of no attempt."""
+    await meta_capi.track_complete_registration(user_id="u_10", email="a@b.com")
+    user_data = capture.calls[0]["json"]["data"][0]["user_data"]
+    assert "fbc" not in user_data
+    assert "fbp" not in user_data
+
+
+# ── fbc wire format ──────────────────────────────────────────────────────────
+
+def test_fbc_value_builds_metas_required_format():
+    """A bare fbclid is rejected by Meta — the version prefix and the
+    millisecond timestamp are load-bearing, not decoration."""
+    click = datetime(2026, 8, 23, 4, 30, tzinfo=UTC)
+    value = meta_capi.fbc_value("IwAR0-abc", click)
+    assert value == f"fb.1.{int(click.timestamp() * 1000)}.IwAR0-abc"
+    parts = (value or "").split(".")
+    assert parts[0] == "fb"
+    assert parts[1] == "1"
+    assert parts[2].isdigit() and len(parts[2]) == 13  # milliseconds, not seconds
+    assert parts[3] == "IwAR0-abc"
+
+
+def test_fbc_value_is_none_without_a_click_id():
+    """Callers pass `user.signup_fbclid` straight in; the common case is NULL,
+    and None lets send_event omit the key entirely."""
+    assert meta_capi.fbc_value(None) is None
+    assert meta_capi.fbc_value("") is None
+    assert meta_capi.fbc_value("   ") is None
+
+
+def test_fbc_value_treats_a_naive_timestamp_as_utc():
+    """SQLite hands back naive datetimes; a silent local-time reading would
+    shift the cookie stamp by hours for no visible reason."""
+    naive = datetime(2026, 8, 23, 4, 30)
+    aware = datetime(2026, 8, 23, 4, 30, tzinfo=UTC)
+    assert meta_capi.fbc_value("abc", naive) == meta_capi.fbc_value("abc", aware)
 
 
 # ── dedupe ───────────────────────────────────────────────────────────────────

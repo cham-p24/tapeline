@@ -16,18 +16,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import {
+  getStoredFbclid,
   getStoredGclid,
   getStoredLandingPath,
   getStoredReferrerHost,
   getStoredUtm,
 } from "@/lib/utm";
 
-// The four first-touch captures are mocked at the module boundary so these
+// The five first-touch captures are mocked at the module boundary so these
 // tests pin what OAuthButtons FORWARDS, independent of lib/utm.ts's storage
-// details (covered by landingPathCapture / referrerHostCapture tests).
+// details (covered by landingPathCapture / referrerHostCapture /
+// fbclidCapture tests).
 vi.mock("@/lib/utm", () => ({
   getStoredUtm: vi.fn(() => ({})),
   getStoredGclid: vi.fn(() => ({})),
+  getStoredFbclid: vi.fn(() => ({})),
   getStoredReferrerHost: vi.fn(() => ({})),
   getStoredLandingPath: vi.fn(() => ({})),
 }));
@@ -44,6 +47,7 @@ beforeEach(() => {
   );
   vi.mocked(getStoredUtm).mockReturnValue({});
   vi.mocked(getStoredGclid).mockReturnValue({});
+  vi.mocked(getStoredFbclid).mockReturnValue({});
   vi.mocked(getStoredReferrerHost).mockReturnValue({});
   vi.mocked(getStoredLandingPath).mockReturnValue({});
 });
@@ -107,12 +111,37 @@ describe("OAuthButtons attribution carry", () => {
     }
   });
 
-  it("carries all four captures plus ?next= together without clobbering", async () => {
+  /**
+   * The Meta click id has to travel this path for the same reason: OAuth is
+   * the primary signup route, so a capture wired only into the email form
+   * leaves users.signup_fbclid NULL for nearly every real account — and
+   * without it Meta's match quality is capped and there is no honest way to
+   * count Meta payers (the 14-day trial puts every first charge outside
+   * Meta's 7-day click window). Wire key is `fbclid`, matching
+   * routers/oauth.py:ATTRIBUTION_FIELDS.
+   */
+  it("forwards the Meta click id to every provider start link", async () => {
+    vi.mocked(getStoredFbclid).mockReturnValue({ fbclid: "IwAR0-TeSt-FbCliD" });
+    render(<OAuthButtons />);
+
+    for (const provider of ["Google", "Microsoft", "Apple"]) {
+      const link = await screen.findByRole("link", {
+        name: new RegExp(`Continue with ${provider}`),
+      });
+      const qs = new URLSearchParams(
+        (link.getAttribute("href") ?? "").split("?")[1] ?? "",
+      );
+      expect(qs.get("fbclid")).toBe("IwAR0-TeSt-FbCliD");
+    }
+  });
+
+  it("carries all five captures plus ?next= together without clobbering", async () => {
     vi.mocked(getStoredUtm).mockReturnValue({
       utm_source: "google",
       utm_medium: "cpc",
     });
     vi.mocked(getStoredGclid).mockReturnValue({ gclid: "TeSt-GcLiD-123" });
+    vi.mocked(getStoredFbclid).mockReturnValue({ fbclid: "TeSt-FbCliD-456" });
     vi.mocked(getStoredReferrerHost).mockReturnValue({
       signup_referrer_host: "chat.openai.com",
     });
@@ -128,6 +157,7 @@ describe("OAuthButtons attribution carry", () => {
     expect(qs.get("utm_source")).toBe("google");
     expect(qs.get("utm_medium")).toBe("cpc");
     expect(qs.get("gclid")).toBe("TeSt-GcLiD-123");
+    expect(qs.get("fbclid")).toBe("TeSt-FbCliD-456");
     expect(qs.get("referrer_host")).toBe("chat.openai.com");
     expect(qs.get("landing_path")).toBe("/compare/finviz");
     expect(qs.get("next")).toBe(intent);

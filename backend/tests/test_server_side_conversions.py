@@ -334,6 +334,12 @@ ATTR = {
     "utm_term": "stock screener",
     "utm_content": "ad-b",
     "gclid": "TeSt-GcLiD-123",
+    # Meta's click ID has to survive the same round-trip. OAuth is the
+    # designed-primary signup path, so a capture wired only into the email
+    # form leaves users.signup_fbclid NULL for very nearly every real account
+    # — exactly what the 2026-08-20 audit found for referrer_host and
+    # landing_path before they were carried here.
+    "fbclid": "TeSt-FbCliD-456",
 }
 
 
@@ -418,6 +424,7 @@ async def test_oauth_new_user_persists_utm_and_gclid(
         assert row.signup_utm_term == "stock screener"
         assert row.signup_utm_content == "ad-b"
         assert row.signup_gclid == "TeSt-GcLiD-123"
+        assert row.signup_fbclid == "TeSt-FbCliD-456"
         user_id = row.id
         await s.delete(row)
         await s.commit()
