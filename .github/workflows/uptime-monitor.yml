@@ -95,6 +95,42 @@ jobs:
             fi
           fi
 
+          # ---- worker liveness ----
+          # The 2026-08-23 incident: the worker's 60s tick crash-looped for 4h
+          # while this watchdog reported success the whole time, because an
+          # HTTP-200 /api/health says nothing about the worker. /api/status
+          # already computes worker_last_tick.status ("ok"/"stale") against
+          # the backend's own threshold, so trust that verdict. Confirm twice
+          # (60s apart) to ride out a deploy-restart race, restart ONLY the
+          # worker-group machines, and alert either way — a tick that stays
+          # stale after a restart is almost always a code bug in the tick
+          # (check: fly logs -a tapeline-backend), which no restart fixes.
+          worker_stale=""
+          for i in 1 2; do
+            wstat=$(curl -s --max-time 20 "https://api.tapeline.io/api/status?cb=${GITHUB_RUN_ID}-w$i" | jq -r '.checks.worker_last_tick.status // "unknown"')
+            if [ "$wstat" = "ok" ]; then worker_stale=""; break; fi
+            worker_stale="$wstat"
+            sleep 60
+          done
+          if [ -n "$worker_stale" ]; then
+            fail=1
+            echo "::error::worker tick STALE (status=$worker_stale) - restarting worker machines"
+            ensure_flyctl
+            wids=$(FLY_API_TOKEN="$FLY_API_TOKEN" flyctl machines list -a tapeline-backend --json 2>/dev/null \
+              | jq -r '.[] | select((.config.metadata.fly_process_group // .process_group // "") == "worker") | .id')
+            for mid in $wids; do
+              [ -n "$mid" ] && FLY_API_TOKEN="$FLY_API_TOKEN" flyctl machine restart "$mid" -a tapeline-backend >/dev/null 2>&1 \
+                && echo "restarted worker $mid"
+            done
+            sleep 90
+            wstat2=$(curl -s --max-time 20 "https://api.tapeline.io/api/status?cb=${GITHUB_RUN_ID}-w9" | jq -r '.checks.worker_last_tick.status // "unknown"')
+            if [ "$wstat2" = "ok" ]; then
+              notify "🔁 Tapeline WORKER tick went stale - watchdog restarted the worker machine(s) and the tick is back."
+            else
+              notify "🔴 Tapeline WORKER tick STALE and still stale after a machine restart - this is likely a code bug in the tick, not an infra blip. Check: fly logs -a tapeline-backend (look for tick.failure tracebacks)."
+            fi
+          fi
+
           # ---- frontend ----
           web_down=$(confirm_down "https://tapeline.io/" 200 20)
           if [ -n "$web_down" ]; then
