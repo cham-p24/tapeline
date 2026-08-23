@@ -27,7 +27,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "Many do. Yahoo Finance for news and quote aggregation; Tapeline for the daily 'where is the score, what's the regime, which setups are live'. The 14-day Tapeline trial is no-card so you can layer it onto Yahoo without committing.",
+    a: "Many do. Yahoo Finance for news and quote aggregation; Tapeline for the daily 'where is the score, what's the regime, which setups are live'. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can read it alongside Yahoo without committing.",
   },
 ];
 

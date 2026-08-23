@@ -26,7 +26,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How do prices compare?",
-    a: "Tapeline Pro is $8.25/mo billed annually; Premium is $16.58/mo billed annually. WallStreetZen Premium is approximately $24.50/mo billed annually. Tapeline Pro runs at roughly a third of that, with Tapeline including the public scorecard, plain-English Why on every row, and Congressional + insider activity feeds (Premium tier).",
+    a: "Tapeline Pro is $8.25/mo billed annually; Premium is $16.58/mo billed annually. WallStreetZen Premium is $19.50/mo billed annually ($234/yr), or $59 month-to-month. Tapeline Pro runs at well under half that, with Tapeline including the public scorecard, plain-English Why on every row, and Congressional + insider activity feeds (Premium tier).",
   },
   {
     q: "Does WallStreetZen publish a per-pick track record?",
@@ -34,7 +34,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. The 14-day no-credit-card Tapeline trial lets you compare directly against your existing WallStreetZen workflow.",
+    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare it directly against your existing WallStreetZen workflow.",
   },
 ];
 
@@ -91,6 +91,11 @@ const WINS = [
     competitor: "Annual subscription only on Premium",
   },
   {
+    label: "Cheapest paid tier",
+    tapeline: "✓ $8.25/mo (Pro, billed annually)",
+    competitor: "$19.50/mo (Premium, billed annually) — $59/mo month-to-month",
+  },
+  {
     label: "Macro regime + sector heatmap in same tool",
     tapeline: "✓ Live VIX / DXY / 10Y macro indicators, breadth + sector rotation",
     competitor: "—",
@@ -103,12 +108,6 @@ const TRADEOFFS = [
     tapeline: "Daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON — no account; the app itself takes a card",
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
     note: "This one goes to WallStreetZen and it isn't close: their free tier is the strongest in the category and you can screen with it. Tapeline's free surface is a published record you can read and download, not a screener you can run — from 22 August 2026 a new Tapeline account takes a card at first sign-in.",
-  },
-  {
-    label: "Cheapest paid tier",
-    tapeline: "$8.25/mo (Pro, billed annually)",
-    competitor: "$19.50/mo (Premium, billed annually)",
-    note: "WallStreetZen is ~$5/mo cheaper. You're getting fewer features for the saving — Tapeline includes the live tick, scorecard, and squeeze module at the same price band.",
   },
   {
     label: "Brand history",
@@ -144,8 +143,8 @@ export default function VsWallStreetZenPage() {
       {compareJsonLd({
         competitorName: "WallStreetZen",
         competitorUrl: "https://www.wallstreetzen.com",
-        competitorPriceMonthly: 24.5,
-        competitorAnnualNote: "Premium ~$24.50/mo billed annually",
+        competitorPriceMonthly: 59,
+        competitorAnnualNote: "Premium $19.50/mo billed annually ($234/yr); $59/mo month-to-month",
         pageUrl: "https://tapeline.io/compare/wallstreetzen",
       }).map((g, i) => (
         <script key={`wszld-${i}`} {...jsonLdScript(g)} />

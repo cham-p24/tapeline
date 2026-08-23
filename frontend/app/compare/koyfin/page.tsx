@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Yes, that's the natural pairing. Koyfin for institutional-quality fundamentals/macro/charting; Tapeline for the multi-factor composite score and public scorecard. Tapeline's 14-day no-credit-card trial makes side-by-side comparison easy.",
+    a: "Yes, that's the natural pairing. Koyfin for institutional-quality fundamentals/macro/charting; Tapeline for the multi-factor composite score and public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so side-by-side comparison costs nothing.",
   },
 ];
 

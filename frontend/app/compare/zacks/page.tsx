@@ -34,7 +34,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "Plenty do. Zacks Premium for the curated research and Equity Research Reports; Tapeline for the live multi-factor synthesis and the public scorecard. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side before deciding.",
+    a: "Plenty do. Zacks Premium for the curated research and Equity Research Reports; Tapeline for the live multi-factor synthesis and the public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side before deciding.",
   },
 ];
 
@@ -82,6 +82,11 @@ const WINS = [
     competitor: "$2,995/yr ≈ $250/mo (Ultimate) — 12× more",
   },
   {
+    label: "Cheapest paid tier",
+    tapeline: "$8.25/mo (Pro, billed annually) · month-to-month also offered",
+    competitor: "~$21/mo (Premium, $249/yr — annual only)",
+  },
+  {
     label: "Email noise level",
     tapeline: "10/day cap (Pro) · digests opt-in",
     competitor: "Heavy daily volume — top complaint in reviews",
@@ -105,12 +110,6 @@ const TRADEOFFS = [
     tapeline: "Pre-launch (under 12 months)",
     competitor: "37-year track record + academic citations",
     note: "Zacks' aggregate Rank performance is genuinely impressive. We're younger — that's why our scorecard is per-pick public from day one rather than a 37-year aggregate.",
-  },
-  {
-    label: "Cheapest paid tier",
-    tapeline: "$8.25/mo (Pro, billed annually)",
-    competitor: "~$21/mo (Premium, $249/yr only)",
-    note: "Effectively the same. Tapeline has month-to-month pricing too; Zacks Premium is annual-only with no monthly option.",
   },
   {
     label: "Universe size",

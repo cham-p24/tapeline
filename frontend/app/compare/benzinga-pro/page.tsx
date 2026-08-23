@@ -93,7 +93,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Reasonable if you're an active intraday trader. The 14-day Tapeline trial is no-credit-card so you can run them in parallel for two weeks. Common workflow: Benzinga for the live news + WIM commentary, Tapeline for the daily multi-factor synthesis + watchlist of names worth watching.",
+    a: "Reasonable if you're an active intraday trader. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can weigh the two before committing. Common workflow: Benzinga for the live news + WIM commentary, Tapeline for the daily multi-factor synthesis + watchlist of names worth watching.",
   },
 ];
 

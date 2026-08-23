@@ -92,7 +92,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Some traders do — Trade Ideas for intraday scalping signals and Holly's auto-execution layer, Tapeline for the swing/positional composite ranking and the public scorecard. The Tapeline trial is no-card, so running them in parallel for a week is easy.",
+    a: "Some traders do — Trade Ideas for intraday scalping signals and Holly's auto-execution layer, Tapeline for the swing/positional composite ranking and the public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can weigh them against each other first.",
   },
 ];
 
