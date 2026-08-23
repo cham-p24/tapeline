@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Sensible if you're a fundamental investor who also wants a live multi-factor view. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side. Common workflow: Stock Rover for monthly portfolio-level analysis + multi-screen fundamental filters, Tapeline for daily 'what's worth a look right now' synthesis.",
+    a: "Sensible if you're a fundamental investor who also wants a live multi-factor view. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. Common workflow: Stock Rover for monthly portfolio-level analysis + multi-screen fundamental filters, Tapeline for daily 'what's worth a look right now' synthesis.",
   },
 ];
 

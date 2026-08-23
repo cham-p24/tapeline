@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Sensible if you're a technical trader who wants the multi-factor synthesis on top. The 14-day Tapeline trial is no-credit-card so you can run them in parallel for two weeks. Common workflow: StockCharts for deep chart review (ChartLists, custom indicators, RRG), Tapeline for the daily composite ranking + watchlist with smart alerts.",
+    a: "Sensible if you're a technical trader who wants the multi-factor synthesis on top. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can weigh the two before committing. Common workflow: StockCharts for deep chart review (ChartLists, custom indicators, RRG), Tapeline for the daily composite ranking + watchlist with smart alerts.",
   },
 ];
 

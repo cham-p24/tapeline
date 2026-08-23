@@ -103,7 +103,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Sensible if you need the analyst-consensus data and broader coverage Tipranks provides — those are genuinely unique. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side. Many traders run Tipranks for the analyst layer and Tapeline for the live multi-factor synthesis with public accountability.",
+    a: "Sensible if you need the analyst-consensus data and broader coverage Tipranks provides — those are genuinely unique. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. Many traders run Tipranks for the analyst layer and Tapeline for the live multi-factor synthesis with public accountability.",
   },
 ];
 

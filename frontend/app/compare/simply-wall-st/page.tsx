@@ -103,7 +103,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Common pattern: Simply Wall St for portfolio-level fundamental research before a meaningful position, Tapeline for active scanning and timing decisions. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side. They're not zero-sum; they answer different questions.",
+    a: "Common pattern: Simply Wall St for portfolio-level fundamental research before a meaningful position, Tapeline for active scanning and timing decisions. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. They're not zero-sum; they answer different questions.",
   },
 ];
 

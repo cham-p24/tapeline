@@ -103,7 +103,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Reasonable if you value SA's transcript library and contributor essays — those are genuinely best-in-class on the retail internet. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side. Many traders keep SA for the editorial layer and add Tapeline for the live multi-factor synthesis with public accountability.",
+    a: "Reasonable if you value SA's transcript library and contributor essays — those are genuinely best-in-class on the retail internet. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. Many traders keep SA for the editorial layer and add Tapeline for the live multi-factor synthesis with public accountability.",
   },
 ];
 
