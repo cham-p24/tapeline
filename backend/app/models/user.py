@@ -138,6 +138,19 @@ class User(Base):
     # entry per week and overran the old String(40) within a month (Postgres
     # raised StringDataRightTruncation on commit).
     drip_state: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    # UTC date of the last EOD watchlist digest actually delivered to this user.
+    #
+    # run_eod_watchlist_digest was the ONLY email orchestrator with no durable
+    # per-recipient dedupe — run_daily_drip stamps drip_state,
+    # run_weekly_newsletter stamps a weekly_* token, newsletter.run_daily_digest
+    # stamps NewsletterSubscriber.last_sent_at. Its only guard was a
+    # process-global date latch set after the whole batch returned cleanly, so a
+    # partial run re-mailed the already-sent prefix on every tick until 24:00
+    # UTC. A Date (not a bool/token list) because this send recurs daily.
+    # See migration 0056_eod_digest_sent_on.
+    eod_digest_sent_on: Mapped[date | None] = mapped_column(
+        Date, nullable=True, index=True
+    )
 
     # ── Subscription-lifecycle / retention state (migration 0029) ──────────
     # Set when a paid user pauses billing via the cancel intercept (Stripe

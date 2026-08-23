@@ -184,6 +184,27 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
                 )
             )
             item.last_alert_at = now
+            # Commit the debounce PER ITEM, immediately after the send.
+            #
+            # This used to be written in memory and persisted only by a single
+            # commit AFTER the whole loop. This loop runs inline inside tick(),
+            # which the worker wraps in `asyncio.wait_for(tick(), timeout=60)`.
+            # CancelledError is a BaseException: it is not caught by the per-item
+            # `except Exception` below, nor by the worker's `except Exception`,
+            # and db.session_scope only rolls back on Exception — so the session
+            # closed with every pending last_alert_at discarded, while the emails
+            # had already gone out.
+            #
+            # And the trigger is stable, not transient: WatchlistItem
+            # .baseline_score is captured once at add time and never refreshed,
+            # so once a symbol has drifted past alert_threshold_delta it STAYS
+            # past it. The same items re-qualify on the very next 60s tick and
+            # the whole batch re-sends, indefinitely.
+            #
+            # Every other email orchestrator commits per-recipient for exactly
+            # this reason (run_daily_drip, run_daily_digest, every run_*_drip);
+            # this path was never converted.
+            await session.commit()
             fired += 1
             logger.info(
                 "alert.watchlist user=%s symbol=%s score=%.1f delta=%+.1f delivered=%s",
@@ -194,8 +215,6 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
                 "alert.watchlist_failed user=%s symbol=%s", user.id, item.symbol,
             )
 
-    if fired:
-        await session.commit()
     return fired
 
 
