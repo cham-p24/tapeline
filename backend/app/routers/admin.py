@@ -461,6 +461,52 @@ async def revenue_dashboard(
         for row in channel_rows
     }
 
+    # ── Self-reported attribution (gap G2, second half) ───────────────────
+    # The free-text "How did you hear about us?" answer, collected at signup.
+    #
+    # Why this is a separate block and not another column on the table above:
+    # it measures something the UTM/referrer chain structurally CANNOT. Every
+    # Facebook click — paid or organic — arrives through the `l.facebook.com`
+    # shim, AI assistants and dark social (Slack, Discord, WhatsApp) send no
+    # referrer at all, and in-app browsers drop UTMs. Those channels are
+    # invisible to `acquisition_channels` by construction; this is the only
+    # instrument that ever credits them.
+    #
+    # Deliberately NOT bucketed into canonical channel names here. The answers
+    # are free text on purpose (a dropdown biases the answer), the volume is
+    # small enough to read every row by hand, and premature normalisation
+    # would discard exactly the surprising phrasings worth reading. Raw counts,
+    # newest first, and the founder does the categorising.
+    referral_rows = (await session.execute(
+        select(
+            User.referral_source.label("answer"),
+            func.count().label("n"),
+            func.max(User.created_at).label("latest"),
+        )
+        .where(
+            User.referral_source.isnot(None),
+            func.trim(User.referral_source) != "",
+        )
+        .group_by(User.referral_source)
+        .order_by(func.count().desc(), func.max(User.created_at).desc())
+        .limit(200)
+    )).all()
+    self_reported_attribution = {
+        "answers": [
+            {
+                "answer": r.answer,
+                "signups": int(r.n),
+                "latest": r.latest.isoformat() if r.latest else None,
+            }
+            for r in referral_rows
+        ],
+        "answered": sum(int(r.n) for r in referral_rows),
+        # Denominator is every signup, so the response rate is readable — an
+        # optional field sitting ahead of the card wall is expected to skip
+        # ~30%, and a collapse below that is itself a signal about the form.
+        "asked": users_total,
+    }
+
     # ── Top landing pages by signup — the same population as the channel
     # readout above, but cut by WHICH page the visitor first landed on
     # (users.signup_landing_path, first-touch, path only). The channel slice
@@ -643,6 +689,7 @@ async def revenue_dashboard(
         # are separate columns since the card gate (G12); `paid` is a
         # back-compat alias of paid_active_subs, not a third number.
         "acquisition_channels": acquisition_channels,
+        "self_reported_attribution": self_reported_attribution,
         # Top landing pages: [{channel, path, signups, trials_started,
         # paid_active_subs, paid}], ordered by signups, capped at 25. The
         # content-level cut of the channel readout above — which of the ~4,750

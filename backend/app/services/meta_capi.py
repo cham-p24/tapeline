@@ -300,6 +300,8 @@ async def track_start_trial(
     email: str | None = None,
     value: float | None = None,
     currency: str = "USD",
+    fbc: str | None = None,
+    fbp: str | None = None,
 ) -> bool:
     """`StartTrial` — the card-required trial began.
 
@@ -316,6 +318,8 @@ async def track_start_trial(
         email=email,
         user_id=user_id,
         custom_data=custom,
+        fbc=fbc,
+        fbp=fbp,
     )
 
 
@@ -328,6 +332,8 @@ async def track_purchase(
     currency: str = "USD",
     tier: str | None = None,
     billing_period: str | None = None,
+    fbc: str | None = None,
+    fbp: str | None = None,
 ) -> bool:
     """`Purchase` — the first real charge succeeded.
 
@@ -348,6 +354,8 @@ async def track_purchase(
         email=email,
         user_id=user_id,
         custom_data=custom,
+        fbc=fbc,
+        fbp=fbp,
     )
 
 
