@@ -26,12 +26,15 @@ import pytest
 
 from app.services.mock_feed import _render_reason
 from app.services.polygon_feed import (
-    FACTOR_WEIGHTS,
     MIN_FACTORS_FOR_COMPOSITE,
+    _WEIGHT_KEY_TO_COLUMN,
     _composite_from_subs,
 )
+from app.services.score import NEUTRAL, WEIGHTS
 
-_ALL = {k: 50.0 for k in FACTOR_WEIGHTS}
+FACTOR_COLUMNS = tuple(_WEIGHT_KEY_TO_COLUMN.values())
+
+_ALL = {c: 50.0 for c in FACTOR_COLUMNS}
 
 
 def _row(**over: float | None) -> dict:
@@ -39,7 +42,7 @@ def _row(**over: float | None) -> dict:
 
 
 def test_all_six_present_is_the_plain_weighted_sum():
-    """Re-normalising must not change the number when nothing is missing."""
+    """The unchanged case: every factor held, plain weighted sum."""
     r = _row(
         sub_trend=80.0, sub_rs=70.0, sub_fundamentals=60.0,
         sub_smart_money=40.0, sub_macro=50.0, sub_momentum=30.0,
@@ -48,7 +51,7 @@ def test_all_six_present_is_the_plain_weighted_sum():
         80 * 0.25 + 70 * 0.20 + 60 * 0.15 + 40 * 0.15 + 50 * 0.15 + 30 * 0.10, 1
     )
     assert _composite_from_subs(r) == expected
-    assert sum(FACTOR_WEIGHTS.values()) == pytest.approx(1.0)
+    assert sum(WEIGHTS.values()) == pytest.approx(1.0)
 
 
 def test_a_missing_factor_is_not_treated_as_zero():
@@ -56,37 +59,63 @@ def test_a_missing_factor_is_not_treated_as_zero():
     held = {"sub_trend": 80.0, "sub_rs": 80.0, "sub_macro": 80.0, "sub_momentum": 80.0}
     partial = _composite_from_subs(_row(sub_fundamentals=None, sub_smart_money=None, **held))
 
-    assert partial == 80.0, (
-        f"four factors all reading 80 produced {partial}. Anything below 80 "
-        f"means the two we hold nothing for were averaged in as low values."
-    )
+    # NEUTRAL for the two gaps: 80*0.70 + 50*0.30 = 71.0.
+    assert partial == 71.0, f"expected the NEUTRAL fallback, got {partial}"
 
-    # Explicitly: scoring the gaps as 0 would have given 56.0.
+    # Scoring the gaps as 0 would have given 56.0 — "no reading" rendered as
+    # "terrible". That is the defect this exists to prevent.
     as_zero = _composite_from_subs(_row(sub_fundamentals=0.0, sub_smart_money=0.0, **held))
     assert as_zero == 56.0
-    assert partial != as_zero
+    assert partial > as_zero
 
 
-def test_the_gap_does_not_shift_the_composite_at_all():
-    """Re-normalisation, not partial-sum: the divisor must shrink with the set."""
-    for missing in FACTOR_WEIGHTS:
-        r = _row(**{k: (None if k == missing else 62.0) for k in FACTOR_WEIGHTS})
-        assert _composite_from_subs(r) == 62.0, (
-            f"with {missing} absent and every other factor at 62, the average "
-            f"of what we hold is still 62"
-        )
+def test_a_missing_factor_does_not_upgrade_thin_coverage():
+    """The other direction, and the reason this is not a re-normalised average.
+
+    Re-normalising over the factors held would return 80.0 here — four strong
+    readings promoted to a conviction score that a full six-factor read never
+    justified. NEUTRAL keeps the gap neutral instead of letting it flatter the
+    row.
+    """
+    held = {"sub_trend": 80.0, "sub_rs": 80.0, "sub_macro": 80.0, "sub_momentum": 80.0}
+    partial = _composite_from_subs(_row(sub_fundamentals=None, sub_smart_money=None, **held))
+    assert partial == 71.0
+    assert partial < 80.0, "thin coverage must not read as strong coverage"
+
+
+def test_it_matches_the_sheet_paths_composite_exactly():
+    """One product, one composite definition.
+
+    score.compute_tapeline_composite is the definition of record and the sheet
+    path has always used it. If these diverge, the same ticker scores
+    differently depending on which feed happened to write it — measured in
+    production, CDNA scored 80.2 through the sheet while a re-normalising
+    version of this function would have given it 93.2.
+    """
+    subs = {
+        "trend": 100.0, "rs": 100.0, "momentum": 90.0, "macro": 75.0,
+        "fundamentals": None, "smart_money": None,
+    }
+    sheet_side = round(
+        sum(WEIGHTS[k] * (v if v is not None else NEUTRAL) for k, v in subs.items()), 1
+    )
+    ours = _composite_from_subs(
+        _row(**{_WEIGHT_KEY_TO_COLUMN[k]: v for k, v in subs.items()})
+    )
+    assert ours == sheet_side == 80.2
 
 
 def test_below_the_floor_there_is_no_composite():
     """One factor is not a six-factor composite by any stretch."""
-    none_of_them = {k: None for k in FACTOR_WEIGHTS}
+    none_of_them = {c: None for c in FACTOR_COLUMNS}
 
     only_one = _row(**{**none_of_them, "sub_trend": 90.0})
     assert _composite_from_subs(only_one) is None
     assert _composite_from_subs(_row(**none_of_them)) is None
 
+    # Two held at 90, the other four NEUTRAL: 90*0.45 + 50*0.55 = 68.0.
     two = _row(**{**none_of_them, "sub_trend": 90.0, "sub_rs": 90.0})
-    assert _composite_from_subs(two) == 90.0
+    assert _composite_from_subs(two) == 68.0
 
 
 def test_the_floor_matches_the_one_users_are_filtered_by():
@@ -100,8 +129,8 @@ def test_the_floor_matches_the_one_users_are_filtered_by():
 
 
 def test_the_composite_stays_clamped():
-    assert _composite_from_subs(_row(**{k: 100.0 for k in FACTOR_WEIGHTS})) == 100.0
-    assert _composite_from_subs(_row(**{k: 0.0 for k in FACTOR_WEIGHTS})) == 0.0
+    assert _composite_from_subs(_row(**{c: 100.0 for c in FACTOR_COLUMNS})) == 100.0
+    assert _composite_from_subs(_row(**{c: 0.0 for c in FACTOR_COLUMNS})) == 0.0
 
 
 # --------------------------------------------------------------------------
