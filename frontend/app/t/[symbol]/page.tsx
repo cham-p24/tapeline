@@ -20,6 +20,8 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { AnonSignupNudge } from "@/components/AnonSignupNudge";
 import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
+import { sectorRankLine } from "@/components/sectorRankLine";
 import {
   breadcrumbJsonLd,
   faqJsonLd,
@@ -91,6 +93,17 @@ type TickerData = {
     macro?: FactorEntry;
     momentum?: FactorEntry;
   };
+  // Key statistics (market cap / P/E / 52-week range / volumes / earnings
+  // date). Returned by the endpoint for EVERY caller — anonymous included —
+  // since 2026-08-22 (#552's backend half), but this public page never
+  // rendered it, so logged-out visitors and crawlers saw no market facts at
+  // all. Optional AND nullable: a frontend deploy can land ahead of the
+  // backend that serves the key, and the block renders em-dashes either way.
+  key_stats?: KeyStats | null;
+  // Peer-percentile block from backend/app/services/percentile.py — the
+  // honest, MIN_PEERS-floored source for the rank line. `unknown` because
+  // components/percentiles.ts owns validation; nothing here reads it raw.
+  peer_percentiles?: unknown;
 };
 
 /**
@@ -394,6 +407,15 @@ async function fetchRelatedTickers(
   if (!sector) return [];
   try {
     const params = new URLSearchParams({
+      // Sector filter applied SERVER-SIDE. This request is anonymous SSR, so
+      // the backend clamps it to the Free row cap (10 rows) regardless of the
+      // limit asked for. Without the sector param the response was the GLOBAL
+      // top-10 by score, and the in-memory sector filter below then matched
+      // ~zero rows — the "Similar setups" section silently vanished for most
+      // tickers in prod, and the old rank line collapsed to "#1 out of 1".
+      // Scoped server-side, the capped rows are all same-sector and the
+      // section actually populates.
+      sector,
       sort: "score",
       order: "desc",
       min_score: "40",
@@ -533,7 +555,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
 // (Google's rich-result eligibility requires the schema to mirror visible
 // page content). Answers are templated on the ticker but score/signal are
 // pulled live so they always reflect what's rendered above.
-function buildFaq(sym: string, name: string, score: string, signal: string, sector: string | null): { q: string; a: string }[] {
+function buildFaq(sym: string, name: string, score: string, signal: string, sector: string | null, rankLine: string | null): { q: string; a: string }[] {
   // 2026-05-24: expanded from 5 → 12 entries. Each new question is
   // ticker-templated so the FAQ section reads as genuinely about THIS
   // ticker rather than boilerplate. Google's quality classifier weights
@@ -572,7 +594,14 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Where does ${sym} rank in ${sectorPhrase}?`,
-      a: `${sym}'s sector rank within ${sectorPhrase} updates live as composite scores re-tick during US market hours — see the rank line near the top of this page. Sector ranks are computed across the actively-scored universe (~2,500 US tickers by daily $-volume) so the cohort is consistent across all ${sectorPhrase} names Tapeline covers.`,
+      // FAQPage JSON-LD must mirror visible page content, and the rank line
+      // near the top of the page is suppressed whenever the peer group has
+      // fewer than 30 covered peers — so this answer states the rank when one
+      // is published and states the refusal rule when it isn't, never
+      // pointing at a line that isn't there.
+      a: rankLine
+        ? `${rankLine} Peer percentiles are computed across every ticker in the peer group Tapeline holds a composite score for, always print the covered-peer count (n) they were computed against, and update as scores re-tick during US market hours.`
+        : `Tapeline publishes a peer rank only when at least 30 covered peers exist to rank against — a percentile computed over a handful of rows would claim precision the data cannot support. ${sym}'s peer group is currently below that floor, so no rank line is shown on this page right now.`,
     },
     {
       q: `Does Tapeline have insider buying data for ${sym}?`,
@@ -617,27 +646,16 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
     fetchTickerNews(sym),
   ]);
 
-  // Sector rank derived from the related-tickers fetch (queries up to 60
-  // same-sector scoring rows). We can answer "{SYM} ranks #X out of Y in
-  // {sector}" deterministically — that single sentence is uniquely per-
-  // ticker text that Google's quality classifier can't dismiss as boilerplate.
-  // Computed inline (not via a new round-trip) because related already has
-  // the data we need.
-  const sectorRank = (() => {
-    if (!data.sector || data.score == null) return null;
-    // related is same-sector + min_score=40, sorted by closeness to data.score.
-    // We need rank-by-score-desc, so re-sort that pool and find the position.
-    const scored = related
-      .filter((r) => r.score != null)
-      .map((r) => ({ symbol: r.symbol, score: r.score! }));
-    scored.push({ symbol: data.symbol, score: data.score });
-    const desc = [...new Set(scored.map((s) => s.symbol))]
-      .map((s) => scored.find((x) => x.symbol === s)!)
-      .sort((a, b) => b.score - a.score);
-    const idx = desc.findIndex((s) => s.symbol === data.symbol);
-    if (idx === -1) return null;
-    return { rank: idx + 1, total: desc.length };
-  })();
+  // Peer-rank line — from the ticker endpoint's `peer_percentiles` block, the
+  // ONLY honest source of rank on this page. The old inline computation ranked
+  // the ticker inside the related-tickers pool, which (being an anonymous SSR
+  // scanner call) is clamped to the Free row cap — so the pool collapsed to
+  // the ticker itself and prod printed "ranks #1 out of 1 information
+  // technology stocks", a rank over ONE row. sectorRankLine goes through
+  // toRanking, which enforces the MIN_PEERS=30 floor client-side (matching
+  // backend/app/services/percentile.py), and returns null — no line at all —
+  // whenever the denominator is under 30 or the ranking was refused.
+  const rankLine = sectorRankLine(data.symbol, data.peer_percentiles);
 
   const score = data.score ?? 0;
   const signal = data.signal ?? "—";
@@ -669,6 +687,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
     data.score?.toFixed(0) ?? "—",
     data.signal ?? "—",
     data.sector,
+    rankLine,
   );
   const url = `https://tapeline.io/t/${data.symbol}`;
   // Sector-hub uplink. When the ticker's sector has a hub page, the
@@ -777,16 +796,15 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               {data.reason && (
                 <p className="mt-6 max-w-xl text-sm sm:text-base leading-relaxed text-fg">{data.reason}</p>
               )}
-              {/* Sector rank — deterministic per-ticker prose. This single
-                  sentence varies for every ticker (rank differs even when
-                  two tickers have the same score in the same sector, because
-                  the cohort sizes differ for low-volume sub-segments) which
-                  is what Google's quality classifier needs to see as proof
-                  the page is not boilerplate-templated. */}
-              {sectorRank && data.sector && (
-                <p className="mt-3 max-w-xl text-xs sm:text-sm text-subtle">
-                  {data.symbol} ranks <span className="font-semibold text-muted">#{sectorRank.rank}</span> out of {sectorRank.total} {data.sector.toLowerCase()} stocks in the Tapeline universe by composite score this session.
-                </p>
+              {/* Peer-rank line — percentile within the FULL peer group, from
+                  the backend's peer_percentiles aggregate. Renders only when
+                  the ranking clears the MIN_PEERS=30 floor (enforced both
+                  server-side and again in toRanking); otherwise the line is
+                  suppressed entirely rather than printing a rank computed
+                  over a handful of rows. Still deterministic per-ticker
+                  prose with an always-printed denominator. */}
+              {rankLine && (
+                <p className="mt-3 max-w-xl text-xs sm:text-sm text-subtle">{rankLine}</p>
               )}
             </div>
             <div className="hidden sm:block flex-shrink-0">
@@ -816,6 +834,18 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               size={200}
             />
           </div>
+        </div>
+
+        {/* Key statistics — the #552 market-facts block (market cap, P/E,
+            52-week range, volumes, earnings date). The backend returns
+            `key_stats` to anonymous callers too, but this page never rendered
+            it, so the logged-out /t/ surface — the SEO/AEO landing page — had
+            no market facts at all. Server-rendered here (KeyStatistics is a
+            client component with no hooks, so its full HTML is in the SSR
+            payload for crawlers). Defaults to {} so a frontend deploy ahead
+            of the backend renders em-dashes instead of throwing. */}
+        <div className="mt-8">
+          <KeyStatistics stats={data.key_stats ?? {}} />
         </div>
 
         {/* 6-factor breakdown */}
