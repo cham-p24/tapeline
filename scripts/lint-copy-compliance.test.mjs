@@ -516,3 +516,48 @@ test("every ad-copy variant in the shipped banks passes Rule 9", () => {
     );
   }
 });
+
+/* ============================================================ *
+ * (k) Card-free trial / account claims — Rule 10
+ * ============================================================ */
+
+test("catches card-free trial and account claims", () => {
+  for (const src of [
+    `<p>14-day Premium trial available with no credit card.</p>`,
+    `<p>The 14-day Tapeline trial is no-credit-card so you can compare.</p>`,
+    `<p>Tapeline's 14-day no-credit-card trial makes it easy.</p>`,
+    `<p>Start a card-free trial today.</p>`,
+    `<p>No credit card required to sign up.</p>`,
+  ]) {
+    assert.ok(fires(src, "card-free-trial"), `expected card-free-trial for: ${src}`);
+  }
+});
+
+test("does NOT flag card wording that is TRUE about the public record", () => {
+  // The public scorecard/daily-picks genuinely need no account and no card —
+  // that claim survived the 2026-08-22 card gate and must stay sayable.
+  for (const src of [
+    `<p>Our public record needs no account and no card, so you can compare first.</p>`,
+    `<p>One email each market morning. No credit card. Unsubscribe in one click.</p>`,
+  ]) {
+    assert.ok(!fires(src, "card-free-trial"), `false positive on: ${src}`);
+  }
+});
+
+test("does NOT flag copy that RULES OUT a trial or denies a card-free tier", () => {
+  // "no card, no trial" negates BOTH — it is not an offer of a card-free
+  // trial. "there is no card-free tier" is the honest statement of the
+  // constraint. Both regressed as false positives while writing this rule.
+  for (const src of [
+    `<p>Free. No card, no trial, no upsell to read it.</p>`,
+    `<p>No card, no trial — unsubscribe in one click.</p>`,
+    `<p>A new account takes a card at first sign-in — there is no card-free logged-in tier to sign up for.</p>`,
+  ]) {
+    assert.ok(!fires(src, "card-free-trial"), `false positive on: ${src}`);
+  }
+});
+
+test("does NOT flag the accurate card-required trial description", () => {
+  const src = `<p>14-day full Premium trial — card required, $0 charged today, first charge on day 14.</p>`;
+  assert.ok(!fires(src, "card-free-trial"), `false positive on: ${src}`);
+});
