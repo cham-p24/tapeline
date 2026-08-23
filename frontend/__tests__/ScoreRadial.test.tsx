@@ -166,3 +166,123 @@ describe("ScoreRadial label placement", () => {
     expect(Math.abs(Number(macro.getAttribute("x")) - SIZE / 2)).toBeGreaterThan(SIZE * 0.25);
   });
 });
+
+/**
+ * A factor we hold NO value for used to be plotted at radius 0 — the origin.
+ * On the chart that is indistinguishable from a measured near-zero, so a
+ * ticker whose fundamentals we simply don't have read as a ticker with
+ * terrible fundamentals. ~72% of the universe is missing at least one factor,
+ * so this was the common case, not the edge case.
+ *
+ * Contract now: absence is not plotted. No vertex, no dot, the outline BREAKS
+ * on that axis, the spoke is dashed, and an incomplete ring carries no fill
+ * (an implicit close across the gap would paint area over an axis we hold
+ * nothing for).
+ */
+const CENTRE = 110; // size 220 / 2
+
+function vertices(container: Element): [number, number][] {
+  const path = container.querySelector("path.radial-polygon");
+  if (!path) return [];
+  const d = path.getAttribute("d") ?? "";
+  return [...d.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+}
+
+function radii(container: Element): number[] {
+  return vertices(container).map(([x, y]) => Math.hypot(x - CENTRE, y - CENTRE));
+}
+
+describe("ScoreRadial — an unheld factor is not plotted at zero", () => {
+  it("drops the vertex and the dot for a missing factor instead of collapsing it to the origin", () => {
+    const { container } = render(
+      <ScoreRadial
+        trend={91}
+        rs={51}
+        fundamentals={null}
+        smart_money={40}
+        macro={75}
+        momentum={50}
+        score={64}
+        size={220}
+      />,
+    );
+
+    // Five plotted vertices, five dots — not six with one at the centre.
+    expect(vertices(container)).toHaveLength(5);
+    expect(container.querySelectorAll("circle")).toHaveLength(5);
+    // Nothing sits at (or next to) the origin.
+    for (const r of radii(container)) {
+      expect(r, "a vertex was plotted at the centre").toBeGreaterThan(1);
+    }
+  });
+
+  it("breaks the outline and drops the fill when the ring is incomplete", () => {
+    const { container } = render(
+      <ScoreRadial trend={91} rs={51} fundamentals={null} smart_money={40} macro={75} momentum={50} score={64} size={220} />,
+    );
+    const poly = container.querySelector("path.radial-polygon")!;
+    expect(poly.getAttribute("data-complete")).toBe("false");
+    // Open path: an incomplete ring must not close...
+    expect(poly.getAttribute("d")!.trim().endsWith("Z")).toBe(false);
+    // ...and must not be filled, because a fill implies the closed area.
+    expect(poly.getAttribute("fill")).toBe("none");
+    expect(Number(poly.getAttribute("fill-opacity"))).toBe(0);
+  });
+
+  it("dashes only the spokes of the axes we hold nothing for", () => {
+    const { container } = render(
+      <ScoreRadial trend={91} rs={null} fundamentals={null} smart_money={40} macro={75} momentum={50} score={64} size={220} />,
+    );
+    const missing = container.querySelectorAll('line[data-missing="true"]');
+    expect(missing).toHaveLength(2);
+    for (const line of missing) {
+      expect(line.getAttribute("stroke-dasharray")).toBeTruthy();
+      // The reason is stated, not just implied by a line style.
+      expect(line.querySelector("title")!.textContent).toContain("no reading held");
+    }
+    // The four held axes keep the solid spoke.
+    const solid = [...container.querySelectorAll("line")].filter(
+      (l) => !l.hasAttribute("data-missing"),
+    );
+    expect(solid).toHaveLength(4);
+    for (const line of solid) {
+      expect(line.getAttribute("stroke-dasharray")).toBeNull();
+    }
+  });
+
+  it("draws a run that wraps past Momentum → Trend as one arc, not two stubs", () => {
+    // Gap on fundamentals + smart money: the held run is macro → momentum →
+    // trend → rs, which crosses the wrap point.
+    const { container } = render(
+      <ScoreRadial trend={91} rs={51} fundamentals={null} smart_money={null} macro={75} momentum={50} score={64} size={220} />,
+    );
+    const d = container.querySelector("path.radial-polygon")!.getAttribute("d")!;
+    // One sub-path (one "M") covering all four held axes.
+    expect(d.match(/M/g)).toHaveLength(1);
+    expect(d.match(/[ML]/g)).toHaveLength(4);
+  });
+
+  it("renders no polygon and no dots at all when we hold no factor", () => {
+    const { container } = render(
+      <ScoreRadial trend={null} rs={null} fundamentals={null} smart_money={null} macro={null} momentum={null} score={null} size={220} />,
+    );
+    expect(container.querySelector("path.radial-polygon")).toBeNull();
+    expect(container.querySelectorAll("circle")).toHaveLength(0);
+    expect(container.querySelectorAll('line[data-missing="true"]')).toHaveLength(6);
+    // The reference grid still renders, so the reader sees an empty chart
+    // rather than a broken one.
+    expect(container.querySelectorAll("path")).toHaveLength(4);
+    // And the accessible label states the absence per factor.
+    expect(container.querySelector("svg")!.getAttribute("aria-label")).toContain("trend —");
+  });
+
+  it("keeps the closed, filled hexagon when all six factors are held", () => {
+    const container = renderRadial(64);
+    const poly = container.querySelector("path.radial-polygon")!;
+    expect(poly.getAttribute("data-complete")).toBe("true");
+    expect(poly.getAttribute("d")!.trim().endsWith("Z")).toBe(true);
+    expect(poly.getAttribute("fill")).not.toBe("none");
+    expect(container.querySelectorAll("circle")).toHaveLength(6);
+    expect(container.querySelectorAll('line[data-missing="true"]')).toHaveLength(0);
+  });
+});

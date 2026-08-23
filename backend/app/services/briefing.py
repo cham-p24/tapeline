@@ -222,11 +222,17 @@ def _render_html(
     def _ticker_row(t: Ticker) -> str:
         base = baselines.get(t.symbol)
         thresh = thresholds.get(t.symbol, 10.0)
-        cur = t.score or 0.0
+        # A null composite is "no read", not a zero score. Rendering it as 0.0
+        # AND differencing the since-you-added baseline against that zero
+        # manufactured a score collapse (often tagged "· ALERT") out of missing
+        # data. Render an em-dash and show no delta when either side is absent.
+        cur = t.score
+        cur_str = f"{cur:.1f}" if cur is not None else "—"
+        cur_col = "#10b981" if cur is not None else "#9ca3af"
         signal = t.signal or "—"
         reason = t.reason or ""
         delta_html = ""
-        if base is not None:
+        if base is not None and cur is not None:
             delta = cur - base
             color = "#10b981" if delta >= 0 else "#ef4444"
             arrow = "▲" if delta >= 0 else "▼"
@@ -240,7 +246,7 @@ def _render_html(
               '<td style="padding:12px 0;font-family:\'JetBrains Mono\',monospace;font-weight:600;">'
               f'{t.symbol}{delta_html}'
               '</td>'
-              f'<td style="padding:12px 0;text-align:right;color:#10b981;font-weight:600;">{cur:.1f}</td>'
+              f'<td style="padding:12px 0;text-align:right;color:{cur_col};font-weight:600;">{cur_str}</td>'
               f'<td style="padding:12px 0;text-align:right;color:#9ca3af;font-size:13px;">{signal}</td>'
             '</tr>'
             f'<tr><td colspan="3" style="padding-bottom:12px;color:#9ca3af;font-size:13px;">{reason}</td></tr>'
@@ -275,7 +281,9 @@ def _render_html(
             '<div style="font-size:12px;text-transform:uppercase;color:#9ca3af;">Market regime</div>'
             f'<div style="font-size:28px;font-weight:700;color:{tone};margin-top:4px;">{regime.regime}</div>'
             '<div style="color:#9ca3af;font-size:13px;margin-top:6px;">'
-            f'VIX {regime.vix:.2f} · 10Y {regime.yield_10y:.2f}% · Breadth {regime.breadth_pct:.0f}%'
+            # Not "Breadth": it is a same-day advance/decline ratio over our
+            # own universe, not the % of the market above a moving average.
+            f'VIX {regime.vix:.2f} · 10Y {regime.yield_10y:.2f}% · {regime.breadth_pct:.0f}% advancing'
             '</div>'
             '</div>'
         )

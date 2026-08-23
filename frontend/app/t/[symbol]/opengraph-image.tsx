@@ -332,10 +332,35 @@ function RadialMark({
     }).join(" ") + " Z";
   }
 
-  const valuePath = subs.map((v, i) => {
-    const [x, y] = pointAt(i, v == null ? 0 : v / 100);
-    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ") + " Z";
+  // A factor we hold nothing for is NOT plotted at the origin. `v == null ? 0`
+  // draws a vertex at dead centre, which on a radial chart is the strongest
+  // statement the shape can make: "measured, and it is the worst possible
+  // value". A missing reading is not a zero reading. This is the social card —
+  // the one image that reaches every share, every crawler and every AI
+  // assistant that renders a link preview — so it is the last place to imply a
+  // measurement we do not have.
+  //
+  // Missing axes break the outline instead: each run of consecutive present
+  // factors is its own sub-path, so the ring is visibly open where we hold
+  // nothing. Mirrors components/ScoreRadial.tsx.
+  const present = subs.map((v) => v != null && Number.isFinite(v));
+  const segments: string[] = [];
+  let run: string[] = [];
+  for (let i = 0; i < subs.length; i++) {
+    if (present[i]) {
+      const [x, y] = pointAt(i, (subs[i] as number) / 100);
+      run.push(`${run.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
+    } else if (run.length) {
+      segments.push(run.join(" "));
+      run = [];
+    }
+  }
+  if (run.length) segments.push(run.join(" "));
+  const complete = present.every(Boolean);
+  // Only a complete ring closes and carries fill. A fill on an open shape has
+  // to close implicitly across the gap, painting area over an axis we hold no
+  // reading for — the same false claim in a subtler form.
+  const valuePath = segments.join(" ") + (complete ? " Z" : "");
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block" }}>
@@ -348,11 +373,21 @@ function RadialMark({
         const [x, y] = pointAt(i, 1);
         return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#52525b" strokeOpacity={0.18} strokeWidth={1} />;
       })}
-      {/* value polygon */}
-      <path d={valuePath} fill={accent} fillOpacity={0.22} stroke={accent} strokeWidth={2.5} strokeLinejoin="round" />
-      {/* vertex dots */}
+      {/* value polygon — omitted entirely when no factor is held */}
+      {valuePath ? (
+        <path
+          d={valuePath}
+          fill={complete ? accent : "none"}
+          fillOpacity={complete ? 0.22 : 0}
+          stroke={accent}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+        />
+      ) : null}
+      {/* vertex dots — one per factor we actually hold */}
       {subs.map((v, i) => {
-        const [x, y] = pointAt(i, v == null ? 0 : v / 100);
+        if (!present[i]) return null;
+        const [x, y] = pointAt(i, (v as number) / 100);
         return <circle key={i} cx={x} cy={y} r={3.5} fill={accent} />;
       })}
     </svg>

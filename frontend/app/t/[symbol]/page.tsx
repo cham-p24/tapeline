@@ -660,14 +660,22 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
   // whenever the denominator is under 30 or the ranking was refused.
   const rankLine = sectorRankLine(data.symbol, data.peer_percentiles);
 
-  const score = data.score ?? 0;
+  // Stays nullable. The old `?? 0` leaked out of the tier-colour calculation
+  // and into the share text below, which then tweeted "score: 0/100" for a
+  // ticker we hold no score for. Same contract as /app/ticker/[symbol].
+  const score = data.score;
+  // Pre-formatted once, so every place that PRINTS the composite prints the
+  // em-dash rather than a fabricated zero.
+  const scoreStr = score != null ? score.toFixed(0) : "—";
   const signal = data.signal ?? "—";
   const change = data.change_pct_1d ?? 0;
   const changeColor = change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted";
 
-  // Score-tier colours mirror /how-it-works.
+  // Score-tier colours mirror /how-it-works. No score → no tier, so the
+  // neutral muted tone rather than the bottom band's red.
   const scoreColor =
-    score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-warn" : "text-down";
+    score == null ? "text-muted"
+    : score >= 70 ? "text-up" : score >= 55 ? "text-accent" : score >= 40 ? "text-muted" : score >= 25 ? "text-warn" : "text-down";
 
   const b = data.breakdown ?? {};
   // Listed in descending weight order. We show the qualitative emphasis
@@ -973,7 +981,9 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                 live score preview underneath. */}
             <a
               href={`https://twitter.com/intent/tweet?${new URLSearchParams({
-                text: `$${sym} score: ${score.toFixed(0)}/100 (${signal})\n\nSix named factors, public scorecard.`,
+                // No `?? 0`: a ticker we hold no score for shares as an
+                // em-dash, never as a fabricated zero.
+                text: `$${sym} score: ${scoreStr}/100 (${signal})\n\nSix named factors, public scorecard.`,
                 url: `https://tapeline.io/t/${sym}`,
               }).toString()}`}
               target="_blank"

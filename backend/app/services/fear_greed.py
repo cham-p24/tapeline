@@ -2,9 +2,9 @@
 Fear & Greed Index — 0-100 sentiment score.
 
 Tapeline's version of the CNN F&G index, computed from data we already have:
-VIX (via FRED), breadth_pct (% of S&P above 200DMA, computed live each tick),
-regime label, and short-window SPY momentum. No new data sources needed —
-all four inputs already feed the regime endpoint.
+VIX (via FRED), breadth_pct (advancers today as a % of the names that moved,
+computed live each tick), regime label, and short-window SPY momentum. No new
+data sources needed — all four inputs already feed the regime endpoint.
 
 Score buckets (matches CNN's labels for instant familiarity):
    0-24  Extreme Fear      red
@@ -15,14 +15,20 @@ Score buckets (matches CNN's labels for instant familiarity):
 
 Inputs:
   vix          — lower = greed (low expected vol). 12 = floor, 40 = max stress.
-  breadth_pct  — % of S&P above 200DMA. Higher = greed.
+  breadth_pct  — advancers today as a % of the names that moved (a same-day
+                 advance/decline ratio, NOT the share above a 200-day moving
+                 average). 50 = balanced. Higher = greed.
   regime       — BULL / NEUTRAL / CAUTIOUS / BEAR. Anchor + sanity check.
   spy_change_5d_pct — momentum tilt; positive = greed, negative = fear.
 
 Weighting (sum to 1.0):
   VIX     0.35   — most-watched single fear input
-  Breadth 0.30   — strongest internal-strength signal
-  Regime  0.20   — composite of the above plus rate-direction
+  Breadth 0.30   — same-day participation read
+  Regime  0.20   — the stored regime label. NOT a composite of the other
+                   inputs: it comes from a VIX threshold ladder, or from the
+                   market-mode read in the macro workbook when that feed is
+                   configured (it writes last and wins). Because the ladder is
+                   VIX-only, this term partly re-weights VIX.
   SPY 5d  0.15   — short-window emotion proxy
 
 When inputs are missing (worker boot, FRED down, etc.) we fall back to the
@@ -48,7 +54,8 @@ def _vix_to_greed(vix: float | None) -> float:
 
 
 def _breadth_to_greed(breadth_pct: float | None) -> float:
-    """% of S&P 500 above 200-day moving average. Already 0-100 — pass through."""
+    """Advancers today as a % of the names that moved. Already 0-100 — pass
+    through. 50 = advancers and decliners balanced."""
     if breadth_pct is None:
         return 50.0
     return _clamp(breadth_pct)

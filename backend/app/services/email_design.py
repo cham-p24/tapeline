@@ -420,15 +420,27 @@ def watchlist_table(items: list[dict]) -> str:
     rows = []
     for it in items:
         sym = _escape(it.get("symbol", ""))
-        score = it.get("score") or 0
+        # A missing score or 1D change means "no read", not zero. Coercing
+        # either to 0 printed a measured-looking "0.0" / "+0.00%" for a
+        # reading that never happened. Keep the None, render an em-dash, and
+        # hand the un-coerced score to score_color (it has a None tier).
+        score = it.get("score")
         sig = it.get("signal") or "—"
-        change = it.get("change_pct_1d") or 0
+        change = it.get("change_pct_1d")
         delta = it.get("score_delta")
         col_sig = score_color(score)
-        change_col = SIG_BULL if change > 0 else SIG_BEAR if change < 0 else LIGHT_MUTED
-        change_str = f"{'+' if change >= 0 else ''}{change:.2f}%"
+        score_str = f"{score:.1f}" if score is not None else "—"
+        if change is None:
+            change_col = LIGHT_MUTED
+            change_str = "—"
+        else:
+            change_col = SIG_BULL if change > 0 else SIG_BEAR if change < 0 else LIGHT_MUTED
+            change_str = f"{'+' if change >= 0 else ''}{change:.2f}%"
         delta_str = ""
-        if delta is not None and abs(delta) >= 1:
+        # A "Δ +3.2" next to an em-dash score describes a move between two
+        # numbers we can't both show. The only caller already withholds the
+        # delta when the score is null; don't rely on that from in here.
+        if score is not None and delta is not None and abs(delta) >= 1:
             d_col = SIG_BULL if delta > 0 else SIG_BEAR
             d_sign = "+" if delta > 0 else ""
             delta_str = (
@@ -441,7 +453,7 @@ def watchlist_table(items: list[dict]) -> str:
           <td class="tl-border-top" style="padding:12px 6px;border-top:1px solid {LIGHT_BORDER};">
             <a href="https://tapeline.io/t/{sym}" class="tl-fg" style="color:{LIGHT_FG};text-decoration:none;font-family:{FONT_MONO};font-weight:600;font-size:14px;">{sym}</a>
           </td>
-          <td align="right" class="tl-border-top tl-fg" style="padding:12px 6px;border-top:1px solid {LIGHT_BORDER};font-family:{FONT_MONO};font-weight:600;font-size:14px;color:{LIGHT_FG};">{score:.1f}{delta_str}</td>
+          <td align="right" class="tl-border-top tl-fg" style="padding:12px 6px;border-top:1px solid {LIGHT_BORDER};font-family:{FONT_MONO};font-weight:600;font-size:14px;color:{LIGHT_FG};">{score_str}{delta_str}</td>
           <td class="tl-border-top" style="padding:12px 6px;border-top:1px solid {LIGHT_BORDER};font-size:11px;font-weight:500;color:{col_sig};font-family:{FONT_SANS};letter-spacing:0.05em;">{sig}</td>
           <td align="right" class="tl-border-top" style="padding:12px 6px;border-top:1px solid {LIGHT_BORDER};font-family:{FONT_MONO};font-size:13px;font-weight:500;color:{change_col};">{change_str}</td>
         </tr>

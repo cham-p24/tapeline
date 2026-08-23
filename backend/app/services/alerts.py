@@ -303,10 +303,16 @@ async def evaluate_regime_rules(session: AsyncSession) -> int:
         if regime.regime.upper() == watch_label:
             msg = (
                 f"Market regime: {regime.regime} "
-                f"(VIX {regime.vix:.1f}, breadth {regime.breadth_pct:.0f}%, "
+                # "breadth" reads as the market-wide % above a long moving
+                # average. Nothing computes one; this is a same-day advance/
+                # decline ratio over our own universe. Named for what it is,
+                # matching /market-regime and the weekly digest.
+                f"(VIX {regime.vix:.1f}, {regime.breadth_pct:.0f}% advancing, "
                 f"10Y {regime.yield_10y:.2f}%)"
             )
-            await _fire(session, rule, user, "MARKET", msg, score=0)
+            # Regime rules are market-wide — there is no ticker composite to
+            # report, so send None rather than a placeholder 0.
+            await _fire(session, rule, user, "MARKET", msg, score=None)
             fired += 1
 
     if fired:
@@ -387,7 +393,8 @@ async def evaluate_news_rules(session: AsyncSession) -> int:
             f" sentiment {chosen.sentiment:+.2f}" if chosen.sentiment is not None else ""
         )
         msg = f"{sym} news: {chosen.title} ({chosen.publisher}{sent_str})"
-        await _fire(session, rule, user, sym, msg, score=0)
+        # News rules never read the ticker's composite — None, not 0.
+        await _fire(session, rule, user, sym, msg, score=None)
         fired += 1
 
     if fired:
@@ -426,7 +433,8 @@ async def evaluate_congress_rules(session: AsyncSession) -> int:
                 f"{t.politician} ({t.chamber}, {t.party}) {t.direction} {t.symbol} "
                 f"${t.amount_min:,.0f}–${t.amount_max:,.0f} on {t.trade_date}"
             )
-            await _fire(session, rule, user, t.symbol, msg, score=0)
+            # Congress rules never read the ticker's composite — None, not 0.
+            await _fire(session, rule, user, t.symbol, msg, score=None)
             fired += 1
 
     if fired:
@@ -585,9 +593,15 @@ async def _fire(
     user: User,
     symbol: str,
     message: str,
-    score: float,
+    score: float | None,
 ) -> None:
-    """Record the alert event and deliver it via the rule's configured channel."""
+    """Record the alert event and deliver it via the rule's configured channel.
+
+    `score` is None for rule types that don't read the ticker's composite
+    (news / congress / regime). The alert email omits the score line entirely
+    in that case — it used to be passed a hardcoded 0, which rendered as a
+    real-looking "Score · 0.0".
+    """
     event = AlertEvent(
         user_id=user.id,
         rule_id=rule.id,

@@ -8,7 +8,18 @@
  * so the ordering plus the qualitative emphasis label is all this can show.
  * Used as a hover popover on every scanner row + as a full panel on the
  * ticker detail page.
+ *
+ * A sub-score we do not hold is NOT a zero. The backend deliberately stores
+ * NULL for a factor it has no reading for, and most of the universe is missing
+ * at least one, so this path fires constantly. Absence renders as an em-dash
+ * over an EMPTY track — the same contract components/ScorePanel.tsx applies to
+ * the same six factors on the ticker page. A real measured 0 still renders as
+ * "0" with a bar in the bottom band; only the unknown is blank.
  */
+
+/** The single, deliberate rendering of "we do not hold this value". */
+const EMPTY = "—";
+
 export function ScoreBreakdown({
   trend, rs, fundamentals, momentum, macro, smart_money,
   reason,
@@ -40,9 +51,13 @@ export function ScoreBreakdown({
       )}
       <div className="space-y-2">
         {rows.map((r) => {
-          const v = r.value ?? 0;
+          const v = r.value ?? null;
+          // Bands apply only where a value exists. The old `?? 0` sent every
+          // missing factor into the bottom band, painting a red bar under a
+          // measured-looking "0" for a reading we never had.
           const color =
-            v >= 70 ? "bg-up"
+            v == null ? null
+            : v >= 70 ? "bg-up"
             : v >= 45 ? "bg-accent"
             : v >= 30 ? "bg-yellow-500"
             : "bg-down";
@@ -50,13 +65,22 @@ export function ScoreBreakdown({
             <div key={r.label} className="text-xs">
               <div className="flex justify-between">
                 <span className="text-muted">{r.label} <span className="opacity-50">({r.emphasis})</span></span>
-                <span className="nums font-medium">{v.toFixed(0)}</span>
+                <span
+                  className={v == null ? "nums font-medium text-muted" : "nums font-medium"}
+                  title={v == null ? "No reading held for this factor" : undefined}
+                >
+                  {v != null ? v.toFixed(0) : EMPTY}
+                </span>
               </div>
+              {/* Empty track, no bar: an unknown must not read as a
+                  measurement sitting at the bottom of the scale. */}
               <div className="mt-1 h-1.5 w-full rounded-full bg-panel">
-                <div
-                  className={`h-full rounded-full ${color}`}
-                  style={{ width: `${Math.max(2, v)}%` }}
-                />
+                {v != null && (
+                  <div
+                    className={`h-full rounded-full ${color}`}
+                    style={{ width: `${Math.max(2, v)}%` }}
+                  />
+                )}
               </div>
             </div>
           );
