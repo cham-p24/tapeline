@@ -33,13 +33,16 @@ SRC = inspect.getsource(signal_publisher)
 
 
 def test_cache_derived_columns_are_coalesced():
-    """Every cache-fed column is in the guarded set."""
-    for col in (
-        "market_cap", "week52_high", "week52_low", "avg_volume_30d",
-        "sub_trend", "sub_rs", "sub_fundamentals",
-        "sub_smart_money", "sub_macro", "sub_momentum",
-        "score", "signal", "reason", "confidence_pct",
-    ):
+    """The vendor-profile and daily-bar caches, and only those.
+
+    The six factors were briefly in here too. They are now merged in Python
+    instead (signal_publisher._merged_factor_set), because per-column COALESCE
+    lets each column decide independently whether to keep or replace, while
+    the composite is a statement about all six at once — the two rules drifted
+    apart in production within the hour. See
+    tests/test_score_matches_its_own_factors.py.
+    """
+    for col in ("market_cap", "week52_high", "week52_low", "avg_volume_30d"):
         assert col in CACHE_DERIVED_COLUMNS, (
             f"{col} is fed by an in-memory cache that is empty after every "
             f"restart; without COALESCE the first tick post-deploy erases it"

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import bindparam, delete, desc, func, select, update
 
@@ -64,12 +65,81 @@ logger = logging.getLogger(__name__)
 CACHE_DERIVED_COLUMNS: tuple[str, ...] = (
     # Vendor profile / daily-bar caches
     "market_cap", "week52_high", "week52_low", "avg_volume_30d",
-    # The six factors, the composite they produce, and the fields derived from
-    # that composite. All six come from caches the daily factor pass fills.
+)
+
+#: The six factors, in composite-weight order.
+FACTOR_COLUMNS: tuple[str, ...] = (
     "sub_trend", "sub_rs", "sub_fundamentals",
     "sub_smart_money", "sub_macro", "sub_momentum",
-    "score", "signal", "reason", "confidence_pct",
 )
+
+
+def _merged_factor_set(
+    snap: dict[str, Any], previous: dict[str, Any] | None
+) -> dict[str, Any]:
+    """The factor columns, the composite, and everything derived from it —
+    as ONE internally consistent set.
+
+    These columns were briefly in CACHE_DERIVED_COLUMNS, i.e. COALESCE'd
+    individually in SQL. That is subtly wrong and it showed up in production
+    within the hour: 158 of 2,500 just-ticked rows carried a score that did
+    not match their own published factors, every one off by ~3.75.
+
+    The mechanism. `sub_macro` is stamped fresh on every tick from the regime,
+    so it is never NULL and always overwrites. `score` CAN be NULL — right
+    after a restart the factor caches are empty, fewer than two factors are
+    held, and the composite correctly refuses. COALESCE then keeps the
+    PREVIOUS score while macro updates underneath it. The old score had been
+    computed when the regime was BULL (macro 75); the new stored macro was
+    NEUTRAL (50). 0.15 x 25 = 3.75, on every affected row.
+
+    Per-column COALESCE cannot fix that, because each column decides
+    independently whether to keep or replace, and the composite is a statement
+    about all six at once. So the merge happens HERE, in Python, against the
+    values already in the row: incoming-or-previous per factor, then the
+    composite recomputed from the merged set, then the label and the sentence
+    recomputed from that same composite. Whatever is written, is consistent.
+
+    `previous` is None for a symbol we have never seen, in which case the
+    merge is just the incoming values.
+    """
+    from app.services.mock_feed import _render_reason, _signal_from_score
+    from app.services.polygon_feed import _composite_from_subs
+
+    prev = previous or {}
+    merged: dict[str, Any] = {
+        col: (snap.get(col) if snap.get(col) is not None else prev.get(col))
+        for col in FACTOR_COLUMNS
+    }
+
+    score = _composite_from_subs(merged)
+    held = sum(1 for c in FACTOR_COLUMNS if merged[c] is not None)
+
+    return {
+        **merged,
+        "score": score,
+        "signal": _signal_from_score(score),
+        # The sentence describes the factors printed beside it, so it is
+        # rendered from the merged set or not at all.
+        "reason": (
+            _render_reason(
+                snap["symbol"],
+                snap.get("sector") or prev.get("sector") or "",
+                merged["sub_trend"], merged["sub_rs"],
+                merged["sub_fundamentals"], merged["sub_momentum"],
+                merged["sub_macro"], merged["sub_smart_money"],
+            )
+            if score is not None
+            else None
+        ),
+        # Coverage of the STORED row: how many of the six factors it actually
+        # holds, plus whether we have a live price. Counting the incoming
+        # values would understate a row whose factors came from the previous
+        # pass.
+        "confidence_pct": round(
+            100.0 * (held + (1 if snap.get("price") is not None else 0)) / 7, 1
+        ),
+    }
 settings = get_settings()
 
 # Strong references to detached fire-and-forget tasks. asyncio only keeps a
@@ -259,8 +329,25 @@ async def tick() -> None:
         # Only the PK is selected: loading full ORM Ticker objects for the whole
         # table made per-tick memory scale with the universe (5.7k rows and
         # growing) for what is just an exists-check.
-        existing_symbols = {
-            s for (s,) in (await session.execute(select(Ticker.symbol))).all()
+        # The six factors come back too, not just the PK. The tick has to
+        # recompute the composite from the values that will actually be
+        # STORED, and a COALESCE'd column's stored value is not the incoming
+        # one — see _merged_factor_set below.
+        existing_rows = (await session.execute(select(
+            Ticker.symbol, Ticker.sector,
+            Ticker.sub_trend, Ticker.sub_rs, Ticker.sub_fundamentals,
+            Ticker.sub_smart_money, Ticker.sub_macro, Ticker.sub_momentum,
+        ))).all()
+        existing_symbols = {r.symbol for r in existing_rows}
+        existing_factors = {
+            r.symbol: {
+                "sub_trend": r.sub_trend, "sub_rs": r.sub_rs,
+                "sub_fundamentals": r.sub_fundamentals,
+                "sub_smart_money": r.sub_smart_money,
+                "sub_macro": r.sub_macro, "sub_momentum": r.sub_momentum,
+                "sector": r.sector,
+            }
+            for r in existing_rows
         }
         full_updates: list[dict] = []
         market_updates: list[dict] = []
@@ -304,16 +391,9 @@ async def tick() -> None:
             else:
                 data = {
                     **market_only,
-                    "score": snap["score"],
-                    "signal": snap["signal"],
-                    "sub_trend": snap["sub_trend"],
-                    "sub_rs": snap["sub_rs"],
-                    "sub_fundamentals": snap["sub_fundamentals"],
-                    "sub_momentum": snap["sub_momentum"],
-                    "sub_macro": snap["sub_macro"],
-                    "sub_smart_money": snap["sub_smart_money"],
-                    "confidence_pct": snap.get("confidence_pct"),
-                    "reason": snap["reason"],
+                    **_merged_factor_set(
+                        snap, existing_factors.get(snap["symbol"])
+                    ),
                 }
             if snap["symbol"] not in existing_symbols:
                 session.add(Ticker(symbol=snap["symbol"], name=snap["symbol"], **data))
