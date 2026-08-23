@@ -15,6 +15,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript, pressContactPageJsonLd } from "@/lib/jsonld";
+import { PRICING, usd, usdCompact } from "@/lib/pricing";
 
 export const metadata = pageMeta({
   title: "Tapeline Press Kit — Logos, Fact Sheet, Founder Bio, Media Contact",
@@ -23,8 +24,8 @@ export const metadata = pageMeta({
   path: "/press",
 });
 
-const LAST_UPDATED = "2026-05-22";
-const LAST_UPDATED_DISPLAY = "May 22, 2026";
+const LAST_UPDATED = "2026-08-24";
+const LAST_UPDATED_DISPLAY = "August 24, 2026";
 
 const FACT_SHEET = [
   { label: "Company",         value: "Tapeline (tapeline.io)" },
@@ -32,11 +33,20 @@ const FACT_SHEET = [
   { label: "Founded",         value: "2025 (engine), 2026 (public launch)" },
   { label: "Headquarters",    value: "Melbourne, Victoria, Australia" },
   { label: "Funding",         value: "Bootstrapped — no external investment" },
-  { label: "Pricing",         value: "Free · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual)" },
-  { label: "Free trial",      value: "14-day Premium; card required at sign-in, $0 charged that day" },
+  // Derived from lib/pricing.ts (the sitewide pricing source of truth) so the
+  // press kit can never quote a price checkout doesn't charge.
+  {
+    label: "Pricing",
+    value:
+      `Free · Pro ${usdCompact(PRICING.pro.annual)}/yr (or ${usd(PRICING.pro.monthly)}/mo) · ` +
+      `Premium ${usdCompact(PRICING.premium.annual)}/yr (or ${usd(PRICING.premium.monthly)}/mo) · ` +
+      `Trader ${usdCompact(PRICING.trader.annual)}/yr (concierge, sold by hand) — annual billing is the default`,
+  },
+  { label: "Free trial",      value: "14-day Premium; card required, $0 charged today, first charge on day 14" },
   { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume, from the full liquid US universe)" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
+  { label: "Integrations",    value: "Public MCP server for AI assistants (tapeline.io/mcp) · CSV export · API (tapeline.io/developers)" },
   { label: "Press contact",   value: "press@tapeline.io" },
   { label: "Last updated",    value: LAST_UPDATED_DISPLAY },
 ];
@@ -44,7 +54,9 @@ const FACT_SHEET = [
 const ONE_LINER =
   "Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks every top-10 daily pick against the next-day SPY-relative move.";
 
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $10-20/mo price point (Pro $9.99/mo or $99/yr; Premium $19.99/mo or $199/yr).`;
+// Prices interpolate from lib/pricing.ts so a future reprice can't strand a
+// stale figure in the most-copied paragraph on the site.
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the active US universe (~2,500, selected by daily dollar volume) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during US market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
 
 const PULL_QUOTES = [
   {
@@ -62,6 +74,58 @@ const PULL_QUOTES = [
       "Six descriptive labels, no buy-or-sell language. We tell you what the data says — you decide what to do with it.",
     attribution: "Tapeline founder, on descriptive vs prescriptive scoring",
   },
+];
+
+/**
+ * Downloadable brand files. Everything here is a real file in /public (or a
+ * live image route) — no dead links, no "email us for the logo" for the
+ * basics. The PNGs regenerate reproducibly via
+ * `node scripts/make-press-assets.mjs` from the favicon.svg geometry.
+ */
+const BRAND_ASSETS = [
+  {
+    label: "Logo (SVG, vector)",
+    href: "/favicon.svg",
+    note: "Canonical mark; scales to any size",
+    download: "tapeline-logo.svg",
+  },
+  {
+    label: "Logo 1024×1024 (PNG)",
+    href: "/press/tapeline-logo-1024.png",
+    note: "Transparent rounded corners",
+  },
+  {
+    label: "Logo 512×512 (PNG)",
+    href: "/press/tapeline-logo-512.png",
+    note: "Transparent rounded corners",
+  },
+  {
+    label: "Logo tile 240 (PNG, @2x — 480×480)",
+    href: "/press/tapeline-logo-240.png",
+    note: "Directory / launch-listing tile",
+  },
+  {
+    label: "Gallery banner 1270×760 (PNG)",
+    href: "/press/tapeline-gallery-1270x760.png",
+    note: "Logo + wordmark + descriptor, for review-site galleries",
+  },
+  {
+    label: "Social card 1200×630 (PNG)",
+    href: "/opengraph-image",
+    note: "The sitewide OpenGraph card",
+    download: "tapeline-og.png",
+  },
+];
+
+/**
+ * Pre-captured product screenshots — retina captures (1270×760 @2x, so
+ * 2540×1520 actual pixels) of the four launch surfaces, committed 2026-08.
+ */
+const SCREENSHOT_FILES = [
+  { label: "Live scanner (home)", href: "/press/tapeline-scanner.png" },
+  { label: "Public scorecard", href: "/press/tapeline-scorecard.png" },
+  { label: "Per-ticker page", href: "/press/tapeline-ticker.png" },
+  { label: "Verify-a-pick page", href: "/press/tapeline-verify.png" },
 ];
 
 const SCREENSHOTS = [
@@ -212,35 +276,32 @@ export default function PressPage() {
           </div>
         </section>
 
-        {/* Brand assets. Once a public brand-assets folder exists, point the
-            buttons at downloadable .zip / SVG / PNG. For now they link to
-            the in-app SVG favicon as a placeholder. */}
+        {/* Brand assets — real downloadable files served from /public/press. */}
         <section className="mt-12">
           <h2 className="text-2xl font-bold tracking-tight">Brand assets</h2>
           <p className="mt-3 text-sm text-muted">
-            Logos in SVG and PNG, dark and light variants, with usage guidance.
+            The Tapeline mark as vector SVG and PNG at three sizes, plus a
+            gallery banner and the social card. The tile ground is #0a0a0a and
+            reads correctly on light or dark backgrounds as-is.
           </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <a
-              href="/favicon.svg"
-              download
-              className="flex items-center justify-between rounded-lg border border-border bg-panel/40 px-4 py-3 hover:border-border2 hover:bg-panel/60 transition-colors"
-            >
-              <span className="font-medium">Logo (SVG, single colour)</span>
-              <span className="text-xs text-subtle">Download →</span>
-            </a>
-            <a
-              href="/opengraph-image"
-              download="tapeline-og.png"
-              className="flex items-center justify-between rounded-lg border border-border bg-panel/40 px-4 py-3 hover:border-border2 hover:bg-panel/60 transition-colors"
-            >
-              <span className="font-medium">Social card (1200×630 PNG)</span>
-              <span className="text-xs text-subtle">Download →</span>
-            </a>
+            {BRAND_ASSETS.map((a) => (
+              <a
+                key={a.href}
+                href={a.href}
+                download={a.download ?? true}
+                className="rounded-lg border border-border bg-panel/40 px-4 py-3 hover:border-border2 hover:bg-panel/60 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{a.label}</span>
+                  <span className="shrink-0 text-xs text-subtle">Download →</span>
+                </div>
+                <p className="mt-1 text-xs text-muted">{a.note}</p>
+              </a>
+            ))}
           </div>
           <p className="mt-3 text-xs text-subtle">
-            Need a vector logo, dark/light variants, or a higher-resolution
-            screenshot kit?{" "}
+            Need a size or format not listed?{" "}
             <a href="mailto:press@tapeline.io" className="text-accent hover:underline">
               press@tapeline.io
             </a>{" "}
@@ -253,10 +314,27 @@ export default function PressPage() {
         <section className="mt-12">
           <h2 className="text-2xl font-bold tracking-tight">Screenshot kit</h2>
           <p className="mt-3 text-sm text-muted">
-            Direct links to the most-screenshotted screens. Open, screenshot,
-            credit Tapeline.io.
+            Pre-captured retina screenshots (1270×760 @2x) of the four core
+            surfaces — download and use directly, credit Tapeline.io.
           </p>
-          <div className="mt-6 space-y-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {SCREENSHOT_FILES.map((s) => (
+              <a
+                key={s.href}
+                href={s.href}
+                download
+                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-panel/40 px-4 py-3 hover:border-border2 hover:bg-panel/60 transition-colors"
+              >
+                <span className="font-medium">{s.label}</span>
+                <span className="shrink-0 text-xs text-subtle">PNG →</span>
+              </a>
+            ))}
+          </div>
+          <p className="mt-5 text-sm text-muted">
+            Prefer a fresh capture? Direct links to the live screens — open,
+            screenshot, credit Tapeline.io.
+          </p>
+          <div className="mt-4 space-y-3">
             {SCREENSHOTS.map((s) => (
               <Link
                 key={s.label}
