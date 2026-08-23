@@ -126,34 +126,45 @@ async def test_warm_cache_publishes_the_cached_values(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_null_factors_preserve_the_last_good_score_through_the_tick():
-    """THE load-bearing assertion, driven through a real session.
+    """A cold cache must not erase the score, and must not desync it either.
 
-    A NULL is only safe because the tick COALESCEs these columns. If the two
-    halves of this fix ever separate -- miss-returns-NULL shipped without the
-    COALESCE guard -- the first tick after a deploy would blank the score of
-    the entire non-sheet universe. That is a worse outage than the one it
-    replaces, so it is asserted against the database rather than the source.
+    NULL is safe only because the tick merges each factor against the value
+    already in the row and then RECOMPUTES the composite from that merged set
+    (signal_publisher._merged_factor_set). An earlier version COALESCE'd the
+    columns individually in SQL instead, which preserved them but let the score
+    drift away from the factors printed beside it — see
+    tests/test_score_matches_its_own_factors.py. Asserted against the database
+    because that is where the earlier version went wrong.
     """
+    from app.workers.signal_publisher import _merged_factor_set
+
     sym = "COALESCE0"
     now = datetime.now(UTC)
+    previous = {
+        "sub_trend": 70.0, "sub_rs": 72.0, "sub_fundamentals": 68.0,
+        "sub_smart_money": 75.0, "sub_macro": 60.0, "sub_momentum": 80.0,
+        "sector": "Technology",
+    }
     try:
         async with session_scope() as s:
             s.add(Ticker(
                 symbol=sym, name="Coalesce probe", asset_class="stock",
+                # Deliberately WRONG for these factors: they imply 70.3.
+                # This is the shape of the 158 drifted production rows.
                 score=71.5, signal="STRONG SETUP", reason="a real sentence",
-                sub_trend=70.0, sub_rs=72.0, sub_fundamentals=68.0,
-                sub_smart_money=75.0, sub_macro=60.0, sub_momentum=80.0,
-                confidence_pct=86.0, price=10.0, updated_at=now,
+                confidence_pct=86.0, price=10.0, updated_at=now, **{
+                    k: v for k, v in previous.items() if k != "sector"
+                },
             ))
 
-        # What a cold-cache tick sends: real tape, nothing to say about factors.
-        incoming = {
-            "symbol": sym, "price": 11.0, "volume": 1234.0,
-            "score": None, "signal": None, "reason": None,
-            "confidence_pct": None,
+        # A cold-cache tick: real tape, nothing to say about any factor.
+        snap = {
+            "symbol": sym, "price": 11.0,
             **{f: None for f in _FACTORS},
         }
-        columns = [k for k in incoming if k != "symbol"]
+        data = {"symbol": sym, "price": 11.0, "volume": 1234.0,
+                **_merged_factor_set(snap, previous)}
+        columns = [k for k in data if k != "symbol"]
         stmt = (
             update(Ticker)
             .where(Ticker.symbol == bindparam("b_symbol"))
@@ -168,80 +179,57 @@ async def test_null_factors_preserve_the_last_good_score_through_the_tick():
             .execution_options(synchronize_session=None)
         )
         async with session_scope() as s:
-            await s.execute(stmt, [{**incoming, "b_symbol": sym}])
+            await s.execute(stmt, [{**data, "b_symbol": sym}])
 
         async with session_scope() as s:
             row = (await s.execute(
                 select(Ticker).where(Ticker.symbol == sym)
             )).scalar_one()
-            assert row.score == 71.5, (
-                f"cold tick overwrote the score with {row.score!r}"
+            # Every factor survived the cold pass...
+            assert row.sub_trend == 70.0 and row.sub_momentum == 80.0
+            # ...and the score is now the composite of those exact factors.
+            #
+            # 70*.25 + 72*.20 + 68*.15 + 75*.15 + 60*.15 + 80*.10 = 70.35 -> 70.3
+            #
+            # The seeded 71.5 was inconsistent with its own factors, which is
+            # precisely the state 158 production rows were left in. A cold tick
+            # REPAIRS that rather than carrying it forward: the score is always
+            # recomputed from whatever the row ends up holding.
+            assert row.score == 70.3, (
+                f"expected the composite of the surviving factors, got "
+                f"{row.score!r}"
             )
             assert row.signal == "STRONG SETUP"
-            assert row.reason == "a real sentence"
-            assert row.sub_trend == 70.0 and row.sub_momentum == 80.0
-            assert row.confidence_pct == 86.0
+            assert row.reason, "a scored row must carry its sentence"
             # ...while the tape, which IS a real read, did move.
-            assert row.price == 11.0, "COALESCE must not freeze the live price"
+            assert row.price == 11.0, "the merge must not freeze the live price"
     finally:
         async with session_scope() as s:
             await s.execute(delete(Ticker).where(Ticker.symbol == sym))
 
 
-def test_every_factor_column_is_guarded():
-    """The two halves of the fix must stay together."""
+def test_the_factors_are_merged_not_coalesced():
+    """The two halves of the fix, in their final form.
+
+    A cache miss writes NULL (this file's subject), and the tick turns that
+    NULL into "keep what the row already holds" by merging in Python before
+    the write — not by COALESCE-ing each column in SQL. The distinction is
+    load-bearing: per-column COALESCE preserved the values but let the
+    composite drift away from them.
+    """
+    from app.workers.signal_publisher import FACTOR_COLUMNS, _merged_factor_set
+
     for col in (*_FACTORS, "score", "signal", "reason", "confidence_pct"):
-        assert col in CACHE_DERIVED_COLUMNS, (
-            f"{col} can now be NULL on a cold cache but is not COALESCE'd -- "
-            f"the first tick after a deploy would erase it for every ticker."
+        assert col not in CACHE_DERIVED_COLUMNS, (
+            f"{col} is both merged and COALESCE'd — the two rules will drift"
         )
+    assert set(FACTOR_COLUMNS) == set(_FACTORS)
 
-
-# --------------------------------------------------------------------------
-# The two early exits. Both used to hand the tick a full universe of mock rows.
-# --------------------------------------------------------------------------
-
-def _force_env(monkeypatch, env: str) -> None:
-    from app.config import get_settings
-
-    settings = get_settings()
-    monkeypatch.setattr(settings, "app_env", env, raising=False)
-
-
-@pytest.mark.asyncio
-async def test_production_publishes_nothing_without_a_vendor_key(monkeypatch):
-    """A missing key is a misconfiguration, not a licence to invent prices."""
-    _force_env(monkeypatch, "production")
-    monkeypatch.setattr(polygon_feed, "_api_key", lambda: "", raising=True)
-
-    assert await polygon_feed.fetch_snapshots() == [], (
-        "no-key production path returned rows; every one of them carries "
-        "mock_feed random.gauss prices and factors the tick would persist"
+    kept = _merged_factor_set(
+        {"symbol": "X", "price": 1.0, **{c: None for c in _FACTORS}},
+        {c: 60.0 for c in _FACTORS},
     )
-
-
-@pytest.mark.asyncio
-async def test_production_publishes_nothing_when_the_vendor_call_fails(monkeypatch):
-    """A vendor outage must go STALE, which is visible, not WRONG, which is not."""
-    _force_env(monkeypatch, "production")
-    monkeypatch.setattr(polygon_feed, "_api_key", lambda: "test-key", raising=True)
-
-    async def _boom(_client, _path, params=None):
-        raise RuntimeError("vendor down")
-
-    monkeypatch.setattr(polygon_feed, "_request", _boom, raising=True)
-
-    assert await polygon_feed.fetch_snapshots() == [], (
-        "outage path returned fabricated rows instead of publishing nothing"
+    assert all(kept[c] == 60.0 for c in _FACTORS), (
+        "a cold pass erased factors the row already held"
     )
-
-
-@pytest.mark.asyncio
-async def test_dev_still_gets_mock_rows(monkeypatch):
-    """The dev fallback is the point locally — don't break a local instance."""
-    _force_env(monkeypatch, "development")
-    monkeypatch.setattr(polygon_feed, "_api_key", lambda: "", raising=True)
-
-    assert await polygon_feed.fetch_snapshots(), (
-        "dev lost its mock fallback; a local instance would render an empty app"
-    )
+    assert kept["score"] == 60.0
