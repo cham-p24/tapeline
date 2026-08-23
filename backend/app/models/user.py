@@ -384,7 +384,13 @@ class AlertEvent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(60), ForeignKey("users.id"), nullable=False, index=True)
-    rule_id: Mapped[int] = mapped_column(Integer, ForeignKey("alert_rules.id"), nullable=False)
+    # Nullable: watchlist smart-alert emails are a rule-less path, but they
+    # must still land on the SAME meter the email_alerts_per_day cap reads
+    # (delivered AlertEvent rows), rather than being uncapped and uncounted.
+    # See migration 0055_alert_event_rule_null.
+    rule_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("alert_rules.id"), nullable=True
+    )
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)
     message: Mapped[str] = mapped_column(String(400), nullable=False)
     channel: Mapped[str] = mapped_column(String(20), nullable=False)
