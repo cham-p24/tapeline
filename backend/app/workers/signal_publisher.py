@@ -315,6 +315,12 @@ async def tick() -> None:
             if not batch:
                 continue
             columns = [k for k in batch[0] if k != "symbol"]
+            # synchronize_session=None is required: an executemany UPDATE with
+            # WHERE criteria cannot synchronize persistent objects, and without
+            # it SQLAlchemy raises InvalidRequestError on every tick the moment
+            # any Ticker is resident in the session — which is exactly what
+            # took the worker down for 4h on 2026-08-23 (tick.failure loop).
+            # Nothing in the tick relies on in-session Ticker state afterwards.
             stmt = (
                 update(Ticker)
                 .where(Ticker.symbol == bindparam("b_symbol"))
@@ -326,6 +332,7 @@ async def tick() -> None:
                     )
                     for col in columns
                 })
+                .execution_options(synchronize_session=None)
             )
             await session.execute(
                 stmt,
