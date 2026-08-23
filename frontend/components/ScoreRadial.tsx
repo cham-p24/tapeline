@@ -198,15 +198,31 @@ export function ScoreRadial({
           // Anchor based on which side of the centre the label sits, so text
           // hugs toward the radial rather than overlapping the polygon.
           const anchor = p.x < cx - 1 ? "end" : p.x > cx + 1 ? "start" : "middle";
+          // Keep the label inside the viewBox. The anchor makes text grow AWAY
+          // from centre, so a long label on a 150°/210° vertex starts left of
+          // x=0 and the SVG clips it: "Macro" rendered as "lacro" on /t/AAPL,
+          // and shipped that way in the press screenshot. Nudging x inward is
+          // enough — these vertices sit well clear of the polygon — and the
+          // width estimate only has to be close, since it is a floor not a
+          // layout. 0.62em per character is a safe over-estimate for the
+          // geometric sans this renders in.
+          const fontSize = Math.round(size * 0.052);
+          const approxWidth = f.short.length * fontSize * 0.62;
+          const x =
+            anchor === "end"
+              ? Math.max(p.x, approxWidth + 2)
+              : anchor === "start"
+                ? Math.min(p.x, size - approxWidth - 2)
+                : p.x;
           return (
             <text
               key={f.key}
-              x={p.x}
+              x={x}
               y={p.y}
               textAnchor={anchor}
               dominantBaseline="middle"
               className="fill-current text-muted"
-              style={{ fontSize: Math.round(size * 0.052) }}
+              style={{ fontSize }}
             >
               {f.short}
             </text>
