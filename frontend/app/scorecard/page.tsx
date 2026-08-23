@@ -38,6 +38,7 @@ import {
 import type { CitableSummary } from "@/lib/scorecardCitation";
 import { CitableRecord } from "./CitableRecord";
 import { ScorecardClient } from "./ScorecardClient";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // ISR: the archive gains at most one session a trading day, so a 30-minute
 // revalidate keeps the static citation fresh without a request-time fetch.
@@ -62,6 +63,7 @@ async function fetchSummary(): Promise<CitableSummary | null> {
   try {
     const res = await fetch(`${API_BASE}/api/scorecard?days=1`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;

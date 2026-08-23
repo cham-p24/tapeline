@@ -5,6 +5,7 @@ import { STRATEGIES } from "./best-stocks-for/[strategy]/strategies";
 import { FACTORS } from "./how-it-works/factors";
 import { TERMS } from "./glossary/terms";
 import { allComparePairs } from "@/lib/comparePairs";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
 // the day, without paying a DB roundtrip on every crawler hit.
@@ -76,6 +77,7 @@ async function fetchUniverseSymbols(): Promise<string[]> {
         `${API_BASE}/api/public/signals?limit=${UNIVERSE_PAGE_SIZE}&offset=${offset}`,
         {
           next: { revalidate: 3600 },
+          headers: ssrInternalHeaders(),
           signal: AbortSignal.timeout(UNIVERSE_TIMEOUT_MS),
         },
       );

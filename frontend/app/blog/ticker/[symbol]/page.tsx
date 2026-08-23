@@ -23,6 +23,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta, SITE_URL } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { TICKERS, findTicker, type TickerPost } from "../tickers";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Refresh per-page live data every 30 minutes. Long-tail SEO pages don't
 // need sub-minute freshness; longer cache = fewer API hits on each crawl.
@@ -76,6 +77,7 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
         // AbortSignal is not part of Next's fetch cache key, so the 30-min
         // ISR cache below is preserved.
         next: { revalidate: 1800 },
+        headers: ssrInternalHeaders(),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (res.ok) return (await res.json()) as TickerData;
@@ -114,6 +116,7 @@ async function fetchSymbolScorecard(symbol: string): Promise<ScorecardForSymbol 
     try {
       const res = await fetch(url, {
         next: { revalidate: 3600 }, // hourly is plenty — scorecard rolls daily
+        headers: ssrInternalHeaders(),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (res.ok) {

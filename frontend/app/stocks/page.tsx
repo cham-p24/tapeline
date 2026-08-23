@@ -27,6 +27,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Hourly ISR. The directory only needs to reflect universe membership
 // (which churns slowly via auto-discovery), not live scores — so a 1h cache
@@ -82,6 +83,7 @@ async function fetchUniverse(): Promise<DirectoryRow[]> {
         `${API_BASE}/api/public/signals?limit=${UNIVERSE_PAGE_SIZE}&offset=${offset}`,
         {
           next: { revalidate: 3600 },
+          headers: ssrInternalHeaders(),
           signal: AbortSignal.timeout(8000),
         },
       );

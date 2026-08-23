@@ -9,6 +9,7 @@ import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { POSTS } from "./blog/posts";
 import { REFUND } from "@/lib/pricing";
 import { formatTrackedSince, type CitableSummary } from "@/lib/scorecardCitation";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // ScannerPreview server-fetches the real anonymous top-scored rows; 30-min
 // ISR (same budget as /daily-picks) keeps the homepage static-fast while the
@@ -36,6 +37,7 @@ async function fetchSummary(): Promise<CitableSummary | null> {
   try {
     const res = await fetch(`${API_BASE}/api/scorecard?days=1`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;

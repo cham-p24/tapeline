@@ -7,6 +7,7 @@ import { AnonSignupNudge } from "@/components/AnonSignupNudge";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { parseMatchup, canonicalMatchup, relatedMatchups } from "@/lib/comparePairs";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Ticker pages are the crawl surface; a page-level revalidate keeps every
 // comparison fresh hourly without a rebuild, and (unlike the fetch-level
@@ -52,6 +53,7 @@ async function fetchTicker(symbol: string): Promise<Fetch> {
     try {
       const res = await fetch(url, {
         next: { revalidate: 1800 },
+        headers: ssrInternalHeaders(),
         signal: AbortSignal.timeout(7000),
       });
       if (res.status === 404) return { status: "missing" };
