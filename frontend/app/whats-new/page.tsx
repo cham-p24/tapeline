@@ -1,12 +1,13 @@
 import { Button } from "@/components/Button";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { ScoreRadial } from "@/components/ScoreRadial";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "What's new in Tapeline — faster search, cleaner navigation",
+  title: "What's new in Tapeline — MCP server, rebuilt ticker pages, open access",
   description:
-    "The latest Tapeline upgrades: universal ticker search, a new sidebar, a Compare hub, saved screens, and simpler alerts — and exactly where to find each one.",
+    "The latest Tapeline upgrades: a public MCP server for AI assistants, embeddable score badges, ticker pages rebuilt as a decision aid, a card-backed Premium trial, and the ranked scanner open on Free until 8 September.",
   path: "/whats-new",
 });
 
@@ -58,6 +59,153 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 /* ── Mocks ────────────────────────────────────────────────────────────────── */
+
+function McpMock() {
+  const tools = [
+    "get_ticker_score",
+    "get_daily_picks",
+    "get_track_record",
+    "get_ticker_record",
+    "search_tickers",
+  ];
+  return (
+    <div>
+      <pre className="overflow-x-auto rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-[11px] leading-relaxed text-muted">
+        {`{ "mcpServers": { "tapeline": {
+    "url": "https://api.tapeline.io/mcp"
+} } }`}
+      </pre>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {tools.map((t) => (
+          <span
+            key={t}
+            className="rounded-full border border-border bg-panel/40 px-2 py-0.5 font-mono text-[10px] text-muted"
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 font-mono text-[10px] text-subtle">
+        free · no account · no API key
+      </div>
+    </div>
+  );
+}
+
+function EmbedMock() {
+  return (
+    <div className="mx-auto max-w-[280px]">
+      <div className="rounded-lg border border-border bg-panel/40 p-3">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-sm font-semibold">NVDA</span>
+          <span className="font-mono text-2xl font-bold text-up">91</span>
+        </div>
+        <div className="mt-1 text-[10px] uppercase tracking-wider text-subtle">
+          Tapeline Score · live
+        </div>
+        <div className="mt-2 border-t border-border/60 pt-1.5 text-[9px] text-subtle">
+          Powered by tapeline.io
+        </div>
+      </div>
+      <pre className="mt-2 overflow-x-auto rounded border border-border bg-panel px-2 py-1.5 font-mono text-[10px] text-muted">
+        {`![Score](tapeline.io/badge/NVDA)`}
+      </pre>
+    </div>
+  );
+}
+
+function TickerDecisionMock() {
+  const stats: [string, string, string][] = [
+    ["Score", "91", "97th pctile · Info Tech (n=148)"],
+    ["Trend", "88", "90th pctile · Info Tech (n=148)"],
+    ["Momentum", "85", "86th pctile · Info Tech (n=143)"],
+  ];
+  return (
+    <div className="flex items-center gap-4">
+      <div className="shrink-0">
+        <ScoreRadial
+          trend={88}
+          rs={92}
+          fundamentals={74}
+          smart_money={61}
+          macro={70}
+          momentum={85}
+          score={91}
+          size={120}
+          showLabels={false}
+        />
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {stats.map(([k, v, ctx]) => (
+          <div key={k} className="rounded border border-border/70 bg-panel/40 px-2.5 py-1.5">
+            <div className="flex items-baseline justify-between gap-2 text-xs">
+              <span className="text-muted">{k}</span>
+              <span className="font-mono font-semibold">{v}</span>
+            </div>
+            <div className="font-mono text-[9px] text-subtle">{ctx}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrialMock() {
+  const rows: [string, string][] = [
+    ["Due today", "$0.00"],
+    ["First charge", "day 14 · the plan you pick"],
+    ["Reminder email", "three days before"],
+  ];
+  return (
+    <div className="mx-auto max-w-[300px] space-y-1.5">
+      {rows.map(([k, v]) => (
+        <div
+          key={k}
+          className="flex items-center justify-between rounded border border-border/70 bg-panel/40 px-3 py-2 text-xs"
+        >
+          <span className="text-muted">{k}</span>
+          <span className="font-mono font-medium">{v}</span>
+        </div>
+      ))}
+      <div className="rounded border border-border/70 bg-panel/40 px-3 py-2 text-center text-xs text-muted">
+        Cancel in one click — first screen, no hoops
+      </div>
+    </div>
+  );
+}
+
+function OpenAccessMock() {
+  const rows: [string, string, string][] = [
+    ["11", "PLTR", "78"],
+    ["247", "ONTO", "64"],
+    ["893", "CRVL", "52"],
+  ];
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[11px] text-subtle">Scanner · Free plan</span>
+        <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+          until 8 September
+        </span>
+      </div>
+      <div className="mt-2 space-y-1.5">
+        {rows.map(([n, s, v]) => (
+          <div
+            key={s}
+            className="flex items-center gap-3 rounded border border-border/70 bg-panel/40 px-2.5 py-1.5 text-xs"
+          >
+            <span className="w-8 text-right font-mono text-subtle">#{n}</span>
+            <span className="font-mono font-semibold">{s}</span>
+            <span className="ml-auto font-mono text-up">{v}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 text-center font-mono text-[10px] text-subtle">
+        1,000 ranked rows · was top 10
+      </div>
+    </div>
+  );
+}
 
 function SearchMock() {
   const rows = [
@@ -212,12 +360,14 @@ export default function WhatsNewPage() {
         <div className="max-w-2xl">
           <div className="font-mono text-xs font-medium uppercase tracking-wider text-accent">What&rsquo;s new</div>
           <h1 className="mt-3 text-4xl font-bold tracking-tight text-balance sm:text-5xl">
-            Tapeline just got faster to get around
+            The record, in more places
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-muted">
-            A round of navigation upgrades — a universal search, a cleaner layout, a Compare hub, and
-            saved screens. Same transparent six-factor scores and the same public record behind
-            everything; here&rsquo;s what changed and where to find it.
+            The latest round: a public MCP server so AI assistants can read the record directly,
+            embeddable score badges, ticker pages rebuilt as a decision aid, a clearer card-backed
+            trial, and the ranked scanner open on the Free plan until 8 September. Same transparent
+            six-factor scores and the same public record behind everything; here&rsquo;s what changed
+            and where to find it.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button href="/signup" variant="primary" shape="rounded">
@@ -229,7 +379,95 @@ export default function WhatsNewPage() {
           </div>
         </div>
 
-        {/* Features */}
+        {/* Features — latest wave */}
+        <FeatureRow
+          where="tapeline.io/mcp — Claude, ChatGPT, or any MCP client"
+          title="Ask your AI assistant for the record"
+          body={
+            <>
+              Tapeline now runs a <strong className="text-fg">public MCP server</strong> at
+              api.tapeline.io/mcp. Connect it and your assistant can pull a ticker&rsquo;s six-factor
+              score, today&rsquo;s published top 10, and the full never-edited track record — losing
+              picks included — through five public tools. Free, no account, no API key; setup
+              instructions at tapeline.io/mcp.
+            </>
+          }
+          mock={<McpMock />}
+        />
+
+        <FeatureRow
+          flip
+          where="tapeline.io/embed"
+          title="A live score badge you can embed anywhere"
+          body={
+            <>
+              Drop a live Tapeline Score into a blog post, Substack or GitHub README. Two flavours:
+              an <strong className="text-fg">iframe widget</strong> for web pages and an{" "}
+              <strong className="text-fg">SVG badge</strong> at tapeline.io/badge/&#123;TICKER&#125;
+              that renders in GitHub markdown. Free, no auth, no API key — it shows the same score
+              the site does.
+            </>
+          }
+          mock={<EmbedMock />}
+        />
+
+        <FeatureRow
+          where="any ticker page in the app"
+          title="Ticker pages rebuilt as a decision aid"
+          body={
+            <>
+              Every ticker page now carries <strong className="text-fg">key statistics</strong> —
+              market cap, 52-week range, relative volume, earnings date and more — and places the
+              score in context: the composite and all six factors are{" "}
+              <strong className="text-fg">ranked against sector peers</strong>, with the peer group
+              and its size printed next to every percentile. When there are too few peers to rank,
+              the page says so instead of guessing. A{" "}
+              <strong className="text-fg">six-factor radar</strong> shows the shape of the score at a
+              glance, and the ticker&rsquo;s own published record — every time it appeared in a daily
+              top 10 and how each entry resolved, losses included — sits on the same page.
+            </>
+          }
+          mock={<TickerDecisionMock />}
+        />
+
+        <FeatureRow
+          flip
+          where="first sign-in, for accounts created from 22 August"
+          title="The 14-day Premium trial now takes card details up front"
+          body={
+            <>
+              A new account adds a card at first sign-in and starts the 14-day Premium trial:{" "}
+              <strong className="text-fg">$0 charged today</strong>, first charge on day 14 at the
+              plan you pick. We email you <strong className="text-fg">three days before</strong> that
+              charge, and cancelling is one click on the first screen — cancel before day 14 and you
+              are never charged. Existing accounts are unchanged, and the published record stays free
+              to read with no account.
+            </>
+          }
+          mock={<TrialMock />}
+        />
+
+        <FeatureRow
+          where="the scanner, on the Free plan"
+          title="Open-access month: the ranked scanner, open on Free"
+          body={
+            <>
+              Until <strong className="text-fg">8 September</strong>, signed-in Free accounts see{" "}
+              <strong className="text-fg">1,000 ranked scanner rows</strong> instead of the top 10 —
+              the same row cap the paid plans use. On 8 September the cap simply returns to the top
+              10; nothing else about the Free plan changes.
+            </>
+          }
+          mock={<OpenAccessMock />}
+        />
+
+        {/* Features — early-August navigation wave */}
+        <div className="mt-20 border-t border-border/60 pt-10">
+          <div className="font-mono text-xs font-medium uppercase tracking-wider text-subtle">
+            Earlier in August · navigation
+          </div>
+        </div>
+
         <FeatureRow
           where="the search bar up top — or ⌘K / Ctrl-K anywhere"
           title="Search anything, instantly"

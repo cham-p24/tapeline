@@ -42,6 +42,14 @@ type LogEntry = {
 
 const METHODOLOGY_LOG: LogEntry[] = [
   {
+    date: "2026-08-23",
+    kind: "scope",
+    title: "Per-ticker pick history now applies the same 7-day publication delay",
+    body:
+      "Three public surfaces serve the per-ticker scorecard rows. The CSV/JSON export and the scorecard page withhold the most recent seven days from readers not on a paying tier, and say so. A third endpoint — the one backing the score sparkline on ticker pages — served the same rows with no delay at all. It now applies the identical seven-day delay for the same readers, so every public surface publishes the record on one schedule. No historical entry was changed.",
+    ref: "#568",
+  },
+  {
     date: "2026-07-18",
     kind: "scope",
     title: "Stopped collecting investing experience and portfolio size",
@@ -110,6 +118,50 @@ type Entry = {
 // user, not what changed in the codebase. Implementation details, vendor names,
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
+  {
+    date: "2026-08-22",
+    version: "0.1.20",
+    tag: "improvement",
+    title: "Premium trial takes card details up front — $0 today, reminder email, one-click cancel",
+    body: [
+      "From 22 August 2026, a new account adds a card at first sign-in and starts the 14-day Premium trial. $0 is charged on day 0; the first charge lands on day 14 at the plan picked at sign-up.",
+      "A reminder email goes out three days before the first charge, and cancelling is one click on the first screen of the cancel flow — cancel before day 14 and no charge is ever made.",
+      "Existing accounts are unaffected, and the published record — daily top 10, scorecard, CSV/JSON — stays free to read with no account.",
+    ],
+  },
+  {
+    date: "2026-08-22",
+    version: "0.1.19",
+    tag: "shipped",
+    title: "Ticker pages rebuilt as a decision aid",
+    body: [
+      "Key statistics on every ticker page — relative volume, 52-week range, market cap, next earnings date, dividend yield, beta, P/E and EPS — populated from the same feeds that drive the score. Fields we hold no peer ranking for are labelled as such rather than presented as judgeable.",
+      "The composite score and all six factors are now ranked against sector peers, with the peer group and its size printed next to every percentile. Rankings with fewer than 30 covered peers say so instead of printing a number a single peer could swing.",
+      "A six-factor radar shows the shape of the score at a glance — balanced or lopsided — using the same factor order as /how-it-works.",
+      "The ticker's own published record is on the page: every time it appeared in a daily top 10 and how each entry resolved, losses included. Same data as the public scorecard, scoped to the ticker you're looking at.",
+    ],
+  },
+  {
+    date: "2026-08-20",
+    version: "0.1.18",
+    tag: "improvement",
+    title: "Open-access month: 1,000 ranked scanner rows on Free until 8 September",
+    body: [
+      "Until 8 September 2026, signed-in Free accounts see 1,000 ranked scanner rows instead of the top 10 — the same row cap the paid plans use. On 8 September the cap returns to the top 10 automatically.",
+      "Nothing else about the Free plan changes: same daily look-ups, watchlist, alerts and public scorecard.",
+    ],
+  },
+  {
+    date: "2026-08-20",
+    version: "0.1.17",
+    tag: "shipped",
+    title: "Public MCP server — connect Tapeline to Claude, ChatGPT or any MCP client",
+    body: [
+      "Tapeline now runs a Model Context Protocol server at api.tapeline.io/mcp. Any MCP-compatible AI assistant can read the record directly: five public tools cover a ticker's six-factor score, today's published top 10, the full track record with its sample-size qualifier, a single ticker's pick history with losses included, and name-to-symbol search.",
+      "Free, no account, no API key. Setup instructions — including the three-line config for Claude and ChatGPT — are at tapeline.io/mcp.",
+      "The server states the same caveats as the site: an assistant that calls the tools and a reader on /scorecard get the same record with the same qualifiers attached.",
+    ],
+  },
   {
     date: "2026-08-12",
     version: "0.1.16",
