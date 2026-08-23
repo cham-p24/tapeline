@@ -84,6 +84,11 @@ _last_aggregates_failed_at: datetime | None = None  # last failed aggregates run
 _last_inbox_tick: datetime | None = None
 _last_checkout_recovery: datetime | None = None
 _last_activation_nudge: datetime | None = None
+# "YYYY-MM-DD" of the last successful point-in-time score_snapshots capture
+# (UTC). Latched ONLY after a successful run so a failed capture retries next
+# tick; the in-DB ON CONFLICT DO NOTHING makes those retries insert-only no-ops
+# for whatever was already captured.
+_last_score_snapshot_date: str | None = None
 
 # Symbols the ALL SIGNALS sheet governs. Refreshed alongside the sheet tick;
 # consumed by the per-tick snapshot upsert so the market feed can't clobber the
@@ -649,6 +654,34 @@ async def tick() -> None:
                 await ensure_watchlist_snapshot(_wl_session, started.date())
         except Exception:
             logger.exception("watchlist_trackrecord.snapshot_failed")
+
+        # Point-in-time archive of the FULL scored universe (score_snapshots).
+        # Every trading day without this capture is universe history that can
+        # never be regenerated — the hard gate before any data-licensing
+        # conversation. Same placement rationale as the two freezes above:
+        # after the session close AND after the sheet refresh, so the archived
+        # factor values are the Tapeline composite's, not the earlier per-tick
+        # feed values. Insert-only: capture_score_snapshots INSERTs with
+        # ON CONFLICT (snapshot_date, symbol) DO NOTHING and nothing ever
+        # updates or deletes a captured row. The date latch just stops the
+        # ~2.5k-row no-op re-insert from running on every remaining tick of
+        # the day; correctness never depends on it.
+        global _last_score_snapshot_date
+        _snap_today = started.date().isoformat()
+        if _last_score_snapshot_date != _snap_today:
+            try:
+                from app.services.score_snapshots import capture_score_snapshots
+                async with session_scope() as _snap_session:
+                    _snap_rows = await capture_score_snapshots(
+                        _snap_session, started.date()
+                    )
+                _last_score_snapshot_date = _snap_today
+                logger.info(
+                    "score_snapshots.captured date=%s rows=%d",
+                    _snap_today, _snap_rows,
+                )
+            except Exception:
+                logger.exception("score_snapshots.capture_failed")
 
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
