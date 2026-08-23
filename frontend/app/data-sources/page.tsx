@@ -7,7 +7,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline Data Categories — What Powers Every Score",
   description:
-    "The data categories Tapeline uses to compute every score: live market data, fundamentals, macro indicators, SEC filings, Congressional disclosures, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
+    "The data categories Tapeline reads from: live market data, fundamentals, macro indicators, SEC filings, Congressional disclosures, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
   path: "/data-sources",
 });
 
@@ -78,14 +78,23 @@ const CATEGORIES: Category[] = [
     publicRecord: true,
   },
   {
+    // Truth check (2026-08-23): no live congressional disclosure feed is wired
+    // in production — the dev-only generator is gated out of prod
+    // (backend/app/workers/signal_publisher.py, _mock_writes_enabled), so the
+    // /app/congress table does not accrue new rows. What IS live: curated
+    // STOCK Act names from the scoring workbook feed the Smart Money
+    // sub-factor (backend/app/services/sheet_feed.py, parse_smart_money_csv).
+    // Do not re-describe /app/congress as a daily-refreshed feed until a real
+    // disclosure source ships.
     name: "Congressional disclosures",
     usedFor: [
-      "House + Senate financial disclosure filings",
+      "Curated House + Senate STOCK Act disclosure filings",
       "Inputs to the Smart Money sub-factor",
     ],
     surfaceArea:
-      "Congressional trades feed at /app/congress (Premium tier).",
-    refreshCadence: "Daily.",
+      "The Smart Money sub-factor in every score breakdown. The Congressional trades page at /app/congress (Premium tier) shows previously collected disclosures; it is not currently receiving new filings.",
+    refreshCadence:
+      "Curated batches on the scoring-workbook cadence. There is no live per-filing feed today.",
     publicRecord: true,
   },
   {
@@ -100,14 +109,22 @@ const CATEGORIES: Category[] = [
     publicRecord: false,
   },
   {
+    // Truth check (2026-08-23): only the aggregate Buy/Hold/Sell tally is on
+    // Tapeline's current data plan. Per-firm rating events and price targets
+    // (including any "average price target") are a paid upstream endpoint we
+    // do not subscribe to — the backend always returns avg_pt: null and
+    // events: [] (backend/app/services/finnhub_feed.py,
+    // fetch_analyst_recommendations), and the ticker key-stats endpoint
+    // deliberately omits the 1-year price target for the same reason
+    // (backend/app/routers/ticker.py). Cache TTL mirrors
+    // CACHE_TTL_RECS_HOURS = 12.
     name: "Analyst ratings",
     usedFor: [
       "Consensus tally (Buy / Hold / Sell)",
-      "Average price target + recent rating events",
     ],
     surfaceArea:
-      "Analyst Ratings widget on Premium ticker pages. Not folded into the score — displayed as descriptive context only.",
-    refreshCadence: "Cached 6 hours per ticker.",
+      "Analyst Ratings widget on Premium ticker pages. Not folded into the score — displayed as descriptive context only. Per-firm rating events and price targets are not on Tapeline's current data plan and are not shown.",
+    refreshCadence: "Cached 12 hours per ticker.",
     publicRecord: false,
   },
 ];
