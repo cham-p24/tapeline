@@ -425,3 +425,94 @@ test("findings report file, line, matched phrase and rule", () => {
   assert.ok(finding.brief.includes("Rule 1"));
   assert.ok(finding.excerpt.length > 0);
 });
+
+/* ============================================================ *
+ * (j) Financial-state targeting — Rule 9
+ *
+ * The gap this closes: acquisition copy addressed to a stranger that
+ * claims to know their financial position. Rule 7 covers reporting a
+ * KNOWN user's actual holdings; Rule 8 covers COLLECTING suitability
+ * inputs. Neither fires on "if your returns disappoint" — which is the
+ * #1 documented Meta finance rejection trigger, and the class that
+ * reads most like advice.
+ * ============================================================ */
+
+test("catches second-person financial-state copy", () => {
+  const bad = [
+    `<h1>If your returns disappoint, try a different lens.</h1>`,
+    `<p>Struggling with debt? Start here.</p>`,
+    `<h2>Want to grow your savings faster?</h2>`,
+    `<p>Is your portfolio down this quarter?</p>`,
+    `<p>Are you losing money on every swing?</p>`,
+    `<p>Not seeing the returns you expected?</p>`,
+    `<h2>Your portfolio is underperforming the market.</h2>`,
+    `<p>Tired of losing money on hype stocks.</p>`,
+    `<p>When your trades keep losing, the process is the problem.</p>`,
+    `<p>Ready to double your money this year?</p>`,
+  ];
+  for (const src of bad) {
+    assert.ok(
+      fires(src, "financial-state-targeting"),
+      `should flag financial-state targeting: ${src}`,
+    );
+  }
+});
+
+test("does NOT flag legitimate second person, workflow targeting, or Rule 8's required sentence", () => {
+  const ok = [
+    // The sentence Rule 8's own comment says compliant pages must be able to say.
+    `<p>Whether to act depends on your portfolio, risk tolerance and time horizon — things Tapeline does not know about you.</p>`,
+    // Workflow qualification: the compliant replacement, per the playbooks.
+    `<p>If you screen 500 tickers by hand every weekend, this compresses the reading.</p>`,
+    `<h1>Retire the Sunday-night spreadsheet.</h1>`,
+    // Ordinary product second person.
+    `<p>Your watchlist keeps the tickers you saved.</p>`,
+    `<p>Your trial ends on the date shown above.</p>`,
+    `<p>Add your card to start the 14-day Premium trial.</p>`,
+    `<p>Your account stays free forever.</p>`,
+    // Live copy-bank variants that must survive.
+    `<p>It never tells you what to do.</p>`,
+    `<p>You still make every decision — the scanner just shortens the reading.</p>`,
+    `<p>A score of 62 and one sentence is something you can note in a journal.</p>`,
+    `<p>We publish the scorecard, misses included.</p>`,
+    // Descriptive market language that is about the MARKET, not the reader.
+    `<p>The momentum factor measures stocks that have outperformed recently.</p>`,
+  ];
+  for (const src of ok) {
+    assert.ok(
+      !fires(src, "financial-state-targeting"),
+      `false positive on legitimate copy: ${src}`,
+    );
+  }
+});
+
+test("every ad-copy variant in the shipped banks passes Rule 9", () => {
+  // The banks live in docs/**, which CI's include globs deliberately do not
+  // cover — so this is the only automated check they ever get. Headlines and
+  // bodies from PAID_ADS_METRICS_BIBLE.md §7.3.
+  const bank = [
+    "One number. One sentence.",
+    "See what the scanner read — no account needed.",
+    "We publish the record, misses included.",
+    "Built for the 20-minute trader.",
+    "Six factors. Plain-English labels. Public methodology.",
+    "Retire the Sunday-night spreadsheet.",
+    "The whole record is one click away.",
+    "We publish the log, not the highlights.",
+    "$0 today. The charge date is on the page.",
+    "Scanner tooling, minus the terminal price.",
+    "One number you can say out loud.",
+    "It never tells you what to do.",
+    "I built the scanner I wanted on Sunday nights.",
+    "If your process is fourteen browser tabs and a hand-built spreadsheet every Sunday night, Tapeline does the compression for you.",
+    "The 14-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm.",
+    "Informational only. Descriptive scores, not recommendations.",
+  ];
+  for (const line of bank) {
+    assert.deepEqual(
+      scanSource(`<p>${line}</p>`, "frontend/app/x/page.tsx").map((f) => f.rule),
+      [],
+      `shipped ad copy must lint clean, but this did not: ${line}`,
+    );
+  }
+});
