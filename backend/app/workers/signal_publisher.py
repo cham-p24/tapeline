@@ -10,7 +10,7 @@ import asyncio
 import logging
 from datetime import UTC, date, datetime
 
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import bindparam, delete, desc, func, select, update
 
 from app.config import get_settings
 from app.db import session_scope
@@ -291,9 +291,46 @@ async def tick() -> None:
                 full_updates.append({"symbol": snap["symbol"], **data})
 
         # Bulk UPDATE ... WHERE symbol = :symbol, executemany'd per column set.
+        #
+        # COALESCE on the four CACHE-DERIVED columns is load-bearing, not a
+        # nicety. market_cap comes from _MARKET_CAP_CACHE and the three bar
+        # stats from _BAR_STATS_CACHE; both are in-memory dicts that are EMPTY
+        # for every symbol after a process start, and this upsert runs every 60
+        # seconds. Writing the plain value therefore stamped NULL over perfectly
+        # good data on the first tick after each deploy, and kept doing so until
+        # the once-daily refresh repopulated the cache — up to 24 hours later.
+        #
+        # Observed in production: 52-week coverage fell from 2,190 rows to 100,
+        # and average volume from 2,486 to 103, purely from a restart. It also
+        # explains why market_cap crawled: the backfill filled rows while the
+        # snapshot tick wiped them, so the two raced each other all day.
+        #
+        # COALESCE(:incoming, existing) keeps whatever we already hold when the
+        # cache has nothing to say. The snapshot fields above are deliberately
+        # NOT protected this way — they come fresh from the vendor on every
+        # tick, so a NULL there is a real "no read", and preserving a stale one
+        # would be the dishonest choice.
+        cache_derived = ("market_cap", "week52_high", "week52_low", "avg_volume_30d")
         for batch in (full_updates, market_updates):
-            if batch:
-                await session.execute(update(Ticker), batch)
+            if not batch:
+                continue
+            columns = [k for k in batch[0] if k != "symbol"]
+            stmt = (
+                update(Ticker)
+                .where(Ticker.symbol == bindparam("b_symbol"))
+                .values({
+                    col: (
+                        func.coalesce(bindparam(col), getattr(Ticker, col))
+                        if col in cache_derived
+                        else bindparam(col)
+                    )
+                    for col in columns
+                })
+            )
+            await session.execute(
+                stmt,
+                [{**row, "b_symbol": row["symbol"]} for row in batch],
+            )
 
         # --- Replace squeeze setups ---
         # ONLY when the rows we're about to write are real enough to persist.
