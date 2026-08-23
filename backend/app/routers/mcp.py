@@ -368,19 +368,23 @@ async def _record_tool_call(name: str) -> None:
     try:
         async with session_scope() as s:
             dialect = s.get_bind().dialect.name
+            values = {"tool_name": name, "called_at": datetime.now(UTC).date(), "count": 1}
+            # The two dialect insert() constructors have incompatible mypy
+            # types, so each branch builds its own complete statement instead
+            # of sharing one imported name.
+            count_col = McpToolCall.__table__.c.count
             if dialect == "postgresql":
-                from sqlalchemy.dialects.postgresql import insert
-            else:
-                from sqlalchemy.dialects.sqlite import insert
-            table = McpToolCall.__table__
-            stmt = (
-                insert(table)
-                .values(tool_name=name, called_at=datetime.now(UTC).date(), count=1)
-                .on_conflict_do_update(
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                stmt: Any = pg_insert(McpToolCall).values(**values).on_conflict_do_update(
                     index_elements=["tool_name", "called_at"],
-                    set_={"count": table.c.count + 1},
+                    set_={"count": count_col + 1},
                 )
-            )
+            else:
+                from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+                stmt = sqlite_insert(McpToolCall).values(**values).on_conflict_do_update(
+                    index_elements=["tool_name", "called_at"],
+                    set_={"count": count_col + 1},
+                )
             await s.execute(stmt)
     except Exception:
         logger.exception("mcp.usage_count_failed tool=%s", name)
