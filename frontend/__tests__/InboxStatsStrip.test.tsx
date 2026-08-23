@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 
-import { StatsStrip } from "@/app/app/inbox/page";
+import { StatsStrip } from "@/components/InboxStatsStrip";
 
 // A fully-populated, healthy baseline. Each test overrides only the LLM-health
 // fields it cares about so the assertions stay focused on the new signal.

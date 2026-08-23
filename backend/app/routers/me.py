@@ -6,7 +6,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -669,10 +669,38 @@ async def setup_2fa(
     return {"secret": secret, "otpauth_uri": uri, "qr_svg": qr_svg(uri)}
 
 
+async def _send_security_confirmation_bg(
+    email: str, name: str, change: str, subject: str,
+) -> None:
+    """Send a security-confirmation receipt OUTSIDE the request path.
+
+    Same shape (and same reason) as auth._send_signin_code_bg: the receipt is
+    fire-and-forget, so awaiting Resend inline only adds its latency to the
+    response the user is waiting on — for /2fa/enable that response carries
+    the one-time recovery codes. No DB session needed: everything the email
+    wants was already in hand when the request committed.
+
+    A delivery failure is logged, never raised — background-task exceptions
+    would otherwise surface after the response as a spurious 500 in the logs.
+    """
+    from app.services.email import render_security_confirmation_email, send_email
+
+    try:
+        await send_email(
+            email,
+            subject,
+            render_security_confirmation_email(name, change=change),
+            persona="default",
+        )
+    except Exception:
+        logger.exception("me.security_confirmation_email_failed email=%s", email)
+
+
 @router.post("/2fa/enable")
 async def enable_2fa(
     body: TwoFAEnableBody,
     response: Response,
+    background: BackgroundTasks,
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -740,32 +768,21 @@ async def enable_2fa(
         "me.2fa_enabled user=%s session_epoch=%s", user.id, user.session_epoch,
     )
 
-    # Security-confirmation receipt — fire-and-forget so a Resend hiccup
-    # never fails the enable. Account-state notification (the user can't opt
-    # out of it): persona "default", no List-Unsubscribe. Gives an
-    # "if this wasn't you" recovery path if someone turned 2FA on that the
-    # real owner didn't request.
+    # Security-confirmation receipt — sent AFTER the response via
+    # BackgroundTasks (#294 follow-up) so Resend latency never sits between
+    # the user and their recovery codes, and a Resend hiccup never fails the
+    # enable. Account-state notification (the user can't opt out of it):
+    # persona "default", no List-Unsubscribe. Gives an "if this wasn't you"
+    # recovery path if someone turned 2FA on that the real owner didn't
+    # request.
     if user.email:
-        try:
-            from app.services.email import (
-                render_security_confirmation_email,
-                send_email,
-            )
-
-            html = render_security_confirmation_email(
-                user.name or "trader",
-                change="Two-factor authentication was enabled",
-            )
-            await send_email(
-                user.email,
-                "Two-factor authentication was enabled on your Tapeline account",
-                html,
-                persona="default",
-            )
-        except Exception:  # email must never block the enable
-            logger.exception(
-                "me.2fa_enable_confirmation_email_failed user=%s", user.id
-            )
+        background.add_task(
+            _send_security_confirmation_bg,
+            user.email,
+            user.name or "trader",
+            "Two-factor authentication was enabled",
+            "Two-factor authentication was enabled on your Tapeline account",
+        )
 
     return {"ok": True, "recovery_codes": codes}
 
@@ -794,6 +811,7 @@ def _reissue_session_cookie(response: Response, user: User) -> None:
 async def disable_2fa(
     body: TwoFADisableBody,
     response: Response,
+    background: BackgroundTasks,
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -827,32 +845,19 @@ async def disable_2fa(
         "me.2fa_disabled user=%s session_epoch=%s", user.id, user.session_epoch,
     )
 
-    # Security-confirmation receipt — fire-and-forget so a Resend hiccup
-    # never fails the disable. Account-state notification (the user can't opt
-    # out of it): persona "default", no List-Unsubscribe. Gives an
-    # "if this wasn't you" recovery path if someone turned 2FA off that the
-    # real owner didn't request.
+    # Security-confirmation receipt — sent AFTER the response via
+    # BackgroundTasks (#294 follow-up); see enable_2fa for the reasoning.
+    # This one matters MORE for safety: it's the "if this wasn't you" alarm
+    # for an attacker stripping 2FA, so it must never be lost to a request
+    # error — and never delay confirming the change to the real owner either.
     if user.email:
-        try:
-            from app.services.email import (
-                render_security_confirmation_email,
-                send_email,
-            )
-
-            html = render_security_confirmation_email(
-                user.name or "trader",
-                change="Two-factor authentication was turned off",
-            )
-            await send_email(
-                user.email,
-                "Two-factor authentication was turned off on your Tapeline account",
-                html,
-                persona="default",
-            )
-        except Exception:  # email must never block the disable
-            logger.exception(
-                "me.2fa_disable_confirmation_email_failed user=%s", user.id
-            )
+        background.add_task(
+            _send_security_confirmation_bg,
+            user.email,
+            user.name or "trader",
+            "Two-factor authentication was turned off",
+            "Two-factor authentication was turned off on your Tapeline account",
+        )
 
     return {"ok": True}
 
