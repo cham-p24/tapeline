@@ -52,15 +52,22 @@ const TAPELINE_SITES = [
   { host: /(^|\.)reuters\.com$/, url: [/\/markets\/companies\/([A-Za-z0-9.\-]{1,16})(?:[/?#]|$)/i] },
 
   // ── brokers: none ship enabled. robinhood.com was dropped from the manifest
-  //    in PR #526, so this rule never runs at install time. Keeping the entry
-  //    stops the loose generic patterns mis-parsing a Robinhood URL, but it has
-  //    a side effect worth knowing: isKnownHost("robinhood.com") is true, and
-  //    popup.js only renders "Enable on this site" when that is false — so the
-  //    popup's one-click grant is NOT offered on Robinhood. This rule applies
-  //    only if the origin is granted by some other route and syncEnabledSites()
-  //    registers the script for it. Every broker is opt-in rather than us
-  //    asking for brokerage access at install time. ─────────────
-  { host: /(^|\.)robinhood\.com$/, url: [/\/stocks\/([A-Za-z0-9.\-]{1,12})(?:[/?#]|$)/], spa: true },
+  //    in PR #526, so this rule never runs at install time. The entry stays so
+  //    that once a user DOES grant the origin, we parse their URLs with a rule
+  //    written for Robinhood rather than the loose generic patterns.
+  //
+  //    `optIn` is what keeps the two ideas apart: "we have a rule for this
+  //    host" and "this host works out of the box" are different questions, and
+  //    conflating them cost us the Enable button here — isKnownHost was true,
+  //    so popup.js never offered the grant, and the extension was a silent
+  //    dead end on Robinhood with no way in from the UI. Every broker is
+  //    opt-in rather than us asking for brokerage access at install. ────────
+  {
+    host: /(^|\.)robinhood\.com$/,
+    url: [/\/stocks\/([A-Za-z0-9.\-]{1,12})(?:[/?#]|$)/],
+    spa: true,
+    optIn: true,
+  },
 ];
 
 /**
@@ -156,9 +163,16 @@ function isSpaHost(loc = window.location) {
   return rule ? Boolean(rule.spa) : true;
 }
 
-/** Is this host covered out of the box? Drives the popup's enable button. */
+/**
+ * Is this host covered out of the box? Drives the popup's enable button.
+ *
+ * Deliberately NOT "do we have a rule for it" — an `optIn` rule exists to parse
+ * URLs once the user grants the origin, and is not shipped in the manifest.
+ * Reporting those as known suppresses the very button that grants them.
+ */
 function isKnownHost(hostname) {
-  return Boolean(_rule(hostname));
+  const rule = _rule(hostname);
+  return Boolean(rule) && !rule.optIn;
 }
 
 if (typeof module !== "undefined") {

@@ -76,6 +76,10 @@ const HOST_CASES = [
   ["www.tradingview.com", true],
   ["client.schwab.com", false],
   ["example.com", false],
+  // Robinhood has a parsing rule but is NOT in the manifest, so it must report
+  // as unknown or the popup withholds "Enable on this site" and the extension
+  // is a dead end there with no route in. Regression guard for that exact bug.
+  ["robinhood.com", false],
 ];
 for (const [host, want] of HOST_CASES) {
   const got = isKnownHost(host);
