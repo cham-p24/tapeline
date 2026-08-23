@@ -1,13 +1,29 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = {
+// pageMeta (not a bare object) so this page self-canonicalises, matching its
+// three siblings (privacy / terms / risk / extension-privacy).
+//
+// app/layout.tsx sets `alternates: { canonical: "/" }` on the ROOT layout, and
+// Next's metadata merge starts from a clone of the resolved parent and only
+// overwrites keys physically present in the child — so a child exporting a bare
+// `{ title, description }` silently inherits the homepage canonical. This page
+// was the one legal sibling doing that: it shipped
+// `<link rel="canonical" href="https://tapeline.io"/>` and og:url pointing at
+// the homepage (verified in production). Because sitemap.ts submits
+// /legal/refund, GSC filed it as "Duplicate, submitted URL not selected as
+// canonical" and folded it into the homepage — so the refund policy never
+// surfaced for queries like "tapeline refund policy", and any Stripe dispute or
+// trust-page link previewed the homepage card instead of this page.
+export const metadata = pageMeta({
   title: "Refund & Cancellation Policy — Tapeline",
   description:
     "Cancel anytime. Full refund within 30 days of paid-plan start on monthly plans, no questions asked. " +
     "Annual plans: prorated refund minus first month if cancelled within 30 days.",
-};
+  path: "/legal/refund",
+});
 
 export default function RefundPolicyPage() {
   return (

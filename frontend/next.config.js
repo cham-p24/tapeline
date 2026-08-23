@@ -135,10 +135,33 @@ const nextConfig = {
       // honour it; cost is zero.
       { key: "X-XSS-Protection", value: "1; mode=block" },
     ];
+    // The embed widget exists ONLY to be iframed by third parties — it is the
+    // backlink-acquisition asset (app/embed/score/[symbol]/page.tsx). The
+    // blanket `X-Frame-Options: DENY` below forbids framing by ANY origin,
+    // including same-origin, so the widget could never paint: a blogger who
+    // pasted the snippet from /embed saw an empty box, the "Powered by
+    // Tapeline" dofollow link was never emitted, and the three live-preview
+    // iframes on /embed itself rendered blank to every visitor of the page
+    // that is supposed to sell the widget. Because trackEmbedImpression never
+    // fired, the admin "Embed distribution" panel read zero — so the failure
+    // looked like nobody embedded it rather than embedding being impossible.
+    //
+    // Everything except the framing lock still applies to the embed route.
+    // Note the report-only CSP also carries `frame-ancestors 'none'`; it is
+    // inert today (report-only), but when it is flipped to enforcing this
+    // route needs a variant with `frame-ancestors *` or the bug returns.
+    const embedHeaders = securityHeaders.filter(
+      (h) => h.key !== "X-Frame-Options",
+    );
     return [
       {
-        source: "/:path*",
+        // Everything EXCEPT the embed widget gets the full set.
+        source: "/((?!embed/score).*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/embed/score/:path*",
+        headers: embedHeaders,
       },
       // Keep Next's auto-generated social-card image routes OUT of Google's
       // index without Disallow'ing them in robots.txt (a Disallow also blocks
