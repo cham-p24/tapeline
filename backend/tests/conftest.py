@@ -1,13 +1,15 @@
-"""Pytest fixtures — bootstrap an empty SQLite schema before any test runs.
+"""Pytest fixtures — a fully isolated, per-test SQLite database.
 
-CI starts with a blank `tapeline_dev.sqlite` (it's gitignored), so the smoke
-tests would hit `no such table: users` on the first /api/me call. Local dev
-already has the file populated via `alembic upgrade head`, but CI runs in a
-fresh sandbox.
+Every test gets its OWN database file (copied from a schema-only template
+built once per session), and the app's session factory is re-bound to it for
+the duration of that test. No two tests ever share a SQLite file, so no test
+can ever hold a lock that another test trips over — the structural end of the
+recurring `sqlite3.OperationalError: database is locked` CI flake
+(#451/#475/#476). See `_isolated_test_db` for the full story, including why
+the request-path detached news writer is also neutralized here.
 
-This fixture runs ONCE per session — calls `Base.metadata.create_all()` against
-the configured engine, regardless of dialect. Safe to re-run; it's a no-op when
-tables already exist.
+Local dev used to need `tapeline_dev.sqlite` deleted before a run; that file
+is no longer touched by the suite at all.
 """
 from __future__ import annotations
 
@@ -48,49 +50,142 @@ elif not os.environ.get("DATABASE_URL", "").startswith("sqlite"):
     os.environ["DATABASE_URL"] = "sqlite:///./tapeline_dev.sqlite"
 
 import asyncio  # noqa: E402
+import contextlib  # noqa: E402
+import shutil  # noqa: E402
 
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
+from sqlalchemy import create_engine, event  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
 
 # Importing the models package registers all tables on Base.metadata
+import app.db as _db  # noqa: E402
 import app.models  # noqa: E402,F401
-from app.db import Base, engine  # noqa: E402
+from app.db import Base  # noqa: E402
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _create_tables() -> None:
-    """Create all tables before the test session starts."""
-    async def _run() -> None:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    asyncio.run(_run())
+@pytest.fixture(scope="session")
+def _template_db(tmp_path_factory: pytest.TempPathFactory):
+    """Build the empty schema ONCE into a template file.
+
+    `Base.metadata.create_all()` across ~all tables costs real milliseconds;
+    doing it once and file-copying the result per test keeps per-test setup at
+    filesystem-copy speed. DDL is dialect-identical between the sync `sqlite://`
+    driver used here and the `aiosqlite` driver the app runs on.
+    """
+    template = tmp_path_factory.mktemp("db-template") / "template.sqlite"
+    sync_engine = create_engine(f"sqlite:///{template.as_posix()}")
+    try:
+        Base.metadata.create_all(sync_engine)
+    finally:
+        sync_engine.dispose()
+    return template
+
+
+@pytest.fixture(autouse=True)
+def _isolated_test_db(tmp_path_factory: pytest.TempPathFactory, _template_db, monkeypatch):
+    """One private database per test — the structural fix for the CI
+    `sqlite3.OperationalError: database is locked` flake (#451/#475/#476).
+
+    The old harness pointed EVERY test at one shared `tapeline_dev.sqlite`.
+    SQLite allows a single writer per file, so any second connection writing at
+    the wrong moment produced the read→write upgrade deadlock: a request's
+    session takes a read lock on its first SELECT, another connection grabs the
+    write lock in between, and the request's INSERT/UPDATE then fails to
+    upgrade — *immediately*, bypassing `busy_timeout` (SQLite returns
+    SQLITE_BUSY without invoking the busy handler when waiting could deadlock,
+    which is why the earlier busy_timeout/WAL attempts didn't fix it).
+
+    Two concurrent writers existed:
+
+      1. Cross-test: a detached task leaking a locked connection into the next
+         test's first write — fixed by `_drain_background_tasks` (#485) and now
+         made impossible outright, since the next test is a different file.
+      2. Within-test: `routers/ticker.py:_maybe_refresh_news` spawns
+         `_refresh_news_bg` on every ticker GET. In CI (no vendor keys) the
+         news fetch falls back to `_mock_news`, which is NON-empty — so the
+         detached task opened its own session and INSERTed mock NewsItem rows
+         while the next request in the same test was mid-metering-UPDATE.
+         That is the race that kept hitting test_lookup_meter_surface (12
+         sequential ticker GETs). Fixed at the source below: the refresh is
+         no-op'd for the whole suite. No test asserts on the background
+         refresh (news tests seed NewsItem rows directly), and the mock rows
+         it raced in could themselves corrupt exact-match news assertions.
+
+    Isolation mechanics: copy the schema-only template to a per-test file,
+    build a NullPool engine on it (fresh connection per checkout — nothing
+    pooled across pytest-asyncio's per-test event loops), and re-bind the
+    app's ONE session factory to it. Everything in the app goes through
+    `SessionLocal` / `session_scope` / `get_session`, which all resolve to the
+    same sessionmaker object, so `SessionLocal.configure(bind=...)` re-points
+    the entire app atomically. Nothing outside this fixture holds an engine
+    reference (verified: only conftest imported `engine`).
+
+    Belt-and-braces on the engine itself, for any FUTURE concurrent writer
+    someone adds: WAL journal (readers never block writers) + a 30s
+    busy_timeout (a contended write lock waits instead of erroring).
+    Production is Postgres — none of this touches it.
+    """
+    # A dedicated directory per test — NOT the test's own `tmp_path`. Tests
+    # that use tmp_path as a scratch dir may glob it and count files
+    # (test_walk_forward_backtest does exactly that); the harness must never
+    # leak artifacts into a test's visible filesystem.
+    db_dir = tmp_path_factory.mktemp("dbiso")
+    db_file = db_dir / "test.sqlite"
+    shutil.copyfile(_template_db, db_file)
+
+    test_engine = create_async_engine(
+        f"sqlite+aiosqlite:///{db_file.as_posix()}",
+        poolclass=NullPool,
+        connect_args={"timeout": 30},
+    )
+
+    @event.listens_for(test_engine.sync_engine, "connect")
+    def _sqlite_pragmas(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")  # durability is irrelevant in tests
+        cursor.close()
+
+    # Silence the within-test detached news writer (see docstring point 2).
+    from app.routers import ticker as _ticker_module
+    monkeypatch.setattr(_ticker_module, "_maybe_refresh_news", lambda symbol: None)
+
+    old_engine = _db.engine
+    _db.engine = test_engine
+    _db.SessionLocal.configure(bind=test_engine)
+    try:
+        yield
+    finally:
+        _db.SessionLocal.configure(bind=old_engine)
+        _db.engine = old_engine
+        # NullPool holds no connections, so there is nothing to dispose; just
+        # reclaim the disk (pytest retains the last few tmp_path roots, and a
+        # thousand schema copies per run adds up). Best-effort: a straggler
+        # handle on Windows must not fail the test that already passed.
+        for suffix in ("", "-wal", "-shm"):
+            with contextlib.suppress(OSError):
+                (db_dir / f"test.sqlite{suffix}").unlink(missing_ok=True)
+        with contextlib.suppress(OSError):
+            db_dir.rmdir()
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _drain_background_tasks():
+async def _drain_background_tasks(_isolated_test_db):
     """Reap detached fire-and-forget tasks before the event loop tears down.
 
-    THE root cause of the recurring `sqlite3.OperationalError: database is
-    locked` flake (seen on test_lookup_meter_surface, test_freemium_lookups,
-    test_watchlists — always on a *setup* write like `INSERT INTO users`).
+    Endpoints may spawn detached `asyncio.create_task(...)` work that outlives
+    its request. Under pytest-asyncio's function-scoped loops such a task
+    would outlive its test and die noisily (or mid-write) when the loop
+    closes. A brief grace lets quick tasks finish on their own, then anything
+    still running is cancelled and reaped so the loop closes clean.
 
-    Several endpoints spawn a detached `asyncio.create_task(...)` that opens its
-    OWN short-lived DB session and writes — most notably
-    `routers/ticker.py:_refresh_news_bg`, fired by every `GET /api/ticker/{sym}`.
-    On the shared, single-writer SQLite test DB that task becomes a second
-    connection racing the next request. It is *this* concurrent writer that the
-    diagnosed read→write upgrade deadlock needs: the request's session takes a
-    read lock on its first SELECT, the detached task grabs the write lock in
-    between, and the request's INSERT then fails to upgrade — immediately, so
-    `busy_timeout`/WAL can't help (both were tried and reverted). Under pytest's
-    function-scoped loops the task also outlives its test, leaking a locked
-    connection into the *next* test's first write.
-
-    Draining here removes the concurrent writer at the source instead of
-    fighting the lock: a brief grace lets quick tasks finish on their own, then
-    anything still running (e.g. a background news fetch mid `wait_for`, holding
-    no DB lock yet) is cancelled and reaped so the loop closes clean. Test
-    infrastructure only — production is Postgres and unaffected.
+    Depends on `_isolated_test_db` so that teardown ordering keeps the
+    test's engine bound while stragglers are cancelled and their sessions
+    close. With the per-test database, a straggler can no longer affect any
+    OTHER test either way — this fixture is now about clean loop shutdown,
+    not lock hygiene.
     """
     yield
     current = asyncio.current_task()
