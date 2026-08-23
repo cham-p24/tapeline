@@ -136,7 +136,7 @@ async def fetch_snapshots(
         get_cached_score,
         get_cached_smart_money_score,
     )
-    from app.services.mock_feed import _signal_from_score
+    from app.services.mock_feed import _render_reason, _signal_from_score
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots
     from app.services.score import regime_to_macro_score
     from app.services.universe import active_universe
@@ -276,6 +276,52 @@ async def fetch_snapshots(
         # (sub_macro is the deterministic regime-derived value stamped above).
         r["score"] = _composite_from_subs(r)
         r["signal"] = _signal_from_score(r["score"])
+
+        # REGENERATE the one-sentence reason from the sub-scores we just wrote.
+        #
+        # Without this the sentence describes a DIFFERENT SET OF NUMBERS than the
+        # ones published beside it. Every row starts as a _mock_snapshots() row,
+        # where _render_reason is called on six random.gauss draws; the block
+        # above then replaces five of those six with real cached values and
+        # recomputes the composite — but the sentence was left describing the
+        # discarded draws. A ticker whose published Trend is 20 could carry
+        # "trend factor in the top band", because the thrown-away draw was 88.
+        #
+        # It is the product's stated differentiator, it renders directly beneath
+        # the six real sub-scores on the scanner, and it goes out in the welcome
+        # email. Explaining a score with numbers that are not that score is the
+        # worst version of this bug class.
+        r["reason"] = _render_reason(
+            sym,
+            r.get("sector") or "",
+            r["sub_trend"], r["sub_rs"], r["sub_fundamentals"],
+            r["sub_momentum"], r["sub_macro"], r["sub_smart_money"],
+        )
+
+        # CONFIDENCE = how much of this row is actually sourced.
+        #
+        # mock_feed derives confidence_pct from a hash of the symbol bucketed by
+        # two hardcoded symbol lists — a stable random number that measures
+        # nothing. Every user-facing description of the field says it reflects
+        # which underlying data feeds returned data, so the honest implementation
+        # is to count exactly that: how many of the six factors came from a real
+        # source for THIS symbol, plus whether we hold a live price.
+        #
+        # Macro is regime-derived and deterministic for every symbol, so it
+        # always counts. The other five count only when their cache produced a
+        # value on this pass.
+        sourced = sum((
+            fund is not None,
+            sm is not None,
+            trend is not None,
+            rs is not None,
+            mom is not None,
+            True,  # macro: deterministic, always real
+        ))
+        has_price = r.get("price") is not None
+        # Seven signals: six factors plus a live price read. Rounded to a whole
+        # percent because a decimal implies a precision this does not have.
+        r["confidence_pct"] = round(100.0 * (sourced + (1 if has_price else 0)) / 7)
 
     return base_rows
 
