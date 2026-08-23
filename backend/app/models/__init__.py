@@ -15,6 +15,7 @@ from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
 from app.models.scanner_preset import ScannerPreset
 from app.models.scorecard import DailyScorecardEntry
+from app.models.signin_code import SigninCode
 from app.models.squeeze import SqueezeSetup
 from app.models.telegram_token import TelegramLinkToken
 from app.models.ticker import Ticker
@@ -45,6 +46,7 @@ __all__ = [
     "RegimeState",
     "RoadmapVote",
     "ScannerPreset",
+    "SigninCode",
     "SqueezeSetup",
     "StripeWebhookEvent",
     "Subscription",

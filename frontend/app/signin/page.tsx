@@ -66,6 +66,11 @@ function SignInForm() {
   // returns an mfa_token instead of a session; we then show the code prompt.
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
+  // Which second factor is being asked for. "email" => we mailed a code
+  // because this browser isn't recognised; null/undefined => authenticator
+  // app. Drives the copy only — the backend decides which code it accepts.
+  const [mfaMethod, setMfaMethod] = useState<"email" | null>(null);
+  const [emailHint, setEmailHint] = useState<string | null>(null);
 
   // OAuth → 2FA handoff. Signing in through a provider used to skip TOTP
   // entirely: the callback minted a full session regardless of mfa_enabled,
@@ -140,6 +145,8 @@ function SignInForm() {
         // Password was correct but the account needs a 2FA code. Stash the
         // challenge token and switch to the code step; finally{} clears busy.
         setMfaToken(res.mfa_token);
+        setMfaMethod(res.method === "email" ? "email" : null);
+        setEmailHint(res.email_hint ?? null);
         return;
       }
       await finishSignin();
@@ -174,6 +181,8 @@ function SignInForm() {
   function cancelMfa() {
     setMfaToken(null);
     setMfaCode("");
+    setMfaMethod(null);
+    setEmailHint(null);
     setErr(null);
     setFieldErrors({});
   }
@@ -191,9 +200,19 @@ function SignInForm() {
 
           {mfaToken ? (
             <>
-              <h1 className="mt-10 text-3xl font-bold tracking-tight">Two-step verification</h1>
+              <h1 className="mt-10 text-3xl font-bold tracking-tight">
+                {mfaMethod === "email" ? "Check your email" : "Two-step verification"}
+              </h1>
               <p className="mt-2 text-sm text-muted">
-                Enter the 6-digit code from your authenticator app — or a recovery code.
+                {mfaMethod === "email" ? (
+                  <>
+                    We don&rsquo;t recognise this browser, so we emailed a 6-digit
+                    code to <span className="text-fg">{emailHint ?? "your email"}</span>.
+                    It expires in 10 minutes.
+                  </>
+                ) : (
+                  <>Enter the 6-digit code from your authenticator app &mdash; or a recovery code.</>
+                )}
               </p>
 
               <form onSubmit={submitCode} noValidate className="mt-8 space-y-4">

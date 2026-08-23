@@ -383,16 +383,27 @@ async def test_signin_finds_the_row_signup_normalised(client):
     assert stored != typed.lower(), "fixture must exercise the rewrite"
 
     password = "SomePassword!2026"
+    uid = f"u_{_uuid.uuid4().hex}"
     async with session_scope() as s:
         s.add(User(
-            id=f"u_{_uuid.uuid4().hex}", email=stored, name="DottedSignin",
+            id=uid, email=stored, name="DottedSignin",
             tier="free", password_hash=hash_password(password),
         ))
         await s.commit()
 
+    # Sign in from an ALREADY-TRUSTED browser: this test is about the address
+    # lookup, not the new-device email-code gate, and without the trust cookie
+    # /signin would return a code challenge instead of the user row.
+    from app.services.signin_codes import (
+        TRUSTED_DEVICE_COOKIE,
+        issue_trusted_device_token,
+    )
+
     async with client:
         r = await client.post(
-            "/api/auth/signin", json={"email": typed, "password": password},
+            "/api/auth/signin",
+            json={"email": typed, "password": password},
+            cookies={TRUSTED_DEVICE_COOKIE: issue_trusted_device_token(uid, 0)},
         )
     assert r.status_code == 200, r.text
     assert r.json()["user"]["email"] == stored
