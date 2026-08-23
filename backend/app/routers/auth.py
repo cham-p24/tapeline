@@ -1341,7 +1341,37 @@ async def signin_2fa(
                 rc = rows[idx]
         if rc is None:
             raise HTTPException(401, "Invalid code.")
-        rc.used_at = datetime.now(UTC)  # consume it
+
+        # Burn the code with a CONDITIONAL UPDATE, for exactly the reason the
+        # TOTP branch above spells out — and which this branch used to ignore.
+        #
+        # It read the unused rows, spent ~1.9s in bcrypt off the event loop,
+        # then did an in-memory `rc.used_at = ...` before the commit. That is
+        # the pattern the comment above calls out by name: "an in-memory
+        # assignment lets both through and mints two sessions from one code".
+        # The bcrypt scan makes the window enormous — two overlapping requests
+        # both SELECT the row while `used_at IS NULL`, both spend their ~1.9s,
+        # both stamp it, and both fall through to issue_session_token +
+        # set_cookie. A real-time phishing proxy controls request timing and
+        # submits the relayed code ALONGSIDE the victim rather than after them.
+        #
+        # `WHERE used_at IS NULL` makes the database the arbiter: the second
+        # writer re-evaluates it after the first commits and matches zero rows.
+        # Conditional UPDATE rather than SELECT ... FOR UPDATE because SQLite
+        # ignores row locks, which would leave this untestable on dev/CI.
+        from app.models import MfaRecoveryCode as _MfaRecoveryCode
+
+        burned = await session.execute(
+            update(_MfaRecoveryCode)
+            .where(
+                _MfaRecoveryCode.id == rc.id,
+                _MfaRecoveryCode.used_at.is_(None),
+            )
+            .values(used_at=datetime.now(UTC))
+        )
+        if burned.rowcount == 0:  # type: ignore[attr-defined]  # CursorResult.rowcount (DML)
+            # Someone else spent this code between our read and our write.
+            raise HTTPException(401, "Invalid code.")
 
     token = issue_session_token(user.id, user.session_epoch)
     response.set_cookie(value=token, **session_cookie_kwargs())

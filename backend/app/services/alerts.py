@@ -131,6 +131,23 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
         if abs(delta) < threshold:
             continue
 
+        # Enforce the SAME email budget the rule-driven path enforces.
+        #
+        # This is a second, independent email path: it never calls _fire, so it
+        # never called _email_cap_reached and never created an AlertEvent row.
+        # Its sends were therefore neither capped nor counted, and they did not
+        # consume the rule-driven budget either — `email_alerts_per_day`
+        # (Pro = 10) simply did not apply here. The cap's own docstring records
+        # that it was added because "a noisy rule set could bill zero and email
+        # without limit"; that fix never reached this path, and a Pro watchlist
+        # holds up to 50 tickers.
+        if await _email_cap_reached(session, user):
+            logger.info(
+                "alert.watchlist_email_cap_reached user=%s symbol=%s",
+                user.id, item.symbol,
+            )
+            continue
+
         try:
             html = render_watchlist_alert_email(
                 user_name=user.name or "trader",
@@ -151,6 +168,21 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
                 unsubscribe_category="alert_emails",
             )
             delivered = not res.get("skipped", False)
+            # Record it on the SAME meter the cap reads, so this send actually
+            # consumes the budget instead of being invisible to it (and so
+            # /api/usage stops under-reporting the user's alert emails).
+            # rule_id is NULL — there is no rule behind a watchlist alert; see
+            # migration 0055_alert_event_rule_null.
+            session.add(
+                AlertEvent(
+                    user_id=user.id,
+                    rule_id=None,
+                    symbol=item.symbol,
+                    message=subject[:400],
+                    channel="email",
+                    delivered=delivered,
+                )
+            )
             item.last_alert_at = now
             fired += 1
             logger.info(
