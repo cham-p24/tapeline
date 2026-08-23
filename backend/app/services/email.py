@@ -1208,7 +1208,7 @@ def render_signin_code_email(user_name: str, code: str, ttl_minutes: int) -> str
         f'font-size:34px;font-weight:700;letter-spacing:0.28em;'
         f'color:{LIGHT_FG};text-align:center;padding:6px 0 2px;">{digits}</div>'
         f'<div style="font-size:12px;color:{LIGHT_MUTED};text-align:center;">'
-        f'Expires in {ttl_minutes} minutes</div>'
+        f'Good for {ttl_minutes} minutes</div>'
     )
     return shell(
         h1("Your sign-in code")
@@ -1244,7 +1244,7 @@ Enter this code on the sign-in page to finish:
 
     {code}
 
-It expires in {ttl_minutes} minutes. We will remember this browser for
+The code is good for {ttl_minutes} minutes. We will remember this browser for
 30 days, so you will not need a code every time.
 
 If this was not you, someone else knows your password. Do not enter the

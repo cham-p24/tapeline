@@ -208,7 +208,7 @@ function SignInForm() {
                   <>
                     We don&rsquo;t recognise this browser, so we emailed a 6-digit
                     code to <span className="text-fg">{emailHint ?? "your email"}</span>.
-                    It expires in 10 minutes.
+                    The code is good for 10 minutes.
                   </>
                 ) : (
                   <>Enter the 6-digit code from your authenticator app &mdash; or a recovery code.</>
