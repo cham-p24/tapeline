@@ -28,6 +28,11 @@ from app.services.growth_funnel import (
     MIN_WINDOW_DAYS,
     summarize_growth_funnel,
 )
+from app.services.revenue_cohorts import (
+    summarize_cap_events,
+    summarize_paid_cohorts,
+    summarize_trial_cancels,
+)
 from app.services.tier import mrr_contribution
 
 logger = logging.getLogger(__name__)
@@ -382,28 +387,62 @@ async def revenue_dashboard(
 
     # ── Acquisition channels — every signup sliced by the attribution captured
     # at landing: utm_source, else the external referrer HOST (AI assistants /
-    # other sites that carry no utm_*), else "direct". Each channel carries how
-    # many of its signups later reached paid (stripe_customer_id set). This is
-    # the "which channel actually brings users, and which converts" readout,
-    # answered entirely from first-party columns already stored at signup — no
-    # external analytics tool or connector required. count(col) counts non-NULL,
-    # so count(stripe_customer_id) is the paid tally per channel. ──
+    # other sites that carry no utm_*), else "direct". This is the "which
+    # channel actually brings users, and which converts" readout, answered
+    # entirely from first-party columns already stored at signup — no external
+    # analytics tool or connector required.
+    #
+    # TRIALS AND PAYERS ARE COUNTED SEPARATELY, and that split is the whole
+    # point of this block (metrics-bible gap G12). Until 2026-08-22 the "paid"
+    # tally was count(stripe_customer_id), which was a fair proxy: the only way
+    # to acquire a Stripe customer was to buy something. The #548 card gate
+    # broke that — a card is now stamped at TRIAL start, so from that date
+    # every trialist reads as a payer and every channel's conversion column
+    # silently inflates. Splitting them is not cosmetic: a channel that fills
+    # the card wall but produces no active subscription is the exact failure
+    # mode paid acquisition is supposed to detect.
+    #
+    #   trials_started    — users.trial_started_at (write-once, never cleared)
+    #   paid_active_subs  — a row in the local subscriptions mirror with
+    #                       status "active", which is the same population the
+    #                       MRR figure above is computed from. trialing /
+    #                       past_due / canceled are deliberately excluded, so
+    #                       this number can only ever mean "paying today".
+    #
+    # `paid` is kept as an alias of paid_active_subs so the existing dashboard
+    # column keeps rendering; it now carries the corrected meaning. ──
+    active_sub_ids = (
+        select(Subscription.user_id.label("user_id"))
+        .where(Subscription.status == "active")
+        .group_by(Subscription.user_id)  # one row per user → join can't multiply
+        .subquery()
+    )
     channel_expr = func.coalesce(
         func.nullif(User.signup_utm_source, ""),
         func.nullif(User.signup_referrer_host, ""),
         literal("direct"),
     )
+    # count(col) counts non-NULL, so these are per-channel tallies of "has a
+    # trial stamp" and "has an active subscription" respectively.
     channel_rows = (await session.execute(
         select(
             channel_expr.label("channel"),
             func.count().label("signups"),
-            func.count(User.stripe_customer_id).label("paid"),
+            func.count(User.trial_started_at).label("trials_started"),
+            func.count(active_sub_ids.c.user_id).label("paid_active_subs"),
         )
+        .select_from(User)
+        .outerjoin(active_sub_ids, active_sub_ids.c.user_id == User.id)
         .group_by(channel_expr)
         .order_by(func.count().desc())
     )).all()
     acquisition_channels = {
-        row.channel: {"signups": row.signups, "paid": row.paid}
+        row.channel: {
+            "signups": row.signups,
+            "trials_started": row.trials_started,
+            "paid_active_subs": row.paid_active_subs,
+            "paid": row.paid_active_subs,
+        }
         for row in channel_rows
     }
 
@@ -419,14 +458,20 @@ async def revenue_dashboard(
     # column shipped) are excluded rather than bucketed as "unknown", which
     # would dominate the ordering for months. Capped — this is a top-N
     # readout, not an export. ──
+    # Carries the same trials/payers split as the channel table above, for the
+    # same reason — a landing page whose "paid" column really meant "put a card
+    # in at the wall" would rank identically to one that produced subscribers.
     landing_expr = func.nullif(User.signup_landing_path, "")
     landing_rows = (await session.execute(
         select(
             channel_expr.label("channel"),
             landing_expr.label("path"),
             func.count().label("signups"),
-            func.count(User.stripe_customer_id).label("paid"),
+            func.count(User.trial_started_at).label("trials_started"),
+            func.count(active_sub_ids.c.user_id).label("paid_active_subs"),
         )
+        .select_from(User)
+        .outerjoin(active_sub_ids, active_sub_ids.c.user_id == User.id)
         .where(User.signup_landing_path.isnot(None))
         .group_by(channel_expr, landing_expr)
         .order_by(func.count().desc())
@@ -437,7 +482,9 @@ async def revenue_dashboard(
             "channel": row.channel,
             "path": row.path,
             "signups": row.signups,
-            "paid": row.paid,
+            "trials_started": row.trials_started,
+            "paid_active_subs": row.paid_active_subs,
+            "paid": row.paid_active_subs,
         }
         for row in landing_rows
         if row.path
@@ -455,6 +502,25 @@ async def revenue_dashboard(
     # Degrades to an empty summary on any error — this readout must never take
     # the revenue dashboard down with it. ──
     embed_impressions = await summarize_embed_impressions(session, days=30, top=15)
+
+    # ── Free-tier cap-hit log (metrics-bible gap G3) — five routers have been
+    # appending to `cap_events` at every free→paid wall since it shipped, and
+    # nothing read it back: the upgrade-pressure funnel's ground truth was
+    # reachable only by hand-run SQL. Which cap, which ISO week, how many
+    # distinct users, and how many of those users later trialled or now pay.
+    # Fails open to an empty summary — see services/revenue_cohorts.py. ──
+    cap_events = await summarize_cap_events(session, weeks=12)
+
+    # ── Payer retention (gap G8) — subscription start month × still-active.
+    # `active_subscriptions` above is a single number that cannot distinguish
+    # "nobody churned" from "new starts exactly replaced churn"; this can. ──
+    paid_cohorts = await summarize_paid_cohorts(session, months=12)
+
+    # ── Day-0 trial cancels (gap G11) — a cancel stamped the same UTC day the
+    # trial started is card-wall remorse, not a verdict on the product, and the
+    # two have opposite fixes. Sits with the trial metrics below. Floor, not a
+    # census: it can only see cancels made through our own intercept. ──
+    trial_cancels = await summarize_trial_cancels(session)
 
     # ── Churn / cancellation ──────────────────────────────────────────────
     cancellations_scheduled = (await session.execute(
@@ -529,6 +595,11 @@ async def revenue_dashboard(
         "subs_by_status": subs_by_status,
         "users_total": users_total,
         "trials_active": trials_active,
+        # Day-0 trial cancels (G11), deliberately adjacent to the trial counts:
+        # {trials_started, cancels_recorded, day0_cancels, day0_cancel_pct,
+        #  day0_share_of_cancels_pct}. A floor — only cancels made through the
+        # in-app intercept stamp users.canceled_at.
+        "trial_cancels": trial_cancels,
         "paid_customers": paid_customers,
         "signup_to_paid_pct": round(paid_customers / users_total * 100, 1) if users_total else 0.0,
         # Activation funnel (§4.2): share of signups who added a first
@@ -550,14 +621,24 @@ async def revenue_dashboard(
         # gclid capture (§3.7): signups whose Google Ads click ID is stored and
         # therefore available for the (founder-gated) offline-conversion upload.
         "gclid_capture_count": gclid_capture_count,
-        # Acquisition channels: {channel: {signups, paid}} keyed by utm_source →
-        # external referrer host → "direct". First-party "where do signups come
-        # from, and which channel converts" — no external analytics required.
+        # Acquisition channels: {channel: {signups, trials_started,
+        # paid_active_subs, paid}} keyed by utm_source → external referrer host
+        # → "direct". First-party "where do signups come from, and which
+        # channel converts" — no external analytics required. Trials and payers
+        # are separate columns since the card gate (G12); `paid` is a
+        # back-compat alias of paid_active_subs, not a third number.
         "acquisition_channels": acquisition_channels,
-        # Top landing pages: [{channel, path, signups, paid}], ordered by
-        # signups, capped at 25. The content-level cut of the channel readout
-        # above — which of the ~4,750 SEO pages actually earns signups.
+        # Top landing pages: [{channel, path, signups, trials_started,
+        # paid_active_subs, paid}], ordered by signups, capped at 25. The
+        # content-level cut of the channel readout above — which of the ~4,750
+        # SEO pages actually earns signups.
         "acquisition_landing_pages": acquisition_landing_pages,
+        # Free-tier cap-hit log (G3): per-cap lifetime totals, ISO week × cap
+        # over the last 12 weeks, and whether cap-hitters went on to convert.
+        "cap_events": cap_events,
+        # Payer retention (G8): subscription cohorts by start month, each with
+        # how many of that month's starts are still active today.
+        "paid_cohorts": paid_cohorts,
         # Embed distribution: top embedding hosts / top embedded symbols /
         # per-day totals over the last 30 days. Directional (CDN-cached renders
         # are invisible to the origin) — for ranking and trend, not absolutes.
