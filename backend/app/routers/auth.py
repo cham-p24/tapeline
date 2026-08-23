@@ -715,8 +715,29 @@ async def _consume_verification(
         # confirm_required, which is a screen, not a deletion.
         if not confirmed:
             return {"status": "confirm_required"}
-        # Token row cascades via the FK; we delete the user explicitly.
-        await session.delete(user)
+        # Delete the child rows FIRST, then the user.
+        #
+        # This was a bare `session.delete(user)`. Of the 14 FKs into `users`,
+        # only email_verification_tokens, password_reset_tokens and
+        # mfa_recovery_codes carry ON DELETE CASCADE — watchlists,
+        # watchlist_items, alert_rules, alert_events, api_keys, roadmap_votes,
+        # scanner_presets, subscriptions, web_push_subscriptions and
+        # watchlist_track_record do not, and there is no ORM relationship()
+        # anywhere in app/models/, so SQLAlchemy emits a plain DELETE FROM users
+        # and Postgres enforces RESTRICT.
+        #
+        # The child rows are GUARANTEED to be there: me.submit_onboarding fires
+        # on both Submit and Skip and seeds a watchlist plus 2-4 items in the
+        # first minute of every account — before the user has even opened the
+        # verification email. So "this wasn't me" raised a ForeignKeyViolation,
+        # the commit rolled back, and the account the user had just reported as
+        # fraudulent stayed alive.
+        #
+        # Shared with the GDPR erasure path so a newly-added child table cannot
+        # be handled by one and missed by the other.
+        from app.services.account_purge import purge_user
+
+        await purge_user(session, user.id, user.email)
         await session.commit()
         logger.info(
             "auth.verification_cancelled user=%s email=%s", user.id, user.email,
