@@ -13,6 +13,11 @@ from app.models import Ticker, User
 from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
 from app.services.ticker_freshness import live_clauses
+from app.services.ticker_ordering import (
+    ORDER_PATTERN,
+    SORT_PATTERN,
+    deterministic_order_by,
+)
 from app.services.tier import Tier
 from app.services.tier import limit as tier_limit
 
@@ -119,8 +124,8 @@ async def list_scanner(
     signal: str | None = None,
     sector: str | None = None,
     q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
-    sort: str = Query("score", pattern="^(score|change_pct_1d|change_pct_5d|change_pct_1m|volume|symbol)$"),
-    order: str = Query("desc", pattern="^(asc|desc)$"),
+    sort: str = Query("score", pattern=SORT_PATTERN),
+    order: str = Query("desc", pattern=ORDER_PATTERN),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict:
@@ -209,14 +214,10 @@ async def list_scanner(
     # names inside a tie. symbol is the primary key, so the composite is a total
     # order: identical data yields an identical list every run. Skipped when the
     # caller already sorted BY symbol, which is a total order on its own.
-    col = getattr(Ticker, sort)
-    order_by = [desc(col) if order == "desc" else col]
-    if sort != "symbol":
-        order_by.extend([
-            desc(Ticker.price * Ticker.volume).nullslast(),
-            Ticker.symbol.asc(),
-        ])
-    stmt = stmt.order_by(*order_by)
+    # Shared with /api/public/signals via services/ticker_ordering so the
+    # public SEO pages and the in-app scanner can never rank the same list
+    # differently. See that module for the full rationale.
+    stmt = stmt.order_by(*deterministic_order_by(sort, order))
     stmt = stmt.limit(limit).offset(offset)
 
     # Cap the scan server-side (Postgres only; SQLite has no statement_timeout

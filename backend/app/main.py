@@ -6,7 +6,7 @@ import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -52,6 +52,7 @@ from app.services.news_health import (
     NEWS_INGEST_STALE_SECONDS,
     news_wire_canary_seconds,
 )
+from app.services.ticker_ordering import ORDER_PATTERN, SORT_PATTERN
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -311,6 +312,18 @@ async def public_signals(
     offset: int = 0,
     min_score: float = 0,
     signal: str | None = None,
+    sector: str | None = None,
+    max_price: float | None = None,
+    # Liquidity floor, mirroring /api/scanner's SCANNER_MIN_DOLLAR_VOLUME.
+    # Defaults to 0 (disabled) so every existing caller of this endpoint —
+    # /signals, the sitemap, the ticker page — is completely unaffected; the
+    # SEO pages that moved off the row-capped scanner pass the scanner's own
+    # value so their ranked lists keep excluding near-untradeable names.
+    # Rows with an UNKNOWN price or volume are kept either way, so the filter
+    # can only remove obvious junk, never hide a name we lack a read for.
+    min_dollar_volume: float = 0,
+    sort: str = Query("score", pattern=SORT_PATTERN),
+    order: str = Query("desc", pattern=ORDER_PATTERN),
 ) -> dict[str, object]:
     """Public, no-auth, no-tier-cap view of EVERY scored ticker.
 
@@ -330,17 +343,45 @@ async def public_signals(
     JSON payload reasonable; the full universe is currently ~500 names,
     so a single call returns everything.
     """
-    from sqlalchemy import desc, select
+    from sqlalchemy import func, or_, select
 
     from app.db import session_scope
     from app.models import Ticker
     from app.services.ticker_freshness import live_clauses
+    from app.services.ticker_ordering import deterministic_order_by
 
     capped = max(1, min(limit, 2000))
     # Ticker.score IS NOT NULL is enforced by live_clauses() below.
     stmt = select(Ticker).where(Ticker.score >= min_score)
     if signal:
         stmt = stmt.where(Ticker.signal == signal)
+    if sector:
+        # Case-insensitive so a URL slug ("technology") matches the stored
+        # display casing ("Technology"). Lets an anonymous caller pull a
+        # WHOLE sector cohort in one request — which is what the ticker
+        # page's "ranks #X out of Y {sector} stocks" sentence needs to be
+        # true. Doing it here rather than filtering client-side matters:
+        # the alternative was fetching the top-N of the universe and
+        # filtering, which silently yields a handful of rows per sector and
+        # publishes a rank against a sample instead of the cohort.
+        stmt = stmt.where(func.lower(Ticker.sector) == sector.strip().lower())
+    if max_price is not None:
+        # Mirrors /api/scanner's max_price so the price-anchored listicle pages
+        # (/best-stocks-for/penny-stocks, /under-5, /under-10) can read the
+        # un-gated endpoint and still get their price bound applied in SQL.
+        stmt = stmt.where(Ticker.price <= max_price)
+    if min_dollar_volume > 0:
+        # Byte-for-byte the scanner's clause: keep rows whose price or volume
+        # is UNKNOWN, drop only those with a KNOWN dollar-volume below the
+        # floor. Any divergence here would show up as the SEO page and the
+        # in-app scanner disagreeing about which names qualify.
+        stmt = stmt.where(
+            or_(
+                Ticker.price.is_(None),
+                Ticker.volume.is_(None),
+                Ticker.price * Ticker.volume >= min_dollar_volume,
+            )
+        )
 
     async with session_scope() as session:
         # Freshness + data-quality floor — drop stale "ghost" rows (delisted
@@ -351,7 +392,15 @@ async def public_signals(
         # app.services.ticker_freshness.
         for clause in await live_clauses(session):
             stmt = stmt.where(clause)
-        stmt = stmt.order_by(desc(Ticker.score)).limit(capped).offset(max(0, offset))
+        # Same ORDER BY the tier-gated scanner uses (services/ticker_ordering),
+        # so a public SEO page and the in-app scanner can never rank the same
+        # list differently — including the dollar-volume/symbol tiebreak that
+        # makes the published order reproducible run to run.
+        stmt = (
+            stmt.order_by(*deterministic_order_by(sort, order))
+            .limit(capped)
+            .offset(max(0, offset))
+        )
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
