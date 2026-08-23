@@ -1,12 +1,24 @@
 # Tapeline — Pricing
 
-> **2026-07 founding reprice.** Market research put the old prices ($29.99/$49.99)
-> at the ~70th-80th percentile of the market with zero brand assets; the accepted
-> band for an unknown tool is $8-15. Stripe now charges the founding prices below
-> (price IDs swapped in backend env). Zero paying customers existed at switch
-> time, so no grandfathering was needed. Framing everywhere: **"Founding pricing —
-> locked in for early subscribers"** — truthful (subscribers keep their price);
-> never a fake countdown or a fabricated "N left" counter.
+> **This document is descriptive, not authoritative.** The code is the source
+> of truth and this file mirrors it:
+>
+> - `frontend/lib/pricing.ts` — `PRICING`, `DEFAULT_BILLING_PERIOD`,
+>   `FREE_LIMITS`, `PROMO_OPEN_ACCESS_UNTIL`, `REFUND`
+> - `backend/app/services/tier.py` — `FEATURES`, `TIER_LIMITS`, `TIER_PRICES`,
+>   `_MRR_CONTRIBUTION`, the card gate (`CARD_GATE_START` / `must_add_card`),
+>   the open-access promo (`free_open_access`)
+>
+> Change those files first; update this doc in the same PR. There is no build
+> check tying the three together.
+
+> **2026-07 founding reprice.** Market research put the old prices
+> ($29.99/$49.99) at the ~70th–80th percentile of the market with zero brand
+> assets. Stripe charges the founding prices below (price IDs swapped in
+> backend env). Zero paying customers existed at switch time, so no
+> grandfathering was needed. Framing everywhere: **"Founding pricing — locked
+> in for early subscribers"** — truthful (subscribers keep their price); never
+> a fake countdown or a fabricated "N left" counter.
 
 ## Card gate (2026-08-22)
 
@@ -20,17 +32,22 @@ Two things this does **not** touch, deliberately:
 
 - **Grandfathered accounts.** Every account created BEFORE 2026-08-22 signed up
   under "free account, no card" and keeps that deal forever. They never see the
-  wall. Admins and lifetime accounts are exempt too, as is anyone who already has
-  a card on file or has already trialled — the ask is made once per account.
+  wall. Admins, lifetime accounts, and hand-comped pro/premium accounts are
+  exempt too, as is anyone who already has a card on file or has already
+  trialled — the ask is made once per account.
 - **The public surface.** `/scorecard`, `/daily-picks`, the record CSV/JSON
-  export (`/api/scorecard.csv`, `/api/scorecard.json`), the per-ticker pages, the
-  marketing pages and the public API stay open with no account and no card.
+  export (`/api/scorecard.csv`, `/api/scorecard.json`), the per-ticker pages,
+  the marketing pages and the public API stay open with no account and no card.
 
 Copy rule that falls out of this: **do not describe an account as free or
-card-free anywhere.** Descriptions of the PUBLIC record as free and account-free
-stay true and should stay.
+card-free anywhere.** Descriptions of the PUBLIC record as free and
+account-free stay true and should stay.
 
 ## Tiers
+
+Four tiers: **Free / Pro / Premium / Trader**, plus the account-free public
+record. Trader, Team, Enterprise and Lifetime all map to `premium` in the DB
+with per-account overrides for larger seat counts or API caps.
 
 ### Public record — free, no account
 **$0**
@@ -38,88 +55,163 @@ stay true and should stay.
 - The complete scorecard at `/scorecard` — every pick, back-checked vs SPY
 - A page per scored ticker at `/t/{TICKER}`, all six factor sub-scores
 - The raw record as CSV and JSON
+- Anonymous ticker look-ups: 2 per UTC day per IP (`ANON_DAILY_LOOKUPS`)
 - Purpose: the trust asset and the only card-free entry point. Not a trial and
   does not expire.
 
-### Free — "Browser" (grandfathered accounts only)
-**$0/mo**
-- Scanner: **top 10 tickers, live** (`FREE_DATA_DELAY_MINUTES = 0`,
-  `FREE_SCANNER_ROWS = 10` in `services/tier.py`)
-- Market regime: basic view (bull/neutral/bear label only)
-- Watchlist: 5 tickers, no alerts
-- Public scorecard access
-- **No longer self-serve.** From 2026-08-22 a new visitor cannot sign up for
-  this tier. It remains the tier for accounts created before the cutover, and
-  the tier an account lands on after cancelling a trial (a card is already on
-  file at that point, so `must_add_card` stays false and they are never
-  re-walled). Marketing surfaces must not advertise it as an available plan.
+### Free — $0 (not self-serve)
+The tier for accounts created before the 2026-08-22 card gate, and the tier an
+account lands on after cancelling or lapsing a trial (a card or trial stamp is
+already on record at that point, so `must_add_card` stays false — they are
+never re-walled). A new visitor cannot sign up directly for this tier, and
+marketing surfaces must not advertise it as an available plan.
+
+Limits — enforced in `tier.py` and mirrored in `FREE_LIMITS`
+(`frontend/lib/pricing.ts`); every copy surface derives from those constants:
+
+- Scanner: **top 10 rows, live** (`FREE_SCANNER_ROWS = 10`,
+  `FREE_DATA_DELAY_MINUTES = 0` — no stale-data cliff)
+- Ticker-detail look-ups: **12 per UTC day** (`FREE_DAILY_LOOKUPS`); brand-new
+  accounts are never metered for the first **24 h**
+  (`FREE_FIRST_SESSION_GRACE_HOURS`)
+- Watchlist: **5 tickers, 1 list** (`FREE_WATCHLIST_TICKERS`; the 2026-08-02
+  watchlist→Pro cutover was REVERSED 2026-08-19)
+- Web-push alerts: **up to 2 rules** (`FREE_WEB_PUSH_ALERTS`) — the deliberate
+  free "alert taste"; email alerts 0/day, no API, no saved scans, no CSV export
+- Squeeze Watch preview: **3 rows** (`FREE_SQUEEZE_PREVIEW_LIMIT`,
+  `routers/squeeze.py`); Congress preview: **3 most recent disclosures**
+  (`routers/congress.py`)
+- Market regime: basic view
+
+#### Open-access month — temporary, until 8 September 2026
+`PROMO_OPEN_ACCESS_UNTIL = 2026-09-08` (`tier.py` + `lib/pricing.ts`, kept in
+lock-step). Founder experiment started 2026-08-08; the last open day is
+**2026-09-07** and the revert is date-gated — no deploy needed.
+
+The lift is **one numeric cap, not "Free becomes Pro"**: signed-in Free
+accounts get the Pro scanner row cap (1,000 rows) instead of 10. Logged-out
+visitors keep the standard top-10 (the lift is authenticated-only, on
+purpose). `daily_lookups`, `watchlist_tickers`, `web_push_alerts` and every
+Pro/Premium **feature** stay gated. `backend/tests/test_open_access_month.py`
+asserts each exclusion by name and is the authority if copy drifts.
+
+Forward-looking copy (pricing cards, cancel intercepts, trial nudges) must
+quote the steady-state Free caps, never the promo numbers — see
+`freeScannerRows()` in `lib/pricing.ts`.
 
 ### Pro — "Scanner"
-**$9.99/mo** or **$8.25/mo billed annually** ($99/yr · save $20)
-- Scanner: full ~2,500-ticker universe, **live (sub-60s refresh)**
+**$9.99/mo** or **$8.25/mo · billed annually ($99/yr · save $20)**
+- Scanner: full active-universe scan, **live (sub-60s refresh)**, row cap 1,000
+  (`TIER_LIMITS[PRO]["scanner_rows"]`)
 - Squeeze Watch: full setup list with windows
-- Market regime: full view with VIX/DXY/10Y/sector leaders
-- Watchlist (50) with smart alerts
-- Email alerts: up to 10 per day
-- Daily briefing email · CSV export
-- Browser push alerts
-- No Congress data, no Telegram, no API
+- Market regime: full view with VIX/DXY/10Y/sector leaders · heatmap
+- Full ticker detail, news, IPOs, earnings; ticker look-ups unmetered
+- Watchlist: 50 tickers across 5 named lists, with smart alerts
+- Email alerts: up to 10/day · browser push (effectively unlimited)
+- Daily briefing email · CSV export · 10 saved scans
+- No Congress feed, no API access
 
 ### Premium — "Analyst"
-**$19.99/mo** or **$16.58/mo billed annually** ($199/yr · save $40)
+**$19.99/mo** or **$16.58/mo · billed annually ($199/yr · save $40)**
 - Everything in Pro
-- **Congressional trade feed** (daily updates, ticker aggregation)
-- **Recent insider buys** — live SEC Form 4 transactions across the active universe, refreshed daily
-- **Telegram alerts** (unlimited)
-- **API access** (1,000 requests/day)
-- Email alerts: unlimited
-- Watchlist (200) · saved scans (100)
+- **Congressional trade feed** (`congress.feed`) at `/app/congress`.
+  **Honest status:** no live disclosure source is wired in production — the
+  fabricated dev generator is gated out of prod
+  (`signal_publisher._mock_writes_enabled`), so the table does not accrue new
+  rows until a real feed is wired. Congressional STOCK Act names DO feed the
+  Smart Money sub-factor via the curated workbook tab
+  (`sheet_feed.parse_smart_money_csv`). Marketing copy must not describe the
+  `/app/congress` feed as live/daily until a real source ships.
+- **Recent insider buys** (`holdings.elite`) — SEC Form 4 transactions,
+  refreshed daily — plus per-ticker Form 4 detail (`insider.form4`)
+- **Analyst ratings widget** (`ratings.analyst`) — Buy/Hold/Sell consensus
+  tally only; per-firm rating events and price targets are not on the current
+  data plan and must not be advertised
+- **Personal watchlist track record** (`watchlist.track_record`) — each
+  watchlist ticker frozen daily and back-checked vs SPY
+- **API access**: 1,000 requests/day (throttled to 100/day while on trial —
+  `_TRIAL_PREMIUM_REDUCTIONS`)
+- Email alerts: unlimited · watchlist 200 tickers / 20 lists · 100 saved scans
 - Priority support
 
----
+Note: Telegram alerts were removed as a user-facing feature in 2026-08
+(PR #474; the ops bot remains). The `telegram_alerts_per_day` entries in
+`TIER_LIMITS` are legacy plumbing — do not resurrect Telegram in marketing
+copy from them.
 
-## Why these prices
+### Trader — concierge
+**$59/mo** or **$49/mo · billed annually ($588/yr)** — early-access / concierge
+high tier.
+- **Not self-serve.** Sold by hand via the "Talk to us" CTA; there is no Stripe
+  self-checkout, so no unbuilt feature can be billed. A manually created
+  Trader subscription books via `TIER_PRICES` / `_MRR_CONTRIBUTION` in
+  `tier.py` ($49/mo recognized on annual).
+- The data-out differentiators (full record + attribution, higher API caps,
+  bulk export/webhooks) are built WITH the early customers who buy it.
+- Its job on the pricing page is the high anchor that reframes Premium as the
+  value choice.
 
-Competitive set:
-- Motley Fool Stock Advisor: $200/yr — monthly picks, no scanner
-- Seeking Alpha Premium: $240/yr — ratings + screeners, no live data
-- Trade Ideas: $170/mo — real-time scanner, no congress/squeeze
-- Unusual Whales: $48/mo — options flow + congress
-- BlackBoxStocks: $100/mo — squeeze + dark pool alerts
-- Zacks Premium: $250/yr — rankings, no scanner
+## Billing default & annual math
 
-Founding pricing puts Tapeline at the bottom of the live-scanner category on
-purpose: an unknown tool with no reviews earns trust with a low ask, a fully
-public and downloadable track record that needs no account, and a 30-day
-money-back guarantee — not with a mid-pack sticker.
-Pro at $9.99 is an impulse-priced entry; Premium at $19.99 undercuts Unusual
-Whales (~$48/mo) and Trade Ideas (~$170/mo) by a wide margin while covering a
-different primary use case (quant scanner vs. options flow).
+- **Annual is the sitewide default** (`DEFAULT_BILLING_PERIOD = "annual"`,
+  founder decision 2026-07-18). Monthly is one click away.
+  `BillingToggle.tsx` seeds the default so plan cards and the always-annual
+  comparison table can never disagree; explicit intent (`?billing=monthly`)
+  overrides.
+- An annual per-month rate **never renders without** "billed annually
+  ($N/yr)" attached (`billedAnnuallyNote`) — a bare "$8.25/mo" reads as a
+  monthly price, which it isn't.
+- Savings are floored to whole dollars so they are never overstated
+  (`annualSaving`): Pro $119.88 → $99 ("save $20", not $21); Premium $239.88
+  → $199 ("save $40"); Trader $708 → $588.
+- Revenue accounting: annual subscriptions book MRR at the advertised
+  per-month equivalent ($8.25 / $16.58 / $49), keeping the admin dashboard
+  aligned with the pricing page with zero rounding drift.
 
-## Trial / conversion strategy
+## Trial / conversion
 
 - **14-day Premium trial, card required at first sign-in** — signup is email +
-  password, and the first sign-in puts the account in front of the card wall
-  (`/app/start`). Adding a card there runs Stripe Checkout
-  (`mode=subscription` + `subscription_data.trial_end`) and starts the trial.
-  Grandfathered accounts skip the wall entirely.
-- Disclosed before the card is entered: $0 charged today, the exact first-charge
-  date (day 14), the amount, and one-click cancel before then
+  password; the first sign-in lands on the card wall (`/app/start`). Adding a
+  card runs Stripe Checkout (`mode=subscription` +
+  `subscription_data.trial_end`) and starts the trial. Grandfathered accounts
+  skip the wall entirely.
+- Disclosed before the card is entered: $0 charged today, the exact
+  first-charge date (day 14), the amount, and one-click cancel before then.
 - Declining is a normal outcome and must not be punished: the wall carries a
   link to the free public record and a sign-out. No auto-redirect into Stripe,
   nothing pre-ticked.
-- At day 14, the subscription starts and the card is charged, unless cancelled
-  first (one click in Billing) — in which case the account lands on Free and is
-  never asked for a card again
-- **Annual is the default billing toggle** on /pricing and /app/billing (`BillingToggle.tsx` seeds the sitewide annual default so the plan cards and the always-annual comparison table can never disagree); monthly is one click away
-- **30-day money back** on every paid plan (was 7-day; extended 2026-07 —
-  costless at zero customers, neutralizes the no-reviews trust gap)
-- Pro carries the **"Best value"** badge (factual framing); no popularity
-  claims anywhere until there are customers to back them
+- At day 14 the subscription starts and the card is charged, unless cancelled
+  first (one click in Billing) — in which case the account lands on Free and
+  is never asked for a card again.
+- During trial the API cap is throttled 1,000 → 100/day
+  (`_TRIAL_PREMIUM_REDUCTIONS`) — full conversion-test value on product
+  features, abuse-resistant on data extraction.
 - Email drip: day 0 welcome, day 3 feature tour, day 7 trial reminder (both
-  price cards), day 11 T-3, day 13 trial-ends-tomorrow + trial-expired emails
-  quote BOTH options ("Keep everything — Premium $19.99/mo" / "Keep the
-  scanner — Pro $9.99/mo")
+  price cards), day 11 T-3, day 13 trial-ends-tomorrow; trial-ended emails
+  quote BOTH options ("Keep everything — Premium" / "Keep the scanner — Pro").
+
+## Refunds
+
+Single-sourced from the `REFUND` object in `lib/pricing.ts`, ground truth at
+`/legal/refund`:
+
+- **Monthly plans**: full refund within 30 days of the first paid charge.
+- **Annual plans**: prorated refund within 30 days (one month at the monthly
+  rate is retained).
+
+Do not write "30-day money back on every plan, in full" — the annual clause is
+prorated.
+
+## Why these prices
+
+Founding pricing puts Tapeline at the bottom of the credible-screener category
+on purpose: an unknown tool with no reviews earns trust with a low ask, a
+fully public and downloadable track record that needs no account, and the
+refund guarantee above — not with a mid-pack sticker. Competitor pricing
+verified 2026-08: Pro at $99/yr sits well under Finviz Elite (~$299.50/yr),
+Stock Rover (~$280/yr), Koyfin ($374+/yr) and Danelfin ($228+/yr). Price is
+not the current conversion blocker; do not cut it. Premium is if anything
+under-priced — revisit after there are paying customers, not before.
 
 ## Unit economics (rough)
 
@@ -135,22 +227,7 @@ different primary use case (quant scanner vs. options flow).
 | Domain amortized | $1 |
 | **Fixed ops** | **~$110/mo** |
 
-Per Premium subscriber marginal cost: ~$1–2/mo (mostly Polygon at-tier overage + email sends).
-
-**Breakeven: ~11 paying Pro users OR ~6 Premium users** (at founding prices).
-
-## Revenue targets (year 1)
-
-Old targets were set against $29.99/$49.99 stickers; scale expectations to
-roughly one-third revenue per subscriber, offset by (hopefully) materially
-higher conversion at the credible price point. Re-baseline once real
-conversion data exists — do not steer by the old table.
-
-## Annual plan pricing math
-
-Monthly → Annual discount is **~17%** (close to 2 months free), with the exact
-per-month equivalent advertised (never overstated):
-- Pro: $9.99 × 12 = $119.88 → **$99 annual** ($8.25/mo · save $20/yr)
-- Premium: $19.99 × 12 = $239.88 → **$199 annual** ($16.58/mo · save $40/yr)
-
-Annual plans should be **≥40% of paid revenue** by month 6 — they dramatically reduce churn.
+Per Premium subscriber marginal cost: ~$1–2/mo (mostly data-tier overage +
+email sends). **Breakeven: ~11 monthly Pro users OR ~6 monthly Premium users**
+at founding prices. Revenue targets from the $29.99/$49.99 era are void;
+re-baseline once real conversion data exists.
