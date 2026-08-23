@@ -856,6 +856,7 @@ async def ticker_insider(
 
 @router.get("/{symbol}/history")
 async def ticker_score_history(
+    request: Request,
     symbol: str,
     days: int = 60,
     session: AsyncSession = Depends(get_session),
@@ -874,9 +875,34 @@ async def ticker_score_history(
     from datetime import date, timedelta
 
     from app.models import DailyScorecardEntry
+    from app.routers.scorecard import _FREE_DELAY_DAYS, _can_see_live_picks
 
     sym = symbol.upper()
     cutoff = date.today() - timedelta(days=days)
+
+    # SAME publication delay as /scorecard and the CSV/JSON export, and imported
+    # from there rather than re-declared so the three surfaces cannot drift.
+    #
+    # This endpoint previously took no user at all and served today's flags to
+    # anonymous callers, while the export's own metadata told readers that
+    # "entries are published about 7 days after" they print. Both statements
+    # cannot be true. On a product whose whole claim is that it does not
+    # misstate things, the open door is the thing to close — not the promise.
+    #
+    # Paying tiers still see live, exactly as they do on the scorecard page.
+    user = await current_user_optional(request, session)
+    if not _can_see_live_picks(user):
+        delay_cutoff = date.today() - timedelta(days=_FREE_DELAY_DAYS)
+    else:
+        delay_cutoff = None
+
+    where = [
+        DailyScorecardEntry.symbol == sym,
+        DailyScorecardEntry.as_of >= cutoff,
+    ]
+    if delay_cutoff is not None:
+        where.append(DailyScorecardEntry.as_of <= delay_cutoff)
+
     rows_r = await session.execute(
         select(
             DailyScorecardEntry.as_of,
@@ -885,10 +911,7 @@ async def ticker_score_history(
             DailyScorecardEntry.change_pct_1d_after,
             DailyScorecardEntry.alpha_vs_spy,
         )
-        .where(
-            DailyScorecardEntry.symbol == sym,
-            DailyScorecardEntry.as_of >= cutoff,
-        )
+        .where(*where)
         .order_by(DailyScorecardEntry.as_of)
     )
     points = [
@@ -901,4 +924,11 @@ async def ticker_score_history(
         }
         for r in rows_r.all()
     ]
-    return {"symbol": sym, "days": days, "points": points}
+    return {
+        "symbol": sym,
+        "days": days,
+        # Stated, not implied: an MCP client or a chart has no other way to
+        # know whether it is looking at a complete series or a delayed one.
+        "delay_days": 0 if delay_cutoff is None else _FREE_DELAY_DAYS,
+        "points": points,
+    }
