@@ -98,60 +98,67 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
     raise RuntimeError(f"polygon request failed after retries: {path}")
 
 
-#: Composite weights, mirroring mock_feed / signal_publisher / score.py.
-FACTOR_WEIGHTS: dict[str, float] = {
-    "sub_trend": 0.25,
-    "sub_rs": 0.20,
-    "sub_fundamentals": 0.15,
-    "sub_smart_money": 0.15,
-    "sub_macro": 0.15,
-    "sub_momentum": 0.10,
-}
-
 #: Fewest factors that can produce a composite. Matches the floor
 #: ticker_freshness already applies to decide what a user may see, so a row
 #: cannot be scored here and then rejected as unscorable there.
 MIN_FACTORS_FOR_COMPOSITE = 2
 
+#: Row key for each of score.WEIGHTS' factor names.
+_WEIGHT_KEY_TO_COLUMN = {
+    "trend": "sub_trend",
+    "rs": "sub_rs",
+    "fundamentals": "sub_fundamentals",
+    "smart_money": "sub_smart_money",
+    "macro": "sub_macro",
+    "momentum": "sub_momentum",
+}
+
 
 def _composite_from_subs(r: dict[str, Any]) -> float | None:
-    """Weighted average of the factors we actually hold, or None below the floor.
+    """The six-factor composite, or None when too little is held to have one.
 
-    Weights: trend .25  rs .20  fund .15  smart .15  macro .15  mom .10.
-    With all six present the divisor is 1.0 and this is the plain weighted sum
-    — identical to what it has always computed.
+    Delegates the WEIGHTS and the NEUTRAL cache-miss fallback to
+    app.services.score, which is the definition of record — the sheet path
+    (score.compute_tapeline_composite) has always used it. Two composite
+    conventions in one product is itself a misstatement: the same ticker would
+    score differently depending on which feed happened to write it. Measured in
+    production, CDNA scored 80.2 through the sheet and would have scored 93.2
+    through a re-normalising version of this function.
 
-    RE-NORMALISED over the present factors, deliberately. Two wrong answers
-    were available and both are worse:
+    NEUTRAL, not zero, and not a re-normalised average of what we hold:
 
-    * Treat a missing factor as 0. Drags every incompletely-covered row toward
-      the floor, so "we have no fundamentals read" renders as "the fundamentals
-      are terrible". It is the same false-zero defect as plotting a missing
-      axis at the origin.
-    * Refuse to score below six. In production 4,780 rows hold exactly four
-      factors, because the Finnhub fundamentals/insider backfill is rate-capped
-      and will never reach the whole universe. Those rows would freeze at their
-      last value forever — and since the tick COALESCEs the score, the frozen
-      value is the one computed back when missing factors were random draws.
-      Refusing to recompute would preserve the fabrication instead of washing
-      it out.
+    * Zero drags every incompletely-covered row toward the floor, so "we have
+      no fundamentals read" renders as "the fundamentals are terrible". Same
+      false-zero defect as plotting a missing axis at the chart origin.
+    * Re-normalising lets four strong factors produce a 93 that a full
+      six-factor read would never have justified — it quietly upgrades thin
+      coverage into high conviction, which is the overclaim this product
+      exists not to make.
+    * NEUTRAL lets a missing factor neither help nor hurt. It is the
+      conservative reading, and it is what the sub-score columns already
+      document: the value is stored as None so the UI renders an em-dash,
+      while the composite treats the gap as neither good nor bad.
 
-    So: average what we hold, disclose how much that is. `confidence_pct` on
-    the same row counts the sourced inputs, which is what makes this honest
-    rather than merely convenient — a four-factor composite is published
-    alongside the fact that it rests on four factors.
+    Below MIN_FACTORS_FOR_COMPOSITE there is no composite at all — a number
+    built almost entirely from the fallback would be a statement about the
+    fallback, not about the security. NULL there, and the tick's COALESCE
+    keeps the last real score.
     """
-    present = {
-        k: float(r[k]) for k in FACTOR_WEIGHTS
-        if r.get(k) is not None
-    }
-    if len(present) < MIN_FACTORS_FOR_COMPOSITE:
-        # One factor is not a six-factor composite by any stretch, and the
-        # freshness floor would reject the row anyway. NULL; the upsert
-        # COALESCEs it, so the last real score stands.
+    from app.services.score import NEUTRAL, WEIGHTS
+
+    held = sum(
+        1 for col in _WEIGHT_KEY_TO_COLUMN.values() if r.get(col) is not None
+    )
+    if held < MIN_FACTORS_FOR_COMPOSITE:
         return None
-    divisor = sum(FACTOR_WEIGHTS[k] for k in present)
-    composite = sum(v * FACTOR_WEIGHTS[k] for k, v in present.items()) / divisor
+
+    composite = sum(
+        w * (
+            v if (v := r.get(_WEIGHT_KEY_TO_COLUMN[k])) is not None
+            else NEUTRAL
+        )
+        for k, w in WEIGHTS.items()
+    )
     return round(max(0, min(100, composite)), 1)
 
 
