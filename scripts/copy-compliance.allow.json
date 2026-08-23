@@ -15,7 +15,6 @@
     "",
     "See docs/COMPLIANCE_COPY_RULES.md."
   ],
-
   "include": [
     "frontend/app/**/*.tsx",
     "frontend/app/**/*.ts",
@@ -25,7 +24,6 @@
     "backend/app/services/inbox_templates.py",
     "backend/app/services/**/*template*.py"
   ],
-
   "exclude": [
     "**/*.test.ts",
     "**/*.test.tsx",
@@ -36,7 +34,6 @@
     "frontend/app/**/opengraph-image.tsx",
     "frontend/app/**/icon.tsx"
   ],
-
   "allow": [
     {
       "file": "frontend/app/legal/**",
@@ -64,9 +61,25 @@
       "rule": "urgency-scarcity",
       "phrase": "expires in",
       "reason": "Same Rule 6 trial-expiry exception — reports the user's own real trial end date."
+    },
+    {
+      "file": "frontend/app/app/admin/**",
+      "rule": "card-free-trial",
+      "reason": "The owner-only revenue dashboard DESCRIBES account state — 'no card on file, trial still running' is how an operator reads a row, not an offer to anyone. Internal tooling behind is_admin; nobody is being advertised to."
+    },
+    {
+      "file": "frontend/app/changelog/page.tsx",
+      "rule": "card-free-trial",
+      "phrase": "no-card Premium trial",
+      "reason": "Dated historical entry. The no-card trial was genuinely what shipped on that date; the changelog records what happened, and the 2026-06 entry carries the superseding note about the card gate. Rewriting a changelog to match current policy is its own kind of dishonesty."
+    },
+    {
+      "file": "frontend/app/changelog/page.tsx",
+      "rule": "card-free-trial",
+      "phrase": "trial available with no credit card",
+      "reason": "Same dated-history exemption as the entry above — this is the 2026-04-22 launch note, not a live offer."
     }
   ],
-
   "_knownViolations_readme": [
     "PRE-EXISTING findings, carried so the linter can be switched on TODAY without",
     "a repo-wide copy rewrite (which would collide with work in flight).",
@@ -85,7 +98,6 @@
     "so the regression this linter exists to catch would ship green. Entries with",
     "no 'phrase' are the widest — they mute an entire rule for a whole file."
   ],
-
   "knownViolations": [
     {
       "file": "backend/app/services/email.py",
