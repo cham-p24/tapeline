@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -52,8 +53,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
-from app.models import Ticker
+from app.db import get_session, session_scope
+from app.models import McpToolCall, Ticker
 from app.services.symbols import clean_symbol
 
 logger = logging.getLogger(__name__)
@@ -341,6 +342,54 @@ HANDLERS = {
 }
 
 
+# ── usage counter ───────────────────────────────────────────────────────────
+
+async def _record_tool_call(name: str) -> None:
+    """Bump the per-day counter for one tool call. Best-effort by contract:
+    every failure is swallowed — a broken counter must never break the tool
+    call it is counting, because the tool surface is a distribution channel
+    and the counter is only its odometer.
+
+    Mechanics worth stating:
+
+    * Its OWN short-lived session, not the request's. The request session may
+      be mid-handler or already poisoned by a handler failure; committing it
+      here would tangle the counter into the tool call's transaction, which is
+      exactly the coupling this function promises not to have.
+    * Awaited inline rather than asyncio.create_task. A detached writer racing
+      the request's own session on one SQLite file is the documented db-locked
+      flake class (see tests/conftest.py); the write is a single upsert, so
+      inline costs microseconds and stays ordered before the handler's reads.
+    * A real ON CONFLICT upsert against UNIQUE(tool_name, called_at), so two
+      concurrent calls increment one row instead of racing two INSERTs.
+      SQLite and Postgres both speak this dialect form; which one we're on is
+      decided at call time from the live bind (tests swap engines per test).
+    """
+    try:
+        async with session_scope() as s:
+            dialect = s.get_bind().dialect.name
+            values = {"tool_name": name, "called_at": datetime.now(UTC).date(), "count": 1}
+            # The two dialect insert() constructors have incompatible mypy
+            # types, so each branch builds its own complete statement instead
+            # of sharing one imported name.
+            count_col = McpToolCall.__table__.c.count
+            if dialect == "postgresql":
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                stmt: Any = pg_insert(McpToolCall).values(**values).on_conflict_do_update(
+                    index_elements=["tool_name", "called_at"],
+                    set_={"count": count_col + 1},
+                )
+            else:
+                from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+                stmt = sqlite_insert(McpToolCall).values(**values).on_conflict_do_update(
+                    index_elements=["tool_name", "called_at"],
+                    set_={"count": count_col + 1},
+                )
+            await s.execute(stmt)
+    except Exception:
+        logger.exception("mcp.usage_count_failed tool=%s", name)
+
+
 # ── JSON-RPC plumbing ───────────────────────────────────────────────────────
 
 def _result(req_id: Any, payload: dict) -> dict:
@@ -385,6 +434,10 @@ async def _dispatch(message: dict, session: AsyncSession) -> dict | None:
         handler = HANDLERS.get(name)
         if handler is None:
             return _error(req_id, -32602, f"Unknown tool: {name}")
+        # Counted AFTER the handler lookup (unknown-tool probes never write)
+        # and BEFORE the handler runs (a call that then fails in-handler was
+        # still a call an assistant made — usage, not success, is the metric).
+        await _record_tool_call(name)
         try:
             payload = await handler(params.get("arguments") or {}, session)
         except Exception:
