@@ -8,6 +8,7 @@ from app.models.embed_impression import EmbedImpression
 from app.models.inbox import InboundMessage
 from app.models.inbox_classification_log import InboxClassificationLog
 from app.models.insider_transaction import InsiderTransaction
+from app.models.mcp_usage import McpToolCall
 from app.models.news import NewsItem
 from app.models.newsletter import NewsletterSubscriber
 from app.models.password_reset_token import PasswordResetToken
@@ -40,6 +41,7 @@ __all__ = [
     "InboundMessage",
     "InboxClassificationLog",
     "InsiderTransaction",
+    "McpToolCall",
     "MfaRecoveryCode",
     "NewsItem",
     "NewsletterSubscriber",

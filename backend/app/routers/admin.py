@@ -16,6 +16,7 @@ from app.db import get_session
 from app.models import (
     AlertEvent,
     DailyScorecardEntry,
+    McpToolCall,
     StripeWebhookEvent,
     Subscription,
     User,
@@ -647,6 +648,47 @@ async def revenue_dashboard(
     )).all()
     webhook_events: dict[str, int] = {row[0]: row[1] for row in webhook_rows}
 
+    # ── MCP tool usage — the AI-assistant channel's USAGE side. The channel
+    # readouts above only see arrivals that carry utm_source=mcp; this reads
+    # the per-day counter routers/mcp.py upserts on every tools/call, i.e.
+    # whether assistants call the tools at all and which ones they reach for.
+    # 7d = "this week, is anything happening"; 28d = trend context. Windows
+    # are inclusive of today (7 and 28 distinct UTC days). Fails open to an
+    # empty readout — an instrument must never take the dashboard down. ──
+    try:
+        today = now.date()
+        mcp_rows = (await session.execute(
+            select(
+                McpToolCall.tool_name,
+                McpToolCall.called_at,
+                func.sum(McpToolCall.count).label("n"),
+            )
+            .where(McpToolCall.called_at >= today - timedelta(days=27))
+            .group_by(McpToolCall.tool_name, McpToolCall.called_at)
+        )).all()
+        mcp_7d: dict[str, int] = {}
+        mcp_28d: dict[str, int] = {}
+        for tool, day, n in mcp_rows:
+            mcp_28d[tool] = mcp_28d.get(tool, 0) + int(n)
+            if day >= today - timedelta(days=6):
+                mcp_7d[tool] = mcp_7d.get(tool, 0) + int(n)
+        mcp_usage = {
+            "available": True,
+            "by_tool_7d": mcp_7d,
+            "by_tool_28d": mcp_28d,
+            "calls_7d": sum(mcp_7d.values()),
+            "calls_28d": sum(mcp_28d.values()),
+        }
+    except Exception:
+        logger.exception("revenue.mcp_usage_rollup_failed")
+        mcp_usage = {
+            "available": False,
+            "by_tool_7d": {},
+            "by_tool_28d": {},
+            "calls_7d": 0,
+            "calls_28d": 0,
+        }
+
     return {
         "mrr_usd": mrr_usd,
         "arr_usd": arr_usd,
@@ -715,6 +757,10 @@ async def revenue_dashboard(
         "referral_credits_outstanding": referral_credits_outstanding,
         "drip_reach": drip_reach,
         "webhook_events": webhook_events,
+        # MCP tool usage (7d/28d per-tool call counts + totals): whether the
+        # AI-assistant surface is being called at all — the usage-side
+        # complement of the utm_source=mcp arrival bucket above.
+        "mcp_usage": mcp_usage,
         "generated_at": now.isoformat(),
     }
 
