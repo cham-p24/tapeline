@@ -667,18 +667,31 @@ async def tick() -> None:
             stages (sector + market-cap backfill) converge towards no-ops as
             their columns fill. Key statistics runs last so it reads the
             /stock/metric blobs the fundamentals stage has already cached."""
-            try:
-                await _refresh_fundamentals_cache()
-            except Exception:
-                logger.exception("fundamentals.refresh_failed")
-            try:
-                await _refresh_insider_cache()
-            except Exception:
-                logger.exception("insider.refresh_failed")
-            try:
-                await _backfill_sectors()
-            except Exception:
-                logger.exception("sectors.backfill_failed")
+            # ORDER IS LOAD-BEARING — user-visible COLUMNS first, internal
+            # caches last.
+            #
+            # These stages are serial and paced at ~1.1s/request against caps of
+            # 2,500, so the whole chain is roughly two hours. The latches above
+            # are in-memory globals, so every deploy resets them and the chain
+            # restarts from stage one. With the cache warmers running first, a
+            # day of active deploys meant stages four and five were NEVER
+            # reached: market_cap sat at 49 of 8,879 rows and pe_ttm / beta /
+            # eps_ttm / dividend_yield sat at zero, so the ticker page rendered
+            # em-dashes for every one of them.
+            #
+            # Each backfill is self-gating (it queries `WHERE <col> IS NULL`), so
+            # a completed stage costs one query and falls straight through to the
+            # next — which is what makes restarting mid-chain cheap rather than
+            # wasteful. Putting the column backfills first means the fields a
+            # reader actually sees converge even if the process only ever gets an
+            # hour between deploys.
+            #
+            # Cost of the reorder is zero: key statistics reads the metric blob
+            # via _fetch_metric_all, which fetches on a cache miss, so running it
+            # before the fundamentals warmer just moves which stage pays for the
+            # call. The warmer then reads a hot cache for free. market_cap goes
+            # first of all because fetch_company_profile also fills sector, so it
+            # does part of the sector backfill's work on the way past.
             try:
                 await _backfill_market_cap()
             except Exception:
@@ -687,6 +700,18 @@ async def tick() -> None:
                 await _backfill_key_statistics()
             except Exception:
                 logger.exception("key_statistics.backfill_failed")
+            try:
+                await _backfill_sectors()
+            except Exception:
+                logger.exception("sectors.backfill_failed")
+            try:
+                await _refresh_fundamentals_cache()
+            except Exception:
+                logger.exception("fundamentals.refresh_failed")
+            try:
+                await _refresh_insider_cache()
+            except Exception:
+                logger.exception("insider.refresh_failed")
 
         asyncio.create_task(_serial_finnhub_refreshes())
 
@@ -2156,7 +2181,46 @@ async def _seed_calendar() -> None:
         for row in await upcoming_earnings():
             session.add(EarningsEvent(**row))
 
+    await _sync_next_earnings_dates()
     logger.info("calendar.refreshed")
+
+
+async def _sync_next_earnings_dates() -> None:
+    """Denormalise the NEXT future earnings date onto each Ticker row.
+
+    `Ticker.next_earnings_date` shipped with the key-statistics columns and
+    nothing ever wrote it: the ticker endpoint reads `earnings_events` directly,
+    so the column sat permanently NULL. A column that looks like data and never
+    holds any is worse than no column — the next person to read the model
+    reasonably assumes it is populated, and any scanner filter built on it would
+    silently match nothing.
+
+    So: fill it. This costs no API calls — the events are already in the table
+    from the refresh above — and it makes the field sortable and filterable,
+    which a join at render time is not. The endpoint keeps reading the events
+    table (it is the fresher source between daily refreshes); this column exists
+    for the ranked surfaces.
+
+    Rows are cleared first so a symbol whose only event has passed goes back to
+    NULL rather than keeping a stale date forever.
+    """
+    from sqlalchemy import text
+
+    async with session_scope() as session:
+        await session.execute(
+            text("UPDATE tickers SET next_earnings_date = NULL "
+                 "WHERE next_earnings_date IS NOT NULL")
+        )
+        # Correlated subquery rather than a join+GROUP BY: dialect-neutral, and
+        # `earnings_events.symbol` + `report_date` are both indexed.
+        await session.execute(text(
+            "UPDATE tickers SET next_earnings_date = ("
+            "  SELECT MIN(e.report_date) FROM earnings_events e"
+            "  WHERE e.symbol = tickers.symbol AND e.report_date >= :today"
+            ")"
+        ), {"today": date.today()})
+
+    logger.info("calendar.next_earnings_synced")
 
 
 def _init_sentry() -> None:
