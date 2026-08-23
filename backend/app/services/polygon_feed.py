@@ -249,6 +249,26 @@ async def fetch_snapshots(
             r["week52_high"] = bar_stats["week52_high"]
             r["week52_low"] = bar_stats["week52_low"]
             r["avg_volume_30d"] = bar_stats["avg_volume_30d"]
+            # Overwrite the mock base's FABRICATED returns with measured ones.
+            # The base row comes from mock_feed, where change_pct_5d is
+            # random.gauss(0, 3.0) and change_pct_1m is random.gauss(2, 6.0);
+            # because this function overrides only some fields, those draws
+            # previously survived into the database and were republished every
+            # 60 seconds. Only overwrite when the bars actually support the
+            # number — see the guard below for what happens when they don't.
+            if bar_stats["change_pct_5d"] is not None:
+                r["change_pct_5d"] = bar_stats["change_pct_5d"]
+            if bar_stats["change_pct_1m"] is not None:
+                r["change_pct_1m"] = bar_stats["change_pct_1m"]
+
+        # Whatever the bars could not support must be NULL, never the mock's
+        # invented value. This is the load-bearing half: without it, a symbol
+        # with no bar history keeps the gauss draw and looks identical to a
+        # measured one. An em-dash is the honest rendering of "we don't know".
+        if bar_stats is None or bar_stats.get("change_pct_5d") is None:
+            r["change_pct_5d"] = None
+        if bar_stats is None or bar_stats.get("change_pct_1m") is None:
+            r["change_pct_1m"] = None
 
         # Recompute composite from updated sub_* — keeps all 6 factors blended
         # (sub_macro is the deterministic regime-derived value stamped above).
@@ -543,12 +563,52 @@ def compute_bar_stats(bars: list[dict[str, Any]]) -> dict[str, Any] | None:
     if len(volumes) == 30:
         avg_volume_30d = int(sum(volumes) / 30)
 
-    if week52_high is None and avg_volume_30d is None:
+    # REAL 5-day and 1-month returns, from the same bars.
+    #
+    # These replace two fabricated columns. change_pct_5d was
+    # random.gauss(0, 3.0) and change_pct_1m random.gauss(2, 6.0) in mock_feed,
+    # and because polygon_feed builds its rows on the mock base and overrides
+    # only SOME fields, both draws survived all the way into production and were
+    # rewritten every 60 seconds. Confirmed on the live database: change_pct_5d
+    # had mean -0.023 and standard deviation 3.011 across 2,500 rows — the
+    # signature of the generator, not of a market.
+    #
+    # Measured in TRADING sessions, not calendar days: bars[-1] is the latest
+    # close, bars[-6] is five sessions back. A calendar-day window would silently
+    # shift with weekends and holidays and produce a different number for the
+    # same label.
+    #
+    # No fallback and no default. A symbol with four bars has no five-day return,
+    # and NULL — an em-dash — is the honest rendering of that. A zero or a
+    # previous close would both be inventions.
+    def _pct_change_over(sessions: int) -> float | None:
+        closes = [b.get("c") for b in bars if b.get("c") is not None]
+        if len(closes) < sessions + 1:
+            return None
+        then, now = closes[-(sessions + 1)], closes[-1]
+        if not then or then <= 0:
+            return None  # a non-positive base makes the percentage meaningless
+        return round(((now - then) / then) * 100, 2)
+
+    change_pct_5d = _pct_change_over(5)
+    # 21 sessions is the conventional trading month (~252 / 12). The sheet feed
+    # approximates this as its 3-month return divided by three; a real
+    # measurement beats an approximation wearing a "1 month" label.
+    change_pct_1m = _pct_change_over(21)
+
+    if (
+        week52_high is None
+        and avg_volume_30d is None
+        and change_pct_5d is None
+        and change_pct_1m is None
+    ):
         return None
     return {
         "week52_high": week52_high,
         "week52_low": week52_low,
         "avg_volume_30d": avg_volume_30d,
+        "change_pct_5d": change_pct_5d,
+        "change_pct_1m": change_pct_1m,
     }
 
 

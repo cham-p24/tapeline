@@ -310,7 +310,13 @@ async def tick() -> None:
         # NOT protected this way — they come fresh from the vendor on every
         # tick, so a NULL there is a real "no read", and preserving a stale one
         # would be the dishonest choice.
-        cache_derived = ("market_cap", "week52_high", "week52_low", "avg_volume_30d")
+        cache_derived = (
+            "market_cap", "week52_high", "week52_low", "avg_volume_30d",
+            # change_pct_5d / change_pct_1m joined this list when they stopped
+            # being random draws and became bar-derived measurements: same cache,
+            # same empty-after-restart exposure, same protection.
+            "change_pct_5d", "change_pct_1m",
+        )
         for batch in (full_updates, market_updates):
             if not batch:
                 continue

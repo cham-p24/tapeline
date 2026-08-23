@@ -27,7 +27,17 @@ SRC = inspect.getsource(signal_publisher.publish_tick) if hasattr(
 
 
 def test_cache_derived_columns_are_coalesced():
-    assert 'cache_derived = ("market_cap", "week52_high", "week52_low", "avg_volume_30d")' in SRC
+    """Membership, not formatting — the list grows as more columns become
+    cache-derived, and a test that pins the exact literal fails on a reflow
+    instead of on a regression."""
+    start = SRC.index("cache_derived = (")
+    block = SRC[start:SRC.index(")", start)]
+    for col in (
+        "market_cap", "week52_high", "week52_low", "avg_volume_30d",
+        # Joined the list when they stopped being random draws.
+        "change_pct_5d", "change_pct_1m",
+    ):
+        assert f'"{col}"' in block, f"{col} is no longer protected from the restart wipe"
     assert "func.coalesce(bindparam(col), getattr(Ticker, col))" in SRC
 
 
