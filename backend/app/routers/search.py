@@ -82,7 +82,14 @@ async def search(
         (Ticker.symbol.like(sym_like, escape="\\"), 2),
         else_=3,  # name-only match
     )
-    stmt = stmt.order_by(relevance, desc(Ticker.score), Ticker.symbol.asc()).limit(limit)
+    # nullslast on the score tiebreak. Search deliberately has NO scored-row
+    # floor — an unscored ETF must stay findable — but Postgres sorts NULLs
+    # FIRST under DESC, so without this the 2,338 unscored rows outranked every
+    # scored name at equal relevance. Only the tiebreak changes; an exact symbol
+    # match still wins on `relevance` regardless of score.
+    stmt = stmt.order_by(
+        relevance, desc(Ticker.score).nullslast(), Ticker.symbol.asc()
+    ).limit(limit)
     rows = (await session.execute(stmt)).all()
 
     # The database already applied the ordering above; no Python re-rank.

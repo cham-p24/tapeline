@@ -65,7 +65,16 @@ def deterministic_order_by(sort: str, order: str) -> list[Any]:
         raise ValueError(f"bad sort order: {order!r}")
 
     col = getattr(Ticker, sort)
-    order_by: list[Any] = [desc(col) if order == "desc" else col]
+    # nullslast on BOTH directions. Postgres defaults to NULLS FIRST for DESC
+    # and NULLS LAST for ASC, so a descending sort on any nullable column led
+    # with the rows that have no value at all — "sort by market cap, highest
+    # first" opened on tickers with no market cap. Callers here all apply the
+    # ticker_freshness floor (which requires a non-null SCORE), but every other
+    # sortable column is independently nullable, so the floor does not cover
+    # this. Making it explicit means the two directions are mirror images.
+    order_by: list[Any] = [
+        desc(col).nullslast() if order == "desc" else col.asc().nullslast()
+    ]
     if sort != "symbol":
         order_by.extend([
             desc(Ticker.price * Ticker.volume).nullslast(),

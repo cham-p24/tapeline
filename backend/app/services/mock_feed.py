@@ -276,11 +276,17 @@ _ETF_SET = {
 }
 
 
-def _signal_from_score(score: float) -> str:
+def _signal_from_score(score: float | None) -> str | None:
     """
     Descriptive (not prescriptive) labels describing the STATE of the factor data.
     Legal posture: never tells the user what to do. See LEGAL_CHECKLIST.md.
+
+    None in, None out: a label is a claim about a score, so with no score there
+    is no label to make. polygon_feed imports THIS function (shadowing its own
+    module-level copy), so this is the branch the production path runs.
     """
+    if score is None:
+        return None
     if score >= 85: return "HIGH CONVICTION"     # score 85-100
     if score >= 70: return "STRONG SETUP"        # score 70-84
     if score >= 55: return "CONSTRUCTIVE"        # score 55-69
