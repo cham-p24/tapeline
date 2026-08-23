@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import delete, select
@@ -322,7 +323,6 @@ async def stripe_webhook(
             (obj.get("metadata") or {}).get("trial_save_offer") == "1"
             and user.save_offer_redeemed_at is None
         ):
-            from datetime import UTC, datetime
             user.save_offer_redeemed_at = datetime.now(UTC)
 
         # Upsert subscription
@@ -402,7 +402,6 @@ async def stripe_webhook(
                 # this handler drops redelivered events outright, and these two
                 # writes are idempotent anyway — the same trial_end re-lands on
                 # the same column, and trial_started_at is write-once.
-                from datetime import UTC, datetime
 
                 raw_trial_end = obj.get("trial_end")
                 if raw_trial_end:
@@ -582,7 +581,6 @@ async def stripe_webhook(
                 billing_period = p["billing_period"]
                 next_charge_iso: str | None = None
                 try:
-                    from datetime import UTC, datetime
                     next_charge_iso = datetime.fromtimestamp(
                         obj["current_period_end"], UTC,
                     ).isoformat()
@@ -1014,7 +1012,6 @@ async def resend_webhook(
     if not recipients:
         return {"ok": True, "noop": True}
 
-    from datetime import UTC, datetime
     now = datetime.now(UTC)
 
     affected = 0
