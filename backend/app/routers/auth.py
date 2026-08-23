@@ -804,6 +804,32 @@ async def _send_password_reset_bg(user_id: str) -> None:
         logger.exception("auth.password_reset_send_failed user=%s", user_id)
 
 
+async def _send_signin_code_bg(user_id: str) -> None:
+    """Mint + email a sign-in code OUTSIDE the request path.
+
+    Same shape (and same reason) as _send_password_reset_bg: FastAPI tears the
+    request-scoped session down before background tasks run, so this opens its
+    own. Keeping Resend off the signin request matters more here than for a
+    reset — the user is sitting on a spinner waiting to log in.
+
+    A delivery failure is logged, not surfaced: /signin has already returned
+    the challenge, and telling the client "the email failed" would leak that
+    the password was correct.
+    """
+    from app.db import session_scope
+    from app.services.email import mint_and_send_signin_code
+
+    try:
+        async with session_scope() as s:
+            r = await s.execute(select(User).where(User.id == user_id))
+            user = r.scalar_one_or_none()
+            if user is None:
+                return
+            await mint_and_send_signin_code(s, user)
+    except Exception:
+        logger.exception("auth.signin_code_send_failed user=%s", user_id)
+
+
 @router.post("/forgot-password", dependencies=[Depends(limit_auth)])
 async def forgot_password(
     body: ForgotPasswordBody,
@@ -951,7 +977,9 @@ async def reset_password(
 @router.post("/signin", dependencies=[Depends(limit_auth)])
 async def signin(
     body: SigninBody,
+    request: Request,
     response: Response,
+    background: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     email = body.email.lower().strip()
@@ -980,6 +1008,50 @@ async def signin(
         from app.services.mfa import issue_mfa_token
         logger.info("auth.signin_mfa_challenge user=%s", user.id)
         return {"mfa_required": True, "mfa_token": issue_mfa_token(user.id)}
+
+    # New-device gate. A browser that has already cleared an emailed code
+    # carries a signed trust cookie (30 days); anything else has to prove it
+    # can read the account's inbox before we mint a session.
+    #
+    # Deliberately NOT applied to every sign-in: that would make Resend a hard
+    # dependency of logging in at all, so a mail outage would lock every user
+    # (including the founder) out of a live product. Unrecognised-device-only
+    # is the same trade every major SaaS makes.
+    from app.services.signin_codes import (
+        CODE_ISSUE_MAX,
+        CODE_ISSUE_WINDOW_SECONDS,
+        TRUSTED_DEVICE_COOKIE,
+        is_trusted_device,
+        mask_email,
+    )
+
+    if not is_trusted_device(
+        request.cookies.get(TRUSTED_DEVICE_COOKIE), user.id, user.session_epoch
+    ):
+        # Cap codes ISSUED per account. limit_auth buckets on IP, which does
+        # nothing to stop someone who knows a victim's password from using
+        # /signin as a mail bomb; this bucket is keyed on the account being
+        # mailed. Verification attempts are capped separately at /2fa.
+        if not await limiter.consume(
+            f"signin_code:{user.id}", CODE_ISSUE_MAX, CODE_ISSUE_WINDOW_SECONDS
+        ):
+            logger.warning("auth.signin_code_issue_cap_hit user=%s", user.id)
+            raise HTTPException(
+                429,
+                "Too many sign-in codes requested for this account. "
+                "Wait a few minutes, then try again.",
+            )
+        from app.services.mfa import issue_mfa_token
+        background.add_task(_send_signin_code_bg, user.id)
+        logger.info("auth.signin_code_challenge user=%s", user.id)
+        return {
+            "mfa_required": True,
+            "mfa_token": issue_mfa_token(user.id),
+            "method": "email",
+            # Masked so the code screen can say WHICH inbox to check without
+            # handing the full address to someone who only has the password.
+            "email_hint": mask_email(user.email),
+        }
 
     token = issue_session_token(user.id, user.session_epoch)
     response.set_cookie(value=token, **session_cookie_kwargs())
@@ -1015,6 +1087,52 @@ class TwoFASigninBody(BaseModel):
 # both to a shared store together when we scale out.
 TWOFA_MAX_ATTEMPTS = 5
 TWOFA_WINDOW_SECONDS = 900
+
+
+async def _consume_signin_code(
+    session: AsyncSession, user: User, code: str
+) -> bool:
+    """Verify + burn an emailed sign-in code. True only if it was live.
+
+    Single-use is enforced with a CONDITIONAL update rather than a
+    read-then-assign, for the same reason the TOTP step-burn below is: two
+    submissions of the same code racing each other would otherwise both pass
+    their read and both mint a session. The database arbitrates instead.
+
+    Codes are compared in constant time (services/signin_codes.verify_code)
+    and the newest few unused rows are scanned — mint_and_send_signin_code
+    invalidates prior codes, so in practice there is at most one.
+    """
+    from app.models import SigninCode
+    from app.services.signin_codes import verify_code
+
+    now = datetime.now(UTC)
+    rows = (await session.execute(
+        select(SigninCode)
+        .where(SigninCode.user_id == user.id, SigninCode.used_at.is_(None))
+        .order_by(SigninCode.created_at.desc())
+        .limit(5)
+    )).scalars().all()
+
+    for row in rows:
+        expires_at = row.expires_at
+        # SQLite hands back naive datetimes; Postgres tz-aware. Same
+        # normalisation the verification/reset paths use above.
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at < now:
+            continue
+        if not verify_code(code, user.id, row.code_hash):
+            continue
+        res = await session.execute(
+            update(SigninCode)
+            .where(SigninCode.id == row.id, SigninCode.used_at.is_(None))
+            .values(used_at=now)
+        )
+        # rowcount 0 => another request spent this code between our read and
+        # our write, so that one wins and this submission fails.
+        return res.rowcount != 0  # type: ignore[attr-defined]
+    return False
 
 
 @router.post("/2fa", dependencies=[Depends(limit_auth)])
@@ -1055,10 +1173,37 @@ async def signin_2fa(
 
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    if user is None or not user.mfa_enabled or not user.totp_secret:
+    if user is None:
         raise HTTPException(401, "Two-factor auth is not active on this account.")
 
     code = body.code.strip()
+
+    # ── Emailed sign-in code (accounts without an authenticator app) ────────
+    # /signin only issues one when the browser isn't already trusted, so
+    # clearing it is also what EARNS that trust: we set the 30-day device
+    # cookie here, which is why the next sign-in from this browser is a plain
+    # password login. TOTP accounts never reach this branch.
+    if not (user.mfa_enabled and user.totp_secret):
+        if not await _consume_signin_code(session, user, code):
+            raise HTTPException(
+                401,
+                "That code is wrong or has expired. Sign in again to get a new one.",
+            )
+        from app.services.signin_codes import (
+            issue_trusted_device_token,
+            trusted_device_cookie_kwargs,
+        )
+        response.set_cookie(
+            value=issue_trusted_device_token(user.id, user.session_epoch),
+            **trusted_device_cookie_kwargs(),
+        )
+        response.set_cookie(
+            value=issue_session_token(user.id, user.session_epoch),
+            **session_cookie_kwargs(),
+        )
+        await session.commit()
+        logger.info("auth.signin_code_verified user=%s", user.id)
+        return {"user": _user_out(user)}
     # Burn the time-step this code belongs to. verify_totp_step refuses any
     # step at or below user.totp_last_step, so the same 6 digits can't be
     # replayed inside their ~90s ±1 window — which is what let an attacker who

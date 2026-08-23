@@ -96,7 +96,18 @@ type SignupExtras = {
 // `mfa_required` discriminant.
 export type SigninResult =
   | { user: SessionUser }
-  | { mfa_required: true; mfa_token: string };
+  | {
+      mfa_required: true;
+      mfa_token: string;
+      // "email" when the second step is a code we mailed because this browser
+      // isn't recognised. Absent for an authenticator-app (TOTP) challenge, so
+      // the code screen can name the right source. `email_hint` is masked
+      // server-side ("c*******@gmail.com") — enough to know which inbox to
+      // open, not enough to hand the address to someone who only has the
+      // password.
+      method?: "email";
+      email_hint?: string;
+    };
 
 export const authApi = {
   session: () => req<{ user: SessionUser | null }>("/api/auth/session"),

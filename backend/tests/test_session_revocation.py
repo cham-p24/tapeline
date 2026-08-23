@@ -206,9 +206,24 @@ async def test_signin_mints_a_token_carrying_the_current_epoch(client):
     not a stale 0 that its own verify would reject."""
     password = "SigninPassword!2026"
     user = await _seed_user(password_hash=hash_password(password), session_epoch=7)
+    # Trusted browser: this test asserts the epoch carried by a minted token,
+    # so it must reach the token-minting branch rather than the new-device
+    # email-code challenge. The trust cookie is issued at the SAME epoch the
+    # user currently has — a stale-epoch cookie is deliberately not trusted.
+    from app.services.signin_codes import (
+        TRUSTED_DEVICE_COOKIE,
+        issue_trusted_device_token,
+    )
+
     async with client:
         r = await client.post(
-            "/api/auth/signin", json={"email": user.email, "password": password},
+            "/api/auth/signin",
+            json={"email": user.email, "password": password},
+            cookies={
+                TRUSTED_DEVICE_COOKIE: issue_trusted_device_token(
+                    user.id, user.session_epoch
+                )
+            },
         )
         assert r.status_code == 200, r.text
         cookie = r.cookies.get(SESSION_COOKIE)

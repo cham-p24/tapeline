@@ -1186,6 +1186,131 @@ async def mint_and_send_password_reset(session, user) -> bool:
         return False
 
 
+# ── Sign-in code (new-device second factor) ─────────────────────────────────
+
+def render_signin_code_email(user_name: str, code: str, ttl_minutes: int) -> str:
+    """The 6-digit code emailed when someone signs in from a new browser.
+
+    Deliberately plain and procedural: no marketing, no CTA button, nothing to
+    click. A code email that trains people to click links is a phishing lesson,
+    so the only action here is "type these six digits into the page you already
+    have open".
+
+    The "wasn't you" line is the security-relevant half — it's how a user finds
+    out their password is known to someone else, so it names the concrete next
+    step (change the password) rather than just raising alarm.
+    """
+    from html import escape as _escape
+
+    digits = _escape(code)
+    code_block = (
+        f'<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
+        f'font-size:34px;font-weight:700;letter-spacing:0.28em;'
+        f'color:{LIGHT_FG};text-align:center;padding:6px 0 2px;">{digits}</div>'
+        f'<div style="font-size:12px;color:{LIGHT_MUTED};text-align:center;">'
+        f'Good for {ttl_minutes} minutes</div>'
+    )
+    return shell(
+        h1("Your sign-in code")
+        + lead(
+            f"Hi {_escape(user_name)} — someone just signed in to Tapeline from "
+            f"a browser we don't recognise. Enter this code on the sign-in page "
+            f"to finish."
+        )
+        + card(code_block, accent=True)
+        + muted_paragraph(
+            "We'll remember this browser for 30 days, so you won't need a code "
+            "every time."
+        )
+        + footnote(
+            "If this wasn't you, someone else knows your password. Don't enter "
+            "the code — change your password straight away, and the sign-in "
+            "won't complete without it."
+        ),
+        preheader=f"Your Tapeline sign-in code: {digits}",
+    )
+
+
+def render_signin_code_text(user_name: str, code: str, ttl_minutes: int) -> str:
+    """Plain-text twin of the code email.
+
+    Worth having for a credential email specifically: some clients render
+    text-only, and a code the user cannot read is a lockout.
+    """
+    return f"""Hi {user_name},
+
+Someone just signed in to Tapeline from a browser we do not recognise.
+Enter this code on the sign-in page to finish:
+
+    {code}
+
+The code is good for {ttl_minutes} minutes. We will remember this browser for
+30 days, so you will not need a code every time.
+
+If this was not you, someone else knows your password. Do not enter the
+code - change your password straight away, and the sign-in will not
+complete without it.
+
+- Tapeline
+"""
+
+
+
+async def mint_and_send_signin_code(session, user) -> bool:
+    """Issue a fresh sign-in code for `user`, email it, return True if sent.
+
+    Idempotent in the way that matters: any prior unused codes for this user
+    are invalidated first, so a user who clicks sign-in twice types the code
+    from the LATEST email and the older one is dead. Without that, two live
+    codes double the guess surface for no benefit.
+
+    Transactional — no unsubscribe header (a user cannot opt out of the code
+    that lets them log in) and it deliberately ignores email_prefs.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update as _update
+
+    from app.models import SigninCode
+    from app.services.signin_codes import (
+        CODE_TTL_MINUTES,
+        code_expiry,
+        generate_code,
+        hash_code,
+    )
+
+    # Kill any still-live codes for this account — latest email wins.
+    await session.execute(
+        _update(SigninCode)
+        .where(SigninCode.user_id == user.id, SigninCode.used_at.is_(None))
+        .values(used_at=datetime.now(UTC))
+    )
+
+    code = generate_code()
+    session.add(SigninCode(
+        user_id=user.id,
+        code_hash=hash_code(code, user.id),
+        expires_at=code_expiry(),
+    ))
+    await session.commit()
+
+    try:
+        name = user.name or "trader"
+        html = render_signin_code_email(name, code, CODE_TTL_MINUTES)
+        text = render_signin_code_text(name, code, CODE_TTL_MINUTES)
+        res = await send_email(
+            user.email,
+            f"Tapeline sign-in code: {code}",
+            html,
+            text,
+            persona="default",
+        )
+        return not res.get("skipped", False)
+    except Exception:
+        logger.exception("signin_code.send_failed user=%s", user.id)
+        return False
+
+
 # ── Payment-failed ──────────────────────────────────────────────────────────
 
 def _ordinal(n: int) -> str:

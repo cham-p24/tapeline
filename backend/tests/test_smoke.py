@@ -234,10 +234,24 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert me["tier"] == "free"
         assert me["on_trial"] is False
 
-        # 3. Signin with the same creds returns a fresh cookie + user dict
+        # 3. Signin with the same creds returns a fresh cookie + user dict.
+        #    Sent from an already-trusted browser: signing in from an
+        #    UNRECOGNISED device returns an emailed-code challenge instead of a
+        #    session (see tests/test_signin_email_codes.py), which is a
+        #    different flow than the one this smoke test covers.
+        from app.services.signin_codes import (
+            TRUSTED_DEVICE_COOKIE,
+            issue_trusted_device_token,
+        )
+
         r3 = await client.post(
             "/api/auth/signin",
             json={"email": email, "password": password},
+            cookies={
+                TRUSTED_DEVICE_COOKIE: issue_trusted_device_token(
+                    body["user"]["id"], 0
+                )
+            },
         )
         assert r3.status_code == 200
         assert r3.json()["user"]["email"] == email

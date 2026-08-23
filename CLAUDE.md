@@ -120,6 +120,17 @@ Three application-level layers (Cloudflare Bot Fight Mode is the recommended fre
 
 Rate limit: `services/rate_limit.py` `limit_auth` caps `/api/auth/*` at 10 attempts per IP per minute (vs default 120 for /api/*).
 
+## Sign-in codes (new-device second factor) — `backend/app/services/signin_codes.py`
+Password sign-in from an **unrecognised browser** does NOT mint a session: it emails a 6-digit code and returns the same `{mfa_required, mfa_token}` challenge the TOTP flow uses, plus `method: "email"` and a masked `email_hint`. `POST /api/auth/2fa` accepts that code, mints the session, and sets a signed 30-day **trusted-device cookie** (`tapeline_device`) — so routine logins from a known browser stay a plain password step.
+
+- **Deliberately new-device-only, not every sign-in.** Requiring a code every time would make Resend a hard dependency of logging in at all, so a mail outage would lock out every user (founder included). Decided 2026-08-19.
+- **TOTP keeps precedence** — an account with an authenticator app never gets an emailed code, and the TOTP/recovery-code path in `/2fa` is untouched.
+- **Codes** are 6 digits, 10-minute TTL, single-use (burned with a conditional UPDATE so a replay can't mint a second session), stored as a keyed HMAC-SHA256 bound to the user id — never plaintext. Table `signin_codes`, migration 0052.
+- **The trust cookie carries `session_epoch`**, so sign-out-everywhere / password reset revoke every remembered device for free.
+- **Two caps**: issuance is capped per ACCOUNT (`signin_code:{user_id}`, 5 per 15 min) so /signin can't be used to mail-bomb someone; verification reuses the existing per-account `2fa:{user_id}` budget.
+- **OAuth sign-in is not gated** — Google/Microsoft run their own device checks and never hit `/api/auth/signin`.
+- Tests: `backend/tests/test_signin_email_codes.py`.
+
 ## News + analyst ratings
 - **News** — `news_feed.py` queries Massive/Polygon and Finnhub in parallel,
   merges by `published_at desc`, dedupes by id. SEC EDGAR 8-Ks are fed into
