@@ -33,7 +33,7 @@ const FACT_SHEET = [
   { label: "Headquarters",    value: "Melbourne, Victoria, Australia" },
   { label: "Funding",         value: "Bootstrapped — no external investment" },
   { label: "Pricing",         value: "Free · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual)" },
-  { label: "Free trial",      value: "14-day Premium, no credit card required" },
+  { label: "Free trial",      value: "14-day Premium; card required at sign-in, $0 charged that day" },
   { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume, from the full liquid US universe)" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },

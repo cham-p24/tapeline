@@ -247,7 +247,7 @@ export function CompareLayout({
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier — no card. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+          The record is free to read — no account. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
         {/* Instrumented, not restyled: these two CTAs are what tell us whether
@@ -261,7 +261,7 @@ export function CompareLayout({
             destination="signup"
             slug={slug}
           >
-            Try the live scanner free — no card →
+            Try the live scanner — 14-day trial →
           </ContentCtaLink>
           <ContentCtaLink
             href={ctaSecondaryHref}

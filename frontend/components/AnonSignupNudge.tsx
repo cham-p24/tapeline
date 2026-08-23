@@ -167,12 +167,12 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
           <p className="mt-1 max-w-xl text-sm text-muted">
             {freeHasWatchlist() ? (
               <>
-                You&rsquo;ve looked at a few tickers. Sign up free (no card) to
+                You&rsquo;ve looked at a few tickers. Create an account to
                 save them to a watchlist and get alerts when their scores move.
               </>
             ) : (
               <>
-                You&rsquo;ve looked at a few tickers. Sign up free (no card) for
+                You&rsquo;ve looked at a few tickers. Create an account for
                 live scores and browser alerts when their scores move — save
                 them to a watchlist on Pro.
               </>

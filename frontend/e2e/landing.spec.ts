@@ -15,7 +15,7 @@ test.describe("Landing page", () => {
     await expect(page.getByText(/six named factors/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /see the track record/i })).toBeVisible();
     // GAP #6 — the subtle tertiary trial link is above the fold alongside the pills.
-    await expect(page.getByRole("link", { name: /start free — no card/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /start the 14-day trial/i })).toBeVisible();
 
     // Openness line vs the paid rivals (GAP #22) — static, server-rendered.
     await expect(page.getByText(/most scanners keep their picks behind a paywall/i)).toBeVisible();

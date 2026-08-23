@@ -152,7 +152,7 @@ export default async function LandingPage() {
                 href="/signup"
                 className="text-accent underline-offset-2 hover:underline"
               >
-                Start free &mdash; no card
+                Start the 14-day trial
               </Link>
             </p>
           </div>
@@ -197,9 +197,11 @@ export default async function LandingPage() {
               left column on desktop (lg:gap-y-0 keeps its mt-3 the only gap, so
               the desktop layout is unchanged). */}
           <p className="order-3 mt-3 text-xs leading-relaxed text-muted lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-2">
-            The trial is 14 days of Premium. No credit card, no payment
-            details, nothing charged &mdash; it simply ends and your account
-            stays on the Free tier.
+            The trial is 14 days of Premium. Your card goes on at first sign-in
+            and nothing is charged that day &mdash; the first charge is on day 14 at
+            the plan you pick, we email you three days before, and one click cancels
+            before then. The scorecard and daily Top 10 stay free to read with no
+            account either way.
           </p>
         </div>
       </section>
@@ -476,7 +478,7 @@ export default async function LandingPage() {
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-muted">
             See your watchlist scored the same way we score the public
-            scorecard. Free for 14 days, no card.
+            scorecard. 14 days of Premium, $0 today.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
@@ -487,7 +489,7 @@ export default async function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted">
-            No credit card &middot; Cancel in one click &middot;{" "}
+            $0 today &middot; Cancel in one click &middot;{" "}
             {REFUND.windowDays}-day refund on monthly
           </p>
         </div>

@@ -48,7 +48,7 @@ export function Paywall({
   // trial there would be false. They get the real guarantee instead.
   const riskLine = signedIn
     ? "30-day money-back guarantee · cancel anytime."
-    : "14-day trial, no card required.";
+    : "14-day Premium trial — $0 today, cancel in one click.";
 
   return (
     <div className="card relative overflow-hidden p-0">
@@ -186,7 +186,7 @@ export function PaywallModal({
           Upgrade to {priceLine} to unlock.{" "}
           {user
             ? "30-day money-back guarantee · cancel anytime."
-            : "14-day trial, no card required. Cancel in one click."}
+            : "14-day Premium trial — $0 today, first charge on day 14, cancel in one click."}
         </p>
         <div className="mt-6 flex gap-3">
           <Link

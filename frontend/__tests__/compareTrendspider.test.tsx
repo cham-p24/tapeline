@@ -27,12 +27,15 @@ describe("/compare/trendspider", () => {
     expect(text).toMatch(/check their site for current pricing/i);
   });
 
-  it("states Tapeline founding pricing and the no-card trial", () => {
+  it("states Tapeline founding pricing and the card-required trial", () => {
     const { container } = render(<VsTrendSpiderPage />);
     const text = container.textContent || "";
     expect(text).toMatch(/\$8\.25\/mo/);
     expect(text).toMatch(/\$16\.58\/mo/);
-    expect(text).toMatch(/no card/i);
+    // The trial takes a card from #548 onward; what stays card-free is reading
+    // the record. Assert that split rather than a bare "no card".
+    expect(text).toMatch(/14-day trial/i);
+    expect(text).toMatch(/free to read — no account/i);
   });
 
   it("contains no banned performance-claim or rating-label phrases", () => {

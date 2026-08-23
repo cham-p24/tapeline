@@ -113,7 +113,7 @@ describe("LandingPage hero fold", () => {
     render(await LandingPage());
     // The tertiary link is present and points at /signup...
     expect(
-      screen.getByRole("link", { name: /start free — no card/i }),
+      screen.getByRole("link", { name: /start the 14-day trial/i }),
     ).toHaveAttribute("href", "/signup");
     // ...and the two proof-first pills are still first-class (unchanged).
     expect(
@@ -124,14 +124,19 @@ describe("LandingPage hero fold", () => {
     ).toHaveAttribute("href", "/daily-picks");
   });
 
-  it("states the trial terms plainly: no card, nothing charged, falls back to Free", async () => {
+  it("states the trial terms plainly: card at sign-in, \$0 today, day-14 charge, one-click exit", async () => {
     render(await LandingPage());
-    const terms = screen.getByText(
-      /no credit card, no payment details, nothing charged/i,
-    );
+    // CHANGED by the #548 card gate. The old copy promised "no credit card, no
+    // payment details, nothing charged" — false for any account created from
+    // 2026-08-22. The terms must now name the card, the amount and the date.
+    const terms = screen.getByText(/your card goes on at first sign-in/i);
     expect(terms).toBeInTheDocument();
     expect(terms.textContent).toMatch(/14 days of Premium/i);
-    expect(terms.textContent).toMatch(/stays on the Free tier/i);
+    expect(terms.textContent).toMatch(/nothing is charged that day/i);
+    expect(terms.textContent).toMatch(/first charge is on day 14/i);
+    expect(terms.textContent).toMatch(/one click cancels/i);
+    // The genuinely card-free path is still offered.
+    expect(terms.textContent).toMatch(/free to read with no\s+account/i);
   });
 
   it("keeps the trial CTA free of urgency and scarcity framing (Rule 6)", async () => {

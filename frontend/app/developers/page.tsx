@@ -110,7 +110,7 @@ const FAQ = [
   },
   {
     q: "Is there a free tier for the API?",
-    a: "The API itself is a Premium feature. Every new account gets a 14-day Premium trial with no credit card, so you can build and test against it before deciding. The free tier covers the in-app product (live scores for the top 10 scanner rows, 5 look-ups/day), not programmatic API access.",
+    a: "The API itself is a Premium feature. A new account adds a card at first sign-in and starts a 14-day Premium trial — $0 that day, first charge on day 14, one click to cancel before then — so you can build and test against the API before deciding. The Free tier covers the in-app product (live scores for the top 10 scanner rows, 12 look-ups/day), not programmatic API access.",
   },
 ];
 

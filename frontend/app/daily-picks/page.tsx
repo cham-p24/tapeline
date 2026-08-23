@@ -309,8 +309,8 @@ export default async function DailyPicksPage() {
             Want the same composite, live and on your own watchlist?
           </h2>
           <p className="mt-3 text-muted">
-            14-day Premium trial — no card. The daily email keeps coming
-            either way.
+            14-day Premium trial — $0 today, cancel in one click. The daily email
+            is free with no account and keeps coming either way.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">

@@ -59,8 +59,9 @@ export default function ConnectClient() {
       <div className="mt-8 rounded-xl border border-border bg-panel p-6">
         <h2 className="text-lg font-semibold">You need an account first</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          The extension works with a Tapeline account. Free accounts see the full scanner
-          until 8 September — creating one takes a few seconds and needs no card.
+          The extension works with a Tapeline account. Creating one takes a few seconds
+          and adds a card at first sign-in, which starts a 14-day Premium trial &mdash; $0
+          today, one click to cancel before day 14.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button href="/signup?next=/extension/connect" variant="primary" shape="rounded">

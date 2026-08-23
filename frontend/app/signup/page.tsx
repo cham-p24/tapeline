@@ -6,7 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
-import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
 import {
   getStoredGclid,
@@ -59,34 +59,44 @@ if (typeof window !== "undefined") {
 // single highest-confidence funnel lever (Unbounce / NN-group information-
 // scent research). Unknown/absent `from` falls back to `_default`.
 //
-// CARD HONESTY (2026-08). Every line here used to promise "14 days of Premium
-// free — no credit card", because signup itself auto-granted the trial. It no
-// longer does: creating an account is email + password and stays free forever
-// with no card, and the 14-day Premium trial is a SEPARATE, explicitly-chosen
-// step that DOES take a card ($0 today, first charge at trial end, one click
-// to cancel before then). So "no credit card" survives here only where it is
-// still literally true — the account and the Free tier — and never attached to
-// the trial. Do not re-couple the two.
+// CARD HONESTY (2026-08, revised for the #548 card gate). This copy has been
+// wrong twice, in opposite directions, so read both steps before editing it.
+//
+//   #536 removed the auto-granted trial: signup stopped granting Premium, and
+//   the lines here were rewritten to promise a card-free FREE ACCOUNT instead.
+//
+//   #548 then made THAT false. From CARD_GATE_START (2026-08-22) a new account
+//   meets a card wall at /app/start before it can use the logged-in product.
+//   So "free account, no card to sign up" is now misleading even though this
+//   form still collects no card: the visitor cannot reach the product without
+//   one. Promising a free account here and producing a card wall one click
+//   later is precisely the bait-and-switch the gate's own grandfather clause
+//   exists to avoid.
+//
+// What is still literally true, and the ONLY place "no card" may appear: the
+// PUBLISHED RECORD — /scorecard, /daily-picks, per-ticker pages, the CSV/JSON
+// export — needs no account at all. Everything about the account and the trial
+// must state the card and the dates. Do not re-couple "free" to either one.
 const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   _default: {
-    h1: "Create your free Tapeline account",
-    sub: "Email and password — no card to sign up, and Free stays free forever.",
+    h1: "Create your Tapeline account",
+    sub: "Email and password to start. At first sign-in you add a card and your 14-day Premium trial begins — $0 today, cancel in one click.",
   },
   finviz: {
     h1: "The Finviz alternative — free to start.",
-    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. Free account, no card.",
+    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. 14-day Premium trial, $0 today.",
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: "One score, one sentence, and every pick logged public vs SPY. Free account, no card to sign up.",
+    sub: "One score, one sentence, and every pick logged public vs SPY. 14-day Premium trial, $0 today.",
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: "The full live universe, every name scored. Creating your account is free and takes no card.",
+    sub: "The full live universe, every name scored. 14-day Premium trial — $0 today, cancel in one click.",
   },
   compare: {
-    h1: "Switching to Tapeline? Start free.",
-    sub: "One transparent score per ticker plus a public track record. Free account, no card to sign up.",
+    h1: "Switching to Tapeline?",
+    sub: "One transparent score per ticker plus a public track record. 14-day Premium trial, $0 today.",
   },
 };
 
@@ -350,14 +360,13 @@ function SignUpForm() {
           <h1 className="mt-10 text-3xl font-bold tracking-tight">{headline.h1}</h1>
           <p className="mt-2 text-sm text-muted">{headline.sub}</p>
 
-          {/* Value strip at the decision point. "No credit card" now qualifies
-              the ACCOUNT, which is the only thing this form creates — the
-              14-day Premium trial is a separate opt-in on the next screen and
-              it does take a card. Stating both here, side by side, is the
-              whole point: the visitor should learn the card rule from us
-              before they are anywhere near a card field. */}
+          {/* Value strip at the decision point. Post-#548 the honest headline
+              fact is the card itself: it goes on at first sign-in, $0 moves
+              today, and the first charge is 14 days out. The visitor should
+              learn that from us here, before they are anywhere near a card
+              field — not discover it at the wall on the next screen. */}
           <p className="mt-4 text-xs text-muted">
-            Free forever &middot; No credit card to sign up &middot; Optional 14-day Premium trial (card required, $0 today) &middot; {REFUND.windowDays}-day money-back on paid plans
+            14-day Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
           </p>
 
           {/* PRIMARY signup path: Google-first, above the fold, first thing the
@@ -551,12 +560,11 @@ function SignUpForm() {
             </button>
             {/* Reassurance adjacent to the highest-intent click — kills the
                 "will I be charged?" objection right where hesitation happens,
-                not only in the H1 subhead far above. The button creates a FREE
-                account and nothing else, so this line says exactly that; the
-                card conversation happens on the next screen, where the trial
-                is offered with its dates and amounts in full. */}
+                not only in the H1 subhead far above. It must not say "no card":
+                this button does not collect one, but the very next screen does,
+                so the true reassurance is the AMOUNT, not the absence. */}
             <p className="text-center text-xs text-muted">
-              No card, no charge &mdash; this creates a free account
+              $0 charged today &mdash; the first charge is 14 days away
             </p>
 
             <p className="text-xs text-subtle">
@@ -570,28 +578,28 @@ function SignUpForm() {
               objection is "am I going to get auto-charged?" — and now that the
               14-day Premium trial takes a card, the only acceptable answer is
               to state the whole rule BEFORE the account exists, not after.
-              Free first (it is the card-free default and stays that way), then
-              exactly what the trial does and when it charges, then the exit. */}
+              What the card does, when it charges, how to leave, and what you can
+              still read without an account at all. */}
           <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
-            <div className="font-medium text-fg">Free account, and where a card does come in</div>
-            {/* Numbers derive from lib/pricing (PRICING / FREE_LIMITS / REFUND)
+            <div className="font-medium text-fg">Where the card comes in</div>
+            {/* Numbers derive from lib/pricing (PRICING / REFUND)
                 — the single source of truth checkout + every other surface
                 uses — so this prose can never drift from the real price or
                 the real Free-tier caps again (it previously hardcoded all
                 three and had already drifted once). */}
             <p className="mt-1.5">
-              This form creates a <span className="text-fg">Free account</span>: live scores,
-              top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day,
-              free forever and never needing a card.
+              This form takes an email and a password. At first sign-in you add a card, and
+              that starts your <span className="text-fg">14-day Premium trial</span>:{" "}
+              <span className="text-fg">$0 is charged today</span>, the first charge is 14 days
+              later at the plan you pick, we email you three days before, and one click ends it
+              before then with nothing taken. Paid plans start at{" "}
+              <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span>.
             </p>
             <p className="mt-2">
-              On the next screen you can also start the{" "}
-              <span className="text-fg">14-day Premium trial</span>. That one takes a card,
-              because it turns into a paid plan if you keep it:{" "}
-              <span className="text-fg">$0 is charged today</span>, the first charge is 14 days
-              later, and one click ends it before then with nothing taken. Say no and you stay
-              on Free — the scanner works either way. Paid plans start at{" "}
-              <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span>.
+              You do not need an account &mdash; or a card &mdash; to read the record: the daily
+              Top 10, the whole back-checked scorecard, a page per scored ticker and the raw
+              CSV/JSON export are open to everyone. Accounts created before 22 August 2026 keep
+              the free access they signed up for and are never asked for a card.
             </p>
             <p className="mt-2 text-[11px] text-subtle">
               <span className="text-muted">{REFUND.short}</span> if you change your mind ·
