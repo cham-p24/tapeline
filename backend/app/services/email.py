@@ -229,31 +229,49 @@ async def send_email(
 # ── Alert emails ────────────────────────────────────────────────────────────
 
 def render_alert_email(
-    user_name: str, rule_name: str, symbol: str, score: float, message: str,
+    user_name: str, rule_name: str, symbol: str, score: float | None, message: str,
 ) -> str:
     """User-rule alert (score / squeeze / regime / congress / news).
 
     Single CTA → /app/scanner since these are usually market-wide signals;
     if the alert is symbol-specific the receiver can click into the ticker
     from the scanner.
+
+    `score` is None for rule types that never read a composite (news, congress,
+    regime) and for a symbol with no scored row. Those paths used to pass a
+    hardcoded 0, which printed "Score · 0.0" — a bottom-of-the-range reading the
+    scanner never produced. When it is None the score line and the preheader's
+    score clause are omitted entirely rather than rendered as a zero.
     """
+    score_line = (
+        f'<div style="margin-top:6px;color:{score_color(score)};font-weight:600;font-size:14px;font-family:{FONT_SANS};">Score · {score:.1f}</div>'
+        if score is not None else ""
+    )
     body = (
         h1(f"Alert: {rule_name}")
         + lead(
             f"Hi {user_name}, one of your alert rules just triggered. "
-            f"Score and signal below — open the scanner for the full breakdown."
+            + (
+                "Score and signal below — open the scanner for the full breakdown."
+                if score is not None else
+                "Details below — open the scanner for the full breakdown."
+            )
         )
         + card(
             f'<div class="tl-fg" style="font-family:{FONT_MONO};font-size:24px;font-weight:700;color:{LIGHT_FG};line-height:1;">{symbol}</div>'
-            f'<div style="margin-top:6px;color:{score_color(score)};font-weight:600;font-size:14px;font-family:{FONT_SANS};">Score · {score:.1f}</div>'
-            f'<div class="tl-muted" style="margin-top:10px;color:{LIGHT_MUTED};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">{message}</div>',
+            + score_line
+            + f'<div class="tl-muted" style="margin-top:10px;color:{LIGHT_MUTED};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">{message}</div>',
             accent=True,
         )
         + button("Open the scanner", "https://tapeline.io/app/scanner")
     )
     return shell(
         body,
-        preheader=f"{rule_name} triggered on {symbol} (score {score:.0f}).",
+        preheader=(
+            f"{rule_name} triggered on {symbol} (score {score:.0f})."
+            if score is not None else
+            f"{rule_name} triggered on {symbol}."
+        ),
     )
 
 
@@ -3569,6 +3587,18 @@ async def run_daily_drip(
     return counts
 
 
+def _regime_stat(value: float | None, fmt: str) -> str:
+    """Format a regime reading, or an em-dash when we hold none.
+
+    Callers used `regime.get(k, 0)`, which renders an absent reading as a
+    confident measurement: VIX "0.00" is the calmest tape ever recorded and
+    breadth "0%" means every name declined. Neither has ever been true.
+    """
+    if value is None:
+        return "—"
+    return fmt.format(value)
+
+
 # ── Weekly market digest (newsletter) ───────────────────────────────────────
 
 def render_weekly_market_digest(
@@ -3605,9 +3635,22 @@ def render_weekly_market_digest(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Market regime</div>'
             f'<div style="margin-top:8px;font-family:{FONT_MONO};font-size:24px;font-weight:700;color:{regime_col};line-height:1;">{regime_label}</div>'
             f'<div style="height:12px;"></div>'
-            + stat_row("VIX", f"{regime.get('vix', 0):.2f}")
-            + stat_row("10Y yield", f"{regime.get('yield_10y', 0):.2f}%")
-            + stat_row("Breadth (% > 200DMA)", f"{regime.get('breadth_pct', 0):.0f}%"),
+            # `, 0` defaults removed. A missing VIX rendered as "0.00" — not a
+            # gap, but the calmest reading in the instrument's history — and a
+            # missing breadth as "0%", i.e. every single name declined. An
+            # em-dash says what is true: we hold no reading.
+            #
+            # The breadth LABEL was also wrong. Nothing computes a 200-day
+            # moving average anywhere in this codebase; both writers
+            # (polygon_feed._compute_breadth / sheet_feed._compute_breadth_pct)
+            # produce a same-day advance/decline ratio over OUR universe from
+            # change_pct_1d. Named for what it measures, matching /market-regime.
+            + stat_row("VIX", _regime_stat(regime.get("vix"), "{:.2f}"))
+            + stat_row("10Y yield", _regime_stat(regime.get("yield_10y"), "{:.2f}%"))
+            + stat_row(
+                "Advancers today (% of names that moved)",
+                _regime_stat(regime.get("breadth_pct"), "{:.0f}%"),
+            ),
             accent=True,
         )
     else:

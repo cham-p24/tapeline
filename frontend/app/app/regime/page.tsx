@@ -80,22 +80,27 @@ const RD_COPY: KpiCopy = {
   hint: () => "RISING = headwind for growth equities. FALLING = tailwind. SIDEWAYS = neutral.",
 };
 
+// Advance/decline ratio, NOT a 200-day-moving-average breadth read. The
+// writers compute 100 * advancers / (advancers + decliners) from today's
+// change_pct_1d, so the bands below are centred on 50 (balanced) rather than
+// on the 60-70% levels a 200DMA breadth series is read against. It describes
+// one session only — a single day's A/D says nothing about the trend.
 const BR_COPY: KpiCopy = {
-  desc: "Percentage of S&P 1500 names trading above their 200-day moving average. The single best breadth read.",
+  desc: "Of the names that moved today, the share that closed up — advancers ÷ (advancers + decliners), across the Tapeline universe. Names with no price read, and names that closed unchanged, are excluded.",
   hint: (v) => {
     const n = typeof v === "number" ? v : parseFloat(String(v));
-    if (n > 70) return "Above 70% — broad participation. Healthy bull.";
-    if (n > 55) return "55-70% — solid. Most stocks confirming uptrend.";
-    if (n > 40) return "40-55% — narrow. Index masking weakness.";
-    if (n > 25) return "25-40% — washing out. Defensive rotation.";
-    return "Below 25% — capitulation. Bear-market territory.";
+    if (n > 70) return "Above 70% — broad advance; most moving names rose today.";
+    if (n > 60) return "60-70% — advancers clearly outnumber decliners today.";
+    if (n >= 40) return "40-60% — mixed session; advancers and decliners roughly balanced.";
+    if (n >= 30) return "30-40% — decliners outnumber advancers today.";
+    return "Below 30% — broad decline; most moving names fell today.";
   },
-  tone: (n) => (n > 60 ? "up" : n > 45 ? "muted" : n > 30 ? "warn" : "down"),
+  tone: (n) => (n > 60 ? "up" : n >= 40 ? "muted" : n >= 30 ? "warn" : "down"),
 };
 
 const SL_COPY: KpiCopy = {
-  desc: "Top 3 GICS sectors by 5-day relative strength vs SPY. Reads as 'risk-on' when Tech / Discretionary / Industrials lead; 'risk-off' when Staples / Utilities / Health Care lead.",
-  hint: () => "Watch for a shift — the rotation often precedes the headline regime by 1-3 weeks.",
+  desc: "The 3 sectors with the highest mean Tapeline composite score this tick, across the symbols we scored that carry a known sector. Our own ranking — not relative strength vs SPY.",
+  hint: () => "Reflects where our scores currently cluster, not a measured sector return. Shows — when we could not rank sectors this tick.",
 };
 
 // Descriptive characterisation of how the score distribution behaves in each
@@ -104,9 +109,9 @@ const SL_COPY: KpiCopy = {
 // scores do, not what a reader should do with capital.
 const REGIME_PLAYBOOK: Record<string, { headline: string; bullets: string[] }> = {
   BULL: {
-    headline: "Broad participation. The regime multiplier lifts scores across the universe.",
+    headline: "Volatility is compressed. The regime multiplier lifts scores across the universe.",
     bullets: [
-      "A larger share of the universe sits in the STRONG SETUP and HIGH CONVICTION bands — factor confluence is common when breadth is wide.",
+      "A larger share of the universe sits in the STRONG SETUP and HIGH CONVICTION bands — factor confluence is more common in this regime.",
       "The Trend and Relative Strength factors stay elevated for more names.",
       "A given factor profile scores higher in BULL than the same profile would in CAUTIOUS or BEAR.",
     ],
@@ -120,11 +125,11 @@ const REGIME_PLAYBOOK: Record<string, { headline: string; bullets: string[] }> =
     ],
   },
   CAUTIOUS: {
-    headline: "Breadth is narrowing; the regime multiplier marks scores down.",
+    headline: "Volatility is elevated; the regime multiplier marks scores down.",
     bullets: [
       "Weak-factor names score lower here — the composite weights drag more heavily than in BULL.",
       "The top bands thin out: fewer names reach STRONG SETUP, and HIGH CONVICTION becomes rarer.",
-      "Breadth divergence — the index up while advancers shrink — is the classic CAUTIOUS-to-BEAR signal the regime tracks.",
+      "A further rise in VIX past 25 moves the label to BEAR — the classifier reads nothing else, so the advancer count above can disagree with the label.",
     ],
   },
   BEAR: {
@@ -181,15 +186,22 @@ export default function RegimePage() {
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
-      {/* Regime legend — open by default so the meanings are above the fold */}
+      {/* Regime legend — open by default so the meanings are above the fold.
+          States the actual VIX cut-offs. It previously described breadth and
+          200DMA criteria that the classifier does not read. */}
       <details className="card mt-5 cursor-pointer p-4 text-sm" open>
         <summary className="font-semibold">What each regime means</summary>
         <div className="mt-3 grid gap-3 text-muted sm:grid-cols-2">
-          <div><strong className="text-up">BULL</strong> &mdash; VIX low, breadth above 60%, most stocks above 200DMA. Risk-on trades tend to work. Long bias favoured.</div>
-          <div><strong className="text-accent">NEUTRAL</strong> &mdash; VIX mid-range, mixed breadth. Stock selection dominates. Individual setups matter more than beta.</div>
-          <div><strong className="text-warn">CAUTIOUS</strong> &mdash; VIX elevated, breadth eroding. Time to lighten size, tighten stops, avoid marginal setups.</div>
-          <div><strong className="text-down">BEAR</strong> &mdash; VIX high, most stocks below 200DMA. Capital preservation mode. Cash is a position.</div>
+          <div><strong className="text-up">BULL</strong> &mdash; VIX below 15. Volatility is compressed; the multiplier lifts scores across the universe.</div>
+          <div><strong className="text-accent">NEUTRAL</strong> &mdash; VIX 15&ndash;20. The multiplier is roughly neutral, so company-specific factors separate the scores.</div>
+          <div><strong className="text-warn">CAUTIOUS</strong> &mdash; VIX 20&ndash;25. Elevated volatility; the multiplier marks scores down.</div>
+          <div><strong className="text-down">BEAR</strong> &mdash; VIX 25 or above. The multiplier marks most scores down hard.</div>
         </div>
+        <p className="mt-3 text-xs text-subtle">
+          These four cut-offs are the whole classifier. The other figures on
+          this page are context we publish alongside the label &mdash; they do
+          not feed it.
+        </p>
       </details>
 
       {/* Pro gate — same pattern as the sibling gated pages (heatmap,
@@ -246,8 +258,8 @@ export default function RegimePage() {
                 </div>
                 <p className="mt-4 text-center text-[11px] leading-relaxed text-subtle">
                   Composite of VIX ({fmtScore(r.fear_greed.components.vix.score)}),
-                  breadth ({fmtScore(r.fear_greed.components.breadth.score)}),
-                  regime ({fmtScore(r.fear_greed.components.regime.score)}),
+                  advancers today ({fmtScore(r.fear_greed.components.breadth.score)}),
+                  regime label ({fmtScore(r.fear_greed.components.regime.score)}),
                   and 5-day SPY momentum ({fmtScore(r.fear_greed.components.spy_5d.score)}).
                 </p>
               </div>
@@ -270,8 +282,8 @@ export default function RegimePage() {
             <Kpi label="USD Broad Index" value={fmtKpi(r.dxy, 2)} copy={DXY_COPY} numericValue={r.dxy} />
             <Kpi label="10Y Yield" value={fmtKpi(r.yield_10y, 3, "%")} copy={TY_COPY} numericValue={r.yield_10y} />
             <Kpi label="Rate direction" value={r.rate_direction} copy={RD_COPY} />
-            <Kpi label="Breadth (above 200DMA)" value={fmtKpi(r.breadth_pct, 1, "%")} copy={BR_COPY} numericValue={r.breadth_pct} />
-            <Kpi label="Sector leaders" value={r.sector_leaders} copy={SL_COPY} small />
+            <Kpi label="Advancers today (% of names that moved)" value={fmtKpi(r.breadth_pct, 1, "%")} copy={BR_COPY} numericValue={r.breadth_pct} />
+            <Kpi label="Highest-scoring sectors (our composite)" value={r.sector_leaders || "—"} copy={SL_COPY} small />
           </div>
 
           {/* Where the regime comes from — transparency block. p-6 to match
@@ -279,14 +291,23 @@ export default function RegimePage() {
               on this page; previously p-5 made this block look subtly
               smaller than its peers despite carrying the same weight. */}
           <div className="card mt-8 p-6 text-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Where this regime score comes from</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Where this regime label comes from</h2>
             <p className="mt-3 text-muted leading-relaxed">
-              The regime classifier blends four inputs — VIX percentile vs its
-              trailing 1-year distribution, breadth above 200DMA, 10-year yield
-              direction, and sector-leader rotation — leaning most on the
-              volatility and breadth readings. Bands: composite &gt; 70 = BULL,
-              50-70 = NEUTRAL, 30-50 = CAUTIOUS, &lt; 30 = BEAR. The thresholds
-              are fixed and visible — any change ships with a changelog entry.
+              There is no composite. The label is decided by the VIX level
+              against four fixed thresholds, and nothing else:{" "}
+              <strong>below 15 = BULL</strong>, <strong>15&ndash;20 = NEUTRAL</strong>,{" "}
+              <strong>20&ndash;25 = CAUTIOUS</strong>, <strong>25 or above = BEAR</strong>.
+              When our macro workbook publishes an explicit market-mode read,
+              that read is written last and supersedes the VIX ladder.
+            </p>
+            <p className="mt-3 text-muted leading-relaxed">
+              The other figures above — advancers today, the 10-year yield and
+              its direction, the USD index, and the highest-scoring sectors —
+              are published as context. None of them are inputs to the label.
+              The Fear &amp; Greed dial is the one number here that is a
+              weighted blend, and it reads the label as one of its four terms.
+              The thresholds are fixed and visible — any change ships with a
+              changelog entry.
             </p>
           </div>
         </>

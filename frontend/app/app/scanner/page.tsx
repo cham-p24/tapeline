@@ -876,7 +876,7 @@ export default function ScannerPage() {
                 <td className="hidden sm:table-cell px-2 sm:px-4 py-2 text-muted text-xs">{r.sector}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right ${scoreColor(r.score)}`}>
                   <HoverCard
-                    trigger={<span className="cursor-help underline decoration-dotted decoration-border underline-offset-2">{r.score?.toFixed(1)}</span>}
+                    trigger={<span className="cursor-help underline decoration-dotted decoration-border underline-offset-2">{r.score != null ? r.score.toFixed(1) : "—"}</span>}
                     content={
                       <ScoreBreakdown
                         trend={r.sub_trend}
@@ -896,7 +896,9 @@ export default function ScannerPage() {
                   {r.confidence_pct == null ? "—" : `${r.confidence_pct.toFixed(0)}%`}
                 </td>
                 <td className="px-2 sm:px-4 py-2"><SignalPill v={r.signal} /></td>
-                <td className="px-2 sm:px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
+                {/* A price we don't hold is the em-dash the rest of the row
+                    uses, not a bare "$" with nothing after it. */}
+                <td className="px-2 sm:px-4 py-2 text-right text-base font-semibold">{r.price != null ? `$${r.price.toFixed(2)}` : "—"}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
                 <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>

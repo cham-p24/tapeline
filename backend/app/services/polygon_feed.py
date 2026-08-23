@@ -428,6 +428,28 @@ def _positive_or_none(value: Any) -> float | None:
     return round(f, 2) if f > 0 else None
 
 
+def _positive_int_or_none(value: Any) -> int | None:
+    """Volume counterpart of `_positive_or_none`.
+
+    Massive sends 0 — not null — for a symbol it has no volume read for, and
+    ~72% of the universe has no read on a given tick. `int(x or 0)` wrote that
+    straight through as a measured "0 shares traded". We cannot tell a genuine
+    zero-volume session apart from a missing read here, so NULL is the only
+    honest value; the column is nullable and the UI renders an em-dash.
+
+    Nothing visible disappears: the heatmap already filters `volume > 100_000`
+    and the scanner `volume > 0`, so rows that would now be NULL were already
+    excluded from both.
+    """
+    if value is None:
+        return None
+    try:
+        i = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return i if i > 0 else None
+
+
 def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
     """Reshape Massive v3 snapshot result to our DB schema.
 
@@ -464,25 +486,32 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
     # math if missing (e.g. just-listed tickers without a previous_close).
     cp = session.get("change_percent")
     if cp is None:
+        # No vendor change-%, and for a just-listed ticker there is no previous
+        # close and no session open to compute one from either. That is "we
+        # don't know today's move", not a flat session — publishing 0.0 asserts
+        # the stock closed unchanged on a day it may never have traded. NULL.
         fallback_base = prev_close or day_open
-        change_1d = ((last_price / fallback_base) - 1) * 100 if fallback_base else 0.0
+        change_1d = ((last_price / fallback_base) - 1) * 100 if fallback_base else None
     else:
         change_1d = float(cp)
 
     # Composite score requires historical aggregates — worker runs a secondary
-    # pass to fill this in. For now, derive a naive score from today's move.
-    score = _naive_score_from_move(change_1d)
-    signal = _signal_from_score(score)
+    # pass to fill this in. For now, derive a naive score from today's move —
+    # and only when there IS a move to derive it from. (fetch_snapshots
+    # recomputes the composite from the sub-scores and ignores these two, but a
+    # 50 "neutral" derived from a move we never measured must not leak either.)
+    score = _naive_score_from_move(change_1d) if change_1d is not None else None
+    signal = _signal_from_score(score) if score is not None else None
 
     return {
         "symbol": ticker,
-        "score": round(score, 1),
+        "score": round(score, 1) if score is not None else None,
         "signal": signal,
         "price": round(float(last_price), 2),
-        "change_pct_1d": round(change_1d, 2),
+        "change_pct_1d": round(change_1d, 2) if change_1d is not None else None,
         "change_pct_5d": 0.0,   # filled by historical pass
         "change_pct_1m": 0.0,   # filled by historical pass
-        "volume": int(session.get("volume", 0) or 0),
+        "volume": _positive_int_or_none(session.get("volume")),
         # Key statistics (SNAPSHOT-sourced half) — refreshed every tick along
         # with price, so the day range never lags the price it brackets.
         "previous_close": prev_close,
@@ -799,17 +828,30 @@ async def fetch_squeezes() -> list[dict[str, Any]]:
 
 async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """
-    Classify market regime from VIX, breadth (advancers vs decliners),
-    rate direction (10Y yield slope), and sector leader rotation.
+    Classify market regime from VIX alone, and return the macro figures that
+    are displayed alongside it.
+
+    The regime label is a four-threshold VIX ladder and nothing else:
+    <15 BULL, <20 NEUTRAL, <25 CAUTIOUS, >=25 BEAR. ``breadth_pct``,
+    ``dxy``, ``yield_10y`` and ``rate_direction`` are returned for display —
+    none of them feed the label. (``sheet_feed.upsert_market_regime`` runs
+    later in the same tick and overwrites the label with the workbook's
+    market-mode text when MARKET_INTELLIGENCE_CSV_URL is configured.)
 
     Macro indicators come from FRED when FRED_API_KEY is set; falls back
     to hardcoded values otherwise. Polygon is used for the live VIX index.
 
     ``snapshots`` (this tick's rows, same shape as fetch_snapshots) drives a
-    REAL market-breadth read: the % of moving names that advanced today,
+    REAL advance/decline read: the % of moving names that advanced today,
     100 * advancers / (advancers + decliners) from each row's change_pct_1d.
     Replaces the long-standing hardcoded 55.0 placeholder. NEUTRAL 50 only when
-    no snapshots are supplied or none moved.
+    no snapshots are supplied or none moved. This is a same-day ratio — it is
+    NOT the share of the universe above its 200-day moving average.
+
+    ``sector_leaders`` is None here: this function has no sector data. The
+    worker (signal_publisher) ranks sectors by the mean of our own composite
+    and fills it in; when it cannot, absence stays absence rather than
+    reverting to a hardcoded list of sector names.
     """
     # Try FRED first (free + reliable for daily series)
     from app.services.fred_feed import fetch_macro_indicators
@@ -871,7 +913,11 @@ async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[st
         "yield_10y": round(y10, 3),
         "rate_direction": rate_direction,
         "breadth_pct": round(breadth_pct, 1),
-        "sector_leaders": "Technology, Industrials, Financials",
+        # We have no sector data here, so we report that we have none. This
+        # used to be the literal "Technology, Industrials, Financials", which
+        # rendered a fabricated ranking whenever the worker's real sector
+        # ranking failed. RegimeState coerces None to an em-dash on write.
+        "sector_leaders": None,
     }
 
 

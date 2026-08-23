@@ -88,16 +88,43 @@ export function ScoreRadial({
     }).join(" ") + " Z";
   }
 
-  // Filled value polygon. Missing factors render at 0 (collapses inward),
-  // visually distinguishing data-thin tickers from comprehensive ones.
-  const valuePoints = FACTORS.map((f, i) => {
+  // Value polygon. A factor we hold NO value for is not plotted: it used to be
+  // pushed to the origin, which draws exactly the same shape as a measured
+  // near-zero, so a data-thin ticker read as a scored-badly one. Absence now
+  // BREAKS the outline on that axis (no vertex, no dot, the spoke is dashed
+  // below) and the reader can see the ring is simply open there.
+  const valueVertices = FACTORS.map((f, i) => {
     const v = values[f.key];
-    const frac = v == null ? 0 : v / 100;
-    return pointAt(i, frac);
+    return v == null ? null : { i, ...pointAt(i, v / 100) };
   });
-  const valuePath = valuePoints
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
-    .join(" ") + " Z";
+  const valuePoints = valueVertices.filter((p) => p != null);
+  const hasGap = valuePoints.length < FACTORS.length;
+
+  // Walk the six axes and start a fresh sub-path after every gap, so a stroke
+  // is drawn only between two axes we hold ADJACENT readings for. When there
+  // is a gap the walk starts at the first axis following one, so a run that
+  // wraps past Momentum → Trend draws as a single arc, not two stubs.
+  const n = FACTORS.length;
+  const firstAfterGap = valueVertices.findIndex(
+    (p, i) => p != null && valueVertices[(i + n - 1) % n] == null,
+  );
+  const start = hasGap && firstAfterGap >= 0 ? firstAfterGap : 0;
+  const segments: string[] = [];
+  let current: string[] = [];
+  for (let k = 0; k < n; k++) {
+    const p = valueVertices[(start + k) % n];
+    if (p == null) {
+      if (current.length > 1) segments.push(current.join(" "));
+      current = [];
+      continue;
+    }
+    current.push(`${current.length === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`);
+  }
+  if (current.length > 1) segments.push(current.join(" "));
+  // Only a complete hexagon closes (and only a closed ring may be filled): an
+  // implicit close across a gap would paint area over an axis we hold nothing
+  // for, which is the misreading this is fixing.
+  const valuePath = hasGap ? segments.join(" ") : segments.join(" ") + " Z";
 
   // Score-tier colour echoes /how-it-works tier system. Defaults to accent
   // when score isn't provided.
@@ -154,9 +181,12 @@ export function ScoreRadial({
         />
       ))}
 
-      {/* Axis spokes */}
-      {FACTORS.map((_, i) => {
+      {/* Axis spokes. An axis we hold no reading for is dashed and carries a
+          <title>, so absence has a visible treatment of its own instead of
+          being silently indistinguishable from a measured zero. */}
+      {FACTORS.map((f, i) => {
         const p = pointAt(i, 1);
+        const missing = values[f.key] == null;
         return (
           <line
             key={i}
@@ -167,27 +197,38 @@ export function ScoreRadial({
             stroke="currentColor"
             strokeOpacity={0.16}
             strokeWidth={0.75}
+            strokeDasharray={missing ? "2 3" : undefined}
+            data-missing={missing ? "true" : undefined}
             className="text-muted"
-          />
+          >
+            {missing && <title>{`${f.short}: no reading held`}</title>}
+          </line>
         );
       })}
 
       {/* Value polygon — draws in via stroke-dashoffset on mount, then the
-          fill + dots fade in just behind. Honours prefers-reduced-motion. */}
-      <path
-        d={valuePath}
-        fill={tone}
-        fillOpacity={0.18}
-        stroke={tone}
-        strokeWidth={1.75}
-        strokeLinejoin="round"
-        className="radial-polygon"
-      />
+          fill + dots fade in just behind. Honours prefers-reduced-motion.
+          Filled only when all six axes are held: on an incomplete ring the
+          fill would have to close across the gap, painting area over an axis
+          we hold no value for. Open outline, no area, on those. */}
+      {valuePath && (
+        <path
+          d={valuePath}
+          fill={hasGap ? "none" : tone}
+          fillOpacity={hasGap ? 0 : 0.18}
+          stroke={tone}
+          strokeWidth={1.75}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          className="radial-polygon"
+          data-complete={hasGap ? "false" : "true"}
+        />
+      )}
 
-      {/* Vertex dots */}
+      {/* Vertex dots — one per axis we actually hold a value for. */}
       <g className="radial-fade-in">
-        {valuePoints.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill={tone} />
+        {valuePoints.map((p) => (
+          <circle key={p.i} cx={p.x} cy={p.y} r={2.5} fill={tone} />
         ))}
       </g>
 

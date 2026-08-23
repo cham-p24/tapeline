@@ -61,9 +61,9 @@ export function FinancialsTab({ symbol }: { symbol: string }) {
   const m = data.metrics;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <Metric label="P/E" value={fmtNumber(m.pe)} hint="Price ÷ trailing EPS" />
-      <Metric label="Net margin" value={fmtPct(m.margin)} hint="Net income ÷ revenue, TTM" />
-      <Metric label="ROE" value={fmtPct(m.roe)} hint="Return on equity, RFY" />
+      <Metric label="P/E" value={fmtNumber(m.pe)} hint="Normalized annual, falls back to TTM" />
+      <Metric label="Net margin" value={fmtPct(m.margin)} hint="Net income ÷ revenue, annual, falls back to TTM" />
+      <Metric label="ROE" value={fmtPct(m.roe)} hint="Return on equity, last full fiscal year, falls back to TTM" />
       <Metric label="EPS growth" value={fmtPct(m.eps_growth)} hint="5-year CAGR, falls back to TTM YoY" />
       <Metric label="Revenue growth" value={fmtPct(m.revenue_growth)} hint="5-year CAGR, falls back to TTM YoY" />
       <Metric label="Debt / equity" value={fmtNumber(m.debt_to_equity)} hint="Total debt ÷ total equity, annual" />

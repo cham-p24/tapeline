@@ -11,21 +11,28 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Market Regime Indicator — Live VIX + Breadth + Rate Direction | Tapeline",
+  title: "Market Regime Indicator — Live VIX Thresholds + Advancers | Tapeline",
   description:
-    "Tapeline's market regime classifier synthesizes VIX, breadth, rate direction, and SPY momentum into one read on macro conditions: Risk On, Neutral, Cautious, Risk Off. Cached snapshot, refreshed hourly.",
+    "Tapeline's market regime label is set by the VIX against four fixed thresholds. We publish it next to the advancer count, rate direction and SPY momentum, and show exactly which of those feed the label. Cached snapshot, refreshed hourly.",
   path: "/market-regime",
 });
 
+// Every reading is nullable on the LIVE path. The API can answer with a regime
+// label and no VIX (the FRED leg failed, the cache is cold), and substituting
+// the showcase's number there prints an invented measurement on a card headed
+// "Cached snapshot". Absence renders as an em-dash — same contract as
+// sector_leaders below.
 type RegimePreview = {
   regime: string;
-  vix: number;
-  breadth_pct: number;
-  rate_direction: string;
-  yield_10y: number;
-  fear_greed: { score: number; label: string };
+  vix: number | null;
+  breadth_pct: number | null;
+  rate_direction: string | null;
+  yield_10y: number | null;
+  fear_greed: { score: number; label: string } | null;
   sector_leaders: string;
 };
+
+const EMPTY = "—";
 
 const SHOWCASE: RegimePreview = {
   regime: "NEUTRAL",
@@ -51,14 +58,19 @@ async function fetchRegime(): Promise<{ data: RegimePreview; live: boolean }> {
     const body = (await res.json()) as Partial<RegimePreview> & { available?: boolean };
     if (!body.available || !body.regime) return { data: SHOWCASE, live: false };
     return {
+      // NO SHOWCASE FALLBACKS on this branch. The whole card is labelled
+      // "Cached snapshot" here, so borrowing the example's numbers for whatever
+      // the API omitted would present invented readings as real ones — the
+      // showcase VIX of 17.26 is not a measurement of anything. Absent stays
+      // absent; each one renders as an em-dash.
       data: {
         regime: body.regime,
-        vix: body.vix ?? SHOWCASE.vix,
-        breadth_pct: body.breadth_pct ?? SHOWCASE.breadth_pct,
-        rate_direction: body.rate_direction ?? SHOWCASE.rate_direction,
-        yield_10y: body.yield_10y ?? SHOWCASE.yield_10y,
-        fear_greed: body.fear_greed ?? SHOWCASE.fear_greed,
-        sector_leaders: body.sector_leaders ?? SHOWCASE.sector_leaders,
+        vix: body.vix ?? null,
+        breadth_pct: body.breadth_pct ?? null,
+        rate_direction: body.rate_direction ?? null,
+        yield_10y: body.yield_10y ?? null,
+        fear_greed: body.fear_greed ?? null,
+        sector_leaders: body.sector_leaders || "—",
       },
       live: true,
     };
@@ -72,28 +84,40 @@ export default async function MarketRegimePage() {
   // Tone the F&G number by its score band so the colour matches what the
   // dial would show: red below 25, amber to 44, muted to 54, accent to 74,
   // green at 75+.
+  const fgScore = data.fear_greed?.score ?? null;
   const fgTone =
-    data.fear_greed.score < 25 ? "text-down"
-    : data.fear_greed.score < 45 ? "text-warn"
-    : data.fear_greed.score < 55 ? "text-muted"
-    : data.fear_greed.score < 75 ? "text-accent"
+    fgScore == null ? "text-muted"
+    : fgScore < 25 ? "text-down"
+    : fgScore < 45 ? "text-warn"
+    : fgScore < 55 ? "text-muted"
+    : fgScore < 75 ? "text-accent"
     : "text-up";
   return (
     <SeoFeaturePage
       slug="market-regime"
       eyebrow="Feature · Market regime"
-      h1="Market Regime Indicator — Live VIX, Breadth, Rates"
-      lede="Every individual scoring decision is downstream of the macro state. Tapeline's regime classifier synthesizes the four inputs that actually drive sector rotation — VIX (volatility), breadth (% of S&P above 200DMA), rate direction (10Y yield slope from FRED), and short-window SPY momentum — into one descriptive read: Risk On, Neutral, Cautious, or Risk Off. The Fear &amp; Greed dial blends the same inputs into the familiar 0–100 sentiment scale."
+      h1="Market Regime Indicator — Live VIX, Advancers, Rates"
+      lede="Every individual scoring decision is downstream of the macro state. Tapeline's regime label is set by one input: the VIX, against four fixed thresholds — below 15 BULL (risk on), 15–20 NEUTRAL, 20–25 CAUTIOUS, 25 and above BEAR (risk off). We publish the other macro figures we track next to it — advancers today, rate direction (10Y yield slope from FRED), and short-window SPY momentum — and we tell you plainly that they are context, not inputs. The Fear &amp; Greed dial is the number here that does blend all four into the familiar 0–100 sentiment scale."
       methodology={{
         heading: "How the regime is computed",
         body: (
           <>
             <p>
-              Four inputs blended into a composite Fear &amp; Greed score, leaning
-              most on the volatility and breadth readings:
-              VIX (lower = greed), breadth (more % above 200DMA = greed),
-              regime label (BULL/NEUTRAL/CAUTIOUS/BEAR), and 5-day SPY
-              momentum (positive = greed). The composite maps to{" "}
+              Two different things share this page. The{" "}
+              <strong>regime label</strong> is not a composite: it is the VIX
+              read against four fixed thresholds — below 15 BULL, 15&ndash;20
+              NEUTRAL, 20&ndash;25 CAUTIOUS, 25 and above BEAR — and nothing
+              else. When our macro workbook publishes an explicit market-mode
+              read, that read is written last and supersedes the ladder.
+            </p>
+            <p>
+              The <strong>Fear &amp; Greed score</strong> is the composite.
+              Four inputs, leaning most on the volatility and advancer
+              readings: VIX (lower = greed), advancers today (more of the
+              moving names closing up = greed), the regime label itself, and
+              5-day SPY momentum (positive = greed). Because the label is
+              VIX-derived, that third term partly re-weights VIX rather than
+              adding an independent input. The composite maps to{" "}
               <strong>0&ndash;24 Extreme Fear</strong>, <strong>25&ndash;44 Fear</strong>,{" "}
               <strong>45&ndash;54 Neutral</strong>, <strong>55&ndash;74 Greed</strong>,{" "}
               <strong>75&ndash;100 Extreme Greed</strong> &mdash; matches the labels
@@ -101,20 +125,18 @@ export default async function MarketRegimePage() {
               can read it instantly.
             </p>
             <p>
-              The regime label itself anchors more loosely. <strong>Risk On</strong>{" "}
-              when VIX is low, breadth is wide, and rates aren&rsquo;t threatening
-              a sharp move. <strong>Risk Off</strong> when those flip. Most days
-              are <strong>Neutral</strong> or <strong>Cautious</strong> &mdash; the
-              regime isn&rsquo;t a coin flip, it&rsquo;s a slow-moving
-              classification that filters which factor weights deserve more
-              weight in this moment of the cycle.
+              Because the ladder is VIX-only, the label can disagree with the
+              other figures on this page &mdash; a calm VIX reads Risk On even
+              on a day when most moving names fell. We show both rather than
+              reconciling them behind the scenes. Most days land in{" "}
+              <strong>Neutral</strong> or <strong>Cautious</strong>.
             </p>
             <p>
-              All four macro inputs come from FRED via the free-tier API: VIX
-              (VIXCLS), 10Y yield (DGS10), USD broad index (DTWEXBGS). Breadth
-              and sector leaders are computed live each worker tick across the
-              full Tapeline universe. Full live regime panel + Fear &amp; Greed dial
-              at{" "}
+              The macro figures come from FRED via the free-tier API: VIX
+              (VIXCLS), 10Y yield (DGS10), USD broad index (DTWEXBGS). The
+              advancer count and the sector ranking are computed live each
+              worker tick across the Tapeline universe. Full live regime panel
+              + Fear &amp; Greed dial at{" "}
               <Link href="/app/regime" className="link">
                 /app/regime
               </Link>
@@ -125,24 +147,24 @@ export default async function MarketRegimePage() {
       }}
       faq={[
         {
-          q: "What's the difference between 'Risk On' and 'Risk Off'?",
-          a: "Risk On means the macro inputs that historically support equity gains are aligned: low VIX (calm), wide breadth (broad participation, not just mega-caps carrying the index), and stable or falling rates. Risk Off is the opposite — VIX spiking, breadth narrowing, rates jumping. Neutral and Cautious sit between, and reflect the fact that most days aren't unambiguously one or the other.",
+          q: "What's the difference between 'Risk On' (BULL) and 'Risk Off' (BEAR)?",
+          a: "Only the VIX level. BULL is VIX below 15, NEUTRAL is 15–20, CAUTIOUS is 20–25, and BEAR is 25 or above — those four labels are what the app displays. Nothing else moves the label: not the advancer count, not rates, not the sector ranking. We used to describe this as a blend of those inputs; it never was one, and the page now states the thresholds instead.",
         },
         {
           q: "How is the Fear & Greed score different from CNN's?",
-          a: "Same labels (Extreme Fear / Fear / Neutral / Greed / Extreme Greed), different inputs. CNN blends seven inputs including put/call ratio, junk bond demand, market momentum, etc. Tapeline uses four: VIX, breadth, regime label, SPY 5d momentum. The simpler input set converges on similar reads but is fully transparent — every component score is visible in the response, so you can audit which input is driving the headline number.",
+          a: "Same labels (Extreme Fear / Fear / Neutral / Greed / Extreme Greed), different inputs. CNN blends seven inputs including put/call ratio, junk bond demand, market momentum, etc. Tapeline uses four: VIX, advancers today, the regime label, and SPY 5d momentum. Two of those four are VIX-derived, since the regime label is itself a VIX threshold read — so our score leans on volatility more than the four-way split suggests. Every component score is visible in the response, so you can audit which input is driving the headline number.",
         },
         {
           q: "How often does the regime update?",
-          a: "Every worker tick — sub-60 seconds during US market hours. The underlying FRED series (VIX, 10Y) update once a day at end-of-day; the breadth and SPY momentum inputs are live; the composite recomputes on each tick.",
+          a: "Every worker tick — sub-60 seconds during US market hours. The underlying FRED series (VIX, 10Y) update once a day at end-of-day, so the regime label only moves when that daily VIX close crosses a threshold; the advancer count and SPY momentum are live; the Fear & Greed composite recomputes on each tick.",
         },
         {
           q: "Does the regime change scoring weights?",
           a: "No — Tapeline's six factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) and the ordering of their weights are fixed and public; the exact numeric weights are not published. The regime classifier is a separate macro context indicator. What changes per regime isn't the scoring, it's which scores you might pay more attention to: high-momentum names in Risk On, high-quality fundamentals + low-beta names in Risk Off.",
         },
         {
-          q: "What's 'breadth' here exactly?",
-          a: "Percentage of S&P 500 components trading above their 200-day moving average. Above 70% = broad participation, equity rally is healthy. Below 30% = narrow market, the rally is concentrated and fragile. Mid-range (40–60%) is the most common state. Computed live from the underlying Tapeline scoring universe each tick.",
+          q: "What is 'advancers today' exactly?",
+          a: "Of the names that moved today, the share that closed up: advancers ÷ (advancers + decliners), computed live from the Tapeline scoring universe each tick. Names with no price read for the day, and names that closed unchanged, are excluded from both sides. It is a same-day advance/decline ratio, so 50% means advancers and decliners were balanced. It is not the percentage of stocks above their 200-day moving average — that is a different measure, and we do not currently publish it. One session's ratio describes that session only; it is not a trend reading.",
         },
         {
           q: "What tier do I need?",
@@ -165,11 +187,11 @@ export default async function MarketRegimePage() {
           </div>
           <p className="mt-2 text-5xl font-bold tracking-tight text-accent">{data.regime}</p>
           <p className="mt-3 text-xs text-muted leading-relaxed">
-            Synthesized from VIX, breadth, rate direction, and short-window SPY
-            momentum. Updated each worker tick (~60s).
+            Set by the VIX against four fixed thresholds. Updated each worker
+            tick (~60s).
           </p>
           <p className="mt-4 text-[11px] uppercase tracking-wider text-subtle">
-            Sector leaders
+            Highest-scoring sectors (our composite)
           </p>
           <p className="text-xs">{data.sector_leaders}</p>
         </div>
@@ -178,26 +200,29 @@ export default async function MarketRegimePage() {
         <div className="rounded-2xl border border-border bg-panel/40 p-6">
           <p className="text-xs uppercase tracking-wider text-muted">Fear &amp; Greed</p>
           <div className="mt-2 flex items-baseline gap-3">
-            <span className={`text-5xl font-bold tracking-tight ${fgTone}`}>
-              {data.fear_greed.score}
+            <span className={`text-5xl font-bold tracking-tight ${data.fear_greed ? fgTone : "text-muted"}`}>
+              {data.fear_greed ? data.fear_greed.score : EMPTY}
             </span>
-            <span className={`text-base font-semibold uppercase tracking-wider ${fgTone}`}>
-              {data.fear_greed.label}
+            <span className={`text-base font-semibold uppercase tracking-wider ${data.fear_greed ? fgTone : "text-muted"}`}>
+              {data.fear_greed ? data.fear_greed.label : "No reading held"}
             </span>
           </div>
           <p className="mt-3 text-xs text-muted leading-relaxed">
-            Blended from VIX, breadth, regime, and 5-day SPY momentum. The composite maps
-            to 0–24 Extreme Fear, 25–44 Fear, 45–54 Neutral, 55–74 Greed, 75–100
-            Extreme Greed.
+            Blended from VIX, advancers today, the regime label, and 5-day SPY
+            momentum. The composite maps to 0–24 Extreme Fear, 25–44 Fear,
+            45–54 Neutral, 55–74 Greed, 75–100 Extreme Greed.
           </p>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="VIX" value={data.vix.toFixed(2)} />
-        <Kpi label="10Y Yield" value={`${data.yield_10y.toFixed(2)}%`} />
-        <Kpi label="Rate direction" value={data.rate_direction} />
-        <Kpi label="Breadth above 200DMA" value={`${data.breadth_pct.toFixed(1)}%`} />
+        <Kpi label="VIX" value={data.vix != null ? data.vix.toFixed(2) : EMPTY} />
+        <Kpi label="10Y Yield" value={data.yield_10y != null ? `${data.yield_10y.toFixed(2)}%` : EMPTY} />
+        <Kpi label="Rate direction" value={data.rate_direction || EMPTY} />
+        <Kpi
+          label="Advancers today (% of names that moved)"
+          value={data.breadth_pct != null ? `${data.breadth_pct.toFixed(1)}%` : EMPTY}
+        />
       </div>
 
       <p className="mt-3 text-xs text-subtle">
