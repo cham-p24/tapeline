@@ -113,3 +113,56 @@ describe("ScoreRadial paint values", () => {
     expect(new Set(radii.map((r) => r.toFixed(1))).size).toBeGreaterThan(1);
   });
 });
+
+/**
+ * Second prod bug, caught in a press screenshot rather than by a test: the
+ * left-hand axis label rendered as "lacro" instead of "Macro".
+ *
+ * The labels are anchored so text grows AWAY from the centre (textAnchor="end"
+ * on the left side), so a long label on a 150-degree vertex starts left of
+ * x=0 and the SVG viewBox clips it. At the default size the estimated span was
+ * roughly -9 to 25, losing the M. It shipped that way in
+ * public/press/tapeline-ticker.png.
+ *
+ * Asserted as GEOMETRY rather than a rendered-pixel check, because jsdom has
+ * no text metrics: every label box, computed from its anchor and a width
+ * estimate, must sit inside [0, size].
+ */
+describe("ScoreRadial label placement", () => {
+  const SIZE = 220;
+  // Mirrors the component: fontSize = round(size * 0.052), width estimated at
+  // 0.62em per character.
+  const FONT = Math.round(SIZE * 0.052);
+  const widthOf = (s: string) => s.length * FONT * 0.62;
+
+  it("keeps every factor label inside the viewBox", () => {
+    const { container } = render(
+      <ScoreRadial trend={88} rs={81} fundamentals={34} smart_money={52} macro={61} momentum={70} score={71} />,
+    );
+    const labels = [...container.querySelectorAll("text")].filter((t) =>
+      ["Trend", "RS", "Fund", "SM", "Macro", "Mom"].includes(t.textContent ?? ""),
+    );
+    expect(labels).toHaveLength(6);
+
+    for (const el of labels) {
+      const text = el.textContent ?? "";
+      const x = Number(el.getAttribute("x"));
+      const anchor = el.getAttribute("text-anchor");
+      const w = widthOf(text);
+      const left = anchor === "end" ? x - w : anchor === "middle" ? x - w / 2 : x;
+      const right = left + w;
+      expect(left, `"${text}" starts at ${left.toFixed(1)}, outside the viewBox`).toBeGreaterThanOrEqual(0);
+      expect(right, `"${text}" ends at ${right.toFixed(1)}, past size ${SIZE}`).toBeLessThanOrEqual(SIZE);
+    }
+  });
+
+  it("still pushes each label clear of the centre", () => {
+    // The clamp must not drag a label so far inward that it lands on the
+    // polygon it is meant to annotate.
+    const { container } = render(
+      <ScoreRadial trend={88} rs={81} fundamentals={34} smart_money={52} macro={61} momentum={70} score={71} />,
+    );
+    const macro = [...container.querySelectorAll("text")].find((t) => t.textContent === "Macro")!;
+    expect(Math.abs(Number(macro.getAttribute("x")) - SIZE / 2)).toBeGreaterThan(SIZE * 0.25);
+  });
+});
