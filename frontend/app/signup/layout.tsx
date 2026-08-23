@@ -4,9 +4,9 @@ import { pageMeta } from "@/lib/seo";
 // metadata lives here. Indexable — brand queries like "tapeline sign up"
 // and "tapeline free trial" should land here directly.
 export const metadata = pageMeta({
-  title: "Start Your Free Tapeline Trial — 14-Day Premium, No Credit Card",
+  title: "Create Your Tapeline Account — 14-Day Premium Trial",
   description:
-    "Create a free Tapeline account. 14-day Premium trial unlocks the full ~2,500-ticker live scanner, smart alerts, congressional trades, and recent insider buys (SEC Form 4). No credit card required, cancel in one click.",
+    "Create a Tapeline account and start a 14-day Premium trial: $0 today, first charge on day 14, cancel in one click. Unlocks the full ~2,500-ticker live scanner, smart alerts, congressional trades, and recent insider buys (SEC Form 4). The published record stays free to read with no account.",
   path: "/signup",
 });
 

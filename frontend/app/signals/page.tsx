@@ -313,8 +313,8 @@ export default async function SignalsPage() {
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
                 You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
-                Your free account includes a 14-day Premium trial — the full live universe,
-                no card, same public 6-factor formula on every row.
+                An account starts a 14-day Premium trial — the full live universe, same
+                public 6-factor formula on every row. $0 today, cancel in one click.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">

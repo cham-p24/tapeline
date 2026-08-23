@@ -70,7 +70,7 @@ export function OnboardingTip() {
             Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}. Three things to try first.
           </h3>
           <p className="mt-1 text-sm text-muted">
-            Your 14-day Premium trial is live. No credit card on file.
+            Your 14-day Premium trial is live.
           </p>
           <ul className="mt-3 space-y-1.5 text-sm">
             <li className="flex items-start gap-2">

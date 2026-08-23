@@ -262,7 +262,7 @@ export default async function SectorsIndexPage() {
           </h2>
           <p className="mt-3 text-sm text-muted">
             Drill from any sector into its top-scoring names on the live scanner.
-            14-day Premium trial, no card — the full ~2,500-ticker live universe.
+            14-day Premium trial, $0 today — the full ~2,500-ticker live universe.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">

@@ -141,7 +141,7 @@ describe("content CTA instrumentation on real surfaces", () => {
     // The bottom-of-page CTA is the instrumented one; the above-the-fold
     // LandingCta block renders the same label, so take the last match.
     const ctas = screen.getAllByRole("link", {
-      name: /try the live scanner free — no card/i,
+      name: /try the live scanner — 14-day trial/i,
     });
     await userEvent.click(ctas[ctas.length - 1]);
 

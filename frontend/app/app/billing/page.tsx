@@ -1028,8 +1028,8 @@ export default function BillingPage() {
           )}
 
           {/* Payment security in plain language, directly under the upgrade
-              buttons — the highest-value placement, since signup takes no card
-              and the first card entry happens at Stripe Checkout from here.
+              buttons — the highest-value placement, since a new account is walled
+              until it adds one, and every card entry happens at Stripe Checkout.
               Factual and verifiable; no badge, no certification claim. */}
           <p className="mx-auto max-w-2xl text-center text-[11px] leading-relaxed text-subtle">
             Card details are entered on Stripe&rsquo;s own checkout page, not on

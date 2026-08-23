@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SignUpPage from "@/app/signup/page";
-import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 
 vi.mock("@/lib/auth", () => ({
   authApi: {
@@ -144,13 +144,12 @@ describe("SignUpPage", () => {
 
   it("renders the coherent value strip, with the card rule attached to the right thing", () => {
     render(<SignUpPage />);
-    // CHANGED with the card-required trial: the strip used to read
-    // "Free forever · No credit card · 14-day Premium trial", which now reads
-    // as a promise that the TRIAL takes no card. It does. So "no credit card"
-    // has to qualify signup, and the trial has to carry its own qualifier.
+    // CHANGED TWICE. #536 moved "no credit card" off the trial and onto the
+    // account. #548 then put a card wall at first sign-in, so the account is
+    // not card-free either — the strip must lead with the card and the amount.
     expect(
       screen.getByText(
-        /Free forever.*No credit card to sign up.*14-day Premium trial \(card required, \$0 today\).*30-day money-back/i,
+        /14-day Premium trial.*Card added at first sign-in, \$0 charged today.*Cancel in one click.*30-day money-back/i,
       ),
     ).toBeInTheDocument();
   });
@@ -176,21 +175,31 @@ describe("SignUpPage", () => {
     expect(text).not.toMatch(/no (?:credit )?card[^.]{0,25}(?:14[- ]day|Premium) trial/i);
   });
 
-  it("states the trial's charge terms up front: card required, $0 today, first charge at day 14, one-click exit", () => {
+  it("states the trial's charge terms up front: card at sign-in, $0 today, first charge at day 14, one-click exit", () => {
     const { container } = render(<SignUpPage />);
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(/card required/i);
+    expect(text).toMatch(/at first sign-in you add a card/i);
     expect(text).toMatch(/\$0 is charged today/i);
     expect(text).toMatch(/first charge is 14 days later/i);
     expect(text).toMatch(/one click ends it before then/i);
-    // And the free fallback is named as a real, unpunished outcome.
-    expect(text).toMatch(/stay on Free/i);
+    // The advance warning is a promise the backend actually keeps (the
+    // trial_will_end handler), so the page is allowed to make it.
+    expect(text).toMatch(/three days before/i);
   });
 
-  it("keeps the Free-tier no-card promise literally true", () => {
+  it("attaches the card-free claim ONLY to the published record", () => {
     const { container } = render(<SignUpPage />);
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(/free forever and never needing a card/i);
+    // The one card-free path that survived #548: reading the record needs no
+    // account at all. If this line goes, the page has no honest "free" left
+    // and every remaining "free" is selling something that takes a card.
+    expect(text).toMatch(/do not need an account — or a card — to read the record/i);
+    // And the grandfather clause is stated, because it is a promise to real
+    // users rather than a marketing line.
+    expect(text).toMatch(/before 22 August 2026 keep the free access/i);
+    // The dead claim must not come back in any form.
+    expect(text).not.toMatch(/free forever and never needing a card/i);
+    expect(text).not.toMatch(/no card to sign up/i);
   });
 
   it("labels the submit button as account creation, not a trial start", () => {
@@ -236,20 +245,21 @@ describe("SignUpPage", () => {
 
   it("shows the card-transparency block", () => {
     render(<SignUpPage />);
-    // CHANGED: the footer used to headline "After your 14 days", which assumed
-    // a trial had already started. It now explains what this form creates
-    // (a free account) and where a card does come in.
+    // CHANGED TWICE: it headlined "After your 14 days" (assumed a trial had
+    // started), then "Free account, and where a card does come in" (assumed the
+    // account was free). Post-#548 it is simply about the card.
     expect(
-      screen.getByText(/Free account, and where a card does come in/i),
+      screen.getByText(/^Where the card comes in$/i),
     ).toBeInTheDocument();
   });
 
   it("uses the default headline when no ?from= source is set", () => {
     render(<SignUpPage />);
-    // CHANGED: "Try Premium free for 14 days" over an email+password form is
-    // now a mis-promise — the form creates a free account, not a trial.
+    // CHANGED: "Try Premium free for 14 days" over an email+password form was
+    // a mis-promise, and so was "free account" once #548 put a card wall at
+    // first sign-in. The H1 now claims neither.
     expect(
-      screen.getByRole("heading", { name: /Create your free Tapeline account/i }),
+      screen.getByRole("heading", { name: /^Create your Tapeline account$/i }),
     ).toBeInTheDocument();
   });
 
@@ -273,7 +283,7 @@ describe("SignUpPage", () => {
     nav.search = new URLSearchParams("from=bogus");
     render(<SignUpPage />);
     expect(
-      screen.getByRole("heading", { name: /Create your free Tapeline account/i }),
+      screen.getByRole("heading", { name: /^Create your Tapeline account$/i }),
     ).toBeInTheDocument();
   });
 
@@ -285,6 +295,9 @@ describe("SignUpPage", () => {
         " " + (container.querySelector("h1")?.nextElementSibling?.textContent ?? "");
       expect(head).not.toMatch(/(?:14[- ]days? )?free[^.]{0,20}no credit card/i);
       expect(head).not.toMatch(/Premium free/i);
+      // #548: no source may sell a card-free ACCOUNT either.
+      expect(head).not.toMatch(/free account/i);
+      expect(head).not.toMatch(/no card/i);
       unmount();
     }
   });
@@ -424,15 +437,15 @@ describe("SignUpPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("derives the Free-tier caps in the after-trial footer from FREE_LIMITS", () => {
+  it("names the card-free escape hatch in the transparency footer", () => {
+    // This replaced a FREE_LIMITS-derivation check: the footer used to sell a
+    // card-free Free tier with its caps, which #548 made false, so there are no
+    // caps left to derive. What the footer must still carry is the honest
+    // alternative — the record a visitor can read without an account.
     render(<SignUpPage />);
-    expect(
-      screen.getByText(
-        new RegExp(
-          `top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
-        ),
-      ),
-    ).toBeInTheDocument();
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toMatch(/the daily Top 10, the whole back-checked scorecard/i);
+    expect(text).toMatch(/raw CSV\/JSON export are open to everyone/i);
   });
 
   it("derives the refund copy from REFUND", () => {

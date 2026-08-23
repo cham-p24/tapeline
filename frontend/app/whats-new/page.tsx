@@ -302,7 +302,8 @@ export default function WhatsNewPage() {
         <div className="mt-20 rounded-2xl border border-border bg-panel p-8 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">See it for yourself</h2>
           <p className="mx-auto mt-2 max-w-md text-muted">
-            The full scanner is free to look — top rows, live scores, no card required.
+            The record is free to read with no account. The live scanner takes a card at
+            first sign-in and starts a 14-day Premium trial &mdash; $0 today.
           </p>
           <Button href="/signup" variant="primary" shape="rounded" className="mt-6">
             Open Tapeline &rarr;

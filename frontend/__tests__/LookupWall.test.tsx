@@ -46,10 +46,12 @@ describe("LookupWall", () => {
 
       // Inviting, not punitive headline.
       expect(
-        screen.getByText(/sign up free to keep looking up tickers/i),
+        screen.getByText(/keep looking up tickers/i),
       ).toBeInTheDocument();
-      // Sign-up CTA carries a next= back to the ticker the user wanted.
-      const signup = screen.getByRole("link", { name: /sign up free/i });
+      // Sign-up CTA carries a next= back to the ticker the user wanted. Label
+      // is "Create an account", not "Sign up free": this wall is only shown to
+      // anonymous guests, whose new account hits the #548 card gate.
+      const signup = screen.getByRole("link", { name: /create an account/i });
       expect(signup).toHaveAttribute(
         "href",
         "/signup?next=" + encodeURIComponent("/app/ticker/NVDA"),
@@ -65,7 +67,7 @@ describe("LookupWall", () => {
 
     it("omits the next= param when no symbol is provided", () => {
       render(<LookupWall reason="signup_required" />);
-      expect(screen.getByRole("link", { name: /sign up free/i })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: /create an account/i })).toHaveAttribute(
         "href",
         "/signup",
       );

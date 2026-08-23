@@ -123,7 +123,7 @@ export const metadata: Metadata = {
     // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
-      `Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo. 14-day Premium trial, no card.`,
+      `Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. The whole record is free to read with no account. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo.`,
     url: "/",
     siteName: "Tapeline",
     type: "website",
