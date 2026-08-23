@@ -151,8 +151,11 @@ These need user-side values that came up yesterday:
 # 1. Local .env Resend key (paste line 41 of C:\Project 1\.env)
 RESEND_API_KEY=<paste from resend.com/api-keys>
 
-# 2. Quiver API key (already paying — just need the key)
-fly secrets set QUIVER_API_KEY=<paste from quiverquant.com> -a tapeline-backend
+# 2. WITHDRAWN — do not run. The Quiver subscription was cancelled; quiver_feed.py,
+#    the _refresh_elite_13f worker task, the InstitutionalHolding model and the
+#    quiver_api_key config are all deleted, so this secret activates nothing.
+#    Smart-money inputs are SEC Form 4 insider data via Finnhub.
+# fly secrets set QUIVER_API_KEY=<paste from quiverquant.com> -a tapeline-backend
 ```
 
 ## What's NOT done from the original launch list

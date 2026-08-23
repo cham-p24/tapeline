@@ -35,7 +35,7 @@ export async function ogResponse({
   eyebrow,
   title,
   subtitle,
-  footerLeft = "Six-factor formula · Public scorecard · Live sub-60s refresh",
+  footerLeft = "Six named factors · Public scorecard · Live sub-60s refresh",
   footerRight = "tapeline.io",
   accent = "#3b82f6",
 }: OgParams) {

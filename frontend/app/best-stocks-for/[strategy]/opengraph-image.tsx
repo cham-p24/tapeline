@@ -19,7 +19,7 @@ export default async function OG({ params }: { params: Promise<{ strategy: strin
     return ogResponse({
       eyebrow: "BEST STOCKS FOR",
       title: "Best stocks, ranked by the Tapeline Score.",
-      subtitle: "Live 6-factor scoring with the formula in public and the picks on the record.",
+      subtitle: "Live six-factor scoring with the methodology in public and the picks on the record.",
     });
   }
   return ogResponse({

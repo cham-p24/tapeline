@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Drafted 2026-05-13. Goal: drive trial signups by turning the public scorecard into daily, auditable content. Each tweet links to a page anyone can verify.
@@ -69,24 +85,24 @@ https://tapeline.io/scorecard
 
 ---
 
-### Day 2 — Fri 2026-05-15 · 8:00 AM ET · Formula transparency
+### Day 2 — Fri 2026-05-15 · 8:00 AM ET · Methodology transparency
 
 ```
-Every Tapeline score is the same recipe:
+Every Tapeline score is the same six factors, weighted the same way for every ticker:
 
-Trend 25%
-Relative Strength 20%
-Fundamentals 15%
-Smart Money 15%
-Macro 15%
-Momentum 10%
+Trend
+Relative Strength
+Fundamentals
+Smart Money
+Macro
+Momentum
 
-Same weights for every ticker. If they ever change, there's a changelog entry on the page.
+Heaviest Trend and Relative Strength, lightest Momentum. If the ordering ever changes, there's a changelog entry on the page.
 
 https://tapeline.io/how-it-works
 ```
 
-**Screenshot**: the "How the score is built" section of /how-it-works showing the six-factor pie or weight table. No live data, so this tweet is publish-ready as-is.
+**Screenshot**: the factor list on /how-it-works, which shows the six factors in weight order without the numbers. No live data, so this tweet is publish-ready as-is.
 
 ---
 
@@ -155,7 +171,7 @@ https://tapeline.io/scorecard
 ```
 Where Tapeline's scoring tends to disagree with a fundamentals-only screen:
 
-Smart Money (15%) is Form 4 insider buys, not 13F lag. Same ticker can score 75 here and 60 elsewhere because someone in the C-suite just bought.
+Smart Money is Form 4 insider buys, not 13F lag. Same ticker can score 75 here and 60 elsewhere because someone in the C-suite just bought.
 
 Receipts: https://tapeline.io/how-it-works
 ```
@@ -187,12 +203,12 @@ CRWD on Tapeline today: 79.0 composite, STRONG SETUP.
 
 Trend 89 · RS 94 · Fundamentals 66 · Smart Money 94 · Macro 59 · Momentum 51
 
-Smart Money 94 = Congressional buys disclosed in the last 30 days. The disclosure feed is public — anyone can verify.
+Smart Money 94 = disclosed SEC Form 4 insider transactions, netted over a recent window. The filings are public — anyone can verify.
 
 https://tapeline.io/t/CRWD
 ```
 
-**Pre-post check**: 5 min before posting, run `curl -s "https://api.tapeline.io/api/ticker/CRWD"` and confirm the breakdown numbers still match. If the composite has crossed a label boundary (STRONG SETUP at 70, HIGH CONVICTION at 85), rewrite the label to fit. If Smart Money drops below 80, drop the Congressional-buys hook and swap in whichever factor is highest.
+**Pre-post check**: 5 min before posting, run `curl -s "https://api.tapeline.io/api/ticker/CRWD"` and confirm the breakdown numbers still match. If the composite has crossed a label boundary (STRONG SETUP at 70, HIGH CONVICTION at 85), rewrite the label to fit. If Smart Money drops below 80, drop the insider-filings hook and swap in whichever factor is highest. Do not attribute the Smart Money sub-score to Congressional trades — those are a separate published feed, not an input to it.
 
 **Backup ticker** if CRWD's score has materially shifted: use any STRONG SETUP from `curl -s "https://api.tapeline.io/api/scanner?limit=10&sort=score&order=desc"` — preferably one with a recognizable name (CRWD, AMGN, PANW, etc., not an obscure ETF).
 
@@ -274,7 +290,7 @@ Every other stock scanner gives you 47 filters and a blank stare.
 
 Tapeline gives you one number, one plain-English why, and a public track record you can audit before you pay.
 
-Free tier covers top 20 tickers (24h delayed), no card. Pro is full live for $9.99/mo. 14-day Premium trial takes a card, charges $0 today.
+The full record is free to read with no account. Pro is $9.99/mo for the live full universe. An account takes a card and starts the 14-day Premium trial — $0 today, one click cancels.
 
 https://tapeline.io
 ```
@@ -299,7 +315,7 @@ Triggers any tweet posted above hits ≥ 10 likes or ≥ 1,000 impressions in th
 1. **Reply to every comment** within 2 hours. The Twitter algorithm cares about conversation depth as much as raw engagement.
 2. **Link to /scorecard in one of your first 3 replies**, not in every reply. Spamming the same URL gets the tweet de-prioritized.
 3. **If someone names a ticker**: reply with that ticker's current score + one-line reason, plus the /t/[symbol] link. Run `curl -s https://api.tapeline.io/api/ticker/[SYMBOL]` to get the live numbers in 2 seconds.
-4. **If someone challenges the methodology**: don't get defensive. Link to /how-it-works and say "the formula is right there, what would you change?" Treat it as user research, not an attack.
+4. **If someone challenges the methodology**: don't get defensive. Link to /how-it-works and say "the six factors and how they're ordered are right there — which would you weight differently?" Treat it as user research, not an attack.
 5. **If someone asks "where's the back-test"**: "Walk-forward back-test on 2024-2025 in progress. The /scorecard page is the live forward-test — that's the one that counts for trust. Day-by-day, every ticker, no cherry-picking."
 
 ## What to do if a tweet flops

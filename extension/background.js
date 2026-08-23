@@ -12,11 +12,12 @@
  *
  * LOAD DISCIPLINE
  * ---------------
- * `/api/ticker/{symbol}` backs the public SSR pages, so an extension that
- * re-fetched on every navigation could add real origin load. Two guards:
- * a per-symbol cache in session storage (TTL below), and single-flight
- * de-duplication so N tabs opening the same symbol produce one request.
- * Scores move on a daily cadence, so a stale-by-minutes read is fine.
+ * Requests go to the extension's own `/api/extension/*` namespace, but they
+ * land on the same backend as the public site, so an extension that re-fetched
+ * on every navigation could add real origin load. Two guards: a per-symbol
+ * cache in session storage (TTL below), and single-flight de-duplication so N
+ * tabs opening the same symbol produce one request. Scores move on a daily
+ * cadence, so a stale-by-minutes read is fine.
  */
 
 const API_BASE = "https://api.tapeline.io";

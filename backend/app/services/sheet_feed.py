@@ -22,7 +22,7 @@ the worker falls back to mock_feed. The whole module is dormant until
 the user publishes the sheet + sets the env var.
 
 Why CSV-publish and not the Sheets API? It matches Tapeline's "public
-formula, public scorecard" brand stance — the data IS public, so the
+methodology, public scorecard" brand stance — the data IS public, so the
 URL being public is consistent. For service-account auth instead, swap
 fetch_csv() for a google-api-python-client call; the rest of the
 pipeline doesn't change.
@@ -299,7 +299,7 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # Sheet's column-F "Score" is retained as `sheet_score` for transparency
         # and back-compat, but Tapeline's own 6-factor composite (computed
         # below from the raw sheet columns + Finnhub caches) is what becomes
-        # `score`. Before this change the marketed 6-factor formula on
+        # `score`. Before this change the 6-factor method described on
         # /how-it-works was a copy claim, not running code — fix 2 in
         # docs/SCORING_AUDIT_2026-06-01.md.
         #
@@ -330,7 +330,8 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
             "near_52w_high_pct":  _parse_float(raw.get("Near 52W High %")),
         }
 
-        # Stage 2: compute Tapeline's published composite from those inputs.
+        # Stage 2: compute Tapeline's own composite from those inputs (the
+        # score is published; the weight vector behind it is not).
         # `compute_tapeline_composite` lazy-imports the Finnhub caches so
         # missing data degrades to NEUTRAL (50) per factor, never None.
         composite, subs = compute_tapeline_composite(row_for_composite)

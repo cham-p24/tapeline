@@ -49,7 +49,7 @@ const SCANNERS: Scanner[] = [
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     summary:
-      "The only US scanner here that publishes its full 6-factor formula AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Where a card IS needed: opening an account. New accounts add a card at first sign-in through Stripe Checkout — $0 charged that day, a 14-day Premium trial, the first charge on day 14, one click to cancel before then. Accounts created before 22 August 2026 keep the access they signed up for and are never asked for a card.",
+      "The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Where a card IS needed: opening an account. New accounts add a card at first sign-in through Stripe Checkout — $0 charged that day, a 14-day Premium trial, the first charge on day 14, one click to cancel before then. Accounts created before 22 August 2026 keep the access they signed up for and are never asked for a card.",
   },
   {
     name: "StockAnalysis.io",
@@ -96,7 +96,7 @@ const SCANNERS: Scanner[] = [
 const FAQ = [
   {
     q: "What's the best free stock scanner with no credit card?",
-    a: "It depends what you want to do with no card. To READ a scanner's output and its track record without an account, Tapeline — the daily Top 10, the whole scorecard and the raw CSV/JSON record are open to everyone, and it is the only one here that publishes its scoring formula. To RUN your own screens with no card, StockAnalysis.io (no account at all), the free Finviz screener (no account), or TradingView (a free account, no card). Tapeline's own signed-in app is the one thing on this page that does take a card.",
+    a: "It depends what you want to do with no card. To READ a scanner's output and its track record without an account, Tapeline — the daily Top 10, the whole scorecard and the raw CSV/JSON record are open to everyone, and it is the only one here that names every factor behind its score. To RUN your own screens with no card, StockAnalysis.io (no account at all), the free Finviz screener (no account), or TradingView (a free account, no card). Tapeline's own signed-in app is the one thing on this page that does take a card.",
   },
   {
     q: "Which stock scanners genuinely need no signup?",
@@ -112,7 +112,7 @@ const FAQ = [
   },
   {
     q: "How did you decide which scanners qualify?",
-    a: "On features only, never on returns: what you can reach with no credit card, whether the tool publishes the formula behind any score it shows, and whether it keeps a public track record. We list tools that fail the no-card test — Trade Ideas, and Tapeline's own signed-in app — so the comparison is complete rather than cherry-picked. We never rank scanners by claimed performance; descriptive analytics only.",
+    a: "On features only, never on returns: what you can reach with no credit card, whether the tool names the factors behind any score it shows, and whether it keeps a public track record. We list tools that fail the no-card test — Trade Ideas, and Tapeline's own signed-in app — so the comparison is complete rather than cherry-picked. We never rank scanners by claimed performance; descriptive analytics only.",
   },
 ];
 
@@ -121,7 +121,7 @@ const ITEM_LIST_JSON_LD = {
   "@type": "ItemList",
   name: "Free Stock Scanners — No Credit Card",
   description:
-    "Feature comparison of stock scanners on what they let you reach without a credit card, formula transparency, and public track record.",
+    "Feature comparison of stock scanners on what they let you reach without a credit card, methodology transparency, and public track record.",
   numberOfItems: SCANNERS.length,
   itemListElement: SCANNERS.map((s, i) => ({
     "@type": "ListItem",
@@ -154,7 +154,8 @@ export default function FreeStockScannerNoCreditCardPage() {
           Free Stock Scanner — No Credit Card
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Tapeline is the only US scanner that publishes its full 6-factor formula
+          Tapeline is the only US scanner that names all six of its scoring factors and
+          their weight ordering
           <em> and</em> leaves every losing day on a public scorecard — and you can read
           all of it without an account or a card: the daily Top 10, the whole record, a
           page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about the
@@ -185,7 +186,7 @@ export default function FreeStockScannerNoCreditCardPage() {
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance — what you get with no card</h2>
           <p className="mt-2 text-sm text-muted">
-            Features only. We compare card-free access, formula transparency, and track
+            Features only. We compare card-free access, methodology transparency, and track
             record — never claimed returns.
           </p>
           <div className="mt-4 overflow-x-auto">
@@ -195,7 +196,7 @@ export default function FreeStockScannerNoCreditCardPage() {
                   <th className="px-3 py-3 text-left font-medium">Scanner</th>
                   <th className="px-3 py-3 text-left font-medium">No-card access</th>
                   <th className="px-3 py-3 text-center font-medium">Card needed</th>
-                  <th className="px-3 py-3 text-center font-medium">Public formula</th>
+                  <th className="px-3 py-3 text-center font-medium">Factors named</th>
                   <th className="px-3 py-3 text-center font-medium">Track record</th>
                 </tr>
               </thead>
@@ -285,9 +286,11 @@ export default function FreeStockScannerNoCreditCardPage() {
             </li>
             <li>
               <Link href="/how-it-works" className="text-accent hover:underline">
-                The formula itself &rarr;
+                The methodology itself &rarr;
               </Link>{" "}
-              <span className="text-muted">— all six factors named, and how they are weighted.</span>
+              <span className="text-muted">
+                — all six factors named, and the order they are weighted in.
+              </span>
             </li>
           </ul>
         </section>
@@ -304,7 +307,7 @@ export default function FreeStockScannerNoCreditCardPage() {
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
               <span className={cardChip(s.cardNeeded)}>Card needed: {s.cardNeeded}</span>
               <span className={formulaChip(s.publicFormula)}>
-                Public formula: {s.publicFormula}
+                Factors named: {s.publicFormula}
               </span>
               <span className={trackChip(s.trackRecord)}>Track record: {s.trackRecord}</span>
             </div>
@@ -323,7 +326,7 @@ export default function FreeStockScannerNoCreditCardPage() {
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Three feature criteria, no performance criteria:{" "}
             <strong>what you can reach with no credit card</strong>; whether the tool{" "}
-            <strong>publishes the formula</strong> behind any score it shows; and whether it
+            <strong>names the factors</strong> behind any score it shows; and whether it
             keeps a <strong>public track record</strong>. We list tools that fail the first
             test — Trade Ideas, and our own signed-in app — so the comparison is complete
             rather than cherry-picked.
@@ -336,7 +339,7 @@ export default function FreeStockScannerNoCreditCardPage() {
             first charge on day 14, one click to cancel before then. Accounts created before
             22 August 2026 keep the free access they signed up for and are never asked for a
             card. The raw filter screeners don&apos;t produce a composite score, so the
-            formula and scorecard columns simply don&apos;t apply to them — a difference in
+            factors and scorecard columns simply don&apos;t apply to them — a difference in
             design, not a criticism.
           </p>
         </section>

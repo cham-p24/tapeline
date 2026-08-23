@@ -78,7 +78,7 @@ class WatchlistItem(Base):
     baseline_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     alert_threshold_delta: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)
 
-    # Last time the smart-alert evaluator fired an email/Telegram/push for
+    # Last time the smart-alert evaluator fired an email/web-push alert for
     # this item. Used to debounce: while a ticker stays above the threshold,
     # we re-fire at most once every 24h (the EOD digest carries the steady-
     # state cadence; this column ensures we don't spam mid-day).

@@ -21,9 +21,10 @@ import { PRICING, REFUND, usd } from "@/lib/pricing";
  *      best-fitting existing slug for message-match. Secondary CTA links to
  *      the public /scorecard so a skeptical visitor can inspect the record
  *      before committing.
- *   2. A trust strip stating the offer plainly — free-forever tier, founding
- *      Pro price (pulled live from lib/pricing.ts so it can never drift from
- *      checkout), and the 30-day money-back guarantee.
+ *   2. A trust strip stating the offer plainly — the free public record (no
+ *      account), the 14-day Premium trial ($0 today), the founding Pro price
+ *      (pulled live from lib/pricing.ts so it can never drift from checkout),
+ *      and the 30-day money-back guarantee.
  *   3. An optional live ScannerPreview (`showPreview`) so the visitor SEES
  *      the product surface, not just reads about it. On by default; compare
  *      pages that already lead with a big comparison table above the fold
@@ -80,7 +81,7 @@ export function LandingCta({
         </Link>
       </div>
 
-      {/* Offer clarity strip — free tier, founding price, guarantee. Kept to
+      {/* Offer clarity strip — public record, trial, founding price, guarantee. Kept to
           one scannable line of plain chips so the offer is legible at a
           glance at the exact point of interest. */}
       <ul
@@ -110,7 +111,7 @@ export function LandingCta({
           <ScannerPreview />
           <p className="mt-2 text-center text-xs text-subtle">
             A live preview of the Tapeline scanner. Every liquid US stock &amp; ETF,
-            scored on six public factors.
+            scored on six named factors.
           </p>
         </div>
       )}

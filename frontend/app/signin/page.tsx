@@ -320,7 +320,7 @@ function SignInForm() {
 
               <p className="mt-8 text-center text-sm text-muted">
                 Don&rsquo;t have an account?{" "}
-                <Link href={`/signup?next=${encodeURIComponent(next)}`} className="link">Sign up free</Link>
+                <Link href={`/signup?next=${encodeURIComponent(next)}`} className="link">Create an account</Link>
               </p>
             </>
           )}

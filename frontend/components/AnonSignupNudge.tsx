@@ -17,7 +17,7 @@
  * BEHAVIOUR:
  *   - Counts DISTINCT ticker pages an anonymous visitor has opened, within a
  *     rolling window, in localStorage. After VIEW_THRESHOLD distinct tickers
- *     it shows a friendly, DISMISSIBLE inline card inviting a free sign-up.
+ *     it shows a friendly, DISMISSIBLE inline card inviting an account.
  *   - Never shows for the first few views (below the threshold).
  *   - Never shows to signed-in users (UserContext.user is truthy), and never
  *     while auth state is still loading (avoids a flash before we know).
@@ -155,32 +155,41 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          {/* The saved watchlist is Pro-and-up from the 2026-08-02 cutover, so
-              the free value prop can no longer be "save your tickers, free".
-              Reframe around what Free genuinely keeps (live scores + browser
-              alerts) and sell the saved watchlist as a Pro perk. */}
+          {/* The saved watchlist is Pro-and-up whenever freeHasWatchlist() is
+              false, so that branch sells it as a Pro perk instead.
+              CARD HONESTY: this nudge only ever renders for an anonymous
+              visitor, so the account being offered is a POST-2026-08-22 one —
+              it adds a card at first sign-in. "Sign up free" was true before
+              #548 and is not now, so the headline and CTA drop "free" and the
+              body states the mechanism, the way LookupWall does. */}
           <h2 className="text-base sm:text-lg font-semibold tracking-tight text-fg">
             {freeHasWatchlist()
-              ? "You’re exploring — save your tickers, free"
-              : "You’re exploring — sign up free to track these"}
+              ? "You’re exploring — save your tickers"
+              : "You’re exploring — an account tracks these for you"}
           </h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
             {freeHasWatchlist() ? (
               <>
-                You&rsquo;ve looked at a few tickers. Create an account to
-                save them to a watchlist and get alerts when their scores move.
+                You&rsquo;ve looked at a few tickers. An account saves them to a
+                watchlist and alerts you when their scores move. Creating one adds
+                a card at first sign-in and starts a 14-day Premium trial &mdash; $0
+                today, one click to cancel before day 14. Or keep reading the
+                published record with no account at all.
               </>
             ) : (
               <>
-                You&rsquo;ve looked at a few tickers. Create an account for
-                live scores and browser alerts when their scores move — save
-                them to a watchlist on Pro.
+                You&rsquo;ve looked at a few tickers. An account gives you live
+                scores and browser alerts when their scores move &mdash; save them to
+                a watchlist on Pro. Creating one adds a card at first sign-in and
+                starts a 14-day Premium trial &mdash; $0 today, one click to cancel
+                before day 14. Or keep reading the published record with no account
+                at all.
               </>
             )}
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link href="/signup?from=ticker" className="btn-accent" rel="nofollow">
-              Sign up free →
+              Create an account →
             </Link>
             <button
               type="button"

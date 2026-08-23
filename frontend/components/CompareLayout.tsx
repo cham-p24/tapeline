@@ -245,7 +245,13 @@ export function CompareLayout({
       </section>
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
+        {/* The live scanner is behind /app/*, and a new account meets the card
+            wall, so it cannot be "tried free". The free thing is the published
+            record; the scanner is the 14-day trial, which is what the button
+            below already says. */}
+        <h2 className="text-3xl font-bold tracking-tight">
+          Read the record free. Try the live scanner on a 14-day trial.
+        </h2>
         <p className="mt-3 text-muted">
           The record is free to read — no account. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.

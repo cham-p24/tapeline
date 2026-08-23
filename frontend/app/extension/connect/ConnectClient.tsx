@@ -65,7 +65,7 @@ export default function ConnectClient() {
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button href="/signup?next=/extension/connect" variant="primary" shape="rounded">
-            Create a free account
+            Create an account
           </Button>
           <Button href="/signin?next=/extension/connect" variant="secondary" shape="rounded">
             Sign in

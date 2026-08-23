@@ -788,8 +788,9 @@ async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[st
 
 async def fetch_congress_trades() -> list[dict[str, Any]]:
     """
-    Congress trades are NOT in Polygon. Source them from QuiverQuant
-    (Premium tier), or scrape official House/Senate STOCK Act disclosures.
+    Congress trades are NOT in Polygon/Massive. The QuiverQuant path is gone
+    (subscription cancelled 2026-05; quiver_feed.py deleted), so the remaining
+    source is the official House/Senate STOCK Act disclosures.
 
     Returns empty list by default — populate via `congress_ingestor.py`.
     """

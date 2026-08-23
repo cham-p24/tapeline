@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Thread #1 launched 2026-05-13 on @tapeline_io and was extended with
@@ -34,24 +50,25 @@ Posting rules:
 
 ---
 
-## Thread #2 — Trend at 25%: what's actually in it
+## Thread #2 — Trend is the heaviest factor: what's actually in it
 
 Target: Wed 2026-05-21, 10pm AEST = 8 AM ET.
 
-**Tweet 1** (~270 chars):
+**Tweet 1** (~250 chars):
 ```
-"Trend 25%" is Tapeline's largest single factor.
+Trend is Tapeline's heaviest factor.
 
-Most quant services say "trend-following" and leave it there. We publish exactly what goes in:
+Most quant services say "trend-following" and leave it there. We at least tell you what it's reading:
 
-– 20DMA vs 50DMA vs 200DMA stack (above/below)
-– Slope of the 50DMA over the last 30 sessions
-– Days the price has held above the 50DMA
+– The ticker's own multi-month price change
+– Where the latest price sits inside its own 52-week range
+
+Both describe price that has already happened.
 ```
 
-**Tweet 2** (~250 chars):
+**Tweet 2** (~280 chars):
 ```
-Why 25% and not 30 or 20?
+Why Trend and not fundamentals first?
 
 Price action is the lowest-lag signal you can compute. Every other factor — fundamentals, smart money, macro — argues for or against the trend continuing.
 
@@ -60,21 +77,21 @@ If the trend score is high but the others disagree, the composite stays moderate
 
 **Tweet 3** (~230 chars):
 ```
-A high Trend score with low Fundamentals means "momentum without quality" — the kind of move that snaps back hard.
+A high Trend score with low Fundamentals is a move without much reported quality behind it.
 
-A high Trend score with high Smart Money means "the trend has institutional cover" — much more likely to persist.
+A high Trend score with high Smart Money means insiders were net disclosed buyers over the same stretch.
 
-The composite weighs both.
+The composite weighs both. Neither reading is a forecast.
 ```
 
 **Tweet 4** (~250 chars):
 ```
 What Trend specifically WON'T catch:
 
-– Regime breaks (that's Macro's job)
-– Earnings surprises (that's Fundamentals)
-– Insider selling into strength (that's Smart Money)
-– 1-day spikes on news (that's Momentum)
+– The market-wide regime (that's Macro)
+– What the last filing reported (that's Fundamentals)
+– Disclosed insider selling into strength (that's Smart Money)
+– Shorter-horizon rate of change (that's Momentum)
 
 Trend is structural, not tactical. It's measuring multi-month behaviour.
 ```
@@ -96,18 +113,16 @@ Most "smart money" trackers in fintech are 13F-driven.
 
 13F has a 45-day filing lag. That's almost 7 weeks of price action between when the fund traded and when you find out.
 
-Tapeline weights Form 4 (officers/directors, 2-business-day lag) more than 13F. Here's the math.
+Tapeline's Smart Money factor reads Form 4 (officers/directors, 2-business-day filing deadline). It doesn't read 13F at all. Here's why.
 ```
 
 **Tweet 2** (~260 chars):
 ```
-Smart Money is 15% of the Tapeline composite. Inside that 15%:
+The Smart Money factor reads one disclosed-trade stream: SEC Form 4 insider transactions.
 
-– Congressional disclosures (STOCK Act): 8%
-– SEC Form 4 insider buys: 5%
-– Curated 13F (8 named funds): 2%
+Congressional disclosures (STOCK Act) are ingested too and published as their own Premium feed — but they are not an input to this sub-score.
 
-Form 4 has more weight than 13F because the lag math actually works.
+Form 4 lands in days; Congressional disclosures take weeks.
 ```
 
 **Tweet 3** (~260 chars):
@@ -125,7 +140,7 @@ Caveat: Form 4 is noisy.
 
 Officers sell for personal reasons all the time. A single insider sale isn't bearish.
 
-What we score is the 90-day NET — total bought minus total sold, weighted by transaction size. That's harder to fake and captures cluster patterns better than any single filing.
+What we score is the NET over a recent window — total disclosed buying minus total disclosed selling, by transaction value. A single filing moves it very little on its own.
 ```
 
 **URL reply**:
@@ -194,34 +209,32 @@ Most SaaS free tiers cripple core functionality. Fewer rows, no exports, no filt
 
 It teaches users the product is annoying.
 
-Tapeline's free tier instead shows the real product, just 24 hours delayed.
+Tapeline's free tier instead shows the real product, live — just fewer rows and a daily look-up cap.
 ```
 
 **Tweet 2** (~270 chars):
 ```
 The Free tier on Tapeline:
 
-– Top 20 tickers from yesterday's close
-– Full 6-factor breakdown on every row
-– Full plain-English "Why" sentence
+– Top 10 rows, live
+– 12 ticker look-ups a day
+– Full 6-factor breakdown and "Why" sentence on every row
 – Full scorecard
 – Watchlist of 5 names
 
-The ONLY difference vs Pro is the 24-hour delay on data.
+Pro adds the full ~2,500-ticker universe, unlimited look-ups, email alerts, CSV export and saved scans.
 ```
 
-**Tweet 3** (~260 chars):
+**Tweet 3** (~250 chars):
 ```
-If you can act on day-old data, the free tier IS the right tier. Stay there forever — that's fine.
+The published record is free to read with no account and no card at all — if that's all you need, stay there.
 
-If you need live data, Pro is $8.25/mo billed annually. Same scoring engine, same scorecard, no data delay, plus smart watchlist alerts.
-
-That's the entire upgrade decision.
+If you want live scanning across the full universe, Pro is $8.25/mo billed annually. Same scoring engine, same scorecard, plus smart watchlist alerts.
 ```
 
 **Tweet 4** (~270 chars):
 ```
-The 14-day Premium trial gives the full live universe + Congressional trades + insider Form 4 + Telegram unlimited. It takes a card, charges $0 today, and cancels in one click.
+The 14-day Premium trial gives the full live universe + Congressional trades + insider Form 4. It takes a card, charges $0 today, and cancels in one click.
 
 I'd rather you understand what Tapeline does, decide it doesn't fit, and not pay than have you upgrade because the free tier was deliberately broken.
 ```
@@ -288,43 +301,38 @@ Target: Wed 2026-06-18, 8 AM ET.
 
 **Tweet 1** (~270 chars):
 ```
-Tapeline's Macro factor is 15% of every score.
+Tapeline's Macro factor is a full, named factor in every score.
 
-That seems high to people new to the platform — "isn't macro noise?"
+That seems odd to people new to the platform — "isn't macro noise?"
 
-It's not noise. It's the regime overlay that gates whether the other 85% means anything.
+It's a mid-weighted term in the composite: the market-wide backdrop gets a seat at the table instead of being left to the reader.
 
 Here's what goes in.
 ```
 
 **Tweet 2** (~270 chars):
 ```
-Inputs to the Macro factor:
+Input to the Macro factor:
 
-– VIX percentile (last 252 sessions)
-– NYSE advance/decline breadth
-– 10-year Treasury yield direction (FRED)
-– Composite regime score (bull/bear/transition)
+– A single market-wide regime classification, resolved into rising, sideways or falling.
 
-Each gets a sub-weight. They aggregate into a 0-100 macro reading.
+That's the whole input. Nothing about the individual ticker enters this factor — no price, no filing, no company data.
 ```
 
 **Tweet 3** (~260 chars):
 ```
-When Macro is high (60+):
+Which means: on any given tick, Macro is the SAME reading for every ticker on the board.
 
-A high Trend/Fundamentals composite is much more likely to persist.
+It lifts or lowers the whole board together and never separates one name from another.
 
-When Macro is low (<40):
-
-The same high Trend/Fundamentals score still triggers, but the composite gets dampened. The model says "right setup, wrong regime, wait."
+That is a real limitation, and the methodology page says so rather than burying it.
 ```
 
 **Tweet 4** (~260 chars):
 ```
-Most retail-facing scanners don't model regime at all. You get the same "high conviction" signal in a benign tape as in a melt-down — and the marketing never tells you.
+Most retail-facing scanners don't name a macro input at all. The label reads the same in a benign tape as in a melt-down, and the marketing never mentions it.
 
-Tapeline's HIGH CONVICTION label requires the regime to AGREE. That's not a feature; it's the entry ticket.
+Tapeline doesn't solve that. It just puts the backdrop inside the score, named, where you can see what it did.
 ```
 
 **URL reply**:
@@ -386,48 +394,48 @@ The result: https://tapeline.io
 
 Target: Wed 2026-07-02, 8 AM ET.
 
-**Tweet 1** (~270 chars):
+**Tweet 1** (~250 chars):
 ```
-Tapeline's score is built from 6 factors with public weights:
+Tapeline's score is built from six named factors, in fixed weight order:
 
-Trend 25
-Relative Strength 20
-Fundamentals 15
-Smart Money 15
-Macro 15
-Momentum 10
+Trend
+Relative Strength
+Fundamentals
+Smart Money
+Macro
+Momentum
 
-Sums to 100. Doesn't change retroactively. Open for arguing about on the methodology page.
+Heaviest first, lightest last. It doesn't change retroactively. Open for arguing about on the methodology page.
 
-Why these weights? Quick thread.
-```
-
-**Tweet 2** (~270 chars):
-```
-TREND (25%) — price action across 20/50/200 DMA stack + slope + days above 50DMA. Largest weight because it's the lowest-lag signal you can compute.
-
-RELATIVE STRENGTH (20%) — Mansfield RS vs SPY, sector RS, 12-1 momentum. Filters out "everything's going up" markets.
+Why this order? Quick thread.
 ```
 
-**Tweet 3** (~270 chars):
+**Tweet 2** (~260 chars):
 ```
-FUNDAMENTALS (15%) — Piotroski-style F-score with a quality tilt. Revenue growth, margin trend, ROE, debt-to-equity.
+TREND — the ticker's multi-month price change and where the latest price sits inside its own 52-week range. Heaviest factor because price is the lowest-lag input available.
 
-Why 15 and not 20? Fundamentals are slow-moving and 1-day-alpha-irrelevant. Worth weighting but not dominating.
+RELATIVE STRENGTH — that same price change minus a broad-market benchmark's, over three horizons. Not sector-adjusted. Filters out "everything's going up" markets.
 ```
 
-**Tweet 4** (~260 chars):
+**Tweet 3** (~240 chars):
 ```
-SMART MONEY (15%) — Congressional disclosures + Form 4 insider buys + curated 13F. Inside that 15%: Congress 8, Form 4 5, 13F 2. Lagged data, weighted lower than its media airtime suggests.
+FUNDAMENTALS — reported margin, return on equity, EPS and revenue growth, and an earnings multiple.
 
-MACRO (15%) — VIX, breadth, 10Y, regime. The regime overlay that gates the other 85%.
+Why mid-weighted rather than top? Reported figures are slow-moving and 1-day-alpha-irrelevant. Worth weighting, not worth dominating.
+```
+
+**Tweet 4** (~250 chars):
+```
+SMART MONEY — disclosed SEC Form 4 insider transactions, netted over a recent window. Lagged by statute, weighted lower than its media airtime suggests.
+
+MACRO — a single market-wide regime classification. The same reading for every ticker on a tick.
 ```
 
 **Tweet 5** (~260 chars):
 ```
-MOMENTUM (10%) — 20-day rate-of-change, RSI position, accumulation/distribution. Lowest weight on purpose.
+MOMENTUM — a momentum-quality reading plus a short-horizon return. Lightest factor on purpose.
 
-Pure momentum factors over-fit to the recent regime. Keeping it at 10% forces the composite to wait for confirmation across other dimensions before tagging high-conviction.
+Pure momentum factors over-fit to the recent regime. Keeping it lightest stops the noisiest input from dominating the composite.
 ```
 
 **URL reply**:
@@ -437,13 +445,13 @@ https://tapeline.io/how-it-works
 
 ---
 
-## Thread #10 — Why the formula is public and the infrastructure isn't
+## Thread #10 — Why the methodology is public and the infrastructure isn't
 
 Target: Wed 2026-07-09, 8 AM ET.
 
-**Tweet 1** (~260 chars):
+**Tweet 1** (~270 chars):
 ```
-Tapeline publishes its scoring formula. Six factors, exact weights, on /how-it-works. The /changelog tracks every methodology change.
+Tapeline publishes its factor set and their weight ordering on /how-it-works — the exact weights and the parameter recipe stay private. The /changelog tracks every methodology change.
 
 A retail trader asked: "doesn't that let competitors copy it?"
 
@@ -452,11 +460,11 @@ Three answers:
 
 **Tweet 2** (~270 chars):
 ```
-1. The formula isn't the moat.
+1. Naming the factors isn't the moat.
 
-Six published factors with weights is the ENTRY TICKET to being credible. The actual moat is operations: data pipelines from 6 vendors, the back-check infrastructure, the scorecard accountability layer.
+Six named factors with a published record is the ENTRY TICKET to being credible. The actual moat is operations: data pipelines from 6 vendors, the back-check infrastructure, the scorecard accountability layer.
 
-The formula is a weekend. The infra was 9 months.
+The idea is a weekend. The infra was 9 months.
 ```
 
 **Tweet 3** (~270 chars):
@@ -470,9 +478,9 @@ If a model doesn't tell you how it works, you can't act on it. You're just gambl
 
 **Tweet 4** (~270 chars):
 ```
-3. If the formula is wrong, I want to know.
+3. If the methodology is wrong, I want to know.
 
-Publishing it invites every quant on Twitter to argue with me. Some of them will be right. The model gets better when it's audited in public.
+Naming the factors and the record invites every quant on Twitter to argue with me. Some of them will be right. The model gets better when it's audited in public.
 
 The /changelog is markdown. You can read every methodology change since launch.
 ```
@@ -545,15 +553,15 @@ Shipping this month:
 – Walk-forward back-test on 2024-2025 (historical version of /scorecard)
 – Multi-watchlist support — themed buckets like "Tech compounders" / "AI plays" (just shipped)
 – Saved scanner presets (just shipped)
+– Public API — live at /api/v1 for Premium, 1,000 requests/day, docs at /developers
 ```
 
-**Tweet 3** (~270 chars):
+**Tweet 3** (~250 chars):
 ```
 Deferred until 50+ paying users specifically ask:
 
 – Apple Sign-In (needs $99/yr Apple Dev membership for me)
 – Microsoft OAuth (needs M365 Developer tenant)
-– Public API endpoint (real-shaped 2-3 days of work; building to demand)
 – Discord server
 ```
 
@@ -589,7 +597,7 @@ https://tapeline.io/roadmap
 | 2026-06-18 | #7 Why Macro matters |
 | 2026-06-25 | #8 Building solo from Melbourne |
 | 2026-07-02 | #9 Six-factor breakdown |
-| 2026-07-09 | #10 Why publish the formula |
+| 2026-07-09 | #10 Why publish the methodology |
 | 2026-07-16 | #11 Confidence pct |
 | 2026-07-23 | #12 What's next |
 

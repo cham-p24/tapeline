@@ -389,7 +389,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
             href={`https://twitter.com/intent/tweet?${new URLSearchParams({
               // No `?? 0`: a ticker we hold no score for shares as an em-dash,
               // never as a fabricated zero.
-              text: `$${data.symbol} score: ${data.score != null ? data.score.toFixed(0) : "—"}/100 (${data.signal ?? "—"})\n\nTransparent 6-factor formula, public scorecard.`,
+              text: `$${data.symbol} score: ${data.score != null ? data.score.toFixed(0) : "—"}/100 (${data.signal ?? "—"})\n\nSix named factors, public scorecard.`,
               url: `https://tapeline.io/t/${data.symbol}`,
               // `via=` adds "via @tapeline_io" to the tweet draft so every
               // share attributes back to the brand account. Don't include the

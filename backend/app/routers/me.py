@@ -52,11 +52,9 @@ def _upgrade_nudge(user: User) -> dict[str, str | int] | None:
     as incoherent; the TrialBanner owns that conversion moment instead.
 
     For genuine Free users it returns a stable `id` plus the Free-tier caps
-    the frontend folds into copy, so the numbers (top-10 rows, live/no delay,
-    and the date-gated watchlist cap — 0 after the 2026-08-02 Pro cutover)
-    come straight from tier.py and never drift from a hardcoded string. The
-    frontend UpgradeNudge drops the watchlist clause when the cap is 0.
-    Dismissal + frequency are handled client-side; the
+    the frontend folds into copy, so the numbers (scanner rows, data delay,
+    watchlist cap) come straight from tier.py and never drift from a
+    hardcoded string. Dismissal + frequency are handled client-side; the
     server only decides eligibility, which keeps that decision in one place
     if we later want to suppress the nudge (e.g. brand-new accounts).
     """

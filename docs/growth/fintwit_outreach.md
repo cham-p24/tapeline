@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Drafted 2026-05-14. Refreshed 2026-05-17 after a live audit invalidated the original "30 cold DMs in 6 days" plan.
@@ -87,13 +103,13 @@ Workflow per reply (~5 minutes):
 
 Three components, in this order:
 
-1. **One specific data point** from the live Tapeline read. Not the full breakdown — one number that's actually relevant to what the OP said. ("Smart Money is reading 78 right now on the back of a 3-cluster insider buy in the last 30 days.")
+1. **One specific data point** from the live Tapeline read. Not the full breakdown — one number that's actually relevant to what the OP said. ("Smart Money is reading 78 right now, on net disclosed insider buying.")
 2. **An honest opinion.** Agree, disagree, or add a nuance. Not "wow great thread." This is the part that has to add to the conversation — otherwise it's spam dressed as a reply.
 3. **A `/scorecard` link only if it naturally fits.** If the reply works without the link, don't add the link. If the link is the entire point of the reply, don't post the reply. Most quality replies will include the link 1 in 3 times, not every time.
 
 Example of a reply that works:
 
-> Tapeline read on $XYZ is composite 72 right now — Smart Money 78 is the standout (3 Form-4 clusters in 30 days) but Trend's only 58, hasn't confirmed. Lines up with your "early but right" framing. Full breakdown if useful: tapeline.io/t/XYZ
+> Tapeline read on $XYZ is composite 72 right now — Smart Money 78 is the standout (net disclosed Form 4 buying) but Trend's only 58. Lines up with your "early but right" framing. Full breakdown if useful: tapeline.io/t/XYZ
 
 Example of a reply that doesn't:
 
@@ -144,11 +160,11 @@ For those narrow cases the original DM template (preserved in git history if nee
 
 | Reply type                              | Response                                                                                                                                                                              |
 |-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| "Interesting, what's the formula?"      | Link to /how-it-works. Don't paste the formula — getting them onto the site lets Vercel Analytics attribute the click.                                                                |
+| "Interesting, what's the formula?"      | Link to /how-it-works. Never paste weights or an equation — the page names the six factors and their weight ordering, and that is the whole of what's public. Getting them onto the site also lets GA4 attribute the click.       |
 | "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the live forward-test — every miss stays on the page."                                                                |
 | "What about $[other ticker]?"           | Run the curl, paste the breakdown in the thread. Be willing to spend 2-3 replies going deep on their actual ticker of interest before any soft CTA.                                   |
 | "Are you the founder?"                  | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula."                                                             |
-| "How do I try it?"                      | "Free tier covers top 20 tickers (24h delayed) and never asks for a card. 14-day Premium trial for the full universe — that one takes a card, charges $0 today, cancels in one click. tapeline.io if you want to give it a shot."                                      |
+| "How do I try it?"                      | "The full record — daily Top 10, the whole scorecard, a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in product, an account puts a card on file at first sign-in and starts the 14-day Premium trial: $0 that day, first charge on day 14, one click cancels. tapeline.io if you want to give it a shot."                                      |
 | Pushback / methodological critique      | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently."           |
 | Silence after the OP reads it           | Move on. The followers who saw the exchange got the value either way.                                                                                                                 |
 

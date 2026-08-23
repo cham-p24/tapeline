@@ -266,7 +266,7 @@ const ENTRIES: Entry[] = [
     tag: "improvement",
     title: "Sharper Pro vs Premium presentation, faster app pages",
     body: [
-      "Premium plan card now leads with what it adds on top of Pro (Congress feed, elite 13F, unlimited Telegram + email, public API, larger watchlist) instead of duplicating the Pro list.",
+      "Premium plan card now leads with what it adds on top of Pro instead of duplicating the Pro list.",
       "Loading states across the app now show shimmer placeholders in the shape of the eventual content — the product feels noticeably snappier on first visit.",
       "Per-ticker public share pages (/t/AAPL, /t/NVDA etc.) render the live score and 6-factor breakdown without needing a sign-in. Share-on-X button included.",
       "Public scorecard, status page, and blog all reachable from every page footer.",
@@ -313,9 +313,9 @@ const ENTRIES: Entry[] = [
     tag: "shipped",
     title: "Telegram alerts (Premium), commodity ETF universe, three-tier pricing",
     body: [
-      "Telegram alert channel for Premium subscribers — paste a chat ID on the billing page, send a test, get hourly market-regime + watchlist digests plus per-rule alerts.",
+      "Telegram alert channel for Premium subscribers — paste a chat ID on the billing page, send a test, get hourly market-regime + watchlist digests plus per-rule alerts. Retired since: see the 12 August 2026 entry — alerts now run on email and browser push.",
       "32 commodity ETFs added to the scanner universe (gold, silver, oil, gas, agriculture, copper, uranium, miners) with a dedicated Commodities sector filter.",
-      "Pricing simplified to three tiers: Free, Pro $29/mo, Premium $49/mo (or $24.99 / $39.99 billed annually).",
+      "Pricing simplified to three tiers: Free, Pro $29/mo, Premium $49/mo (or $24.99 / $39.99 billed annually). Since repriced: see /pricing for the current figures.",
     ],
   },
   {
@@ -337,7 +337,7 @@ const ENTRIES: Entry[] = [
       "Six-factor scoring methodology live with all six factors published on /how-it-works.",
       "Scanner with one composite score and one plain-English Why on every US-listed ticker.",
       "Watchlist with smart score-change alerts.",
-      "14-day Premium trial available with no credit card.",
+      "14-day Premium trial available with no credit card. (Since superseded: the trial is card-required, and from 22 August 2026 a new account adds a card at first sign-in — see /pricing.)",
     ],
   },
 ];

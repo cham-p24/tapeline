@@ -330,18 +330,20 @@ async def public_signals(
     The companion to the /signals frontend page. Returns the full
     universe (or a sorted/filtered slice of it) so unauthenticated
     visitors can see exactly what Tapeline is scoring — same "public
-    formula, public scorecard, public everything" stance as /scorecard
+    factors, public scorecard, public everything" stance as /scorecard
     and /how-it-works.
 
-    Distinct from /api/scanner which tier-gates row count (Free → 10)
-    AND applies the 24h delay for unauth/free visitors. /api/public/signals
-    has neither cap nor delay — every visitor sees the same scores the
-    paid scanner does. The paid scanner's value moves to its features
-    (filter UX, watchlist, alerts, exports), not data access.
+    Distinct from /api/scanner, which tier-gates row count (Free → 10).
+    /api/public/signals has no cap. Neither endpoint delays data — every
+    tier has been live since the 2026-06-20 freemium retune — so the only
+    difference between them is breadth. The paid scanner's value moves to
+    its features (filter UX, watchlist, alerts, exports), not data access.
 
     Sorted desc by score. Capped at 2000 rows per request to keep the
-    JSON payload reasonable; the full universe is currently ~500 names,
-    so a single call returns everything.
+    JSON payload reasonable. The scored universe is the top
+    ACTIVE_UNIVERSE_SIZE names by dollar-volume (services/universe.py),
+    which is env-tunable — so use the row count you get back rather than
+    assuming one call returns the whole universe.
     """
     from sqlalchemy import func, or_, select
 

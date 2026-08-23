@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Continues the @tapeline_io launch thread from May 13. Tweets 1-3 are already
@@ -45,13 +61,15 @@ Self-skeptical tone matches the rest of the thread.
 
 ---
 
-## Tweet 5 (~210 chars)
+## Tweet 5 (~275 chars)
 
 ```
-Free tier: top 20 names, 24h delayed. Pro $8.25/mo billed annually = full live universe + smart alerts. Premium $19.99 adds Congress trades + SEC Form 4 + Telegram. Free tier needs no card; the 14-day Premium trial takes one and charges $0 today. Built solo from Melbourne.
+The full record is free to read, no account. Pro $8.25/mo billed annually = full live universe + smart alerts. Premium $19.99 adds Congress trades + SEC Form 4. An account takes a card: 14-day Premium trial, $0 today, one click cancels. Built solo from Melbourne.
 ```
 
-**Why this works:** transparent pricing with the card-free free tier as the hook, and the trial's terms stated rather than buried. "Built solo
+**Why this works:** transparent pricing with the genuinely card-free surface as
+the hook — the published record needs no account at all — and the trial's terms
+stated rather than buried. "Built solo
 from Melbourne" adds founder context without being self-promotional. No CTA
 verb — the URL reply that follows IS the CTA.
 
@@ -78,24 +96,24 @@ angle:
 
 **Tweet 4:**
 ```
-The six factors and their weights, in full:
+The six factors, heaviest-weighted first (Trend and Relative Strength most, Momentum least):
 
-Trend 25
-Relative Strength 20
-Fundamentals 15
-Smart Money 15
-Macro 15
-Momentum 10
+Trend
+Relative Strength
+Fundamentals
+Smart Money
+Macro
+Momentum
 
-Sums to 100. Doesn't change retroactively. Open for arguing about on /how-it-works.
+Heaviest Trend and RS, lightest Momentum. The ordering is fixed and public, and it doesn't change retroactively. Argue with it on /how-it-works.
 ```
 
 **Tweet 5:**
 ```
-Free tier shows the real product (top 20, 24h delayed). Pro $8.25/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $19.99/mo adds Congressional trades + SEC Form 4 insider feed + unlimited Telegram. Free tier needs no card; the 14-day trial takes one and charges $0 today.
+The published record shows the real product, live and complete, with no account. Free accounts get top-10 rows and 12 look-ups a day. Pro $8.25/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $19.99/mo adds Congress trades + SEC Form 4.
 ```
 
 **URL reply:** `https://tapeline.io`
 
-Skipped because it rehashes the formula content already in tweets 2/3.
-Kept here in case the founder prefers the explicit weights list.
+Skipped because it rehashes the methodology content already in tweets 2/3.
+Kept here in case the founder prefers to lead with the factor list.

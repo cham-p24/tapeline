@@ -9,15 +9,23 @@ ad-hoc analyses in chat.
 
 **Last reviewed:** 2026-05-10
 
+> ⚠️ **Dated snapshot.** §1's "Built / Not built" inventory and the status
+> claims in §8–§9 are as of 2026-05-10 and have not been re-verified against the
+> current code. Copy-facing lines have been corrected in place — pricing (§9)
+> and the disclosure boundary (§1, §2, §4, §9) — but check anything else here
+> against the repo before reusing it.
+
 ---
 
 ## 1. Where Tapeline is right now (honest)
 
 ### Built and live ✓
 
-- Production scoring engine on Fly: 6-factor formula (Trend 25% · RS
-  20% · Fundamentals 15% · Smart money 15% · Macro 15% · Momentum
-  10%) running across ~2,500 actively-scored tickers
+- Production scoring engine on Fly: six-factor composite (Trend,
+  Relative Strength, Fundamentals, Smart Money, Macro, Momentum)
+  running across ~2,500 actively-scored tickers. The weights are
+  INTERNAL — PR #342 stripped them from the public site; never write
+  them into marketing, briefs or outreach copy
 - Sub-60s tick cadence; news refresh every 5 min (Massive + Finnhub
   parallel merge, including international names)
 - Public surfaces: `/`, `/pricing`, `/how-it-works`, `/scorecard`,
@@ -79,17 +87,24 @@ Retail traders who:
 
 ### The positioning statement
 
-> "The only retail stock scanner that publishes its scoring formula
-> on the homepage and back-checks every pick against SPY publicly."
+> "A retail stock scanner with a published methodology — all six
+> factors named, weight ordering disclosed — that back-checks every
+> pick against SPY on a public scorecard."
+
+(The weights themselves are not published. "Publishes its formula" is
+false copy — see PR #342.)
 
 That's the wedge. Every piece of marketing reinforces it. Every
 feature decision is judged by whether it strengthens or dilutes it.
 
 ### Three things competitors literally cannot copy
 
-1. **The published formula.** TipRanks/Zacks/WallStreetZen/Simply
-   Wall St all hide their methodology as IP. Their incentive
-   structure prevents copying — they sell opacity.
+1. **The published methodology.** All six factors are named and the
+   weight ordering is public ("weighted most toward Trend and
+   Relative Strength, least toward Momentum"); the weights themselves
+   stay internal. TipRanks/Zacks/WallStreetZen/Simply Wall St all hide
+   their methodology as IP. Their incentive structure prevents copying
+   — they sell opacity.
 2. **The public scorecard with both wins and losses.** Newsletter
    shops have known for 30 years to hide losers. Tapeline auto-
    publishes both.
@@ -115,11 +130,11 @@ The strategy is to **win on the wedge, accept the rest.**
 
 ### Direct composite-score competitors (closest competition)
 
-| Competitor | Their score | Pricing | Public formula? | Public scorecard? | Tapeline's edge |
+| Competitor | Their score | Pricing | Public methodology? | Public scorecard? | Tapeline's edge |
 |---|---|---|---|---|---|
 | TipRanks | Smart Score 1-10 | $30-45/mo | ✗ | ✗ | Both transparency moats |
 | WallStreetZen | Letter grade A-F | $40/mo | ✗ "115 factors" | ✗ | Both moats + cleaner UX |
-| Simply Wall St | Snowflake (5-axis) | $8-16/mo | ✗ ML black box | ✗ | Formula transparency + scorecard |
+| Simply Wall St | Snowflake (5-axis) | $8-16/mo | ✗ ML black box | ✗ | Published methodology + scorecard |
 | Stock Rover | Multiple scores | $8-28/mo | Partial | ✗ | Modern UX + scorecard |
 | Zacks | Rank 1-5 | $250/yr | ✗ | ✗ | Modern + transparent + cheaper |
 | Kavout | K-Score | Custom | ✗ "AI" | ✗ | Same |
@@ -167,7 +182,7 @@ The strategy is to **win on the wedge, accept the rest.**
 - **ScoreRadial component** — 6-axis SVG with score-tier coloring, polygon draw-in animation. **More sophisticated than any direct competitor's score viz.** Simply Wall St's Snowflake is closest but uses 5 axes and is ML-driven (no transparency). TipRanks shows just a number; WallStreetZen just a letter. Tapeline's radial is the strongest single-stock visualization in the field.
 - **Live ScannerPreview** with pulsing rows + score nudges every 4s. Sells "live" claim through demonstrated behavior, not asserted text.
 - **LiveCounters strip** with counting-up animation (0 → 5,757 tickers, etc.). Pulled live from `/api/status`. Concrete numbers replace vague "live" claims.
-- **TransparencyStrip** cross-linking the moat artefacts (formula, scorecard, status, security, changelog).
+- **TransparencyStrip** cross-linking the moat artefacts (methodology, scorecard, status, security, changelog).
 - **Public OG images per ticker** with the radial signature in the corner — share previews self-sell.
 - **Hero gradient backdrop** with soft accent glow (Linear-style depth).
 - **FadeIn-on-scroll** for trust pillars + How It Works steps, with `prefers-reduced-motion` support.
@@ -187,7 +202,7 @@ The strategy is to **win on the wedge, accept the rest.**
 - **Embed full TradingView chart on `/t/{sym}`** — would dominate the page visually, dilute the score focus. Already on `/app/ticker` for paid users.
 - **Full fundamentals tables** (income statement, balance sheet, cash flow) — turns Tapeline into Stock Analysis. Wrong positioning.
 - **Cmd+K palette** — power-user feature; pre-launch, defer.
-- **Discord/Telegram integration as primary alert channels** — Discord retired (low conversion); Telegram exists for Premium users only.
+- **Discord/Telegram integration as primary alert channels** — Discord retired 2026-05-04 (low conversion). Telegram's per-rule alert dispatch arm was retired 2026-08-11 as well (see the comment in `backend/app/services/alerts.py`); both service files and their DB columns are kept so either channel can be re-enabled.
 
 ---
 
@@ -429,16 +444,17 @@ What kills similar businesses:
 
 If we're aligned, this is the strategy:
 
-- Tapeline is the **transparent, formula-published, scorecard-audited**
+- Tapeline is the **methodology-published, scorecard-audited**
   alternative to TipRanks/Zacks/WallStreetZen
-- Pricing is mid-market ($29-49/mo retail; $399 lifetime; $2k+
-  enterprise) — not a race to the bottom, not premium-priced
+- Pricing is $9.99/mo Pro and $19.99/mo Premium retail ($99 / $199
+  annual); $399 founder's lifetime; $2k+ enterprise. (The $29-49/mo
+  band in earlier drafts was retired by the 2026-07 founding reprice.)
 - Distribution is organic-first: HN/Reddit/podcasts/SEO compounding
   over 6-12 months
 - Stripe is the only revenue blocker; everything else is incremental
 - Visual moat is the radial signature + transparency stack — defended
   by NOT cluttering with generic data dump pages
-- SEO moat is the published formula + scorecard pages — defended by
+- SEO moat is the published methodology + scorecard pages — defended by
   consistent compare-page + content cadence
 
 If any of the above is wrong, tell me — better to course-correct now

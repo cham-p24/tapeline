@@ -185,6 +185,11 @@ copy reads as if both monthly and annual cost $39.99, which is wrong.
 **Fix:** change to `($49.99/mo or $39.99/mo billed annually — saves $120/yr)`
 to match the day-7 email's format. One-liner.
 
+> ⚠️ **SUPERSEDED by the 2026-07-03 founding reprice — do not apply as written.**
+> $49.99/$39.99 are retired. Premium is **$19.99/mo or $16.58/mo billed
+> annually ($199/yr · save $40)**. The typo still needs fixing; use the
+> current numbers, not the ones in this dated audit.
+
 ---
 
 ## Concrete fixes (one-liner per gap)
@@ -192,8 +197,9 @@ to match the day-7 email's format. One-liner.
 1. Delete the stale comment block at `backend/app/services/email.py:751-764`.
 2. Fix the log line at `backend/app/workers/signal_publisher.py:257` to
    print all six stage counts (`day3 day7 day11 day13 expired post3`).
-3. Fix the price typo at `backend/app/services/email.py:368` (`$39.99/mo or
-   $39.99/mo` → `$49.99/mo or $39.99/mo`).
+3. Fix the price typo at `backend/app/services/email.py:368` — but with the
+   **current** founding prices (Premium $19.99/mo or $16.58/mo billed
+   annually, $199/yr), not the retired $49.99/$39.99 this audit quoted.
 
 No structural changes needed. The drip system is **production-ready** —
 it just hasn't had any real users yet to drip-mail.

@@ -14,8 +14,11 @@ import { freeHasWatchlist } from "@/lib/pricing";
  *     An UPGRADE wall: invites unlimited look-ups on a paid plan, and
  *     notes the count resets tomorrow so the free tier still feels useful.
  *   - "signup_required"   → anonymous visitor over their (smaller) daily
- *     cap. A SIGN-UP-FREE wall: invites a free account, inviting not
- *     punitive — the free tier keeps live scores and more look-ups.
+ *     cap. Invites an account — inviting, not punitive — and states the
+ *     mechanism plainly: since the 2026-08-22 cutover a new account adds a
+ *     card at first sign-in and that starts the 14-day Premium trial. The
+ *     genuinely card-free path, the published record, is offered in the
+ *     footnote.
  *
  * Copy follows the ASIC rule: descriptive, never prescriptive — no
  * buy/sell/recommend/should/guaranteed/beats-the-market language. We
@@ -39,8 +42,10 @@ export function LookupWall({
   const isUpgrade = reason === "free_lookup_limit";
   const sym = symbol?.toUpperCase();
 
-  // Headline: name the limit honestly. With a known limit we can say
-  // "your 5 free look-ups today"; without one we keep it generic.
+  // Headline: name the limit honestly. The backend reports the cap for the
+  // caller — 12/day for a signed-in free account, 2/day for a guest — so with
+  // a known limit we can say "your 12 free look-ups today"; without one we
+  // keep it generic rather than guess a number.
   const countPhrase =
     typeof limit === "number" && limit > 0
       ? `your ${limit} free look-up${limit === 1 ? "" : "s"} today`
@@ -54,7 +59,7 @@ export function LookupWall({
     >
       <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
         <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
-        {isUpgrade ? "Daily look-up limit" : "Free account"}
+        {isUpgrade ? "Daily look-up limit" : "Create an account"}
       </div>
 
       {isUpgrade ? (

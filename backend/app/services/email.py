@@ -372,8 +372,8 @@ def render_welcome_email(
                 "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=welcome&utm_medium=transactional",
             )
             + muted_paragraph(
-                'Tap any card above to see the 6-factor breakdown. The formula '
-                'is public — see <a href="https://tapeline.io/how-it-works" '
+                'Tap any card above to see the 6-factor breakdown. The '
+                'methodology is public — see <a href="https://tapeline.io/how-it-works" '
                 f'style="color:{ACCENT};">how it works</a>.'
             )
             + footnote(_FREE_VS_TRIAL_FOOTNOTE)
@@ -418,7 +418,9 @@ def render_referral_referee_email(
         h1(f"Welcome, {user_name}.")
         + lead(
             f"You signed up via {referrer_str}'s referral link — that earned you "
-            f"<strong>1 free month of Premium</strong> on top of your 14-day trial."
+            f"<strong>1 free month of Premium</strong>. It applies automatically "
+            f"the first time you start a paid plan or the card-required Premium "
+            f"trial."
         )
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-family:{FONT_SANS};font-weight:600;">Credit applied</div>'
@@ -427,7 +429,8 @@ def render_referral_referee_email(
             accent=True,
         )
         + muted_paragraph(
-            "Trial today, free month after — your first paid month is on us."
+            "Your free month lands on your first paid month, whenever you start "
+            "one — including if you start the 14-day Premium trial."
         )
         + button("Open the scanner", "https://tapeline.io/app/scanner"),
         preheader="You earned 1 free month of Premium — applied at your next checkout.",
@@ -518,7 +521,7 @@ def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str
         )
         + card(
             f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Squeeze Watch</div>'
-            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Bollinger Band compressions flagged before they break. Eight setups updated live.</div>'
+            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Bollinger Band compressions flagged before they break.</div>'
         )
         + card(
             f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Congress Trades</div>'
@@ -528,12 +531,8 @@ def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str
             f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Recent insider buys</div>'
             f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">SEC Form 4 transactions across the universe — date, insider, shares, value.</div>'
         )
-        + card(
-            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Telegram alerts</div>'
-            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Hourly digest of your watchlist + market regime, delivered to your phone.</div>'
-        )
         + button("Try a Premium feature", "https://tapeline.io/app/holdings"),
-        preheader="Squeeze Watch, Congress Trades, Insider Buys, Telegram — inside your trial.",
+        preheader="Squeeze Watch, Congress Trades, Insider Buys — inside your trial.",
     )
 
 
@@ -641,9 +640,9 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
             f"{FREE_DAILY_LOOKUPS} a day, "
             + (
                 f"the watchlist caps at {FREE_WATCHLIST_TICKERS} tickers, and "
-                "alerts, Telegram, and the Congress feed switch off."
+                "alerts and the Congress feed switch off."
                 if free_has_watchlist()
-                else "and the watchlist, alerts, Telegram, and the Congress "
+                else "and the watchlist, alerts, and the Congress "
                 "feed switch off."
             )
             + " To keep what you have, add a card."
@@ -655,7 +654,7 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
         )
         + _pricing_card(
             "Premium", "$19.99", "$16.58", "$199", "$40",
-            "Everything in Pro + Congress + Telegram unlimited + insider Form 4 + analyst ratings.",
+            "Everything in Pro + Congress + insider Form 4 + analyst ratings.",
             accent=True,
         )
         + button("Add a card", "https://tapeline.io/app/billing")
@@ -773,7 +772,7 @@ def render_trial_day13_email(
                 else ""
             )
             + f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
-            f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts, Telegram, "
+            f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts "
             f"and the Congress feed switch off."
         )
         + muted_paragraph(
@@ -824,8 +823,8 @@ def render_trial_expired_email(
             f"{user_name}, your 14-day Premium trial ended overnight. Your "
             f"account is now on the Free tier — still live data, but capped "
             f"at the top {FREE_SCANNER_ROWS} scanner rows and "
-            f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with no Telegram "
-            f"or smart alerts."
+            f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with no smart "
+            f"alerts."
         )
         + _trial_summary_block(summary)
         + (
@@ -842,7 +841,7 @@ def render_trial_expired_email(
             'A few things stay open regardless of tier: the '
             f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
             '(every top-10 call back-checked vs SPY) and the '
-            f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring formula</a>'
+            f'<a href="https://tapeline.io/how-it-works" style="color:{ACCENT};">scoring methodology</a>'
             + (
                 f', and your watchlist (capped at {FREE_WATCHLIST_TICKERS} tickers on Free).'
                 if free_has_watchlist()
@@ -952,8 +951,8 @@ def render_trial_lapse30_email(
             f'<strong><a href="{pro_url}" style="color:{ACCENT};">$9.99/mo '
             "for Pro</a></strong> (the full scanner) and "
             f'<strong><a href="{premium_url}" style="color:{ACCENT};">'
-            "$19.99/mo for Premium</a></strong> (scanner + smart alerts, "
-            "Telegram, and the Congress feed) — locked in for early "
+            "$19.99/mo for Premium</a></strong> (scanner + smart alerts "
+            "and the Congress feed) — locked in for early "
             "subscribers for as long as they stay subscribed."
         )
         + muted_paragraph(
@@ -989,14 +988,14 @@ def render_trial_ended_email(user_name: str) -> str:
         + lead(
             "Your account is now on the Free plan. "
             + (
-                "Your watchlist and settings are intact — only the data feed changes."
+                "Your watchlist and settings are intact — only the caps change."
                 if free_has_watchlist()
                 else "Your settings are intact, and anything you saved to a watchlist is "
                 "kept — you'll need Pro to open the watchlist again."
             )
         )
         + muted_paragraph(
-            "If you want live data + alerts back, the door is always open."
+            "If you want email alerts and CSV export back, the door is always open."
         )
         + button("See plans", "https://tapeline.io/app/billing")
         + footnote(
@@ -1364,6 +1363,17 @@ def render_subscription_started_email(
             next_charge_line = f"Next charge: {dt.strftime('%b %d, %Y')}."
         except Exception:
             next_charge_line = ""
+    # The guarantee is not the same on both plans and this renderer fires for
+    # both: monthly refunds in full inside the window, annual refunds the
+    # remainder prorated with one month at the monthly rate retained. Canonical
+    # wording lives in frontend/lib/pricing.ts REFUND and /legal/refund.
+    if billing_period == "annual":
+        refund_clause = (
+            "reply to this email and we'll refund the remainder, prorated — one "
+            "month at the monthly rate is retained."
+        )
+    else:
+        refund_clause = "just reply to this email and we'll refund in full."
     return shell(
         h1(f"You're in, {user_name}.")
         + lead(
@@ -1386,7 +1396,7 @@ def render_subscription_started_email(
               <li><strong>Build your watchlist</strong> — add the names you actually
                   trade. Alerts fire the moment any score crosses your threshold.</li>
               <li><strong>Pick a notification channel</strong> — email's on by default,
-                  but {tier_label} can also fire {("Telegram " if tier.lower() == "premium" else "")}browser push and
+                  but {tier_label} can also fire browser push and
                   the daily briefing. <a href="https://tapeline.io/app/settings/email"
                   style="color:{ACCENT};">Channel settings</a>.</li>
             </ol>
@@ -1399,7 +1409,7 @@ def render_subscription_started_email(
         + footnote(
             "Changed your mind? <a href=\"https://tapeline.io/legal/refund\" "
             f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">30-day money "
-            "back, no questions</a> — just reply to this email and we'll refund in full."
+            f"back</a> — {refund_clause}"
         ),
         preheader=f"Welcome to Tapeline {tier_label} — your full data feed is live.",
     )
@@ -1796,7 +1806,7 @@ def render_re_engagement_email(
         + footnote(
             'One more note from me may follow, then nothing further.'
             '<br><br>— Christian, founder. '
-            f'<a href="https://tapeline.io/how-it-works" style="color:{LIGHT_SUBTLE};text-decoration:underline;">The formula is still public.</a>'
+            f'<a href="https://tapeline.io/how-it-works" style="color:{LIGHT_SUBTLE};text-decoration:underline;">The methodology is still public.</a>'
         )
     )
     return shell(
@@ -2142,10 +2152,13 @@ def render_activation_watchlist_email(user_name: str, has_watchlist: bool = True
     of a name you know seen against the published record. Step one is the
     watchlist add (activation milestone #1: it stamps User.activated_at and
     powers the end-of-day digest) FOR recipients who have a watchlist. This
-    email is sent to every tier, and the saved watchlist is Pro-and-up from the
-    2026-08-02 cutover, so for a Free recipient (`has_watchlist=False`) step one
-    becomes "score a ticker you follow" — a first action Free can actually take,
-    same aha, no dead end. Descriptive only, persona "default"."""
+    email is sent to every tier. The 2026-08-02 watchlist→Pro cutover was
+    REVERSED on 2026-08-19 (see tier.FREE_WATCHLIST_REMOVAL_DATE), so Free keeps
+    a 5-ticker watchlist and `has_watchlist` currently resolves True for
+    everyone. The `has_watchlist=False` branch — step one becomes "score a
+    ticker you follow", a first action Free can always take — is retained only
+    in case the Free watchlist is removed again. Descriptive only, persona
+    "default"."""
     if has_watchlist:
         # Rule 7: the watchlist line says which NUMBER changes (the score), not
         # "what moved" — the score is a factor value Rule 7 permits, where price
@@ -2311,11 +2324,12 @@ def render_activation_first_scan_email(
             "One scan is the whole first step."
         )
         + paragraph(
-            "The scanner ranks US equities on six measured factors — momentum, "
-            "trend, relative volume, short interest, insider and institutional "
-            "flow. You set the thresholds; it returns every name that currently "
-            "meets them, with the underlying numbers shown next to each row so "
-            "you can see why it matched."
+            "The scanner ranks US equities on six measured factors — trend, "
+            "relative strength, fundamentals, smart money, macro and momentum, "
+            "weighted most toward trend and relative strength and least toward "
+            "momentum. You set the thresholds; it returns every name that "
+            "currently meets them, with the underlying numbers shown next to "
+            "each row so you can see why it matched."
         )
         + button(
             "Run my first scan",
@@ -2582,6 +2596,7 @@ def render_annual_renewal_reminder_email(
 
 def render_free_trial_invite_email(
     user_name: str, *, open_access: bool = False, open_access_until: str = "",
+    must_add_card: bool = False,
 ) -> str:
     """Day ~3: the first (and usually only) invitation to start a trial.
 
@@ -2600,20 +2615,57 @@ def render_free_trial_invite_email(
     2. **State the trial terms here, not at the checkout wall.** The trial takes
        a card. Someone should learn that from us, in the email doing the asking,
        not discover it after clicking.
+    3. **A walled account has not reached the scanner yet.** From
+       tier.CARD_GATE_START an account created on or after that date meets the
+       /app/start card wall at first sign-in, so `must_add_card=True` means the
+       in-app rows are not open to them yet — the daily picks and the public
+       record still are, with no account and no card. Never tell that recipient
+       the scanner is already on, and do not tell them their Free account
+       "stays exactly as it is" if they say no — it has never been open to
+       them. Accounts created before the cutover are grandfathered and read
+       `must_add_card=False`.
     """
-    if open_access:
+    if open_access and not must_add_card:
         access_line = muted_paragraph(
             f"Right now your Free account has the <strong>full scanner</strong> — "
             f"every scored row, not the top ten — because open access is running "
             f"until {open_access_until}. Nothing to do to get it; it is already on."
         )
         adds_intro = "What a trial adds on top of that:"
+    elif open_access:
+        access_line = muted_paragraph(
+            f"Open access is running until {open_access_until}: once your card is "
+            f"on file at first sign-in, your Free account gets every scored row, "
+            f"not the top ten. The daily picks and the whole public record are "
+            f"open to you right now, with no account and no card."
+        )
+        adds_intro = "What a trial adds on top of that:"
+    elif must_add_card:
+        access_line = muted_paragraph(
+            "The daily picks and the whole public record are open to you right "
+            "now, with no account and no card. The in-app scanner — the top ten "
+            "scored rows on Free — opens once you add a card at first sign-in."
+        )
+        adds_intro = "What a trial adds:"
     else:
         access_line = muted_paragraph(
             "Free gives you the top ten scored rows, the daily picks and the "
             "whole public record, with no card and no expiry."
         )
         adds_intro = "What a trial adds:"
+
+    # A walled account has no Free product to "stay exactly as it is" — the
+    # thing that survives a no is the public record, which needs neither an
+    # account nor a card.
+    if must_add_card:
+        decline_line = (
+            "Say no and nothing changes — the daily picks and the whole public "
+            "record stay open to you, with no account and no card."
+        )
+    else:
+        decline_line = (
+            "Say no and nothing changes — your Free account stays exactly as it is."
+        )
 
     return shell(
         h1(f"{user_name}, here's what else your account can do.")
@@ -2640,11 +2692,11 @@ def render_free_trial_invite_email(
             "<strong>$0 is charged today</strong>, the first charge lands 14 days "
             "later, and one click ends it before then with nothing taken. We email "
             "you three days before that date, so it cannot arrive unannounced. "
-            "Say no and nothing changes — your Free account stays exactly as it is."
+            f"{decline_line}"
         )
         + button("See what's included", "https://tapeline.io/app/billing")
         + footnote(
-            'Every daily pick we have ever published, including the ones that '
+            'The published record of past daily picks, including the ones that '
             'lost, is at <a href="https://tapeline.io/scorecard" '
             f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">tapeline.io/scorecard</a> — '
             'readable without an account, before you decide anything.'
@@ -2673,9 +2725,10 @@ def render_free_trial_last_invite_email(user_name: str) -> str:
         )
         + paragraph(
             "Most screeners show you a score and never mention what happened "
-            "next. We publish every daily top-ten pick the day it prints, append "
-            "the following session's move against SPY, and never edit it — losses "
-            "included."
+            "next. We log every daily top-ten pick, append the following "
+            "session's move against SPY, and never edit it — losses included. "
+            "Without a paid plan the day-by-day rows reach you on a seven-day "
+            "delay; the headline stats are live for everyone."
         )
         + muted_paragraph(
             "The honest state of that record is on the page: at the current "
@@ -2687,7 +2740,8 @@ def render_free_trial_last_invite_email(user_name: str) -> str:
         + muted_paragraph(
             "If it holds up for you, the 14-day Premium trial is on the billing "
             "page — card required, $0 today, one click to stop before the first "
-            "charge. If not, your Free account stays open and unchanged."
+            "charge. If not, nothing changes: the public record and the daily "
+            "picks stay open to you either way, no account and no card."
         )
         + footnote(
             "That's the end of this series. — Christian, founder."
@@ -4262,9 +4316,10 @@ async def run_activation_drip(
                 continue
             try:
                 if token == "act_wl":
-                    # act_wl reaches every tier; the watchlist step-one is a
-                    # dead end for a Free recipient after the 2026-08-02 cutover
-                    # (watchlist is Pro-and-up). Paid/trial recipients keep it.
+                    # act_wl reaches every tier, so step one is chosen from
+                    # free_has_watchlist(). The 2026-08-02 watchlist→Pro cutover
+                    # was reversed on 2026-08-19, so this currently resolves
+                    # True for everyone. Paid/trial recipients always keep it.
                     # Call the renderer directly (not via the loop's `renderer`,
                     # which mypy narrows to the two stages' common (str)->str
                     # signature and would reject the has_watchlist kwarg).
@@ -4573,7 +4628,11 @@ async def run_free_trial_invite_drip(
 
     from app.models import User
     from app.services.email_prefs import EmailPref, wants
-    from app.services.tier import PROMO_OPEN_ACCESS_UNTIL, free_open_access
+    from app.services.tier import (
+        PROMO_OPEN_ACCESS_UNTIL,
+        free_open_access,
+        must_add_card,
+    )
 
     now = now or datetime.now(UTC)
     counts = {"free_invite1": 0, "free_invite2": 0}
@@ -4595,15 +4654,18 @@ async def run_free_trial_invite_drip(
         (
             "free_invite1",
             now - timedelta(days=6), now - timedelta(days=3),
-            lambda name: render_free_trial_invite_email(
+            # The card wall decides whether this recipient can reach the in-app
+            # rows at all, so the access claim has to be per-account.
+            lambda name, u: render_free_trial_invite_email(
                 name, open_access=open_access, open_access_until=open_until,
+                must_add_card=must_add_card(u),
             ),
             "What else your Tapeline account can do",
         ),
         (
             "free_invite2",
             now - timedelta(days=16), now - timedelta(days=12),
-            render_free_trial_last_invite_email,
+            lambda name, u: render_free_trial_last_invite_email(name),
             "Last note — our published record",
         ),
     ]
@@ -4638,7 +4700,7 @@ async def run_free_trial_invite_drip(
             ):
                 continue
             try:
-                html = renderer(user.name or "trader")
+                html = renderer(user.name or "trader", user)
                 res = await send_email(
                     user.email, subject, html,
                     persona="sales",

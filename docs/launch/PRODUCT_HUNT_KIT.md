@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 **Why this instead of Reddit:** Reddit's finance subs auto-remove self-promo from
@@ -52,7 +68,7 @@ is fine now — don't block on finding a hunter.)*
 ```
 The stock scanner that publishes its track record
 ```
-*(Alt: `A stock score you can audit — public formula, public record` — 54 char)*
+*(Alt: `A stock score you can audit — public factors, public record` — 59 char)*
 
 **Topics/categories:** Fintech · Investing · Stocks · SaaS · Analytics
 
@@ -60,7 +76,7 @@ The stock scanner that publishes its track record
 
 **Description** (260 char max):
 ```
-Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY next day — wins and losses, never edited. Free tier, no card; trial takes one.
+Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY next day — wins and losses, never edited. Record free to read, no account.
 ```
 
 ---
@@ -74,13 +90,13 @@ I built Tapeline because every stock scanner I'd paid for had the same tell: the
 
 So Tapeline does the opposite three ways:
 
-1. One score, explained. Every US stock gets a 0–100 score from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) — with a plain-English sentence on every row saying what's driving it. The formula and weight-ordering are public at /how-it-works.
+1. One score, explained. Every US stock gets a 0–100 score from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) — with a plain-English sentence on every row saying what's driving it. The six factors and their weight ordering are public at /how-it-works.
 
 2. A record you can't edit. Every market day it freezes the top 10 and logs each name's next-day return vs SPY. Wins stay, losses stay, nothing gets quietly deleted. It's ~52 days deep and — honestly — the top-10 is beating SPY only about 47% of the time so far. I'm posting that on purpose. The point is that it's auditable, not that it's magic.
 
 3. You can download the whole record and check my math (/verify).
 
-Free tier is genuinely usable (live scores, 12 look-ups/day, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys + Telegram). The free tier never asks for a card; the 14-day Premium trial does — $0 charged today, first charge on day 14, one click to cancel.
+The published record is genuinely usable on its own (live scores, the daily Top 10, a page per ticker, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys). The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 14-day Premium trial — $0 charged today, first charge on day 14, one click to cancel.
 
 Built solo from Melbourne. I'd genuinely love for this crowd to tear apart the methodology — which factor am I under-weighting? What would make the back-check defensible over a 1-year horizon instead of 1-day?
 ```

@@ -41,7 +41,10 @@ const PLANS = [
       "The full scorecard — every pick, back-checked vs SPY",
       "A page per scored ticker, all six factors",
       "The raw record as CSV and JSON",
-      "The scoring formula, named and weighted",
+      // Not "the scoring formula, named and weighted" — PR #342 deliberately
+      // stripped the numbers. What /how-it-works publishes is the factor set
+      // plus the weight ORDERING, and this bullet may promise no more.
+      "The six scoring factors, named and ranked by weight",
       "No account, no card, no email",
     ],
     cta: "Read the record",

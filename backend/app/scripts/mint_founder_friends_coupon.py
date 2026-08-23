@@ -116,10 +116,11 @@ def main() -> int:
     logger.info("")
     logger.info("How to use it:")
     logger.info("  1. DM someone the code: 'Use FOUNDERFRIENDS at /app/billing for 50%% off 90 days'")
-    logger.info("  2. They sign up at tapeline.io/signup (14-day trial auto-starts, no card)")
-    logger.info("  3. Day 5-7 of trial they go to /app/billing → Premium → enter FOUNDERFRIENDS")
+    logger.info("  2. They sign up at tapeline.io/signup, then add a card at first sign-in")
+    logger.info("     — that starts the 14-day Premium trial ($0 today, first charge day 14)")
+    logger.info("  3. BEFORE day 14 they go to /app/billing → Premium → enter FOUNDERFRIENDS")
     logger.info("  4. Stripe applies the 50% off for the next 3 monthly invoices")
-    logger.info("     ($19.99 × 3 = $59.97 total before retail kicks in)")
+    logger.info("     (~$10.00/mo instead of $19.99 — about $30 total before retail kicks in)")
     logger.info("")
     return 0
 

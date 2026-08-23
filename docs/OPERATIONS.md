@@ -79,7 +79,7 @@ Direct dashboard URLs, in the order you'll need them:
 | Tapeline Premium | Monthly | $19.99 USD | `premium_monthly` |
 | Tapeline Premium | Yearly | $199 USD | `premium_annual` |
 
-Annual rows are intentional "charm" prices — `$99/yr` displays in-app as `$8.25/mo billed annually` (saves $60 vs monthly), `$199/yr` displays as `$16.58/mo billed annually` (saves $120). The frontend pricing UI in `frontend/components/PricingTable.tsx` does that math; the Stripe-side amount stays the annual total.
+Annual rows are intentional "charm" prices — `$99/yr` displays in-app as `$8.25/mo billed annually` (saves $20/yr vs monthly), `$199/yr` displays as `$16.58/mo billed annually` (saves $40/yr). Those savings are computed off the founding prices ($9.99 × 12 − $99 = $20.88; $19.99 × 12 − $199 = $40.88) and match `frontend/lib/pricing.ts` and `docs/PRICING.md`. The frontend pricing UI in `frontend/components/PricingTable.tsx` does that math; the Stripe-side amount stays the annual total.
 
 **Webhook endpoint**: `https://api.tapeline.io/api/webhooks/stripe` — subscribe to:
 - `checkout.session.completed` — links the Stripe customer_id back to the Tapeline user
@@ -160,17 +160,30 @@ Without all six secrets above, `POST /api/billing/checkout` returns `400 No Stri
 The day-3 / day-7 / day-13 drip and trial-ended email all auto-fire from the
 worker's daily task once Resend is live. No additional wiring needed.
 
-### Step 5 — Telegram (Free, 10 minutes)
+### Step 5 — Telegram — FOUNDER notifications only (Free, 10 minutes)
+
+**Telegram is not a customer feature.** It was retired as a customer alert
+channel on 2026-08-11: `AlertRuleCreate.channel` in `backend/app/routers/alerts.py`
+accepts only `email` / `web_push` (a `channel="telegram"` POST returns 422),
+`services/alerts.py:_fire` has no Telegram arm, there is no Telegram card at
+`/app/billing`, and the old hourly customer digest is gone from the worker.
+Set the bot up only for the **founder-facing** uses: new-signup and
+new-subscription pings, the weekly SEO-health digest, and the inbox Tier-1
+Approve/Reject card.
 
 1. DM `@BotFather` on Telegram, send `/newbot`, name it `TapelineBot`
 2. Get the bot token
 3. Paste into `.env`: `TELEGRAM_BOT_TOKEN=...`
-4. Test: sign in as a Premium user, go to `/app/billing` → Notifications card,
-   paste your own chat_id (DM `/start` to your bot, it'll reply with your numeric id), hit "Save" then "Send test message"
+4. Get your own numeric chat id (DM `@userinfobot`) and paste it as
+   `INBOX_FOUNDER_TELEGRAM_CHAT_ID=...` — `services/telegram.py:deliver_founder_alert`
+   needs **both** vars before it will use Telegram
+5. Test: trigger a signup. The founder ping should arrive in Telegram within a
+   few seconds. With either var unset, `deliver_founder_alert` silently falls
+   back to email (Resend) instead — exactly one channel fires, never both
 
-### Step 5a — Twilio SMS (Optional, ~$0.008/msg US, 15 minutes)
+### Step 5a — Twilio SMS — RETIRED 2026-05-04 (re-enable path only)
 
-Skip this if you don't want SMS as a third alert channel. Email + Telegram cover most use cases.
+**None of the steps below do anything as written.** SMS was retired on 2026-05-04: `alerts.sms` is no longer in `tier.py:FEATURES`, so the `/app/billing` SMS card does not render and no rule can fire on SMS. `services/sms.py` and the DB columns were deliberately kept, so re-enabling needs no migration — re-add `alerts.sms` to `tier.py:FEATURES` first, then follow the steps.
 
 1. Sign up at https://www.twilio.com (free trial gives ~$15 credit)
 2. Buy a phone number (~$1.15/mo for a US number)
@@ -187,14 +200,11 @@ Skip this if you don't want SMS as a third alert channel. Email + Telegram cover
 (HIGH CONVICTION crossings, regime flips, big congress trades). Don't enable
 SMS on a high-frequency rule — every message is billed.
 
-### Step 6 — Quiver QuantData (Free tier, 5 minutes)
+### Step 6 — Quiver QuantData — REMOVED (nothing to do)
 
-1. Sign up at https://api.quiverquant.com/
-2. Grab the API key
-3. Paste into `.env`: `QUIVER_API_KEY=...`
-4. Restart the worker. Within 24h the elite-13F holdings will switch from mock
-   to real data (or sooner if you nuke the cache: `rm backend/.cache/quiver_*.json`)
-5. Verify: `/app/holdings` should show real fund positions (Buffett, Burry, etc.)
+The Quiver subscription was cancelled. `services/quiver_feed.py`, the `_refresh_elite_13f` worker task, the `InstitutionalHolding` model and the `quiver_api_key` setting are all deleted, so setting `QUIVER_API_KEY` activates nothing. The `institutional_holdings` table is left behind as a harmless orphan.
+
+`/app/holdings` is now the **Recent insider buys** surface — SEC Form 4 transactions from Finnhub, refreshed daily. It needs only `FINNHUB_API_KEY`, which is already set. `/api/holdings/funds` is a legacy empty stub kept for frontend compatibility.
 
 ### Step 7 — Google + Microsoft OAuth (Both free, 30 minutes total)
 
@@ -274,13 +284,6 @@ cd backend
 .venv\Scripts\python.exe -m app.scripts.seed_owner
 ```
 
-### Force a 13F refresh (skip the 24h cache)
-
-```powershell
-rm backend/.cache/quiver_*.json
-# Worker will refetch on next 24h tick — or restart it
-```
-
 ### Force-downgrade a user (manual override)
 
 ```sql
@@ -292,7 +295,7 @@ UPDATE users SET tier = 'free' WHERE email = 'user@example.com';
 Look for these tick lines:
 - `tick.done snapshots=N squeezes=N regime=X trades_added=N elapsed=Ns`
 - `alerts.fired count=N` (when alert rules trigger)
-- `holdings.13f_refreshed source=quiver|mock count=N` (daily)
+- `insider.refreshed scored=N score_cache=N feed_size=N` (daily; SEC Form 4 via Finnhub)
 - `trial.downgraded count=N` (hourly check; usually 0)
 - `drip.sent day3=N day7=N day13=N` (daily)
 
@@ -338,17 +341,24 @@ multi-instance setup.
 3. Test directly: `curl -X POST https://api.resend.com/emails -H "Authorization: Bearer $RESEND_API_KEY" -d '...'`
 4. If Resend returns 401, the key is wrong. If 422, the from-domain isn't verified.
 
-### "Telegram digest stopped"
+### "A customer says their Telegram alerts stopped"
 
-1. Confirm `TELEGRAM_BOT_TOKEN` is set
-2. Check users actually have `telegram_chat_id` set: `SELECT email, telegram_chat_id FROM users WHERE telegram_chat_id IS NOT NULL`
-3. The hourly digest only runs for `tier='premium'` users. Free/Pro users won't get it (by design).
+Nothing to fix — **there is no customer Telegram channel.** It was retired
+2026-08-11. The hourly customer digest task is gone from the worker, no Telegram
+dispatch arm remains in `services/alerts.py:_fire`, and `POST /api/alerts/rules`
+with `channel="telegram"` now 422s at validation. The `telegram_chat_id` column
+and the `telegram_alerts_per_day` cap in `tier.py` are leftovers with no
+consumer. Point the customer at email (Pro+) or browser push instead.
 
-### "13F holdings are still showing mock data with QUIVER_API_KEY set"
+### "Founder Telegram pings stopped"
 
-1. Force-clear the cache: `rm backend/.cache/quiver_*.json`
-2. Restart the worker (the 24h timer is in-memory)
-3. Check logs for `quiver.13f_fetched count=N` — if you see `quiver.13f_empty no_funds_returned_data`, the API endpoints have changed shape; look at `_try_fund_endpoints` in `quiver_feed.py`
+1. Confirm `TELEGRAM_BOT_TOKEN` **and** `INBOX_FOUNDER_TELEGRAM_CHAT_ID` are both
+   set — `deliver_founder_alert` needs both, and falls back to email if either
+   is missing
+2. Check `latest_run.log` for `telegram.skipped no_bot_token` or
+   `telegram.send_failed`
+3. If pings are arriving by email instead of Telegram, that IS the documented
+   fallback — set the chat id to switch the route back
 
 ### "Trial users aren't being downgraded"
 
@@ -400,11 +410,11 @@ These don't block launch but should land within the first month:
 
 ## 6. Hard limits (don't change without thinking)
 
-- **Six-factor scoring formula and weights** — `backend/app/services/mock_feed.py` `fetch_snapshots()`. Transparency is the moat.
+- **Six-factor scoring formula and weights** — the composite weighting is the moat, so don't retune it casually. **It is not public and must not be described as public:** PR #342 stripped the exact weights, the equation and the per-factor indicator recipe from the site. What IS published is the six factor *names*, what each measures, and their weight **ordering** ("most toward Trend and Relative Strength, least toward Momentum"). Never write "publishes its formula" or "published weights".
 - **Descriptive signal labels** — never use "BUY", "ACCUMULATE", "WATCH" in any user-facing copy. Use the descriptive labels in `mock_feed.py:_signal_from_score`.
 - **Public scorecard** — never gate it. It's the trust mechanism. Free users see it; paying users see the live data.
 - **Owner login** — only created via `seed_owner.py`. Never expose admin promotion via the signup form.
-- **Three-tier price points** — Pro $29 / Premium $49. Don't revisit until 500+ paying users with conversion data.
+- **Three-tier price points** — Pro $9.99/mo ($99/yr) / Premium $19.99/mo ($199/yr), founding pricing, locked in for early subscribers. Only revisit with conversion data.
 - **The public record shows real product** — the daily Top 10, the full scorecard and every per-ticker page are live, real data, readable with no account and no card. Not a feature-stripped mock. (The signed-in app takes a card at first sign-in from 2026-08-22 — see docs/PRICING.md.)
 - **Trial tier is Premium** — gives users the best, takes it away on expiry. Don't drop to Pro-trial without an A/B.
 

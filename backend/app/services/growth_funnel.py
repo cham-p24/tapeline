@@ -29,9 +29,10 @@ DEFINITIONS (deliberately spelled out — every one of these is arguable)
   first watchlist ticker: someone who skipped the watchlist and went straight
   to arming an alert is unambiguously activated, and counting them as a
   drop-off would misdirect the fix.
-* **trials_started** — `trial_ends_at` is set. Signup auto-starts a trial, so
-  in steady state this tracks signups; a gap means the signup path failed to
-  arm one, which is worth seeing.
+* **trials_started** — `trial_ends_at` is set. The trial is card-required and
+  opt-in since PR #536, so this is a strict subset of signups by design. The
+  signup→trial ratio IS the conversion step to watch; the gap is the funnel,
+  not a bug.
 * **trials_active** — trial end date is still in the future and no Stripe
   customer exists. Point-in-time, restricted to the cohort.
 * **paying** — `stripe_customer_id` is set. Same definition the lifetime

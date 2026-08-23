@@ -29,7 +29,7 @@ Realistic impact: **10–25% of paid signups within 6 months** if 15–20 active
 
 **Cookie window:** **60 days** (SaaS standard; finance purchase consideration is long — they research before subscribing).
 
-**Attribution:** last-click within the cookie window; the paid-conversion (not trial start) is the commissionable event, so the no-card trial doesn't generate phantom payouts.
+**Attribution:** last-click within the cookie window; the paid-conversion (not trial start) is the commissionable event, so a trial start — card-gated or not — doesn't generate phantom payouts.
 
 ---
 
@@ -70,7 +70,9 @@ The program is only as good as the 15–20 creators in it. Target order:
 4. **Discord/Telegram trading-community owners** — high-intent, but vet for hype/pump culture that clashes with the transparency brand.
 
 **The pitch (one paragraph, reusable):**
-> "Tapeline is the only retail scanner that publishes its scoring formula and back-checks every top-10 against SPY publicly — wins *and* losses, never edited. Your audience is tired of black-box 'gurus'; this is the honest alternative. 40% lifetime recurring on every Pro sub, 30% on Premium, 60-day cookie, and your followers get founding-member pricing. Here's the public scorecard so you can vet it yourself: tapeline.io/scorecard"
+> "Tapeline is the only retail scanner that publishes its scoring methodology — the six factors it reads and which ones carry the most weight — and back-checks every top-10 against SPY publicly, wins *and* losses, never edited. Your audience is tired of black-box 'gurus'; this is the honest alternative. 40% lifetime recurring on every Pro sub, 30% on Premium, 60-day cookie, and your followers get founding-member pricing. Here's the public scorecard so you can vet it yourself: tapeline.io/scorecard"
+
+⚠️ **Disclosure boundary — do not soften back.** The pitch says *methodology*, never *formula*. The six factors are named publicly and their weight **ordering** is published ("most toward Trend and Relative Strength, least toward Momentum"); the exact weight numbers, the scoring equation and the per-factor indicator recipe were withdrawn from the public site by PR #342 and are **not** public. "Publishes its formula" / "published weights" is a false claim — keep it out of the creator kit and every affiliate-approved headline.
 
 Target: **15–20 recruited, ~5–8 active posters** in the first 90 days. One creator with a genuinely aligned audience can outproduce ten lukewarm ones.
 

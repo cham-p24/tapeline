@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs Trade Ideas.",
     subtitle:
-      "Published 6-factor formula at $25-50/mo vs. Trade Ideas' proprietary HOLLY at $84-228/mo. Track record beats marketing.",
+      "Six named factors, published weight ordering, at $8.25-16.58/mo annual vs. Trade Ideas' proprietary HOLLY. Track record beats marketing.",
   });
 }

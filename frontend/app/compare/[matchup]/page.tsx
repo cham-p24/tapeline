@@ -17,7 +17,9 @@ export const revalidate = 3600;
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://api.tapeline.io";
 
-type FactorEntry = { value: number | null; weight: number; label: string };
+// No `weight`: the unauthenticated ticker API no longer returns the factor
+// weight vector (see backend/app/routers/ticker.py).
+type FactorEntry = { value: number | null; label: string };
 type TickerData = {
   symbol: string;
   name: string;
@@ -153,7 +155,7 @@ export default async function ComparePage({ params }: { params: Promise<{ matchu
       q: `How do ${parsed.a} and ${parsed.b} compare on Tapeline?`,
       a:
         `Tapeline scores ${parsed.a} ${fmtScore(sa)}/100 and ${parsed.b} ${fmtScore(sb)}/100 on its ` +
-        `published six-factor composite (trend, relative strength, fundamentals, smart money, macro, ` +
+        `published six-factor composite score (trend, relative strength, fundamentals, smart money, macro, ` +
         `momentum). The page breaks the two scores down factor by factor.`,
     },
     {

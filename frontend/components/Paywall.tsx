@@ -42,10 +42,12 @@ export function Paywall({
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$19.99/mo (Premium)" : "$9.99/mo (Pro)";
   const signedIn = !!user;
-  // Risk-reversal line must be TRUE for the viewer. The 14-day no-card trial
-  // is granted once at signup; a signed-in user's checkout charges
-  // immediately (their trial is consumed or unavailable), so promising a
-  // trial there would be false. They get the real guarantee instead.
+  // Risk-reversal line must be TRUE for the viewer. Signup grants no trial at
+  // all (routers/auth.py writes tier="free", trial_ends_at=None). The 14-day
+  // Premium trial is card-required and opt-in — POST /api/billing/checkout
+  // {"start_trial": true} — so a signed-out reader can still be offered it,
+  // while a signed-in user's checkout charges immediately (their trial is
+  // consumed or unavailable). They get the real guarantee instead.
   const riskLine = signedIn
     ? "30-day money-back guarantee · cancel anytime."
     : "14-day Premium trial — $0 today, cancel in one click.";
@@ -79,7 +81,7 @@ export function Paywall({
                 className="btn-primary"
                 onClick={() => trackUpgradePromptClicked("paywall", feature)}
               >
-                Try Premium free &rarr;
+                Start the 14-day trial &rarr;
               </Link>
             )}
             <Link href="/pricing" className="btn-ghost">See all plans</Link>
@@ -110,12 +112,17 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
       </strong>{" "}
       <span className="text-muted">
         Upgrade to unlock this data.{" "}
+        {/* Unlike the full Paywall card there is no risk-reversal line on
+            screen here to qualify the CTA, so the label has to carry the
+            mechanism itself — "Try Premium free" would be the only thing this
+            reader sees about the trial, and the trial takes a card. */}
+        {!user && <>The 14-day Premium trial is $0 today, cancel in one click.{" "}</>}
         <Link
           href={user ? "/app/billing" : "/signup"}
           className="text-accent underline"
           onClick={() => trackUpgradePromptClicked("paywall", feature)}
         >
-          {user ? "Upgrade" : "Try Premium free"} &rarr;
+          {user ? "Upgrade" : "Start the 14-day trial"} &rarr;
         </Link>
       </span>
     </div>

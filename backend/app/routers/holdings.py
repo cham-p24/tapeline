@@ -6,7 +6,7 @@ key that was never wired in production, so the page sat empty.
 Data source: Finnhub `/stock/insider-transactions` (SEC Form 4), already
 fetched daily by `_refresh_insider_cache` in the worker for the active scoring
 universe. The same data powers the Smart Money sub-score, so this endpoint
-is the visible "receipt" for the 15% Smart Money pillar of every Tapeline Score.
+is the visible "receipt" for the Smart Money pillar of every Tapeline Score.
 
 Response shape (kept stable for the frontend that paginates/filters):
     {

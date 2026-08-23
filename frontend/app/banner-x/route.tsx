@@ -95,7 +95,7 @@ export async function GET() {
             display: "flex",
           }}
         >
-          One score per US stock. Public scorecard. Public formula.
+          One score per US stock. Public scorecard. Named factors.
         </div>
       </div>
     ),

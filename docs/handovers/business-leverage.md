@@ -16,9 +16,9 @@ operational cost. Three time horizons:
 
 ## Why this matters
 
-A retail SaaS at $29-$49/mo per user has a clear ceiling: even at
+A retail SaaS at $9.99-$19.99/mo per user has a clear ceiling: even at
 10,000 paying users (very ambitious for a solo founder pre-launch),
-that's ~$5M ARR. Real generational outcomes come from leverage
+that's ~$1.2-2.4M ARR. Real generational outcomes come from leverage
 multipliers — partnerships, API revenue, white-label, enterprise tiers,
 acquisition. This agent's job is to find those without building
 features that don't pay.
@@ -28,7 +28,7 @@ features that don't pay.
 ### IN scope
 1. **Affiliate program design** — referral economics + technical
    implementation outline
-2. **API monetization** — already on Premium ($49/mo includes
+2. **API monetization** — already on Premium ($19.99/mo includes
    1k/day); design a higher API-only tier
 3. **White-label evaluation** — could financial advisors / RIAs buy
    Tapeline-branded-as-theirs? Cost vs. revenue?
@@ -78,7 +78,7 @@ signups, but offset by zero direct CAC on those signups.
 
 ### 2. Public API tier
 
-Tapeline already has API access at Premium ($49/mo, 1,000 req/day).
+Tapeline already has API access at Premium ($19.99/mo, 1,000 req/day).
 That's a feature, not a product line. There's a market for an
 API-first tier targeted at:
 - Quant hobbyists building their own dashboards
@@ -92,7 +92,7 @@ Deliver `outputs/api-tier-design.md` covering:
   - **Embed** $2,499/mo · 5M req/day · custom fields · SLA
 - [ ] Endpoint scope: `/api/scanner`, `/api/ticker/{sym}`,
   `/api/scorecard`, `/api/regime`, `/api/news`. Hidden:
-  `/api/holdings` (Quiver licensing), `/api/congress` (Quiver)
+  `/api/holdings` (Finnhub Form 4 licensing — see `docs/LICENSE_AUDIT.md`), `/api/congress` (no source wired — see `docs/DATA_SOURCES.md`)
 - [ ] Implementation: separate `api_token` table, per-tier rate limit
   middleware, usage dashboard. ~2 weeks engineering
 - [ ] Marketing: Show HN, dev.to write-up, post on r/algotrading

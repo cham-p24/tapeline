@@ -86,7 +86,7 @@ export async function GET() {
             display: "flex",
           }}
         >
-          Public 6-factor formula. Public scorecard. tapeline.io
+          Six named factors. Public scorecard. tapeline.io
         </div>
       </div>
     ),

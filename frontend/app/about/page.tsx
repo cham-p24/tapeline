@@ -25,7 +25,7 @@ import {
 } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "About Tapeline — The Public-Formula Stock Scanner",
+  title: "About Tapeline — The Named-Factors Stock Scanner",
   description:
     "Who's behind Tapeline, why we publish our methodology and the scorecard, what we believe about transparency in retail finance tooling, and how to reach us.",
   path: "/about",
@@ -124,7 +124,7 @@ export default function AboutPage() {
             <Link href="/how-it-works" className="text-accent hover:underline">
               six named factors
             </Link>{" "}
-            and how they&apos;re weighted are on the methodology page, and every top-10
+            and the ordering of their weights are on the methodology page, and every top-10
             daily pick auto-publishes to{" "}
             <Link href="/scorecard" className="text-accent hover:underline">
               the public scorecard
@@ -236,11 +236,13 @@ export default function AboutPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">See the public scorecard.</h2>
           <p className="mt-3 text-sm text-muted">
-            The receipts are at /scorecard. The methodology is at /how-it-works. The free trial is at /signup.
+            The receipts are at /scorecard. The methodology is at /how-it-works. The 14-day Premium
+            trial starts at first sign-in with a card — $0 charged that day, first charge on day 14,
+            one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Try Premium free →
+              Start the 14-day trial →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the scorecard

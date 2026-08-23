@@ -23,7 +23,9 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
-type FactorEntry = { value: number | null; weight: number; label: string };
+// No `weight`: the unauthenticated ticker API no longer returns the factor
+// weight vector (see backend/app/routers/ticker.py).
+type FactorEntry = { value: number | null; label: string };
 
 type TickerData = {
   symbol: string;
@@ -279,7 +281,7 @@ export default async function OG({ params }: { params: Promise<{ symbol: string 
             }}
           >
             <span style={{ display: "flex" }}>One score. One sentence.</span>
-            <span style={{ display: "flex" }}>Six factors. Public formula.</span>
+            <span style={{ display: "flex" }}>Six named factors. Public record.</span>
           </div>
         </div>
       </div>

@@ -139,7 +139,9 @@ price, a P/E ratio, an analyst rating), the displayed value is the upstream
 value at the time of the most recent refresh. Where Tapeline displays its own
 derived metric (the composite score, the sub-scores, the signal label, the
 plain-English "why" sentence), that's Tapeline's own analytical output computed
-via the published 6-factor formula at /how-it-works.
+via the published six-factor methodology at /how-it-works (the six factors are
+named there, along with which carry the most weight; the exact weights are not
+published).
 
 Tapeline is not a registered investment adviser. Everything on the platform is
 descriptive analytics — see /legal/risk for the full disclosure.
@@ -162,7 +164,7 @@ export default function DataSourcesPage() {
         </p>
         <p className="mt-3 text-sm text-subtle">
           The Tapeline composite score and the per-factor sub-scores are
-          computed via the published 6-factor formula at{" "}
+          computed via the published six-factor methodology at{" "}
           <Link href="/how-it-works" className="link">/how-it-works</Link>. Those
           numbers are Tapeline&rsquo;s analytical output — derived through
           transformation, not redistributed from any single source. The list

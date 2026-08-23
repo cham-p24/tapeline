@@ -47,7 +47,7 @@ type Props = {
 export function NewsletterCapture({
   source,
   heading = "Get the daily Top 10 picks",
-  sub = "One email each market morning. The 10 highest-scoring US tickers from our public 6-factor composite. No card, no trial — unsubscribe in one click.",
+  sub = "One email each market morning. The 10 highest-scoring US tickers from our six-factor composite score. No card, no trial — unsubscribe in one click.",
   variant = "inline",
 }: Props) {
   const [email, setEmail] = useState("");

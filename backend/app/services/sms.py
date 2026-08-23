@@ -1,4 +1,10 @@
 """
+RETIRED 2026-05-04 — SMS is not a shipped channel (the unit economics did not
+work at low volume). No call sites remain. Kept so `alerts.sms` can be
+re-added to tier.py:FEATURES without a migration.
+
+Historical description:
+
 Twilio SMS delivery — third notification channel after email and Telegram.
 
 Premium-only feature. Twilio bills per-message (~$0.008 US, more elsewhere)

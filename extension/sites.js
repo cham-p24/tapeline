@@ -51,10 +51,15 @@ const TAPELINE_SITES = [
   { host: /(^|\.)wsj\.com$/, url: [/\/market-data\/quotes\/([A-Za-z0-9.\-]{1,12})(?:[/?#]|$)/i] },
   { host: /(^|\.)reuters\.com$/, url: [/\/markets\/companies\/([A-Za-z0-9.\-]{1,16})(?:[/?#]|$)/i] },
 
-  // ── brokers shipped enabled: Robinhood only, because its quote pages are
-  //    public and readable without an account. Every other broker is reachable
-  //    through the popup's "enable on this site", so the user opts in rather
-  //    than us asking for brokerage access at install time. ───────────────
+  // ── brokers: none ship enabled. robinhood.com was dropped from the manifest
+  //    in PR #526, so this rule never runs at install time. Keeping the entry
+  //    stops the loose generic patterns mis-parsing a Robinhood URL, but it has
+  //    a side effect worth knowing: isKnownHost("robinhood.com") is true, and
+  //    popup.js only renders "Enable on this site" when that is false — so the
+  //    popup's one-click grant is NOT offered on Robinhood. This rule applies
+  //    only if the origin is granted by some other route and syncEnabledSites()
+  //    registers the script for it. Every broker is opt-in rather than us
+  //    asking for brokerage access at install time. ─────────────
   { host: /(^|\.)robinhood\.com$/, url: [/\/stocks\/([A-Za-z0-9.\-]{1,12})(?:[/?#]|$)/], spa: true },
 ];
 

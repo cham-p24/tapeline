@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 > Filename still says `_4_to_12` for git-blame continuity — file now
@@ -53,48 +69,39 @@ Char count: ~990. Add `tapeline.io/scorecard` in first comment.
 
 ---
 
-## Post #5 — The 6 factors, in order of how much they actually predict
+## Post #5 — The six factors, and the order they're weighted in
 
 ```
-Tapeline scores every US stock on six factors. The weights are public:
+Tapeline scores every US stock on six factors, and the ordering is public:
 
-Trend          25%
-Relative Strength  20%
-Fundamentals     15%
-Smart Money    15%
-Macro            15%
-Momentum     10%
+Trend carries the most, then Relative Strength, then Fundamentals / Smart Money / Macro, with Momentum the lightest.
 
-The weights aren't equal — they reflect what predicts forward performance vs SPY, not what's most "rigorous" or "fundamental."
+The weights aren't equal. The exact numbers stay internal; the ordering doesn't, and it doesn't change without a changelog entry.
 
-Trend dominates because price action is the cleanest, fastest signal you can compute. The other five factors all argue for or against the trend's persistence.
+Trend carries the most because price is the lowest-lag input available. The other five describe conditions around it.
 
-Momentum is intentionally only 10%. Pure momentum factors over-fit to the recent regime. Weighting it lower forces the composite to wait for confirmation across other dimensions before tagging a name as high-conviction.
+Momentum is deliberately the lightest: short-horizon rate of change reverses often, and one of its two inputs is an approximation rather than a direct measurement. Weighting it least keeps the noisiest input from dominating.
 
-Most quant services hide their weights. Anyone arguing my weights are wrong can argue them in public on the methodology page — that's the whole point of publishing them.
+Most quant services won't even tell you what's in the score. Anyone who thinks I've got the ordering wrong can argue it in public on the methodology page.
 ```
 
-Char count: ~880. Add `tapeline.io/how-it-works` in first comment.
+Char count: ~840. Add `tapeline.io/how-it-works` in first comment.
 
 ---
 
 ## Post #6 — What "Smart Money" actually means in our score
 
 ```
-"Smart Money" is the most-overloaded term in finance. People mean different things by it. So Tapeline pins down exactly which three signals make up its 15% weight:
+"Smart Money" is the most-overloaded term in finance. People mean different things by it. So Tapeline pins down exactly what the factor reads:
 
-1. Congressional disclosures (STOCK Act filings, ~1-3 month lag). 8% of the 15%.
+SEC Form 4 insider transactions — officers and directors trading their own company's stock, filed within 2 business days — netted by direction and dollar value over a recent window. That is the whole input.
 
-2. SEC Form 4 insider trades (officers and directors trading their own company's stock, 2-business-day filing window). 5%.
+Two things it is not. It isn't 13F: a quarterly snapshot filed up to 45 days after the quarter ends is old news by the time you see it, so Tapeline doesn't score it at all. And it isn't Congressional disclosure: Tapeline ingests STOCK Act filings and publishes them as their own feed in the product, but they are not folded into this sub-score, and the methodology page says so.
 
-3. Curated 13F holdings from 8 named managers — Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer. 45-day lag. 2%.
-
-Notice the weights inside the weight. Form 4 carries more weight than 13F even though 13F gets more financial-media airtime. The reason is the lag: 45-day-old 13F data has had its alpha eaten before you see it.
-
-The whole "Smart Money" factor is intentionally only 15% of the composite. Lagged data shouldn't dominate a forward-looking score. But it's still better than vibes.
+"Smart Money" is also deliberately a mid-weighted factor, not a top one. Lagged data shouldn't dominate the score, and a filing records that a transaction happened, never why. Still better than vibes.
 ```
 
-Char count: ~1,030. Add `tapeline.io/how-it-works` in first comment.
+Char count: ~900. Add `tapeline.io/how-it-works` in first comment.
 
 ---
 
@@ -122,18 +129,18 @@ Char count: ~960. Add `tapeline.io/scorecard` in first comment.
 
 ---
 
-## Post #8 — Why I publish the formula even though competitors don't
+## Post #8 — Why I publish the methodology even though competitors don't
 
 ```
-A retail trader asked me last week why I publish Tapeline's scoring formula. "Doesn't that let competitors copy it?"
+A retail trader asked me last week why I publish Tapeline's scoring methodology. "Doesn't that let competitors copy it?"
 
 Three answers:
 
-1. The formula isn't the moat. Six published factors with published weights is the entry ticket to being credible. The moat is the operations — the data pipelines, the back-check infrastructure, the scorecard accountability layer. Anyone can build the formula in a weekend. The infrastructure took six months.
+1. Naming the factors isn't the moat. Six named factors with a published weight ordering — and a public per-pick record — is the entry ticket to being credible. The moat is the operations: the data pipelines, the back-check infrastructure, the scorecard accountability layer. Anyone can build a six-factor composite in a weekend. The infrastructure took six months.
 
-2. The customer can't trust a black box. Finviz, Zacks, TipRanks, Simply Wall St all hide their scoring methodology. That's not a competitive advantage; it's a trust deficit. If I don't tell you how the score is built, why should you act on it?
+2. The customer can't trust a black box. Finviz, Zacks, TipRanks, Simply Wall St all hide their scoring methodology entirely. That's not a competitive advantage; it's a trust deficit. If I don't tell you what the score is even made of, why should you act on it?
 
-3. If the formula is wrong, I want to know. Publishing it invites every quant on the internet to argue with me. Some of them will be right. The model gets better when it's audited in public.
+3. If the methodology is wrong, I want to know. Publishing it invites every quant on the internet to argue with me. Some of them will be right. The model gets better when it's audited in public.
 
 Tapeline.io/how-it-works has the full breakdown.
 ```
@@ -180,16 +187,16 @@ Char count: ~1,360 (within LinkedIn's 3000 cap). Add nothing in comments.
 
 ---
 
-## Post #11 — Why "Free" tier shows the real product, just delayed
+## Post #11 — Why "Free" shows the real product, not a crippled demo
 
 ```
-The Tapeline Free tier doesn't show a feature-stripped demo. It shows the actual product, 24 hours delayed.
+The Tapeline free surface doesn't show a feature-stripped demo. It shows the actual product, live.
 
 Most SaaS free tiers cripple core functionality — fewer rows, no exports, no filters. The idea is to frustrate users into upgrading. That's the wrong incentive: it teaches users that the product is annoying.
 
-Tapeline's free tier instead shows the top 20 tickers from yesterday's close, with the full 6-factor breakdown, the full reason sentence, and the full scorecard. The only difference vs Pro is the 24-hour delay.
+The published record needs no account at all: the daily Top 10, a page per scored ticker, the complete scorecard, and the raw CSV/JSON export. A free account adds the top 10 scanner rows, live, with 12 ticker look-ups a day — each with the full 6-factor breakdown and the full reason sentence. The gate is breadth and volume, not freshness.
 
-If you can act on day-old data, the free tier is the right tier. If you can't, the Pro tier ($8.25/month annual) gives you the same data live.
+If ten names a day is enough, that's the right tier. If you want to scan the full ~2,500-ticker universe live, Pro ($8.25/month annual) opens it up.
 
 I'd rather a user understand what Tapeline does for free, decide it doesn't fit their workflow, and not pay, than have someone upgrade because the free tier was deliberately annoying and then churn in week two.
 
@@ -234,7 +241,7 @@ between your own posts.
 | Thu 2026-05-21 | #5 (factors in order) |
 | Sat 2026-05-23 | #6 (Smart Money breakdown) |
 | Tue 2026-05-26 | #7 (7 days of forward-testing) — needs the number refreshed at post time |
-| Thu 2026-05-28 | #8 (why publish the formula) |
+| Thu 2026-05-28 | #8 (why publish the methodology) |
 | Sat 2026-05-30 | #9 (a scanner that publishes misses) |
 | Tue 2026-06-02 | #10 (building solo from Melbourne) |
 | Thu 2026-06-04 | #11 (free tier philosophy) |
@@ -273,13 +280,15 @@ We lose on:
 - Raw filter breadth (Finviz has 70+ filters; we don't try to)
 - Portfolio analytics (Stock Rover does this better)
 - Earnings + analyst-rating depth (Zacks is the reference)
-- Free-tier data freshness (ours is 24-hour delayed — deliberately)
+- Free-tier breadth (top-10 rows and 12 look-ups a day — deliberately)
 
 We win on:
-- Public formula with exact weights (not "proprietary algorithm")
+- Public factor set and weight ordering, plus a public per-pick record
+  (not "proprietary algorithm")
 - Daily back-checked picks vs SPY, append-only, every loser still on
   the page
-- One-click cancel, no-card trial
+- One-click cancel, a T-3 reminder email before the first charge, and
+  30-day money back
 
 The reason most "best scanner" articles are useless is that they're
 affiliate-fee farms. Every product gets 9/10, the criteria are
@@ -306,12 +315,12 @@ Most retail traders see a Form 4 filing — the SEC paperwork every
 corporate insider files within 2 business days of trading their
 company's stock — and assume any large purchase is bullish.
 
-90% of Form 4 activity is noise. Here's what I filter out before
-the data hits Tapeline's Smart Money sub-score:
+A lot of Form 4 activity isn't a directional trade at all. What
+to check before reading anything into one:
 
-1. Anything that isn't transaction code P (open-market buy) or S
-   (open-market sale). Grants, vestings, withholdings, exercises
-   — those are HR paperwork, not directional trades.
+1. The transaction code. P is an open-market buy, S an open-market
+   sale. Grants, vestings, withholdings and exercises
+   — those are HR paperwork, not decisions about the stock.
 
 2. 10b5-1 plan sales. These are pre-arranged schedules executives
    use to sell systematically. A CFO who set up a 10b5-1 in March
@@ -326,15 +335,17 @@ the data hits Tapeline's Smart Money sub-score:
    New board appointees are often just complying with the policy,
    not expressing a view.
 
-What's left after that filter is the 10% that actually predicts
-something. Cluster buying (CEO + CFO + ≥1 director, same direction,
-30-day window) is the cleanest signal in the data. The 2-day filing
-lag is the catch — by the time you see it, the trade is up to 48
-hours old.
+And the catch that applies to all of it: the 2-day filing deadline
+means that by the time you see a Form 4, the trade is already up to
+48 hours old.
 
-Smart Money is 15% of the Tapeline composite. The 90% filter runs
-automatically; the result is one number, scored against the
-universe.
+Where Tapeline sits on this, plainly. Smart Money is one of the six
+factors in the composite, and it nets every disclosed transaction in
+a recent window by direction and dollar value. It does not strip out
+10b5-1 sales, exercises or withholdings — they get netted like
+anything else. The filing records that a transaction happened, never
+why, and no amount of scoring fixes that. It's stated as a limitation
+on the methodology page rather than buried.
 ```
 
 Char count: ~1,310. First comment: `tapeline.io/blog/how-to-read-sec-form-4`
@@ -364,9 +375,9 @@ the vague answer to each one tells you:
    Vague answer: "outperforms the market" with no index named.
 
 3. Is the scoring methodology published?
-   Right answer: exact factor weights, public, change-log
-   announced. Vague answer: "proprietary algorithm developed
-   over X years."
+   Right answer: the factor set and their weighting order,
+   published, with a changelog on any change. Vague answer:
+   "proprietary algorithm developed over X years."
 
 4. How fresh is the data?
    Test it by checking the timestamp on a single quote against
@@ -404,7 +415,7 @@ rather than shifting the whole calendar.
 |---|---|
 | Catch-up (post in order, one per Tue/Thu/Sat) | #4 → #5 → #6 |
 | Tue 2026-05-26 | #7 (7 days of forward-testing) — refresh the number at post time |
-| Thu 2026-05-28 | #8 (why publish the formula) |
+| Thu 2026-05-28 | #8 (why publish the methodology) |
 | Sat 2026-05-30 | #9 (a scanner that publishes misses) |
 | Tue 2026-06-02 | #10 (building solo from Melbourne) |
 | Thu 2026-06-04 | #11 (free tier philosophy) |

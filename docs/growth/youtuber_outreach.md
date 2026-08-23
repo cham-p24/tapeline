@@ -48,7 +48,7 @@ New candidates added at sections 6-10 below to refill the pipeline.
 **Audience**: ~700K subs, long-term dividend / compounder framework. US-retail.
 **Why a fit**: deeply methodology-curious audience; the channel format is
 "here's my portfolio, here's why, here's the back-test of my decisions" —
-parallels Tapeline's published-formula + public-scorecard ethos directly.
+parallels Tapeline's published-methodology + public-scorecard ethos directly.
 
 **Contact paths**:
 - **Public email**: NOT found on YouTube About tab or `qualtrim.com`
@@ -87,10 +87,11 @@ talking-head spot.
 **Audience**: ~600K subs, central banking + macro economics. Academic
 register, Belgium-based, PhD economist.
 **Why a fit**: less direct fit than Plain Bagel — his content is macro
-policy, not retail stock-picking. But Tapeline's **Macro factor (15%
-weight, FRED-sourced 10Y / DXY / VIX)** is exactly his lane. The pitch is
-narrower: how Tapeline distills macro-regime data into a retail-readable
-sub-score.
+policy, not retail stock-picking. But Tapeline's **Macro factor** — a
+single market-wide regime read carried inside a per-ticker score — is
+adjacent to his lane. The pitch is narrower: how a retail tool distils a
+macro regime into one readable sub-score, and what that necessarily
+throws away.
 
 **Contact paths**:
 - **Public email**: `info@moneymacro.net` (listed on
@@ -100,8 +101,9 @@ sub-score.
 
 **Recommendation**: email `info@moneymacro.net` with a NARROW pitch — not
 "please cover Tapeline", but "I'd value a 60-second sanity-check on whether
-my macro sub-score's weighting (FRED 10Y direction, DXY trend, VIX
-percentile) maps to your framework". Academic flattery, low ask, no plug.
+collapsing a macro regime into three broad states is defensible for a
+retail audience". Academic flattery, low ask, no plug, and nothing about
+the scoring internals.
 
 ## 4. Tom Nash (@TomNashTV / Unrivaled Investing) — DISQUALIFIED (competitor)
 
@@ -149,8 +151,9 @@ high signal-to-noise.
 **Recommendation**: lowest-priority of the five. The geographic-niche fit
 is real but Ziet's reach is meaningfully smaller than the other four. Save
 for Week 6+ if there's bandwidth and the US-only-cap on Tapeline's
-free-tier (top-20 tickers, 24h delay) is loosened for non-US-resident
-sign-ups.
+free-tier (top-10 live rows, 12 look-ups/day) is loosened for
+non-US-resident sign-ups. Note there is no data delay left to loosen —
+the gating condition here is the look-up cap, not freshness.
 
 ---
 
@@ -172,7 +175,8 @@ not paid placement.
 - **LinkedIn**: uk.linkedin.com/in/patrick-boyle-25164
 
 **Recommendation**: email pitch. Open with one specific recent video, then
-the technical hook — Tapeline's published formula + scorecard are exactly
+the technical hook — Tapeline's published methodology (factors + weight
+ordering) and its scorecard are exactly
 the kind of receipts his audience appreciates. He won't do a paid mention
 but might cover it as a market-infrastructure topic.
 
@@ -183,9 +187,11 @@ but might cover it as a market-infrastructure topic.
 and permabear takes alike. Often discusses transparent multi-factor
 models.
 **Why a fit**: Cullen's whole brand is "show me the data and the weights".
-The transparent 6-factor + public scorecard pitch is one of the cleanest
-landings in the candidate set. Discipline Funds is an asset manager (not
-a scanner), so no competitor conflict.
+The six-named-factors + public scorecard pitch is one of the cleanest
+landings in the candidate set — but pitch the published methodology, not
+the weights: the factors and their weight *ordering* are public, the
+numbers are not. Discipline Funds is an asset manager (not a scanner), so
+no competitor conflict.
 
 **Contact paths**:
 - **Email**: contact form at pragcap.com (preferred)
@@ -202,7 +208,7 @@ position as competition to Discipline Funds — it isn't.
 Report (subscription newsletter, contrarian / valuation-driven). High
 trust with sceptical retail.
 **Why a fit**: weekly content is methodology + chart-reading. Tapeline's
-"public formula" angle resonates; the back-checked scorecard is exactly
+"public methodology" angle resonates; the back-checked scorecard is exactly
 the kind of receipts he respects. Newsletter is a subscriber product, not
 a scanner — no direct competition.
 
@@ -212,7 +218,7 @@ a scanner — no direct competition.
 
 **Recommendation**: cold email. Reference one specific Felder Report
 piece in the last 30 days. Pitch is "thought you might want to take the
-formula apart on a Friday post" — he often writes "tools I'm watching"
+methodology apart on a Friday post" — he often writes "tools I'm watching"
 posts.
 
 ## 9. Lyn Alden (@LynAldenContact)
@@ -220,9 +226,9 @@ posts.
 **Audience**: ~500K X followers. Macro + equity strategist, runs Lyn
 Alden Investment Strategy (paid newsletter), engineering background.
 **Why a fit**: rigorous, transparent. Her free posts dissect single
-factors (rates, currency, breadth) — Tapeline's macro sub-score wiring
-sits in her vocabulary. Newsletter doesn't compete with a per-ticker
-scanner.
+factors (rates, currency, breadth) — the question of how much a single
+market-wide regime read can carry sits in her vocabulary. Newsletter
+doesn't compete with a per-ticker scanner.
 
 **Contact paths**:
 - **Email**: contact form on lynalden.com
@@ -238,7 +244,7 @@ batch once Plain Bagel and Money Macro have had right-of-refusal.
 analyst. Smaller, but the audience is very technical and active.
 **Why a fit**: not the obvious fit — he writes about wholesale funding,
 not single-stock scoring. But he's exactly the type who values
-"published formula > black box". Smaller account = much easier to land.
+"published methodology > black box". Smaller account = much easier to land.
 
 **Contact paths**:
 - **Email**: anonymous, none public
@@ -263,7 +269,7 @@ day, never the same paragraph twice:
    pitch on the macro sub-score, no broad ask. (Original #2, unchanged.)
 3. **Patrick Boyle** — email via patrickboylefinance.com About. Editorial
    angle. (NEW.)
-4. **Cullen Roche** — pragcap.com contact form. Transparent-formula
+4. **Cullen Roche** — pragcap.com contact form. Published-methodology
    pitch. (NEW.)
 5. **Jesse Felder** — thefelderreport.com contact. Reference one recent
    piece. (NEW.)
@@ -282,7 +288,8 @@ day, never the same paragraph twice:
 - Don't email all five at once. Even with different subject lines, send
   patterns get flagged by their inbox tools. One per week, spaced.
 - Don't pitch Tapeline as "the new Finviz". The whole differentiator is
-  the public scorecard + published formula — lead with that, not with
+  the public scorecard + published methodology (factors + weight ordering)
+  — lead with that, not with
   feature parity to incumbents.
 - Don't ask for a paid placement upfront. Editorial mentions convert
   better and cost nothing; paid integrations cost $1500-5000/mention

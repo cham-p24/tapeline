@@ -6,7 +6,7 @@
  * (it sells the breadth of coverage without giving the actual rows away).
  *
  * Pivoted 2026-05-17 from fully-public to a preview wall. The trust
- * mechanism (public formula, public scorecard) stays intact on /scorecard;
+ * mechanism (published methodology, public scorecard) stays intact on /scorecard;
  * /signals is the "what's live right now" demo, and the preview wall
  * gives anonymous visitors a real taste while turning every scroll
  * past row 10 into a signup CTA.
@@ -35,7 +35,7 @@ export const metadata = pageMeta({
   title: "All Tapeline-Scored Tickers — Live Universe with Public 6-Factor Score",
   description:
     "Every US stock Tapeline scores, ranked by the live 0-100 composite. " +
-    "Same published formula as our public scorecard. Sign up to see the full universe.",
+    "Same published methodology as our public scorecard. Sign up to see the full universe.",
   path: "/signals",
 });
 
@@ -179,7 +179,7 @@ export default async function SignalsPage() {
         <p className="mt-4 max-w-3xl text-lg text-muted">
           One transparent 0–100 score per US stock using the same{" "}
           <Link href="/how-it-works" className="link">
-            public 6-factor formula
+            published six-factor methodology
           </Link>{" "}
           we publish on our{" "}
           <Link href="/scorecard" className="link">
@@ -191,7 +191,9 @@ export default async function SignalsPage() {
           ) : (
             <>
               Anonymous visitors see the top {PREVIEW_ROWS} —{" "}
-              <Link href="/signup" className="link">sign up free</Link> for a 14-day Premium trial of the full universe.
+              <Link href="/signup" className="link">create an account</Link> &mdash; a card at first
+              sign-in starts the 14-day Premium trial of the full universe, $0 charged that day,
+              one click to cancel.
             </>
           )}
         </p>
@@ -309,16 +311,17 @@ export default async function SignalsPage() {
             <div className="p-6 sm:p-8 text-center">
               <p className="eyebrow text-accent">{hiddenCount.toLocaleString()} more tickers behind the wall</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-                Unlock the full universe — free for 14 days.
+                Unlock the full universe — 14-day Premium trial.
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
                 You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
-                An account starts a 14-day Premium trial — the full live universe, same
-                public 6-factor formula on every row. $0 today, cancel in one click.
+                A card at first sign-in starts the 14-day Premium trial — the full live universe,
+                the same six named factors on every row. $0 charged that day, first charge on
+                day 14, one click to cancel.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">
-                  Try Premium free &rarr;
+                  Start the 14-day trial &rarr;
                 </Link>
                 <Link href="/pricing" className="btn-ghost">
                   See pricing

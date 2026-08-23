@@ -47,17 +47,20 @@ set`).
    transactions (free via Finnhub, 2-business-day filing window) carry the
    same Smart Money signal with no license issue.
 3. Premium marketing was scrubbed of "Elite 13F holdings" claims in PR #74.
-   `quiver_feed.py` + the `_refresh_elite_13f` worker task still run with
-   mock-data fallback to keep the `InstitutionalHolding` table populated;
-   nothing surfaces it.
+
+**Since then the code was removed too.** The adapter (`quiver_feed.py`), the
+`_refresh_elite_13f` worker task, the `InstitutionalHolding` model and the
+`quiver_api_key` config were all deleted when the subscription was cancelled.
+Only the orphan `institutional_holdings` table remains (no migration — CI
+asserts a single head).
 
 **Un-defer trigger:** revisit only if EITHER (a) Premium re-adds an elite-13F
 UI surface under a commercial Quiver license (~$200+/mo), OR (b) a vendor
-shipping legally-clear elite-fund holdings becomes available.
+shipping legally-clear elite-fund holdings becomes available. Either route is
+a rebuild, not a re-enable.
 
-**No action required:** the integration is dormant, not broken. Setting
-`QUIVER_API_KEY` now wires a real-data feed that no UI reads from — pure
-overhead.
+**No action required:** `QUIVER_API_KEY` is no longer read anywhere. Setting
+it does nothing.
 
 ---
 

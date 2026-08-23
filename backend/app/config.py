@@ -148,16 +148,20 @@ class Settings(BaseSettings):
 
     # ---- Telegram ----
     telegram_bot_token: str = ""
-    # Bot username (no @, no t.me/). Used to build the t.me/<username>?start=<token>
-    # deep-link for one-click signup. Resolve via getMe API when first wiring.
+    # Bot username (no @, no t.me/). ORPHANED with the customer Telegram channel
+    # (retired 2026-08-11): it fed a t.me/<username>?start=<token> one-click signup
+    # deep-link, and neither this setting nor the TelegramLinkToken model it fed has
+    # any remaining reader. The bot TOKEN above is still live for founder-facing
+    # notifications and the inbox approval flow — only the per-user link path is gone.
     telegram_bot_username: str = "Tapeline_Bot"
     # Shared secret in the webhook URL path so only Telegram (and anyone we
     # show the URL to) can post updates. Mint random and set via setWebhook.
     telegram_webhook_secret: str = ""
 
-    # ---- SMS (Twilio, optional) ----
-    # Without Twilio configured, the SMS alert channel is a no-op (alerts
-    # configured for SMS log a "skipped" line and don't deliver).
+    # ---- SMS (Twilio) — RETIRED 2026-05-04 ----
+    # NOT a live channel: `alerts.sms` was removed from tier.py:FEATURES, so
+    # nothing sends whether or not these are set. Vars kept so services/sms.py
+    # can be re-enabled without a config change.
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""

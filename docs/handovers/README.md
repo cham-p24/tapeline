@@ -17,7 +17,9 @@ from scratch.
 ## Conventions every agent should follow
 
 1. **Read [CLAUDE.md](../../CLAUDE.md) first.** It's the canonical map of
-   what Tapeline is, the moat (public formula + scorecard), legal posture
+   what Tapeline is, the moat (published methodology + public scorecard —
+   the six named factors and their weight *ordering* are public, the exact
+   weights and the equation are not), legal posture
    (descriptive not prescriptive), and "things not to change without
    thinking" (6-factor weights, signal labels, three-tier pricing).
 2. **Ask before changing pricing, signal labels, or scoring weights.**
@@ -35,11 +37,10 @@ from scratch.
 | Source | Purpose | Status | Key |
 |---|---|---|---|
 | Massive (formerly Polygon.io) | Market data + reference + news | Live | `MASSIVE_API_KEY` |
-| Finnhub | Fundamentals + earnings + IPO + news + analyst recs | Live | `FINNHUB_API_KEY` |
+| Finnhub | Fundamentals + earnings + IPO + news + analyst recs + SEC Form 4 insider transactions | Live | `FINNHUB_API_KEY` |
 | FRED | Macro indicators (DXY, 10Y, VIX) | Live | `FRED_API_KEY` |
-| Quiver QuantData | 13F + Congressional trades | Live | `QUIVER_API_KEY` |
 | Resend | Transactional email | Live | `RESEND_API_KEY` |
-| Stripe | Billing | **NOT YET LIVE** | needs setup |
+| Stripe | Billing | Live | all 6 `STRIPE_*` secrets set |
 
 ## Coordination
 

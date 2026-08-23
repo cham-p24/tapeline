@@ -67,7 +67,8 @@ COLUMN_DEFINITIONS: dict[str, str] = {
     "symbol": "US-listed ticker as it was written at flag time.",
     "score_at_flag": "0-100 composite of six named factors (Trend, Relative Strength, "
                      "Fundamentals, Momentum, Macro, Smart Money) at flag time. "
-                     "Formula published at the methodology URL.",
+                     "The methodology URL describes what each factor measures and "
+                     "the order in which they are weighted.",
     "price_at_flag": "Closing price on `date`, in USD.",
     "price_next_day": "Closing price on the next US trading session, in USD. "
                       "Empty when the next-day back-check has not run yet.",

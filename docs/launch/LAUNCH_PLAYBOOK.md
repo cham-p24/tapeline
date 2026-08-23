@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Self-contained reference for the launch push. Drafted 2026-05-13 alongside the email/SEO/Sentry buildout.
@@ -31,7 +47,7 @@ Self-contained reference for the launch push. Drafted 2026-05-13 alongside the e
 
 ### Title (keep ≤ 80 chars; HN hides what doesn't fit)
 
-> **Show HN: Tapeline – One score per stock, fully public formula**
+> **Show HN: Tapeline – one score per stock, with a public, unedited track record**
 
 ### Body (paste verbatim into the URL field is wrong — HN needs the URL in the URL slot, the body goes in "text")
 
@@ -42,26 +58,26 @@ Text field:
 ```
 Hey HN — I built Tapeline because I was tired of stock screeners that ask you to set up 47 filters and give you back a list with no opinion. The whole point of a scanner should be "here's what looks interesting and here's why."
 
-So Tapeline scores every US ticker with a single 0–100 composite — Trend 25%, Relative Strength 20%, Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%. The weights are public on /how-it-works and can't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it.
+So Tapeline scores every US ticker with a single 0–100 composite from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and that ordering are public on /how-it-works and can't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it.
 
 The thing I care most about: a public scorecard. Every day I log the top 10 names. Next day I compute their actual return vs SPY and the result goes on a public page anyone can audit. No cherry-picking, no "we removed 3 underperformers". Live at https://tapeline.io/scorecard — currently in its first 60 days of back-checking, so the win-rate column is still filling in.
 
-Free tier: top 20 tickers, 24-hour delay, 5-name watchlist.
+Free tier: top-10 rows, live, 12 ticker look-ups a day, 5-name watchlist.
 Pro $9.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
-Premium $19.99/mo: + Congress trades, insider Form 4 activity, Telegram alerts.
+Premium $19.99/mo: + Congress trades, insider Form 4 activity.
 14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
-Stack: Next.js 14 + FastAPI + Polygon (now Massive) + Finnhub + FRED. Deployed on Vercel + Fly.io.
+Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED. Deployed on Fly.io.
 
 Built solo over the last few months. Genuinely curious what HN finds wrong with the scoring methodology — it's the part I want to harden first.
 ```
 
 ### Comment-thread playbook
-- **First comment from you** (post immediately after submitting): paste the 6-factor formula in a code block. People click into HN comments before the link.
+- **First comment from you** (post immediately after submitting): paste the six factor names and one line on what each measures, in a code block — no weights, no equation. People click into HN comments before the link.
 - **Anticipated objections + your responses ready**:
   - *"Your scorecard only has 2 days"* → "Yes, it just launched. The whole point of /scorecard is that it's auditable from day one — even with the win-rate still filling in, you can see every call and every back-check."
-  - *"Why not open-source"* → "The score formula is public on /how-it-works. The infrastructure (data pipelines, live scanner) is the moat. Happy to discuss specific factor calculations in depth."
-  - *"Has the formula been backtested"* → "Walk-forward back-test on 2024-2025 is in progress. The /scorecard page is the live forward-test — that's the one that counts for trust."
+  - *"Why not open-source"* → "The six factors and their weight ordering are public on /how-it-works; the exact weights and the parameter recipe aren't — that plus the data infrastructure (pipelines, live scanner) is the moat."
+  - *"Has it been backtested"* → "Walk-forward back-test on 2024-2025 is in progress. The /scorecard page is the live forward-test — that's the one that counts for trust."
   - *"What about $TICKER"* → "Try it — `https://tapeline.io/t/$TICKER` works for any ticker in the universe. Drop your own examples in comments."
 
 ### Realistic outcome
@@ -76,7 +92,7 @@ Reddit hates self-promo. Substance + transparency + responding to every comment 
 
 ### r/algotrading (~700K subs, quant-savvy)
 
-**Title**: `I built a 6-factor composite stock scoring system — formula, weights, and a public back-check page`
+**Title**: `I built a 6-factor composite stock score with a public, unedited daily back-check vs SPY`
 
 **Body**:
 ```
@@ -84,14 +100,14 @@ Three months ago I started Tapeline (tapeline.io) because every screener I tried
 
 Here's what I shipped:
 
-**The formula** (public, version-controlled, won't change without a changelog entry)
+**The methodology** (version-controlled, won't change without a changelog entry). Six factors — Trend and Relative Strength carry the most weight, Momentum the least (the exact weights stay internal):
 
-- Trend 25% — 20/50/200 DMA stack, slope, days above 50DMA
-- Relative Strength 20% — Mansfield RS vs SPY, sector RS, 12-1 momentum
-- Fundamentals 15% — revenue growth, margin trend, ROE, F-score
-- Smart Money 15% — Form 4 insider transactions (net 90-day) — *not* 13F lag
-- Macro 15% — composite of VIX percentile, breadth, 10Y, regime score
-- Momentum 10% — 20-day rate-of-change, RSI position, accumulation/distribution
+- Trend — the ticker's multi-month price change, and where the latest price sits inside its own 52-week range
+- Relative Strength — the ticker's price change minus a broad-market benchmark's, over three horizons; not sector-adjusted
+- Fundamentals — reported margin, return on equity, EPS and revenue growth, and an earnings multiple
+- Smart Money — disclosed SEC Form 4 insider transactions, netted over a recent window — *not* 13F
+- Macro — a single market-wide regime classification; the same reading for every ticker on a tick
+- Momentum — a momentum-quality reading plus a short-horizon return, deliberately the lightest factor
 
 **The accountability layer**
 
@@ -100,10 +116,10 @@ Every market day I freeze the top 10 composite scores. The next day I log each n
 **What I'd like feedback on**
 
 1. Smart Money via Form 4 — is net-90-day buying the right window, or should I weight by insider role (CEO > director)?
-2. Should momentum get less weight (currently 10%) given it's already inside trend + RS?
+2. Should momentum carry even less weight than it does, given it's already inside trend + RS?
 3. What factor would you add to make this defensible for a 1Y horizon vs the current 1D back-check?
 
-Roast it. The formula is the part I want to harden.
+Roast it. The methodology is the part I want to harden.
 ```
 
 ### r/stocks (~3M subs, general retail)
@@ -126,8 +142,7 @@ What costs $9.99/mo (Pro):
 
 What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
-- + Elite 13F holdings (Buffett, Burry, Ackman, etc.)
-- + Unlimited Telegram alerts
+- + Recent insider buys (SEC Form 4) across the active universe
 
 14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
@@ -144,19 +159,20 @@ Tell me what's missing. Roast the methodology at /how-it-works.
 ```
 Live at tapeline.io. Built it because I wanted to stop manually weighing trend / RS / fundamentals / insider activity every time I screened.
 
-The 15% Fundamentals factor breaks down into:
-- Revenue growth (trailing 4 quarters)
-- Operating margin trend
-- ROE (current vs sector median)
-- F-score (Piotroski 9-point)
+The Fundamentals factor reads five reported figures:
+- Revenue growth between reported periods
+- EPS growth between reported periods
+- Profit margin, as reported
+- Return on equity, as reported
+- An earnings multiple — lower moves the reading up
 
-Score is recomputed every ~30 sec during market hours from a live data feed (Polygon/Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro).
+Score is recomputed sub-60 seconds during market hours from a live data feed (Polygon/Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro).
 
 Concrete example a SecurityAnalysis crowd might find useful: filter to `/sector/financials` and the score will give you a 0-100 read on every financial. Click any ticker → /t/$X → see the six-factor breakdown so you can drill into which factor is dragging or pulling.
 
-Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $9.99 unlocks the full universe. Premium $19.99 adds Congress / 13F / Telegram alerts.
+Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $9.99 unlocks the full universe. Premium $19.99 adds Congressional trades / SEC Form 4 insider buys.
 
-Happy to take fundamentals-specific critique. The Piotroski F-score implementation in particular — would love eyes on edge cases (financial vs non-financial scoring).
+Happy to take fundamentals-specific critique — especially on the fact that the same bands are applied to every company regardless of sector, so a bank, a biotech and a software name land on one scale.
 ```
 
 ### Posting schedule
@@ -187,7 +203,7 @@ Live on [@tapeline_io](https://x.com/tapeline_io). Pinned tweet (1/6) is the fir
 | 5 | https://x.com/tapeline_io/status/2054351516954513647 |
 | 6 | https://x.com/tapeline_io/status/2054351713709310077 |
 
-Tweet 4 published with `+ Congress + insider Form 4 activity + unlimited Telegram alerts` (the playbook draft below still has the stale `13F` wording — left as-is for posterity; the *published* tweet matches the current product).
+Tweet 4 published with `+ Congress + insider Form 4 activity + unlimited Telegram alerts`. The Telegram half is now stale — the per-rule Telegram alert channel was retired, so do not re-paste that wording. The draft below also carried stale `13F` wording and stale free-tier caps; those have been corrected in place and the Telegram promise dropped from it, so the block below is safe to re-paste.
 
 The thread was published as **5 self-replies** (each reply chains the previous tweet), not via the multi-post composer — the composer dropped focus on long types and triggered X keyboard shortcuts mid-stream. Reply-chain works around that cleanly and renders identically as a thread on profile.
 
@@ -198,13 +214,13 @@ The thread was published as **5 self-replies** (each reply chains the previous t
 ```
 1/ Built Tapeline (https://tapeline.io) — one transparent score per US stock.
 
-Most scanners give you 47 filters and no opinion. Most "AI" tools hide their formula. Tapeline picks a number, tells you why, and back-checks every call against SPY the next day. Publicly.
+Most scanners give you 47 filters and no opinion. Most "AI" tools won't tell you what's in the score. Tapeline picks a number, tells you why, and back-checks every call against SPY the next day. Publicly.
 
-2/ The formula is public and won't change without a changelog entry:
+2/ The six factors and their weight ordering are public and won't change without a changelog entry:
 
-Trend 25 · Relative Strength 20 · Fundamentals 15 · Smart Money 15 · Macro 15 · Momentum 10
+Trend and Relative Strength carry the most, then Fundamentals / Smart Money / Macro, and Momentum the least.
 
-You can audit it at https://tapeline.io/how-it-works
+https://tapeline.io/how-it-works
 
 3/ Every market day, I freeze the top 10 composite scores. Next day I log each name's actual return vs SPY.
 
@@ -212,17 +228,17 @@ The full history — winners and losers — lives at https://tapeline.io/scoreca
 
 Currently in its first 60 days of back-checking. Win-rate column fills in real-time.
 
-4/ Free tier: top 20 tickers, 24h delay, 5-name watchlist.
+4/ Free tier: top-10 rows, live, 12 ticker look-ups a day, 5-name watchlist.
 
 Pro $9.99/mo: full ~2,500-ticker live scan + smart watchlist alerts + IPO/earnings calendar.
 
-Premium $19.99/mo: + Congress + 13F + unlimited Telegram alerts.
+Premium $19.99/mo: + Congress trades + SEC Form 4 insider buys.
 
 14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
 5/ Three things I care about most:
 
-→ Public formula
+→ Public factor set and weight ordering
 → Public scorecard (no survivor bias)
 → Plain-English Why on every row
 
@@ -320,9 +336,11 @@ Path of least resistance:
 
 ---
 
-## 7. Next.js 16 major bump — deliberately deferred
+## 7. ~~Next.js 16 major bump — deliberately deferred~~ — **DONE**
 
-Currently on Next.js 14.2.35. Upgrading to 16.x is **two major versions in one jump** (skipping 15). Breaking changes you'd hit:
+`frontend/package.json` now pins `next: ^16.2.6`, so this is closed. Everything below is the pre-upgrade note, kept as a record of the reasoning and as a reusable checklist for the next major bump — read it as history, not as an open item. One correction if you reuse the checklist: production `tapeline.io` is served from Fly.io (app `tapeline-web`) since 2026-06-14, and Vercel only builds PR previews now.
+
+At the time of writing this the app was on Next.js 14.2.35, and going to 16.x was **two major versions in one jump** (skipping 15). Breaking changes flagged then:
 
 - `next/legacy/image` removed (used in some marketing pages)
 - `app-router-experimental-features` removed
@@ -336,12 +354,12 @@ A Next major bump needs:
 1. Dedicated branch + isolated PR (no other code changes)
 2. Full Vercel preview deploy + smoke test of every key page (/, /pricing, /scorecard, /t/[symbol], /app/scanner, /app/ticker/[symbol])
 3. Lighthouse rerun to confirm no perf regression
-4. Live test on a few key flows (signup, Telegram connect, Stripe checkout)
+4. Live test on a few key flows (signup, Stripe checkout)
 5. Roll forward with the option to revert if anything breaks
 
 That's a **focused 2-3 hour session**, not a "while I'm doing other things" task. If I crammed it into tonight's batch and something broke at 1 AM, the cost is your live site is down for unknown users.
 
-**Recommendation**: Schedule a dedicated session. I'll do it cleanly. The two open advisories it closes (Image Optimizer DoS + request smuggling) are **theoretical** — neither has been observed in the wild against a Vercel-hosted Next app like yours, so the urgency is "this month" not "tonight."
+**Recommendation at the time**: schedule a dedicated session. The two open advisories it closed (Image Optimizer DoS + request smuggling) were **theoretical** — neither had been observed in the wild against a Next app like this one, so the urgency was "this month" not "tonight."
 
 ---
 
@@ -375,16 +393,17 @@ can sanity-check it's all flowing and know where to read the numbers.
 | Layer | What it captures | Where to read |
 | --- | --- | --- |
 | **Google Analytics 4** | Acquisition, behaviour, conversions (sign_up, start_trial, subscribe, view_*) | analytics.google.com → Tapeline property |
-| **Vercel Analytics** | Per-route pageviews + custom events fired via `track()` | vercel.com/cham-p24/tapeline → Analytics |
-| **Speed Insights** | Core Web Vitals + custom perf metrics | Same Vercel dashboard |
-| **PostHog** | Session recordings + event funnel | posthog.com |
-| **Plausible** | Privacy-first aggregate view (no cookies) | **disabled in prod** — set `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=tapeline.io` in Vercel to enable |
+| ~~**Vercel Analytics**~~ | **REMOVED.** The package and its `track()` calls are gone from `frontend/app/layout.tsx` — the gate they sat behind was never set, so they were no-ops in every environment. Those funnel events go to GA4 via `lib/gtag.ts` now | n/a |
+| ~~**Speed Insights**~~ | **REMOVED** alongside Vercel Analytics | n/a |
+| **PostHog** | Session recordings + event funnel | posthog.com — **dark until `NEXT_PUBLIC_POSTHOG_KEY` is set**; the wiring is in `lib/trackers.ts` |
+| **Plausible** | Privacy-first aggregate view (no cookies) | **disabled in prod** — set `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=tapeline.io` in the frontend build env to enable |
 
 ### GA4 setup verification
 
 GA4 measurement ID is hardcoded as `G-YRK73W9NS9` (default in
-`frontend/app/layout.tsx`). Override with `NEXT_PUBLIC_GA4_ID` env var
-in Vercel if the property rotates.
+`frontend/app/layout.tsx`). Override with the `NEXT_PUBLIC_GA4_ID` env var
+in the frontend build environment if the property rotates. (That is the Fly.io
+`tapeline-web` app since the 2026-06-14 migration, not Vercel.)
 
 After deploy, smoke-test it's actually firing:
 
@@ -392,7 +411,7 @@ After deploy, smoke-test it's actually firing:
 2. In a separate tab, open https://tapeline.io with `?_gl=1*debug*1` (forces debug mode)
 3. Click around — pageviews should arrive in DebugView within ~30s
 4. Submit the newsletter form on the homepage → `sign_up` event with `method=newsletter` arrives
-5. Submit a signup → `sign_up` event with `method=email` arrives + `start_trial`
+5. Submit a signup → `sign_up` event with `method=email` arrives. `start_trial` should **not** appear here — it fires later, on the confirmed return from Stripe Checkout (see the event table below)
 
 If nothing arrives, in GA4 → Admin → Account → Account access management,
 confirm the property has at least one data stream pointing at `tapeline.io`.
@@ -459,7 +478,7 @@ market morning") and ship the worker quickly.
 | --- | --- | --- |
 | `signup_started` | /signup mount | Visitor opened the form |
 | `signup_completed` / `sign_up` | /signup submit | Account created |
-| `trial_started` / `start_trial` | /signup submit | 14-day Premium trial begins |
+| `trial_started` / `start_trial` | Stripe Checkout success → `trialing` subscription webhook | 14-day Premium trial begins. **Not fired at /signup any more** — signup writes `tier="free", trial_ends_at=None` (see `frontend/app/signup/page.tsx`, the `start_trial` note) |
 | `newsletter_subscribed` / `sign_up{method=newsletter}` | NewsletterCapture submit | Email captured |
 | `pricing_page_viewed` | /app/billing render | In-app upgrade view |
 | `trial_converted` | /app/billing on trial → paid | Conversion to paid Premium |

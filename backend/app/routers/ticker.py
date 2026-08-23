@@ -739,13 +739,22 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # here means the read failed, NOT "never flagged" (that is a present
         # block with flag_count 0).
         "flag_record": flag_record,
+        # DISCLOSURE BOUNDARY. Each entry carries the factor's VALUE and its
+        # LABEL, and deliberately no "weight". This endpoint has no auth
+        # dependency — it backs the public SSR ticker pages, the badge and the
+        # SEO pages, so anyone could curl it — and it used to return
+        # {"weight": 25} … {"weight": 10} keyed to the factor names, i.e. the
+        # exact internal weight vector PR #342 stripped from the public site.
+        # The factor NAMES and their ORDERING are public; the numbers are not.
+        # Do not add a weight key back here. If a signed-in surface ever needs
+        # the numbers, serve them from an authenticated endpoint instead.
         "breakdown": {
-            "trend": {"value": t.sub_trend, "weight": 25, "label": "Trend"},
-            "rs": {"value": t.sub_rs, "weight": 20, "label": "Relative strength"},
-            "fundamentals": {"value": t.sub_fundamentals, "weight": 15, "label": "Fundamentals"},
-            "smart_money": {"value": t.sub_smart_money, "weight": 15, "label": "Smart money"},
-            "macro": {"value": t.sub_macro, "weight": 15, "label": "Macro"},
-            "momentum": {"value": t.sub_momentum, "weight": 10, "label": "Momentum"},
+            "trend": {"value": t.sub_trend, "label": "Trend"},
+            "rs": {"value": t.sub_rs, "label": "Relative strength"},
+            "fundamentals": {"value": t.sub_fundamentals, "label": "Fundamentals"},
+            "smart_money": {"value": t.sub_smart_money, "label": "Smart money"},
+            "macro": {"value": t.sub_macro, "label": "Macro"},
+            "momentum": {"value": t.sub_momentum, "label": "Momentum"},
         },
         "squeeze": None if sq is None else {
             "spike_score": sq.spike_score,
@@ -769,8 +778,8 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
 async def ticker_ratings(symbol: str, request: Request) -> dict:
     """Analyst ratings consensus + recent events for a ticker — Premium-only.
 
-    Trial users (auto-Premium for 14 days) and paid Premium subscribers see
-    the widget. Free + Pro users hit the Paywall on the frontend; this
+    Trial users (Premium for the duration of the 14-day card-required trial)
+    and paid Premium subscribers see the widget. Free + Pro users hit the Paywall on the frontend; this
     endpoint also enforces the gate so the data can't be sniffed via direct
     API call.
 

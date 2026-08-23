@@ -1,4 +1,10 @@
 """
+RETIRED 2026-05-04 — Discord is not a shipped channel (webhook setup friction
+was a real conversion blocker). No call sites remain. Kept so `alerts.discord`
+can be re-added to tier.py:FEATURES without a migration.
+
+Historical description:
+
 Discord webhook delivery — third notification channel after email and Telegram.
 
 Free to deliver (Discord doesn't charge for webhook posts). Setup friction is

@@ -122,10 +122,13 @@ class User(Base):
 
     stripe_customer_id: Mapped[str | None] = mapped_column(String(60), nullable=True, unique=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    # E.164-format phone for SMS alerts. Premium-only feature; Twilio-delivered.
+    # E.164-format phone. RETIRED 2026-05-04 — SMS (Twilio) is no longer a
+    # shipped channel; column kept so alerts.sms can be re-added to
+    # tier.py:FEATURES without a migration.
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    # Discord webhook URL for posting alerts into the user's own server.
-    # Pro+ feature, free to deliver — just an HTTP POST to the user's Discord URL.
+    # Discord webhook URL. RETIRED 2026-05-04 — Discord is no longer a shipped
+    # channel; column kept so alerts.discord can be re-added to
+    # tier.py:FEATURES without a migration.
     discord_webhook_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     # Drip-email dedupe — comma-separated day tokens already sent ("3,7,13,end").
@@ -384,7 +387,7 @@ class AlertRule(Base):
     rule_type: Mapped[str] = mapped_column(String(30), nullable=False)  # score|squeeze|regime|congress
     symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)  # None = any ticker
     threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
-    channel: Mapped[str] = mapped_column(String(20), default="email", nullable=False)  # email|telegram
+    channel: Mapped[str] = mapped_column(String(20), default="email", nullable=False)  # email|web_push (the only channels routers/alerts.py accepts)
     enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
     last_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

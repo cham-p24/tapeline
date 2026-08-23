@@ -367,9 +367,12 @@ async def signup(
     referred_by_id = referrer.id if referrer else None
 
     # NO trial is granted here. Creating an account is email + password only,
-    # and it lands on FREE — which stays completely card-free and is never
-    # gated behind a card (the /free-stock-scanner-no-credit-card promise is
-    # about THIS tier and remains literally true).
+    # and it lands on FREE. From tier.CARD_GATE_START a NEW free account still
+    # hits the card wall at first sign-in (services/tier.must_add_card); only
+    # accounts created before that date are card-free forever. The
+    # /free-stock-scanner-no-credit-card page was rewritten for exactly this —
+    # it now tells a true story about the PUBLIC record (scorecard, daily
+    # picks, exports, ticker pages), which needs no account and no card.
     #
     # The 14-day Premium trial is now card-required: the user starts it
     # deliberately from POST /api/billing/checkout {"start_trial": true}, which
@@ -394,9 +397,10 @@ async def signup(
         id=f"u_{uuid.uuid4().hex}",
         email=email,
         name=(body.name or "").strip() or None,
-        # FREE, card-free, and no trial. See the block above: the Premium trial
-        # is opt-in and card-required now, and is stamped by the subscription
-        # webhook — never here.
+        # FREE, no card on file, and no trial. See the block above: from
+        # tier.CARD_GATE_START this row still meets the card wall at first
+        # sign-in, and the Premium trial is opt-in and card-required, stamped
+        # by the subscription webhook — never here.
         tier="free",
         password_hash=pw,
         trial_ends_at=None,

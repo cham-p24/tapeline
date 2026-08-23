@@ -5,9 +5,9 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline Roadmap — Shipped, In Progress, and Up Next",
+  title: "Tapeline Roadmap — Shipped and Up Next",
   description:
-    "Tapeline product roadmap: what's shipped, what's in progress, what's planned next. Premium subscribers vote on the priority order.",
+    "Tapeline product roadmap: what's shipped, what's next, what's planned later. Premium subscribers vote on the priority order.",
   path: "/roadmap",
 });
 
@@ -22,10 +22,9 @@ const ITEMS: RoadmapItem[] = [
   { slug: "public-share-pages",     title: "Per-ticker share pages",    detail: "Every ticker gets a public /t/[symbol] page with the live score and 6-factor breakdown — shareable on X with a live preview card.", status: "shipped" },
   { slug: "public-scorecard",       title: "Public scorecard from day one", detail: "Every top-10 we publish back-checked against the next-day price move vs SPY.",     status: "shipped" },
   { slug: "watchlist-starter",      title: "Watchlist starter pack",    detail: "Empty watchlist? One click adds 8 mega-caps + SPY so smart alerts can fire from day one.", status: "shipped" },
-
-  // IN PROGRESS
-  { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Smooth one-click upgrade from trial to paid via Stripe Checkout.",                       status: "in_progress" },
+  { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Card at first sign-in via Stripe Checkout, then one-click upgrade from trial to paid.",   status: "shipped" },
   { slug: "universe-expansion",     title: "2,500-ticker active scoring",  detail: "Score the top 2,500 names by daily $-volume — covers everything liquid down to small-caps.", status: "shipped" },
+  { slug: "api-v1",                 title: "Public API v1",              detail: "Read-only REST endpoints at /api/v1 for Premium subscribers, key-authenticated, 1,000 requests/day. Documented at /developers.", status: "shipped" },
 
   // NEXT
   { slug: "fundamentals-in-score",  title: "Fundamentals fully in the composite score", detail: "Earnings revisions, margin trends, valuation ratios moving the score per ticker, per tick.", status: "next" },
@@ -37,7 +36,6 @@ const ITEMS: RoadmapItem[] = [
   { slug: "custom-weights",         title: "Custom scoring weights",     detail: "Pro users override the default 6-factor weights per saved scan.",                      status: "later" },
   { slug: "crypto",                 title: "Crypto coverage",            detail: "BTC + top-50 by liquidity, scored on the same framework.",                              status: "later" },
   { slug: "options-flow",           title: "Options flow integration",   detail: "Unusual-options activity overlay on ticker pages.",                                     status: "later" },
-  { slug: "api-v1",                 title: "Public API v1",              detail: "REST endpoints for Premium subscribers (1,000 req/day allowance).",                    status: "later" },
   { slug: "ios-app",                title: "Mobile app",                 detail: "Native iOS + Android with push notifications and watchlist widget.",                    status: "later" },
 ];
 

@@ -78,7 +78,7 @@ describe("CancelInterceptModal", () => {
       expect(text).not.toContain("-ticker watchlist");
     }
     expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);
-    // Free keeps browser push — only email/Telegram are paid. Never claim a
+    // Free keeps browser push — only email alerts are paid. Never claim a
     // blanket "no alerts".
     expect(text).not.toContain("no alerts");
     expect(text).not.toContain("5 look-ups");

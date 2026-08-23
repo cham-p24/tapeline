@@ -10,7 +10,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // Title front-loads the exact query "Best Free Stock Screener" (+ "free stock
 // screener") with a 2026 modifier and the | Tapeline brand suffix. Description
 // leads with the job-to-be-done (compare the genuinely free screeners) and ends
-// with the Tapeline-specific trust hook (public formula + public scorecard).
+// with the Tapeline-specific trust hook (published methodology + public scorecard).
 export const metadata = pageMeta({
   title: "Best Free Stock Screener 2026 — 5 Tools Compared | Tapeline",
   description:

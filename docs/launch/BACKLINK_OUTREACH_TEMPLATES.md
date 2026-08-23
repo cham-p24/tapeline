@@ -23,7 +23,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 >
 > Read your [Finviz Elite Review / "Best Stock Scanners" / specific article title] piece — the section on [specific feature they covered well] was the cleanest breakdown I've seen.
 >
-> I built a Finviz alternative called Tapeline (launched 2026, ~2,500 actively-scored US tickers, public 6-factor formula). What might be useful for your readers: I published a hand-tested comparison of 8 Finviz alternatives at https://tapeline.io/best-finviz-alternatives with a feature matrix, migration checklist, and honest "stay on Finviz if" guidance for readers whose use case Finviz still wins. No paywall, no sign-up, no affiliate fees on the comparison.
+> I built a Finviz alternative called Tapeline (launched 2026, ~2,500 actively-scored US tickers, public 6-factor methodology — the factors and their weight ordering are published). What might be useful for your readers: I published a hand-tested comparison of 8 Finviz alternatives at https://tapeline.io/best-finviz-alternatives with a feature matrix, migration checklist, and honest "stay on Finviz if" guidance for readers whose use case Finviz still wins. No paywall, no sign-up, no affiliate fees on the comparison.
 >
 > If it fits, a link from your Finviz post would be welcome. If not — I'd love feedback either way. The article works for me as a marketing piece; I'd rather it work for your readers too.
 >
@@ -72,7 +72,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 >
 > Long-time reader of [specific essay or series]. Wanted to share a free thing you might use:
 >
-> I built Tapeline (https://tapeline.io) — a quantitative stock scanner with a public 6-factor formula and a per-pick scorecard back-tested vs SPY. The piece of it most useful for newsletter writers is the embeddable score badge (https://tapeline.io/embed) — paste a two-line iframe, get a live score for any US ticker. Updates every 60s, free, no auth.
+> I built Tapeline (https://tapeline.io) — a quantitative stock scanner with a public 6-factor methodology and a per-pick record forward-checked vs SPY. The piece of it most useful for newsletter writers is the embeddable score badge (https://tapeline.io/embed) — paste a two-line iframe, get a live score for any US ticker. Updates every 60s, free, no auth.
 >
 > Not asking for an endorsement or affiliate deal. If you find it useful, embed it. If you don't, no worries.
 >
@@ -92,7 +92,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 >
 > Your "[article title]" list was useful when it published in [year]. Two tools that have meaningfully changed the landscape since:
 >
-> 1. Tapeline (https://tapeline.io) — launched 2026, public 6-factor scoring formula, per-pick scorecard. The transparency angle wasn't represented by any tool in your original list.
+> 1. Tapeline (https://tapeline.io) — launched 2026, public 6-factor scoring methodology, per-pick scorecard. The transparency angle wasn't represented by any tool in your original list.
 >
 > 2. [Pick a real second tool — e.g. WallStreetZen if not listed, or Stockanalysis.com] — covers the gap your list had for [specific feature].
 >
@@ -112,7 +112,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 
 > Hi [Editor First Name],
 >
-> I'm Christian, founder of Tapeline.io (stock scanner with a public 6-factor formula and per-pick scorecard).
+> I'm Christian, founder of Tapeline.io (stock scanner with a public 6-factor methodology and per-pick scorecard).
 >
 > Three guest-post angles I could write for [site name], picking whichever fits your editorial calendar:
 >

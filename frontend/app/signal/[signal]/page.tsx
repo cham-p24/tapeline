@@ -87,7 +87,7 @@ export async function generateMetadata({ params }: { params: Promise<{ signal: s
   }
   return pageMeta({
     title: `${signal.display} Stocks Today (Tapeline Score ${signal.range})`,
-    description: `Live ranking of US stocks at the ${signal.display} signal level (Tapeline Score ${signal.range}). Sub-60s updates in US market hours, public 6-factor formula.`,
+    description: `Live ranking of US stocks at the ${signal.display} signal level (Tapeline Score ${signal.range}). Sub-60s updates in US market hours, six named factors with the weight ordering published.`,
     path: `/signal/${signal.slug}`,
   });
 }
@@ -100,7 +100,7 @@ function signalFaq(display: string, range: string, blurb: string) {
     },
     {
       q: `How is the ${display} list calculated?`,
-      a: `Every US ticker in the active scanner universe (~2,500 by daily dollar-volume) is scored sub-60s using the public 6-factor weighted formula. Names whose composite score falls in the ${range} band get the ${display} label automatically. The list above shows the top names currently in this tier, sorted by score.`,
+      a: `Every US ticker in the active scanner universe (~2,500 by daily dollar-volume) is scored sub-60s using the same six named factors — weighted most toward Trend and Relative Strength and least toward Momentum. Names whose composite score falls in the ${range} band get the ${display} label automatically. The list above shows the top names currently in this tier, sorted by score.`,
     },
     {
       q: `Should I buy ${display} stocks?`,

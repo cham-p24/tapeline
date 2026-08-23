@@ -45,7 +45,7 @@ const API_BASE =
 export const metadata = pageMeta({
   title: "Free Daily Stock Picks — Tapeline Daily Top 10 (no card)",
   description:
-    "Get the Tapeline daily Top 10 picks free in your inbox each US market morning. The 10 highest-scoring US tickers from a public 6-factor composite, one-sentence read on each. No credit card. Unsubscribe in one click.",
+    "Get the Tapeline daily Top 10 picks free in your inbox each US market morning. The 10 highest-scoring US tickers from the six-factor composite score, one-sentence read on each. No credit card. Unsubscribe in one click.",
   path: "/daily-picks",
 });
 
@@ -128,9 +128,9 @@ export default async function DailyPicksPage() {
             <span className="text-accent">in your inbox before the open.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-lg text-muted leading-relaxed">
-            The Tapeline daily Top 10 — 10 highest-scoring US tickers from a{" "}
+            The Tapeline daily Top 10 — 10 highest-scoring US tickers from the{" "}
             <Link href="/how-it-works" className="text-accent hover:underline">
-              public 6-factor composite
+              six-factor composite score
             </Link>
             , one-sentence read on each, sent each US market morning.
           </p>
@@ -267,7 +267,8 @@ export default async function DailyPicksPage() {
               <h3 className="mt-2 font-semibold text-fg">Factors per score</h3>
               <p className="mt-1 text-sm text-muted leading-relaxed">
                 Trend, RS, Fundamentals, Smart Money, Macro, Momentum — weighted
-                at <Link href="/how-it-works" className="text-accent hover:underline">published rates</Link> and back-checked
+                in a <Link href="/how-it-works" className="text-accent hover:underline">published order</Link>{" "}
+                (most toward Trend and Relative Strength, least toward Momentum) and back-checked
                 vs SPY every day.
               </p>
             </div>
@@ -311,12 +312,13 @@ export default async function DailyPicksPage() {
             Want the same composite, live and on your own watchlist?
           </h2>
           <p className="mt-3 text-muted">
-            14-day Premium trial — $0 today, cancel in one click. The daily email
-            is free with no account and keeps coming either way.
+            14-day Premium trial — a card at first sign-in, $0 charged that day, first
+            charge on day 14, one click to cancel. The daily email is free with no account
+            and keeps coming either way.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
-              Try Premium free &rarr;
+              Start the 14-day trial &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost text-base">
               See pricing

@@ -7,8 +7,10 @@ The consequence was measurable: no account had ever produced a payment signal,
 because none had ever been asked for one. Now:
 
   • POST /api/auth/signup creates a FREE account. No card, no trial, no
-    trial_ends_at. The free tier stays entirely card-free — nothing about
-    account creation is gated behind payment details.
+    trial_ends_at — nothing about account creation is gated behind payment
+    details. (Separately, from tier.CARD_GATE_START a new account meets the
+    /app/start card wall the first time it signs in; accounts created before
+    that date are grandfathered card-free forever.)
   • Starting the trial is a separate, deliberate act:
     POST /api/billing/checkout {"start_trial": true} opens the SAME Stripe
     Checkout the paid flow uses, in mode=subscription with
@@ -34,7 +36,7 @@ webhook (parse_webhook + subscription_payload patched, real handler logic).
 from __future__ import annotations
 
 import uuid as _uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 import httpx
 import pytest
@@ -45,8 +47,15 @@ from app.main import app
 from app.models import StripeWebhookEvent, Subscription, User
 from app.routers import billing as billing_router
 from app.routers import webhooks as webhooks_router
+from app.services.tier import CARD_GATE_START
 
 _AUTH = {"Authorization": "Bearer dev-bypass"}
+
+# Anchored on the constant, never on a literal, so moving the cutover moves
+# this with it. Used to pin the shared dev_user row on the POST-cutover side
+# of the card gate instead of inheriting whatever `created_at` a long-lived
+# local tapeline_dev.sqlite happens to carry.
+_AFTER_GATE = datetime.combine(CARD_GATE_START, time.min, tzinfo=UTC) + timedelta(days=1)
 
 
 @pytest.fixture
@@ -78,13 +87,19 @@ async def _prep_dev_user(c: httpx.AsyncClient, **fields) -> None:
     """Reset the shared dev_user row to a known baseline plus `fields`.
 
     Defaults describe a brand-new account under the new contract: FREE, no
-    card, never trialled. Each test states only the deviation it cares about.
+    card, never trialled, created after tier.CARD_GATE_START. Each test states
+    only the deviation it cares about.
+
+    `created_at` is pinned deliberately: the DB is session-scoped and reused
+    between runs, so without this the card-gate assertions would depend on when
+    the developer's local tapeline_dev.sqlite first created the dev row.
     """
     # GET /api/me ensures the dev_user row exists before we mutate it.
     await c.get("/api/me", headers=_AUTH)
     async with session_scope() as s:
         u = (await s.execute(select(User).where(User.id == "dev_user"))).scalar_one()
         u.tier = fields.get("tier", "free")
+        u.created_at = fields.get("created_at", _AFTER_GATE)
         u.stripe_customer_id = fields.get("stripe_customer_id")
         u.canceled_at = fields.get("canceled_at")
         u.trial_ends_at = fields.get("trial_ends_at")
@@ -104,8 +119,13 @@ async def _restore_dev_user_baseline():
     The DB is session-scoped and never truncated, and test_billing_checkout_
     guard.py restores the same row to `premium / no customer / no trial` — so
     this fixture restores THAT baseline, not this file's, plus the two new
-    trial columns.
+    trial columns and the original creation timestamp `_prep_dev_user` pins.
     """
+    async with session_scope() as s:
+        row = (
+            await s.execute(select(User).where(User.id == "dev_user"))
+        ).scalar_one_or_none()
+        original_created = row.created_at if row is not None else None
     yield
     async with session_scope() as s:
         u = (
@@ -113,6 +133,8 @@ async def _restore_dev_user_baseline():
         ).scalar_one_or_none()
         if u is None:
             return
+        if original_created is not None:
+            u.created_at = original_created
         u.tier = "premium"
         u.stripe_customer_id = None
         u.canceled_at = None
@@ -398,9 +420,9 @@ async def test_trial_offer_states_the_charge(monkeypatch):
     """GET /trial-offer carries every fact the pre-card screen has to state.
 
     $0 today, the exact first-charge instant, one-click cancellation, and —
-    explicitly — that the free tier needs no card. Served from the same
-    TRIAL_DAYS the checkout sends, which is the whole point: the disclosure
-    and the subscription cannot disagree.
+    explicitly — whether THIS account still needs a card to use the free
+    product at all. Served from the same TRIAL_DAYS the checkout sends, which
+    is the whole point: the disclosure and the subscription cannot disagree.
     """
     before = datetime.now(UTC)
     async with _dev_client() as c:
@@ -415,7 +437,12 @@ async def test_trial_offer_states_the_charge(monkeypatch):
     assert body["amount_charged_today"] == 0
     assert body["cancel_in_one_click"] is True
     assert body["card_required"] is True
-    assert body["free_tier_requires_card"] is False
+    # Per-account, not a blanket statement about the tier: _prep_dev_user pins
+    # created_at to _AFTER_GATE, so this row sits on the far side of
+    # tier.CARD_GATE_START and must add a card at first sign-in. A
+    # grandfathered row (created before the cutover) reads False — see
+    # tests/test_card_gate.py for both sides of that boundary.
+    assert body["free_tier_requires_card"] is True
     assert body["current_trial_ends_at"] is None
 
     first_charge = datetime.fromisoformat(body["first_charge_at"])

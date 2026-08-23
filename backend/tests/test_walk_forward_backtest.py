@@ -40,8 +40,13 @@ from app.services import historical_bars
 
 
 def test_weights_sum_to_one():
-    """The published 25/20/15/15/15/10 must sum to 1.0 exactly. If this ever
-    breaks the public /how-it-works page is now lying."""
+    """The internal weight vector must sum to 1.0 exactly.
+
+    Deliberately does not restate the numbers: they are a trade secret, and
+    this docstring used to print them next to the word "published" — which was
+    wrong twice over, since /how-it-works gives the factor set and their
+    ORDERING only. Read WEIGHTS if you need the values.
+    """
     assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9
 
 
@@ -134,10 +139,33 @@ def test_csv_schema_smoke():
         "worst_pick", "worst_alpha",
     ]
 
-    # Comment header is present + documents the formula
+    # Comment header is present + documents the method WITHOUT the weights.
+    #
+    # This assertion used to REQUIRE "composite = 0.25*trend" in the header,
+    # which made the disclosure leak a passing test: every exported back-test
+    # CSV carried the exact internal weight vector, and CI enforced it. The
+    # header must describe the method — six named factors, fixed weights, no
+    # refitting — while the numbers stay internal.
     leading_comments = [line for line in lines if line.startswith("#")]
-    assert any("composite = 0.25*trend" in line for line in leading_comments), \
-        "formula must be documented in the CSV header"
+    assert any("fixed-weight composite over six factors" in line for line in leading_comments), \
+        "the CSV header must still document the method"
+    # Scope the leak scan to the METHODOLOGY lines only. Scanning every "#"
+    # line (as the first version of this guard did) also swept the computed
+    # summary footer, where "# overall_avg_alpha,-0.150%" or
+    # "# sharpe_of_alpha_series,0.102" contains "0.15" / "0.10" as a substring
+    # — so a particular data run could fail the test with a disclosure message
+    # about a disclosure that had not happened.
+    methodology = [
+        line for line in leading_comments
+        if line.startswith(("# formula", "# methodology_notes"))
+    ]
+    assert methodology, "the CSV header must carry the formula/methodology lines"
+    methodology_blob = " ".join(methodology)
+    for leaked in ("0.25", "0.20", "0.15", "0.10", "25/20/15"):
+        assert leaked not in methodology_blob, (
+            f"exported back-test CSV leaks the internal weight vector ({leaked!r}). "
+            f"The weights are not published — see WEIGHTS in walk_forward_backtest.py."
+        )
     assert any("LIMITATIONS" in line for line in leading_comments), \
         "limitations block must be documented"
 

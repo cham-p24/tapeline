@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 **Last updated:** 2026-06-01
@@ -62,17 +78,17 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
 - **Handle ladder (use first available):** `@tapeline_io` → `tapelineio` → `tapeline`
 - **One sentence — short (bios, ≤90 chars):**
   ```
-  Live quantitative stock scanner. Public 6-factor formula. Public scorecard. tapeline.io
+  Live quantitative stock scanner. Six named factors. Public scorecard. tapeline.io
   ```
 - **One sentence — formal (press, taglines):**
   ```
-  Tapeline is a quantitative stock scanner that publishes its 6-factor scoring formula and back-checks every top-10 daily pick against the next-day SPY-relative move.
+  Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks every top-10 daily pick against the next-day SPY-relative move.
   ```
 - **One paragraph (the canonical description — verbatim from `/press`):**
   ```
-  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the formula and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six published factors — Trend (25%), Relative Strength (20%), Fundamentals (15%), Smart Money (15%), Macro (15%), Momentum (10%) — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $25-40/mo price point.
+  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $10-20/mo price point (Pro $9.99/mo or $99/yr; Premium $19.99/mo or $199/yr).
   ```
-- **Fact sheet (verbatim from `/press`):**
+- **Fact sheet (same facts as the `/press` table; the Pricing and Free-trial rows are spelled out at greater length here so the card gate can't be misread — quote `/press` itself if you need it byte-exact):**
   | Field | Value |
   |---|---|
   | Company | Tapeline (tapeline.io) |
@@ -80,7 +96,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   | Founded | 2025 (engine), 2026 (public launch) |
   | Headquarters | Melbourne, Victoria, Australia |
   | Funding | Bootstrapped — no external investment |
-  | Pricing | Free · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
+  | Pricing | Public record free, no account required · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
   | Free trial | 14-day Premium — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, one-click cancel. The published record (daily Top 10, full scorecard, raw CSV/JSON) needs no account at all |
   | Universe | ~2,500 active US tickers (top by daily $-volume) · 5,757 tracked |
   | Update cadence | Sub-60 seconds during US market hours |
@@ -125,9 +141,9 @@ bottom of Part A.
 - **Description (paste — GBP allows ≤750 chars, NO URLs / NO pricing / NO promo
   language, so this is a policy-clean variant of the canonical paragraph):**
   ```
-  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the formula and the track record should both be public. Every active US ticker gets one 0-100 composite score blended from six published factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — updated in under 60 seconds during US market hours, each with a plain-English explanation of the reading. Every top-10 daily pick is logged to a public, back-checked scorecard showing its realized next-day return versus the S&P 500. Tapeline provides descriptive market analytics, not financial advice. Bootstrapped and built in Melbourne, Australia; launched in 2026.
+  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every active US ticker gets one 0-100 composite score from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength, least toward Momentum — updated in under 60 seconds during market hours, each with a plain-English explanation of the reading. Every top-10 daily pick is logged to a public, back-checked scorecard showing its realized next-day return versus the S&P 500. Tapeline provides descriptive market analytics, not financial advice. Bootstrapped and built in Melbourne, Australia; launched in 2026.
   ```
-  *(686 chars — under GBP's 750 limit. Note: GBP descriptions forbid URLs, phone numbers, pricing, and
+  *(748 chars — under GBP's 750 limit. Note: GBP descriptions forbid URLs, phone numbers, pricing, and
   promotional/sales language — so this drops the tapeline.io / $-tiers / competitor
   list that the canonical paragraph carries. Everything else is voice-identical.)*
 - **Logo:** export `tapeline.io/favicon.svg` to PNG, **min 250×250** (720×720 ideal).
@@ -148,7 +164,7 @@ bottom of Part A.
   *(51 chars. Alt: `Stock scanner that shows its work` — 33 chars.)*
 - **Description (short — ~260 chars):**
   ```
-  A transparent quantitative stock scanner. Every US ticker gets one 0-100 score from a public 6-factor formula, plus a plain-English "why." Every top-10 daily pick is logged to a public, back-checked scorecard vs SPY. Bootstrapped. Free tier, no card; 14-day Premium trial takes one.
+  A transparent quantitative stock scanner. Every US ticker gets one 0-100 score from six named factors, plus a plain-English "why." Every top-10 daily pick is logged to a public scorecard vs SPY. Bootstrapped. Record free to read, no account; trial takes a card.
   ```
 - **Topics:** `Fintech`, `Stock trading`, `Investing`, `SaaS`, `Analytics`
 - **Links:** Website `https://tapeline.io` · Pricing `https://tapeline.io/pricing`
@@ -159,18 +175,20 @@ bottom of Part A.
 
   I built Tapeline because every other scanner either gives you 60 raw filter
   fields and a blank stare, or an "AI pick" with no way to check it. Tapeline
-  does the opposite: one 0-100 score per US ticker from a formula I publish in
-  full (Trend 25 / Relative Strength 20 / Fundamentals 15 / Smart Money 15 /
-  Macro 15 / Momentum 10), plus one plain-English sentence on why.
+  does the opposite: one 0-100 score per US ticker from six named factors I
+  publish — Trend, Relative Strength, Fundamentals, Smart Money, Macro,
+  Momentum, weighted most toward Trend and Relative Strength and least toward
+  Momentum — plus one plain-English sentence on why.
 
   The part I care most about: every top-10 daily pick auto-publishes to a public
   scorecard the next day with its realized return vs SPY — winners and losers,
-  unedited. The formula is copyable; the moat is the data spine and the
-  receipts.
+  unedited. The factor set is out in the open; the moat is the data spine and
+  the receipts.
 
-  It's descriptive, not advice — six labels, no buy/sell language. Free tier is
-  the real product (delayed) and never asks for a card; the 14-day Premium
-  trial does take one — $0 today, first charge at day 14, one click to cancel.
+  It's descriptive, not advice — six labels, no buy/sell language. The public
+  record is the real product and is readable with no account and no card; the
+  signed-in product takes a card at first sign-in and starts the 14-day Premium
+  trial — $0 today, first charge at day 14, one click to cancel.
   Would genuinely
   love feedback on the scoring methodology: https://tapeline.io/how-it-works
   ```
@@ -182,9 +200,9 @@ bottom of Part A.
 - **Permalink:** `tapeline-io` (bare `tapeline` is taken by the cassette co)
 - **Short description (max ~120 chars):**
   ```
-  Quantitative US-stock scanner with a public 6-factor formula and a back-checked, public daily scorecard.
+  Quantitative US-stock scanner with a public 6-factor methodology and a back-checked, public daily scorecard.
   ```
-  *(104 chars.)*
+  *(108 chars.)*
 - **Full description:** paste the **canonical one paragraph** above.
 - **Founded date:** `2025` (engine built 2025; public launch 2026 — say so in the description)
 - **Operating status:** `Active`
@@ -214,7 +232,8 @@ bottom of Part A.
 - **Tagline:** the **formal one sentence** above.
 - **Description:** paste the **canonical one paragraph**.
 - **Categories:** `Stock Analysis`, `Investment Management`, `Financial Analysis`
-- **Pricing model:** `Subscription` + `Free version` · starting price **$9.99/mo** (Pro, annual)
+- **Pricing model:** `Subscription` · starting price **$8.25/mo** (Pro, billed annually at
+  $99/yr) or **$9.99/mo** billed monthly. The published record is free with no account required.
 - **Deployment:** `Web-based / Cloud`
 - **Tick only true features:** Watchlist, Alerts/Notifications, Technical Analysis,
   Fundamental Analysis, Performance Metrics, Customizable Reports/Export.
@@ -269,7 +288,7 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
 
 - **Title (≤80 chars):**
   ```
-  Show HN: Tapeline – a stock scanner that publishes its formula and scorecard
+  Show HN: Tapeline – a stock scanner that publishes its methodology and scorecard
   ```
 - **URL:** `https://tapeline.io`
 - **First comment (post immediately after submitting):**
@@ -279,9 +298,10 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
   opposite.
 
   Tapeline gives every active US ticker one 0-100 score from a fixed, fully
-  published 6-factor formula (Trend 25 / RS 20 / Fundamentals 15 / Smart Money
-  15 / Macro 15 / Momentum 10) — weights are versioned in a public changelog and
-  never edited retroactively, no ML rerank between the formula and the number.
+  published six-factor set (Trend, Relative Strength, Fundamentals, Smart Money,
+  Macro, Momentum) — weighted most toward Trend and Relative Strength, least
+  toward Momentum. The ordering is published and never changes without a
+  changelog entry, and there's no ML rerank between the factors and the number.
   Each ticker also gets one plain-English sentence explaining the score.
 
   The accountability bit: every top-10 daily pick auto-logs to a public
@@ -289,8 +309,9 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
 
   Stack: FastAPI + SQLAlchemy + Postgres, Next.js front end, a 60s scoring
   worker, SSE for live updates. Scores are descriptive, not advice (no buy/sell
-  language — publisher's-exemption posture). Free tier is the real product
-  (delayed data); Premium is live. Methodology: https://tapeline.io/how-it-works
+  language — publisher's-exemption posture). The public record is live and needs
+  no account; the full ~2,500-ticker scanner is paid.
+  Methodology: https://tapeline.io/how-it-works
 
   Happy to talk about the scoring design, the data spine, or the
   publish-your-track-record bet. Feedback welcome.
@@ -300,10 +321,10 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
 
 - **Title:**
   ```
-  I bet a bootstrapped SaaS on radical transparency: public formula + public scorecard
+  I bet a bootstrapped SaaS on radical transparency: public methodology + public scorecard
   ```
-- **Body angle:** solo + bootstrapped + the contrarian bet (give away the
-  formula, publish every pick's result). Open with the problem, show the
+- **Body angle:** solo + bootstrapped + the contrarian bet (name every factor
+  and publish every pick's result). Open with the problem, show the
   scorecard link as proof, end with a specific ask ("does the
   publish-your-losers angle build trust or scare people off?"). Link
   `tapeline.io` and `/scorecard`.
@@ -314,8 +335,8 @@ Personalize the bracketed slots — a generic blast gets ignored. One outlet at 
 time.
 
 - **Subject (pick one):**
-  - `Tapeline: a stock scanner that publishes its formula and its track record`
-  - `Bootstrapped stock scanner — public 6-factor formula, public scorecard`
+  - `Tapeline: a stock scanner that publishes its methodology and its track record`
+  - `Bootstrapped stock scanner — public 6-factor methodology, public scorecard`
 - **Body:**
   ```
   Hi [NAME],
@@ -323,9 +344,9 @@ time.
   I read [SPECIFIC PIECE / EPISODE] — [ONE GENUINE SENTENCE ON WHY IT'S RELEVANT].
 
   I'm Christian Piyatilaka, solo founder of Tapeline (tapeline.io), a
-  quantitative stock scanner with an unusual bet: both the formula and the track
-  record are public. Every US ticker gets one 0-100 score from a published
-  6-factor formula, and every top-10 daily pick auto-logs to a public scorecard
+  quantitative stock scanner with an unusual bet: both the methodology and the
+  track record are public. Every US ticker gets one 0-100 score from six named
+  factors, and every top-10 daily pick auto-logs to a public scorecard
   the next day with its realized return vs SPY — winners and losers, unedited.
 
   It's descriptive analytics, not advice (no buy/sell language). Bootstrapped,
@@ -355,8 +376,9 @@ time.
 
 ### B5 · Three reusable hooks (rotate per channel)
 
-1. **Transparency:** "The formula is public. Anyone can copy it. The moat is the
-   data spine plus a public scorecard back-checking every call."
+1. **Transparency:** "We name the six factors and publish a per-pick scorecard —
+   it's not a mystery black box. The moat is the data spine plus that public
+   scorecard back-checking every call we make."
 2. **Accountability:** "Newsletter shops have hidden their losers for 30 years.
    We auto-publish every top-10 pick the next day, regardless of how it moved."
 3. **Anti-black-box:** "Six descriptive labels, no buy/sell language. We tell you

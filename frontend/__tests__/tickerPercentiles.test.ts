@@ -28,12 +28,12 @@ import {
 
 /** The breakdown block exactly as the ticker endpoint serves it. */
 const BREAKDOWN = {
-  trend: { value: 88, weight: 25, label: "Trend" },
-  rs: { value: 81, weight: 20, label: "Relative strength" },
-  fundamentals: { value: 34, weight: 15, label: "Fundamentals" },
-  smart_money: { value: 52, weight: 15, label: "Smart money" },
-  macro: { value: 61, weight: 15, label: "Macro" },
-  momentum: { value: 70, weight: 10, label: "Momentum" },
+  trend: { value: 88, label: "Trend" },
+  rs: { value: 81, label: "Relative strength" },
+  fundamentals: { value: 34, label: "Fundamentals" },
+  smart_money: { value: 52, label: "Smart money" },
+  macro: { value: 61, label: "Macro" },
+  momentum: { value: 70, label: "Momentum" },
 };
 
 const HC = (percentile: number, n = 763) => ({
@@ -241,27 +241,49 @@ describe("ordinal", () => {
 });
 
 describe("buildFactorRows", () => {
-  it("reads value, published weight and label straight off the payload", () => {
+  it("reads value and label off the payload, in descending-weight order", () => {
     const rows = buildFactorRows(BREAKDOWN, normalizePercentiles({}));
+    // FACTOR_ORDER is the descending weight order, and it is the disclosure-
+    // safe form of the same fact: "most toward Trend and Relative Strength,
+    // least toward Momentum". The ordering is public; the vector is not.
     expect(rows.map((r) => r.key)).toEqual([
       "trend", "rs", "fundamentals", "smart_money", "macro", "momentum",
     ]);
-    // Descending published weight, summing to 100 — the disclosed formula.
-    expect(rows.map((r) => r.weight)).toEqual([25, 20, 15, 15, 15, 10]);
-    expect(rows.reduce((a, r) => a + r.weight, 0)).toBe(100);
+    expect(rows.map((r) => r.value)).toEqual([88, 81, 34, 52, 61, 70]);
+  });
+
+  it("never carries a numeric weight — the vector is not client-side", () => {
+    // This replaced an assertion that rows.map(r => r.weight) equalled
+    // [25,20,15,15,15,10]. That test pinned the internal weight vector into the
+    // public JS bundle, and a matching "weight" key on the UNAUTHENTICATED
+    // /api/ticker/{symbol} response handed it to anonymous callers too. Both
+    // are gone; this asserts they stay gone.
+    const rows = buildFactorRows(BREAKDOWN, normalizePercentiles({}));
+    for (const row of rows) {
+      expect(row).not.toHaveProperty("weight");
+    }
+    expect(JSON.stringify(rows)).not.toMatch(/\b(25|20|15|10)\b(?=\s*[,}])/);
   });
 
   it("renders a missing sub-score as null, never as 0", () => {
     const rows = buildFactorRows(
-      { ...BREAKDOWN, fundamentals: { value: null, weight: 15, label: "Fundamentals" } },
+      { ...BREAKDOWN, fundamentals: { value: null, label: "Fundamentals" } },
       normalizePercentiles({}),
     );
     expect(rows.find((r) => r.key === "fundamentals")!.value).toBeNull();
   });
 
-  it("falls back to the published weights when the payload omits them", () => {
+  it("still yields all six rows when the payload is sparse", () => {
+    // Was: "falls back to the published weights when the payload omits them",
+    // asserting rows[0].weight === 25 via a client-side FACTOR_WEIGHT map. That
+    // map was the bundle-side half of the disclosure leak and is deleted; the
+    // row set and its order are what must survive a thin payload.
     const rows = buildFactorRows({ trend: { value: 50 } }, normalizePercentiles({}));
-    expect(rows[0].weight).toBe(25);
+    expect(rows).toHaveLength(6);
+    expect(rows[0].key).toBe("trend");
+    expect(rows[0].value).toBe(50);
+    expect(rows[5].key).toBe("momentum");
+    expect(rows[5].value).toBeNull();
   });
 });
 
@@ -307,11 +329,12 @@ describe("buildTickerRead", () => {
     for (let i = 0; i < 20; i++) expect(buildTickerRead(args)).toBe(first);
   });
 
-  it("breaks percentile ties by published weight, so ordering never flips", () => {
+  it("breaks percentile ties by weight ORDER, so ordering never flips", () => {
     // Trend and Momentum are the only two ranked factors and sit at the SAME
-    // percentile. The heavier published weight (Trend, 25 vs Momentum, 10)
-    // takes the "highest" slot on every render — the tie-break is total, so
-    // the sentence can never reorder itself between renders.
+    // percentile. Trend takes the "highest" slot on every render because it
+    // comes first in FACTOR_ORDER, which is the descending weight order — the
+    // same rule as the old numeric comparison, without the vector. The
+    // tie-break is total, so the sentence can never reorder itself.
     const tied = { trend: HC(80, 600), momentum: HC(80, 600) };
     const read = buildTickerRead({
       symbol: "ABC",

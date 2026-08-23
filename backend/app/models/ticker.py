@@ -96,9 +96,10 @@ class Ticker(Base):
     # signals built on thin data. Pattern ported from the personal signal-system.
     confidence_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(400), nullable=True)
-    # Discord webhook deliveries also need sector_leaders/rate_direction,
-    # both still coming from the regime row — left here because it's the
-    # ticker-level data that drives them.
+    # sector_leaders/rate_direction live on the regime row, not here — the
+    # alert payloads that quote them are built from that row plus this
+    # ticker-level data. (The Discord channel that also read them was retired
+    # 2026-05-04.)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

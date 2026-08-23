@@ -6,16 +6,24 @@ breakdown for whatever ticker the user is already looking at.
 **Coverage is two layers**, because "works on every trading platform" and "does
 not ask to read your entire browsing history" pull against each other:
 
-1. **22 sites enabled out of the box** — Yahoo Finance, TradingView, Google
+1. **21 sites enabled out of the box** — Yahoo Finance, TradingView, Google
    Finance, MarketWatch, Seeking Alpha, Stocktwits, Finviz, Barchart, CNBC,
-   Nasdaq, Robinhood, Investing.com, Zacks, Morningstar, TipRanks,
-   stockanalysis.com, Simply Wall St, StockCharts, Benzinga, Motley Fool, WSJ
-   market data and Reuters markets. All public research pages.
-2. **Anything else, one click** — open the popup on any site and press
-   *Enable on this site*. That grants access to **that origin only**, and the
-   generic URL patterns take over. This is how brokers are covered: Webull,
-   Fidelity, Schwab, E*TRADE, tastytrade, moomoo, Public and the long tail all
-   work once enabled, including hash-routed apps.
+   Nasdaq, Investing.com, Zacks, Morningstar, TipRanks, stockanalysis.com,
+   Simply Wall St, StockCharts, Benzinga, Motley Fool, WSJ market data and
+   Reuters markets. All public research pages. Robinhood is *not* one of them
+   — it was dropped from the manifest in PR #526, and it does not fall through
+   to layer 2 either: `sites.js` still carries a Robinhood rule, so
+   `isKnownHost("robinhood.com")` is true, and `popup.js` only offers *Enable
+   on this site* when that is false. So the extension currently does nothing on
+   Robinhood unless the origin is granted outside the popup —
+   `syncEnabledSites()` registers the script for any granted origin. Removing
+   the `robinhood.com` entry from `TAPELINE_SITES` would put it back on the
+   normal opt-in path.
+2. **Anything else, one click** — open the popup on a site that is not already
+   covered and press *Enable on this site*. That grants access to **that origin
+   only**, and the generic URL patterns take over. This is how brokers are
+   covered: Webull, Fidelity, Schwab, E*TRADE, tastytrade, moomoo, Public and
+   the long tail all work once enabled, including hash-routed apps.
 
 Brokers are deliberately NOT bundled into layer 1. Asking for access to every
 brokerage at install time is the top Chrome Web Store rejection reason, and it
@@ -25,9 +33,14 @@ origin is the honest version of the same capability.
 Plus a manual lookup in the toolbar popup that works anywhere, needing no
 site permission at all.
 
-**A free Tapeline account is required.** The user connects once from the popup
+**A Tapeline account is required.** The user connects once from the popup
 (`Get my connect code` → tapeline.io/extension/connect → paste). Without a token
 the content script renders nothing at all, and the popup shows the connect screen.
+An account created on or after 2026-08-22 adds a card at first sign-in, which
+starts a 14-day Premium trial ($0 that day, first charge at the end of the
+trial, one click cancels before then) — see `CARD_GATE_START` /
+`must_add_card` in `backend/app/services/tier.py`. Accounts older than that are
+grandfathered and are never asked for one.
 
 Worth stating in the code as well as the copy: the score and record are already
 public (`/daily-picks`, `/t/{symbol}`, `/badge/{symbol}`). The gate exists because
@@ -49,8 +62,8 @@ small port noted below.
 ## How it works
 
 ```
-content.js ──"NVDA"──▶ background.js ──▶ api.tapeline.io/api/ticker/NVDA
-   (detects symbol            (service worker:
+content.js ──"NVDA"──▶ background.js ──▶ api.tapeline.io/api/extension/ticker/NVDA
+   (detects symbol            (service worker:              (Bearer tlx_…)
     from the URL)              caches 15 min, de-dupes)
 ```
 
@@ -89,16 +102,17 @@ else until clicked, and it can be dismissed.
 
 ## Load discipline
 
-`/api/ticker/{symbol}` also backs the public SSR pages, so the extension caches
-per symbol for 15 minutes in `chrome.storage.session` and collapses concurrent
-requests for the same symbol into one. Scores move on a daily cadence, so a
-stale-by-minutes read is correct.
+The extension calls its own `/api/extension/*` namespace, but those requests
+land on the same backend as the public site, so it caches per symbol for 15
+minutes in `chrome.storage.session` and collapses concurrent requests for the
+same symbol into one. Scores move on a daily cadence, so a stale-by-minutes read
+is correct.
 
-Anonymous callers are **not** metered on that endpoint — see the comment in
-`backend/app/routers/ticker.py` (the per-IP anon cap once 402'd our own SSR
-renders and broke the whole `/t/` surface, so it was deliberately disabled).
-If that ever changes, this extension needs its own lightweight public endpoint
-returning just `{score, signal, reason, factors}`.
+Every extension call carries a `tlx_…` bearer token and hits
+`/api/extension/*`, which authenticates the caller but does not run the daily
+look-up meter `backend/app/routers/ticker.py` applies to logged-in free users
+on `/api/ticker/{symbol}`. The cache and the single-flight de-dup are the only
+backpressure on this path, which is why they matter.
 
 ## Tests
 

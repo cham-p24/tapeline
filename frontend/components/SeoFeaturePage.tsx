@@ -74,8 +74,12 @@ type Props = {
   };
   /** FAQ — visible accordion + JSON-LD FAQPage schema. 5-6 items ideal. */
   faq: FeatureFAQ[];
-  /** Premium feature? Drives the CTA copy. */
-  tier: "free" | "pro" | "premium";
+  /** Premium feature? Drives the CTA copy.
+      No "free" member: this template's CTA sends every reader to /signup, and
+      since the 2026-08-22 card gate a new account is card-gated into the
+      14-day Premium trial — so there is no honest "free tier" line to render
+      under that button. Removed rather than reworded; no caller used it. */
+  tier: "pro" | "premium";
   /** Message-match slug appended to the /signup CTA as ?from=<slug>. The
       signup page restates the matching promise in its H1 (see signup
       FROM_COPY) so ad → landing → signup copy stays consistent. Constrained
@@ -101,13 +105,11 @@ export function SeoFeaturePage({
     { name: "Features", url: "https://tapeline.io/" },
     { name: h1, url },
   ]);
-  const tierLabel = tier === "premium" ? "Premium" : tier === "pro" ? "Pro" : "Free";
+  const tierLabel = tier === "premium" ? "Premium" : "Pro";
   const tierCopy =
     tier === "premium"
       ? "Premium · 14-day trial, $0 today."
-      : tier === "pro"
-        ? "Pro · 14-day Premium trial that includes everything in Pro."
-        : "Free tier — see the live universe today.";
+      : "Pro · 14-day Premium trial that includes everything in Pro.";
 
   return (
     <main id="main" className="min-h-screen">
@@ -219,7 +221,7 @@ export function SeoFeaturePage({
           <p className="mt-3 text-sm text-muted">{tierCopy}</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href={`/signup?from=${signupFrom}`} className="btn-primary">
-              Try Premium free &rarr;
+              Start the 14-day Premium trial &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost">
               See pricing

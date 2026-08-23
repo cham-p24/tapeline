@@ -1,5 +1,5 @@
 /**
- * 6-axis radar showing each factor's contribution to the Tapeline Score.
+ * 6-axis radar showing each factor's sub-score behind the Tapeline Score.
  *
  * Visual signature for the score — same role Simply Wall St's "Snowflake"
  * plays for theirs. Each axis is one of the 6 factors; the radius along

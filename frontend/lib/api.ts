@@ -97,10 +97,11 @@ export class TierGateError extends Error {
  *                   "used": <int>, "limit": <int>,
  *                   "tier": "free" | "anon" } }
  *
- * - "free_lookup_limit" → logged-in free user over their 5/day cap; the
- *   ticker page renders an UPGRADE wall.
- * - "signup_required"   → anonymous visitor over their 2/day cap; the
- *   ticker page renders a SIGN-UP-FREE wall.
+ * - "free_lookup_limit" → logged-in free user over their 12/day cap
+ *   (tier.FREE_DAILY_LOOKUPS); the ticker page renders an UPGRADE wall.
+ * - "signup_required"   → anonymous visitor over their 2/day cap
+ *   (tier.ANON_DAILY_LOOKUPS); the ticker page renders a CREATE-AN-ACCOUNT
+ *   wall.
  *
  * Pro / Premium / active-trial users are unlimited and never see a 402,
  * so this never fires for them.
@@ -125,9 +126,9 @@ export class LookupLimitError extends Error {
     super(detail?.error ?? "lookup_limit");
     this.name = "LookupLimitError";
     // Default to the signup wall when the reason is missing/unrecognised —
-    // it's the safer, less-aggressive variant (invites a free signup rather
-    // than pushing a paid upgrade at someone who might not even have an
-    // account yet).
+    // it's the safer, less-aggressive variant (invites creating an account
+    // rather than pushing a paid upgrade at someone who might not even have
+    // an account yet).
     this.reason =
       detail?.error === "free_lookup_limit" ? "free_lookup_limit" : "signup_required";
     this.used = typeof detail?.used === "number" ? detail.used : null;
@@ -238,7 +239,10 @@ export type TickerDetail = {
   change_pct_1m: number;
   volume: number;
   reason: string | null;
-  breakdown: Record<string, { value: number; weight: number; label: string }>;
+  // No `weight`: /api/ticker/{symbol} is unauthenticated and deliberately no
+  // longer returns the factor weight vector. See the disclosure-boundary note
+  // in backend/app/routers/ticker.py.
+  breakdown: Record<string, { value: number; label: string }>;
   squeeze: null | {
     spike_score: number;
     squeeze_days: number;

@@ -11,7 +11,7 @@ export function ScannerLegend() {
     { label: "CONSTRUCTIVE",    range: "55–69",  tone: "bg-accent/10 text-accent", desc: "Net positive but not decisive. Worth watching." },
     { label: "NEUTRAL",         range: "40–54",  tone: "bg-muted/20 text-muted", desc: "Factors cancel out. No edge either way." },
     { label: "CAUTION",         range: "25–39",  tone: "bg-warn/10 text-warn", desc: "More factors negative than positive." },
-    { label: "WEAK",            range: "0–24",   tone: "bg-down/10 text-down", desc: "Factors broadly negative. Avoid longs, consider shorts." },
+    { label: "WEAK",            range: "0–24",   tone: "bg-down/10 text-down", desc: "Factors broadly negative across the composite." },
   ];
   return (
     <details className="card mt-4 cursor-pointer group">
@@ -38,12 +38,12 @@ export function ScannerLegend() {
         <div className="mt-4 pt-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Score = weighted blend of 6 named factors</p>
           <div className="flex flex-wrap gap-3 text-xs">
-            <Factor name="Trend" emphasis="Weighted most" desc="Price-trend direction and quality" />
-            <Factor name="Rel. Strength" emphasis="High" desc="Performance vs market and sector" />
-            <Factor name="Fundamentals" emphasis="Core" desc="Earnings quality and balance-sheet health" />
-            <Factor name="Smart Money" emphasis="Core" desc="Insider + institutional + Congress" />
-            <Factor name="Macro" emphasis="Core" desc="Regime + rates + sector rotation" />
-            <Factor name="Momentum" emphasis="Weighted least" desc="Short-horizon price acceleration" />
+            <Factor name="Trend" emphasis="Weighted most" desc="Multi-month price change and 52-week range position" />
+            <Factor name="Rel. Strength" emphasis="High" desc="Price change minus the broad-market benchmark's" />
+            <Factor name="Fundamentals" emphasis="Core" desc="Reported margins, returns and growth" />
+            <Factor name="Smart Money" emphasis="Core" desc="Disclosed insider transactions (SEC Form 4)" />
+            <Factor name="Macro" emphasis="Core" desc="Market-wide regime classification" />
+            <Factor name="Momentum" emphasis="Weighted least" desc="Short-horizon rate of change" />
           </div>
           <p className="mt-3 text-xs text-muted">
             Hover any score for the per-ticker breakdown and plain-English reason. Click a ticker for the full page.

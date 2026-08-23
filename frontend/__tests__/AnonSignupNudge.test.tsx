@@ -86,7 +86,7 @@ describe("AnonSignupNudge — view counting + threshold", () => {
     // Give the mount effect a tick to run.
     await waitFor(() => expect(container).toBeEmptyDOMElement());
     expect(
-      screen.queryByRole("link", { name: /sign up free/i }),
+      screen.queryByRole("link", { name: /create an account/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("AnonSignupNudge — view counting + threshold", () => {
     // Two distinct tickers already seen; this mount makes the 3rd.
     seedDistinctViews(2);
     render(<AnonSignupNudge symbol="NVDA" />);
-    const link = await screen.findByRole("link", { name: /sign up free/i });
+    const link = await screen.findByRole("link", { name: /create an account/i });
     expect(link).toHaveAttribute("href", "/signup?from=ticker");
     // The heading's value prop flips at the 2026-08-02 watchlist→Pro cutover:
     // "save your tickers, free" only holds while Free still has a watchlist.
@@ -133,7 +133,7 @@ describe("AnonSignupNudge — audience gating", () => {
     await waitFor(() => expect(mockedUseUser).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
     expect(
-      screen.queryByRole("link", { name: /sign up free/i }),
+      screen.queryByRole("link", { name: /create an account/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -152,7 +152,7 @@ describe("AnonSignupNudge — dismiss behaviour", () => {
     seedDistinctViews(3); // at threshold before this mount → shows immediately
     render(<AnonSignupNudge symbol="AMD" />);
 
-    const link = await screen.findByRole("link", { name: /sign up free/i });
+    const link = await screen.findByRole("link", { name: /create an account/i });
     expect(link).toBeInTheDocument();
 
     await userEvent.click(
@@ -162,7 +162,7 @@ describe("AnonSignupNudge — dismiss behaviour", () => {
     // Gone after dismiss.
     await waitFor(() =>
       expect(
-        screen.queryByRole("link", { name: /sign up free/i }),
+        screen.queryByRole("link", { name: /create an account/i }),
       ).not.toBeInTheDocument(),
     );
     // Cooldown timestamp persisted.
@@ -188,7 +188,7 @@ describe("AnonSignupNudge — dismiss behaviour", () => {
     );
     render(<AnonSignupNudge symbol="AMD" />);
     expect(
-      await screen.findByRole("link", { name: /sign up free/i }),
+      await screen.findByRole("link", { name: /create an account/i }),
     ).toBeInTheDocument();
   });
 });
@@ -209,7 +209,7 @@ describe("AnonSignupNudge — content-safety (additive only)", () => {
     expect(screen.getByText(/AAPL score 82\/100/)).toBeInTheDocument();
     // And the nudge itself is (correctly) absent below threshold.
     expect(
-      screen.queryByRole("link", { name: /sign up free/i }),
+      screen.queryByRole("link", { name: /create an account/i }),
     ).not.toBeInTheDocument();
   });
 });

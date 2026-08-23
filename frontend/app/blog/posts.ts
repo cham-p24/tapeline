@@ -61,7 +61,7 @@ export const POSTS: BlogPost[] = [
 <p>Because so many traders watch the same averages, they can become self-fulfilling support and resistance. But a moving average is built entirely from past prices — it is a lagging line by construction. It confirms a trend that already exists; it never announces one early. Anyone selling a moving-average crossover as a crystal ball is selling yesterday's news.</p>
 
 <h2>How Tapeline's Trend factor reads the same chart</h2>
-<p>The <a href="/how-it-works">Trend factor</a> is one of the six inputs in the Tapeline composite, and it reads the structure above mechanically rather than by eye. It looks at where price sits relative to its key moving averages, whether those averages are stacked in uptrend order and sloping up, and whether the higher-high, higher-low structure is still intact — then compresses that into one 0–100 sub-score so a chart's direction becomes a single comparable number across every US ticker. It is deliberately descriptive: the score reports what the tape is currently doing, not what it will do next. You can see how Trend combines with the other five factors on the public <a href="/scorecard">scorecard</a> — which, in the interest of transparency, currently trails a plain SPY buy-and-hold. The Trend read also shows up pre-computed on lists like <a href="/best-stocks-for/swing-traders">the swing-trading board</a>.</p>
+<p>The <a href="/how-it-works">Trend factor</a> is one of the six inputs in the Tapeline composite, and it reads price structure mechanically rather than by eye. It measures how far price has moved over a multi-month window and where the latest price sits inside the ticker's own 52-week range — not moving-average crossovers — then compresses that into one 0–100 sub-score so a chart's direction becomes a single comparable number across every US ticker. It is deliberately descriptive: the score reports what the tape is currently doing, not what it will do next. You can see how Trend combines with the other five factors on the public <a href="/scorecard">scorecard</a> — which, in the interest of transparency, currently trails a plain SPY buy-and-hold. The Trend read also shows up pre-computed on lists like <a href="/best-stocks-for/swing-traders">the swing-trading board</a>.</p>
 
 <h2>The honest limit</h2>
 <p>Every chart is a picture of the past. It records what has already happened with total accuracy and says nothing certain about tomorrow. Patterns fail, trends reverse without warning, and the cleanest setup can be undone by a single event the chart could never contain:</p>
@@ -110,8 +110,8 @@ export const POSTS: BlogPost[] = [
 <p>This is why MACD works best as a description of an existing trend's health rather than a standalone trigger, and why it pairs naturally with something that tells you whether a real trend is even present.</p>
 
 <h2>How Tapeline reads the same two ideas</h2>
-<p>MACD quietly fuses two different things: trend (are the moving averages stacked in one direction?) and momentum (how fast is price accelerating away from its own average?). Tapeline keeps those as two of its six named factors rather than blending them into a single line. The <a href="/best-stocks-for/momentum">Momentum factor</a> reads the rate and persistence of price change — the same acceleration MACD's histogram is gesturing at. The Trend factor reads moving-average structure and alignment — the same stacking that pushes the MACD line above or below zero.</p>
-<p>Keeping them apart is deliberate. A stock can have strong momentum inside a weak trend (a sharp bounce in a downtrend) or a solid trend with fading momentum (exactly the divergence case above). A single MACD line collapses those two states together; two separate factors let the scanner show which one is on screen. The full weighting of all six factors is written up in <a href="/how-it-works">how the score works</a>.</p>
+<p>MACD quietly fuses two different things: trend (are the moving averages stacked in one direction?) and momentum (how fast is price accelerating away from its own average?). Tapeline keeps those as two of its six named factors rather than blending them into a single line. The <a href="/best-stocks-for/momentum">Momentum factor</a> reads the rate and persistence of price change — the same acceleration MACD's histogram is gesturing at. The Trend factor reads price structure directly — a multi-month price change, and where price sits inside its own 52-week range — rather than the moving-average stack MACD is built from.</p>
+<p>Keeping them apart is deliberate. A stock can have strong momentum inside a weak trend (a sharp bounce in a downtrend) or a solid trend with fading momentum (exactly the divergence case above). A single MACD line collapses those two states together; two separate factors let the scanner show which one is on screen. How the six factors rank by weight — most toward Trend and Relative Strength, least toward Momentum — is written up in <a href="/how-it-works">how the score works</a>.</p>
 
 <h2>The caveat that matters</h2>
 <p>MACD is a lens, not an oracle. It is arithmetic on past prices, and no arrangement of past prices guarantees anything about the next bar. Tapeline treats indicators like this as descriptive inputs, never predictions — and we publish a <a href="/scorecard">public scorecard</a> that currently trails the S&amp;P 500, precisely so nobody mistakes a tidy factor model for a promise. Read MACD for what it is: a compact, lagging summary of trend and momentum that is genuinely informative when a trend exists and genuinely misleading when one doesn't. The <a href="/legal/risk">risk disclosure</a> has the full picture.</p>`,
@@ -148,7 +148,7 @@ export const POSTS: BlogPost[] = [
 <p>Volume is participation. A breakout on heavy volume describes broad agreement; the same move on thin volume describes a handful of orders and a lot of empty tape. Volume doesn't stand alone — it's the corroboration check on everything above. A trend, a relative-strength breakout, an RSI reading: each reads stronger when volume confirms it, and weaker when it doesn't.</p>
 
 <h2>How Tapeline reads these — as factors, not signals</h2>
-<p>Tapeline doesn't hand you a single indicator; it folds these reads into named factors inside a six-factor composite (<a href="/how-it-works">the full methodology is here</a>). Two of the six map directly onto the indicators above. The <a href="/how-it-works/trend">Trend factor</a> reads moving-average structure and slope — the same 50/200 posture, scored 0–100 instead of eyeballed. The <a href="/how-it-works/relative-strength">Relative Strength factor</a> compares each name to SPY and its sector, the leadership read that pure price charts hide. Volume and short-horizon acceleration feed the Momentum factor. The point of naming them is that you can see which read is carrying a score and which is conspicuously silent, instead of trusting one line on one chart.</p>
+<p>Tapeline doesn't hand you a single indicator; it folds these reads into named factors inside a six-factor composite (<a href="/how-it-works">the full methodology is here</a>). Several of the six cover the same ground as the indicators above. The <a href="/how-it-works/trend">Trend factor</a> reads a multi-month price change and where price sits inside its own 52-week range, scored 0–100 instead of eyeballed — it does not read moving-average crossovers. The <a href="/how-it-works/relative-strength">Relative Strength factor</a> compares each name's change with the broad-market benchmark's over the same periods, the leadership read that pure price charts hide. Short-horizon rate of change sits in the Momentum factor. The point of naming them is that you can see which read is carrying a score and which is conspicuously silent, instead of trusting one line on one chart.</p>
 
 <p>If you want that composite pre-sorted for a multi-day horizon, the <a href="/best-stocks-for/swing-traders">best swing trade stocks list</a> ranks the US universe by the composite and shows the per-factor breakdown on every row — Trend and Relative Strength included — so you can read where the confluence sits before you do your own chart work.</p>
 
@@ -261,35 +261,35 @@ export const POSTS: BlogPost[] = [
   },
   {
     slug: "case-against-ai-stock-scanners",
-    title: "AI Stock Scanner: The Case for Seeing the Formula and the Losses",
-    excerpt: "\"AI stock scanner\" has become a marketing label, not a disclosure — most tools that wear it will show you the winners and hide the formula. This is the honest case for the opposite: a published methodology and a public scorecard that includes the trades it got wrong. Transparency isn't an edge, but opacity should be a red flag.",
+    title: "AI Stock Scanner: The Case for Seeing the Method and the Losses",
+    excerpt: "\"AI stock scanner\" has become a marketing label, not a disclosure — most tools that wear it will show you the winners and name nothing about how the number is built. This is the honest case for the opposite: a published methodology and a public scorecard that includes the trades it got wrong. Transparency isn't an edge, but opacity should be a red flag.",
     publishedAt: "2026-07-29",
     author: "Tapeline",
     body: `<p>Search "AI stock scanner" or "best AI stock picker" today and you get a wall of tools that all promise the same thing in the same font: an algorithm, a neural network, a proprietary model that finds the moves before you do. The word "AI" is doing a lot of work in those headlines — and almost none of it is disclosure. It's persuasion. "AI" has quietly become the modern version of "secret formula": a phrase designed to make you stop asking how the thing actually works.</p>
 
-<p>The problem was never artificial intelligence. Plenty of honest tools use machine learning in the pipeline, and there's nothing wrong with a model. The problem is <strong>opacity</strong>, and "AI" is just the most fashionable wrapper for it. When a scanner hides behind the word, it's usually hiding two specific things: the formula it runs, and the record of how that formula has actually done.</p>
+<p>The problem was never artificial intelligence. Plenty of honest tools use machine learning in the pipeline, and there's nothing wrong with a model. The problem is <strong>opacity</strong>, and "AI" is just the most fashionable wrapper for it. When a scanner hides behind the word, it's usually hiding two specific things: what it is actually measuring, and the record of how that process has actually done.</p>
 
 <h2>The two things an opaque scanner won't show you</h2>
 
-<p>The first is the formula. If a tool ranks the entire market and hands you a verdict, the only question that matters is: <em>what is it weighing, and why?</em> A scanner that can't answer that is asking you to trust an output with no way to audit the input. "Our AI analyzes thousands of data points" is not an answer. It's a way of not answering. You can't disagree with a weighting you're not allowed to see, and you can't tell noise from signal when the whole thing is a black box.</p>
+<p>The first is the method. If a tool ranks the entire market and hands you a verdict, the only question that matters is: <em>what is it weighing, and why?</em> A scanner that can't answer that is asking you to trust an output with no way to audit the input. "Our AI analyzes thousands of data points" is not an answer. It's a way of not answering. You can't disagree with a weighting you're not allowed to see, and you can't tell noise from signal when the whole thing is a black box.</p>
 
 <p>The second is the track record — and this is where "AI stock signals" marketing gets genuinely misleading. Look closely at how these tools present results. It's almost always a gallery of winners: a screenshot of the ticker that ran 40%, a testimonial, a green arrow. What's missing is the denominator. How many signals fired that week? How many went nowhere? How many were flatly wrong? A highlight reel of hits with every miss cropped out isn't a track record — it's survivorship bias with a marketing budget. Any process that only publishes its wins is telling you it doesn't want you to keep score.</p>
 
 <p>"AI" makes both problems worse because complexity becomes the excuse. A simple weighted score is at least legible; you could, in principle, ask what each factor contributes. Once a vendor says "deep learning," the honesty bar somehow drops to zero, as if the math being complicated relieves them of the duty to show it to you. It doesn't. The more a model influences what you look at, the <em>more</em> you're owed an explanation, not less.</p>
 
-<h2>The opposite approach: publish the formula</h2>
+<h2>The opposite approach: name the factors</h2>
 
-<p>Tapeline's answer to all of this is deliberately boring: show the formula. The score is a composite of six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — and each one is documented, including what data feeds it and where its lags are. Smart Money, for example, reads SEC Form 4 filings: the disclosures corporate insiders are legally required to file when they trade their own company's stock. Not a mysterious "institutional signal," not hedge-fund tea leaves — a specific, public filing you can go read yourself. You can walk through every factor's methodology on <a href="/how-it-works">how it works</a>. There is no hidden layer where the "real" model lives. The published formula <em>is</em> the model.</p>
+<p>Tapeline's answer to all of this is deliberately boring: name what goes in. The score is a composite of six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — and each one is documented, including what data feeds it and where its lags are. The published methodology also states which factors carry the most weight: most toward Trend and Relative Strength, least toward Momentum. The exact numeric weights stay in-house. Smart Money, for example, reads SEC Form 4 filings: the disclosures corporate insiders are legally required to file when they trade their own company's stock. Not a mysterious "institutional signal," not hedge-fund tea leaves — a specific, public filing you can go read yourself. You can walk through every factor's methodology on <a href="/how-it-works">how it works</a>. There is no hidden layer where the "real" model lives — the six factors on that page are the whole input list.</p>
 
 <p>The harder half is the losses. Tapeline runs a <a href="/scorecard">public scorecard</a> that tracks how the highest-scoring names actually performed afterward — and it publishes that record whether it's flattering or not. Right now it isn't especially flattering: over its tracked window the scorecard trails a simple S&P 500 index fund. That's stated plainly, on the page, because a scorecard that only shows good stretches would be exactly the survivorship theatre this whole post is complaining about. The honest reason to keep score isn't to prove the process wins. It's so you can see, in the open, whether it does.</p>
 
 <h2>What to actually look for</h2>
 
-<p>None of this requires taking a side on any particular competitor. It's a lens for reading all of them. When you evaluate any "AI" scanner — Trade Ideas, Tapeline, or the next one — the questions are the same: Can I see the formula, or just the output? Can I see the losses, or just the highlight reel? Is there a denominator anywhere? Our own side-by-side on <a href="/compare/trade-ideas">Tapeline vs Trade Ideas</a> is written to make those exact differences legible rather than to declare a winner. If a tool makes it hard to answer those three questions, that difficulty is itself the answer.</p>
+<p>None of this requires taking a side on any particular competitor. It's a lens for reading all of them. When you evaluate any "AI" scanner — Trade Ideas, Tapeline, or the next one — the questions are the same: Can I see what it measures, or just the output? Can I see the losses, or just the highlight reel? Is there a denominator anywhere? Our own side-by-side on <a href="/compare/trade-ideas">Tapeline vs Trade Ideas</a> is written to make those exact differences legible rather than to declare a winner. If a tool makes it hard to answer those three questions, that difficulty is itself the answer.</p>
 
 <h2>The honest caveat</h2>
 
-<p>Transparency is not the same thing as edge. A fully published formula can still be wrong, and Tapeline's currently underperforms a plain index — being able to read the methodology doesn't make the methodology correct. A visible track record describes the past; it does not forecast the next quarter, and past scores carry no promise about future ones. Nothing here is a recommendation to buy or sell anything, and none of it is investment advice — see the <a href="/legal/risk">risk disclosure</a> for the full version. The only claim being made is a modest one: a tool that shows you its formula and its losses has given you enough to judge it. A tool that hides both is asking you to judge nothing — and calling that "AI."</p>`,
+<p>Transparency is not the same thing as edge. A fully documented method can still be wrong, and Tapeline's currently underperforms a plain index — being able to read the methodology doesn't make the methodology correct. A visible track record describes the past; it does not forecast the next quarter, and past scores carry no promise about future ones. Nothing here is a recommendation to buy or sell anything, and none of it is investment advice — see the <a href="/legal/risk">risk disclosure</a> for the full version. The only claim being made is a modest one: a tool that names what it measures and shows you its losses has given you enough to judge it. A tool that hides both is asking you to judge nothing — and calling that "AI."</p>`,
   },
   {
     slug: "sector-rotation-2026-q3",
@@ -355,8 +355,8 @@ export const POSTS: BlogPost[] = [
       deserves a paragraph more than "trust us, we're tracking the
       smart money."</p>
 
-      <h2>The three data sources behind the factor</h2>
-      <p>Smart Money sums to a 0–100 sub-score from three independent
+      <h2>The data sources behind the factor</h2>
+      <p>Smart Money sums to a 0–100 sub-score from two independent
       data streams, each with its own lag and signal-to-noise
       characteristics:</p>
       <ol>
@@ -385,18 +385,15 @@ export const POSTS: BlogPost[] = [
       a Finance committee member, regulatory beneficiaries before a
       relevant ruling. The base rate of edge is small but non-zero;
       academic studies (Ziobrowski et al., Belmont & Sayers) have
-      shown weak positive alpha on a portfolio basis. The Tapeline
-      signal weights Congressional flow by relevance — committee
-      assignment + filing volume + recency — not raw transaction
-      count.</p>
+      shown weak positive alpha on a portfolio basis.</p>
 
       <p><strong>Insider Form 4 filings</strong> have the shortest lag
       (1–3 business days) and the highest signal-to-noise for cluster
       events. Single-insider buys are weak — executives buy for
       compensation reasons, exercising options is mechanical, charity
-      donations get filed too. Multi-insider buys in the same window
-      where the executives have no scheduled compensation event are
-      what the score weights. Selling clusters are downweighted (they
+      donations get filed too. Multi-insider buys in the same window,
+      where the executives have no scheduled compensation event, are the
+      higher-signal case. Selling clusters are harder to read (they
       can mean tax planning, diversification, or genuine signal — hard
       to disambiguate).</p>
 
@@ -474,8 +471,8 @@ export const POSTS: BlogPost[] = [
       e.g. <a href="/t/NVDA">/t/NVDA</a>, <a href="/t/AAPL">/t/AAPL</a>
       — or filter by it on the live scanner. The full Congressional
       trades feed and recent insider buys are Premium features at
-      /app/congress and /app/holdings; the score weighting itself is
-      free for everyone, every row, every day.</p>
+      /app/congress and /app/holdings; the Smart Money sub-score itself
+      is shown on the ticker pages linked above.</p>
     `,
   },
   {
@@ -577,9 +574,9 @@ export const POSTS: BlogPost[] = [
       a Zacks Rank, a Zen Rating). Finviz, in spite of its premium tier,
       is a screener (the default is a filterable table where you bring
       the criteria). Most "AI stock scanners" in 2025/26 are also
-      scanners by this test — though many hide the formula behind that
+      scanners by this test — though many won't say what goes into that
       verdict, which is its own problem
-      (<a href="/blog/the-formula-is-public">the formula is public</a>
+      (<a href="/blog/the-formula-is-public">our methodology is public</a>
       goes deep on that).</p>
 
       <h2>Which one Tapeline is</h2>
@@ -587,7 +584,8 @@ export const POSTS: BlogPost[] = [
       <a href="/app/scanner">/app/scanner</a> is a ranked list of every
       liquid US ticker with a 0–100 composite score and a plain-English
       sentence per row. The
-      <a href="/how-it-works">six-factor formula</a> is public; the
+      <a href="/how-it-works">six-factor methodology</a> is public — every
+      factor named, and which ones carry the most weight; the
       <a href="/scorecard">scorecard</a> back-checks every top-10 daily
       pick against the next session vs SPY.</p>
 
@@ -705,9 +703,9 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
 
       <h2>Step 3 — Use the macro factor to ground it</h2>
       <p>This is the factor most other scanners don't expose at all. NVDA's
-      <strong>Macro 65</strong> says the broader regime is mildly supportive —
-      breadth is healthy, the 10Y isn't spiking, VIX is contained. That
-      matters. A 58 composite in a friendly regime reads very differently
+      <strong>Macro 65</strong> says the market-wide regime classification is
+      mildly supportive — the same reading every ticker on the board carries
+      on that tick. That matters. A 58 composite in a friendly regime reads very differently
       from a 58 composite during a vol shock; the latter is a "wait and see"
       and the former is closer to "this is a real setup the regime isn't
       fighting."</p>
@@ -770,8 +768,10 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       composite, the radar, the factor sub-scores, and the why sentence.
       If you want them all in one view ranked by score, the live
       <a href="/app/scanner">scanner</a> is the home for that — Free
-      gets live scores for the top 10 rows plus 5 look-ups a day, the
-      <a href="/signup">14-day trial</a> opens the full real-time universe with unlimited look-ups.</p>
+      gets live scores for the top 10 rows plus 12 look-ups a day
+      (unmetered for the first 24 hours); the
+      <a href="/signup">14-day Premium trial</a> — a card at first sign-in,
+      $0 charged that day — opens the full real-time universe with unlimited look-ups.</p>
     `,
   },
   {
@@ -1054,20 +1054,20 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>RSI is most useful in confluence with other indicators — trend,
       relative strength vs the market, volume, fundamentals. Pure-RSI
       trading is gambling on mean reversion in a market that mostly
-      trends. RSI as part of a broader composite (like
-      <a href="/how-it-works">Tapeline's 6-factor score</a>) is a far more
-      reliable filter.</p>
+      trends. Reading RSI alongside a broader composite (like
+      <a href="/how-it-works">Tapeline's six-factor score</a>) is a far more
+      reliable filter than RSI on its own.</p>
 
-      <h2>How Tapeline uses RSI</h2>
-      <p>RSI feeds into the <strong>Momentum</strong> factor — the
-      lightest-weighted of the six. Specifically, the Momentum factor looks at RSI
-      position (where in the 0–100 range), the rate of change of RSI (is
-      momentum accelerating or decelerating), and divergences between RSI
-      and price (rare, but high-signal when they appear).</p>
+      <h2>Where RSI sits relative to the Tapeline score</h2>
+      <p>It doesn't feed it. RSI is not one of Tapeline's inputs. The
+      <strong>Momentum</strong> factor — the lightest-weighted of the six —
+      covers the same ground RSI reaches for, short-horizon rate of change,
+      but it is built from its own inputs. What each factor reads is set out
+      factor by factor on <a href="/how-it-works">how the score works</a>.</p>
 
       <p>The reason Momentum is the lightest factor — rather than one of the
-      heavyweights — is exactly because pure-momentum signals like RSI mean-revert
-      so reliably. The composite balances RSI against
+      heavyweights — is exactly because short-horizon signals like RSI mean-revert
+      so reliably. The composite balances it against
       <a href="/how-it-works">Trend, Relative Strength, Fundamentals,
       Smart Money, and Macro</a> so you're not betting your account on a
       single overbought reading.</p>
@@ -1362,8 +1362,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       is built to answer the first question. The second question
       mostly takes care of itself once the first one is settled.</p>
 
-      <p><a href="/signup">Try the 14-day Premium trial</a> — $0 charged
-      today, first charge on day 14, cancel in one click before then. Read
+      <p><a href="/signup">Try the 14-day Premium trial</a> — a new account
+      adds a card at first sign-in, $0 charged today, first charge on day 14,
+      cancel in one click before then. Read
       every score the same way our public scorecard does.</p>
     `,
     howToTime: "PT7M",
@@ -1435,7 +1436,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
         core differentiator; everything else is supporting.</li>
         <li><strong>Tapeline Pro</strong> — $8.25/mo annual ($9.99/mo
         monthly). One 0-100 composite per ticker from a
-        <a href="/how-it-works">public 6-factor formula</a>, with a
+        <a href="/how-it-works">published six-factor methodology</a>, with a
         public daily back-checked scorecard.</li>
       </ul>
 
@@ -1484,7 +1485,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       </ul>
 
       <p>Tapeline gates on breadth rather than freshness — Free is live, just
-      narrower (top 10 rows, 5 look-ups a day), and Pro opens the full real-time
+      narrower (top 10 rows, 12 look-ups a day, unmetered for the first 24 hours),
+      and Pro opens the full real-time
       universe. If you're testing the product, the
       <a href="/scorecard">public scorecard</a> shows the real
       composite quality at full freshness.</p>
@@ -1547,7 +1549,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
         events and want the deepest analyst-rating + earnings-surprise
         data set.</li>
         <li><strong>Pick Tapeline Pro</strong> if you want one
-        synthesised read on every US ticker, a transparent formula
+        synthesised read on every US ticker, six named factors
         you can argue with, and a live track record you can audit
         before you trust it.</li>
       </ul>
@@ -1557,9 +1559,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>I'm not going to tell you Tapeline replaces Finviz's filter
       breadth, because it doesn't. I'm not going to tell you it has
       Stock Rover's portfolio analytics, because it doesn't. What it
-      does have is one read per ticker from a formula you can argue
-      with line-by-line, and a public daily record of whether that
-      formula's top-10 picks actually beat SPY.</p>
+      does have is one read per ticker built from six named factors you
+      can argue with one by one, and a public daily record of whether that
+      score's top-10 picks actually beat SPY.</p>
 
       <p>If that's the criterion that should drive the buy decision —
       and we'd argue it should — then the
@@ -1590,8 +1592,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>This post is the field guide: what Form 4 actually contains,
       which 90% of filings to ignore, and what the remaining 10%
-      reliably predicts. Tapeline's Smart Money sub-score (15% of the
-      composite — <a href="/how-it-works">see the formula</a>) does
+      reliably predicts. Tapeline's Smart Money sub-score — one of the six
+      named factors in the composite
+      (<a href="/how-it-works">see the methodology</a>) — does
       this filtering automatically, but the underlying logic is worth
       understanding regardless of what tool you use.</p>
 
@@ -1699,28 +1702,18 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <h2>How Tapeline scores this automatically</h2>
 
-      <p>Tapeline's Smart Money sub-score — 15% of the
-      <a href="/how-it-works">composite formula</a> — looks at the
-      90-day rolling net Form 4 transaction count and dollar volume,
-      filtered to:</p>
-
-      <ul>
-        <li>Transaction codes P and S only (excludes grants,
-        vestings, withholdings).</li>
-        <li>Excludes 10b5-1 marked sales.</li>
-        <li>Weights by insider role (CEO and CFO buys count more than
-        director buys).</li>
-        <li>Weights by transaction size relative to insider's existing
-        position.</li>
-        <li>Bonuses for cluster signals (3+ different insiders, same
-        direction, 30-day window).</li>
-      </ul>
+      <p>Tapeline's Smart Money sub-score — one of the six named factors in the
+      <a href="/how-it-works">composite</a> — nets the disclosed
+      Form 4 purchases and sales in a recent rolling window by their signed
+      dollar value, and maps that balance onto a 0-100 scale. What it reads,
+      and the statutory lags it inherits, are set out on
+      <a href="/how-it-works/smart-money">the Smart Money factor page</a>.</p>
 
       <p>The result is a 0-100 sub-score that lands in the composite.
       Recent insider buys are also displayed on Tapeline Premium at
-      <a href="/app/holdings">/app/holdings</a> — raw filtered Form 4
-      data per ticker, sorted by date, with the same noise filters
-      applied. Read alongside the composite score, not in place of it.</p>
+      <a href="/app/holdings">/app/holdings</a> — Form 4
+      data per ticker, sorted by date. Read alongside the composite score,
+      not in place of it.</p>
 
       <h2>Where the signal breaks down</h2>
 
@@ -1876,10 +1869,12 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li>What's the refund window?</li>
       </ul>
 
-      <p>Tapeline's policy: trial doesn't require a card, cancel from
-      /app/billing in one click, 30-day refund window on monthly
-      subscriptions. We'd rather lose subscribers cleanly than retain
-      them via friction.</p>
+      <p>Tapeline's policy: the trial takes a card at first sign-in and
+      charges $0 until day 14, cancel from /app/billing in one click,
+      30-day refund window on monthly subscriptions. The published
+      record — daily Top 10, scorecard, per-ticker pages, raw CSV/JSON —
+      needs no account or card at all. We'd rather lose subscribers
+      cleanly than retain them via friction.</p>
 
       <h2>How Tapeline scores against the checklist</h2>
 
@@ -1925,8 +1920,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       product that fits you better than win it via misleading
       claims. If the scorecard convinces you, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">14-day
-      Premium trial</a> is the way to see the rest — $0 charged today, one
-      click to cancel before the day-14 charge. If it doesn't, that's useful
+      Premium trial</a> is the way to see the rest — a new account adds a card
+      at first sign-in, $0 is charged today, and one click cancels before the
+      day-14 charge. If it doesn't, that's useful
       information too.</p>
     `,
   },

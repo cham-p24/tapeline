@@ -16,9 +16,15 @@ alpha_vs_spy column → public /scorecard summary
 
 ## Three findings
 
-### 1. The published "Tapeline 6-factor formula" is NOT being computed locally
+### 1. The "Tapeline 6-factor formula" is NOT being computed locally
 
-`/how-it-works` markets:
+> ⚠️ **Disclosure note (added later):** PR #342 withdrew the weights and the
+> equation from the public site. `/how-it-works` now names the six factors and
+> their weight *ordering* only. The quotation below is a record of what the page
+> said on 2026-06-01 — it is **not** a description of what is public today, and
+> the numbers must not be repeated in any copy.
+
+`/how-it-works` marketed, as of this audit:
 > `score = 0.25*trend + 0.20*rs + 0.15*fundamentals + 0.15*smart_money + 0.15*macro + 0.10*momentum`
 
 But `sheet_feed.parse_all_signals_csv` line 228:

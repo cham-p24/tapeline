@@ -103,8 +103,8 @@ function generateBody(data) {
         <li><strong>Average alpha vs SPY:</strong> ${avgAlpha}</li>
       </ul>
       <p>None of these are return predictions. They are descriptive measurements of how
-      the published 6-factor formula performed, in aggregate, against a benchmark over the
-      week. Past performance is not indicative of future results — see the
+      the published six-factor methodology performed, in aggregate, against a benchmark over
+      the week. Past performance is not indicative of future results — see the
       <a href="/legal/risk">risk disclosure</a> for the full caveat.</p>
 
       <h2>Best 5 calls of the week</h2>

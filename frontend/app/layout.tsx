@@ -93,7 +93,7 @@ export const metadata: Metadata = {
   title: {
     // Brand-first title keeps the "Read the tape" tagline (recognisable to
     // existing audience on X/LinkedIn) while adding the explicit category +
-    // public-formula differentiator that addresses the GSC brand-search audit
+    // published-methodology differentiator that addresses the GSC brand-search audit
     // (the old "Live quantitative stock scanner" suffix wasn't winning brand
     // CTR — 11 imp / 0 clicks on "tapeline" over 3mo per GSC). Reads cleanly
     // in the 60-char SERP truncation window.
@@ -101,7 +101,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    `Stock scanner with a public 6-factor formula: one 0-100 score per US ticker, every top-10 pick logged with next-day return. Pro from ${usd(PRICING.pro.annualPerMonth)}/mo.`,
+    `Stock scanner with a public methodology: six named factors, one 0-100 score per US ticker, every top-10 pick logged with next-day return. Pro from ${usd(PRICING.pro.annualPerMonth)}/mo.`,
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -123,7 +123,7 @@ export const metadata: Metadata = {
     // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
-      `Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. The whole record is free to read with no account. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo.`,
+      `Read the tape. One score per US ticker, six named factors with the weight ordering published, daily back-checked scorecard. The whole record is free to read with no account. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo.`,
     url: "/",
     siteName: "Tapeline",
     type: "website",
@@ -134,7 +134,7 @@ export const metadata: Metadata = {
     site: "@tapeline_io",
     title: "Tapeline — Read the tape",
     description:
-      "Read the tape. Public formula, public scorecard. → tapeline.io/scorecard",
+      "Read the tape. Public methodology, public scorecard. → tapeline.io/scorecard",
   },
   robots: {
     index: true,

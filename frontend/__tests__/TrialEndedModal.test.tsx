@@ -15,6 +15,7 @@ vi.mock("@/components/UserContext", () => ({
   useUser: vi.fn(),
 }));
 import { TrialEndedModal } from "@/components/TrialEndedModal";
+import { __resetCardOnFileCache } from "@/components/TrialBanner";
 import { useUser } from "@/components/UserContext";
 import { FREE_LIMITS, REFUND, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 
@@ -36,6 +37,7 @@ const EXPIRED_TRIAL_USER = {
 };
 
 beforeEach(() => {
+  __resetCardOnFileCache();
   localStorage.clear();
   mockedUseUser.mockReturnValue(EXPIRED_TRIAL_USER);
 });
@@ -66,11 +68,47 @@ describe("TrialEndedModal", () => {
     expect(text).not.toContain("3-ticker watchlist");
   });
 
-  it("states that nothing was charged — the trial takes no card", () => {
+  // CHANGED by the #548 card gate. This used to assert, unconditionally, that
+  // "nothing was charged — the trial never took a card". Two cohorts now land
+  // in this modal: legacy card-free trials (true) and card-required trials that
+  // lapsed through Stripe (false). Saying it to the second cohort is a lie
+  // about their money, so the modal branches on the same has_card_on_file
+  // signal TrialBanner uses — and says nothing at all while it is unknown.
+  function stubCardOnFile(value: boolean | null) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(value === null ? {} : { has_card_on_file: value }),
+        }),
+      ),
+    );
+  }
+
+  it("tells a card-free trialist that nothing was charged", async () => {
+    stubCardOnFile(false);
+    const { container } = render(<TrialEndedModal />);
+    await screen.findByText(/never took a card/i);
+    expect(container.textContent ?? "").toMatch(/nothing was charged/i);
+  });
+
+  it("NEVER tells a card-on-file trialist that nothing was charged", async () => {
+    stubCardOnFile(true);
+    const { container } = render(<TrialEndedModal />);
+    await screen.findByText(/charge history/i);
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/nothing was charged/i);
+    expect(text).not.toMatch(/never took a card/i);
+  });
+
+  it("makes no card claim at all while the card state is unknown", () => {
+    stubCardOnFile(null);
     const { container } = render(<TrialEndedModal />);
     const text = container.textContent ?? "";
-    expect(text).toMatch(/nothing was charged/i);
-    expect(text).toMatch(/never took a card/i);
+    expect(text).not.toMatch(/nothing was charged/i);
+    expect(text).not.toMatch(/never took a card/i);
   });
 
   it("uses no loss-aversion framing about market opportunities", () => {

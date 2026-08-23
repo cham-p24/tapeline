@@ -25,7 +25,7 @@ from app.services.billing import (
 )
 from app.services.email_checkout import verify_checkout_token
 from app.services.rate_limit import limit_strict
-from app.services.tier import is_on_trial
+from app.services.tier import is_on_trial, must_add_card
 
 router = APIRouter()
 settings = get_settings()
@@ -47,15 +47,17 @@ _CANCEL_REASONS = frozenset(
 
 # ── Card-required 14-day trial ──────────────────────────────────────────────
 #
-# Creating an account is email + password only and lands on FREE, which stays
-# completely card-free. STARTING the trial is a separate, deliberate act that
-# requires a card: we open the same Stripe Checkout the paid flow uses, in
-# mode=subscription with subscription_data.trial_end 14 days out. Stripe
-# charges $0 today, bills the first real amount at trial_end, and the
-# subscription is cancellable in one click from the customer portal before
-# then. That mechanism (rather than setup-mode + a cron + SetupIntent →
-# Subscription) is what keeps dunning, the portal and the whole existing
-# webhook path working for trialists.
+# Creating an account is email + password only and lands on FREE. Accounts
+# created before tier.CARD_GATE_START stay card-free forever; from that date a
+# NEW account must still add a card at first sign-in to use the logged-in
+# product (services/tier.must_add_card). STARTING the trial is a separate,
+# deliberate act that requires a card: we open the same Stripe Checkout the
+# paid flow uses, in mode=subscription with subscription_data.trial_end 14
+# days out. Stripe charges $0 today, bills the first real amount at
+# trial_end, and the subscription is cancellable in one click from the
+# customer portal before then. That mechanism (rather than setup-mode + a
+# cron + SetupIntent → Subscription) is what keeps dunning, the portal and
+# the whole existing webhook path working for trialists.
 #
 # TRIAL_DAYS is the single source of truth: the endpoint that SHOWS the user
 # their first-charge date (GET /trial-offer) and the endpoint that SENDS the
@@ -486,8 +488,11 @@ async def trial_offer(
 
       eligible / ineligible_reason / message
           Whether this account can start a trial, and — when it can't — the
-          plain sentence explaining why. Declining is a normal outcome: the
-          free tier is unchanged and needs no card.
+          plain sentence explaining why. Declining is a normal outcome: for a
+          grandfathered account (created before tier.CARD_GATE_START) the
+          free tier is unchanged and needs no card. An account created on or
+          after the cutover still faces the /app/start card wall — see
+          `free_tier_requires_card` below.
       trial_days / first_charge_at
           14, and the exact UTC instant of the FIRST charge if the trial were
           started now. Nothing is charged before it.
@@ -518,9 +523,13 @@ async def trial_offer(
         "amount_charged_today": 0,
         "cancel_in_one_click": True,
         "card_required": True,
-        # The FREE tier is not behind any of this — restated here so a client
-        # rendering the trial card can say so from server-supplied state.
-        "free_tier_requires_card": False,
+        # Whether THIS account still has to put a card up to use the logged-in
+        # free product — the /app/start wall that applies from
+        # tier.CARD_GATE_START. Derived per-account (a grandfathered account
+        # reads False) so a client rendering the trial card states this one
+        # user's position from server-supplied state, instead of asserting a
+        # blanket "the free tier needs no card" that is no longer true.
+        "free_tier_requires_card": must_add_card(user),
         "current_trial_ends_at": ends.isoformat() if ends else None,
         "trial_started_at": (
             user.trial_started_at.isoformat() if user.trial_started_at else None

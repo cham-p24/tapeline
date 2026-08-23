@@ -1,10 +1,12 @@
 """Pull Vercel Analytics event counts and render a 6-step funnel report.
 
-The events come from frontend `track()` calls scattered across the app:
+Funnel event names, and where each one is emitted from the frontend:
 
   signup_started       -> /signup mount + form submit attempt
   signup_completed     -> /signup successful POST response
-  trial_started        -> /signup right after signup_completed (paired)
+  trial_started        -> NOT EMITTED. The frontend call was dropped when the
+                          event was folded into GA4's `start_trial` (see the
+                          note in frontend/lib/gtag.ts), so this row reads 0.
   scanner_first_use    -> first /app/scanner page load per session
   checkout_started     -> /app/billing 'Continue to Stripe' click
   trial_converted      -> /app/billing post-checkout, when Stripe webhook
@@ -45,7 +47,7 @@ FUNNEL_STEPS: list[tuple[str, str]] = [
     # (event_name, display_label)
     ("signup_started",     "Signup form opened"),
     ("signup_completed",   "Signup successful"),
-    ("trial_started",      "Premium trial active"),
+    ("trial_started",      "Premium trial started (event no longer emitted)"),
     ("scanner_first_use",  "First scanner visit"),
     ("checkout_started",   "Checkout clicked"),
     ("trial_converted",    "Paid (trial converted)"),
@@ -160,7 +162,7 @@ def render_funnel(counts: dict[str, int], days: int) -> str:
     lines.append(
         "If `signup_started` is high but `signup_completed` is low, the bottleneck "
         "is form friction (Turnstile, validation, password rules). If "
-        "`scanner_first_use` is much lower than `trial_started`, the issue is "
+        "`scanner_first_use` is much lower than `signup_completed`, the issue is "
         "activation — users sign up but don't engage. `checkout_started` to "
         "`trial_converted` is where Stripe and pricing live."
     )

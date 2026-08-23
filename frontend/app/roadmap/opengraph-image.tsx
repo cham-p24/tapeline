@@ -61,7 +61,10 @@ export default async function OG() {
           </div>
         </div>
 
-        {/* Status pillars */}
+        {/* Status pillars. Counts are hand-kept — keep them in sync with the
+            ITEMS array in roadmap/page.tsx (shipped / next / later). There is
+            deliberately no "In progress" pillar: no item carries that status,
+            and RoadmapItems renders nothing for an empty group. */}
         <div
           style={{
             marginTop: "auto",
@@ -71,17 +74,17 @@ export default async function OG() {
         >
           <Pillar
             label="Shipped"
-            count="6"
+            count="12"
             color="#22c55e"
           />
           <Pillar
-            label="In progress"
+            label="Next"
             count="3"
             color="#fbbf24"
           />
           <Pillar
-            label="Up next"
-            count="8"
+            label="Later"
+            count="5"
             color="#14b8a6"
           />
         </div>

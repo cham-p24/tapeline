@@ -29,7 +29,7 @@ The queue also flags one bug (SPIKE parser returning 0 rows after the upstream s
 | Decision | Whether to enforce the `watchlists` cap on creation (block) or display-only (warn + ask to upgrade) | Spec is silent on the UX |
 | Founder | Set `SHEET_WEBHOOK_SECRET` Fly secret + paste it as Apps Script script property | Requires Sheet edit access + Fly secrets write |
 | Founder | Paste `RESEND_API_KEY` into local `C:\Project 1\.env` line 41 | Local-only — 30 sec |
-| Founder | `fly secrets set QUIVER_API_KEY=... -a tapeline-backend` | 30 sec; activates real 13F |
+| ~~Founder~~ | ~~`fly secrets set QUIVER_API_KEY=... -a tapeline-backend`~~ | **Removed** — the Quiver subscription was cancelled; the adapter, worker task, model and config key are deleted, so the key activates nothing. `/app/holdings` is served by Finnhub SEC Form 4 insider transactions. |
 | Stale | SPIKE parser rewrite | Already shipped in PR #75 (`334b471`). Skip. |
 
 ---
@@ -196,11 +196,9 @@ Cannot be done by an agent: requires the founder's Google account to be the scri
 
 ---
 
-### F3. Set `QUIVER_API_KEY` on Fly
+### F3. ~~Set `QUIVER_API_KEY` on Fly~~ — REMOVED
 
-**Next step:** `fly secrets set QUIVER_API_KEY=<key from quiverquant.com> -a tapeline-backend`. The next daily worker tick will pick up the elite-13F refresh and the `mock_elite_13f_holdings()` fallback will go silent. Verify with `curl https://api.tapeline.io/api/holdings?limit=5` (Premium auth required) — the response shape stays the same but `source` flips from `"mock"` to `"quiver"`.
-
-30 seconds.
+The Quiver subscription was cancelled. `quiver_feed.py`, the `_refresh_elite_13f` worker task, `mock_elite_13f_holdings()`, the `InstitutionalHolding` model and the `quiver_api_key` setting are all deleted, so there is nothing to set. `/api/holdings` now returns SEC Form 4 insider transactions from Finnhub, which needs only `FINNHUB_API_KEY` (already set).
 
 ---
 
@@ -212,7 +210,7 @@ Cannot be done by an agent: requires the founder's Google account to be the scri
 
 3. **A2 third (Phase A frontend)** — strictly downstream of A1. UI can iterate without DB risk once the API contract is stable.
 
-4. **F2 + F3 in parallel** — these are 30-sec founder unlocks that don't block any of the above. Worth doing immediately to clear two known dev/prod data-source gaps.
+4. **F2** — a 30-sec founder unlock that doesn't block any of the above. Worth doing immediately to clear the known dev/prod data-source gap. (F3 is REMOVED — Quiver was cancelled, so there is no second gap to clear.)
 
 **Why this order:**
 - A3 is small, isolated, and the unlock is asymmetric — one tiny PR removes up to 5 min of staleness across the entire universe view.
@@ -227,7 +225,7 @@ A3 (webhook backend) ──→ F1 (founder wires Apps Script) ──→ live-pus
 D2, D3 answered ──→ A1 (backend foundation) ──→ A2 (frontend tabs + presets)
 
 F2 (Resend local) — independent
-F3 (Quiver prod) — independent
+F3 — REMOVED (Quiver cancelled; nothing to wire)
 ```
 
 ---

@@ -1,5 +1,5 @@
 """
-Walk-forward backtest of Tapeline's published 6-factor composite formula.
+Walk-forward backtest of Tapeline's six-factor composite.
 
 This script exists so the founder has real numbers to point at when a podcast
 host (Animal Spirits, Compounders, Excess Returns, Flirting With Models) asks
@@ -22,10 +22,11 @@ and Sharpe of the alpha series.
 
 # What "walk-forward" means here (v1)
 
-The composite WEIGHTS are fixed at the published 25/20/15/15/15/10. In v1
-"walk-forward" and "in-sample" produce identical output because the weights
-never change. The `--mode` flag exists so future adaptive-weight versions
-can use it without breaking the CLI contract.
+The composite WEIGHTS are held fixed across the whole window (they are an
+internal constant — see the note above WEIGHTS, and do not restate the vector
+here). In v1 "walk-forward" and "in-sample" produce identical output because
+the weights never change. The `--mode` flag exists so future adaptive-weight
+versions can use it without breaking the CLI contract.
 
 The walk-forward DISCIPLINE is in the scoring: at rebalance date `t`, each
 ticker's composite is computed from price/factor data with cutoff date `t`,
@@ -78,7 +79,8 @@ Footer (lines starting with `#`):
     # overall_hit_rate, ...
     # overall_avg_alpha, ...
     # sharpe_of_alpha_series, ...
-    # methodology_notes, "weights fixed at 25/20/15/15/15/10"
+    # methodology_notes, "composite weights are held fixed across the entire
+    #                       walk-forward window ... not published."
 """
 from __future__ import annotations
 
@@ -93,8 +95,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-# Import the published universe + weights from the canonical source so we
-# can never drift from what the worker actually scores.
+# Import the universe + the internal weight vector from the canonical source
+# so we can never drift from what the worker actually scores. The weights are
+# NOT published — see the note above WEIGHTS.
 from app.services import historical_bars
 from app.services.historical_bars import BarData
 from app.services.mock_feed import TICKER_UNIVERSE
@@ -105,8 +108,13 @@ from app.services.mock_feed import TICKER_UNIVERSE
 # bars per symbol over the window.
 LIVE_UNIVERSE_TOP_N = 100
 
-# Published formula at /how-it-works — DO NOT change without updating the
-# public page in the same commit.
+# INTERNAL weight vector — NOT published, and must never be written into any
+# artefact that leaves the building. /how-it-works names the six factors and
+# their weight ORDERING only (most toward Trend and Relative Strength, least
+# toward Momentum); PR #342 stripped the numbers from the public site
+# deliberately, and they are the one part of the method a competitor cannot
+# re-derive from the scorecard. Do not "sync" these onto the public page, and
+# do not echo them into CSV headers, logs, or emails.
 WEIGHTS: dict[str, float] = {
     "trend": 0.25,
     "rs": 0.20,
@@ -686,8 +694,14 @@ def _header_comment(report: BacktestReport) -> list[str]:
         f"# universe_source: {cfg.universe_source}",
         f"# data_source: {report.data_source}",
         f"# universe_size: {report.universe_size}",
-        "# formula: composite = 0.25*trend + 0.20*rs + 0.15*fundamentals "
-        "+ 0.15*smart_money + 0.15*macro + 0.10*momentum",
+        # Factor NAMES and ordering only. This header used to carry the exact
+        # equation, which put the internal weight vector into every exported
+        # back-test CSV — a file whose whole purpose is to be handed to someone
+        # else. See the note on WEIGHTS above.
+        "# formula: fixed-weight composite over six factors — trend, "
+        "relative strength, fundamentals, smart money, macro, momentum "
+        "(weighted most toward trend and relative strength, least toward "
+        "momentum; exact weights not published)",
         f"# factors_zeroed_for_period: {zeroed_str}",
         "# benchmark: SPY",
         "# alpha_unit: percent points (pick_return_% - spy_return_%)",
@@ -723,7 +737,9 @@ def _summary_footer(report: BacktestReport) -> list[str]:
         f"# overall_avg_alpha,{report.overall_avg_alpha:.3f}%",
         f"# sharpe_of_alpha_series,{report.sharpe_of_alpha_series:.3f}",
         f"# data_source,{report.data_source}",
-        '# methodology_notes,"weights fixed at 25/20/15/15/15/10"',
+        '# methodology_notes,"composite weights are held fixed across the '
+        'entire walk-forward window — no per-period refitting. The weight '
+        'vector itself is not published."',
     ]
     return lines
 

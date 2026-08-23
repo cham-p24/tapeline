@@ -26,7 +26,7 @@ At each rebalance date in `[start, end]`:
 6. Alpha = `avg(pick_returns) - spy_return`.
 7. Aggregate across periods: hit rate, average alpha, Sharpe-like ratio.
 
-Composite formula (also published at `/how-it-works`):
+Composite formula (**internal — not published**; the public `/how-it-works` page names the six factors and their weight *ordering* only, never the numbers — PR #342 stripped them and `frontend/__tests__/methodologyPages.test.ts` guards the boundary):
 
 ```
 composite = 0.25*trend + 0.20*rs + 0.15*fundamentals
@@ -55,8 +55,9 @@ A back-test on 6 factors with versioned weights is trivially over-fittable:
 sweep the weight grid, find the combination that maximises in-sample Sharpe,
 report that. The numbers will look fantastic. They will not predict anything.
 
-Tapeline's posture is the inverse — the weights were committed to the public
-`/how-it-works` page before any back-test data was collected, and the
+Tapeline's posture is the inverse — the weights were fixed and versioned
+internally, and the factor set plus the weight ordering published on
+`/how-it-works`, before any back-test data was collected, and the
 `/scorecard` page is a public forward-test. The back-test produced by this
 script is a smoke check on the scoring pipeline's structural properties:
 does top-N consistently beat random, does the alpha series have any signal.
@@ -91,8 +92,8 @@ the formula.
 3. **Survivor bias.** Today's universe is used across the full historical
    window. Any ticker that delisted mid-window is silently absent. A future
    version will need a delisting-aware universe loader.
-4. **Smart-money factor zeroed.** Insider Form 4 + Quiver 13F aren't
-   backfilled historically anywhere we own. The composite is effectively
+4. **Smart-money factor zeroed.** Insider Form 4 + Congressional disclosures
+   aren't backfilled historically anywhere we own. The composite is effectively
    5-factor for historical periods. Applies to both mock and live modes.
 5. **Fundamentals factor zeroed by default.** Without a populated Finnhub
    cache snapshotted by date, the factor contributes zero. The CSV header

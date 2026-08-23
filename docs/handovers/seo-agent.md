@@ -17,7 +17,8 @@ within 90 days for at least three of:
 TipRanks ranks page 1 for nearly every "TICKER stock forecast" query
 because they have 6,000+ structured per-ticker pages indexed.
 Tapeline already has the structured per-ticker page (`/t/{symbol}`),
-the public formula, and the public scorecard — three concrete moats
+the published methodology (six named factors + weight ordering; the
+exact weights stay unpublished), and the public scorecard — three concrete moats
 TipRanks doesn't have. The content exists; the SEO layer needs to
 make sure Google can find, parse, and rank it.
 

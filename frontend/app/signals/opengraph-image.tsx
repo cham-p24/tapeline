@@ -16,8 +16,8 @@ export default function Image() {
     eyebrow: "Live Scanner",
     headline: "Every US ticker, one 0-100 score.",
     subhead:
-      "The full scored universe on one public 6-factor formula, updated through the trading day. No tier gate on the data.",
-    footerNote: "Public formula. Public scorecard.",
+      "The full scored universe on one published methodology — six named factors — updated through the trading day.",
+    footerNote: "Named factors. Public scorecard.",
     path: "tapeline.io/signals",
   });
 }

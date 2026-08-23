@@ -181,7 +181,7 @@ async def api_regime(
     _user: User = Depends(api_key_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Current macro regime snapshot — the same inputs that feed the 15% macro
+    """Current macro regime snapshot — the same inputs that feed the macro
     pillar of every score."""
     row = (
         await session.execute(select(RegimeState).where(RegimeState.id == 1))

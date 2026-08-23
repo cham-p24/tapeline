@@ -107,7 +107,7 @@ export async function GET(): Promise<Response> {
     <title>Tapeline — Daily Top 10</title>
     <link>${SITE}/daily-picks</link>
     <atom:link href="${SITE}/feed.xml" rel="self" type="application/rss+xml" />
-    <description>The 10 highest-scoring US tickers from the Tapeline 6-factor composite, refreshed each US market morning. Public formula. Public scorecard. Not investment advice.</description>
+    <description>The 10 highest-scoring US tickers from the Tapeline 6-factor composite, refreshed each US market morning. Six named factors, public methodology. Public scorecard. Not investment advice.</description>
     <language>en-us</language>
     <copyright>© ${now.getUTCFullYear()} Tapeline</copyright>
     <lastBuildDate>${rssDate(now)}</lastBuildDate>

@@ -19,7 +19,7 @@ Every line below is verified live on `https://tapeline.io` / `https://api.tapeli
 | Sitemap | 132+ URLs, auto-grows as worker scores more tickers + you add blog posts | `curl -s https://tapeline.io/sitemap.xml \| grep -c '<loc>'` |
 | OG cards | 7 distinct (root, pricing, how-it-works, scorecard, changelog, roadmap, dynamic per-ticker) | `curl -sI https://tapeline.io/{page}/opengraph-image` returns `image/png` |
 | Security headers | HSTS 2yr+preload, X-Frame DENY, nosniff, Referrer + Permissions Policy, XSS-Protection | `curl -sI https://tapeline.io \| grep -i strict-transport` |
-| Backend | scoring 5,757 tickers per minute, real Massive prices, Finnhub fundamentals + insider, FRED macro, Quiver 13F | `curl -s https://api.tapeline.io/api/status \| jq` |
+| Backend | scoring 5,757 tickers per minute, real Massive prices, Finnhub fundamentals + Form 4 insider, FRED macro | `curl -s https://api.tapeline.io/api/status \| jq` |
 | Reliability | Worker daily refreshes don't block ticks; SSE auto-reconnects with exponential backoff | Watch `LiveBadge` during a backend deploy — flips offline briefly, returns to live within ~2s |
 | Observability | Public `/status`, in-app stale-data banner, client-error endpoint logs to Fly | Visit `https://tapeline.io/status` |
 | Activation | Welcome email embeds 3 live ticker scores; onboarding tip on `/app/*` for new accounts; watchlist 1-click starter pack | Sign up with a fresh email, check inbox |
@@ -57,7 +57,7 @@ Before your first big marketing push.
 1. Holley Nethercote Melbourne — financial-services compliance specialists (~$400-800 for a Tapeline-style review)
 2. Email them with: link to `/legal/{terms,privacy,risk}` + your business setup (Sole Trader)
 3. Get sign-off on:
-   - The not-investment-advice positioning (descriptive labels, public-formula moat)
+   - The not-investment-advice positioning (descriptive labels, published methodology)
    - The publisher-exemption claim
    - GDPR/CCPA language in the privacy policy (placeholder right now)
 4. Replace `legal/*` placeholder pages with their lawyered-up versions

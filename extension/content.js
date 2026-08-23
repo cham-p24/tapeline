@@ -103,9 +103,8 @@
     "HIGH CONVICTION": "pos",
     CONSTRUCTIVE: "pos",
     NEUTRAL: "mid",
-    "WATCH": "mid",
     CAUTION: "neg",
-    AVOID: "neg",
+    WEAK: "neg",
   };
 
   const FACTOR_LABEL = {
