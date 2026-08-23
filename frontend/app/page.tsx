@@ -117,8 +117,8 @@ export default async function LandingPage() {
             </h1>
             <p className="mt-6 text-lg text-muted leading-relaxed">
               Newsletters show you the winners. The{" "}
-              <span className="font-medium text-fg">Tapeline Score</span> blends
-              six named factors into one read on every ticker &mdash; and every
+              <span className="font-medium text-fg">Tapeline Score</span>{" "}
+              blends six named factors into one read on every ticker &mdash; and every
               call, win or miss, goes on a permanent public record you can check
               before you ever pay. Same day, no edits.
             </p>
