@@ -194,6 +194,94 @@ async def test_illiquid_picks_skipped():
 
 
 @pytest.mark.asyncio
+async def test_scorecard_tiebreak_is_deterministic_and_alphabetical():
+    """A block of tickers tied on score, spanning the 80-candidate / 10-freeze
+    boundaries, must freeze the SAME 10 symbols in the SAME order every run —
+    alphabetical within the tie (GAP #8).
+
+    Without a secondary sort key the candidate-pool cutoff at 80 and the top-10
+    freeze depended on whatever order the planner returned tied rows in, so the
+    PERMANENT public scorecard did not reproduce run to run. The freeze now
+    orders by (score desc, symbol asc), so identical data yields an identical,
+    alphabetically-ordered top-10.
+
+    Seeds 85 tickers ALL tied at the same score, each in its own sector (so the
+    per-sector cap never bites), inserted in REVERSE-alphabetical order so any
+    reliance on insertion/planner order would surface as a non-alphabetical
+    result.
+    """
+    today = _next_monday(dt.date.today() + dt.timedelta(days=42))  # distinct day
+
+    symbols = [f"TIE{i:03d}" for i in range(85)]  # TIE000..TIE084
+    expected_top10 = sorted(symbols)[:10]  # alphabetical → TIE000..TIE009
+
+    async def _seed():
+        async with session_scope() as s:
+            existing = await s.execute(
+                select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+            )
+            for e in existing.scalars().all():
+                await s.delete(e)
+            # Insert reversed so insertion order != alphabetical order.
+            for i, sym in enumerate(reversed(symbols)):
+                # All identical score; unique sector per row so _MAX_PER_SECTOR
+                # can't remove any; liquid so the scorecard liquidity floor keeps
+                # them (price*volume = $5M > $250k).
+                s.add(_make_ticker(sym, score=90.0, sector=f"SEC{i:03d}",
+                                   price=50.0, volume=100_000))
+            await s.commit()
+
+    async def _frozen_order() -> list[str]:
+        async with session_scope() as s:
+            rows = (await s.execute(
+                select(DailyScorecardEntry)
+                .where(DailyScorecardEntry.as_of == today)
+                .order_by(DailyScorecardEntry.rank)
+            )).scalars().all()
+            return [r.symbol for r in rows]
+
+    async def _clear_scorecard():
+        async with session_scope() as s:
+            existing = await s.execute(
+                select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+            )
+            for e in existing.scalars().all():
+                await s.delete(e)
+            await s.commit()
+
+    try:
+        # Run 1
+        await _seed()
+        await _ensure_daily_scorecard(today)
+        order_1 = await _frozen_order()
+
+        assert order_1 == expected_top10, (
+            f"top-10 not alphabetical-within-tie: {order_1} != {expected_top10}"
+        )
+
+        # Run 2 — same data, fresh freeze. Must reproduce byte-for-byte.
+        await _clear_scorecard()
+        await _ensure_daily_scorecard(today)
+        order_2 = await _frozen_order()
+
+        assert order_2 == order_1, (
+            f"frozen order not reproducible: {order_2} != {order_1}"
+        )
+    finally:
+        async with session_scope() as s:
+            for sym in symbols:
+                tq = await s.execute(select(Ticker).where(Ticker.symbol == sym))
+                for t in tq.scalars().all():
+                    await s.delete(t)
+            existing = await s.execute(
+                select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today)
+            )
+            for e in existing.scalars().all():
+                await s.delete(e)
+            await s.commit()
+
+
+@pytest.mark.asyncio
 async def test_macro_hostile_picks_skipped(monkeypatch):
     """Tickers with sub_macro < 30 (FALLING regime) should not appear in
     the scorecard freeze even if their composite score is the highest.

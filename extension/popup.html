@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tapeline</title>
+<style>
+  :root { color-scheme: dark light; }
+  body { margin: 0; width: 300px; font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #16181d; color: #e9e7e1; font-size: 13px; }
+  header { padding: 13px 14px 10px; border-bottom: 1px solid #2a2d35; display: flex; align-items: center; gap: 8px; }
+  .mark { width: 17px; height: 17px; border-radius: 4px; background: #0a0a0a; flex: none;
+          display: inline-flex; align-items: center; justify-content: center; }
+  .mark i { display: block; width: 11px; height: 3px; border-radius: 999px; background: #3b82f6; }
+  .title { font-weight: 600; }
+  form { display: flex; gap: 7px; padding: 12px 14px; }
+  input { flex: 1; background: #1f232b; border: 1px solid #333740; color: #e9e7e1; border-radius: 7px;
+          padding: 8px 10px; font-size: 13px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  input:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 7px; padding: 8px 12px;
+           font-weight: 600; font-size: 13px; cursor: pointer; }
+  #out { padding: 0 14px 14px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .sym { font-weight: 700; font-size: 15px; } .name { color: #9a978e; font-size: 12px; }
+  .conf { color: #7c7a72; font-size: 11px; margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+  .score { font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .score span { font-size: 11px; color: #9a978e; font-weight: 500; }
+  .pos { color: #4ec98a } .neg { color: #e0796f } .mid { color: #e0ad4f }
+  .why { color: #c9c6bf; line-height: 1.5; margin: 9px 0 11px; font-size: 12.5px; }
+  .f { display: grid; grid-template-columns: 82px 1fr 24px; gap: 8px; align-items: center; margin-bottom: 5px; }
+  .fl { color: #9a978e; font-size: 11px; }
+  .bar { background: #262a32; height: 5px; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: #3b82f6; }
+  .fv { text-align: right; font-size: 11px; color: #c9c6bf; font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 7px; margin-top: 12px; }
+  a.btn { flex: 1; text-align: center; text-decoration: none; font-size: 12px; font-weight: 600;
+          padding: 7px; border-radius: 7px; background: #3b82f6; color: #fff; }
+  a.ghost { background: transparent; color: #c9c6bf; border: 1px solid #333740; }
+  .fine { color: #7c7a72; font-size: 10.5px; line-height: 1.45; margin: 11px 0 0; }
+  .rec { margin-top: 12px; padding-top: 11px; border-top: 1px solid #2a2d35; }
+  .rec-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: #7c7a72; font-weight: 500; }
+  .rec-n { font-size: 11.5px; color: #c9c6bf; margin-top: 4px; }
+  .rec-empty { font-size: 11.5px; color: #9a978e; margin-top: 4px; }
+  .rec-row { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: #9a978e; margin-top: 4px; }
+  .rec-row b { color: #e9e7e1; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .up { color: #4ec98a } .down { color: #e0796f }
+  .rec-note { font-size: 10px; color: #7c7a72; margin-top: 7px; line-height: 1.4; }
+  .site-card input { width: 100%; margin-top: 8px; box-sizing: border-box; }
+  .site-card button { margin-top: 8px; width: 100%; }
+  .cerr { display: block; margin-top: 7px; font-size: 11.5px; color: #e0796f; }
+  .acct-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; font-size: 12px; color: #9a978e; }
+  .acct-row b { color: #e9e7e1; font-weight: 500; }
+  .acct-row button { flex: none; font-size: 11.5px; padding: 5px 9px; background: transparent; color: #c9c6bf; border: 1px solid #333740; width: auto; margin-top: 0; }
+  .mute-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; font-size: 12px; color: #9a978e; }
+  .mute-row b { color: #e9e7e1; font-weight: 500; }
+  .mute-row button { flex: none; font-size: 11.5px; padding: 5px 9px; background: transparent; color: #c9c6bf; border: 1px solid #333740; }
+  .msg { color: #9a978e; padding: 2px 0 6px; }
+  .pp { margin: 0; padding: 0 14px 12px; font-size: 11px; }
+  .pp a { color: #7c7a72; text-decoration: underline; }
+  #site { padding: 0 14px 12px; }
+  .site-card { border: 1px solid #333740; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: #9a978e; }
+  .site-card b { color: #e9e7e1; font-weight: 500; }
+  .site-card button { margin-top: 8px; width: 100%; }
+  .ok { color: #4ec98a; }
+  @media (prefers-color-scheme: light) {
+    body { background: #fff; color: #1a1a1a }
+    .site-card { border-color: #dcd8cf; color: #6b665d } .site-card b { color: #1a1a1a }
+    header { border-color: #e8e5df } input { background: #f6f5f2; border-color: #dcd8cf; color: #1a1a1a }
+    .name, .fl, .msg, .score span { color: #6b665d } .why, .fv, a.ghost { color: #333 }
+    .bar { background: #eceae5 } a.ghost { border-color: #dcd8cf } .fine { color: #8a857c }
+    .rec { border-top-color: #eceae5 } .rec-row { color: #6b665d } .rec-row b, .rec-n { color: #1a1a1a }
+    .mute-row { color: #6b665d } .mute-row b { color: #1a1a1a } .mute-row button { border-color: #dcd8cf; color: #333 }
+    .acct-row { color: #6b665d } .acct-row b { color: #1a1a1a } .acct-row button { border-color: #dcd8cf; color: #333 }
+  }
+</style>
+<header><span class="mark" aria-hidden="true"><i></i></span><span class="title">Tapeline</span></header>
+<form id="f">
+  <input id="q" placeholder="Ticker, e.g. NVDA" autofocus autocomplete="off" spellcheck="false" maxlength="10" aria-label="Ticker symbol">
+  <button type="submit">Look up</button>
+</form>
+<div id="site"></div>
+
+<div id="out"></div>
+<p class="pp"><a href="https://tapeline.io/legal/extension-privacy?utm_source=extension&utm_medium=popup" target="_blank" rel="noopener">What this reads</a></p>
+<script src="sites.js"></script>
+<script src="popup.js"></script>

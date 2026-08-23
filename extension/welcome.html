@@ -1,0 +1,105 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tapeline extension — what it does</title>
+<style>
+  :root { color-scheme: dark light; }
+  body { margin: 0; padding: 48px 24px; background: #16181d; color: #e9e7e1;
+         font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+         font-size: 15px; line-height: 1.6; }
+  main { max-width: 560px; margin: 0 auto; }
+  .mark { width: 34px; height: 34px; border-radius: 7px; background: #0a0a0a;
+          display: inline-flex; align-items: center; justify-content: center; }
+  .mark i { display: block; width: 21px; height: 5px; border-radius: 999px; background: #3b82f6; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -.01em; margin: 18px 0 6px; }
+  .lede { color: #9a978e; margin: 0 0 28px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em;
+       color: #7c7a72; font-weight: 600; margin: 28px 0 10px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 7px 0; }
+  .yes::marker { color: #4ec98a; }
+  .no::marker { color: #e0796f; }
+  code { background: #1f232b; border-radius: 4px; padding: 1px 5px;
+         font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .card { background: #1b1e25; border: 1px solid #2a2d35; border-radius: 10px;
+          padding: 16px 18px; margin-top: 12px; }
+  a { color: #6fa8e0; }
+  .fine { color: #7c7a72; font-size: 12.5px; margin-top: 30px; line-height: 1.55; }
+  .accept { margin-top: 28px; }
+  .accept button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
+                   padding: 11px 18px; font-size: 15px; font-weight: 600; cursor: pointer;
+                   font-family: inherit; }
+  .accept button:hover { opacity: .92; }
+  .accept span { color: #4ec98a; font-size: 14px; }
+  @media (prefers-color-scheme: light) {
+    body { background: #fff; color: #1a1a1a; }
+    .lede { color: #6b665d } h2 { color: #8a857c }
+    code { background: #f2f1ee } .card { background: #faf9f7; border-color: #e6e3dd }
+    .fine { color: #8a857c }
+  }
+</style>
+<main>
+  <span class="mark"><i></i></span>
+  <h1>Tapeline is installed</h1>
+  <p class="lede">Here is exactly what it does and what it can see, before you use it.</p>
+  <div class="card" style="border-color:#3b82f6">
+    <p style="margin:0"><b>You&rsquo;ll need a free Tapeline account.</b> The next
+    screen signs you in or creates one &mdash; it takes a few seconds and needs no
+    card. Free accounts currently see the full scanner.</p>
+  </div>
+
+  <h2>What it does</h2>
+  <p>When you are on a stock page, a small pill appears in the bottom-right corner
+  showing Tapeline's six-factor score for that ticker. Click it for the factor
+  breakdown, the one-line reason, and — the part no other tool shows — whether
+  Tapeline has published that ticker before and how those picks actually resolved
+  against SPY, losing picks included.</p>
+
+  <h2>What it reads</h2>
+  <ul>
+    <li class="yes">The <b>ticker symbol in the page address</b>, plus the token
+      linking the extension to your account. On
+      <code>finance.yahoo.com/quote/NVDA</code> it reads <code>NVDA</code>.</li>
+    <li class="no">It does <b>not</b> read the page itself — no prices, no
+      holdings, no balances, no account numbers, no form fields.</li>
+    <li class="no">It does <b>not</b> track your browsing, and there is no
+      analytics or advertising code in it.</li>
+    <li class="yes">It uses your <b>Tapeline account</b> &mdash; you sign in on the
+      next screen. Disconnecting in the popup removes the token from this browser.</li>
+  </ul>
+
+  <h2>Where it runs</h2>
+  <div class="card">
+    <p style="margin:0">It is switched on for public research sites — Yahoo Finance,
+    TradingView, Google Finance, MarketWatch, Seeking Alpha, Finviz, CNBC and
+    others.</p>
+    <p style="margin:10px 0 0">Anywhere else, including your broker, it stays off
+    until <b>you</b> turn it on: open the popup on that site and press
+    <b>Enable on this site</b>. That grants access to that one site, and you can
+    revoke it any time in Chrome's extension settings.</p>
+  </div>
+
+  <h2>Turning it off</h2>
+  <p>The × on the pill hides it for that page. To switch it off on a whole site
+  permanently, open the popup there and press <b>Hide on this site</b>.</p>
+
+  <h2>What it sends</h2>
+  <p>One request to <code>api.tapeline.io</code> containing the ticker symbol and
+  your account token, to fetch that stock&rsquo;s score and record. The same data is
+  public on
+  <a href="https://tapeline.io/scorecard?utm_source=extension&utm_medium=welcome">tapeline.io</a>
+  with no account and no extension at all &mdash; the extension asks for an account
+  because that is how we run it, not because the numbers are secret.</p>
+
+  <div class="accept">
+    <button id="ok">Continue &mdash; sign in or create a free account</button>
+    <span id="done" hidden></span>
+  </div>
+
+  <p class="fine">Tapeline's scores are descriptive readings of published data —
+  not investment advice, price targets or forecasts. Every daily top-10 pick is
+  written to a public record the day it prints and is never edited, including the
+  ones that lose. Read the
+  <a href="https://tapeline.io/legal/extension-privacy?utm_source=extension&utm_medium=welcome">privacy policy</a>
+  or the <a href="https://tapeline.io/scorecard?utm_source=extension&utm_medium=welcome">full record</a>.</p>
+</main>
+<script src="welcome.js"></script>

@@ -31,6 +31,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Refresh every 30 min — this is a marketing snapshot of the daily Top 10,
 // not the live in-app scanner, so sub-minute freshness is wasted budget.
@@ -65,6 +66,7 @@ async function fetchTopTen(): Promise<ScannerRow[]> {
     // We slice to 10 to match the email digest exactly.
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to [] below, ISR backfills.
@@ -221,7 +223,7 @@ export default async function DailyPicksPage() {
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-border bg-bg px-6 py-10 text-center text-sm text-muted">
+            <div className="rounded-lg border border-border bg-background px-6 py-10 text-center text-sm text-muted">
               <p>Picks loading. The page caches every 30 minutes — refresh shortly.</p>
               <p className="mt-2">
                 Or read the back-checked record at{" "}
@@ -309,8 +311,8 @@ export default async function DailyPicksPage() {
             Want the same composite, live and on your own watchlist?
           </h2>
           <p className="mt-3 text-muted">
-            14-day Premium trial — no card. The daily email keeps coming
-            either way.
+            14-day Premium trial — $0 today, cancel in one click. The daily email
+            is free with no account and keeps coming either way.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">

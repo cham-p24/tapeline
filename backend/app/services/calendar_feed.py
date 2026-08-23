@@ -58,15 +58,18 @@ def mock_upcoming_ipos(days_ahead: int = 90) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: r["expected_date"])
 
 
-def mock_upcoming_earnings(days_ahead: int = 14) -> list[dict[str, Any]]:
+def mock_upcoming_earnings(days_ahead: int = 90) -> list[dict[str, Any]]:
     """Generate plausible earnings calendar for the scanner universe."""
     from app.services.mock_feed import TICKER_UNIVERSE
     today = date.today()
     rows = []
-    # 80% of names will have an earnings date sometime in 90 days
+    # 80% of names will have an earnings date somewhere in the window. The
+    # dates now honour `days_ahead` — it was previously accepted and ignored
+    # (hardcoded 90), so dev mode silently spanned a different window than the
+    # caller asked for.
     sample = random.sample([t[0] for t in TICKER_UNIVERSE], k=int(len(TICKER_UNIVERSE) * 0.8))
     for sym in sample:
-        report = today + timedelta(days=random.randint(0, 90))
+        report = today + timedelta(days=random.randint(0, days_ahead))
         quarter = f"Q{((report.month - 1) // 3) + 1} {report.year}"
         rows.append({
             "symbol": sym,
@@ -104,10 +107,25 @@ async def upcoming_ipos(days_ahead: int = 90) -> list[dict[str, Any]]:
     return mock_upcoming_ipos(days_ahead=days_ahead)
 
 
-async def upcoming_earnings(days_ahead: int = 14) -> list[dict[str, Any]]:
+async def upcoming_earnings(days_ahead: int = 90) -> list[dict[str, Any]]:
     """
     Returns the earnings calendar, preferring real Finnhub data when configured.
     Falls back to mock if Finnhub is unavailable.
+
+    Window widened 14 → 90 days (2026-08-22) so the per-ticker "next earnings"
+    stat is usually populated. US companies report roughly quarterly, so a
+    14-day window left most of the universe with no upcoming row at all and the
+    ticker page had nothing to show for the vast majority of symbols. 90 days is
+    one full reporting quarter — the same default upcoming_ipos() already uses,
+    and the ceiling /api/calendar/earnings already allows (days=Query(le=90)).
+
+    This costs nothing upstream: /calendar/earnings is a single ranged request
+    either way (cached CACHE_TTL_CALENDAR_HOURS, keyed per window), so it is
+    more rows in the same call, not more calls. Nor does it accumulate stale
+    rows — the worker's _seed_calendar replaces earnings_events wholesale on
+    each daily refresh. A name that reported in the last day or two can still
+    fall just outside the quarter; that reads as a null, which is the honest
+    answer, not a guessed date.
     """
     from app.services.finnhub_feed import fetch_earnings_calendar
     real = await fetch_earnings_calendar(days_ahead=days_ahead)

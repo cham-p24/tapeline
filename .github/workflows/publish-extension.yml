@@ -1,0 +1,110 @@
+name: Publish extension
+
+# Packages extension/ and pushes it to the Chrome Web Store.
+#
+# MANUAL ONLY, and upload-only by default. Two reasons this never runs on push:
+# a store submission is not a deploy you can roll back, and since Chrome 117 a
+# policy takedown converts the entire install base into a one-click "Remove"
+# prompt via Safety Check. So publishing stays a decision someone makes, not a
+# side effect of merging.
+#
+# Requires four secrets — see docs/CHROME_WEB_STORE_SETUP.md:
+#   CWS_CLIENT_ID · CWS_CLIENT_SECRET · CWS_REFRESH_TOKEN · CWS_EXTENSION_ID
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Where to publish after upload"
+        required: true
+        default: "none"
+        type: choice
+        options:
+          - none            # upload only — review the draft in the dashboard
+          - trustedTesters  # visible to your tester list only
+          - default         # live to everyone
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show what is being shipped
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./extension/manifest.json').version")
+          NAME=$(node -p "require('./extension/manifest.json').name")
+          echo "name    : $NAME"
+          echo "version : $VERSION"
+          echo "publish : ${{ inputs.publish }}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Sanity-check the manifest before uploading
+        run: |
+          set -euo pipefail
+          cd extension
+          # A store rejection costs days of review time, so the cheap checks run
+          # here rather than being discovered by a human reviewer.
+          node -e "
+            const m = require('./manifest.json');
+            const fail = (msg) => { console.error('✖ ' + msg); process.exitCode = 1; };
+            if (m.manifest_version !== 3) fail('manifest_version must be 3');
+            if (!/^\d+(\.\d+){1,3}$/.test(m.version)) fail('version must be numeric dotted');
+            if (!m.name || m.name.length > 45) fail('name missing or >45 chars');
+            if (!m.description || m.description.length > 132) fail('description missing or >132 chars');
+            for (const f of Object.values(m.icons || {})) {
+              if (!require('fs').existsSync(f)) fail('missing icon ' + f);
+            }
+            if ((m.permissions || []).includes('tabs')) {
+              fail('the broad \"tabs\" permission triggers heightened review — activeTab is enough');
+            }
+            if ((m.host_permissions || []).some((h) => h.includes('*://*/*'))) {
+              fail('broad host_permissions at install is the top rejection reason');
+            }
+            if (!process.exitCode) console.log('✓ manifest checks passed');
+          "
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          # Stage a clean copy and DELETE the dev artefacts, rather than relying
+          # on `zip -x` patterns. Whether those match depends on how zip stores
+          # the path ("./file" vs "file"), which varies between versions, and a
+          # silent non-match would ship test files to a reviewer. Deleting is
+          # unambiguous, and the next step verifies it worked.
+          rm -rf build && mkdir -p build
+          cp -r extension/. build/
+          rm -f build/test-detection.js build/icons/make-icons.js build/.storeignore build/README.md
+          cd build && zip -rq ../extension.zip . && cd ..
+          echo "packaged $(du -h extension.zip | cut -f1)"
+          unzip -l extension.zip
+
+      - name: Verify the package has no dev artefacts
+        run: |
+          set -euo pipefail
+          if unzip -l extension.zip | grep -qE 'test-detection|make-icons|README'; then
+            echo "✖ dev artefacts leaked into the package"; exit 1
+          fi
+          if ! unzip -l extension.zip | grep -q 'manifest.json'; then
+            echo "✖ manifest.json is not at the package root"; exit 1
+          fi
+          echo "✓ package contents look right"
+
+      - name: Upload to the Chrome Web Store
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          ZIP_PATH: extension.zip
+          PUBLISH_TARGET: ${{ inputs.publish }}
+        run: node .github/scripts/publish-extension.mjs
+
+      - name: Keep the exact bytes that were uploaded
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tapeline-extension-v${{ env.VERSION }}
+          path: extension.zip
+          retention-days: 90

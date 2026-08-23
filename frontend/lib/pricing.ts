@@ -25,6 +25,12 @@ export const PRICING = {
   currency: "USD",
   pro: { monthly: 9.99, annual: 99, annualPerMonth: 8.25 },
   premium: { monthly: 19.99, annual: 199, annualPerMonth: 16.58 },
+  // Trader — early-access / concierge high tier. Not self-serve: sold by hand
+  // to early customers while the data-out differentiators (full record +
+  // attribution, higher API, bulk export/webhooks) are built with them, so no
+  // Stripe self-checkout and no unbuilt feature is billed. Its job on the
+  // pricing page is the high anchor that reframes Premium as the value choice.
+  trader: { monthly: 59, annual: 588, annualPerMonth: 49 },
 } as const;
 
 export type BillingPeriod = "monthly" | "annual";
@@ -76,17 +82,64 @@ export const FREE_LIMITS = {
 } as const;
 
 /**
- * Watchlist → Pro+ cutover. On this date the saved watchlist becomes a Pro-and-up
- * feature and the Free tier loses it (announced to all free users by email
- * 2026-07-26). Mirrors backend tier.py `FREE_WATCHLIST_REMOVAL_DATE` — keep the two
- * in sync. Date-gated so pricing copy flips automatically; `freeHasWatchlist()` is
- * the single guard every Free-tier surface should use before quoting the watchlist.
+ * Open-access month — mirrors backend tier.py `PROMO_OPEN_ACCESS_UNTIL` +
+ * `free_open_access()`, which explicitly asks to be kept in lock-step with this
+ * file. Founder experiment (2026-08-08): the Free tier's scanner ROW cap lifts
+ * to the Pro cap until this date, then auto-reverts with no deploy. Last open
+ * day is 2026-09-07; the boundary matches the backend's `d < UNTIL` exactly.
+ */
+export const PROMO_OPEN_ACCESS_UNTIL = new Date("2026-09-08T00:00:00Z");
+
+/** True while the open-access month is running. */
+export function freeOpenAccess(now: Date = new Date()): boolean {
+  return now.getTime() < PROMO_OPEN_ACCESS_UNTIL.getTime();
+}
+
+/** Pro's scanner row cap — mirrors backend TIER_LIMITS[PRO]["scanner_rows"]. */
+export const PRO_SCANNER_ROWS = 1000;
+
+/**
+ * Scanner rows a Free user ACTUALLY gets right now — the audience-aware
+ * accessor for `FREE_LIMITS.scannerRows`.
+ *
+ * The backend gates the open-access lift on `authenticated` (see the
+ * `limit()` body in tier.py), so the honest number depends on who is reading:
+ *
+ *   - `authenticated: true`  → a signed-in Free user, who really does get the
+ *     Pro cap while the window is open. Use this wherever the copy states that
+ *     user's OWN CURRENT entitlement: the /app/billing "Plan limits" tile, the
+ *     post-trial "what your Free account keeps" list.
+ *   - default (`false`)      → logged-out visitors, for whom the backend
+ *     returns the standard cap, AND every steady-state PLAN DESCRIPTION:
+ *     pricing cards, the comparison matrix, signup and public ticker copy.
+ *     These describe the product on sale, not a promo entitlement, and the
+ *     promo expires — quoting 1,000 on a forward-looking surface (cancel
+ *     intercept, trial-ending nudge) would over-promise to anyone whose
+ *     cancellation or trial lands after the revert date.
+ *
+ * Defaulting to the conservative number is deliberate: a new call site that
+ * forgets the flag understates rather than over-promises.
+ */
+export function freeScannerRows(
+  opts: { authenticated?: boolean; now?: Date } = {},
+): number {
+  const { authenticated = false, now = new Date() } = opts;
+  return authenticated && freeOpenAccess(now) ? PRO_SCANNER_ROWS : FREE_LIMITS.scannerRows;
+}
+
+/**
+ * Watchlist → Pro+ cutover — REVERSED 2026-08-19. The 2026-08-02 cutover (email
+ * 2026-07-26) that made the saved watchlist Pro-only was reversed to un-break the
+ * free web-push alert on-ramp and stop tightening the free tier while arrivals +
+ * activation are the priority. Mirrors backend tier.py — kept in lock-step: the
+ * date is retained for history but `freeHasWatchlist()` no longer consults it.
+ * `freeHasWatchlist()` stays the single guard every Free-tier surface reads.
  */
 export const FREE_WATCHLIST_REMOVAL_DATE = new Date("2026-08-02T00:00:00Z");
 
-/** True while the Free tier still includes a saved watchlist. */
-export function freeHasWatchlist(now: Date = new Date()): boolean {
-  return now < FREE_WATCHLIST_REMOVAL_DATE;
+/** True while the Free tier still includes a saved watchlist (restored 2026-08-19). */
+export function freeHasWatchlist(_now: Date = new Date()): boolean {
+  return true;
 }
 
 /**

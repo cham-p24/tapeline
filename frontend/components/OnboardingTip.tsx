@@ -15,12 +15,22 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { useFirstRunTip } from "@/components/FirstRunTip";
 
 const STORAGE_KEY = "tapeline_onboarding_dismissed_v1";
 
 export function OnboardingTip() {
   const { user, loading } = useUser();
+  const { setTipVisible } = useFirstRunTip();
   const [show, setShow] = useState(false);
+
+  // Publish our on-screen state so the promotional banners can yield while the
+  // welcome is up. Clear it on unmount too (e.g. navigating away from /app), so
+  // the stack is never left suppressed once the tip is gone.
+  useEffect(() => {
+    setTipVisible(show);
+    return () => setTipVisible(false);
+  }, [show, setTipVisible]);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -60,7 +70,7 @@ export function OnboardingTip() {
             Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}. Three things to try first.
           </h3>
           <p className="mt-1 text-sm text-muted">
-            Your 14-day Premium trial is live. No credit card on file.
+            Your 14-day Premium trial is live.
           </p>
           <ul className="mt-3 space-y-1.5 text-sm">
             <li className="flex items-start gap-2">
@@ -75,10 +85,10 @@ export function OnboardingTip() {
             <li className="flex items-start gap-2">
               <span className="text-accent flex-shrink-0">→</span>
               <span>
-                <Link href="/app/watchlist" className="text-fg hover:text-accent transition-colors">
-                  Set up a watchlist
+                <Link href="/app/ticker/NVDA" className="text-fg hover:text-accent transition-colors">
+                  Score a stock you know
                 </Link>{" "}
-                — one click adds 8 mega-caps + SPY so smart alerts can fire from day one.
+                — see its 0-100 score and the 6-factor breakdown in one look, then search any ticker you own.
               </span>
             </li>
             <li className="flex items-start gap-2">

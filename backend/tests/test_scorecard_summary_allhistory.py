@@ -70,6 +70,27 @@ async def test_summary_days_tracked_counts_all_history_not_the_window(client):
 
 
 @pytest.mark.asyncio
+async def test_summary_carries_first_tracked_date(client):
+    """`first_tracked_date` is the oldest session on record, ISO-formatted.
+    It powers the server-rendered "since <date>" citation on /scorecard, so it
+    must be present and at least as old as the oldest seeded session (other
+    tests / dev data may have seeded older rows — `<=` not `==`)."""
+    await _seed()
+    try:
+        async with client:
+            r = await client.get("/api/scorecard", params={"days": 30})
+            assert r.status_code == 200, r.text
+            summary = r.json()["summary"]
+            oldest_seeded = min(_DATES).isoformat()
+            assert summary["first_tracked_date"] is not None
+            assert summary["first_tracked_date"] <= oldest_seeded
+            # ISO date shape, parseable
+            date.fromisoformat(summary["first_tracked_date"])
+    finally:
+        await _cleanup()
+
+
+@pytest.mark.asyncio
 async def test_summary_is_stable_across_display_windows(client):
     """The headline trust stats must not move when the caller changes the picks
     window — days_tracked at days=5 must equal days_tracked at days=30, because

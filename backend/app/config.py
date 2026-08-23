@@ -181,6 +181,17 @@ class Settings(BaseSettings):
     # Set on Fly + as a NEWS_FRESHNESS_WEBHOOK GitHub repo variable
     # containing the full URL: https://api.tapeline.io/api/internal/alert?token=<secret>
     internal_alert_secret: str = ""
+    # Shared secret proving a request came from OUR OWN Next.js server (SSR),
+    # not from a browser. Server-side rendering funnels the whole site's API
+    # traffic through ONE Fly egress IP, so it collides with limit_api's
+    # per-IP 120/min bucket and starts 429ing itself under any bulk crawl —
+    # which the page turns into a 500 (see main.py's middleware). Requests
+    # carrying this token skip the per-IP limit. Unset => no exemption at all,
+    # so the failure mode of a missing secret is today's behaviour, not an
+    # open door. Set the SAME value on both apps:
+    #   fly secrets set INTERNAL_SSR_TOKEN=$(openssl rand -base64 32) -a tapeline-backend
+    #   fly secrets set INTERNAL_SSR_TOKEN=<same value>              -a tapeline-web
+    internal_ssr_token: str = ""
 
     # ---- Sheet webhook (live-push from signal-system Google Sheet) ----
     # Random shared secret used by the Apps Script onChange trigger on the
@@ -278,9 +289,11 @@ class Settings(BaseSettings):
     # (~8am Melbourne). It pulls live metrics from Postgres, drafts a
     # daily X tweet, LinkedIn post, and 3 fintwit reply candidates from
     # the priority-1 account list, and emails the package to
-    # GROWTH_DIGEST_TO. Defaults to off so a fresh deploy doesn't surprise
-    # the founder with daily email — flip to true once they want it.
-    growth_bot_enabled: bool = False
+    # GROWTH_DIGEST_TO. Default flipped to ON at the founder's request
+    # (2026-08-08) — the daily funnel snapshot is the always-on sales
+    # tracker that survives any local session. Set GROWTH_BOT_ENABLED=false
+    # in the environment to switch it off without a deploy.
+    growth_bot_enabled: bool = True
     # Recipient for the daily growth digest email. Defaults to the brand
     # inbox if blank.
     growth_digest_to: str = "tapeline.inbox@gmail.com"

@@ -1,29 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { PRICING, FREE_LIMITS, REFUND, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
+import { Button } from "@/components/Button";
+// FREE_LIMITS / freeHasWatchlist are no longer read here: the $0 column
+// describes the public record (which has no per-account limits), not a
+// logged-in free tier. The constants still exist for the surfaces that
+// legitimately describe grandfathered Free accounts.
+import { PRICING, REFUND, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
+import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 
 const PLANS = [
   {
-    name: "Free",
-    tagline: "Free forever — live scores",
+    // ── The card-free column, restated (2026-08-22, card gate) ────────────
+    // This card used to be "Free — free forever, live scores" with a "Start
+    // free" button into /signup. A new account now requires a card at first
+    // sign-in, so a self-serve free TIER is no longer something a visitor can
+    // sign up for, and selling one here would be the single most expensive
+    // false claim on the site.
+    //
+    // What is still completely true — and is what this column now shows — is
+    // the PUBLIC record: the daily Top 10, the whole scorecard, a page per
+    // scored ticker and the raw CSV/JSON export are open to anyone with no
+    // account, no card and no email. That is a real $0 offer, so it keeps the
+    // $0 column; it just stops pretending to be a logged-in plan.
+    name: "Public record",
+    tagline: "Open to everyone — no account",
     prices: { monthly: 0, annual: 0, annualPerMonth: 0 },
-    // Free-tier numbers derive from FREE_LIMITS (mirrors backend tier.py) so
-    // this card always sells the tier the backend actually enforces.
     highlights: [
-      "Live scores — no delay",
-      `${FREE_LIMITS.dailyLookups} ticker look-ups per day — unmetered your first ${FREE_LIMITS.firstSessionGraceHours}h`,
-      `Top-${FREE_LIMITS.scannerRows} scanner rows`,
-      ...(freeHasWatchlist() ? [`Watchlist (${FREE_LIMITS.watchlistTickers} tickers)`] : []),
-      `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
-      `${FREE_LIMITS.webPushAlerts} browser push alerts`,
-      "Public scorecard, fully open",
+      "The daily Top 10, live",
+      "The full scorecard — every pick, back-checked vs SPY",
+      "A page per scored ticker, all six factors",
+      "The raw record as CSV and JSON",
+      "The scoring formula, named and weighted",
+      "No account, no card, no email",
     ],
-    cta: "Start free",
-    ctaHref: "/signup",
+    cta: "Read the record",
+    ctaHref: "/scorecard",
+    skipBillingParam: true,
     highlight: false,
+    // The grandfather clause, stated where a returning free user will look
+    // first. Accounts created before the cutover keep what they signed up
+    // for; nobody is asked for a card to get back into an account they
+    // already have.
+    footnote:
+      "Nothing here asks for anything. Signing in to the app is separate and does take a card — see the trial terms below. Accounts created before 22 August 2026 keep the free access they signed up for and are never asked for a card.",
   },
   {
     name: "Pro",
@@ -43,7 +65,7 @@ const PLANS = [
       "Email alerts (10/day) · daily briefing",
       "TradingView charts · CSV export",
     ],
-    cta: "Start free trial",
+    cta: "Start 14-day Premium trial",
     ctaHref: "/signup?plan=pro",
     // Pro is the highlighted protagonist — the realistic first purchase.
     // "Best value" is a factual framing (cheapest paid tier per feature),
@@ -68,14 +90,37 @@ const PLANS = [
     highlights: [
       "Congressional trades feed (House + Senate)",
       "Recent insider buys — live SEC Form 4 across ~2,500 tickers",
-      "Telegram alerts · unlimited (Pro: none)",
       "Email alerts · unlimited (Pro: 10/day)",
       "Public API access · 1,000 requests/day",
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
       "Priority support · same-day reply",
     ],
-    cta: "Try Premium free",
+    cta: "Start 14-day Premium trial",
     ctaHref: "/signup?plan=premium",
+    highlight: false,
+  },
+  {
+    name: "Trader",
+    tagline: "Early access — for desks & power users.",
+    prices: {
+      monthly: PRICING.trader.monthly,
+      annual: PRICING.trader.annual,
+      annualPerMonth: PRICING.trader.annualPerMonth,
+    },
+    // Concierge / early-access tier — NOT self-serve. The differentiators are
+    // built with early customers, so the CTA is "Talk to us" (→ /contact), not
+    // a Stripe checkout. Its price is the high anchor that reframes Premium as
+    // the sensible choice. No proPlus strip (that hardcodes "Everything in
+    // Pro"); the first highlight states "Everything in Premium" instead.
+    highlights: [
+      "Everything in Premium",
+      "Your full track record + per-factor attribution",
+      "Get your data out — API, bulk export & webhooks",
+      "Desk-grade watchlists, scans & alerts",
+      "A hand in what we build next",
+    ],
+    cta: "Talk to us",
+    ctaHref: "/contact",
     highlight: false,
   },
 ];
@@ -108,8 +153,9 @@ export function PricingTable() {
         <p className="mt-1 text-center text-xs text-up/90">Save 2 months · your rate, locked in</p>
       )}
 
-      {/* 3 main plans */}
-      <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3 md:gap-6">
+      {/* Plans — Free / Pro / Premium self-serve, plus the Trader early-access
+          anchor. 2-up on tablet, 4-up on desktop. */}
+      <div className="mx-auto mt-10 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
         {PLANS.map((p) => {
           const price = p.prices[billing];
           // Annual advertises the exact per-month equivalent from
@@ -117,7 +163,12 @@ export function PricingTable() {
           // Monthly stays as-is.
           const perMonth = billing === "annual" ? p.prices.annualPerMonth : price;
           const isPower = (p as { proPlus?: boolean }).proPlus === true;
-          const ctaHref = p.ctaHref.includes("?")
+          // The public-record column links to a shared, indexable public URL;
+          // it carries no plan and no billing period, so it does not get a
+          // ?billing= param bolted on.
+          const ctaHref = (p as { skipBillingParam?: boolean }).skipBillingParam
+            ? p.ctaHref
+            : p.ctaHref.includes("?")
             ? `${p.ctaHref}&billing=${billing}`
             : `${p.ctaHref}?billing=${billing}`;
           return (
@@ -132,9 +183,7 @@ export function PricingTable() {
               }`}
             >
               {p.highlight && p.badge && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-accent to-accent2 px-3 py-1 text-[11px] font-medium text-white shadow-md">
-                  {p.badge}
-                </span>
+                <BestValueBadge className="absolute -top-3 left-1/2 -translate-x-1/2" />
               )}
               <h3 className="text-xl font-semibold">{p.name}</h3>
               <p className="mt-1 text-sm text-muted">{p.tagline}</p>
@@ -172,42 +221,57 @@ export function PricingTable() {
               <ul className={`${isPower ? "mt-3" : "mt-6"} space-y-2.5 text-sm`}>
                 {p.highlights.map((f) => (
                   <li key={f} className="flex gap-3">
-                    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" viewBox="0 0 16 16" fill="none">
+                    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-up" viewBox="0 0 16 16" fill="none">
                       <path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <Link
+              {(p as { footnote?: string }).footnote && (
+                <p className="mt-4 text-xs text-muted leading-relaxed">
+                  {(p as { footnote?: string }).footnote}
+                </p>
+              )}
+              <Button
                 href={ctaHref}
-                className={`mt-8 flex h-11 w-full items-center justify-center rounded-md text-sm font-medium transition-all ${
-                  p.highlight
-                    ? "bg-gradient-to-r from-accent to-accent2 text-white hover:opacity-90 active:scale-[0.98]"
-                    : "border border-border2 text-fg hover:bg-panel2"
-                }`}
+                variant={p.highlight ? "gradient" : "secondary"}
+                shape="rounded"
+                className="mt-8 w-full"
               >
                 {p.cta}
-              </Link>
+              </Button>
             </div>
           );
         })}
       </div>
 
-      {/* ── Risk reversals ────────────────────────────────────────────────
-          Only the two that are unconditionally true and cost the user nothing
-          to verify: the trial genuinely takes no card, and cancellation is
-          genuinely one button (POST /api/billing/cancel, no survey gate). Both
-          are stated as mechanisms — what happens, and what does NOT happen —
-          because "no card required" only reassures if the reader can tell it
-          means "we cannot charge you". No urgency, no deadline, no scarcity. */}
+      {/* ── The trial, stated plainly ─────────────────────────────────────
+          The Premium trial takes a card (Stripe Checkout, subscription mode
+          with trial_end), so the honest thing is not a risk-reversal badge —
+          it is the mechanism: what Stripe takes today, what it takes on day
+          14, and the one button that stops it. Cancellation is genuinely one
+          click (POST /api/billing/cancel, no survey gate).
+
+          2026-08-22: the last sentence used to read "Skip the trial and you
+          stay on Free, which never asks for a card." A new account now adds a
+          card at first sign-in, so there is no skip — and the honest
+          replacement is the way out that actually exists: read the public
+          record, which costs nothing and asks for nothing.
+          No urgency, no deadline, no scarcity. */}
       <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-panel/60 px-4 py-3">
-          <div className="text-xs font-medium text-fg">14 days of Premium, no card</div>
+          <div className="text-xs font-medium text-fg">14-day Premium trial — $0 today</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
-            Signup asks for an email and a password — no card fields. Nothing to
-            charge means nothing can auto-renew: at day 14 the account moves to
-            Free on its own unless you choose to add a card.
+            A new account adds a card at first sign-in, and that starts the trial.
+            Stripe charges $0 that day and shows you the exact first-charge date
+            before you confirm: day 14, at the plan and billing period you picked.
+            One click stops it before that date and you are charged nothing. If
+            you would rather not put a card down at all, the{" "}
+            <Link href="/scorecard" className="text-accent hover:underline">
+              public record
+            </Link>{" "}
+            stays open with no account.
           </p>
         </div>
         <div className="rounded-lg bg-panel/60 px-4 py-3">

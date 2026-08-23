@@ -5,19 +5,57 @@ app = "tapeline-web"
 primary_region = "syd"
 
 [build]
+  # NEXT_PUBLIC_* is inlined at BUILD time — a Fly *secret* by the same name is a
+  # runtime var and reaches the client bundle too late to do anything. Anything
+  # that gates a client feature belongs here, not in `fly secrets set`.
+  # These two keys are public by design (every browser receives them); the paired
+  # server-side secrets (CLOUDFLARE_TURNSTILE_SECRET_KEY) stay in Fly secrets.
+  [build.args]
+    # Cloudflare Turnstile site key. Empty = the signup widget never renders and
+    # bot protection is off. Paste the site key from the Cloudflare dashboard
+    # (Turnstile > your widget) to switch it on.
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY = ""
+    # PostHog project key (starts `phc_`) + region host. Empty = PostHog no-ops.
+    # Host is https://us.i.posthog.com or https://eu.i.posthog.com — must match
+    # the region chosen at project creation; it cannot be changed afterwards.
+    NEXT_PUBLIC_POSTHOG_KEY = ""
+    NEXT_PUBLIC_POSTHOG_HOST = ""
+    # Meta pixel id. Empty = no pixel renders and no Meta JS is fetched.
+    # Pair with META_PIXEL_ID + META_CAPI_ACCESS_TOKEN on the BACKEND app
+    # (services/meta_capi) so browser and server events dedupe on event_id.
+    NEXT_PUBLIC_META_PIXEL_ID = "28351455154543230"
 
 [http_service]
   internal_port = 3000
   force_https = true
   auto_stop_machines = "suspend"
   auto_start_machines = true
-  min_machines_running = 1
+  # HA: keep TWO machines running at all times. With a single machine, any
+  # restart (deploy), suspend, crash, or Fly host maintenance left tapeline.io
+  # briefly unreachable — the intermittent HTTP 0 blips the uptime watchdog
+  # kept paging on. Two always-on machines let Fly's proxy serve from one while
+  # the other restarts (zero-downtime rolling deploys) and survive a single
+  # machine/host failure. The deploy workflow runs `flyctl scale count 2` so the
+  # machines actually exist for this floor to hold.
+  min_machines_running = 2
   processes = ["app"]
 
+  # Concurrency limits sized to what ONE machine can actually survive, not an
+  # arbitrary ceiling. These SSR ticker pages (/t/[symbol]) each render React +
+  # fetch the backend on a cold cache, so they are far heavier than a static
+  # hit. With the old soft_limit=200 the Fly proxy would pile up to 200 renders
+  # onto a single 512mb/1-CPU box before load-balancing — which buries it: a
+  # burst of ~25 concurrent cold renders was enough to drive the machine into
+  # 500s and then dropped connections (observed 2026-08-18 while crawling the
+  # sitemap; the same mechanism is behind Search Console's sporadic 5xx after a
+  # deploy wipes the per-machine ISR cache). soft_limit is ALSO the autostart
+  # trigger, so a low value makes Fly spread across the warm pair and wake burst
+  # machines (scale count 4, see deploy-frontend.yml) BEFORE any one box is
+  # overwhelmed; hard_limit queues the overflow instead of 500ing it.
   [http_service.concurrency]
     type = "requests"
-    soft_limit = 200
-    hard_limit = 250
+    soft_limit = 40
+    hard_limit = 60
 
 [[http_service.checks]]
   interval = "15s"
@@ -26,8 +64,14 @@ primary_region = "syd"
   method = "GET"
   path = "/how-it-works"
 
+# Bumped 2026-08-18 from shared-cpu-1x/512mb after the frontend was shown to OOM
+# and drop connections under a burst of concurrent cold SSR renders (each /t/
+# page renders React + fetches the backend). 2 vCPUs let the box render several
+# pages concurrently instead of starving the event loop; 1gb gives headroom so a
+# render burst no longer exhausts memory. Paired with the concurrency limits
+# above and autoscale (scale count 4 in deploy-frontend.yml) for launch spikes.
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = "shared-cpu-2x"
+  memory = "1024mb"
   cpu_kind = "shared"
-  cpus = 1
+  cpus = 2

@@ -314,6 +314,31 @@ def render_watchlist_alert_email(
 
 # ── Welcome / day-0 ─────────────────────────────────────────────────────────
 
+# The one paragraph that has to be exactly right, because the welcome mail is
+# the first place a reader forms a belief about whether we can charge them.
+#
+# CHANGED 2026-08-22 (card gate — see services/tier.CARD_GATE_START). This used
+# to open "The Free plan needs no card and there is nothing to cancel", which
+# was true while signup landed on a card-free Free tier. From the cutover a NEW
+# account adds a card at first sign-in before it can use /app, so that sentence
+# would now be a false statement made to the exact person it is false about.
+#
+# Only render_welcome_email uses this, and welcome is day-0 — grandfathered
+# accounts (created before the cutover) never receive it again, so it is written
+# for the new-account case without a date branch.
+#
+# Three things it must state before any card is asked for: $0 today, when the
+# first charge lands, and that one click stops it — plus a real way out that is
+# not punished (the public record, which needs no account at all).
+_FREE_VS_TRIAL_FOOTNOTE = (
+    "A new account adds a card at first sign-in, on Stripe's own checkout page. "
+    "That starts the 14-day Premium trial: $0 is charged that day, the first "
+    "charge is at the end of day 14, and one click cancels before then with "
+    "nothing taken. If you would rather not, the daily picks and the whole "
+    "public scorecard stay readable at tapeline.io/scorecard with no account."
+)
+
+
 def render_welcome_email(
     user_name: str, picks: list[dict[str, Any]] | None = None,
 ) -> str:
@@ -338,8 +363,8 @@ def render_welcome_email(
         body = (
             h1(f"Welcome, {user_name}.")
             + lead(
-                "Your <strong>14-day Premium trial</strong> is live — everything's "
-                "unlocked. Three live scores from the scanner right now:"
+                "Your <strong>Tapeline account</strong> is live. Three live "
+                "scores from the scanner right now:"
             )
             + picks_html
             + button(
@@ -351,13 +376,13 @@ def render_welcome_email(
                 'is public — see <a href="https://tapeline.io/how-it-works" '
                 f'style="color:{ACCENT};">how it works</a>.'
             )
-            + footnote("No card on file. We'll remind you before the trial ends.")
+            + footnote(_FREE_VS_TRIAL_FOOTNOTE)
         )
     else:
         body = (
             h1(f"Welcome, {user_name}.")
             + lead(
-                "Your <strong>14-day Premium trial</strong> is live. Everything's unlocked."
+                "Your <strong>Tapeline account</strong> is live."
             )
             + muted_paragraph("Three things to try in the first five minutes:")
             + card(
@@ -373,13 +398,13 @@ def render_welcome_email(
                 "Open the scanner",
                 "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=welcome&utm_medium=transactional",
             )
-            + footnote("No card on file. We'll remind you before the trial ends.")
+            + footnote(_FREE_VS_TRIAL_FOOTNOTE)
         )
     return shell(
         body,
         preheader=(
-            "Your 14-day Premium trial is live — three live scores inside."
-            if picks else "Your 14-day Premium trial is live — open the scanner."
+            "Your Tapeline account is live — three live scores inside."
+            if picks else "Your Tapeline account is live — open the scanner."
         ),
     )
 
@@ -673,6 +698,21 @@ def render_trial_day11_email(
             f"Here's what you've actually been using."
         )
         + _trial_summary_block(summary)
+        # The one loss the user personally feels: the watchlist THEY built.
+        # Post-cutover Free has no watchlist, so their saved tickers lock at
+        # expiry. Purely factual capability statement (compliance rules 6/7:
+        # no market-opportunity framing, no performance claims) — and gated on
+        # free_has_watchlist() so it disappears if Free ever regains one.
+        + (
+            muted_paragraph(
+                f"One concrete thing: the {summary['watchlist_count']} saved "
+                f"ticker{'s' if summary['watchlist_count'] != 1 else ''} on "
+                f"your watchlist lock at expiry — the Free tier no longer "
+                f"includes a watchlist. Upgrading restores them instantly."
+            )
+            if summary and summary.get("watchlist_count") and not free_has_watchlist()
+            else ""
+        )
         + muted_paragraph(
             f"If you decide to keep Premium, add a card before {deadline} at "
             f"the founding price — $19.99/mo, or $16.58/mo billed annually "
@@ -717,9 +757,22 @@ def render_trial_day13_email(
             f"{user_name}, your Premium trial expires in less than 24 hours."
         )
         + _trial_summary_block(summary)
+        # Lead the loss list with the user's OWN built asset (their watchlist)
+        # when Free no longer includes one — the generic caps are abstract; the
+        # 7 tickers they saved are not. Factual capability statement only
+        # (compliance rules 6/7); gated on free_has_watchlist().
         + muted_paragraph(
-            f"If you don't add a card, your account drops to Free at expiry — "
-            f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
+            "If you don't add a card, your account drops to Free at expiry — "
+            + (
+                f"the {summary['watchlist_count']} saved "
+                f"ticker{'s' if summary['watchlist_count'] != 1 else ''} on "
+                f"your watchlist lock (Free no longer includes one), "
+                if summary
+                and summary.get("watchlist_count")
+                and not free_has_watchlist()
+                else ""
+            )
+            + f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
             f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts, Telegram, "
             f"and the Congress feed switch off."
         )
@@ -749,11 +802,19 @@ def render_trial_expired_email(
     summary: dict | None = None,
     *,
     checkout_urls: dict[str, str] | None = None,
+    save_offer: bool = False,
 ) -> str:
     """T+0 — trial ended within the last 24 hours.
 
     `checkout_urls` → one-click signed Stripe-checkout CTA (no login wall);
-    falls back to /app/billing when unavailable."""
+    falls back to /app/billing when unavailable.
+
+    `save_offer` → the caller (run_daily_drip) verified the user is eligible
+    for the one-time 50%-off-3-months trial save offer
+    (services/billing.trial_save_offer_eligible); the checkout links in this
+    email then auto-apply it, so the email may truthfully state it. Stated as
+    a standing fact — no countdown, no deadline theatre (compliance rule 6);
+    it genuinely has no expiry, it is simply once per account."""
     cu = checkout_urls or {}
     premium_url = cu.get("premium_monthly", "https://tapeline.io/app/billing")
     pro_url = cu.get("pro_monthly", "https://tapeline.io/app/billing")
@@ -767,6 +828,16 @@ def render_trial_expired_email(
             f"or smart alerts."
         )
         + _trial_summary_block(summary)
+        + (
+            muted_paragraph(
+                "Because you finished the trial, there's a one-time offer on "
+                "your account: <strong>50% off your first 3 months</strong> of "
+                "Pro or Premium, applied automatically at checkout. It doesn't "
+                "expire — it's simply once per account."
+            )
+            if save_offer
+            else ""
+        )
         + muted_paragraph(
             'A few things stay open regardless of tier: the '
             f'<a href="https://tapeline.io/scorecard" style="color:{ACCENT};">public scorecard</a> '
@@ -916,8 +987,13 @@ def render_trial_ended_email(user_name: str) -> str:
     return shell(
         h1(f"Your trial just ended, {user_name}.")
         + lead(
-            "Your account is now on the Free plan. Your watchlist and settings "
-            "are intact — only the data feed changes."
+            "Your account is now on the Free plan. "
+            + (
+                "Your watchlist and settings are intact — only the data feed changes."
+                if free_has_watchlist()
+                else "Your settings are intact, and anything you saved to a watchlist is "
+                "kept — you'll need Pro to open the watchlist again."
+            )
         )
         + muted_paragraph(
             "If you want live data + alerts back, the door is always open."
@@ -926,7 +1002,11 @@ def render_trial_ended_email(user_name: str) -> str:
         + footnote(
             "No hard feelings if not. The public scorecard stays free for everyone, forever."
         ),
-        preheader="You're on the Free plan now — settings + watchlist intact.",
+        preheader=(
+            "You're on the Free plan now — settings + watchlist intact."
+            if free_has_watchlist()
+            else "You're on the Free plan now — your settings and saved watchlist are kept."
+        ),
     )
 
 
@@ -1103,6 +1183,131 @@ async def mint_and_send_password_reset(session, user) -> bool:
         return not res.get("skipped", False)
     except Exception:
         logger.exception("password_reset.send_failed user=%s", user.id)
+        return False
+
+
+# ── Sign-in code (new-device second factor) ─────────────────────────────────
+
+def render_signin_code_email(user_name: str, code: str, ttl_minutes: int) -> str:
+    """The 6-digit code emailed when someone signs in from a new browser.
+
+    Deliberately plain and procedural: no marketing, no CTA button, nothing to
+    click. A code email that trains people to click links is a phishing lesson,
+    so the only action here is "type these six digits into the page you already
+    have open".
+
+    The "wasn't you" line is the security-relevant half — it's how a user finds
+    out their password is known to someone else, so it names the concrete next
+    step (change the password) rather than just raising alarm.
+    """
+    from html import escape as _escape
+
+    digits = _escape(code)
+    code_block = (
+        f'<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
+        f'font-size:34px;font-weight:700;letter-spacing:0.28em;'
+        f'color:{LIGHT_FG};text-align:center;padding:6px 0 2px;">{digits}</div>'
+        f'<div style="font-size:12px;color:{LIGHT_MUTED};text-align:center;">'
+        f'Good for {ttl_minutes} minutes</div>'
+    )
+    return shell(
+        h1("Your sign-in code")
+        + lead(
+            f"Hi {_escape(user_name)} — someone just signed in to Tapeline from "
+            f"a browser we don't recognise. Enter this code on the sign-in page "
+            f"to finish."
+        )
+        + card(code_block, accent=True)
+        + muted_paragraph(
+            "We'll remember this browser for 30 days, so you won't need a code "
+            "every time."
+        )
+        + footnote(
+            "If this wasn't you, someone else knows your password. Don't enter "
+            "the code — change your password straight away, and the sign-in "
+            "won't complete without it."
+        ),
+        preheader=f"Your Tapeline sign-in code: {digits}",
+    )
+
+
+def render_signin_code_text(user_name: str, code: str, ttl_minutes: int) -> str:
+    """Plain-text twin of the code email.
+
+    Worth having for a credential email specifically: some clients render
+    text-only, and a code the user cannot read is a lockout.
+    """
+    return f"""Hi {user_name},
+
+Someone just signed in to Tapeline from a browser we do not recognise.
+Enter this code on the sign-in page to finish:
+
+    {code}
+
+The code is good for {ttl_minutes} minutes. We will remember this browser for
+30 days, so you will not need a code every time.
+
+If this was not you, someone else knows your password. Do not enter the
+code - change your password straight away, and the sign-in will not
+complete without it.
+
+- Tapeline
+"""
+
+
+
+async def mint_and_send_signin_code(session, user) -> bool:
+    """Issue a fresh sign-in code for `user`, email it, return True if sent.
+
+    Idempotent in the way that matters: any prior unused codes for this user
+    are invalidated first, so a user who clicks sign-in twice types the code
+    from the LATEST email and the older one is dead. Without that, two live
+    codes double the guess surface for no benefit.
+
+    Transactional — no unsubscribe header (a user cannot opt out of the code
+    that lets them log in) and it deliberately ignores email_prefs.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update as _update
+
+    from app.models import SigninCode
+    from app.services.signin_codes import (
+        CODE_TTL_MINUTES,
+        code_expiry,
+        generate_code,
+        hash_code,
+    )
+
+    # Kill any still-live codes for this account — latest email wins.
+    await session.execute(
+        _update(SigninCode)
+        .where(SigninCode.user_id == user.id, SigninCode.used_at.is_(None))
+        .values(used_at=datetime.now(UTC))
+    )
+
+    code = generate_code()
+    session.add(SigninCode(
+        user_id=user.id,
+        code_hash=hash_code(code, user.id),
+        expires_at=code_expiry(),
+    ))
+    await session.commit()
+
+    try:
+        name = user.name or "trader"
+        html = render_signin_code_email(name, code, CODE_TTL_MINUTES)
+        text = render_signin_code_text(name, code, CODE_TTL_MINUTES)
+        res = await send_email(
+            user.email,
+            f"Tapeline sign-in code: {code}",
+            html,
+            text,
+            persona="default",
+        )
+        return not res.get("skipped", False)
+    except Exception:
+        logger.exception("signin_code.send_failed user=%s", user.id)
         return False
 
 
@@ -1429,8 +1634,18 @@ def _today_short() -> str:
     return datetime.now(UTC).strftime("%a %b %d")
 
 
-def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
-    """End-of-day watchlist summary — one email per Pro+ user per day."""
+def render_eod_watchlist_digest(
+    user_name: str, items: list[dict], *, trial_note: str | None = None,
+) -> str:
+    """End-of-day watchlist summary — one email per Pro+ user per day.
+
+    `trial_note` (optional): a calm, factual line appended for cardless
+    trialists in their final days — the digest is the one guaranteed daily
+    inbox touch of exactly the engaged-trialist cohort (a watchlist is
+    required to receive it), and previously carried zero trial context even
+    on the last day. Caller composes the wording; keep it a plain statement
+    of the real expiry (compliance rule 6: no manufactured urgency).
+    """
     if not items:
         return shell(
             h1(f"End of day · {_today_short()}")
@@ -1445,6 +1660,7 @@ def render_eod_watchlist_digest(user_name: str, items: list[dict]) -> str:
             f"ticker{'' if len(items) == 1 else 's'} closed today."
         )
         + watchlist_table(items)
+        + (muted_paragraph(trial_note) if trial_note else "")
         + button("Open watchlist", "https://tapeline.io/app/watchlist"),
         preheader=(
             f"Watchlist EOD · {len(items)} ticker"
@@ -1918,15 +2134,35 @@ def render_winback_email(
 # a return, and the public scorecard is described as winning AND losing days
 # (Rule 3 — the record is shown whole, never cherry-picked).
 
-def render_activation_watchlist_email(user_name: str) -> str:
+def render_activation_watchlist_email(user_name: str, has_watchlist: bool = True) -> str:
     """Activation nudge — signed up 24-72h ago with no recorded activity yet.
 
     Lays out the three first-session activation actions in one calm checklist:
-    add a watchlist ticker, run a scan, and read the public scorecard. That set
-    is the "aha" — a scored ticker you follow, seen against the published
-    record. The first ticker added is activation milestone #1 (it stamps
-    User.activated_at and powers the end-of-day digest); the scan and the
-    scorecard are the other two. Descriptive only, persona "default"."""
+    a scored ticker you follow, one scan, and the public scorecard — the "aha"
+    of a name you know seen against the published record. Step one is the
+    watchlist add (activation milestone #1: it stamps User.activated_at and
+    powers the end-of-day digest) FOR recipients who have a watchlist. This
+    email is sent to every tier, and the saved watchlist is Pro-and-up from the
+    2026-08-02 cutover, so for a Free recipient (`has_watchlist=False`) step one
+    becomes "score a ticker you follow" — a first action Free can actually take,
+    same aha, no dead end. Descriptive only, persona "default"."""
+    if has_watchlist:
+        # Rule 7: the watchlist line says which NUMBER changes (the score), not
+        # "what moved" — the score is a factor value Rule 7 permits, where price
+        # movement would not be.
+        first_step = (
+            "<li><strong>Add a ticker you follow</strong> to your watchlist — "
+            "from then on you see its current score and a flag when that score "
+            "shifts.</li>"
+        )
+        preheader = "Three quick steps: a watchlist ticker, one scan, the public scorecard."
+    else:
+        first_step = (
+            "<li><strong>Score a ticker you follow</strong> — search any US "
+            "stock and see its 0-100 score with the six-factor breakdown behind "
+            "it.</li>"
+        )
+        preheader = "Three quick steps: score a ticker, one scan, the public scorecard."
     return shell(
         h1(f"Three steps to your first session, {user_name}.")
         + lead(
@@ -1934,12 +2170,9 @@ def render_activation_watchlist_email(user_name: str) -> str:
             "the names you actually follow — about two minutes, in any order."
         )
         + card(
-            # Rule 7: the watchlist line says which NUMBER changes (the score),
-            # not "what moved" — the score is a factor value Rule 7 permits,
-            # where price movement would not be.
             f"""
             <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
-              <li><strong>Add a ticker you follow</strong> to your watchlist — from then on you see its current score and a flag when that score shifts.</li>
+              {first_step}
               <li><strong>Run one scan</strong> — rank US equities on the six measured factors and read why each name matched, with the numbers next to every row.</li>
               <li><strong>See the public scorecard</strong> — every daily call we've logged, winning and losing days alike, each with the original reasoning.</li>
             </ol>
@@ -1956,7 +2189,7 @@ def render_activation_watchlist_email(user_name: str) -> str:
             "a single filter."
         )
         + footnote("Takes about two minutes. — Christian, founder."),
-        preheader="Three quick steps: a watchlist ticker, one scan, the public scorecard.",
+        preheader=preheader,
     )
 
 
@@ -2032,8 +2265,9 @@ def render_activation_alert_email(user_name: str) -> str:
 #
 # Rule 6 also binds here: no countdowns, no scarcity, no deadline framing. A
 # factual mention of the user's OWN real trial end date is permitted, styled
-# calmly, and must never be described as a billing event — the trial takes no
-# card, so nothing is charged when it ends.
+# calmly. It IS now a billing event — the Premium trial takes a card and the
+# first charge lands at expiry — so the note states that plainly. Rule 6 bans
+# manufactured urgency, not the disclosure a card-required trial owes.
 #
 # Enforced mechanically by scripts/lint-copy-compliance.mjs (rules
 # `personalised-performance` and `urgency-scarcity`) and by
@@ -2043,9 +2277,9 @@ def _calm_trial_note(trial_ends_at: datetime | None) -> str:
     """A factual, non-urgent note about the user's own trial end date.
 
     Rule 6 permits exactly this one time statement. Rendered as a muted
-    footnote — no colour, no countdown, no ticking clock — and deliberately
-    worded so it cannot read as a billing event: the trial takes no card, so
-    nothing is charged and nothing lapses into a payment.
+    footnote — no colour, no countdown, no ticking clock. Because the trial
+    now runs on a card, the note names the first-charge date and the one-click
+    way out: a reader must never learn about a charge from their statement.
 
     Returns "" when the user has no trial, which is the common case for the
     6h nudge (free signups) and keeps the template branch-free.
@@ -2054,9 +2288,9 @@ def _calm_trial_note(trial_ends_at: datetime | None) -> str:
         return ""
     return footnote(
         "For reference, your Premium trial runs to "
-        f"{trial_ends_at.strftime('%d %b %Y')}. There's no card on file, so "
-        "nothing is charged either way — the account simply stays on Free "
-        "afterwards."
+        f"{trial_ends_at.strftime('%d %b %Y')}, which is also the date of the "
+        "first charge on the card you added. Cancel in one click before then "
+        "and nothing is charged — the account simply stays on Free."
     )
 
 
@@ -2144,6 +2378,75 @@ def render_activation_ask_email(
             "keep nudging. — Christian, founder."
         ),
         preheader="One question: what got in the way? Hit reply, it comes to me.",
+    )
+
+
+def render_activation_arm_alerts_email(
+    user_name: str,
+    *,
+    watchlist_count: int,
+    trial_ends_at: datetime | None = None,
+) -> str:
+    """The ENGAGED trialist — a watchlist built, no alert rule ever ("act_arm").
+
+    Closes a lifecycle blind spot. Every other activation message targets a user
+    with NO recorded activity, so the person who curated a seven-ticker
+    watchlist and never armed an alert was excluded from all of them — despite
+    being the highest-intent cohort in the trial. Alerts are the #1 pay-driver,
+    and someone who has never felt one arrive has nothing to miss at day 14.
+
+    RULE 7 (the banner above binds here — this is a 1:1 message to a named
+    person about securities they self-selected): the ONLY personal fact quoted
+    is the COUNT of tickers they added, which is an ACTIVITY number and sits on
+    the permitted side of that table. No security is named, nothing is said
+    about how anything moved, and the alert is described by the MECHANISM it
+    watches — a measured value crossing a threshold the user sets — never by an
+    outcome it would have produced. "You'd have caught X" is the framing this
+    template exists to not make.
+
+    Rule 6: no urgency. The only time reference is `_calm_trial_note`, the
+    user's own real trial end date, rendered as a muted footnote.
+    """
+    noun = "ticker" if watchlist_count == 1 else "tickers"
+    return shell(
+        h1(f"You're watching {watchlist_count} {noun}, {user_name}.")
+        + lead(
+            "None of them has an alert rule on it yet. That means Tapeline only "
+            "tells you a number changed when you come and look."
+        )
+        + paragraph(
+            "An alert rule watches one measured condition and notifies you when "
+            "it's met. It reports what the factors measured and stops there — "
+            "what to make of it stays with you."
+        )
+        + card(
+            f"""
+            <ul style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
+              <li><strong>Score move</strong> — a ticker on your watchlist changes score by more than the number of points you choose.</li>
+              <li><strong>Squeeze condition</strong> — the short-interest and float measures cross the levels you set.</li>
+              <li><strong>Regime change</strong> — the market-wide readings Tapeline tracks shift from one state to another.</li>
+            </ul>
+            """
+        )
+        + button(
+            "Arm an alert",
+            "https://tapeline.io/app/watchlist?utm_source=email&utm_campaign=activation_arm_alerts&utm_medium=transactional",
+        )
+        + muted_paragraph(
+            "Your watchlist page carries a one-click card: it turns on browser "
+            "notifications, sends a sample straight away so you can see what one "
+            "looks like, and sets a score-move rule on a ticker you already "
+            "watch. Edit or delete it whenever you like."
+        )
+        + _calm_trial_note(trial_ends_at)
+        + footnote(
+            "Tapeline tells you a measured value moved. It doesn't tell you "
+            "what to do next. — Christian, founder."
+        ),
+        preheader=(
+            f"{watchlist_count} {noun} on your watchlist, no alert rule yet — "
+            f"one click arms one."
+        ),
     )
 
 
@@ -2274,6 +2577,272 @@ def render_annual_renewal_reminder_email(
         )
         + footnote("Questions about your bill? Reply to this email — billing@tapeline.io reads every one."),
         preheader=preheader_copy,
+    )
+
+
+def render_free_trial_invite_email(
+    user_name: str, *, open_access: bool = False, open_access_until: str = "",
+) -> str:
+    """Day ~3: the first (and usually only) invitation to start a trial.
+
+    This exists because the card-required trial left a hole: `run_daily_drip`
+    keys on `trial_ends_at IS NOT NULL`, and a new account now has no trial, so
+    nobody was ever asked. Activation nudges still fire (they key on
+    `activated_at`), but nothing invited the person to try Premium.
+
+    Two accuracy rules bind this copy, and both are easy to get wrong:
+
+    1. **Do not claim the scanner is locked while open access is running.** Until
+       PROMO_OPEN_ACCESS_UNTIL a signed-in Free user gets the same 1,000 scanner
+       rows Pro does. "Upgrade to unlock the full scanner" is *false* for them
+       today and true again on Sept 9 — so the promo case says so plainly and
+       sells only what Premium genuinely adds on top.
+    2. **State the trial terms here, not at the checkout wall.** The trial takes
+       a card. Someone should learn that from us, in the email doing the asking,
+       not discover it after clicking.
+    """
+    if open_access:
+        access_line = muted_paragraph(
+            f"Right now your Free account has the <strong>full scanner</strong> — "
+            f"every scored row, not the top ten — because open access is running "
+            f"until {open_access_until}. Nothing to do to get it; it is already on."
+        )
+        adds_intro = "What a trial adds on top of that:"
+    else:
+        access_line = muted_paragraph(
+            "Free gives you the top ten scored rows, the daily picks and the "
+            "whole public record, with no card and no expiry."
+        )
+        adds_intro = "What a trial adds:"
+
+    return shell(
+        h1(f"{user_name}, here's what else your account can do.")
+        + lead(
+            "You signed up a few days ago, so this is the one note explaining "
+            "what sits behind the Premium trial — and exactly what it costs to try."
+        )
+        + access_line
+        + muted_paragraph(adds_intro)
+        + card(
+            f"""
+            <ul style="margin:0;padding-left:18px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.75;">
+              <li><strong>Congressional trades</strong> — disclosed House and Senate buys and sells, by ticker</li>
+              <li><strong>Insider filings</strong> — SEC Form 4 transactions: date, insider, shares, value</li>
+              <li><strong>Analyst consensus</strong> per ticker</li>
+              <li><strong>Email alerts and the daily briefing</strong> — Free carries browser push only</li>
+              <li><strong>Your watchlist's own record</strong> — how each name you saved has scored since you added it</li>
+              <li><strong>CSV export and API access</strong></li>
+            </ul>
+            """
+        )
+        + paragraph(
+            "The trial runs 14 days and <strong>takes a card</strong>: "
+            "<strong>$0 is charged today</strong>, the first charge lands 14 days "
+            "later, and one click ends it before then with nothing taken. We email "
+            "you three days before that date, so it cannot arrive unannounced. "
+            "Say no and nothing changes — your Free account stays exactly as it is."
+        )
+        + button("See what's included", "https://tapeline.io/app/billing")
+        + footnote(
+            'Every daily pick we have ever published, including the ones that '
+            'lost, is at <a href="https://tapeline.io/scorecard" '
+            f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">tapeline.io/scorecard</a> — '
+            'readable without an account, before you decide anything.'
+        ),
+        preheader=(
+            "What the Premium trial adds, and exactly what it costs to try "
+            "($0 today, card required, one click to stop)."
+        ),
+    )
+
+
+def render_free_trial_last_invite_email(user_name: str) -> str:
+    """Day ~12: the second and final invitation. Then the series stops.
+
+    Deliberately not a harder sell than the first. The lesson already learned
+    here is that saturation is the failure mode — the three most engaged early
+    users each received six to ten automated touches and none of them converted.
+    So this leads with the least flattering fact we have, which is also the most
+    honest reason to trust the product, and then gets out of the way.
+    """
+    return shell(
+        h1("Last note about the trial.")
+        + lead(
+            f"{user_name}, this is the final message in this series — after it, "
+            f"you'll only hear from us for the things you asked for."
+        )
+        + paragraph(
+            "Most screeners show you a score and never mention what happened "
+            "next. We publish every daily top-ten pick the day it prints, append "
+            "the following session's move against SPY, and never edit it — losses "
+            "included."
+        )
+        + muted_paragraph(
+            "The honest state of that record is on the page: at the current "
+            "sample the picks do not beat SPY, and we label it as not "
+            "distinguishable from chance rather than hiding it. That is the "
+            "thing worth judging us on, and you can read it without an account."
+        )
+        + button("Read the record", "https://tapeline.io/scorecard")
+        + muted_paragraph(
+            "If it holds up for you, the 14-day Premium trial is on the billing "
+            "page — card required, $0 today, one click to stop before the first "
+            "charge. If not, your Free account stays open and unchanged."
+        )
+        + footnote(
+            "That's the end of this series. — Christian, founder."
+        ),
+        preheader="The last note — our published record, losses included.",
+    )
+
+
+def render_trial_started_email(
+    user_name: str,
+    *,
+    tier: str,
+    amount_label: str,
+    charge_date_label: str,
+) -> str:
+    """Confirmation that a CARD-REQUIRED trial has started.
+
+    Deliberately NOT the welcome-to-paid receipt. `customer.subscription.created`
+    fires with status "trialing" the moment a card trial begins, and sending the
+    purchase receipt there would tell someone who has paid nothing that they are
+    "in" on a $19.99/mo plan — a receipt for a charge that never happened. That
+    is precisely the confusion that produces "I never agreed to pay" disputes,
+    and it would be a self-inflicted wound for a product whose whole claim is
+    that it does not misstate things.
+
+    So this email does the opposite of a receipt: it repeats the terms the user
+    just agreed to, in the same words the checkout used, and makes the exit
+    obvious. The paid receipt fires later, when the first real charge clears.
+    """
+    tier_label = tier.capitalize()
+    return shell(
+        h1(f"Your {tier_label} trial has started.")
+        + lead(
+            f"{user_name}, everything is unlocked for the next 14 days. "
+            f"<strong>Nothing has been charged.</strong>"
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;'
+            f'letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">The terms, in full</div>'
+            f'<div class="tl-fg" style="margin-top:8px;color:{LIGHT_FG};font-size:14px;'
+            f'line-height:1.7;font-family:{FONT_SANS};">'
+            f"Charged today: <strong>$0</strong>.<br>"
+            f"First charge: <strong>{charge_date_label}</strong>, for {amount_label}.<br>"
+            f"Cancel before then and you are charged <strong>nothing at all</strong>."
+            f"</div>",
+            accent=True,
+        )
+        + muted_paragraph(
+            "We will email you three days before that date, so the charge will "
+            "not arrive unannounced. Cancelling takes one click in Billing — no "
+            "email, no phone call, no retention questions."
+        )
+        + button("Open the scanner", "https://tapeline.io/app/scanner")
+        + footnote(
+            'Your card is held by Stripe; we never see the number. '
+            '<a href="https://tapeline.io/app/billing" '
+            f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">Manage or cancel</a>.'
+        ),
+        preheader=(
+            f"Nothing charged today. First charge {charge_date_label} — "
+            f"cancel before then and you pay nothing."
+        ),
+    )
+
+
+def render_trial_canceled_email(user_name: str, *, tier: str) -> str:
+    """Sent when a trial is cancelled BEFORE the first charge.
+
+    The one thing a person wants confirmed at this moment is that no money will
+    be taken. Say it first, say it plainly, and do not spend the email trying to
+    win them back — a cancellation confirmation that argues with you is how a
+    company earns a chargeback instead of a second look later.
+    """
+    tier_label = tier.capitalize()
+    return shell(
+        h1("Cancelled — you have not been charged.")
+        + lead(
+            f"{user_name}, your {tier_label} trial is cancelled and "
+            f"<strong>no payment was taken</strong>. There is nothing "
+            f"outstanding and nothing scheduled."
+        )
+        + muted_paragraph(
+            "Your account stays on the Free tier, so the scanner, the daily "
+            "top-10 and the public record are all still open to you. Anything "
+            "you saved is where you left it."
+        )
+        + button("Open the scanner", "https://tapeline.io/app/scanner")
+        + footnote(
+            "If it was something we got wrong, replying to this email reaches "
+            "me directly. — Christian, founder."
+        ),
+        preheader="Cancelled — no payment was taken, and nothing is scheduled.",
+    )
+
+
+def render_trial_precharge_reminder_email(
+    user_name: str,
+    *,
+    tier: str,
+    amount_label: str,
+    charge_date_label: str,
+) -> str:
+    """T-3 pre-charge notice for a CARD-REQUIRED trial.
+
+    This email is not optional and it is not marketing. A trial that collects a
+    card up front and then charges it without warning is the exact pattern that
+    generates chargebacks and the billing-dispute complaints that dominate this
+    category's reviews — and it would be indefensible for a product whose whole
+    claim is that it does not misstate things. So: state the date, state the
+    amount, and make stopping it one click.
+
+    Deliberately NOT part of `run_daily_drip`. That drip is filtered to
+    `stripe_customer_id IS NULL` and its day-11/13 CTAs are signed Stripe
+    *Checkout* links — pointed at someone who already has a subscription they
+    would open a second one. This is fired from the Stripe
+    `customer.subscription.trial_will_end` webhook instead, so the date quoted
+    is Stripe's own trial_end and cannot drift from what will actually be
+    charged. The CTA goes to billing (portal/cancel), never to checkout.
+
+    No urgency language, no scarcity, no retention pitch. If someone wants to
+    stop, the job of this email is to help them stop.
+    """
+    tier_label = tier.capitalize()
+    return shell(
+        h1("Your trial ends in 3 days.")
+        + lead(
+            f"{user_name}, a heads-up before anything is charged: your "
+            f"<strong>{tier_label}</strong> trial ends on "
+            f"<strong>{charge_date_label}</strong>."
+        )
+        + card(
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;'
+            f'letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">What happens next</div>'
+            f'<div class="tl-fg" style="margin-top:8px;color:{LIGHT_FG};font-size:14px;'
+            f'line-height:1.7;font-family:{FONT_SANS};">'
+            f"On {charge_date_label} the card you added is charged "
+            f"<strong>{amount_label}</strong> and {tier_label} continues.<br>"
+            f"Cancel before then and you are charged <strong>nothing at all</strong>."
+            f"</div>",
+            accent=True,
+        )
+        + button("Manage or cancel", "https://tapeline.io/app/billing")
+        + muted_paragraph(
+            "Cancelling takes one click on that page — no email, no phone call, "
+            "no retention questions. If you keep it, there is nothing to do."
+        )
+        + footnote(
+            "You are getting this because you started a trial with a card on "
+            "file. It is a billing notice, so it is sent whether or not you "
+            "receive our other email."
+        ),
+        preheader=(
+            f"Your trial ends {charge_date_label} — {amount_label} then, "
+            f"or cancel in one click and pay nothing."
+        ),
     )
 
 
@@ -2643,8 +3212,30 @@ async def run_eod_watchlist_digest(
         if not items:
             continue
 
+        # Cardless trialist in the final 3 days: append one calm, factual
+        # line naming the real expiry. This digest is the one guaranteed
+        # daily inbox touch of the engaged-trialist cohort (a watchlist is
+        # required to receive it) and previously carried no trial context at
+        # all — the T-3/T-1 drip emails could land while the user's daily
+        # email said nothing. Truthful deadline only; no countdown framing.
+        trial_note = None
+        from datetime import UTC, timedelta
+        _now = datetime.now(UTC)
+        if (
+            user.trial_ends_at is not None
+            and user.stripe_customer_id is None
+            and _now < user.trial_ends_at <= _now + timedelta(days=3)
+        ):
+            trial_note = (
+                f"A quiet note: this daily digest is part of Pro. Your trial "
+                f"ends {user.trial_ends_at:%A, %B} {user.trial_ends_at.day} — "
+                f"plans are at tapeline.io/pricing if you want to keep it."
+            )
+
         try:
-            html = render_eod_watchlist_digest(user.name or "trader", items)
+            html = render_eod_watchlist_digest(
+                user.name or "trader", items, trial_note=trial_note
+            )
             res = await send_email(
                 user.email, f"Tapeline EOD · {_today_short()}", html,
                 persona="alerts",
@@ -2808,8 +3399,13 @@ async def run_daily_drip(
                             user.name or "trader", summary, checkout_urls=cu,
                         )
                     elif token == "expired":
+                        # The T+0 email may state the one-time 50%-off save
+                        # offer only when checkout will actually apply it —
+                        # same gate as POST /checkout and /api/me.
+                        from app.services.billing import trial_save_offer_eligible
                         html = render_trial_expired_email(
                             user.name or "trader", summary, checkout_urls=cu,
+                            save_offer=trial_save_offer_eligible(user),
                         )
                     else:
                         html = renderer(user.name or "trader", summary)
@@ -3553,6 +4149,10 @@ async def run_activation_drip(
                     zero-setup surface: the public scorecard. Free is excluded
                     (kept off the Pro-only cohort); token name is historical.
 
+    A THIRD stage, "act_arm", runs after those two on the INVERSE cohort — a
+    user who HAS built a watchlist and has zero alert rules. See its own block
+    below for why it can't share the loop.
+
     Bounded signup windows (not just a lower bound) keep the nudge timely — we
     don't email someone who signed up two months ago. A daily run catches each
     user once inside the window; the drip_state token prevents a repeat if
@@ -3562,14 +4162,14 @@ async def run_activation_drip(
     """
     from datetime import UTC, datetime, timedelta
 
-    from sqlalchemy import exists, select
+    from sqlalchemy import exists, func, select
 
     from app.models import AlertRule, ScannerPreset, User, WatchlistItem
     from app.services.email_prefs import EmailPref, wants
     from app.services.lifecycle import ActivitySnapshot, has_recorded_activity
 
     now = datetime.now(UTC)
-    counts = {"act_wl": 0, "act_alert": 0}
+    counts = {"act_wl": 0, "act_alert": 0, "act_arm": 0}
 
     # Cheap "no durable activation artefact" pre-filter pushed into SQL for
     # volume. The Python has_recorded_activity() re-check below re-tests these
@@ -3635,7 +4235,21 @@ async def run_activation_drip(
             ):
                 continue
             try:
-                html = renderer(user.name or "trader")
+                if token == "act_wl":
+                    # act_wl reaches every tier; the watchlist step-one is a
+                    # dead end for a Free recipient after the 2026-08-02 cutover
+                    # (watchlist is Pro-and-up). Paid/trial recipients keep it.
+                    # Call the renderer directly (not via the loop's `renderer`,
+                    # which mypy narrows to the two stages' common (str)->str
+                    # signature and would reject the has_watchlist kwarg).
+                    recipient_has_watchlist = (
+                        user.tier in ("pro", "premium") or free_has_watchlist()
+                    )
+                    html = render_activation_watchlist_email(
+                        user.name or "trader", has_watchlist=recipient_has_watchlist
+                    )
+                else:
+                    html = renderer(user.name or "trader")
                 res = await send_email(
                     user.email, subject, html,
                     persona="default",
@@ -3655,6 +4269,102 @@ async def run_activation_drip(
                 logger.exception(
                     "activation.send_failed user=%s stage=%s", user.id, token,
                 )
+
+    # ── act_arm — the ENGAGED trialist: watchlist built, zero alert rules ────
+    #
+    # This is the INVERSE cohort of the two stages above, which is why it can't
+    # share their loop: they require no recorded activity, and this one requires
+    # a WatchlistItem, so the shared has_recorded_activity() re-check would
+    # suppress every candidate. It also needs a per-user count the stage tuple
+    # has no way to carry.
+    #
+    # The gap it closes: a trialist who curated a watchlist and never armed an
+    # alert was excluded from EVERY behaviour-triggered email, because all of
+    # them keyed off inactivity — while being the highest-intent cohort in the
+    # trial. Alerts are the #1 pay-driver; someone who has never felt one has
+    # nothing to miss at day 14.
+    #
+    # DELIBERATELY NOT in lifecycle.ACTIVATION_SERIES_TOKENS. That cap exists to
+    # stop hammering people who never engaged; this fires only for people who
+    # did. Folding it into that budget would let three ignored dormant nudges
+    # permanently block the one message aimed at an engaged user. The governor
+    # still binds — the token is passed to allows(), so the min-gap and weekly
+    # LIFECYCLE ceiling apply, and adding it to the series cap later is a
+    # one-line change.
+    #
+    # Window: 2-10 days after signup. The lower bound gives the watchlist time
+    # to exist; the upper bound keeps it inside a 14-day trial and clear of the
+    # day-13 trial email.
+    arm_users = (
+        await session.execute(
+            select(User).where(
+                User.created_at >= now - timedelta(days=10),
+                User.created_at < now - timedelta(days=2),
+                User.tier.in_(["pro", "premium"]),
+                exists().where(WatchlistItem.user_id == User.id),
+                ~exists().where(AlertRule.user_id == User.id),
+            )
+        )
+    ).scalars().all()
+
+    arm_candidates = [
+        u for u in arm_users
+        if u.email
+        and "act_arm" not in ((u.drip_state or "").split(","))
+        and wants(u, EmailPref.TRIAL_DRIP)
+    ]
+    # One grouped count for the whole cohort rather than a query per user — the
+    # rendered copy quotes this number, so it has to be the real one.
+    wl_counts: dict[str, int] = {}
+    if arm_candidates:
+        wl_counts = dict(
+            (
+                await session.execute(
+                    select(WatchlistItem.user_id, func.count(WatchlistItem.id))
+                    .where(WatchlistItem.user_id.in_([u.id for u in arm_candidates]))
+                    .group_by(WatchlistItem.user_id)
+                )
+            ).all()
+        )
+
+    for user in arm_candidates:
+        wl_count = wl_counts.get(user.id, 0)
+        if wl_count < 1:
+            # Raced: the last item was removed between the EXISTS filter and the
+            # count. "You're watching 0 tickers" is worse than not sending.
+            continue
+        if governor is not None and not governor.allows(
+            user, SendClass.LIFECYCLE, token="act_arm",
+        ):
+            continue
+        try:
+            html = render_activation_arm_alerts_email(
+                user.name or "trader",
+                watchlist_count=wl_count,
+                trial_ends_at=user.trial_ends_at,
+            )
+            res = await send_email(
+                user.email,
+                "Your Tapeline watchlist has no alert rule yet",
+                html,
+                persona="default",
+                unsubscribe_user_id=user.id,
+                unsubscribe_category="trial_drip",
+            )
+            if not res.get("skipped", False):
+                sent_tokens = set((user.drip_state or "").split(",")) - {""}
+                sent_tokens.add("act_arm")
+                user.drip_state = ",".join(sorted(sent_tokens))
+                # Per-user commit; a deploy SIGTERM must not roll back a delivered send.
+                await session.commit()
+                counts["act_arm"] += 1
+                any_sent = True
+                if governor is not None:
+                    governor.record(user, SendClass.LIFECYCLE)
+        except Exception:
+            logger.exception(
+                "activation.send_failed user=%s stage=act_arm", user.id,
+            )
 
     if any_sent:
         await session.commit()
@@ -3788,6 +4498,140 @@ async def run_activation_nudge_drip(
             except Exception:
                 logger.exception(
                     "activation_nudge.send_failed user=%s stage=%s",
+                    user.id, token,
+                )
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
+async def run_free_trial_invite_drip(
+    session, *, governor: FrequencyGovernor | None = None, now=None,
+) -> dict[str, int]:
+    """Invite a FREE account to start the (card-required) Premium trial.
+
+    This closes a hole the card-required change opened. `run_daily_drip` keys on
+    `trial_ends_at IS NOT NULL`; a new account no longer has a trial, so every
+    conversion message in that drip became unreachable for new signups — nobody
+    was ever asked. It cannot be fixed by relaxing that filter either: the day
+    11/13 stages say "add a card" and their CTAs are signed Stripe *Checkout*
+    links, which for a card-on-file user would open a SECOND subscription.
+
+    So this is a separate, deliberately SHORT series — two messages, then it
+    stops:
+
+      "free_invite1"  ~3-6 days after signup. What Premium adds, and the trial's
+                      real terms (card, $0 today, one click to stop).
+      "free_invite2"  ~12-16 days. One last note led by the published record,
+                      then silence.
+
+    Two messages is the whole design, not a starting point. The three most
+    engaged early users received six to ten automated touches each and none
+    converted; saturation is the demonstrated failure mode here, not
+    under-messaging.
+
+    Audience is strictly the un-asked: tier FREE, never started a trial
+    (`trial_started_at IS NULL`), and no Stripe customer. Anyone who has trialled
+    or holds a card is excluded — they are already in a different conversation.
+    Windows are bounded on BOTH ends so a worker that was down for a fortnight
+    cannot wake up and mail a backlog at once.
+
+    Gated on EmailPref.TRIAL_DRIP, unsubscribe-aware via the governor, and a
+    no-op without RESEND_API_KEY (send_email returns skipped:True, so no token
+    is stamped and the user is simply retried next tick).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+    from app.services.tier import PROMO_OPEN_ACCESS_UNTIL, free_open_access
+
+    now = now or datetime.now(UTC)
+    counts = {"free_invite1": 0, "free_invite2": 0}
+
+    # Only people who have never been asked. A trial-starter or card-holder is
+    # in another sequence entirely and must not receive an invitation to do the
+    # thing they already did.
+    never_trialled = [
+        User.tier == "free",
+        User.trial_started_at.is_(None),
+        User.stripe_customer_id.is_(None),
+        User.trial_ends_at.is_(None),
+    ]
+
+    open_access = free_open_access()
+    open_until = f"{PROMO_OPEN_ACCESS_UNTIL:%B} {PROMO_OPEN_ACCESS_UNTIL.day}"
+
+    stages = [
+        (
+            "free_invite1",
+            now - timedelta(days=6), now - timedelta(days=3),
+            lambda name: render_free_trial_invite_email(
+                name, open_access=open_access, open_access_until=open_until,
+            ),
+            "What else your Tapeline account can do",
+        ),
+        (
+            "free_invite2",
+            now - timedelta(days=16), now - timedelta(days=12),
+            render_free_trial_last_invite_email,
+            "Last note — our published record",
+        ),
+    ]
+
+    any_sent = False
+    for token, lower, upper, renderer, subject in stages:
+        users = (
+            await session.execute(
+                select(User).where(
+                    User.created_at >= lower,
+                    User.created_at < upper,
+                    *never_trialled,
+                )
+            )
+        ).scalars().all()
+
+        for user in users:
+            if not user.email:
+                continue
+            sent_tokens = set((user.drip_state or "").split(",")) - {""}
+            if token in sent_tokens:
+                continue
+            # Never send the second note to someone who never got the first —
+            # a worker outage across the first window would otherwise make the
+            # "last note" the only note, which reads as a non-sequitur.
+            if token == "free_invite2" and "free_invite1" not in sent_tokens:
+                continue
+            if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=token,
+            ):
+                continue
+            try:
+                html = renderer(user.name or "trader")
+                res = await send_email(
+                    user.email, subject, html,
+                    persona="sales",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="trial_drip",
+                )
+                if not res.get("skipped", False):
+                    sent_tokens.add(token)
+                    user.drip_state = ",".join(sorted(sent_tokens))
+                    # Per-user commit; a deploy SIGTERM must not roll back a
+                    # delivered send and re-mail the person tomorrow.
+                    await session.commit()
+                    counts[token] += 1
+                    any_sent = True
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
+            except Exception:
+                logger.exception(
+                    "free_trial_invite.send_failed user=%s stage=%s",
                     user.id, token,
                 )
 

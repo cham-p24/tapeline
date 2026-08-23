@@ -180,8 +180,14 @@ def _random_email() -> str:
 async def test_signup_signin_me_full_flow(client, monkeypatch):
     """The most critical revenue path — signup creates a user, returns a
     session cookie, and /api/me with that cookie reflects the authenticated
-    state including the auto-started Premium trial. If this test breaks,
-    no new user can convert.
+    state. If this test breaks, no new user can convert.
+
+    Signup is FREE and card-free: it no longer auto-grants a Premium trial.
+    The 14-day trial is a separate, opt-in, card-required step (POST
+    /api/billing/checkout {"start_trial": true}) — pinned in
+    test_card_required_trial.py. Asserted here too, because "the account we
+    just created cannot be billed for anything" is part of what this
+    critical-path test exists to guarantee.
     """
     # Bypass Turnstile in tests — local .env may have the secret set.
     # The actual Turnstile flow is exercised by the e2e signup test in
@@ -205,8 +211,13 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert r.status_code == 200, f"signup failed: {r.status_code} {r.text}"
         body = r.json()
         assert body["user"]["email"] == email
-        assert body["user"]["tier"] == "premium", "trial should auto-start at Premium"
-        assert body["user"]["trial_ends_at"] is not None
+        assert body["user"]["tier"] == "free", (
+            "signup must land on FREE — the Premium trial is card-required "
+            "and opt-in, never granted by account creation"
+        )
+        assert body["user"]["trial_ends_at"] is None, (
+            "no trial, therefore no first-charge date, at signup"
+        )
         assert body["user"]["referral_code"] is not None
         # Session cookie set
         assert "tapeline_session" in r.cookies or any(
@@ -220,12 +231,27 @@ async def test_signup_signin_me_full_flow(client, monkeypatch):
         assert r2.status_code == 200
         me = r2.json()
         assert me["authenticated"] is True
-        assert me["tier"] == "premium"
+        assert me["tier"] == "free"
+        assert me["on_trial"] is False
 
-        # 3. Signin with the same creds returns a fresh cookie + user dict
+        # 3. Signin with the same creds returns a fresh cookie + user dict.
+        #    Sent from an already-trusted browser: signing in from an
+        #    UNRECOGNISED device returns an emailed-code challenge instead of a
+        #    session (see tests/test_signin_email_codes.py), which is a
+        #    different flow than the one this smoke test covers.
+        from app.services.signin_codes import (
+            TRUSTED_DEVICE_COOKIE,
+            issue_trusted_device_token,
+        )
+
         r3 = await client.post(
             "/api/auth/signin",
             json={"email": email, "password": password},
+            cookies={
+                TRUSTED_DEVICE_COOKIE: issue_trusted_device_token(
+                    body["user"]["id"], 0
+                )
+            },
         )
         assert r3.status_code == 200
         assert r3.json()["user"]["email"] == email
@@ -280,15 +306,22 @@ def test_email_normalisation():
 
 
 def test_ip_signup_rate_limit():
-    """3 signups per IP per 24h is the hard cap."""
-    from app.services.trial_abuse import record_signup, signup_allowed, signup_count_24h
+    """The per-IP signup cap (MAX_PER_IP_PER_24H) is enforced per 24h. Tracks the
+    constant rather than a hardcoded number so tuning the cap (raised 3 -> 25 to
+    stop 429ing legitimate shared/CGNAT paid traffic) doesn't break this guard."""
+    from app.services.trial_abuse import (
+        MAX_PER_IP_PER_24H,
+        record_signup,
+        signup_allowed,
+        signup_count_24h,
+    )
     ip = "10.20.30.40"  # never used elsewhere in tests
     assert signup_count_24h(ip) == 0
-    for _ in range(3):
+    for _ in range(MAX_PER_IP_PER_24H):
         assert signup_allowed(ip)
         record_signup(ip)
-    assert not signup_allowed(ip), "4th signup must be blocked"
-    assert signup_count_24h(ip) == 3
+    assert not signup_allowed(ip), "signup past the cap must be blocked"
+    assert signup_count_24h(ip) == MAX_PER_IP_PER_24H
 
 
 def test_fingerprint_cap_is_tolerant():
@@ -310,7 +343,7 @@ async def test_signup_ip_cap_keys_off_xforwarded_for(client, monkeypatch):
     """Regression guard for the global-cap bug. Behind Fly's edge proxy,
     request.client.host is the proxy's internal peer IP (identical for every
     visitor), so the per-IP signup cap MUST key off X-Forwarded-For — otherwise
-    it collapses into a GLOBAL 3-per-24h limit that 429s everyone. We prove the
+    it collapses into a GLOBAL per-IP limit that 429s everyone. We prove the
     fix by confirming the signup is accounted under the XFF client IP, not the
     loopback test-client IP. If the handler reverts to request.client.host, the
     count under the XFF IP stays 0 and this fails."""
@@ -757,13 +790,18 @@ async def test_growth_bot_preview_returns_full_payload(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_growth_bot_run_respects_kill_switch(client, monkeypatch):
-    """When GROWTH_BOT_ENABLED=false (default), POST .../run returns skipped."""
+    """GROWTH_BOT_ENABLED=false must short-circuit the tick.
+
+    The default flipped to ON at the founder's request (2026-08-08), so the
+    kill switch is now exercised explicitly rather than via the default —
+    which is the stronger assertion anyway: the env var must always win."""
+    import app.services.growth_bot as gb
     from app.db import session_scope
     from app.services.growth_bot import run_daily_growth_tick
 
+    monkeypatch.setattr(gb.settings, "growth_bot_enabled", False)
     async with session_scope() as s:
         result = await run_daily_growth_tick(s)
-        # Default is disabled — must short-circuit
         assert result.get("skipped") is True
         assert result.get("reason") == "disabled"
 

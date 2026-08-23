@@ -29,15 +29,22 @@ class TokenBucket:
         async with self._lock:
             now = time.monotonic()
             b = self._buckets[key]
-            if b.capacity == 0:  # first use, initialize
-                b.capacity = capacity
-                b.refill_rate = capacity / per_seconds
-                b.tokens = capacity
-                b.last_refill = now
+            refill_rate = capacity / per_seconds
+            if b.capacity == 0:  # first use for this key
+                b.tokens = float(capacity)
             else:
-                elapsed = now - b.last_refill
-                b.tokens = min(b.capacity, b.tokens + elapsed * b.refill_rate)
-                b.last_refill = now
+                # Honor the CURRENT (capacity, per_seconds), not whatever the
+                # first caller froze in. Previously this else-branch reused
+                # b.capacity/b.refill_rate, so if a key was ever consumed with
+                # two different caps the FIRST one won forever — which silently
+                # killed limit_strict's 10/min cap once the 120/min middleware
+                # limiter initialized the shared key. Callers now also namespace
+                # their keys (api:/strict:/auth:), so a key maps to one cap; this
+                # keeps it correct even if that ever changes.
+                b.tokens = min(float(capacity), b.tokens + (now - b.last_refill) * refill_rate)
+            b.last_refill = now
+            b.capacity = float(capacity)
+            b.refill_rate = refill_rate
 
             if b.tokens >= cost:
                 b.tokens -= cost
@@ -49,9 +56,27 @@ limiter = TokenBucket()
 
 
 def client_ip(request: Request) -> str:
-    """Best client IP. Prefer Cloudflare's un-forgeable cf-connecting-ip header
-    (set by the proxy, not the client), then fall back to the leftmost
-    X-Forwarded-For token, then the direct socket peer."""
+    """Best client IP, resolved for the actual topology (DNS-only Cloudflare).
+
+    tapeline.io / api.tapeline.io use Cloudflare for DNS ONLY — there is no
+    Cloudflare proxy in front of the origin, so every external request reaches
+    Fly's edge directly and Fly stamps the REAL client IP into `Fly-Client-IP`.
+    A client cannot forge that header: Fly's proxy sets it from the actual TCP
+    peer (overwriting any client-supplied value), and the app's internal port
+    is only reachable through that proxy. So in prod that header is present and
+    authoritative — key on it.
+
+    We deliberately do NOT trust `cf-connecting-ip` or the leftmost
+    `X-Forwarded-For` in production: with no Cloudflare proxy, both are just
+    attacker-supplied strings, and honoring them let a client rotate a fake IP
+    per request to sail past limit_auth and the per-IP signup cap. Those headers
+    survive only as a LOCAL-DEV convenience — reached solely when Fly-Client-IP
+    is absent (i.e. not running on Fly), where there is no adversary.
+    """
+    fly_ip = (request.headers.get("Fly-Client-IP") or "").strip()
+    if fly_ip:
+        return fly_ip
+    # Not on Fly (local dev / tests): old header order, no adversary here.
     xff = request.headers.get("X-Forwarded-For", "")
     return (
         request.headers.get("cf-connecting-ip")
@@ -61,23 +86,48 @@ def client_ip(request: Request) -> str:
 
 
 def _client_key(request: Request) -> str:
-    """Prefer Authorization user, fall back to IP."""
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        return f"tok:{auth[-20:]}"  # last 20 chars is enough to distinguish users
+    """Rate-limit bucket key. ALWAYS the client IP.
+
+    This used to prefer the Authorization header ("tok:" + its last 20 chars) so
+    authenticated users got their own bucket. That header is NOT verified here —
+    the limiter runs in middleware, long before any token is validated — so the
+    key was entirely attacker-chosen: sending `Authorization: Bearer <random>`
+    minted a brand-new empty bucket on every request, and rotating the random
+    part made limit_api (120/min) and limit_strict (10/min) unenforceable. Any
+    scraper or credential-stuffer could opt out of rate limiting by adding one
+    header, which is strictly worse than having no per-user bucketing at all.
+
+    Keying on the IP is safe because client_ip() reads Fly-Client-IP, which Fly
+    sets from the real TCP peer and a client cannot forge (see client_ip). The
+    cost is that several users behind one NAT share a bucket — the same
+    behaviour anonymous traffic already had, and the correct trade against a
+    trivially-bypassable limit.
+
+    (Genuine per-user fairness would need verified identity, which is only
+    available after auth resolution — i.e. inside the endpoint, not here. Our
+    own SSR is handled separately by the INTERNAL_SSR_TOKEN exemption in
+    main.py, and API keys carry their own per-account daily quota.)
+    """
     return f"ip:{client_ip(request)}"
 
 
 async def limit_api(request: Request, capacity: int = 120, per_seconds: int = 60) -> None:
     """Default: 120 req/min per client. Strict enough to stop abusers, loose for humans."""
-    ok = await limiter.consume(_client_key(request), capacity, per_seconds)
+    # Namespaced key: the global middleware calls this on every /api/* request,
+    # so it must NOT share a bucket with limit_strict (which would let the
+    # 120/min budget satisfy the strict endpoints' intended 10/min cap).
+    ok = await limiter.consume(f"api:{_client_key(request)}", capacity, per_seconds)
     if not ok:
         raise HTTPException(status_code=429, detail="Too many requests. Slow down.")
 
 
 async def limit_strict(request: Request) -> None:
-    """Tighter limit for expensive endpoints (briefing send, checkout)."""
-    ok = await limiter.consume(_client_key(request), 10, 60)
+    """Tighter limit (10/min) for expensive endpoints (briefing send, checkout).
+
+    Its own `strict:` namespace so the always-first middleware limit_api bucket
+    can't pre-initialize and swallow this cap.
+    """
+    ok = await limiter.consume(f"strict:{_client_key(request)}", 10, 60)
     if not ok:
         raise HTTPException(status_code=429, detail="Too many requests.")
 

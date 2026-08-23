@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, errorMessage } from "@/lib/api";
 import { CardSkeleton } from "@/components/Skeleton";
+import { Input } from "@/components/Input";
 
 /**
  * Account security — two-factor authentication (TOTP).
@@ -263,14 +264,14 @@ export default function SecuritySettingsPage() {
         {showDisable && (
           <form onSubmit={doDisable} className="mt-6 border-t border-border pt-6">
             <div className="font-medium text-sm">Confirm your password to turn off 2FA</div>
-            <input
+            <Input
               type="password"
               autoComplete="current-password"
               value={disablePassword}
               onChange={(e) => setDisablePassword(e.target.value)}
               placeholder="Your account password"
               required
-              className="mt-2 block h-11 w-full max-w-xs rounded-md border border-border bg-panel px-3 text-base focus:border-accent focus:outline-none"
+              className="mt-2 max-w-xs"
             />
             {err && <p className="mt-4 text-sm text-down">{err}</p>}
             <div className="mt-5 flex gap-3">

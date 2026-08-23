@@ -6,6 +6,24 @@
 
 # Show HN — alternative variants
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 `LAUNCH_PLAYBOOK.md` §1 has the primary draft (focus: public formula + public
 scorecard, 14-day trial mention). This file holds two alternate angles in
 case the primary doesn't feel right on Tuesday morning. All three are
@@ -36,7 +54,7 @@ The scorecard is the part I want HN to tear apart. It's the only thing I've ever
 Free tier: top 20 tickers, 24h delay, 5-name watchlist.
 Pro $8.25/mo billed annually: full live universe + smart alerts.
 Premium $19.99/mo: + Congress trades + SEC Form 4 + Telegram.
-14-day Premium trial, no card.
+14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
 Built solo over the last few months from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and what factors I'm under-weighting.
 ```
@@ -75,7 +93,7 @@ Weights are version-controlled. /scorecard is uneditable history. /changelog log
 
 Stack: Next.js 16 + FastAPI + Polygon/Massive + Finnhub + FRED, deployed on Vercel + Fly.io. Source for the scoring formula and the scorecard back-check service is open on /how-it-works in pseudocode form (the production code is closed but mirror-able from the published spec).
 
-Free tier: top 20 tickers, 24h delay. Pro $8.25/mo annual. Premium $16.58/mo annual. 14-day trial, no card.
+Free tier: top 20 tickers, 24h delay. Pro $8.25/mo annual. Premium $16.58/mo annual. 14-day Premium trial takes a card — $0 today, first charge on day 14, one click to cancel.
 
 What I want HN to break: the methodology. The Smart Money sub-score in particular — I weight Form 4 over 13F because the lag math kills 13F-driven signals, but I'd love to be argued out of it.
 ```

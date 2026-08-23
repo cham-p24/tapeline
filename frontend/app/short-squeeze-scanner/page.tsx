@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // 5-minute server-cache. Fresh enough to feel live, cheap enough that
 // crawler hits + thundering-herd organic traffic doesn't hammer the API.
@@ -44,6 +45,7 @@ async function fetchSqueeze(): Promise<{ items: SqueezeRow[]; live: boolean }> {
   try {
     const res = await fetch(`${API_BASE}/api/public/squeeze?limit=5`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to SHOWCASE_ROWS below.
@@ -130,7 +132,7 @@ export default async function ShortSqueezeScannerPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Squeeze Watch is a Pro feature ($8.25/mo billed annually, or $9.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades, recent insider buys via SEC Form 4, and unlimited Telegram alerts on top of everything in Pro.",
+          a: "Squeeze Watch is a Pro feature ($8.25/mo billed annually, or $9.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades, recent insider buys via SEC Form 4 on top of everything in Pro.",
         },
       ]}
       tier="pro"

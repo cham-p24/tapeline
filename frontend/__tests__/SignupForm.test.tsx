@@ -1,7 +1,11 @@
 /**
  * Signup page tests:
  *   - the offscreen honeypot field (bot-protection layer depends on it)
- *   - core fields + trial commitment copy
+ *   - core fields, and the CARD RULE stated honestly. Since 2026-08 this form
+ *     creates a FREE account and nothing else: no card, no trial. The 14-day
+ *     Premium trial is a separate opt-in on the next screen and it DOES take a
+ *     card, so every "no credit card" line here must qualify the account, not
+ *     the trial. The page must also contain NO card input of any kind.
  *   - source-aware (message-match) headlines driven by ?from=, the funnel
  *     fix that carries an ad/landing-page promise through to the signup H1
  *     instead of showing cold traffic a generic form.
@@ -12,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SignUpPage from "@/app/signup/page";
-import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 
 vi.mock("@/lib/auth", () => ({
   authApi: {
@@ -31,6 +35,14 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/fingerprint", () => ({
   deviceFingerprint: vi.fn().mockResolvedValue("aabbccddeeff0011"),
 }));
+
+// Analytics: only `trackEvent` is intercepted, so the funnel assertions below
+// see real calls without the rest of lib/gtag being stubbed out.
+const trackEventMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/gtag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/gtag")>();
+  return { ...actual, trackEvent: trackEventMock };
+});
 
 // Override the global next/navigation stub so each test can drive the
 // ?from=/?plan= search params and assert on router.push. vi.hoisted keeps
@@ -58,6 +70,7 @@ let oauthProviders = { google: true, microsoft: false, apple: false };
 beforeEach(() => {
   nav.search = new URLSearchParams();
   routerSpies.push.mockClear();
+  trackEventMock.mockClear();
   oauthProviders = { google: true, microsoft: false, apple: false };
   vi.stubGlobal(
     "fetch",
@@ -129,11 +142,71 @@ describe("SignUpPage", () => {
     );
   });
 
-  it("renders the coherent value strip (free forever + money-back, not just the trial)", () => {
+  it("renders the coherent value strip, with the card rule attached to the right thing", () => {
     render(<SignUpPage />);
+    // CHANGED TWICE. #536 moved "no credit card" off the trial and onto the
+    // account. #548 then put a card wall at first sign-in, so the account is
+    // not card-free either — the strip must lead with the card and the amount.
     expect(
-      screen.getByText(/Free forever.*No credit card.*14-day Premium trial.*30-day money-back/i),
+      screen.getByText(
+        /14-day Premium trial.*Card added at first sign-in, \$0 charged today.*Cancel in one click.*30-day money-back/i,
+      ),
     ).toBeInTheDocument();
+  });
+
+  // ── The card rule, stated before an account exists ────────────────────────
+
+  it("contains NO card input of any kind", () => {
+    const { container } = render(<SignUpPage />);
+    const inputs = Array.from(container.querySelectorAll("input, select, textarea"));
+    const cardish = /card|cc-|cvc|cvv|expiry|exp-|postal|billing/i;
+    for (const el of inputs) {
+      expect(el.getAttribute("name") ?? "").not.toMatch(cardish);
+      expect(el.getAttribute("id") ?? "").not.toMatch(cardish);
+      expect(el.getAttribute("autocomplete") ?? "").not.toMatch(cardish);
+    }
+  });
+
+  it("never promises a card-free TRIAL (the free account is what takes no card)", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    // The exact claim that stopped being true.
+    expect(text).not.toMatch(/(?:14[- ]day|Premium) trial[^.]{0,40}no (?:credit )?card/i);
+    expect(text).not.toMatch(/no (?:credit )?card[^.]{0,25}(?:14[- ]day|Premium) trial/i);
+  });
+
+  it("states the trial's charge terms up front: card at sign-in, $0 today, first charge at day 14, one-click exit", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toMatch(/at first sign-in you add a card/i);
+    expect(text).toMatch(/\$0 is charged today/i);
+    expect(text).toMatch(/first charge is 14 days later/i);
+    expect(text).toMatch(/one click ends it before then/i);
+    // The advance warning is a promise the backend actually keeps (the
+    // trial_will_end handler), so the page is allowed to make it.
+    expect(text).toMatch(/three days before/i);
+  });
+
+  it("attaches the card-free claim ONLY to the published record", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    // The one card-free path that survived #548: reading the record needs no
+    // account at all. If this line goes, the page has no honest "free" left
+    // and every remaining "free" is selling something that takes a card.
+    expect(text).toMatch(/do not need an account — or a card — to read the record/i);
+    // And the grandfather clause is stated, because it is a promise to real
+    // users rather than a marketing line.
+    expect(text).toMatch(/before 22 August 2026 keep the free access/i);
+    // The dead claim must not come back in any form.
+    expect(text).not.toMatch(/free forever and never needing a card/i);
+    expect(text).not.toMatch(/no card to sign up/i);
+  });
+
+  it("labels the submit button as account creation, not a trial start", () => {
+    render(<SignUpPage />);
+    const submit = screen.getByRole("button", { name: /create my free account/i });
+    expect(submit).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start my free trial/i })).toBeNull();
   });
 
   it("falls back to an email-first, unbroken page when no providers are enabled", async () => {
@@ -153,8 +226,12 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
+    // CHANGED: the default destination is now the trial OFFER rather than the
+    // scanner. Signup no longer starts a trial, so if nothing presented the
+    // choice the trial would never be offered to anyone. The offer is a
+    // two-button fork, one of which is "Continue on the Free plan" → scanner.
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
   });
 
@@ -166,17 +243,23 @@ describe("SignUpPage", () => {
     expect((screen.getByLabelText(/password/i) as HTMLInputElement).required).toBe(true);
   });
 
-  it("shows the 14-day trial commitment", () => {
+  it("shows the card-transparency block", () => {
     render(<SignUpPage />);
-    // Trial is 14-day Premium; the after-trial transparency footer headlines
-    // the commitment as "After your 14 days" (signup/page.tsx).
-    expect(screen.getByText(/After your 14 days/i)).toBeInTheDocument();
+    // CHANGED TWICE: it headlined "After your 14 days" (assumed a trial had
+    // started), then "Free account, and where a card does come in" (assumed the
+    // account was free). Post-#548 it is simply about the card.
+    expect(
+      screen.getByText(/^Where the card comes in$/i),
+    ).toBeInTheDocument();
   });
 
   it("uses the default headline when no ?from= source is set", () => {
     render(<SignUpPage />);
+    // CHANGED: "Try Premium free for 14 days" over an email+password form was
+    // a mis-promise, and so was "free account" once #548 put a card wall at
+    // first sign-in. The H1 now claims neither.
     expect(
-      screen.getByRole("heading", { name: /Try Premium free for 14 days/i }),
+      screen.getByRole("heading", { name: /^Create your Tapeline account$/i }),
     ).toBeInTheDocument();
   });
 
@@ -200,8 +283,23 @@ describe("SignUpPage", () => {
     nav.search = new URLSearchParams("from=bogus");
     render(<SignUpPage />);
     expect(
-      screen.getByRole("heading", { name: /Try Premium free for 14 days/i }),
+      screen.getByRole("heading", { name: /^Create your Tapeline account$/i }),
     ).toBeInTheDocument();
+  });
+
+  it("keeps every source headline honest about the card (no source promises a card-free trial)", () => {
+    for (const from of ["", "finviz", "screener", "scorecard", "compare", "bogus"]) {
+      nav.search = new URLSearchParams(from ? `from=${from}` : "");
+      const { container, unmount } = render(<SignUpPage />);
+      const head = (container.querySelector("h1")?.textContent ?? "") +
+        " " + (container.querySelector("h1")?.nextElementSibling?.textContent ?? "");
+      expect(head).not.toMatch(/(?:14[- ]days? )?free[^.]{0,20}no credit card/i);
+      expect(head).not.toMatch(/Premium free/i);
+      // #548: no source may sell a card-free ACCOUNT either.
+      expect(head).not.toMatch(/free account/i);
+      expect(head).not.toMatch(/no card/i);
+      unmount();
+    }
   });
 
   // ── Plan-intent carry-through (?plan= / ?billing= from /pricing) ──────────
@@ -230,12 +328,12 @@ describe("SignUpPage", () => {
     );
   });
 
-  it("keeps the default scanner destination when no plan intent is present", async () => {
+  it("falls back to the trial offer when no plan intent is present", async () => {
     const { container } = render(<SignUpPage />);
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
   });
 
@@ -245,8 +343,32 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
+  });
+
+  it("still honours an explicit ?next= deep link over the trial offer", async () => {
+    nav.search = new URLSearchParams("next=/app/watchlist");
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
+    expect(routerSpies.push).toHaveBeenCalledWith(
+      `/app/onboarding?next=${encodeURIComponent("/app/watchlist")}`,
+    );
+  });
+
+  it("does NOT fire start_trial — this form no longer starts a trial", async () => {
+    // CHANGED with the card-required trial. `start_trial` used to fire on the
+    // same beat as `sign_up` because signup auto-granted a trial. Leaving it
+    // here would report a trial that hasn't started, and would hand Google Ads
+    // a trial conversion for every account created. It now fires from
+    // /app/billing on the confirmed return from a trial checkout.
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() =>
+      expect(trackEventMock.mock.calls.some((c) => c[0] === "sign_up")).toBe(true),
+    );
+    expect(trackEventMock.mock.calls.some((c) => c[0] === "start_trial")).toBe(false);
   });
 
   it("carries the plan intent through the Sign in link for existing users", () => {
@@ -315,15 +437,15 @@ describe("SignUpPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("derives the Free-tier caps in the after-trial footer from FREE_LIMITS", () => {
+  it("names the card-free escape hatch in the transparency footer", () => {
+    // This replaced a FREE_LIMITS-derivation check: the footer used to sell a
+    // card-free Free tier with its caps, which #548 made false, so there are no
+    // caps left to derive. What the footer must still carry is the honest
+    // alternative — the record a visitor can read without an account.
     render(<SignUpPage />);
-    expect(
-      screen.getByText(
-        new RegExp(
-          `top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
-        ),
-      ),
-    ).toBeInTheDocument();
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toMatch(/the daily Top 10, the whole back-checked scorecard/i);
+    expect(text).toMatch(/raw CSV\/JSON export are open to everyone/i);
   });
 
   it("derives the refund copy from REFUND", () => {

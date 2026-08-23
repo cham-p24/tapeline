@@ -41,12 +41,13 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Smart watchlist alerts on score change",
-    tapeline: "✓ Email + Telegram + push when the composite moves",
+    tapeline: "✓ Email + push when the composite moves",
     competitor: "Email alerts on data thresholds; no composite to alert on",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Free tier exists; Plus tier requires card",
   },
 ];

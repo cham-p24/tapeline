@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -20,7 +20,7 @@ class AlertRuleCreate(BaseModel):
     rule_type: str = Field(..., pattern="^(score|squeeze|regime|congress|news)$")
     symbol: str | None = Field(None, max_length=20)
     threshold: float | None = None
-    channel: str = Field("email", pattern="^(email|telegram|web_push)$")
+    channel: str = Field("email", pattern="^(email|web_push)$")
 
 
 @router.get("/rules")
@@ -41,12 +41,11 @@ async def create_rule(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    # Feature gate: Telegram = Premium-only, email = Pro+, web_push = Free+
+    # Feature gate: email = Pro+, web_push = Free+
     # (the free "alert taste" channel — see tier.FREE_WEB_PUSH_ALERTS).
-    # Discord + SMS channels were retired 2026-05-04.
+    # Discord + SMS channels were retired 2026-05-04; Telegram 2026-08-11.
     feature = (
-        "alerts.telegram" if body.channel == "telegram"
-        else "alerts.web_push" if body.channel == "web_push"
+        "alerts.web_push" if body.channel == "web_push"
         else "alerts.email"
     )
     if not has_feature(Tier(user.tier), feature):
@@ -82,7 +81,7 @@ async def create_rule(
     # tier.web_push_alerts (Free=FREE_WEB_PUSH_ALERTS=2, paid=effectively
     # unlimited). Enforced server-side because a forked/old client can't be
     # trusted. effective_limit keeps this correct under trial-state Premium
-    # too (which sits at the paid cap). email/telegram are already fully
+    # too (which sits at the paid cap). email is already fully
     # gated by has_feature above, so this cap only needs to guard web_push.
     if body.channel == "web_push":
         cap = effective_limit(user, "web_push_alerts")
@@ -102,7 +101,7 @@ async def create_rule(
             raise HTTPException(
                 403,
                 f"Free web-push alert limit reached ({cap} on {tier}). "
-                f"Upgrade for 10 alerts/day plus Telegram at /app/billing.",
+                f"Upgrade for 10 alerts/day at /app/billing.",
             )
 
     # Normalize the symbol on write. Ticker.symbol / CongressTrade.symbol are
@@ -139,6 +138,13 @@ async def delete_rule(
     rule = result.scalar_one_or_none()
     if rule is None:
         raise HTTPException(404, "Rule not found")
+    # Delete the rule's AlertEvent rows FIRST. alert_events.rule_id is a NOT-NULL
+    # FK with no ON DELETE behaviour and there's no ORM relationship/cascade, so
+    # on production Postgres deleting a rule that has ever fired raises a
+    # ForeignKeyViolation (23503) → HTTP 500, and the user can never delete it.
+    # SQLite (FKs off by default in tests) hides this. Mirrors the order in
+    # routers/account.py's account-deletion path.
+    await session.execute(delete(AlertEvent).where(AlertEvent.rule_id == rule_id))
     await session.delete(rule)
     await session.commit()
     return {"ok": True}

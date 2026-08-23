@@ -3,7 +3,8 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type TickerDetail, TierGateError, LookupLimitError, errorMessage } from "@/lib/api";
-import { ScoreBreakdown } from "@/components/ScoreBreakdown";
+import { ScorePanel } from "@/components/ScorePanel";
+import { TickerRecord } from "@/components/TickerRecord";
 import { LiveBadge } from "@/components/LiveBadge";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { recordTickerVisit } from "@/components/RecentTickers";
@@ -12,13 +13,30 @@ import { FinancialsTab } from "@/components/FinancialsTab";
 import { InsiderTab } from "@/components/InsiderTab";
 import { Paywall, PaywallModal } from "@/components/Paywall";
 import { LookupWall } from "@/components/LookupWall";
-import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
+import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
 import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
+import { SECTORS } from "@/app/sector/sectors";
+import { relatedMatchups, canonicalMatchup } from "@/lib/comparePairs";
+import { useTheme } from "@/components/ThemeProvider";
+import { useUser } from "@/components/UserContext";
+
+/**
+ * In-app scanner, pre-filtered to this sector, if it maps to a known GICS
+ * sector; else null. Deliberately points at /app/scanner (not the public
+ * /sector/<slug> marketing hub) so an authed user staring at a ticker isn't
+ * ejected out of the app shell. The scanner's sector filter keys on the
+ * canonical `api` string, which is exactly what Ticker.sector stores.
+ */
+function sectorScannerPath(sector: string | null): string | null {
+  if (!sector) return null;
+  const match = SECTORS.find((s) => s.api === sector);
+  return match ? `/app/scanner?sector=${encodeURIComponent(match.api)}` : null;
+}
 
 type DetailTab = "financials" | "insider";
 
@@ -100,6 +118,13 @@ export function LookupMeterPill({
 export default function TickerPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol: rawSymbol } = use(params);
   const symbol = rawSymbol.toUpperCase();
+  // Applied theme ("light" | "dark") for the embedded chart, so it tracks the
+  // user's light/dark choice instead of being pinned to dark.
+  const { resolved: resolvedTheme } = useTheme();
+  // Session user — drives the news-alert channel default (Free users can only
+  // create web_push rules; email is a paid channel and would 403 them).
+  const { user } = useUser();
+  const isFree = !!user && user.tier === "free";
   const [data, setData] = useState<TickerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Set when GET /api/ticker returns 402 (free/anon daily look-up cap). When
@@ -113,6 +138,10 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const [capMsg, setCapMsg] = useState<string | null>(null);
   const [newsAlerting, setNewsAlerting] = useState(false);
   const [newsAlertMsg, setNewsAlertMsg] = useState<string | null>(null);
+  // True when the news-alert failure was a tier gate — the message then gets a
+  // real billing <Link> appended after it (a plain "/app/billing" string isn't
+  // clickable).
+  const [newsAlertGate, setNewsAlertGate] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>("financials");
   // Upcoming-earnings lookup for the header pill. 14-day window matches the
   // earnings page; non-fatal if it fails (pill just won't show).
@@ -190,6 +219,11 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   async function subscribeNews() {
     setNewsAlerting(true);
     setNewsAlertMsg(null);
+    setNewsAlertGate(false);
+    // Pick the channel the caller can actually create: email is a paid channel,
+    // so defaulting a Free user to it walked them straight into a 403. web_push
+    // is free-tier, mirroring the /app/alerts create form.
+    const channel = isFree ? "web_push" : "email";
     try {
       await api.alertRuleCreate({
         name: `News on ${symbol}`,
@@ -198,14 +232,19 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         // No threshold — we want every fresh article. Users can later edit
         // the rule on /app/alerts to require sentiment >= 0.3 etc.
         threshold: null,
-        channel: "email",
+        channel,
       });
-      setNewsAlertMsg(`✓ Email alerts on for ${symbol} news`);
+      setNewsAlertMsg(
+        channel === "web_push"
+          ? `✓ Browser alerts on for ${symbol} news — enable notifications on /app/alerts if prompted`
+          : `✓ Email alerts on for ${symbol} news`,
+      );
     } catch (e: unknown) {
       // 401 is auto-handled by lib/api handle401() — page redirects to /signin.
       if (e instanceof TierGateError) {
-        // Backend's exact message — e.g. "Email alerts require Pro tier"
-        setNewsAlertMsg(`${e.message} — upgrade at /app/billing`);
+        // Strip any trailing "at /app/billing" — the JSX appends a real link.
+        setNewsAlertMsg(e.message.replace(/\s*at \/app\/billing\.?\s*$/i, "."));
+        setNewsAlertGate(true);
       } else {
         const m = errorMessage(e);
         if (m.includes("409")) setNewsAlertMsg("Already subscribed to news for this ticker");
@@ -249,14 +288,6 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       </div>
     );
 
-  const toneSig =
-    data.signal === "HIGH CONVICTION" ? "text-up bg-up/20"
-    : data.signal === "STRONG SETUP" ? "text-up bg-up/10"
-    : data.signal === "CONSTRUCTIVE" ? "text-accent bg-accent/10"
-    : data.signal === "NEUTRAL" ? "text-muted bg-muted/20"
-    : data.signal === "CAUTION" ? "text-warn bg-warn/10"
-    : "text-down bg-down/10";
-
   const displayScore =
     animatedScoreX10 != null ? (animatedScoreX10 / 10).toFixed(1) : "—";
 
@@ -265,10 +296,38 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   const lookups =
     (data as TickerDetail & { lookups?: LookupMeter | null }).lookups ?? null;
 
+  // Key statistics — the `key_stats` group the ticker endpoint returns (see
+  // _key_stats_payload in backend/app/routers/ticker.py). Read structurally for
+  // the same reason `lookups` above is: TickerDetail lives in lib/api.ts, which
+  // is outside this change's file lane. Folding both into TickerDetail is the
+  // follow-up.
+  //
+  // Defaults to an empty object, so a frontend that deploys ahead of the
+  // backend renders a block of em-dashes instead of throwing.
+  const keyStats =
+    (data as TickerDetail & { key_stats?: KeyStats | null }).key_stats ?? {};
+
+  // `peer_percentiles` — the block that turns "sub_trend 82" into "82, 91st
+  // percentile of Health Care (n=763)". Built by
+  // backend/app/services/percentile.py; null when its aggregate degraded, in
+  // which case the page still renders every raw value and simply cannot locate
+  // them. Read structurally for the same reason key_stats is, and passed
+  // through untouched: components/percentiles.ts owns validation, the
+  // minimum-n floor and the refusal to rank on an unusable peer group.
+  const percentiles = (data as TickerDetail & { peer_percentiles?: unknown })
+    .peer_percentiles;
+
+  // `flag_record` — this ticker's own history on the public scorecard.
+  // `undefined` is NOT "never flagged": it is "we were not told", and
+  // TickerRecord renders nothing at all in that case. See the three-states
+  // comment in components/TickerRecord.tsx.
+  const recordBlock = (data as TickerDetail & { flag_record?: unknown }).flag_record;
+
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      {/* Header — stacks on phones so the two text-4xl blocks (symbol + price)
+          don't collide; side-by-side from sm up. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <div className="flex items-center gap-3">
             <Link href="/app/scanner" className="text-muted hover:text-fg text-sm">&larr; Scanner</Link>
@@ -280,21 +339,57 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
                 Descriptive ("Reports in 3d"), never prescriptive. */}
             <EarningsPill reportDate={earningsBySymbol.get(data.symbol)} />
           </div>
-          <p className="mt-1 text-muted">{data.name} &middot; {data.sector}</p>
+          <p className="mt-1 text-muted">
+            {data.name}
+            {data.sector && (
+              <>
+                {" · "}
+                {sectorScannerPath(data.sector) ? (
+                  <Link
+                    href={sectorScannerPath(data.sector)!}
+                    className="underline-offset-4 hover:text-fg hover:underline"
+                  >
+                    {data.sector}
+                  </Link>
+                ) : (
+                  data.sector
+                )}
+              </>
+            )}
+          </p>
         </div>
-        <div className="text-right">
-          <div className="text-4xl font-bold nums">${data.price?.toFixed(2)}</div>
+        <div className="sm:text-right">
+          {/* A price we don't hold is an em-dash, not "$undefined" and not $0 —
+              ~72% of the universe has no daily price read. */}
+          <div className="text-4xl font-bold nums">
+            {data.price != null ? `$${data.price.toFixed(2)}` : "—"}
+          </div>
           <div className={`nums ${data.change_pct_1d == null || data.change_pct_1d === 0 ? "text-muted" : data.change_pct_1d > 0 ? "text-up" : "text-down"}`}>
             {data.change_pct_1d == null
               ? "—"
               : `${data.change_pct_1d >= 0 ? "+" : ""}${data.change_pct_1d.toFixed(2)}% today`}
+          </div>
+          {/* Explicit as-of stamp. The LiveBadge says whether the stream is
+              connected; this says how old the numbers under it actually are,
+              which is the thing a reader needs before treating any of them as
+              current. Absolute time on hover, relative in the flow. */}
+          <div className="mt-1 text-xs text-muted">
+            {data.updated_at ? (
+              <span title={formatAbsolute(data.updated_at)}>
+                As of {formatRelativeOrAbsolute(data.updated_at)}
+              </span>
+            ) : (
+              <span>As of &mdash; (no update stamp on this ticker)</span>
+            )}
           </div>
           {/* Share opens X with the public /t/[symbol] URL pre-filled. The
               social card crawler hits opengraph-image.tsx and renders the
               tier-coloured score preview. */}
           <a
             href={`https://twitter.com/intent/tweet?${new URLSearchParams({
-              text: `$${data.symbol} score: ${(data.score ?? 0).toFixed(0)}/100 (${data.signal ?? "—"})\n\nTransparent 6-factor formula, public scorecard.`,
+              // No `?? 0`: a ticker we hold no score for shares as an em-dash,
+              // never as a fabricated zero.
+              text: `$${data.symbol} score: ${data.score != null ? data.score.toFixed(0) : "—"}/100 (${data.signal ?? "—"})\n\nTransparent 6-factor formula, public scorecard.`,
               url: `https://tapeline.io/t/${data.symbol}`,
               // `via=` adds "via @tapeline_io" to the tweet draft so every
               // share attributes back to the brand account. Don't include the
@@ -314,6 +409,33 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         </div>
       </div>
 
+      {/* Compare — onward navigation from what was a near dead-end. Curated
+          head-to-heads that include this ticker; renders nothing when the
+          symbol isn't in a curated pair, so it never shows an empty row. */}
+      {(() => {
+        const pairs = relatedMatchups(data.symbol, 4);
+        if (pairs.length === 0) return null;
+        const self = data.symbol.toUpperCase();
+        return (
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-wider text-subtle">Compare</span>
+            {pairs.map(({ a, b }) => {
+              const other = a === self ? b : a;
+              const slug = canonicalMatchup(a, b);
+              return (
+                <Link
+                  key={slug}
+                  href={`/compare/${slug}`}
+                  className="rounded-full border border-border bg-panel px-3 py-1 font-mono text-xs text-muted transition-colors hover:border-accent hover:text-fg"
+                >
+                  {data.symbol} vs {other}
+                </Link>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Daily look-up meter — self-hiding unless a metered (free) caller is
           within LOOKUP_METER_REMAINING_THRESHOLD of the cap. Sits above the
           fold so the count is seen BEFORE the wall, never as a surprise. */}
@@ -325,48 +447,29 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         />
       )}
 
-      {/* Top row: score + signal + actions */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <div className="card p-5 flex items-center gap-4">
-          {/* Inline radial — small visual signature next to the number,
-              showing the shape of the 6 sub-scores at a glance. */}
-          <ScoreRadial
-            trend={data.breakdown.trend?.value}
-            rs={data.breakdown.rs?.value}
-            fundamentals={data.breakdown.fundamentals?.value}
-            smart_money={data.breakdown.smart_money?.value}
-            macro={data.breakdown.macro?.value}
-            momentum={data.breakdown.momentum?.value}
+      {/* ------------------------------------------------------------------
+          THE DECISION LAYER.
+
+          The reader arrives asking two questions: "what does this product
+          think, and can I check it?" Both are answered before they are shown a
+          quote grid. Score panel + factors + the one-sentence read first, then
+          this ticker's own record, then the market fields, then everything
+          else. That order is the whole point of the page.
+          ------------------------------------------------------------------ */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ScorePanel
+            symbol={data.symbol}
             score={data.score ?? null}
-            size={108}
-            showCenter={false}
-            showLabels={false}
+            signal={data.signal ?? null}
+            confidencePct={data.confidence_pct ?? null}
+            breakdown={data.breakdown}
+            percentiles={percentiles}
+            reason={data.reason ?? null}
+            displayScore={displayScore}
           />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="text-xs uppercase text-muted">Tapeline Score</div>
-              {data.confidence_pct != null && (
-                <span className={`text-xs nums ${confColor(data.confidence_pct)}`}
-                      title={confLabel(data.confidence_pct)}>
-                  conf {data.confidence_pct.toFixed(0)}%
-                </span>
-              )}
-            </div>
-            <div className="mt-1 text-4xl font-bold nums">{displayScore}</div>
-            <div className={`mt-2 inline-block rounded px-2 py-0.5 text-xs ${toneSig}`}>
-              {data.signal}
-            </div>
-          </div>
         </div>
-        <div className="card p-5">
-          <div className="text-xs uppercase text-muted">Performance</div>
-          <div className="mt-2 space-y-1 text-sm">
-            <Row label="5D" value={data.change_pct_5d} />
-            <Row label="1M" value={data.change_pct_1m} />
-            <Row label="Volume" value={data.volume} formatter={compact} />
-          </div>
-        </div>
-        <div className="card p-5">
+        <div className="card h-fit p-5">
           <div className="text-xs uppercase text-muted">Actions</div>
           <button onClick={addWatch} disabled={adding} className="btn-primary mt-3 w-full text-sm">
             {adding ? "Adding…" : "★ Add to watchlist"}
@@ -380,29 +483,58 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           >
             {newsAlerting ? "Subscribing…" : "📰 Notify me on news"}
           </button>
-          {newsAlertMsg && <p className="mt-2 text-xs text-muted">{newsAlertMsg}</p>}
+          {newsAlertMsg && (
+            <p className="mt-2 text-xs text-muted">
+              {newsAlertMsg}
+              {newsAlertGate && (
+                <>
+                  {" "}
+                  <Link href="/app/billing" className="text-accent hover:underline">
+                    See plans
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
+          {/* One-tap news alert above; this hands off to the full alerts form
+              pre-armed with this ticker + the news rule so the user can tune
+              the channel/threshold instead of starting from a blank screen. */}
+          <Link
+            href={`/app/alerts?symbol=${encodeURIComponent(symbol)}&type=news`}
+            className="mt-2 block text-xs text-muted hover:text-accent hover:underline"
+          >
+            Set a custom alert →
+          </Link>
         </div>
       </div>
 
-      {/* Score breakdown panel */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <div className="card lg:col-span-2">
-          <div className="border-b border-border p-4">
-            <h2 className="font-semibold">Why score {data.score?.toFixed(1)}</h2>
-            <p className="text-xs text-muted">Contribution of each factor to the composite.</p>
-          </div>
-          <ScoreBreakdown
-            trend={data.breakdown.trend?.value}
-            rs={data.breakdown.rs?.value}
-            fundamentals={data.breakdown.fundamentals?.value}
-            momentum={data.breakdown.momentum?.value}
-            macro={data.breakdown.macro?.value}
-            smart_money={data.breakdown.smart_money?.value}
-            reason={data.reason}
-          />
-        </div>
+      {/* "On our record" — the block no rival can print. Renders nothing at all
+          when the payload carries no record block: not being told is not the
+          same as being told there are no flags. See TickerRecord. */}
+      <div className="mt-6">
+        <TickerRecord symbol={data.symbol} record={recordBlock} />
+      </div>
 
-        {/* Squeeze panel, only if detected */}
+      {/* ------------------------------------------------------------------
+          THE MARKET LAYER — the reported facts about the instrument, below our
+          read of them rather than above it.
+          ------------------------------------------------------------------ */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <KeyStatistics stats={keyStats} />
+        </div>
+        <div className="card h-fit p-5">
+          <div className="text-xs uppercase text-muted">Price change</div>
+          <div className="mt-2 space-y-1 text-sm">
+            <Row label="1D" value={data.change_pct_1d} />
+            <Row label="5D" value={data.change_pct_5d} />
+            <Row label="1M" value={data.change_pct_1m} />
+          </div>
+        </div>
+      </div>
+
+      {/* Squeeze panel, only if detected */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {data.squeeze ? (
           <div className="card">
             <div className="border-b border-border p-4">
@@ -436,7 +568,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           (US + UK / international ADRs). Trial users
           see this for free since trial = Premium for 14 days; post-trial
           Free + Pro users see the Paywall instead. Mirrors how other
-          Premium intelligence (Congress, insider Form 4, Telegram) is gated. */}
+          Premium intelligence (Congress, insider Form 4) is gated. */}
       <div className="mt-6">
         <Paywall feature="ratings.analyst" title="Analyst consensus is Premium">
           <AnalystRatings symbol={data.symbol} currentPrice={data.price} />
@@ -487,8 +619,8 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         <h2 className="mb-3 font-semibold">Chart</h2>
         <div className="overflow-hidden rounded-md">
           <iframe
-            src={`https://s.tradingview.com/widgetembed/?frameElementId=tv_${data.symbol}&symbol=${data.symbol.replace(".", "-")}&interval=D&theme=dark&style=1&timezone=exchange&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&studies=%5B%22RSI@tv-basicstudies%22%5D`}
-            className="h-[500px] w-full border-0"
+            src={`https://s.tradingview.com/widgetembed/?frameElementId=tv_${data.symbol}&symbol=${data.symbol.replace(".", "-")}&interval=D&theme=${resolvedTheme}&style=1&timezone=exchange&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&studies=%5B%22RSI@tv-basicstudies%22%5D`}
+            className="h-[320px] w-full border-0 sm:h-[420px] lg:h-[500px]"
             title={`${data.symbol} chart`}
           />
         </div>
@@ -539,13 +671,29 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
   );
 }
 
-function Row({ label, value, formatter }: { label: string; value: number | null | undefined; formatter?: (n: number) => string }) {
-  const v = value ?? 0;
-  const fmt = formatter ? formatter(v) : (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+/**
+ * One period's price change.
+ *
+ * A period we hold no read for renders as an em-dash in muted type. It used to
+ * be `value ?? 0`, which printed "+0.00%" — a fabricated flat session — for
+ * every ticker whose 5-day or 1-month change we simply do not have. Zero is
+ * never a stand-in for unknown on this page.
+ */
+function Row({ label, value }: { label: string; value: number | null | undefined }) {
+  if (value == null || Number.isNaN(value)) {
+    return (
+      <div className="flex justify-between">
+        <span className="text-muted">{label}</span>
+        <span className="nums text-muted">—</span>
+      </div>
+    );
+  }
   return (
     <div className="flex justify-between">
       <span className="text-muted">{label}</span>
-      <span className={`nums ${!formatter ? (v > 0 ? "text-up" : v < 0 ? "text-down" : "") : ""}`}>{fmt}</span>
+      <span className={`nums ${value > 0 ? "text-up" : value < 0 ? "text-down" : ""}`}>
+        {(value >= 0 ? "+" : "") + value.toFixed(2)}%
+      </span>
     </div>
   );
 }
@@ -556,23 +704,4 @@ function Kv({ k, v }: { k: string; v: string | number }) {
       <dd className="nums font-medium">{v}</dd>
     </div>
   );
-}
-function compact(n: number) {
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
-  return String(n);
-}
-function confColor(c: number) {
-  if (c >= 80) return "text-up";
-  if (c >= 60) return "text-fg";
-  if (c >= 40) return "text-warn";
-  return "text-down";
-}
-function confLabel(c: number) {
-  if (c >= 95) return "Full data on every signal feature — strongest evidence";
-  if (c >= 80) return "Most features present, missing 1–3 minor data points";
-  if (c >= 60) return "Core scoring data + most fundamentals — typical liquid stock";
-  if (c >= 40) return "Only basic price/trend data — caution";
-  return "Sparse data — unreliable signals, deprioritise";
 }

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { track } from "@vercel/analytics";
 import { trackEvent, trackEventOnce } from "@/lib/gtag";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
@@ -45,7 +44,9 @@ export function CheckoutSuccessClient() {
         },
       );
       if (fired) {
-        track("trial_converted", { tier, billing_period: period, src: "email" });
+        // Funnel mirror only — no value/currency and no Google Ads label, so
+        // the revenue conversion stays exclusively on `subscribe` above.
+        trackEvent("trial_converted", { tier, billing_period: period, src: "email" });
       }
       // Strip session_id from the URL either way — the event is settled and
       // the id shouldn't survive into a shared link or the referrer header.
@@ -59,8 +60,8 @@ export function CheckoutSuccessClient() {
     } else {
       // No session id (legacy link, or Stripe didn't substitute). Fall back to
       // the old un-deduped behaviour rather than losing the conversion.
-      track("trial_converted", { tier, billing_period: period, src: "email" });
       trackEvent("subscribe", { tier, billing_period: period, value, currency: "USD" });
+      trackEvent("trial_converted", { tier, billing_period: period, src: "email" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

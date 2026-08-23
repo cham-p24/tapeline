@@ -111,6 +111,15 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-08-12",
+    version: "0.1.16",
+    tag: "improvement",
+    title: "Telegram alerts retired; alerts consolidated on email + browser push",
+    body: [
+      "The Telegram alert channel has been retired. Score-change, squeeze and regime alerts now go out over email and browser push, which cover the same triggers. Existing rules keep firing on those channels — nothing about your watchlist, billing or the feeds changes.",
+    ],
+  },
+  {
     date: "2026-07-10",
     version: "0.1.15",
     tag: "improvement",
@@ -241,7 +250,7 @@ const ENTRIES: Entry[] = [
     title: "Elite 13F holdings, harder Free tier, three competitor comparisons",
     body: [
       "Elite-fund 13F holdings live for Premium: latest positions from Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer.",
-      "Free tier reworked at the time so the trial-end transition was meaningful. (Since superseded: Free is now live scores on the top-10 scanner with 5 look-ups/day, free forever — see /pricing.)",
+      "Free tier reworked at the time so the trial-end transition was meaningful. (Since superseded: Free is live scores on the top-10 scanner with 12 look-ups/day, and from 22 August 2026 a new account adds a card at first sign-in — see /pricing.)",
       "Plain-English Why on every scanner row rewritten with sector-aware language across ~100 phrase variants.",
       "Side-by-side comparison pages live for Finviz, Zacks, and WallStreetZen.",
     ],

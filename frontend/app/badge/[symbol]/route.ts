@@ -28,6 +28,9 @@
  */
 import { NextRequest } from "next/server";
 
+import { trackEmbedImpression } from "@/lib/embedImpression";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
@@ -43,6 +46,7 @@ async function fetchTickerForBadge(symbol: string): Promise<TickerData | null> {
   try {
     const res = await fetch(`${API_BASE}/api/ticker/${symbol.toUpperCase()}`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
@@ -97,15 +101,25 @@ function buildBadgeSvg(
   const leftBg = isDark ? "#0a0d14" : "#27272a"; // dark muted grey
   const leftFg = "#fafafa";
   const score = data?.score;
-  const scoreStr = score != null ? score.toFixed(0) : "—";
-  const sig = signalShort(data?.signal ?? null);
+  // XML-escape EVERY value interpolated into the SVG below. `label` is a raw
+  // query param and the error-branch `symbol` is the raw decoded path — both
+  // attacker-controlled; the rest are ours but escaped defensively. This route
+  // serves a genuine top-level image/svg+xml document, so without escaping a
+  // label like `</text><script>…</script>` breaks out of <text> and executes
+  // JS on the tapeline.io origin (reflected XSS; the CSP is Report-Only and
+  // does not block it, and the session cookie is domain-wide). `label` is also
+  // capped so a huge value can't bloat the badge.
+  const esc = (s: string): string =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const symE = esc(symbol);
+  const scoreStr = esc(score != null ? score.toFixed(0) : "—");
+  const sig = esc(signalShort(data?.signal ?? null));
   const rightBg = data ? signalColor(data.signal) : "#52525b";
   const rightFg = "#fafafa";
 
   // Layout: [ symbol · label | score · signal ]
-  // Left segment: "TAPELINE NVDA"
-  // Right segment: "76 STRONG"
-  const leftText = `${opts.label} ${symbol}`;
+  const leftText = `${esc(opts.label.slice(0, 24))} ${symE}`;
   const rightText = data ? `${scoreStr} ${sig}` : "—";
   const padX = 8;
   const leftW = textWidth(leftText) + padX * 2;
@@ -117,8 +131,8 @@ function buildBadgeSvg(
   // Build SVG. Inline styles + Verdana fallback chain (matches shields.io,
   // ensures consistent rendering across GitHub / GitLab / Bitbucket /
   // generic markdown renderers).
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" role="img" aria-label="Tapeline Score for ${symbol}: ${scoreStr}">
-  <title>Tapeline Score for ${symbol}: ${scoreStr} (${sig})</title>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" role="img" aria-label="Tapeline Score for ${symE}: ${scoreStr}">
+  <title>Tapeline Score for ${symE}: ${scoreStr} (${sig})</title>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#fff" stop-opacity=".06"/>
     <stop offset="1" stop-opacity=".15"/>
@@ -165,6 +179,27 @@ export async function GET(
 
   const data = await fetchTickerForBadge(sym);
   const svg = buildBadgeSvg(sym, data, { theme, label });
+
+  // Count this render as an embed impression. The POST is scheduled with
+  // `after()` so it runs once the response is flushed — the badge is never
+  // delayed by, and can never fail because of, the tracking call. The helper
+  // itself cannot throw. See lib/embedImpression.ts.
+  //
+  // Only the Referer HOSTNAME is forwarded; the full referring URL is discarded
+  // inside refererHost() and never leaves this process. Renders with no
+  // referer, from tapeline.io itself, or from localhost are skipped there.
+  //
+  // Deliberately NOT piggybacked on the /api/ticker fetch above: that fetch is
+  // `revalidate: 1800`, so it reaches the backend at most once per symbol per
+  // 30 min — it would see one embedding host per symbol per half hour, which is
+  // exactly the signal we're trying to recover. (And per-host fetch options
+  // would fragment Next's data cache.)
+  //
+  // CACHING NOTE: this response is CDN-cached (s-maxage=60), so renders served
+  // from the edge never run this handler and are never counted. The totals are
+  // therefore DIRECTIONAL, not exact — real impressions always exceed them.
+  // That's intended; don't "fix" the gap with a cache-buster.
+  trackEmbedImpression(request.headers.get("referer"), sym, "badge");
 
   return new Response(svg, {
     status: 200,

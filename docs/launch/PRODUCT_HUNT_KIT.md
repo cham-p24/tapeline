@@ -1,5 +1,23 @@
 # Product Hunt launch kit — the Reddit-free fast channel (2026-08-01)
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 **Why this instead of Reddit:** Reddit's finance subs auto-remove self-promo from
 new/low-karma accounts. Product Hunt is the opposite — it's *built* for "I made
 this," first-time makers launch there daily, and there's no karma/age wall. A
@@ -42,7 +60,7 @@ The stock scanner that publishes its track record
 
 **Description** (260 char max):
 ```
-Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY the next day — wins and losses, never edited. Free tier + 14-day trial, no card.
+Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY next day — wins and losses, never edited. Free tier, no card; trial takes one.
 ```
 
 ---
@@ -62,7 +80,7 @@ So Tapeline does the opposite three ways:
 
 3. You can download the whole record and check my math (/verify).
 
-Free tier is genuinely usable (live scores, 12 look-ups/day, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys + Telegram). 14-day Premium trial, no credit card.
+Free tier is genuinely usable (live scores, 12 look-ups/day, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys + Telegram). The free tier never asks for a card; the 14-day Premium trial does — $0 charged today, first charge on day 14, one click to cancel.
 
 Built solo from Melbourne. I'd genuinely love for this crowd to tear apart the methodology — which factor am I under-weighting? What would make the back-check defensible over a 1-year horizon instead of 1-day?
 ```

@@ -103,6 +103,30 @@ def fund_cache_size() -> int:
     return len(_FUND_SCORE_CACHE)
 
 
+# ---- In-memory market-cap cache (absolute dollars) ---------------------
+# Same pattern as _FUND_SCORE_CACHE — populated when the worker fetches a
+# company profile (daily sector backfill), read per-tick by
+# polygon_feed.fetch_snapshots so the cheap dict lookup — not an HTTP call —
+# runs 60×/min. Values are ABSOLUTE DOLLARS (Finnhub reports market cap in
+# MILLIONS; the populator multiplies by 1e6 before storing here).
+_MARKET_CAP_CACHE: dict[str, float] = {}
+
+
+def get_cached_market_cap(symbol: str) -> float | None:
+    """Per-tick lookup. Returns None if the symbol has no profile yet."""
+    return _MARKET_CAP_CACHE.get(symbol.upper())
+
+
+def set_cached_market_cap(symbol: str, market_cap: float | None) -> None:
+    """Worker-side setter — call with ABSOLUTE DOLLARS (already ×1e6)."""
+    if market_cap is not None:
+        _MARKET_CAP_CACHE[symbol.upper()] = market_cap
+
+
+def market_cap_cache_size() -> int:
+    return len(_MARKET_CAP_CACHE)
+
+
 # ---- In-memory smart-money score cache (insider Form 4) ----------------
 # Same pattern as _FUND_SCORE_CACHE — populated daily by the worker,
 # read per-tick by polygon_feed.fetch_snapshots.
@@ -338,6 +362,13 @@ def compute_smart_money_score(transactions: list[dict[str, Any]] | None) -> floa
 
 # ---- Earnings calendar -----------------------------------------------------
 
+# One /calendar/earnings request is capped by the vendor at ~1,500 rows, and an
+# over-long range returns the tail of the window rather than the head. 30 days
+# of US earnings sits well under that even in peak reporting season.
+_EARNINGS_CHUNK_DAYS = 30
+_EARNINGS_ROWS_CAP = 1500
+
+
 async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] | None:
     """
     Returns earnings events scheduled in the next `days_ahead` days.
@@ -356,24 +387,65 @@ async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] 
         return cached
 
     today = date.today()
+
+    # Fetch in CHUNKS, and merge. Finnhub caps a single /calendar/earnings
+    # response at roughly 1,500 rows, and when the requested range overflows
+    # that cap the rows we get back are the FAR END of it. Asking for 90 days in
+    # one call produced exactly 1500 rows dated 2026-11-05..11-20 with NOTHING
+    # in the intervening ten weeks — so "next earnings" was silently wrong for
+    # every company reporting sooner, which is the only case the field exists to
+    # answer. Chunking keeps each request comfortably under the cap, so the
+    # near-term dates (the ones that matter) are always present.
+    #
+    # Cost is 1 request per chunk instead of 1 total, on a 12h cache — a
+    # rounding error against the per-tick symbol calls this module already makes.
+    chunks: list[tuple[date, date]] = []
+    cursor = today
     end = today + timedelta(days=days_ahead)
-    params = {
-        "from": today.isoformat(),
-        "to": end.isoformat(),
-        "token": _api_key(),
-    }
+    while cursor <= end:
+        chunk_end = min(cursor + timedelta(days=_EARNINGS_CHUNK_DAYS - 1), end)
+        chunks.append((cursor, chunk_end))
+        cursor = chunk_end + timedelta(days=1)
+
+    raw_rows: list[dict[str, Any]] = []
     try:
         async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.get(f"{BASE_URL}/calendar/earnings", params=params)
-            if r.status_code != 200:
-                logger.warning("finnhub.earnings_failed status=%s body=%s", r.status_code, r.text[:200])
-                return None
-            data = r.json()
+            for chunk_from, chunk_to in chunks:
+                # `resp`, not `r`: the row loop further down binds `r` to each
+                # calendar entry, and reusing the name makes the response type
+                # leak into it.
+                resp = await c.get(
+                    f"{BASE_URL}/calendar/earnings",
+                    params={
+                        "from": chunk_from.isoformat(),
+                        "to": chunk_to.isoformat(),
+                        "token": _api_key(),
+                    },
+                )
+                if resp.status_code != 200:
+                    logger.warning(
+                        "finnhub.earnings_failed status=%s from=%s to=%s body=%s",
+                        resp.status_code, chunk_from, chunk_to, resp.text[:200],
+                    )
+                    # A partial calendar beats no calendar: keep what we have.
+                    continue
+                part = (resp.json() or {}).get("earningsCalendar", []) or []
+                if len(part) >= _EARNINGS_ROWS_CAP:
+                    # Still truncating. Say so loudly rather than shipping a
+                    # window that silently starts late again.
+                    logger.warning(
+                        "finnhub.earnings_chunk_at_cap rows=%d from=%s to=%s "
+                        "— shrink _EARNINGS_CHUNK_DAYS",
+                        len(part), chunk_from, chunk_to,
+                    )
+                raw_rows.extend(part)
     except Exception:
         logger.exception("finnhub.earnings_exception")
         return None
 
-    raw_rows = data.get("earningsCalendar", []) or []
+    if not raw_rows:
+        return None
+
     rows: list[dict[str, Any]] = []
     for r in raw_rows:
         sym = r.get("symbol", "")
@@ -508,31 +580,36 @@ async def fetch_ipo_calendar(days_ahead: int = 90) -> list[dict[str, Any]] | Non
 
 # ---- Fundamentals ----------------------------------------------------------
 
-async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
+async def _fetch_metric_all(symbol: str) -> dict[str, Any] | None:
     """
-    Per-ticker financial metrics: P/E, margin, ROE, EPS growth, revenue growth.
-    Cached 7 days per symbol — fundamentals don't change tick-to-tick.
+    One cached GET of /stock/metric?metric=all — the single upstream call
+    behind BOTH fetch_basic_financials and fetch_key_statistics.
 
-    Returns None if no API key OR ticker has no data (e.g. ETFs without fundamentals).
+    What's cached is the RAW `metric` object, not a projection of it. Until
+    2026-08-22 the six-key fundamentals dict was the cached thing, so ~110
+    other data points in a payload we had already fetched and paid for were
+    discarded at parse time, and a second consumer would have needed a second
+    API call. Caching the blob makes the key-statistics columns cost ZERO
+    extra calls against the 60/min free tier.
+
+    Returns None for "no coverage". `{}` is the on-disk sentinel for that
+    (same as fetch_company_profile) — it has to be a NON-None value because
+    _load_cache can't tell a cached None from a genuine miss, and caching
+    None made the 7-day negative cache dead code so every ETF/ADR re-polled
+    on every call.
+
+    The cache key moved from `fund_` to `metric_` with the shape change, so
+    any `finnhub_fund_*.json` left on disk is simply orphaned and ignored
+    (nothing reads it, and it ages out) rather than being misread as a blob.
     """
     if not configured():
         return None
 
     sym = symbol.upper()
-    cache_key = f"fund_{sym}"
+    cache_key = f"metric_{sym}"
     cached = _load_cache(cache_key, CACHE_TTL_FUNDAMENTALS_HOURS)
     if cached is not None:
-        # `{}` is the cached "no coverage" sentinel (mirrors fetch_company_profile
-        # below). It must be a NON-None value or _load_cache can't distinguish a
-        # cached negative from a genuine miss — caching None here made the 7-day
-        # negative cache dead code, so every ETF/ADR re-polled Finnhub on every
-        # call. Also treat a legacy all-None dict (pre-2026-05-16 rows) as no
-        # coverage until its TTL clears.
-        if not cached or (
-            isinstance(cached, dict) and all(v is None for v in cached.values())
-        ):
-            return None
-        return cached
+        return cached or None  # {} = cached negative
 
     params = {"symbol": sym, "metric": "all", "token": _api_key()}
     try:
@@ -545,9 +622,21 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
         return None
 
     metric = data.get("metric") or {}
+    # ETFs / funds sometimes return empty here — cache the negative so we
+    # don't re-poll for 7 days, then let the caller fall back.
+    _save_cache(cache_key, metric)
+    return metric or None
+
+
+async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
+    """
+    Per-ticker financial metrics: P/E, margin, ROE, EPS growth, revenue growth.
+    Cached 7 days per symbol — fundamentals don't change tick-to-tick.
+
+    Returns None if no API key OR ticker has no data (e.g. ETFs without fundamentals).
+    """
+    metric = await _fetch_metric_all(symbol)
     if not metric:
-        # ETFs / funds typically return empty here — that's fine, caller falls back
-        _save_cache(cache_key, {})  # {} sentinel so the cached negative is honoured
         return None
 
     out = {
@@ -560,14 +649,79 @@ async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
     }
     # ETFs and funds: Finnhub returns a non-empty `metric` object (price/return
     # stats) but NONE of the stock-fundamentals fields we look for. Without
-    # this check we cache an all-None dict and the router reports
-    # available=true, which makes the frontend render 6 cards full of "—"
-    # dashes — exactly what the user reported on /app/ticker/BBP. Treat
-    # all-null as no coverage.
+    # this check the router reports available=true, which makes the frontend
+    # render 6 cards full of "—" dashes — exactly what the user reported on
+    # /app/ticker/BBP. Treat all-null as no coverage.
+    #
+    # This guard stays scoped to the SIX SCORING KEYS above, deliberately. The
+    # blob those ETFs return usually DOES carry a real beta and 52-week range,
+    # which fetch_key_statistics now reads — but a beta is not fundamentals
+    # coverage, and widening this `out` dict to include it would flip
+    # available=true and bring the six-dashes bug straight back.
     if all(v is None for v in out.values()):
-        _save_cache(cache_key, {})  # {} sentinel (not None) so it caches
         return None
-    _save_cache(cache_key, out)
+    return out
+
+
+async def fetch_key_statistics(symbol: str) -> dict[str, Any] | None:
+    """
+    The Finnhub-sourced half of the per-ticker key-statistics block: beta,
+    EPS (TTM), P/E (TTM), dividend yield, ex-dividend date. Keys match the
+    Ticker column names so the caller can splat them into an UPDATE.
+
+    Costs ZERO extra API calls — reads the same 7-day-cached
+    /stock/metric?metric=all blob fetch_basic_financials reads.
+
+    Returns None only when every field is absent, so a caller can skip the
+    row entirely rather than writing five NULLs over five NULLs. Unlike
+    fetch_basic_financials this does NOT require stock-fundamentals coverage:
+    an ETF with nothing but a beta still has a real beta worth showing.
+
+    Units, because they are not self-evident and a mislabelled number is
+    worse than a blank:
+      beta            — raw ratio vs the market (1.0 = moves with it)
+      eps_ttm         — currency per share
+      pe_ttm          — raw ratio
+      dividend_yield  — PERCENT, as Finnhub reports it (2.5 means 2.5%), the
+                        same convention as `margin`/`roe` above
+    """
+    metric = await _fetch_metric_all(symbol)
+    if not metric:
+        return None
+
+    out: dict[str, Any] = {
+        "beta": _f(metric.get("beta")),
+        # TTM-only fallback chains. Finnhub ships several spellings of the
+        # same figure depending on coverage, but every candidate here is a
+        # trailing-twelve-month series: falling back to an *Annual* field
+        # under a column named `_ttm` would mislabel the period, which is its
+        # own kind of invented number.
+        "eps_ttm": _f(_first(
+            metric,
+            "epsTTM", "epsBasicExclExtraItemsTTM",
+            "epsExclExtraItemsTTM", "epsInclExtraItemsTTM",
+        )),
+        "pe_ttm": _f(_first(
+            metric,
+            "peTTM", "peBasicExclExtraTTM",
+            "peExclExtraTTM", "peInclExtraTTM",
+        )),
+        # Indicated-annual first (the forward figure Yahoo shows), TTM second.
+        "dividend_yield": _f(_first(
+            metric, "dividendYieldIndicatedAnnual", "currentDividendYieldTTM",
+        )),
+        # Verified 2026-08-22: the metric blob carries NO ex-dividend date on
+        # our plan — it lives on /stock/dividend, which is Premium-gated and
+        # not entitled. The chain is here so the column fills by itself if
+        # that ever changes; until then it stays null and renders an em-dash.
+        # It is NOT worth a second endpoint, and it is certainly not worth
+        # deriving from a dividend-frequency guess.
+        "ex_dividend_date": _d(_first(
+            metric, "exDividendDate", "lastDividendDate",
+        )),
+    }
+    if all(v is None for v in out.values()):
+        return None
     return out
 
 
@@ -579,6 +733,32 @@ def _f(v: Any) -> float | None:
         return float(v)
     except (TypeError, ValueError):
         return None
+
+
+def _d(v: Any) -> date | None:
+    """Coerce a Finnhub "YYYY-MM-DD" string to a date, or None. Sibling of _f."""
+    if v is None or v == "":
+        return None
+    try:
+        return date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def _first(metric: dict[str, Any], *keys: str) -> Any:
+    """First of `keys` that is PRESENT with a non-null value.
+
+    Deliberately not the `a or b` chain the six scoring keys use above: `or`
+    treats a legitimate 0.0 as missing, and 0.0 is the right answer for a
+    break-even EPS or a company that pays no dividend. Falling through it
+    would publish the NEXT field's number under this field's name — a
+    fabricated statistic rather than an honest blank.
+    """
+    for k in keys:
+        v = metric.get(k)
+        if v is not None and v != "":
+            return v
+    return None
 
 
 def compute_fundamentals_score(metrics: dict[str, float | None] | None) -> float | None:
@@ -641,6 +821,14 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
     cache_key = f"profile_{sym}"
     cached = _load_cache(cache_key, CACHE_TTL_FUNDAMENTALS_HOURS)
     if cached is not None:
+        # Seed the per-tick cap cache on the CACHED path too. It used to be
+        # populated only on a live fetch (below), so once a symbol's profile
+        # was on disk this early return skipped it — and since _MARKET_CAP_CACHE
+        # is in-process, every worker restart started from empty and warm-cache
+        # symbols never re-seeded it. Half of why market_cap was NULL for the
+        # whole universe; the other half was the caller (see
+        # signal_publisher._backfill_market_cap).
+        _seed_market_cap_from_profile(sym, cached)
         return cached if cached else None  # may be {} for unknown tickers
 
     params = {"symbol": sym, "token": _api_key()}
@@ -667,7 +855,22 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
         "ipo":         data.get("ipo") or "",
     }
     _save_cache(cache_key, profile)
+    _seed_market_cap_from_profile(sym, profile)
     return profile
+
+
+def _seed_market_cap_from_profile(symbol: str, profile: dict[str, Any] | None) -> None:
+    """Populate the per-tick market-cap cache from a profile dict.
+
+    `profile["market_cap"]` is Finnhub's `marketCapitalization`, which is
+    reported in MILLIONS. The cache — and Ticker.market_cap, and the scanner's
+    "Mkt Cap" column — hold ABSOLUTE DOLLARS. The ×1e6 conversion lives here
+    and nowhere else, so the live path and the cache-hit path can't drift by
+    six orders of magnitude.
+    """
+    mc_millions = _f((profile or {}).get("market_cap"))
+    if mc_millions is not None:
+        set_cached_market_cap(symbol.upper(), mc_millions * 1e6)
 
 
 async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[dict[str, Any]] | None:

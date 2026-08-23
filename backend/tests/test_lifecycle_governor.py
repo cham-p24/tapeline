@@ -40,6 +40,7 @@ from app.db import session_scope
 from app.models import AlertRule, User, WatchlistItem
 from app.services.email import (
     render_activation_alert_email,
+    render_activation_arm_alerts_email,
     render_activation_ask_email,
     render_activation_first_scan_email,
     render_activation_watchlist_email,
@@ -659,14 +660,23 @@ _URGENCY_LANGUAGE = [
     "price goes up",
 ]
 
-# Every template in the activation series, including the two milestone nudges
-# that pre-date this work — the cap counts all four against one budget, so all
+# Every activation-family template, including the two milestone nudges that
+# pre-date this work — the cap counts those four against one budget, so all
 # four are held to the same content rules.
+#
+# "arm_alerts" is in this list for CONTENT purposes only. It is deliberately
+# outside lifecycle.ACTIVATION_SERIES_TOKENS (it targets the engaged cohort,
+# not the dormant one — see run_activation_drip), but it is still a 1:1
+# activation message to a named person about securities they self-selected,
+# which is precisely the fact pattern Rules 6/7 police. Exempting it from the
+# content bar because it is exempt from the frequency cap would be the wrong
+# conclusion drawn from the right distinction.
 _ACTIVATION_TEMPLATES = [
     ("first_scan", lambda: render_activation_first_scan_email("Sam")),
     ("ask", lambda: render_activation_ask_email("Sam")),
     ("watchlist", lambda: render_activation_watchlist_email("Sam")),
     ("alert", lambda: render_activation_alert_email("Sam")),
+    ("arm_alerts", lambda: render_activation_arm_alerts_email("Sam", watchlist_count=7)),
 ]
 
 
@@ -703,19 +713,21 @@ def test_activation_templates_name_no_specific_securities(name, render):
         assert ticker not in html, f"{name}: names a security — {ticker}"
 
 
-def test_trial_note_is_factual_and_not_a_billing_event():
-    """Rule 6's one permitted exception. The trial takes no card, so the note
-    must not read as a charge, a renewal, or a lapse into billing."""
+def test_trial_note_discloses_the_first_charge_without_urgency():
+    """Rule 6's one permitted exception. The trial runs on a card, so the note
+    MUST disclose the first-charge date and the one-click cancel — and must
+    still carry no countdown, deadline theatre or scarcity."""
     ends = datetime(2026, 8, 1, tzinfo=UTC)
     html = render_activation_first_scan_email("Sam", trial_ends_at=ends)
 
     assert "1 Aug 2026" in html
-    assert "no card on file" in html.lower()
-
     lowered = html.lower()
-    for phrase in ("you'll be charged", "will be billed", "auto-renew",
-                   "payment due", "card will be charged"):
-        assert phrase not in lowered, f"trial note reads as billing — {phrase!r}"
+    assert "first charge" in lowered
+    assert "cancel in one click" in lowered
+
+    for phrase in ("hurry", "last chance", "act now", "don't miss out",
+                   "limited time", "spots left", "countdown"):
+        assert phrase not in lowered, f"trial note manufactures urgency — {phrase!r}"
 
 
 def test_trial_note_is_omitted_for_users_without_a_trial():

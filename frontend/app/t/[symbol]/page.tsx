@@ -27,7 +27,8 @@ import {
   tickerDatasetJsonLd,
 } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
-import { FREE_LIMITS } from "@/lib/pricing";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 
 // ISR: regenerate at most hourly. This route has ~8,400 ticker pages and is
 // the site's biggest crawl surface; without a page-level revalidate it
@@ -119,17 +120,26 @@ type TickerFetch =
 // transient blips (most resolve within ~1s). Each attempt is time-bounded
 // so a wedged backend can't hang the whole render up to the platform
 // function timeout.
-const TICKER_FETCH_ATTEMPTS = 2;
+const TICKER_FETCH_ATTEMPTS = 4;
 const TICKER_FETCH_TIMEOUT_MS = 7000;
+// Base backoff between attempts. Grows linearly (0.5s, 1s, 1.5s) so a burst
+// rides out the limiter's refill instead of being converted into a 500: the
+// backend bucket refills at capacity/per_seconds = 2 tokens/sec, so a couple
+// of seconds of patience is the difference between a rendered page and a 500.
+const TICKER_FETCH_BACKOFF_MS = 500;
 
 async function fetchTicker(symbol: string): Promise<TickerFetch> {
   const url = `${API_BASE}/api/ticker/${symbol.toUpperCase()}`;
+  let retryAfterMs: number | null = null;
   for (let attempt = 1; attempt <= TICKER_FETCH_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(url, {
         // Cache for 60s — matches the worker tick cadence so the page is fresh
         // without hammering the API on every social-card crawl.
         next: { revalidate: 1800 },
+        // Identify this as our own SSR so the backend skips the per-IP limit
+        // that all server rendering would otherwise share (see lib/ssrHeaders).
+        headers: ssrInternalHeaders(),
         // Bound each attempt; AbortSignal is not part of Next's fetch cache
         // key, so the 60s ISR cache above is preserved.
         signal: AbortSignal.timeout(TICKER_FETCH_TIMEOUT_MS),
@@ -138,12 +148,25 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
       // this symbol isn't in the scanner universe.
       if (res.status === 404) return { status: "missing" };
       if (res.ok) return { status: "ok", data: (await res.json()) as TickerData };
+      // 429 = WE exhausted the shared SSR budget, not a broken ticker. It is
+      // the single likeliest non-ok status here (all SSR shares one per-IP
+      // bucket), and it is fully recoverable — so honour Retry-After when the
+      // backend sends one, capped so a bad value can't stall the render.
+      if (res.status === 429) {
+        const hinted = Number(res.headers.get("retry-after"));
+        if (Number.isFinite(hinted) && hinted > 0) {
+          retryAfterMs = Math.min(hinted * 1000, 2000);
+        }
+      }
       // 5xx / other non-ok → transient; fall through to retry.
     } catch {
       // Timeout / network error → transient; fall through to retry.
     }
     if (attempt < TICKER_FETCH_ATTEMPTS) {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) =>
+        setTimeout(r, retryAfterMs ?? TICKER_FETCH_BACKOFF_MS * attempt),
+      );
+      retryAfterMs = null;
     }
   }
   return { status: "error" };
@@ -333,7 +356,7 @@ async function fetchTickerNews(symbol: string): Promise<NewsArticle[]> {
       `${API_BASE}/api/news?symbol=${symbol.toUpperCase()}&limit=5`,
       // 5-min cache; news changes much slower than the score, no point
       // hammering the API on every crawl. Matches /api/scanner cadence.
-      { next: { revalidate: 3600 } },
+      { next: { revalidate: 3600 }, headers: ssrInternalHeaders() },
     );
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: NewsArticle[] };
@@ -378,6 +401,7 @@ async function fetchRelatedTickers(
     });
     const res = await fetch(`${API_BASE}/api/scanner?${params.toString()}`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
     });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: RelatedRow[] };
@@ -560,7 +584,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Telegram unlimited and Congressional-trade alerts. The free tier shows live scores for the top ${FREE_LIMITS.scannerRows} scanner rows plus ${FREE_LIMITS.dailyLookups} look-ups a day, with ${FREE_LIMITS.webPushAlerts} browser push alerts; ${sym} email or Telegram alerts specifically require Pro or Premium.`,
+      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Congressional-trade alerts. The free tier shows live scores for the top ${FREE_LIMITS.scannerRows} scanner rows plus ${FREE_LIMITS.dailyLookups} look-ups a day, with ${FREE_LIMITS.webPushAlerts} browser push alerts; ${sym} email alerts specifically require Pro or Premium.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,
@@ -879,8 +903,20 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         <div className="mt-10 sm:mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-5 sm:p-8">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Free signup gives you live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows, a {FREE_LIMITS.watchlistTickers}-ticker watchlist, and {FREE_LIMITS.dailyLookups}{" "}look-ups a day — free forever, no card.
-            Pro unlocks the full ~2,500-ticker real-time scanner with unlimited look-ups and smart alerts; Premium adds congressional trades and recent insider buys (SEC Form 4).
+            {/* CARD HONESTY. This said "Free signup gives you … free forever,
+                no card", which #548 made false: from 2026-08-22 a NEW account
+                adds a card at first sign-in. The card-free claim is kept only
+                where it is still literally true — reading the published record
+                — and the Free-tier caps are now framed as what grandfathered
+                accounts keep. Same split as the /compare and /best-* pages. */}
+            This page, the daily Top 10, the whole scorecard and the raw CSV/JSON record are free to
+            read with no account at all. The signed-in scanner is where the card comes in: a new
+            account adds one at first sign-in and starts a 14-day Premium trial — $0 that day, the
+            first charge on day 14 at the plan you pick, one click to cancel before then. That opens
+            the full ~2,500-ticker real-time scanner with unlimited look-ups and smart alerts;
+            Premium adds congressional trades and recent insider buys (SEC Form 4). Accounts created
+            before 22 August 2026 keep the Free access they signed up for: live scores on the
+            top {FREE_LIMITS.scannerRows}{" "}scanner rows{freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} and {FREE_LIMITS.dailyLookups}{" "}look-ups a day.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {/* rel=nofollow: every public /t/{SYMBOL} page emits this CTA with a
@@ -916,6 +952,17 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               </svg>
               Share on X
             </a>
+            {/* Embed CTA — surfaces the free iframe score badge so bloggers and
+                site owners can drop a live score on their own page. Each embed
+                is an evergreen backlink + a top-of-funnel arrival (the
+                distribution lever); previously it was only reachable from the
+                footer, so almost nobody found it. */}
+            <Link href="/embed" className="btn-ghost inline-flex items-center gap-2">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M8 9l-4 3 4 3M16 9l4 3-4 3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Embed this score
+            </Link>
           </div>
         </div>
 

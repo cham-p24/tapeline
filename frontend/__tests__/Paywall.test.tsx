@@ -84,7 +84,7 @@ describe("Paywall risk-reversal copy (trial truthfulness)", () => {
         <div>gated</div>
       </Paywall>
     );
-    expect(screen.getByText(/14-day trial, no card required/i)).toBeInTheDocument();
+    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
   });
 
   it("shows the money-back guarantee, never a trial, to signed-in users (trial consumed at signup)", () => {
@@ -146,6 +146,6 @@ describe("PaywallModal", () => {
     mockedUseUser.mockReturnValue(signedOut);
     render(<PaywallModal open onClose={() => {}} feature="squeeze" />);
     expect(screen.getByText(/Squeeze Watch is on Pro/)).toBeInTheDocument();
-    expect(screen.getByText(/14-day trial, no card required/i)).toBeInTheDocument();
+    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
   });
 });

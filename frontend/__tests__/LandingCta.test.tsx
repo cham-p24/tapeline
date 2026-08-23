@@ -31,9 +31,9 @@ vi.mock("@/components/ScannerPreview", () => ({
 }));
 
 describe("LandingCta", () => {
-  it("renders a primary signup CTA with the scanner-forward, no-card copy", () => {
+  it("renders a primary signup CTA with the scanner-forward, trial-terms copy", () => {
     render(<LandingCta from="screener" showPreview={false} />);
-    const primary = screen.getByRole("link", { name: /try the live scanner free — no card/i });
+    const primary = screen.getByRole("link", { name: /try the live scanner — 14-day trial/i });
     expect(primary).toBeInTheDocument();
     expect(primary).toHaveAttribute("href", "/signup?from=screener");
   });
@@ -41,26 +41,30 @@ describe("LandingCta", () => {
   it("message-matches the signup page via the ?from= slug", () => {
     const { rerender } = render(<LandingCta from="finviz" showPreview={false} />);
     expect(
-      screen.getByRole("link", { name: /try the live scanner free/i }),
+      screen.getByRole("link", { name: /try the live scanner/i }),
     ).toHaveAttribute("href", "/signup?from=finviz");
 
     rerender(<LandingCta from="compare" showPreview={false} />);
     expect(
-      screen.getByRole("link", { name: /try the live scanner free/i }),
+      screen.getByRole("link", { name: /try the live scanner/i }),
     ).toHaveAttribute("href", "/signup?from=compare");
   });
 
-  it("makes the offer clear: free forever tier, founding price, money-back", () => {
+  it("makes the offer clear: card-free record, trial terms, founding price, money-back", () => {
     render(<LandingCta from="screener" showPreview={false} />);
-    expect(screen.getByText(/free forever tier/i)).toBeInTheDocument();
+    // CARD HONESTY: "Free forever tier — no card" was true until the #548 card
+    // gate. The card-free claim now attaches ONLY to the published record, and
+    // the trial bullet has to carry its own $0-today qualifier.
+    expect(screen.getByText(/published record — free to read, no account/i)).toBeInTheDocument();
+    expect(screen.getByText(/14-day Premium trial — \$0 today, cancel in one click/i)).toBeInTheDocument();
     expect(screen.getByText(/30-day money-back guarantee/i)).toBeInTheDocument();
     // Founding Pro price is read from the single source of truth, not
     // hardcoded. The price sits in its own <li> split across text nodes
-    // ("Pro from", "$9.99", "/mo · ", "$99.00", "/yr"), so match on the
+    // ("Pro from", "$8.25", "/mo · ", "$99.00", "/yr"), so match on the
     // list item's combined textContent rather than a single text node.
     const offerStrip = screen.getByRole("list", { name: /pricing and guarantee/i });
     const text = offerStrip.textContent ?? "";
-    expect(text).toContain(`Pro from ${usd(PRICING.pro.monthly)}`);
+    expect(text).toContain(`Pro from ${usd(PRICING.pro.annualPerMonth)}`);
     expect(text).toContain(usd(PRICING.pro.annual));
   });
 
@@ -82,7 +86,7 @@ describe("LandingCta", () => {
     expect(screen.queryByTestId("scanner-preview")).toBeNull();
     // The CTA + offer strip still render.
     expect(
-      screen.getByRole("link", { name: /try the live scanner free/i }),
+      screen.getByRole("link", { name: /try the live scanner/i }),
     ).toBeInTheDocument();
   });
 });

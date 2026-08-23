@@ -184,6 +184,34 @@ _REGIME_TO_SCORE: dict[str, float] = dict(
 )
 
 
+def regime_to_macro_score(regime: str | None) -> float:
+    """Map a market-regime label to the macro sub-score (0-100).
+
+    Reuses the same NEGATIVE/POSITIVE/NEUTRAL token tables as ``sub_macro`` so
+    the two never drift, but differs on the empty/unknown case: this returns a
+    NEUTRAL 50.0 rather than None. Callers that must ALWAYS produce a macro score
+    (e.g. polygon_feed.fetch_snapshots, which previously let a random value flow
+    into the composite and onto the permanent public scorecard) use this so the
+    macro factor is deterministic — a known regime maps to its fixed value, and
+    an unknown/empty regime falls back to 50, NEVER to a random number.
+    """
+    key = str(regime or "").strip().upper()
+    if not key:
+        return 50.0
+    if key in _REGIME_TO_SCORE:
+        return _REGIME_TO_SCORE[key]
+    for token, value in _NEGATIVE_REGIME_TOKENS:
+        if token in key:
+            return value
+    for token, value in _POSITIVE_REGIME_TOKENS:
+        if token in key:
+            return value
+    for token, value in _NEUTRAL_REGIME_TOKENS:
+        if token in key:
+            return value
+    return 50.0
+
+
 def sub_macro(row: dict[str, Any]) -> float | None:
     """Market regime → sub_macro. Free-text input; defensive normalisation."""
     raw = row.get("market_regime") or ""

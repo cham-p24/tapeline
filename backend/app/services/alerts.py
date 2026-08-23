@@ -2,7 +2,7 @@
 Alert evaluation engine.
 
 Runs after each worker tick. Evaluates four rule types and fires matching
-alerts via the user's configured channel (email, telegram, or web_push). Per-rule
+alerts via the user's configured channel (email or web_push). Per-rule
 debounce prevents spam.
 
 Rule types:
@@ -423,7 +423,6 @@ def _debounced(rule: AlertRule, now: datetime) -> bool:
 # create-time gate in routers/alerts.py:create_rule.
 _CHANNEL_FEATURE: dict[str, str] = {
     "email": "alerts.email",
-    "telegram": "alerts.telegram",
     "web_push": "alerts.web_push",
 }
 
@@ -432,8 +431,8 @@ def _channel_entitled(user: User, channel: str) -> bool:
     """Re-check the user's CURRENT tier against the rule's channel.
 
     Rule rows outlive the entitlement that created them: a trial user authors
-    a Telegram rule on Premium, the trial lapses to free via
-    `_downgrade_expired_trials`, and the rule kept delivering a Premium
+    an email rule on Premium, the trial lapses to free via
+    `_downgrade_expired_trials`, and the rule kept delivering a Pro+
     channel forever. The rule row is deliberately left untouched so delivery
     resumes automatically if they upgrade again.
     """
@@ -449,13 +448,47 @@ def _channel_entitled(user: User, channel: str) -> bool:
     return has_feature(tier, feature)
 
 
+# Rule TYPE -> the tier feature that entitles a user to that CONTENT. Mirrors
+# the create-time gate in routers/alerts.py:create_rule. `score` is the base
+# product (the ungated Free web-push "taste"); the paid signal types map to the
+# same features the scanner enforces.
+_RULE_TYPE_FEATURE: dict[str, str] = {
+    "squeeze": "squeeze.full",
+    "regime": "regime.full",
+    "news": "news.full",
+    "congress": "congress.feed",
+}
+
+
+def _content_entitled(user: User, rule_type: str) -> bool:
+    """Re-check the user's CURRENT tier against the rule TYPE's content feature.
+
+    The channel gate (`_channel_entitled`) only decides HOW an alert is
+    delivered; this decides WHETHER the user may still receive this rule type's
+    paid content at all. Same "rules outlive their entitlement" problem: a Premium
+    trial user authors a congress/squeeze/regime/news rule, the trial lapses to
+    Free, and without this the rule keeps firing its Pro/Premium body. `score`
+    (and any unmapped type) is ungated.
+    """
+    from app.services.tier import Tier, has_feature
+
+    feature = _RULE_TYPE_FEATURE.get(rule_type)
+    if feature is None:
+        return True
+    try:
+        tier = Tier(user.tier)
+    except ValueError:
+        return False
+    return has_feature(tier, feature)
+
+
 async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
     """True when the user has already used their `email_alerts_per_day` cap.
 
     The meter is the SAME one /api/usage reads (routers/usage.py): delivered
     AlertEvent rows created since the current UTC midnight — no separate
     counter to drift out of sync. Scoped to `channel == "email"` because this
-    is the EMAIL cap; a Premium user's Telegram alerts must not eat into it.
+    is the EMAIL cap; a user's other-channel alerts must not eat into it.
 
     The cap was metered and marketed (Pro = 10/day) but never enforced at send
     time, so a noisy rule set could bill zero and email without limit.
@@ -495,37 +528,6 @@ async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
     return bool(sent_today >= cap)
 
 
-async def _telegram_cap_reached(session: AsyncSession, user: User) -> bool:
-    """True when the user has used their `telegram_alerts_per_day` cap.
-
-    Mirrors `_email_cap_reached` for the Telegram channel. Matters most for
-    no-card TRIAL Premium users, whom the trial throttle drops from ~unlimited
-    to 100/day (tier.py) — the cap was metered but never enforced at send time,
-    so a couple of symbol-less congress rules on a busy disclosure day (each
-    firing up to ~96x/day on the 15-min debounce) could blow well past it.
-    Real (paying) Premium sits at 10,000 ≈ unlimited, so this never bites them;
-    Free/Pro can't reach the telegram branch at all (`_channel_entitled` gates
-    alerts.telegram to Premium). Same flush caveat as the email cap.
-    """
-    from app.services.tier import effective_limit
-
-    cap = effective_limit(user, "telegram_alerts_per_day")
-    if cap is None:
-        return False
-    await session.flush()
-    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    sent_today = (await session.execute(
-        select(func.count()).select_from(AlertEvent)
-        .where(
-            AlertEvent.user_id == user.id,
-            AlertEvent.channel == "telegram",
-            AlertEvent.delivered.is_(True),
-            AlertEvent.created_at >= day_start,
-        )
-    )).scalar() or 0
-    return bool(sent_today >= cap)
-
-
 async def _fire(
     session: AsyncSession,
     rule: AlertRule,
@@ -546,7 +548,27 @@ async def _fire(
     session.add(event)
     rule.last_fired_at = datetime.now(UTC)
 
-    # Tier re-check at SEND time, not just at rule-creation time. Record the
+    # CONTENT-tier re-check at SEND time. This decides whether the user may
+    # still receive this rule TYPE's paid content at all — independent of the
+    # delivery channel. A `congress`/`squeeze`/`regime`/`news` rule authored on
+    # a Premium trial keeps firing after the trial lapses to Free
+    # (_downgrade_expired_trials only flips tier), so without this it would
+    # deliver Pro/Premium content to a Free user — most reachably via the Free
+    # `web_push` channel, which `_channel_entitled` does NOT suppress. Redact the
+    # premium body entirely (don't just skip the send): the AlertEvent.message is
+    # readable at GET /api/alerts/events, so the full body must never be stored
+    # for a caller who isn't entitled to it. Mirrors routers/alerts.py.
+    if not _content_entitled(user, rule.rule_type):
+        event.delivered = False
+        _feat = _RULE_TYPE_FEATURE.get(rule.rule_type, rule.rule_type)
+        event.message = f"[suppressed: {rule.rule_type} alerts require {_feat}]"
+        logger.info(
+            "alert.suppressed_content_tier user=%s rule=%s type=%s tier=%s",
+            user.id, rule.id, rule.rule_type, user.tier,
+        )
+        return
+
+    # CHANNEL re-check at SEND time, not just at rule-creation time. Record the
     # event either way so the user can see in /app/alerts/history that the rule
     # DID fire — the channel just isn't on their current plan.
     if not _channel_entitled(user, rule.channel):
@@ -560,7 +582,7 @@ async def _fire(
 
     if rule.channel == "email":
         # Respect per-user email-prefs — alert emails are opt-out-able.
-        # Other channels (telegram, web push) keep their own opt-out logic
+        # Other channels (web push) keep their own opt-out logic
         # via the rule.channel field itself, so this gate is email-only.
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.ALERT_EMAILS):
@@ -598,32 +620,9 @@ async def _fire(
                 event.delivered = not res.get("skipped", False)
             except Exception:
                 logger.exception("alert.email_failed user=%s rule=%s", user.id, rule.id)
-    elif rule.channel == "telegram" and user.telegram_chat_id:
-        if await _telegram_cap_reached(session, user):
-            # Daily telegram-alert cap spent (chiefly the trial throttle of
-            # 100/day). Same posture as the email cap: keep the AlertEvent so
-            # /app/alerts/history shows the rule fired, just skip the send.
-            event.delivered = False
-            event.message = f"[suppressed: daily telegram alert cap reached] {message}"
-            logger.info(
-                "alert.suppressed_telegram_cap user=%s rule=%s tier=%s",
-                user.id, rule.id, user.tier,
-            )
-        else:
-            try:
-                from app.services.telegram import send_message
-                text = (
-                    f"*[Tapeline] {rule.name}*\n\n"
-                    f"{message}\n\n"
-                    f"_Open: tapeline.io/app/scanner_"
-                )
-                ok = await send_message(user.telegram_chat_id, text)
-                event.delivered = ok
-            except Exception:
-                logger.exception("alert.telegram_failed user=%s rule=%s", user.id, rule.id)
-    # SMS + Discord channels were retired 2026-05-04. The dispatch arms
-    # were removed but the underlying app.services.{sms,discord}.py service
-    # files + DB columns are kept so the channels can be re-enabled later
+    # SMS + Discord channels were retired 2026-05-04, and the Telegram channel
+    # was retired 2026-08-11. The dispatch arms were removed but the underlying
+    # service files + DB columns are kept so the channels can be re-enabled later
     # by re-adding entries to FEATURES in tier.py + restoring these arms.
     elif rule.channel == "web_push":
         try:

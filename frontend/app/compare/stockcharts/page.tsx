@@ -21,7 +21,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Plain-English Why on every row",
-    tapeline: "✓ Default sentence, every ticker, free tier included",
+    tapeline: "✓ Default sentence, every ticker — public ticker pages included",
     competitor: "Chart annotations require you to read the chart yourself",
   },
   {
@@ -40,8 +40,9 @@ const WINS: CompareRow[] = [
     competitor: "Basic ~$14.95/mo · Extra ~$24.95/mo · Pro ~$39.95/mo",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "1-month free trial available, card required upfront",
   },
   {

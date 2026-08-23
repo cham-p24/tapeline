@@ -8,13 +8,49 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { POSTS } from "./blog/posts";
 import { REFUND } from "@/lib/pricing";
+import { formatTrackedSince, type CitableSummary } from "@/lib/scorecardCitation";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // ScannerPreview server-fetches the real anonymous top-scored rows; 30-min
 // ISR (same budget as /daily-picks) keeps the homepage static-fast while the
 // hero table stays a truthful snapshot of today's list.
 export const revalidate = 1800;
 
-export default function LandingPage() {
+// Server-side API base — same fallback chain as app/scorecard/page.tsx.
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://api.tapeline.io";
+
+/**
+ * Fetch the tier-invariant archive summary for the usage-as-proof line.
+ *
+ * Same pattern as app/scorecard/page.tsx fetchSummary(): GET
+ * /api/scorecard?days=1 (the summary is computed over ALL history regardless
+ * of the window), 30-min ISR, 5s abort so a degraded API can't hang the static
+ * build. Any failure returns null and the caller renders no proof line.
+ *
+ * COMPLIANCE — Rule 3: the landing/hero surface may show ONLY the raw counts
+ * and the tracked-since date from this summary. The vs-SPY hit rate and the
+ * median-alpha figure are deliberately NOT read here; they stay on /scorecard
+ * where the sample size is disclosed alongside them.
+ */
+async function fetchSummary(): Promise<CitableSummary | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/scorecard?days=1`, {
+      next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { summary?: CitableSummary };
+    return body?.summary ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function LandingPage() {
+  const summary = await fetchSummary();
+  const trackedSince = summary ? formatTrackedSince(summary.first_tracked_date) : null;
   return (
     // The page-wide blue atmospheric gradient now lives on `body::before`
     // in globals.css (PR #141) so EVERY route gets it consistently
@@ -28,20 +64,37 @@ export default function LandingPage() {
       <MarketingNav />
 
       {/* HERO — single-purpose fold.
-          Left: one sentence value prop + one primary CTA + one ghost CTA.
+          Left: one sentence value prop + the record/trial CTA pair + the
+          no-account browse pill.
           Right: the REAL anonymous top-scored table (ScannerPreview, server-
           fetched, 30-min ISR) with a zero-signup link to the full Top 10.
           Nothing else competes. The TickerSearch previously sat under the
           preview, doing the same job twice; removed so the eye lands on one
-          demo, not two. */}
-      <section className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-20 sm:pb-16">
+          demo, not two.
+          Mobile top padding is half the old pt-8, and the column gap below is
+          halved too: on a 375x812 phone the entire left column stacks above
+          the product shot, so every pixel of hero padding pushes row one of
+          the table past the fold. sm+ keeps the original composition. */}
+      <section className="relative overflow-hidden px-6 pt-4 pb-10 sm:pt-20 sm:pb-16">
         {/* Decorative gradient blobs removed 2026-05-22 — too many ambient
             overlays were competing with the actual content + colliding with
             the body::before atmospheric tint, producing an unintentionally
             heavy stacked effect. Sections now use solid panel tints (below)
             for hierarchy rather than blurred colour halos. */}
-        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-5 lg:gap-10">
-          <div className="lg:col-span-2 lg:pt-6">
+        {/* Mobile-only reorder (GAP #5): the two-column grid stacks the whole
+            text column above the ScannerPreview on a phone, pushing the live
+            table below the fold. The hero is split into three grid children so
+            Tailwind order-* can interleave them on mobile — badge+h1+value-prop
+            +CTAs (order-1), the ScannerPreview column (order-2), then the trial
+            fine-print (order-3) — while explicit lg:col-start/lg:row-start
+            rebuild the exact desktop two-column composition and lg:order-none
+            resets the source order. lg:gap-y-0 keeps the stacked left-column
+            blocks on their existing margins (no extra grid row-gap) so the
+            desktop layout is unchanged; lg:gap-x-10 preserves the old column
+            gap. Reason about a 375px viewport: the scanner now sits directly
+            under the CTAs, above the fine-print. */}
+        <div className="mx-auto grid max-w-6xl gap-6 sm:gap-12 lg:grid-cols-5 lg:gap-x-10 lg:gap-y-0">
+          <div className="order-1 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-1 lg:pt-6">
             {/* Static dot on purpose — the hero table refreshes on a 30-min
                 ISR cadence, so nothing here should pulse like a stream. */}
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
@@ -49,59 +102,66 @@ export default function LandingPage() {
               Live market scanning
             </div>
             <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">
-              A scanner that
+              Every pick on the public record.
               <br />
-              <span className="text-accent">shows its work.</span>
+              <span className="text-accent">Even the ones that missed.</span>
             </h1>
             <p className="mt-6 text-lg text-muted leading-relaxed">
-              The <span className="font-medium text-fg">Tapeline Score</span>{" "}
-              blends six named factors into one read on every
-              ticker. Every call goes on a permanent public record &mdash; same
-              day, no edits.
+              Newsletters show you the winners. The{" "}
+              <span className="font-medium text-fg">Tapeline Score</span> blends
+              six named factors into one read on every ticker &mdash; and every
+              call, win or miss, goes on a permanent public record you can check
+              before you ever pay. Same day, no edits.
             </p>
-            {/* PAIRED ENTRY POINTS — two first-class doors, not one button
-                plus a ghost link.
-                The fold used to offer a single real path (/signup) with the
-                scorecard demoted to `btn-ghost` — borderless, muted, reading
-                as a footnote. That buried the two things a cold visitor
-                actually wants: (1) start the no-card trial, or (2) look at the
-                product without handing over anything at all.
-                Both CTAs now share the same pill size and weight; the second
-                is outlined rather than muted so neither reads as the
-                afterthought. Grid (not flex-wrap) so they stay equal width on
-                mobile instead of one stretching and the other shrinking.
-                R6: states the trial's terms as fact — no countdown, no
-                deadline, no scarcity. */}
+            {/* ENTRY POINTS — the proof door and the product door at equal
+                weight, with the no-account browse path under them.
+                The proof-first repositioning is deliberate and stays: the
+                public record leads. But it had left the fold with no way into
+                the product at all — both pills pointed at public pages and a
+                third text link went to /scorecard a SECOND time, so a visitor
+                who was already convinced had nothing to click. /signup is now
+                the second pill, outlined in accent rather than muted so
+                neither door reads as the afterthought, and the duplicate
+                scorecard link is gone. Grid (not flex-wrap) so the pills stay
+                equal width on mobile instead of one stretching and the other
+                shrinking.
+                R6: the trial's terms are stated as fact below — no countdown,
+                no deadline, no scarcity. */}
             <div className="mt-8 grid gap-3 sm:max-w-md sm:grid-cols-2">
-              <Link href="/signup" className="btn-primary text-base">
-                Start the 14-day trial &rarr;
+              <Link href="/scorecard" className="btn-primary text-base">
+                See the track record &rarr;
+              </Link>
+              <Link
+                href="/signup"
+                className="btn border border-accent/60 text-base text-accent transition-colors hover:bg-accent/10"
+              >
+                Start the free trial
               </Link>
               <Link
                 href="/daily-picks"
-                className="btn border border-border bg-panel text-base text-fg transition-colors hover:border-accent/50 hover:bg-panel/70"
+                className="btn border border-border bg-panel text-base text-fg transition-colors hover:border-accent/50 hover:bg-panel/70 sm:col-span-2"
               >
                 Browse without an account
               </Link>
             </div>
-            {/* Plain description of what each door leads to. The trial takes no
-                card, so there is nothing to cancel and no charge to avoid —
-                say that rather than implying a billing cliff. */}
-            <p className="mt-3 text-xs text-muted leading-relaxed">
-              The trial is 14 days of Premium. No credit card, no payment
-              details, nothing charged &mdash; it simply ends and your account
-              stays on the Free tier. Browsing needs no account at all.
-            </p>
-            <p className="mt-2 text-xs text-muted">
+            {/* GAP #6: a subtle tertiary text link into /signup, added ABOVE
+                the fold alongside the two proof-first pills. It does not remove
+                or demote either existing CTA (both stay full pills, test-locked
+                in LandingPage.test.tsx) — it just gives an already-convinced
+                visitor a low-friction door into the trial. */}
+            <p className="mt-3 text-sm">
               <Link
-                href="/scorecard"
+                href="/signup"
                 className="text-accent underline-offset-2 hover:underline"
               >
-                Or read the public record first &rarr;
+                Start the 14-day trial
               </Link>
             </p>
           </div>
 
-          <div className="lg:col-span-3">
+          {/* Block C — the ScannerPreview column. Mobile order-2 so the live
+              table sits directly under the CTAs, above the fine-print. */}
+          <div className="order-2 lg:order-none lg:col-span-3 lg:col-start-3 lg:row-start-1 lg:row-span-2">
             <ScannerPreview />
             {/* Fold-visible zero-signup path: the table above shows the top
                 slice; /daily-picks has the full Top 10, no account needed. */}
@@ -113,7 +173,38 @@ export default function LandingPage() {
                 See today&rsquo;s full Top 10 &mdash; no signup &rarr;
               </Link>
             </p>
+            {/* The differentiator, stated directly under the thing that
+                evidences it: the artefact itself — today's list and the whole
+                logged history, losses included — is readable before anyone
+                signs up, which is the one thing the paid rivals don't do.
+                Descriptive statement of what is published: no returns claim,
+                and no usage figure is asserted because this page carries no
+                server-side count to source a real one from. */}
+            <p className="mx-auto mt-2 max-w-md text-center text-sm leading-snug text-fg">
+              Today&rsquo;s picks and the entire logged history, losses
+              included, are readable before you sign up.
+            </p>
+            {/* GAP #22: one openness line vs the paid rivals. Landing copy
+                only — a factual statement of what Tapeline exposes for free.
+                (The per-rival free-access claim is verified on the /compare
+                pages, not asserted here — see deviations follow-up.) */}
+            <p className="mx-auto mt-2 max-w-md text-center text-sm leading-snug text-muted">
+              All 10 of today&rsquo;s top picks &mdash; free, no login. Most
+              scanners keep their picks behind a paywall.
+            </p>
           </div>
+
+          {/* Block B — the trial fine-print. Mobile order-3 so it trails the
+              live table; lg:row-start-2 tucks it directly under Block A in the
+              left column on desktop (lg:gap-y-0 keeps its mt-3 the only gap, so
+              the desktop layout is unchanged). */}
+          <p className="order-3 mt-3 text-xs leading-relaxed text-muted lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-2">
+            The trial is 14 days of Premium. Your card goes on at first sign-in
+            and nothing is charged that day &mdash; the first charge is on day 14 at
+            the plan you pick, we email you three days before, and one click cancels
+            before then. The scorecard and daily Top 10 stay free to read with no
+            account either way.
+          </p>
         </div>
       </section>
 
@@ -123,6 +214,20 @@ export default function LandingPage() {
       <section>
         <div className="mx-auto max-w-6xl px-6 py-8">
           <LiveCounters />
+          {/* GAP #20: usage-as-proof, sourced LIVE from the scorecard summary
+              (server fetch above, 30-min ISR). Renders nothing when the fetch
+              failed or the archive is empty.
+              COMPLIANCE — Rule 3: ONLY the raw counts and the tracked-since
+              date appear here. The vs-SPY hit rate and median-alpha are NOT
+              surfaced on the landing/hero — they live on /scorecard with the
+              sample size disclosed. */}
+          {summary && (
+            <p className="mt-4 text-center text-sm text-muted">
+              {summary.entries_scored} picks logged across{" "}
+              {summary.days_tracked} market days
+              {trackedSince ? `, tracked since ${trackedSince}` : ""}.
+            </p>
+          )}
         </div>
       </section>
 
@@ -375,18 +480,18 @@ export default function LandingPage() {
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-muted">
             See your watchlist scored the same way we score the public
-            scorecard. Free for 14 days, no card.
+            scorecard. 14 days of Premium, $0 today.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
-              Try Premium free &rarr;
+              Sign up &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost text-base">
               See pricing
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted">
-            No credit card &middot; Cancel in one click &middot;{" "}
+            $0 today &middot; Cancel in one click &middot;{" "}
             {REFUND.windowDays}-day refund on monthly
           </p>
         </div>
@@ -401,7 +506,7 @@ export default function LandingPage() {
       <section className="bg-panel/30">
         <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">
               Free · no card
             </div>
             <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">

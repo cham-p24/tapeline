@@ -1,5 +1,23 @@
 # Tapeline — Newsletter Sponsorship Research
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 Drafted 2026-05-14. 5 finance newsletters where Tapeline's audience fit + the price point work for a first sponsorship test. Budget assumption: $300-1,200 single-newsletter buy or 2 × $300-500 small-newsletter buys. The brief said $300; spend may need to flex up to land a single placement with the right audience.
 
 **Goal**: validate whether newsletter audiences convert at the unit economics Tapeline needs. Target metric: **trial signups per $100 sponsorship spend ≥ 3**. Anything below 1 says newsletters aren't the right channel for the current price point and you should redirect that budget to Twitter/Reddit organic.
@@ -34,7 +52,7 @@ Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stoc
 Why your audience fits:
 — Free tier (top 20 tickers, 24h delay) is a genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
 — Pro tier is $8.25/mo (annual) — accessible price point for retail traders considering a paid tool.
-— 14-day Premium trial requires no card. Friction-free try.
+— Free tier requires no card at all. The 14-day Premium trial does take one, charges $0 today, and cancels in one click.
 
 I'm specifically asking about a *secondary* placement (footer slot, sponsored link, etc.) rather than primary because we're testing the channel at $300-1.2K budget. Happy to take whichever slot/date makes sense for your inventory.
 
@@ -60,7 +78,7 @@ Christian
 ```
 Hi Finimize team,
 
-Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published formula and a public scorecard. Free tier, $9.99/mo Pro, 14-day Premium trial without a card.
+Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published formula and a public scorecard. Free tier (no card), $9.99/mo Pro, and a 14-day Premium trial that takes a card but charges $0 until day 14.
 
 The reason it's a fit for Finimize: your audience is in the "I want to learn how investing works" cohort. Tapeline's positioning lands there — the entire product is built around showing you HOW each score is computed, not just giving you a verdict. The /how-it-works page is half the product.
 
@@ -89,7 +107,7 @@ Pitching Tapeline (tapeline.io) for a single-issue sponsorship. The angle: Tapel
 Why your audience fits specifically:
 — Net Interest readers are professionals who read 10-Ks and quarterly filings. The Smart Money factor (Form 4 cluster detection + elite 13F + Congressional disclosure) speaks to that audience directly. Every other retail scoring tool either hides the smart-money methodology or skips it.
 — The formula transparency matches Net Interest's editorial standard. The product positioning is the inverse of "trust us, our AI works."
-— Pricing is retail-friendly ($9.99/mo Pro, 14-day trial without a card), so the placement converts on direct-response, not just brand-awareness.
+— Pricing is retail-friendly ($9.99/mo Pro, card-free free tier, 14-day Premium trial at $0 today), so the placement converts on direct-response, not just brand-awareness.
 
 Asking about a single-issue sponsored block. Happy to take any format that fits your usual inventory. Budget on our side starts at $300 and we can flex upward if a primary-placement slot makes sense for both of us.
 
@@ -117,7 +135,7 @@ Your audience is the cohort that most cares about this. Most retail scoring tool
 
 Specific angles for the placement:
 — Free tier (top 20 tickers, 24h delay) is real product, not a stripped preview.
-— Pro is $9.99/mo. 14-day Premium trial, no card.
+— Pro is $9.99/mo. Free tier needs no card; the 14-day Premium trial takes one and charges $0 today.
 — Smart Money factor is decomposed into Form 4 cluster + elite 13F + Congressional disclosure — methodology Bear Cave readers appreciate.
 
 Budget on our side starts at $300 and can flex upward if the placement timing/format matches. Open to whatever inventory works best for you.
@@ -142,7 +160,7 @@ Hi Andrew,
 
 Pitching Tapeline (tapeline.io) for a sponsorship slot. Quick overview: stock-scanning tool for retail traders with a published 6-factor formula and a public scorecard that back-checks every daily pick against SPY the next session. Free tier (top 20 tickers, 24h delayed); Pro at $8.25/mo annual.
 
-Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The free tier is a low-friction way for them to try it. The 14-day Premium trial requires no card.
+Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The free tier is a low-friction way for them to try it — no card, ever. The 14-day Premium trial does take a card, charges $0 today, and cancels in one click.
 
 Asking what your sponsorship inventory looks like. Budget on our side starts at $300; happy to flex up to $1,200 if a primary slot is the right fit. Lower-tier / footer inventory is also fine for a first test.
 

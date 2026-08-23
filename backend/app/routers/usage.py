@@ -33,7 +33,7 @@ async def my_usage(
     """
     tier = Tier(user.tier)
     # Resolve caps via effective_limit so trial-state Premium users see the
-    # throttled api/telegram caps, not the paid-Premium caps.
+    # throttled api caps, not the paid-Premium caps.
     on_trial = is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
     caps = {
         "watchlist_tickers":     effective_limit(user, "watchlist_tickers"),

@@ -14,7 +14,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Best Free Stock Screener 2026 — 5 Tools Compared | Tapeline",
   description:
-    "Compare 2026's best free stock screeners — Finviz, TradingView, StockAnalysis and Tapeline's free tier. Only Tapeline names its scoring factors and keeps a public scorecard.",
+    "Compare 2026's best free stock screeners — Finviz, TradingView, StockAnalysis and Tapeline's free published record. Only Tapeline names its scoring factors and keeps a public scorecard.",
   path: "/best-free-stock-screener",
 });
 
@@ -34,14 +34,19 @@ type FreeScreener = {
 
 const SCREENERS: FreeScreener[] = [
   {
-    name: "Tapeline (free tier)",
+    // 2026-08-22 card gate: this entry used to sell a "free forever" logged-in
+    // tier with "no card, no trial clock". A new Tapeline account now takes a
+    // card at first sign-in, so the free thing on offer is the PUBLISHED
+    // RECORD — which is genuinely free, genuinely card-free and genuinely
+    // account-free, and is what this row now describes.
+    name: "Tapeline (public record)",
     freePlan:
-      "Free forever — live scores on the top scanner rows plus a handful of ticker look-ups a day, no card",
+      "The daily Top 10, the full scorecard, a page per scored ticker and the raw CSV/JSON — free, with no account at all",
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     noCard: "Yes",
     summary:
-      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. The free tier gives you the composite score and the plain-English Why on the top rows; no card, no trial clock.",
+      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. All of the published output is readable without an account or a card: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record. What is NOT card-free is the signed-in scanner — a new account adds a card at first sign-in and starts a 14-day Premium trial ($0 that day, first charge on day 14, one click to cancel). Accounts created before 22 August 2026 keep the free access they signed up for.",
   },
   {
     name: "Finviz (free)",
@@ -80,11 +85,11 @@ const SCREENERS: FreeScreener[] = [
 const FAQ = [
   {
     q: "What's the best free stock screener in 2026?",
-    a: "It depends on the job. For a synthesised composite score per ticker with a published methodology, Tapeline's free tier — the only one that also keeps a public scorecard. For raw filter density across a broad universe, the free Finviz screener. For charting plus a free screener, TradingView. For clean fundamental tables with no login wall, StockAnalysis.io. Each is honest about what its free tier includes and what it doesn't.",
+    a: "It depends on the job. To READ a synthesised composite score per ticker with a published methodology, Tapeline's public record — the only one here that also keeps a public scorecard, and none of it needs an account. To RUN your own filters for free, the free Finviz screener for raw filter density, TradingView for charting plus a screener, StockAnalysis.io for clean fundamental tables with no login wall. Each is honest about what its free path includes and what it doesn't.",
   },
   {
     q: "Are free stock screeners actually any good, or just trials?",
-    a: "Several are genuinely free, not disguised trials. StockAnalysis.io, the free Finviz screener, and TradingView's free tier all give you real, ongoing screening with no card required. Tapeline's free tier is free forever — live scores on the top rows plus a handful of look-ups a day. Paid tiers add depth (real-time data, more filters, unlimited look-ups), but the free versions do real work.",
+    a: "Several are genuinely free, not disguised trials. StockAnalysis.io, the free Finviz screener, and TradingView's free tier all give you real, ongoing screening with no card required. Tapeline is the odd one out here and it should be said plainly: its published record is free forever with no account, but the signed-in scanner takes a card at first sign-in — so it is not a free screener you can run yourself. Paid tiers elsewhere add depth (real-time data, more filters, unlimited look-ups), but the free versions do real work.",
   },
   {
     q: "Which free screener publishes how it actually scores stocks?",
@@ -96,7 +101,7 @@ const FAQ = [
   },
   {
     q: "How did you compare these free screeners?",
-    a: "On features only, never on returns: does it have a genuinely free tier, does it publish the methodology behind any score, does it keep a public track record, and does it work with no credit card. We don't rank tools by claimed performance — that's not something an honest scanner should advertise. The right free screener for you depends on whether you want a synthesised score (Tapeline) or a raw filter box (Finviz, TradingView, StockAnalysis.io).",
+    a: "On features only, never on returns: what you can reach with no credit card, whether it publishes the methodology behind any score, whether it keeps a public track record, and whether it works with no account. We don't rank tools by claimed performance — that's not something an honest scanner should advertise. Note the split on Tapeline: reading its record is free and account-free, but from 22 August 2026 a new account takes a card at first sign-in, so if you want a free screener to run yourself the other four are the honest answer.",
   },
 ];
 
@@ -142,7 +147,7 @@ export default function BestFreeStockScreenerPage() {
           <em> and</em> keeps every losing day on a public scorecard. That scorecard currently
           trails SPY — and we leave it up unedited, because a record you can audit beats a
           marketing number you can&apos;t. Below is an honest, feature-only comparison of the
-          genuinely free stock screeners worth your time in 2026 — what each free tier includes,
+          genuinely free stock screeners worth your time in 2026 — what each free path includes,
           whether it publishes its methodology, and whether it needs a card. No performance
           claims, because a screener that promised returns would be lying to you.
         </p>
@@ -150,20 +155,20 @@ export default function BestFreeStockScreenerPage() {
         {/* Above-the-fold conversion block — offer, live scanner preview, and the
             founding price up top where the visitor already is. from="screener"
             message-matches the signup H1 for screener-intent traffic. */}
-        <LandingCta from="screener" />
+        <LandingCta from="screener" primaryLabel="Start the 14-day Premium trial" />
 
         <section className="mt-10">
-          <h2 className="text-xl font-semibold">At a glance — free tiers compared</h2>
+          <h2 className="text-xl font-semibold">At a glance — the free paths compared</h2>
           <p className="mt-2 text-sm text-muted">
-            Features only. We compare free-tier depth, methodology transparency, and track record —
-            never claimed returns.
+            Features only. We compare what each free path gives you, methodology transparency,
+            and track record — never claimed returns.
           </p>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-border text-xs uppercase tracking-wider text-subtle">
                 <tr>
                   <th className="px-3 py-3 text-left font-medium">Screener</th>
-                  <th className="px-3 py-3 text-left font-medium">Free tier</th>
+                  <th className="px-3 py-3 text-left font-medium">Free path</th>
                   <th className="px-3 py-3 text-center font-medium">Public methodology</th>
                   <th className="px-3 py-3 text-center font-medium">Track record</th>
                   <th className="px-3 py-3 text-center font-medium">No card</th>
@@ -202,7 +207,7 @@ export default function BestFreeStockScreenerPage() {
             className="mt-10 scroll-mt-20"
           >
             <h2 className="text-2xl font-bold tracking-tight">{s.name}</h2>
-            <p className="mt-2 text-sm font-medium text-muted">Free tier: {s.freePlan}</p>
+            <p className="mt-2 text-sm font-medium text-muted">Free path: {s.freePlan}</p>
             <p className="mt-3 text-sm text-fg leading-relaxed">{s.summary}</p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
               <span className={formulaChip(s.publicFormula)}>
@@ -225,7 +230,7 @@ export default function BestFreeStockScreenerPage() {
           <h2 className="text-xl font-semibold tracking-tight">How we compared them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Four feature criteria, no performance criteria: is there a{" "}
-            <strong>genuinely free tier</strong> (not a disguised trial);
+            <strong>genuinely free path</strong> (not a disguised trial);
             does the tool <strong>publish the methodology</strong> behind any score it shows;
             does it keep a <strong>public track record</strong>; and does it work with{" "}
             <strong>no credit card</strong>. We deliberately do not rank screeners by claimed
@@ -235,7 +240,10 @@ export default function BestFreeStockScreenerPage() {
             Tapeline is the only tool here that answers &quot;yes&quot; to both the public-methodology
             and public-scorecard columns. The scorecard trailing SPY is stated plainly on the{" "}
             <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link>{" "}
-            itself — it&apos;s the trust hook, not a footnote. The raw filter screeners
+            itself — it&apos;s the trust hook, not a footnote. It is also the one entry here whose
+            free path is reading rather than screening: from 22 August 2026 a new Tapeline account
+            takes a card at first sign-in, so if what you want is a free screener to run yourself,
+            the other four are the honest answer. The raw filter screeners
             (Finviz, TradingView, StockAnalysis.io) don&apos;t produce a composite score at all, so
             those columns simply don&apos;t apply to them — a fair difference in design, not a knock.
           </p>
@@ -295,15 +303,15 @@ export default function BestFreeStockScreenerPage() {
 
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">
-            Try the free scanner that shows its receipts.
+            The scanner that shows its receipts.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">
-              Start free — no card →
+              Start the 14-day Premium trial →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

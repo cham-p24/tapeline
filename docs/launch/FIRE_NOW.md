@@ -1,5 +1,23 @@
 # FIRE NOW — the paste-ready launch pack (current as of 2026-07-26)
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 This supersedes `REDDIT_PASTE_READY.md` and `SHOW_HN_VARIANTS.md`. Those had two
 things wrong that would have burned a launch: the **Free tier** was described as
 "top 20, 24h delayed" (it is now **live, 12 look-ups/day**), and the **scorecard
@@ -22,7 +40,7 @@ version of "go get customers."
 | **Free** | $0 · **live scores, no delay** · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · full public scorecard |
 | **Pro** | **$9.99/mo** or **$8.25/mo billed annually** ($99/yr) · full ~2,500-ticker live scan · smart alerts · calendars · CSV |
 | **Premium** | **$19.99/mo** or **$16.58/mo billed annually** ($199/yr) · + Congress trades · + SEC Form 4 insider buys · + Telegram · + API 1,000/day |
-| **Trial** | 14 days of Premium, **no card**. Drops to Free at day 14 unless a card is added. |
+| **Trial** | 14 days of Premium, **card required** ($0 charged today, first charge on day 14, one-click cancel before then). Account creation itself is email + password and lands on **Free**, which never asks for a card. |
 | **Scorecard** | **52 days on the record, 478 calls logged and never edited. ~47% have beaten SPY the next day** (below a coin flip — say so; the point is that it's auditable, not that it's magic). |
 | **Formula** | 6-factor composite, weights public at `/how-it-works`: Trend 25 · Relative Strength 20 · Fundamentals 15 · Smart Money 15 · Macro 15 · Momentum 10. "Smart Money" = **SEC Form 4 insider buys**, not 13F lag. |
 
@@ -76,7 +94,7 @@ The scorecard is the part I actually want you to attack. Every market day I free
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — with the exact weights published at tapeline.io/how-it-works. "Smart Money" is SEC Form 4 insider buying, not 13F lag.
 
-Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed + Telegram). 14-day trial, no card.
+Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed + Telegram). Free tier needs no card; the 14-day Premium trial takes one and charges $0 until day 14 — one click cancels.
 
 Drop a ticker in the comments and I'll post its current score + the six-factor breakdown. And tell me what's wrong with the methodology — that's the part I want to harden.
 ```
@@ -137,7 +155,7 @@ The score is a public 6-factor composite — Trend 25%, Relative Strength 20%, F
 
 The scorecard is the part I want HN to tear apart. It's 52 days and 478 calls deep, and the top-10 is currently beating SPY about 47% of the time — i.e. slightly worse than a coin flip. I'm posting that number on purpose. The transparency is the product; the early hit rate is not the pitch, and I expect it to move both directions as the sample grows.
 
-Free tier is live (no delay): 12 ticker look-ups/day, top-10 rows, 5-name watchlist, full scorecard. Pro is $8.25/mo billed annually for the full ~2,500-ticker live scan + alerts. Premium is $16.58/mo annually for + Congress trades + SEC Form 4 + Telegram. 14-day Premium trial, no card.
+Free tier is live (no delay): 12 ticker look-ups/day, top-10 rows, 5-name watchlist, full scorecard. Pro is $8.25/mo billed annually for the full ~2,500-ticker live scan + alerts. Premium is $16.58/mo annually for + Congress trades + SEC Form 4 + Telegram. The free tier never asks for a card; the 14-day Premium trial does — $0 today, first charge on day 14, one click to cancel.
 
 Built solo from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and which factor I'm under-weighting.
 ```

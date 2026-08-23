@@ -22,6 +22,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import BillingPage from "@/app/app/billing/page";
 import type { SessionUser } from "@/lib/auth";
+import { freeHasWatchlist, freeScannerRows, PRO_SCANNER_ROWS } from "@/lib/pricing";
 
 // Mutable user context so each test can drive tier/trial state. vi.hoisted
 // keeps the holder reachable inside the hoisted mock factory (same pattern
@@ -162,10 +163,27 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     expect(current).toBeDisabled();
   });
 
-  it("gives authenticated free users an in-page re-activation button, not a /signup link", () => {
-    render(<BillingPage />); // default ctx.user = free
-    expect(screen.getByRole("button", { name: /re-activate premium/i })).toBeInTheDocument();
+  it("gives authenticated free users an in-page plan button, not a /signup link", () => {
+    // CHANGED with the card-required trial: a brand-new free account has never
+    // held Premium, so "Re-activate Premium" was nonsense to it — and it is
+    // also exactly the account the 14-day trial is for. The label now splits
+    // on whether the trial has been used; the point of the original test (an
+    // in-page button, never a dead /signup link) is unchanged.
+    render(<BillingPage />); // default ctx.user = free, never trialled
+    expect(
+      screen.getByRole("button", { name: /see plans and the 14-day trial/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /try premium free/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign ?up/i })).not.toBeInTheDocument();
+  });
+
+  it("still says Re-activate Premium once the trial has been used", () => {
+    ctx.user = {
+      ...freeUser(),
+      trial_ends_at: new Date(Date.now() - 5 * 86_400_000).toISOString(),
+    };
+    render(<BillingPage />);
+    expect(screen.getByRole("button", { name: /re-activate premium/i })).toBeInTheDocument();
   });
 
   it("shows a success message and refreshes the session on ?checkout=success", async () => {
@@ -191,17 +209,33 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     expect(calls.some((u) => u.includes("/api/billing/checkout"))).toBe(false);
   });
 
-  it("shows the current free-tier caps (watchlist 5, top-10 scanner rows)", () => {
+  it("shows the current free-tier caps (watchlist 5, the live scanner row cap)", () => {
     render(<BillingPage />); // default ctx.user = free
     // Scope to the "Plan limits" tiles — the ComparisonTable inside the
     // auto-opened plan picker repeats some of these labels.
     const section = screen.getByText("Plan limits").parentElement!;
     const watchlist = within(section).getByText("Watchlist tickers").parentElement!;
-    // Free watchlist cap raised to 5 (2026-07-12) to break the seed deadlock.
-    expect(watchlist.textContent).toContain("5");
-    expect(watchlist.textContent).not.toContain("3");
+    if (freeHasWatchlist()) {
+      // Free watchlist cap raised to 5 (2026-07-12) to break the seed deadlock.
+      expect(watchlist.textContent).toContain("5");
+      expect(watchlist.textContent).not.toContain("3");
+    } else {
+      // Post-2026-08-02 cutover the watchlist is Pro-only → the Free tile shows
+      // "—" (a 0 limit), like the Email-alerts and Saved-scans tiles.
+      expect(watchlist.textContent).toContain("—");
+      expect(watchlist.textContent).not.toContain("5");
+    }
+    // The "Plan limits" tile states this user's OWN current cap, so it follows
+    // the open-access lift (freeScannerRows, lib/pricing.ts): the Pro cap while
+    // the window is open, FREE_LIMITS.scannerRows after it reverts. Asserting
+    // through the same helper the page uses keeps this green on both sides of
+    // the cutover instead of hard-coding a number with a 2026-09-08 expiry.
+    const expected = freeScannerRows({ authenticated: true });
     const rows = within(section).getByText("Scanner rows").parentElement!;
-    expect(rows.textContent).toContain("10");
+    expect(rows.textContent).toContain(expected.toLocaleString());
+    // Never the retired "top 20" cap, in either window.
     expect(rows.textContent).not.toContain("20");
+    // And the lift, when it applies, is the Pro cap rather than some third number.
+    if (expected !== 10) expect(expected).toBe(PRO_SCANNER_ROWS);
   });
 });

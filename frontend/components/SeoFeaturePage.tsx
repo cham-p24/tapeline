@@ -104,7 +104,7 @@ export function SeoFeaturePage({
   const tierLabel = tier === "premium" ? "Premium" : tier === "pro" ? "Pro" : "Free";
   const tierCopy =
     tier === "premium"
-      ? "Premium · 14-day trial, no credit card."
+      ? "Premium · 14-day trial, $0 today."
       : tier === "pro"
         ? "Pro · 14-day Premium trial that includes everything in Pro."
         : "Free tier — see the live universe today.";

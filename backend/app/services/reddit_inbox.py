@@ -370,7 +370,15 @@ async def _dispatch_inbound(
             await alert_founder(result.message)
         elif allow_auto_reply:
             ok = await send_reddit_reply(result.message, result.auto_reply_text)
-            if ok:
+            # In dry-run, send_reddit_reply returns True WITHOUT posting anything.
+            # Do NOT mark the row 'sent' then — 'sent' is terminal (mark_sent
+            # no-ops on it, handle_inbound is idempotent, and _approve_core
+            # refuses to re-send a 'sent' row), so a genuine Tier-2 message
+            # received during the recommended dry-run shadow week would be
+            # recorded as delivered though nothing went out, and could never be
+            # answered after going live. Leave it drafted ('auto_replied') so the
+            # founder can approve it — mirrors the email adapter (routers/inbox.py).
+            if ok and not inbox_kill_switch.dry_run():
                 await mark_sent(session, result.message.id, when=datetime.now(UTC))
                 await session.commit()
         else:

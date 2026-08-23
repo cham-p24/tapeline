@@ -31,6 +31,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 // Tunables — the levers growth would tweak. Kept as named constants.
 const VIEW_THRESHOLD = 3;           // distinct /t/ tickers before we nudge
@@ -154,12 +155,28 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
+          {/* The saved watchlist is Pro-and-up from the 2026-08-02 cutover, so
+              the free value prop can no longer be "save your tickers, free".
+              Reframe around what Free genuinely keeps (live scores + browser
+              alerts) and sell the saved watchlist as a Pro perk. */}
           <h2 className="text-base sm:text-lg font-semibold tracking-tight text-fg">
-            You&rsquo;re exploring — save your tickers, free
+            {freeHasWatchlist()
+              ? "You’re exploring — save your tickers, free"
+              : "You’re exploring — sign up free to track these"}
           </h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            You&rsquo;ve looked at a few tickers. Sign up free (no card) to save
-            them to a watchlist and get alerts when their scores move.
+            {freeHasWatchlist() ? (
+              <>
+                You&rsquo;ve looked at a few tickers. Create an account to
+                save them to a watchlist and get alerts when their scores move.
+              </>
+            ) : (
+              <>
+                You&rsquo;ve looked at a few tickers. Create an account for
+                live scores and browser alerts when their scores move — save
+                them to a watchlist on Pro.
+              </>
+            )}
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link href="/signup?from=ticker" className="btn-accent" rel="nofollow">

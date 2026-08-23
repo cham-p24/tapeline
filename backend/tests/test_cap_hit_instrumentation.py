@@ -47,6 +47,8 @@ from app.services.tier import (
     FREE_WATCHLIST_TICKERS,
     FREE_WEB_PUSH_ALERTS,
     Tier,
+    free_open_access,
+    free_watchlist_cap,
 )
 
 
@@ -217,8 +219,12 @@ async def test_daily_lookups_cap_hit_persists(client, monkeypatch):
 async def test_watchlist_cap_hit_persists(client, monkeypatch):
     async with client:
         cookies, uid = await _free(client, monkeypatch)
-        # Fill to the free watchlist cap.
-        for i in range(FREE_WATCHLIST_TICKERS):
+        # Fill to the free watchlist cap — read from the SAME date-gated source
+        # the router enforces (free_watchlist_cap), so this stays correct across
+        # the FREE_WATCHLIST_REMOVAL_DATE cutover. On/after that date the cap is
+        # 0 (watchlist is Pro+), the loop adds nothing, and the single add below
+        # is itself the cap-hit that records the one watchlist_tickers row.
+        for i in range(free_watchlist_cap()):
             r = await client.post(
                 "/api/watchlist", json={"symbol": f"WL{i}"}, cookies=cookies
             )
@@ -228,6 +234,15 @@ async def test_watchlist_cap_hit_persists(client, monkeypatch):
             "/api/watchlist", json={"symbol": "WLOVER"}, cookies=cookies
         )
         assert over.status_code == 403, over.text
+        # At cap 0 (post-cutover) the message must not tell a Free user to
+        # "remove a ticker first" — there's nothing to remove; it points them
+        # to Pro instead.
+        detail = over.json()["detail"]
+        if free_watchlist_cap() == 0:
+            assert "Pro" in detail
+            assert "Remove a ticker first" not in detail
+        else:
+            assert "Remove a ticker first" in detail
 
     assert await _cap_rows(uid, "watchlist_tickers") == 1
 
@@ -348,6 +363,14 @@ async def _delete_scanner_universe() -> None:
 
 @pytest.mark.asyncio
 async def test_scanner_rows_cap_hit_persists(client, monkeypatch):
+    # Open-access month deliberately lifts the FREE scanner row cap to Pro
+    # (tier.limit), so for the length of the promo a free user does not hit this
+    # wall at all — there is no truncation to assert and no cap event to record.
+    # Skipping is the honest outcome: the contract below is the post-promo one
+    # and it re-arms by itself when the window closes. See
+    # tests/test_open_access_month.py for the in-window contract.
+    if free_open_access():
+        pytest.skip("scanner row cap is lifted during open-access month")
     try:
         async with client:
             # Comfortably more valid rows than the free cap so the page fills.

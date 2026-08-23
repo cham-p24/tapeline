@@ -8,7 +8,7 @@ export function LiveBadge({
   lastUpdate: Date | null;
 }) {
   const color =
-    status === "live" ? "bg-up" : status === "connecting" ? "bg-yellow-500" : "bg-down";
+    status === "live" ? "bg-up" : status === "connecting" ? "bg-warn" : "bg-down";
   const label =
     status === "live"
       ? `Live${lastUpdate ? ` · updated ${lastUpdate.toLocaleTimeString()}` : ""}`

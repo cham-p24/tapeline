@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { track } from "@vercel/analytics";
 import { api, type ScannerRow, TierGateError, errorMessage } from "@/lib/api";
 import {
   trackEvent,
+  trackEventOnce,
   trackFirstTickerAdded,
   trackCapHit,
   trackUpgradePromptShown,
@@ -16,9 +16,11 @@ import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
+import { ScannerPeek } from "@/components/ScannerPeek";
 import { ScannerLegend } from "@/components/ScannerLegend";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
+import { ArmAlerts } from "@/components/ArmAlerts";
 import { PresetMenu } from "@/components/PresetMenu";
 import { RegimeLabel } from "@/components/RegimeLabel";
 import { PaywallModal } from "@/components/Paywall";
@@ -34,7 +36,7 @@ import {
 } from "@/components/FilterBar";
 import { matchesAssetBucket, type AssetBucket } from "@/lib/filters";
 
-type SortKey = "score" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
+type SortKey = "score" | "confidence_pct" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
 
 // Shape of the filter blob saved into ScannerPreset.filters_json. Adding
 // new filter dimensions later is backwards-compatible — old presets just
@@ -140,6 +142,10 @@ export default function ScannerPage() {
   // belong in the server query and never triggers a refetch.
   const [assetClass, setAssetClass] = useState<AssetBucket>("");
   const [loading, setLoading] = useState(true);
+  // Distinct from the warming-up/empty state: true only when the last load()
+  // actually threw (network/500). Without this, a failed fetch fell through to
+  // the "warming up" copy with no way to retry.
+  const [loadError, setLoadError] = useState(false);
   // Symbols the user has added to their watchlist in this session — drives
   // the per-row star's added/checked state. Optimistic: a symbol lands here
   // the instant the button is clicked and is reverted only on a hard failure
@@ -241,6 +247,32 @@ export default function ScannerPage() {
     if (typeof f.search === "string") setSearch(f.search);
   }, [changeSector]);
 
+  // Apply a saved screen linked from the sidebar (/app/scanner?preset=<id>).
+  // Read once on mount from the URL directly — avoids useSearchParams' Suspense
+  // requirement — then fetch the preset list, find the id, and apply its blob.
+  const presetApplied = useRef(false);
+  useEffect(() => {
+    if (presetApplied.current) return;
+    const presetId = new URLSearchParams(window.location.search).get("preset");
+    if (!presetId) return;
+    presetApplied.current = true;
+    let cancelled = false;
+    api.presets()
+      .then((r) => {
+        if (cancelled) return;
+        const p = r.items.find((x) => String(x.id) === presetId);
+        if (p) {
+          try {
+            applyPreset(JSON.parse(p.filters_json) as ScannerFilters);
+          } catch {
+            /* malformed blob — ignore, leave current filters */
+          }
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [applyPreset]);
+
   const savedScansCap = SAVED_SCANS_CAP_BY_TIER[user?.tier ?? "free"] ?? 0;
   // Symbol search — debounced 250ms so typing "NVDA" fires one request not 4.
   const [search, setSearch] = useState("");
@@ -268,6 +300,7 @@ export default function ScannerPage() {
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       const r = await api.scanner(params);
+      setLoadError(false);
       setRows(r.items);
       setMeta({
         tier: r.tier,
@@ -280,7 +313,7 @@ export default function ScannerPage() {
         totalMatched:
           (r as { total_matched?: number | null }).total_matched ?? null,
       });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setLoadError(true); }
     finally { setLoading(false); }
   }, [minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
 
@@ -327,6 +360,102 @@ export default function ScannerPage() {
   // post-filter on the bucket here.
   const visibleRows = rows.filter((r) => matchesAssetBucket(assetClass, r.asset_class));
 
+  // ── Keyboard row navigation (j/k) + row "peek" slide-over ──────────────
+  // `focusedIdx` is the visually-highlighted row (not DOM focus); -1 = none.
+  // `peekSymbol` non-null renders the slide-over for that ticker.
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const [peekSymbol, setPeekSymbol] = useState<string | null>(null);
+
+  // Refs so the single window keydown listener can read the latest rows /
+  // focus / peek state without re-binding on every render (visibleRows is a
+  // fresh array each render).
+  const visibleRowsRef = useRef(visibleRows);
+  visibleRowsRef.current = visibleRows;
+  const focusedIdxRef = useRef(focusedIdx);
+  focusedIdxRef.current = focusedIdx;
+  const peekOpenRef = useRef(false);
+  peekOpenRef.current = peekSymbol != null;
+
+  // Element refs for the focused-row scrollIntoView.
+  const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+
+  // Clamp the focused index if the row set shrinks (filters/search changed).
+  useEffect(() => {
+    if (focusedIdx > visibleRows.length - 1) {
+      setFocusedIdx(visibleRows.length - 1);
+    }
+  }, [visibleRows.length, focusedIdx]);
+
+  // Keep the focused row in view.
+  useEffect(() => {
+    if (focusedIdx < 0) return;
+    rowRefs.current.get(focusedIdx)?.scrollIntoView({ block: "nearest" });
+  }, [focusedIdx]);
+
+  // Open the peek for a given visible-row index (also marks it focused).
+  const openPeek = useCallback((idx: number) => {
+    const r = visibleRowsRef.current[idx];
+    if (!r) return;
+    setFocusedIdx(idx);
+    setPeekSymbol(r.symbol);
+  }, []);
+
+  // Single global keydown handler for j / k / Enter. Bound once.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Never hijack typing / modifier chords (⌘K search, filter typing, etc.).
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el) {
+        const tag = el.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          tag === "BUTTON" ||
+          tag === "A" ||
+          el.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (e.key === "j" || e.key === "k") {
+        const n = visibleRowsRef.current.length;
+        if (n === 0) return;
+        e.preventDefault();
+        const prev = focusedIdxRef.current;
+        const dir = e.key === "j" ? 1 : -1;
+        const next =
+          prev < 0
+            ? dir === 1
+              ? 0
+              : n - 1
+            : Math.min(Math.max(prev + dir, 0), n - 1);
+        setFocusedIdx(next);
+        // While the peek is open, j/k also moves the peek to the new symbol.
+        if (peekOpenRef.current) {
+          const sym = visibleRowsRef.current[next]?.symbol;
+          if (sym) setPeekSymbol(sym);
+        }
+      } else if (e.key === "Enter") {
+        const n = visibleRowsRef.current.length;
+        if (n === 0) return;
+        const prev = focusedIdxRef.current;
+        const idx = prev < 0 ? 0 : prev;
+        const sym = visibleRowsRef.current[idx]?.symbol;
+        if (sym) {
+          e.preventDefault();
+          setFocusedIdx(idx);
+          setPeekSymbol(sym);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+
   const filtersActive =
     (minScore !== "" && minScore !== 0) ||
     maxScore !== "" ||
@@ -344,20 +473,34 @@ export default function ScannerPage() {
     setSearch("");
   };
 
+  // Column-header sorting. Clicking a sortable header sets that key; clicking
+  // the active header again flips the direction. A newly-selected column
+  // defaults to descending — highest-first is the useful default for scores,
+  // confidence, changes and volume. Sorting is server-side (load() sends
+  // sort+order and refetches), so this only updates state; it shares the exact
+  // same `sort`/`order` state as the Sort-by dropdown, keeping the two in sync.
+  const toggleSort = useCallback((key: SortKey) => {
+    if (sort === key) {
+      setOrder((o) => (o === "desc" ? "asc" : "desc"));
+    } else {
+      setSort(key);
+      setOrder("desc");
+    }
+  }, [sort]);
+
   // Funnel event: activation = "did the user actually open the scanner".
   // localStorage flag dedupes across sessions per browser so we count the
   // first meaningful action exactly once. If they bounce before the scanner,
   // no event fires — which is the signal we want for activation rate.
+  //
+  // Distinct from `open_scanner` below on purpose: that one is a per-mount
+  // engagement signal, this one is a once-per-browser activation signal.
+  // trackEventOnce reuses the SAME storage key the old code wrote, so browsers
+  // that already activated are not re-counted, and it writes the flag only
+  // after a confirmed dispatch (the old order set it first, which permanently
+  // suppressed the event whenever gtag.js hadn't loaded yet).
   useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      if (window.localStorage.getItem("tapeline_scanner_first_use") === "1") return;
-      window.localStorage.setItem("tapeline_scanner_first_use", "1");
-      track("scanner_first_use", {});
-    } catch {
-      // localStorage can throw under private-mode or storage quota — never
-      // let analytics break the page.
-    }
+    trackEventOnce("tapeline_scanner_first_use", "scanner_first_use");
   }, []);
 
   // GA4 engagement event: the scanner was opened. Declared in lib/gtag.ts but
@@ -395,7 +538,16 @@ export default function ScannerPage() {
     meta && meta.tier === "free" && meta.totalMatched != null
       ? Math.max(0, meta.totalMatched - shownRows)
       : 0;
-  const showLockedRemainder = lockedRemainder > 0;
+  // Consistency guard against the "Showing N" line. total_matched is counted
+  // server-side and does NOT know about the asset-class filter, which is applied
+  // client-side after the fetch. So while that client-only filter is active,
+  // visibleRows.length (what "Showing N" reports) diverges from shownRows, and a
+  // remainder like "2,000 more match your filters" would contradict it. Suppress
+  // the locked band in that case; with no client-only filter, shownRows ===
+  // visibleRows.length and the two counts agree. (The server-side filters —
+  // score/sector/signal/search — are all reflected in total_matched, so they
+  // stay consistent and don't suppress the band.)
+  const showLockedRemainder = lockedRemainder > 0 && !assetClass;
 
   // Funnel: the locked-remainder band IS an upgrade prompt becoming visible.
   // Fire upgrade_prompt_shown when it first appears (keyed on the boolean so a
@@ -467,13 +619,17 @@ export default function ScannerPage() {
         <RecentTickers />
       </div>
 
+      {/* Alerts activation moment — one-click "arm + feel a sample alert". Self-
+          gating: renders only for users who haven't turned on notifications yet. */}
+      <ArmAlerts />
+
       {/* Filters — search + score range + sector/signal/asset filters, plus
           sort. Search / score / sector / signal all map to existing
           /api/scanner query params (server-side); asset class is the only
           client-side post-filter. */}
       <FilterBar
         trailing={
-          <>Showing <strong className="text-fg">{visibleRows.length}</strong> · refresh every 10s</>
+          <>Showing <strong className="text-fg">{visibleRows.length}</strong> · updates live</>
         }
       >
         {/* Symbol/name search — widest, primary. Server-side substring match. */}
@@ -508,6 +664,7 @@ export default function ScannerPage() {
           onChange={(v) => setSort(v as SortKey)}
           options={[
             { value: "score", label: "Score" },
+            { value: "confidence_pct", label: "Confidence" },
             { value: "change_pct_1d", label: "1D change" },
             { value: "change_pct_5d", label: "5D change" },
             { value: "change_pct_1m", label: "1M change" },
@@ -610,15 +767,16 @@ export default function ScannerPage() {
                 <span className="sr-only">Add to watchlist</span>
               </th>
               <th className="px-2 sm:px-4 py-2 text-left">Ticker</th>
-              <th className="px-2 sm:px-4 py-2 text-left">Sector</th>
-              <th className="px-2 sm:px-4 py-2 text-right">Score</th>
-              <th className="px-2 sm:px-4 py-2 text-right" title="Per-ticker confidence — varies with which underlying data feeds returned data">Conf</th>
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-left">Sector</th>
+              <SortableTh label="Score" sortKey="score" activeKey={sort} order={order} onSort={toggleSort} className="px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="Conf" sortKey="confidence_pct" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" thTitle="Per-ticker confidence — varies with which underlying data feeds returned data" />
               <th className="px-2 sm:px-4 py-2 text-left">Signal</th>
               <th className="px-2 sm:px-4 py-2 text-right">Price</th>
-              <th className="px-2 sm:px-4 py-2 text-right">1D</th>
-              <th className="px-2 sm:px-4 py-2 text-right">5D</th>
-              <th className="px-2 sm:px-4 py-2 text-right">1M</th>
-              <th className="px-2 sm:px-4 py-2 text-right">Volume</th>
+              <SortableTh label="1D" sortKey="change_pct_1d" activeKey={sort} order={order} onSort={toggleSort} className="px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="5D" sortKey="change_pct_5d" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="1M" sortKey="change_pct_1m" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
+              <SortableTh label="Volume" sortKey="volume" activeKey={sort} order={order} onSort={toggleSort} className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right" />
+              <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">Mkt Cap</th>
               {/* `Why` is no longer a column. It was the widest one and got
                   pushed off the right edge, forcing a horizontal scroll to read
                   the reasoning (and it was hidden entirely on mobile). It now
@@ -629,9 +787,22 @@ export default function ScannerPage() {
           </thead>
           <tbody>
             {loading && visibleRows.length === 0 ? (
-              <tr><td colSpan={11}><TableSkeleton cols={11} rows={8} /></td></tr>
+              <tr><td colSpan={12}><TableSkeleton cols={12} rows={8} /></td></tr>
+            ) : loadError && visibleRows.length === 0 ? (
+              <tr><td colSpan={12} className="px-4 py-12 text-center">
+                <div className="text-muted">
+                  <p>Couldn&apos;t load the scanner.</p>
+                  <button
+                    onClick={() => { setLoading(true); load(); }}
+                    className="mt-3 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20"
+                  >
+                    Retry
+                  </button>
+                  <p className="mt-2 text-xs text-subtle">Still stuck? Check <a href="/status" className="text-accent hover:underline">system status</a>.</p>
+                </div>
+              </td></tr>
             ) : visibleRows.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center">
+              <tr><td colSpan={12} className="px-4 py-12 text-center">
                 {filtersActive ? (
                   <div className="text-muted">
                     <p>No tickers match these filters.</p>
@@ -649,15 +820,25 @@ export default function ScannerPage() {
                   </div>
                 )}
               </td></tr>
-            ) : visibleRows.map((r) => (
+            ) : visibleRows.map((r, i) => (
               <Fragment key={r.symbol}>
-              <tr className="group hover:bg-panel/60">
+              <tr
+                ref={(el) => {
+                  if (el) rowRefs.current.set(i, el);
+                  else rowRefs.current.delete(i);
+                }}
+                onClick={() => openPeek(i)}
+                aria-selected={focusedIdx === i}
+                className={`group cursor-pointer hover:bg-panel/60 ${
+                  focusedIdx === i ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""
+                }`}
+              >
                 <td className="px-2 sm:px-4 py-2">
                   {/* One-click watchlist add. Optimistic; checked (★) once the
                       symbol is on the list. Tap target is 40x40px. */}
                   <button
                     type="button"
-                    onClick={() => addToWatchlist(r.symbol)}
+                    onClick={(e) => { e.stopPropagation(); addToWatchlist(r.symbol); }}
                     disabled={added.has(r.symbol)}
                     aria-label={
                       added.has(r.symbol)
@@ -674,10 +855,10 @@ export default function ScannerPage() {
                     {added.has(r.symbol) ? "★" : "☆"}
                   </button>
                 </td>
-                <td className="px-4 py-2 font-medium">
+                <td className="px-2 sm:px-4 py-2 font-medium">
                   <div className="flex flex-col gap-0.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Link href={`/app/ticker/${r.symbol}`} className="hover:text-accent">{r.symbol}</Link>
+                      <Link href={`/app/ticker/${r.symbol}`} onClick={(e) => e.stopPropagation()} className="hover:text-accent">{r.symbol}</Link>
                       {/* Earnings pill — only shows when a report is within
                           the next week. Descriptive ("Reports in 3d"), never
                           prescriptive. */}
@@ -692,8 +873,8 @@ export default function ScannerPage() {
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-2 text-muted text-xs">{r.sector}</td>
-                <td className={`px-4 py-2 text-right ${scoreColor(r.score)}`}>
+                <td className="hidden sm:table-cell px-2 sm:px-4 py-2 text-muted text-xs">{r.sector}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right ${scoreColor(r.score)}`}>
                   <HoverCard
                     trigger={<span className="cursor-help underline decoration-dotted decoration-border underline-offset-2">{r.score?.toFixed(1)}</span>}
                     content={
@@ -710,33 +891,39 @@ export default function ScannerPage() {
                     }
                   />
                 </td>
-                <td className={`px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
+                <td className={`hidden sm:table-cell px-2 sm:px-4 py-2 text-right text-xs nums ${confidenceColor(r.confidence_pct)}`}
                     title={confidenceLabel(r.confidence_pct)}>
                   {r.confidence_pct == null ? "—" : `${r.confidence_pct.toFixed(0)}%`}
                 </td>
-                <td className="px-4 py-2"><SignalPill v={r.signal} /></td>
-                <td className="px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
-                <td className={`px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
-                <td className="px-4 py-2 text-right text-base text-muted">{compactNum(r.volume)}</td>
+                <td className="px-2 sm:px-4 py-2"><SignalPill v={r.signal} /></td>
+                <td className="px-2 sm:px-4 py-2 text-right text-base font-semibold">${r.price?.toFixed(2)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base font-semibold ${pctColor(r.change_pct_1d)}`}>{fmt(r.change_pct_1d)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_5d)}`}>{fmt(r.change_pct_5d)}</td>
+                <td className={`px-2 sm:px-4 py-2 text-right text-base hidden sm:table-cell font-semibold ${pctColor(r.change_pct_1m)}`}>{fmt(r.change_pct_1m)}</td>
+                <td className="px-2 sm:px-4 py-2 text-right hidden sm:table-cell text-base text-muted">{compactNum(r.volume)}</td>
+                <td className="px-2 sm:px-4 py-2 text-right hidden sm:table-cell text-base text-muted">{compactUsd(r.market_cap)}</td>
               </tr>
               {/* Why — full-width row under the numbers. Wraps to the whole
                   table width, so the reasoning reads in one glance with no
                   horizontal scroll, on every screen size. The bottom border
                   sits here so each ticker (numbers + why) reads as one block. */}
-              <tr className="border-b border-border/20 group-hover:bg-panel/60 hover:bg-panel/60">
-                <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={11}>
-                  {r.reason ? (
+              {r.reason ? (
+                <tr
+                  onClick={() => openPeek(i)}
+                  className={`cursor-pointer border-b border-border/20 hover:bg-panel/60 ${
+                    focusedIdx === i ? "bg-accent/10" : ""
+                  }`}
+                >
+                  <td className="px-2 sm:px-4 pb-3 pt-0" colSpan={12}>
                     <p className="text-xs text-muted leading-snug">
                       <span className="mr-2 align-baseline text-[10px] font-medium uppercase tracking-wide text-subtle">
                         Why
                       </span>
                       {r.reason}
                     </p>
-                  ) : null}
-                </td>
-              </tr>
+                  </td>
+                </tr>
+              ) : null}
               </Fragment>
             ))}
           </tbody>
@@ -811,7 +998,72 @@ export default function ScannerPage() {
         onClose={() => setCsvPaywallOpen(false)}
         feature="csv_export"
       />
+
+      {/* Row "peek" slide-over — a fast look at a ticker without navigating.
+          Opened by clicking a row or pressing Enter on the j/k-focused row;
+          j/k moves it through rows while open. `initial` paints instantly from
+          the row we already have while api.ticker() enriches it. */}
+      {peekSymbol && (
+        <ScannerPeek
+          symbol={peekSymbol}
+          initial={visibleRows.find((r) => r.symbol === peekSymbol)}
+          isAdded={added.has(peekSymbol)}
+          onAddToWatchlist={addToWatchlist}
+          onClose={() => setPeekSymbol(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Sortable column header. Renders a real <button> inside the <th> (keyboard-
+// focusable, Enter/Space activate it) and reflects sort state via aria-sort on
+// the <th> — "ascending"/"descending" on the active column, "none" elsewhere.
+// The active column shows a filled caret (▲ asc / ▼ desc, in the accent colour);
+// inactive columns reveal a faint caret on hover to hint they're clickable.
+function SortableTh({
+  label,
+  sortKey,
+  activeKey,
+  order,
+  onSort,
+  className,
+  thTitle,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  order: "asc" | "desc";
+  onSort: (k: SortKey) => void;
+  className?: string;
+  thTitle?: string;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <th
+      className={className}
+      title={thTitle}
+      aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`group/sort inline-flex items-center gap-1 whitespace-nowrap uppercase transition-colors hover:text-fg ${active ? "text-fg" : ""}`}
+        aria-label={
+          active
+            ? `Sorted by ${label}, ${order === "asc" ? "ascending" : "descending"}. Activate to reverse the order.`
+            : `Sort by ${label}`
+        }
+      >
+        <span>{label}</span>
+        <span
+          aria-hidden
+          className={active ? "text-accent" : "text-subtle opacity-0 transition-opacity group-hover/sort:opacity-60"}
+        >
+          {active ? (order === "asc" ? "▲" : "▼") : "▲"}
+        </span>
+      </button>
+    </th>
   );
 }
 
@@ -868,4 +1120,13 @@ function compactNum(n: number | null) {
   if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
   if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
   return String(n);
+}
+// Compact dollar amounts (absolute $) for market cap — em-dash when unknown.
+function compactUsd(n: number | null | undefined) {
+  if (n == null) return "—";
+  if (n >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
+  if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return "$" + (n / 1e3).toFixed(1) + "K";
+  return "$" + String(n);
 }

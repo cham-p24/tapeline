@@ -127,6 +127,9 @@ def test_mrr_contribution_matches_marketed_rates():
     assert mrr_contribution("pro", "annual") == 8.25
     assert mrr_contribution("premium", "monthly") == 19.99
     assert mrr_contribution("premium", "annual") == 16.58
+    # Trader concierge tier — booked, not silently $0 (a hand-sold Trader sub).
+    assert mrr_contribution("trader", "monthly") == 59.0
+    assert mrr_contribution("trader", "annual") == 49.0
 
 
 def test_mrr_contribution_null_or_unknown_period_falls_back_to_monthly():
@@ -264,6 +267,109 @@ async def test_revenue_drip_reach_counts_lever_tokens(client, monkeypatch):
         # tokens we didn't seed must not move
         assert _d(a, b, "ref_m25") == 0
         assert _d(a, b, "wb90") == 0
+
+
+@pytest.mark.asyncio
+async def test_revenue_acquisition_channels_group_and_count_paid(client, monkeypatch):
+    """Signups group by utm_source → external referrer host → 'direct', and each
+    channel carries how many of its signups later reached paid (card on file)."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        # Two from a utm_source; one of them converted (has a Stripe customer id).
+        await _seed_user(signup_utm_source="google")
+        await _seed_user(
+            signup_utm_source="google",
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        # One from an AI-assistant referrer that carries NO utm — must fall back
+        # to the referrer host, not collapse into "direct".
+        await _seed_user(signup_referrer_host="chat.openai.com")
+        # One with neither utm nor referrer → "direct".
+        await _seed_user()
+
+        after = await _revenue(client, cookies)
+        b, a = before["acquisition_channels"], after["acquisition_channels"]
+
+        def ch(chan: str, field: str) -> int:
+            return a.get(chan, {}).get(field, 0) - b.get(chan, {}).get(field, 0)
+
+        assert ch("google", "signups") == 2
+        assert ch("google", "paid") == 1
+        assert ch("chat.openai.com", "signups") == 1
+        assert ch("chat.openai.com", "paid") == 0
+        assert ch("direct", "signups") == 1
+
+
+@pytest.mark.asyncio
+async def test_revenue_landing_pages_group_by_channel_and_path(client, monkeypatch):
+    """Signups group by (channel, landing path) so a row reads
+    "organic → /compare/finviz → 3 signups". The channel slice alone can't say
+    WHICH of the ~4,750 SEO pages earned the signup; this one can."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        # Two organic signups off the SAME comparison page; one converted.
+        await _seed_user(signup_utm_source="organic", signup_landing_path="/compare/finviz")
+        await _seed_user(
+            signup_utm_source="organic",
+            signup_landing_path="/compare/finviz",
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        # Same channel, DIFFERENT page — must not collapse into the row above.
+        await _seed_user(signup_utm_source="organic", signup_landing_path="/glossary/rsi")
+        # Same page, DIFFERENT channel — must not collapse either.
+        await _seed_user(
+            signup_referrer_host="chat.openai.com", signup_landing_path="/compare/finviz"
+        )
+        # No landing path captured (a pre-column row) → excluded entirely.
+        await _seed_user(signup_utm_source="organic")
+
+        after = await _revenue(client, cookies)
+
+        def rows(payload) -> dict[tuple[str, str], dict]:
+            return {
+                (r["channel"], r["path"]): r
+                for r in payload["acquisition_landing_pages"]
+            }
+
+        b, a = rows(before), rows(after)
+
+        def d(channel: str, path: str, field: str) -> int:
+            key = (channel, path)
+            return a.get(key, {}).get(field, 0) - b.get(key, {}).get(field, 0)
+
+        assert d("organic", "/compare/finviz", "signups") == 2
+        assert d("organic", "/compare/finviz", "paid") == 1
+        assert d("organic", "/glossary/rsi", "signups") == 1
+        assert d("organic", "/glossary/rsi", "paid") == 0
+        # Same path, other channel — tracked as its own row.
+        assert d("chat.openai.com", "/compare/finviz", "signups") == 1
+        # A path is never reported as empty/None.
+        assert all(r["path"] for r in after["acquisition_landing_pages"])
+
+
+@pytest.mark.asyncio
+async def test_revenue_activity_and_w4_retention(client, monkeypatch):
+    """active_7d/28d key off last_seen_at; w4_cohort = signed up 28+ days ago;
+    w4_retained = those active in the last 14 days."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        now = datetime.now(UTC)
+        # Old signup, active 5 days ago → w4_cohort + w4_retained + active_7d + active_28d.
+        await _seed_user(created_at=now - timedelta(days=40), last_seen_at=now - timedelta(days=5))
+        # Old signup, active 20 days ago → w4_cohort + active_28d only (not retained, not 7d).
+        await _seed_user(created_at=now - timedelta(days=40), last_seen_at=now - timedelta(days=20))
+
+        after = await _revenue(client, cookies)
+        assert after["w4_cohort"] - before["w4_cohort"] == 2
+        assert after["w4_retained"] - before["w4_retained"] == 1
+        assert after["active_7d"] - before["active_7d"] == 1
+        assert after["active_28d"] - before["active_28d"] == 2
 
 
 @pytest.mark.asyncio

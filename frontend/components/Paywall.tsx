@@ -48,7 +48,7 @@ export function Paywall({
   // trial there would be false. They get the real guarantee instead.
   const riskLine = signedIn
     ? "30-day money-back guarantee · cancel anytime."
-    : "14-day trial, no card required.";
+    : "14-day Premium trial — $0 today, cancel in one click.";
 
   return (
     <div className="card relative overflow-hidden p-0">
@@ -164,7 +164,6 @@ export function PaywallModal({
     "alerts.email": "Email alerts",
     "ticker.full": "Full ticker deep-dive",
     "congress": "Congressional trades",
-    "alerts.telegram": "Telegram alerts",
     "alerts.web_push": "Browser push alerts",
     "briefing": "Daily briefing email",
     "api": "API access",
@@ -174,7 +173,7 @@ export function PaywallModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="card max-w-md p-8" onClick={(e) => e.stopPropagation()}>
+      <div className="card !bg-surface max-w-md p-8" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2">
           <div className="h-2 w-6 rounded-full bg-accent" />
           <span className="text-sm font-semibold">Tapeline</span>
@@ -187,7 +186,7 @@ export function PaywallModal({
           Upgrade to {priceLine} to unlock.{" "}
           {user
             ? "30-day money-back guarantee · cancel anytime."
-            : "14-day trial, no card required. Cancel in one click."}
+            : "14-day Premium trial — $0 today, first charge on day 14, cancel in one click."}
         </p>
         <div className="mt-6 flex gap-3">
           <Link

@@ -144,7 +144,7 @@ export default function CongressPage() {
         </FilterBar>
       )}
 
-      <div className="card mt-4 overflow-hidden">
+      <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-sm nums">
           <thead className="text-xs uppercase text-muted">
             <tr>

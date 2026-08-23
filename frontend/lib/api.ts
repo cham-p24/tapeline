@@ -212,6 +212,7 @@ export type ScannerRow = {
   change_pct_5d: number;
   change_pct_1m: number;
   volume: number;
+  market_cap?: number | null;
   sub_trend?: number | null;
   sub_rs?: number | null;
   sub_fundamentals?: number | null;
@@ -512,7 +513,7 @@ export type AlertRule = {
   rule_type: "score" | "squeeze" | "regime" | "congress" | "news";
   symbol: string | null;
   threshold: number | null;
-  channel: "email" | "telegram" | "web_push";
+  channel: "email" | "web_push";
   enabled: boolean;
   last_fired_at: string | null;
   created_at: string;
@@ -621,7 +622,20 @@ async function getAuth<T>(path: string, token: string): Promise<T> {
   return res.json();
 }
 
+export type SearchResult = {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  score: number | null;
+};
+
 export const api = {
+  // Lightweight ticker navigation search (symbol OR name), full universe,
+  // tier-agnostic. Backs the ⌘K palette + the public search box.
+  search: (q: string, limit = 10) =>
+    get<{ results: SearchResult[] }>(
+      `/api/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    ),
   scanner: (params: Record<string, string | number> = {}) => {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))

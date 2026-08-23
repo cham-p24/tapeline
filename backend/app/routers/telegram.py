@@ -1,12 +1,10 @@
-"""Public Telegram webhook receiver — captures chat_id from /start <token>.
+"""Telegram webhook receiver — routes updates to the internal inbox ops bot.
 
-Flow:
-1. Authenticated user hits POST /api/me/telegram/start-token (in routers/me.py)
-2. Backend mints a UUID token, stores in telegram_link_tokens with 10min expiry
-3. Frontend opens https://t.me/<bot>?start=<token>
-4. User taps Start in Telegram -> Telegram sends /start <token> to the bot
-5. Telegram posts an update to this webhook
-6. We match the token to a user, persist chat_id, send a confirmation, delete token
+Telegram allows only ONE webhook URL per bot, so every update for the bot
+arrives here. The single live consumer is the founder inbox Approve/Reject
+flow: process_telegram_update() (routers/inbox.py) handles the inline-button
+callbacks and /approve_<id> commands on Tier 1 alert cards. Anything it does
+not claim is acknowledged and dropped.
 
 Webhook URL is path-protected by `settings.telegram_webhook_secret` so random
 internet actors can't spam us. Set it once after deploy:
@@ -17,15 +15,11 @@ internet actors can't spam us. Set it once after deploy:
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
-from sqlalchemy import delete, select
 
 from app.config import get_settings
 from app.db import SessionLocal
-from app.models import TelegramLinkToken, User
-from app.services.telegram import send_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,12 +35,10 @@ async def telegram_webhook(secret: str, request: Request) -> dict:
 
     update = await request.json()
 
-    # First: is this an inbox-bot action (founder tapped an Approve/Reject
-    # button on a Tier 1 alert card, or typed /approve_<id>)? Telegram allows
-    # only ONE webhook URL per bot, so the inbox callbacks ride in on this
-    # same endpoint. process_telegram_update() returns None for anything that
-    # isn't an inbox action — including the /start <token> account-link flow
-    # below — so we fall straight through when it's not ours.
+    # The only live consumer is the inbox-bot action flow (founder tapped an
+    # Approve/Reject button on a Tier 1 alert card, or typed /approve_<id>).
+    # process_telegram_update() returns None for anything that isn't an inbox
+    # action, which we simply acknowledge and drop.
     from app.routers.inbox import process_telegram_update
 
     async with SessionLocal() as session:
@@ -54,74 +46,4 @@ async def telegram_webhook(secret: str, request: Request) -> dict:
     if inbox_result is not None:
         return inbox_result
 
-    message = update.get("message") or update.get("edited_message")
-    if not message:
-        return {"ok": True}
-
-    chat = message.get("chat", {})
-    chat_id = str(chat.get("id", "")).strip()
-    text = (message.get("text") or "").strip()
-
-    if not chat_id or not text:
-        return {"ok": True}
-
-    # Only /start <token> matters here
-    if not text.startswith("/start"):
-        # Optional: respond once so users know to use the website
-        await send_message(
-            chat_id,
-            "Hi! To connect Telegram alerts, click *Connect Telegram* on "
-            "your [Tapeline billing page](https://tapeline.io/app/billing). "
-            "This bot only listens for the link command, not chat.",
-        )
-        return {"ok": True}
-
-    parts = text.split(maxsplit=1)
-    token = parts[1].strip() if len(parts) > 1 else ""
-    if not token:
-        await send_message(
-            chat_id,
-            "No link token detected. Open *Connect Telegram* on the "
-            "[Tapeline billing page](https://tapeline.io/app/billing) and try again.",
-        )
-        return {"ok": True}
-
-    async with SessionLocal() as session:
-        row = (await session.execute(
-            select(TelegramLinkToken).where(TelegramLinkToken.token == token)
-        )).scalar_one_or_none()
-
-        expires_at = row.expires_at if row is not None else None
-        if expires_at is not None and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=UTC)
-
-        if row is None or expires_at < datetime.now(UTC):
-            await send_message(
-                chat_id,
-                "That link expired. Click *Connect Telegram* again on "
-                "[tapeline.io/app/billing](https://tapeline.io/app/billing) — "
-                "tokens are valid for 10 minutes.",
-            )
-            if row is not None:
-                await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.token == token))
-                await session.commit()
-            return {"ok": True}
-
-        user = await session.get(User, row.user_id)
-        if user is None:
-            await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.token == token))
-            await session.commit()
-            raise HTTPException(404, "user not found for token")
-
-        user.telegram_chat_id = chat_id
-        await session.execute(delete(TelegramLinkToken).where(TelegramLinkToken.token == token))
-        await session.commit()
-        logger.info("telegram.linked user=%s chat=%s", user.id, chat_id)
-
-    await send_message(
-        chat_id,
-        "*Connected.* You'll get an hourly Tapeline market digest plus your "
-        "configured alerts here. Manage everything at "
-        "[tapeline.io/app/billing](https://tapeline.io/app/billing).",
-    )
     return {"ok": True}

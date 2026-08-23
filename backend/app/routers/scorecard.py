@@ -174,7 +174,18 @@ async def get_scorecard(
     total_days = (await session.execute(
         select(func.count(func.distinct(DailyScorecardEntry.as_of)))
     )).scalar() or 0
-    summary = {"days_tracked": int(total_days), **_summary_stats(all_scored)}
+    # First session on record — powers the server-rendered "since <date>"
+    # citation on /scorecard. A dataset property (when logging started), not a
+    # statistic derived from the observations, so it is tier-invariant like
+    # the rest of the summary.
+    first_tracked = (await session.execute(
+        select(func.min(DailyScorecardEntry.as_of))
+    )).scalar()
+    summary = {
+        "days_tracked": int(total_days),
+        "first_tracked_date": first_tracked.isoformat() if first_tracked else None,
+        **_summary_stats(all_scored),
+    }
 
     # Non-paying viewers see picks delayed N days. Filter `by_date` after the
     # summary is built so the headline stats are tier-invariant.

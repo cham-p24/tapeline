@@ -126,7 +126,12 @@ async def list_scanner(
 ) -> dict:
     # Tier gating — free users get a capped row count + stale timestamps
     tier = Tier(user.tier) if user else Tier.FREE
-    row_cap = tier_limit(tier, "scanner_rows")  # free=10, pro/elite=1000
+    # `authenticated` matters only during an open-access promo: anonymous callers
+    # score against the FREE table, and the promo lift is deliberately reserved
+    # for people who actually have an account (see tier.limit).
+    row_cap = tier_limit(  # free=10, pro/elite=1000
+        tier, "scanner_rows", authenticated=user is not None,
+    )
     if limit > row_cap:
         limit = row_cap
     # Offset scrape guard: only Pro/Premium may paginate. Without this, a Free
@@ -192,8 +197,26 @@ async def list_scanner(
     # stack a second time and risking the two drifting apart.
     filtered_stmt = stmt
 
+    # Deterministic ordering. Tickers tie on score every single day, and a lone
+    # sort key left those ties to whatever order the planner happened to return
+    # rows in — so the same day's ranked list, which we publish as a permanent
+    # record, did not reproduce run to run (the leaked tie order read as
+    # alphabetical clustering in the top rows). Break ties on dollar-volume
+    # desc, then symbol asc. The tiebreaks hold that direction whatever `order`
+    # the caller picked — they are a canonical key, not a continuation of the
+    # caller's sort. NULLS LAST matters here: most of the universe has no
+    # price/volume read, and without it those rows would sort ABOVE known-liquid
+    # names inside a tie. symbol is the primary key, so the composite is a total
+    # order: identical data yields an identical list every run. Skipped when the
+    # caller already sorted BY symbol, which is a total order on its own.
     col = getattr(Ticker, sort)
-    stmt = stmt.order_by(desc(col) if order == "desc" else col)
+    order_by = [desc(col) if order == "desc" else col]
+    if sort != "symbol":
+        order_by.extend([
+            desc(Ticker.price * Ticker.volume).nullslast(),
+            Ticker.symbol.asc(),
+        ])
+    stmt = stmt.order_by(*order_by)
     stmt = stmt.limit(limit).offset(offset)
 
     # Cap the scan server-side (Postgres only; SQLite has no statement_timeout
@@ -268,6 +291,7 @@ async def list_scanner(
                 "change_pct_5d": r.change_pct_5d,
                 "change_pct_1m": r.change_pct_1m,
                 "volume": r.volume,
+                "market_cap": r.market_cap,
                 "sub_trend": r.sub_trend,
                 "sub_rs": r.sub_rs,
                 "sub_fundamentals": r.sub_fundamentals,

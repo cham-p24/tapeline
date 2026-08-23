@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { track } from "@vercel/analytics";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
-import { FREE_LIMITS, PRICING, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
-import { getStoredGclid, getStoredUtm } from "@/lib/utm";
+import {
+  getStoredGclid,
+  getStoredLandingPath,
+  getStoredReferrerHost,
+  getStoredUtm,
+} from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import {
   FormAlert,
@@ -49,32 +53,50 @@ if (typeof window !== "undefined") {
 }
 
 // Source-aware signup headlines (message-match). Paid landing pages and the
-// /compare/* pages append ?from=<source> to their "Try Premium free" CTA; we
-// restate that exact promise in the H1 here so a visitor who clicked a "Finviz
-// alternative" ad doesn't hit a generic "Try Premium free" form and bounce.
-// Ad → landing message-match is the single highest-confidence funnel lever
-// (Unbounce / NN-group information-scent research). Unknown/absent `from`
-// falls back to `_default` (the original generic copy — never worse).
+// /compare/* pages append ?from=<source> to their CTA; we restate that exact
+// promise in the H1 here so a visitor who clicked a "Finviz alternative" ad
+// doesn't hit a generic form and bounce. Ad → landing message-match is the
+// single highest-confidence funnel lever (Unbounce / NN-group information-
+// scent research). Unknown/absent `from` falls back to `_default`.
+//
+// CARD HONESTY (2026-08, revised for the #548 card gate). This copy has been
+// wrong twice, in opposite directions, so read both steps before editing it.
+//
+//   #536 removed the auto-granted trial: signup stopped granting Premium, and
+//   the lines here were rewritten to promise a card-free FREE ACCOUNT instead.
+//
+//   #548 then made THAT false. From CARD_GATE_START (2026-08-22) a new account
+//   meets a card wall at /app/start before it can use the logged-in product.
+//   So "free account, no card to sign up" is now misleading even though this
+//   form still collects no card: the visitor cannot reach the product without
+//   one. Promising a free account here and producing a card wall one click
+//   later is precisely the bait-and-switch the gate's own grandfather clause
+//   exists to avoid.
+//
+// What is still literally true, and the ONLY place "no card" may appear: the
+// PUBLISHED RECORD — /scorecard, /daily-picks, per-ticker pages, the CSV/JSON
+// export — needs no account at all. Everything about the account and the trial
+// must state the card and the dates. Do not re-couple "free" to either one.
 const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   _default: {
-    h1: "Try Premium free for 14 days",
-    sub: "No credit card. Cancel anytime.",
+    h1: "Create your Tapeline account",
+    sub: "Email and password to start. At first sign-in you add a card and your 14-day Premium trial begins — $0 today, cancel in one click.",
   },
   finviz: {
-    h1: "The Finviz alternative — free for 14 days.",
-    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. No credit card.",
+    h1: "The Finviz alternative — free to start.",
+    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. 14-day Premium trial, $0 today.",
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: "One score, one sentence, and every pick logged public vs SPY. 14 days of Premium free — no credit card.",
+    sub: "One score, one sentence, and every pick logged public vs SPY. 14-day Premium trial, $0 today.",
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: "The full live universe, every name scored. 14-day Premium trial, no credit card.",
+    sub: "The full live universe, every name scored. 14-day Premium trial — $0 today, cancel in one click.",
   },
   compare: {
-    h1: "Switching to Tapeline? Start free.",
-    sub: "One transparent score per ticker plus a public track record. 14 days of Premium free — no credit card.",
+    h1: "Switching to Tapeline?",
+    sub: "One transparent score per ticker plus a public track record. 14-day Premium trial, $0 today.",
   },
 };
 
@@ -106,10 +128,22 @@ function SignUpForm() {
   const planIntent = planRaw === "pro" || planRaw === "premium" ? planRaw : null;
   const billingRaw = (qp.get("billing") || "").toLowerCase();
   const billingIntent = billingRaw === "monthly" || billingRaw === "annual" ? billingRaw : "annual";
-  const postAuthNext =
-    planIntent && !qp.get("next")
-      ? `/app/billing?intent=${planIntent}&billing=${billingIntent}`
-      : next;
+  // Post-auth destination, in precedence order:
+  //   1. an explicit ?next= (deep link the visitor came in on)
+  //   2. a /pricing plan CTA → the billing page with that plan pre-selected
+  //   3. otherwise → the TRIAL OFFER, /app/billing?trial=start
+  //
+  // (3) is new. Signup no longer starts a trial, so if nothing presented the
+  // choice the 14-day Premium trial would simply never be offered to anyone.
+  // The offer screen is a two-option fork — start the trial (card, disclosed
+  // in full, user clicks) or continue on the Free plan (one click to the
+  // scanner, no card, nothing lost). It is NOT an auto-redirect into Stripe:
+  // nothing leaves the site until the user presses the trial button.
+  const postAuthNext = qp.get("next")
+    ? next
+    : planIntent
+    ? `/app/billing?intent=${planIntent}&billing=${billingIntent}`
+    : "/app/billing?trial=start";
   // Referral code from /signup?ref=ABCDEFGH. Backend grants both parties
   // 1 free month of Premium when this resolves to a valid existing user.
   const refCode = (qp.get("ref") || "").trim().toUpperCase();
@@ -179,10 +213,11 @@ function SignUpForm() {
   }, []);
 
   // Funnel event: fired once on mount when a real human sees the signup form.
-  // Pairs with `signup_completed` below to compute drop-off in Vercel Analytics
-  // + GA4 (typed event names — see lib/gtag.ts).
+  // Pairs with `sign_up` below to compute drop-off in GA4 (typed event names —
+  // see lib/gtag.ts). This used to fire a second, identical Vercel-Analytics
+  // `signup_started`; that sink never mounted, and mirroring it into GA4 under
+  // a second name would double-count the same form impression.
   useEffect(() => {
-    track("signup_started", { next });
     trackEvent("sign_up_started", { next });
   }, [next]);
 
@@ -225,6 +260,13 @@ function SignUpForm() {
       token = hidden?.value || "";
     }
     if (TURNSTILE_SITE_KEY && !token) {
+      // Instrument the friction: how often a real-looking submit is blocked
+      // because Turnstile never produced a token (its script blocked by a
+      // privacy extension / ad-blocker / corporate proxy, or the challenge
+      // failed). The gate is UNCHANGED — this only makes the drop-off
+      // measurable so the Cloudflare widget mode (managed vs always-interactive)
+      // can be tuned against real numbers instead of guesses.
+      trackEvent("signup_turnstile_blocked", { next });
       setErr("Please complete the bot check above.");
       return;
     }
@@ -241,6 +283,14 @@ function SignUpForm() {
       // Stored on the User row so the founder-gated offline-conversion
       // upload to Google can later tie this subscriber back to the click.
       const gclid = getStoredGclid();
+      // First-touch external referrer HOSTNAME captured on landing — the
+      // only attribution trace AI-assistant referrals (Copilot etc.) leave,
+      // since they carry no utm_* params. Hostname only, never path/query.
+      const referrer = getStoredReferrerHost();
+      // First-touch landing PATH — which of our own SEO pages pulled them in
+      // (/compare/finviz, /glossary/rsi, a ticker page…). The channel fields
+      // above can't answer that. Path only, never query/hash.
+      const landing = getStoredLandingPath();
       await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: token || undefined,
@@ -253,26 +303,39 @@ function SignUpForm() {
         daily_top10_opt_in: dailyTop10OptIn,
         ...utm,
         ...gclid,
+        ...referrer,
+        ...landing,
       });
-      // Funnel events: signup landed cleanly. Trial auto-starts on signup
-      // (14-day Premium, no card — see tier.py:_start_trial), so we fire the
-      // trial event on the same beat. Property `oauth: false` lets us segment
-      // form-vs-OAuth conversion later when OAuth tracking lands.
-      // Mirror to GA4 so Search Console can attribute the query → signup
-      // chain via Acquisition reports.
-      track("signup_completed", { method: "email", next });
-      track("trial_started", { tier: "premium", days: 14, method: "email" });
+      // Funnel event: signup landed cleanly. GA4 is the sink, so Search
+      // Console can attribute the query → signup chain via Acquisition
+      // reports; `sign_up` is also the event that forwards the Google Ads
+      // signup conversion.
+      //
+      // `start_trial` DELIBERATELY DOES NOT FIRE HERE any more. It used to,
+      // because signup auto-granted a 14-day Premium trial. Since the trial
+      // became a separate card-required opt-in, firing it at account creation
+      // would report a trial that hasn't started — inflating the trial count
+      // and, worse, teaching Smart Bidding that every signup is a trial. It
+      // now fires from app/app/billing/page.tsx at the moment the user starts
+      // one.
+      //
+      // The former Vercel-Analytics `signup_completed` twin fired here too. It
+      // is gone rather than remapped: `sign_up` already records exactly this
+      // moment, and a second GA4 name for the same instant would double-count.
       trackEvent("sign_up", { method: "email" });
-      trackEvent("start_trial", { tier: "premium", days: 14, method: "email" });
-      // Route through /app/onboarding first — captures use-case + attribution
-      // + marketing-opt-in before they hit the product. It does NOT capture
-      // suitability data (experience, portfolio size, capital, risk tolerance,
-      // holdings, goals): those questions were removed 2026-07-18 under
-      // compliance Rule 8, and this signup form has never collected any of
-      // them. Do not reintroduce them here or there. The
-      // onboarding page redirects to the post-auth destination after submit
-      // or skip: /app/billing (with plan intent restated) when the visitor
-      // arrived from a /pricing plan CTA, otherwise the default `next`.
+      // Hand off through /app/onboarding, which ASKS NOTHING: it is a silent
+      // provisioning route that stamps the account, seeds the day-1 watchlist
+      // server-side, and forwards on. It used to be a four-question survey
+      // standing between signup and the first working screen — that was the
+      // single biggest reason a new account never saw the product; the
+      // questions were removed 2026-08-19. Do not send a new user to a form
+      // from here. It never captured suitability data (experience, portfolio
+      // size, capital, risk tolerance, holdings, goals) — those questions
+      // went 2026-07-18 under compliance Rule 8, and this signup form has
+      // never collected any of them. Do not reintroduce them here or there.
+      // The destination it forwards to is the trial offer by default, or
+      // /app/billing with the plan intent restated when the visitor arrived
+      // from a /pricing plan CTA, or an explicit ?next= — see postAuthNext.
       // Existing users (signin) never pass through here.
       router.push(`/app/onboarding?next=${encodeURIComponent(postAuthNext)}`);
       router.refresh();
@@ -297,11 +360,13 @@ function SignUpForm() {
           <h1 className="mt-10 text-3xl font-bold tracking-tight">{headline.h1}</h1>
           <p className="mt-2 text-sm text-muted">{headline.sub}</p>
 
-          {/* Value strip at the decision point — coherent with what the landing
-              pages now promise (free-forever + 30-day money-back), not just the
-              14-day trial the page used to over-emphasise. Descriptive only. */}
+          {/* Value strip at the decision point. Post-#548 the honest headline
+              fact is the card itself: it goes on at first sign-in, $0 moves
+              today, and the first charge is 14 days out. The visitor should
+              learn that from us here, before they are anywhere near a card
+              field — not discover it at the wall on the next screen. */}
           <p className="mt-4 text-xs text-muted">
-            Free forever &middot; No credit card &middot; 14-day Premium trial &middot; {REFUND.windowDays}-day money-back on paid plans
+            14-day Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
           </p>
 
           {/* PRIMARY signup path: Google-first, above the fold, first thing the
@@ -323,7 +388,6 @@ function SignUpForm() {
                 // Mirror the email path's funnel start so OAuth conversion is
                 // measurable alongside it. sign_up (completed) fires backend-
                 // side on the OAuth callback; here we only mark intent.
-                track("signup_started", { next, method: provider });
                 trackEvent("sign_up_started", { next, method: provider });
               }}
             />
@@ -360,7 +424,15 @@ function SignUpForm() {
             </Link>
           )}
 
-          <ul className="mt-6 space-y-2 text-sm text-muted">
+          {/* These three bullets describe PREMIUM, which is what the optional
+              14-day trial opens up — not what the free account includes. They
+              used to sit under a "Try Premium free for 14 days" H1 where that
+              was implicit; with a free-account H1 it has to be said out loud,
+              or the list quietly over-promises the free tier. */}
+          <div className="mt-6 text-[11px] uppercase tracking-wider text-subtle">
+            What the optional Premium trial opens up
+          </div>
+          <ul className="mt-2 space-y-2 text-sm text-muted">
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
               <span><span className="text-fg">Full universe, live scores</span> — not the top-10-row free view</span>
@@ -371,7 +443,7 @@ function SignUpForm() {
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push, Telegram</span>
+              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push</span>
             </li>
           </ul>
 
@@ -484,13 +556,15 @@ function SignUpForm() {
               disabled={busy}
               className="flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
             >
-              {busy ? "Starting your trial…" : "Start my free trial"}
+              {busy ? "Creating your account…" : "Create my free account"}
             </button>
             {/* Reassurance adjacent to the highest-intent click — kills the
                 "will I be charged?" objection right where hesitation happens,
-                not only in the H1 subhead far above. */}
+                not only in the H1 subhead far above. It must not say "no card":
+                this button does not collect one, but the very next screen does,
+                so the true reassurance is the AMOUNT, not the absence. */}
             <p className="text-center text-xs text-muted">
-              No credit card &middot; cancel in one click
+              $0 charged today &mdash; the first charge is 14 days away
             </p>
 
             <p className="text-xs text-subtle">
@@ -500,22 +574,32 @@ function SignUpForm() {
             </p>
           </form>
 
-          {/* After-trial transparency footer. The single most common pre-signup
-              objection is "what happens at day 14 — will I get auto-charged?"
-              Spelling out the off-ramp here defuses that anxiety. Wording is
-              kept tight: free fallback first (loss-aversion-light), upgrade
-              path second, explicit no-charge guarantee third. */}
+          {/* Card transparency footer. The single most common pre-signup
+              objection is "am I going to get auto-charged?" — and now that the
+              14-day Premium trial takes a card, the only acceptable answer is
+              to state the whole rule BEFORE the account exists, not after.
+              What the card does, when it charges, how to leave, and what you can
+              still read without an account at all. */}
           <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
-            <div className="font-medium text-fg">After your 14 days</div>
-            {/* Numbers derive from lib/pricing (PRICING / FREE_LIMITS / REFUND)
+            <div className="font-medium text-fg">Where the card comes in</div>
+            {/* Numbers derive from lib/pricing (PRICING / REFUND)
                 — the single source of truth checkout + every other surface
                 uses — so this prose can never drift from the real price or
                 the real Free-tier caps again (it previously hardcoded all
                 three and had already drifted once). */}
             <p className="mt-1.5">
-              Stay on Free forever (live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day) — or upgrade to{" "}
-              <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span> for the full
-              real-time universe with unlimited look-ups. No card on file means no surprise charge.
+              This form takes an email and a password. At first sign-in you add a card, and
+              that starts your <span className="text-fg">14-day Premium trial</span>:{" "}
+              <span className="text-fg">$0 is charged today</span>, the first charge is 14 days
+              later at the plan you pick, we email you three days before, and one click ends it
+              before then with nothing taken. Paid plans start at{" "}
+              <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span>.
+            </p>
+            <p className="mt-2">
+              You do not need an account &mdash; or a card &mdash; to read the record: the daily
+              Top 10, the whole back-checked scorecard, a page per scored ticker and the raw
+              CSV/JSON export are open to everyone. Accounts created before 22 August 2026 keep
+              the free access they signed up for and are never asked for a card.
             </p>
             <p className="mt-2 text-[11px] text-subtle">
               <span className="text-muted">{REFUND.short}</span> if you change your mind ·

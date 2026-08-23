@@ -12,8 +12,11 @@ export type SessionUser = {
   is_admin?: boolean;
   is_lifetime?: boolean;
   trial_ends_at?: string | null;
+  // One-time 50%-off-3-months offer for expired card-less trialists.
+  // Server-computed (services/billing.trial_save_offer_eligible) so the UI
+  // can never promise a discount checkout won't apply.
+  trial_save_offer_available?: boolean;
   referral_code?: string | null;
-  telegram_chat_id?: string | null;
   phone_number?: string | null;
   discord_webhook_url?: string | null;
   created_at: string | null;
@@ -65,6 +68,18 @@ type SignupExtras = {
   gclid?: string;
   gbraid?: string;
   wbraid?: string;
+  // First-touch EXTERNAL referrer hostname — read from localStorage on
+  // submit via lib/utm.ts:getStoredReferrerHost(). The only attribution
+  // trace AI-assistant referrals (Copilot/ChatGPT/Perplexity) leave, since
+  // they carry no utm_* params. Hostname only, never path/query. Backend
+  // writes it once to users.signup_referrer_host; never updated.
+  signup_referrer_host?: string;
+  // First-touch landing PATH on our own site — read from localStorage on
+  // submit via lib/utm.ts:getStoredLandingPath(). Tells us WHICH of the
+  // ~4,750 SEO pages earned the signup, which the channel fields above
+  // can't. Path only, never query/hash. Backend writes it once to
+  // users.signup_landing_path; never updated.
+  signup_landing_path?: string;
   // Signup-form consent boxes — both rendered UNCHECKED by default (explicit
   // opt-in only). `marketing_opt_in` is the weekly-market-digest consent
   // (users.marketing_opt_in); `daily_top10_opt_in` enrols the email in the
@@ -81,7 +96,18 @@ type SignupExtras = {
 // `mfa_required` discriminant.
 export type SigninResult =
   | { user: SessionUser }
-  | { mfa_required: true; mfa_token: string };
+  | {
+      mfa_required: true;
+      mfa_token: string;
+      // "email" when the second step is a code we mailed because this browser
+      // isn't recognised. Absent for an authenticator-app (TOTP) challenge, so
+      // the code screen can name the right source. `email_hint` is masked
+      // server-side ("c*******@gmail.com") — enough to know which inbox to
+      // open, not enough to hand the address to someone who only has the
+      // password.
+      method?: "email";
+      email_hint?: string;
+    };
 
 export const authApi = {
   session: () => req<{ user: SessionUser | null }>("/api/auth/session"),
@@ -127,7 +153,6 @@ export const FEATURE_TIERS = {
   "alerts.email":       "pro" as const,
   "ticker.full":        "pro" as const,
   "congress":           "premium" as const,
-  "alerts.telegram":    "premium" as const,
   // Web push is the FREE "alert taste" channel. Mirrors backend
   // tier.FEATURES["alerts.web_push"] = Tier.FREE (deliberate activation bet,
   // 2026-07-04): free users may create up to FREE_WEB_PUSH_ALERTS web-push

@@ -40,6 +40,7 @@ export const COMPARE_INDEX: CompareEntry[] = [
   { slug: "tipranks", name: "TipRanks", hint: "Analyst consensus" },
   { slug: "trade-ideas", name: "Trade Ideas", hint: "Intraday AI signals" },
   { slug: "tradingview", name: "TradingView", hint: "Charting + community" },
+  { slug: "trendspider", name: "TrendSpider", hint: "Automated technical analysis" },
   { slug: "wallstreetzen", name: "WallStreetZen", hint: "115-factor Zen Rating" },
   { slug: "webull", name: "Webull", hint: "Mobile-first broker" },
   { slug: "yahoo-finance", name: "Yahoo Finance", hint: "Free fundamental data" },

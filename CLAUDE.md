@@ -32,15 +32,42 @@ Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03, founding reprice 2026-07-03):
-- **Free** $0 — **top 20 tickers, 24-hour delayed**, watchlist (5, no alerts)
+- **Free** $0 — **top-10 scanner rows, LIVE (no delay)**, 12 ticker-detail lookups/UTC day, watchlist (5 tickers, 1 list), 2 web-push alert rules; no email/Telegram alerts, no CSV, no API. The old "top 20, 24-hour delayed" framing is **dead** — the 2026-06-20 freemium retune set `FREE_DATA_DELAY_MINUTES = 0` and `FREE_SCANNER_ROWS = 10`, so conversion pressure comes from breadth + the lookup meter, not stale data. The Free watchlist survives: the 2026-08-02 cutover to 0 was **reversed 2026-08-19** (#525) and `free_watchlist_cap()` now returns 5 unconditionally. **Reaching this tier now takes a card:** since 2026-08-22 a NEW account hits the `/app/start` card wall before it can use the logged-in product — see the card gate below. Accounts created before that date are grandfathered forever.
 - **Pro** $9.99/mo OR **$8.25/mo billed annually** ($99/yr · save $20) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
 - **Premium** $19.99/mo OR **$16.58/mo billed annually** ($199/yr · save $40) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing is now surfaced: `ComparisonTable.tsx` + `PricingTable.tsx` both show the "Public API access · 1,000 requests/day" Premium line, and a public `/developers` landing page (2026-06-06) documents the live endpoints — added to the sitemap + footer, with a tailored OG card.)
+
+**⚠️ OPEN-ACCESS MONTH — RUNNING NOW, AUTO-REVERTS 2026-09-08** (`tier.py:PROMO_OPEN_ACCESS_UNTIL` + `free_open_access()`). The Free bullet above is the **post-promo steady state**, not what a signed-in Free user gets today. Founder experiment (2026-08-08, at 0 payers with users who activate but don't convert): while the window is open, **`scanner_rows` and nothing else** lifts for Free from 10 → Pro's **1,000**. Last open day is 2026-09-07; the revert needs no deploy.
+
+The lift is deliberately narrow, and `backend/tests/test_open_access_month.py` asserts every exclusion:
+- **Signed-in accounts only.** Anonymous callers score against the FREE table too, so `limit()` takes an `authenticated` flag — logged-out visitors keep the standard top-10. The lift is the reward for having an account, since the promo exists to drive signups (and it keeps the scanner's anonymous offset-walk guard closed).
+- **NOT lifted:** `daily_lookups` (still 12/day — the look-up meter's cap-hit and stale-read guards depend on it), `watchlist_tickers` (still 5), `web_push_alerts` (still 2).
+- **No Pro features unlock.** `has_feature()` is untouched: CSV, squeeze, heatmap, regime, congress and the public API all stay gated. This is a numeric cap lift, not "Free becomes Pro".
+
+**Copy rule while it runs:** "Upgrade to unlock the full scanner" is **false** for a signed-in Free user today, and true again on 2026-09-08 — sell only what Pro/Premium genuinely add on top. `services/email.py` already branches on `free_open_access()` for exactly this reason.
+
+**Two stale sources here — trust the `limit()` body and the test file over both:** (a) `tier.py` says to keep a matching `PROMO_OPEN_ACCESS_UNTIL` in `frontend/lib/pricing.ts`, but **there isn't one** — `FREE_LIMITS.scannerRows` is hard-coded to 10, so frontend Free-tier copy currently understates the live cap; (b) the `free_open_access()` docstring still describes the original "caps + every Pro feature" plan, which the implementation never did.
 
 **Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
-**Trial:** auto-started on signup gives **PREMIUM** for 14 days, no card. At expiry, hourly worker task `_downgrade_expired_trials` drops users with no `stripe_customer_id` straight to `free` (skip the Pro middle so loss aversion bites hardest). `TrialBanner.tsx` shows the countdown.
+**Trial + card gate — read this before writing ANY copy.** Two dated changes stack here. Get both or the copy is false.
+
+**1. Signup still stamps no trial** (PR #536). Creating an account is email + password; the row is written `tier="free", trial_ends_at=None` — see the "NO trial is granted here" block in `backend/app/routers/auth.py`. Nothing grants a trial at signup, ever.
+
+**2. Since `CARD_GATE_START = 2026-08-22` a NEW account must put a card on file before it can use the logged-in product** (PR #548). A new signup meets a card wall at `/app/start`: Stripe Checkout, $0 today, 14-day trial, first charge at trial end, one click to cancel. `tier.must_add_card(user)` is the single predicate every surface reads (exposed on `/api/me` and on `/api/auth/session` via `_user_out`). It returns True only when ALL of: account `created_at >= CARD_GATE_START`, no `stripe_customer_id`, `trial_started_at is None`, and not admin / lifetime / hand-comped pro-premium. It **fails open** on an unknown `created_at`.
+
+  - **Grandfathering is load-bearing, not a knob.** The gate compares the ACCOUNT's own creation date to the cutover — never "is this user currently free". Every account created before 2026-08-22 signed up under "free, no card" and keeps that deal permanently. Do not simplify the `created_at` comparison away, and do not move the date backwards over existing accounts.
+  - **The public surface stays open with no account and no card**: `/scorecard`, `/daily-picks`, the record CSV/JSON exports, per-ticker pages, marketing pages and the public API. Anonymous callers have no `User` row, so the predicate never runs for them. That is what keeps "read the record before you decide anything" true, and it is the escape hatch offered at the wall itself.
+  - **Known limit, stated plainly:** the gate is a UX boundary, not a security boundary — `/api/*` is not hard-gated, so a signed-in gated account calling the API directly still gets normal free-tier service.
+
+The 14-day **Premium** trial is a separate, explicitly-chosen, **card-required** step: `POST /api/billing/checkout {"start_trial": true}` opens a Stripe Checkout that collects a card, charges **$0 today**, and states the exact first-charge date. It's gated on never-having-trialled, and returns `trial_end` + `trial_days` so the confirmation UI restates the same instant Stripe was given. `tier` / `trial_ends_at` / `trial_started_at` are written by the `trialing` subscription webhook in `backend/app/routers/webhooks.py` from the subscription's own `trial_end` — never at signup. Declining the checkout leaves the account exactly as created.
+
+**Never write "14-day trial, no credit card" in marketing, ad, or email copy — and since 2026-08-22, never call a NEW ACCOUNT card-free either.** This is a financial product; both claims would be false advertising. What is still true and safe to say: the **public record** (scorecard, daily picks, exports, ticker pages, API) needs no account and no card. What is now false: "free account, no card to sign up", for anyone signing up today. PR #548 rewrote 47 such claims across 30 files — pricing, 13 comparison pages, listicles, blog, `llms.txt`, the inbox/newsletter templates that reply to strangers, and live Google Ads RSA copy. `/free-stock-scanner-no-credit-card` was **rewritten, not deleted** — it kept a true story about the public record. Tapeline's own comparison-table row now reads "Card to sign in".
+
+The CARD HONESTY block in `frontend/app/signup/page.tsx` remains the canonical statement of the trial half of the rule. `TrialBanner.tsx` branches on card-on-file (first charge lands at trial end, one click cancels before then) vs the legacy card-free trial (nothing charged, the account just moves to Free) — never mix the two.
+
+The hourly `_downgrade_expired_trials` worker task still drops expired-trial users with no `stripe_customer_id` straight to `free` (skipping the Pro middle so loss aversion bites hardest) — but it is now a **legacy safety net** for the old auto-granted trials, since a card-required trial always has a `stripe_customer_id` and lapses through Stripe instead.
 
 ## Pricing source-of-truth (all kept in sync as of 2026-05-03)
 - `backend/app/services/tier.py` — feature gating + caps (no $ amounts here)
@@ -92,6 +119,17 @@ Three application-level layers (Cloudflare Bot Fight Mode is the recommended fre
 3. **Cloudflare Turnstile** — env-gated. `CLOUDFLARE_TURNSTILE_SITE_KEY` + `CLOUDFLARE_TURNSTILE_SECRET_KEY`. Pass-through when unset (dev), enforced when set.
 
 Rate limit: `services/rate_limit.py` `limit_auth` caps `/api/auth/*` at 10 attempts per IP per minute (vs default 120 for /api/*).
+
+## Sign-in codes (new-device second factor) — `backend/app/services/signin_codes.py`
+Password sign-in from an **unrecognised browser** does NOT mint a session: it emails a 6-digit code and returns the same `{mfa_required, mfa_token}` challenge the TOTP flow uses, plus `method: "email"` and a masked `email_hint`. `POST /api/auth/2fa` accepts that code, mints the session, and sets a signed 30-day **trusted-device cookie** (`tapeline_device`) — so routine logins from a known browser stay a plain password step.
+
+- **Deliberately new-device-only, not every sign-in.** Requiring a code every time would make Resend a hard dependency of logging in at all, so a mail outage would lock out every user (founder included). Decided 2026-08-19.
+- **TOTP keeps precedence** — an account with an authenticator app never gets an emailed code, and the TOTP/recovery-code path in `/2fa` is untouched.
+- **Codes** are 6 digits, 10-minute TTL, single-use (burned with a conditional UPDATE so a replay can't mint a second session), stored as a keyed HMAC-SHA256 bound to the user id — never plaintext. Table `signin_codes`, migration 0052.
+- **The trust cookie carries `session_epoch`**, so sign-out-everywhere / password reset revoke every remembered device for free.
+- **Two caps**: issuance is capped per ACCOUNT (`signin_code:{user_id}`, 5 per 15 min) so /signin can't be used to mail-bomb someone; verification reuses the existing per-account `2fa:{user_id}` budget.
+- **OAuth sign-in is not gated** — Google/Microsoft run their own device checks and never hit `/api/auth/signin`.
+- Tests: `backend/tests/test_signin_email_codes.py`.
 
 ## News + analyst ratings
 - **News** — `news_feed.py` queries Massive/Polygon and Finnhub in parallel,
@@ -204,7 +242,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
   marketing trust signal don't degrade. Gate lives in
   `backend/app/routers/scorecard.py` (`_FREE_DELAY_DAYS`).
 - Three-tier price points (founding pricing 2026-07: $9.99 Pro / $19.99 Premium, framed "locked in for early subscribers"; 30-day money back) — only revisit with conversion data
-- Free tier shows real product (delayed) — not a feature-stripped version
+- Free tier shows the real product, LIVE — not a feature-stripped version, and not a delayed one (the 24h delay cliff went 2026-06-20; the Free caps are row count, lookups/day, and watchlist size)
 - Owner login mechanism (only seeded via `seed_owner.py`, never via signup form)
 
 ## Critical file map

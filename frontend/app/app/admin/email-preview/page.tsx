@@ -273,7 +273,7 @@ function Toggle({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-border bg-bg p-0.5">
+    <div className="inline-flex rounded-md border border-border bg-background p-0.5">
       {options.map((o) => {
         const on = value === o.value;
         return (

@@ -14,13 +14,9 @@ import { render, screen } from "@testing-library/react";
 vi.mock("@/components/UserContext", () => ({
   useUser: vi.fn(),
 }));
-vi.mock("@vercel/analytics", () => ({
-  track: vi.fn(),
-}));
-
 import { TrialEndedModal } from "@/components/TrialEndedModal";
 import { useUser } from "@/components/UserContext";
-import { FREE_LIMITS, REFUND } from "@/lib/pricing";
+import { FREE_LIMITS, REFUND, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 
 const mockedUseUser = useUser as ReturnType<typeof vi.fn>;
 
@@ -50,8 +46,18 @@ describe("TrialEndedModal", () => {
     const text = container.textContent ?? "";
     expect(screen.getByText(/what your free account keeps/i)).toBeInTheDocument();
     expect(text).toContain(`${FREE_LIMITS.dailyLookups} ticker look-ups a day`);
-    expect(text).toContain(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`);
-    expect(text).toContain(`top ${FREE_LIMITS.scannerRows} scanner rows`);
+    // Watchlist is Pro-only after the 2026-08-02 cutover → listed as a Free
+    // "keep" only while Free still includes one.
+    if (freeHasWatchlist()) {
+      expect(text).toContain(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`);
+    } else {
+      expect(text).not.toContain("-ticker watchlist");
+    }
+    // Window-aware: lifts to the Pro cap while open access runs, back to
+    // FREE_LIMITS.scannerRows after. Asserting through the same helper the
+    // component uses keeps this correct on both sides of the revert date —
+    // same idiom as backend tests/test_upgrade_nudge.py.
+    expect(text).toContain(`top ${freeScannerRows({ authenticated: true })} scanner rows`);
     expect(text).toContain(`top-${FREE_LIMITS.squeezePreviewRows} preview`);
     expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);
     expect(text).toMatch(/full public scorecard/i);
@@ -87,6 +93,27 @@ describe("TrialEndedModal", () => {
   it("states the refund guarantee from REFUND", () => {
     render(<TrialEndedModal />);
     expect(screen.getByText(new RegExp(REFUND.short, "i"))).toBeInTheDocument();
+  });
+
+  it("states the one-time save offer only when the server says it's available", () => {
+    // Flag present → the offer line renders, stated as a standing fact
+    // (no countdown — rule 6; it genuinely has no deadline).
+    mockedUseUser.mockReturnValue({
+      ...EXPIRED_TRIAL_USER,
+      user: { ...EXPIRED_TRIAL_USER.user, trial_save_offer_available: true },
+    });
+    const { container } = render(<TrialEndedModal />);
+    const text = container.textContent ?? "";
+    expect(text).toContain("50% off your first 3 months");
+    expect(text).toContain("applied automatically at checkout");
+    expect(text).not.toMatch(/expires (?:in|soon)|last chance|hurry/i);
+  });
+
+  it("omits the save offer when the server flag is absent", () => {
+    const { container } = render(<TrialEndedModal />);
+    expect(container.textContent ?? "").not.toContain(
+      "50% off your first 3 months",
+    );
   });
 
   it("renders nothing while the trial is still active", () => {

@@ -1,10 +1,16 @@
-"""Trial-state throttling — Premium during trial gets reduced api/telegram caps."""
+"""Trial-state throttling — Premium during trial gets reduced api caps."""
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from app.services.tier import Tier, effective_limit, is_on_trial, limit
+from app.services.tier import (
+    Tier,
+    effective_limit,
+    free_watchlist_cap,
+    is_on_trial,
+    limit,
+)
 
 
 def _user(tier: str, trial_ends_at: datetime | None, stripe_customer_id: str | None) -> SimpleNamespace:
@@ -50,18 +56,10 @@ def test_effective_limit_throttles_api_during_trial():
     assert effective_limit(user, "api_requests_per_day") == 100
 
 
-def test_effective_limit_throttles_telegram_during_trial():
-    future = datetime.now(UTC) + timedelta(days=7)
-    user = _user("premium", future, None)
-    assert limit(Tier.PREMIUM, "telegram_alerts_per_day") == 10_000
-    assert effective_limit(user, "telegram_alerts_per_day") == 100
-
-
 def test_effective_limit_does_not_throttle_paid_premium():
     future = datetime.now(UTC) + timedelta(days=30)
     user = _user("premium", future, "cus_paid_123")
     assert effective_limit(user, "api_requests_per_day") == 1000
-    assert effective_limit(user, "telegram_alerts_per_day") == 10_000
 
 
 def test_effective_limit_unaffected_keys_unchanged_during_trial():
@@ -77,6 +75,7 @@ def test_effective_limit_unaffected_keys_unchanged_during_trial():
 def test_effective_limit_free_user_unchanged():
     user = _user("free", None, None)
     assert effective_limit(user, "api_requests_per_day") == 0
-    # Free watchlist cap raised to 5 (2026-07-12) to break the day-1 seed
-    # deadlock — the seeder now leaves >= 1 free slot for the user's own add.
-    assert effective_limit(user, "watchlist_tickers") == 5
+    # Free watchlist cap was 5 (2026-07-12, to break the day-1 seed deadlock),
+    # then drops to 0 on/after FREE_WATCHLIST_REMOVAL_DATE (watchlist → Pro+).
+    # Assert against the same date-gated source the router enforces.
+    assert effective_limit(user, "watchlist_tickers") == free_watchlist_cap()

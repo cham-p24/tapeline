@@ -45,8 +45,9 @@ const WINS: CompareRow[] = [
     competitor: "Desktop-first; mobile experience is limited",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Free 7-day trial with card on file",
   },
 ];
@@ -87,7 +88,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Can I trial Tapeline before paying?",
-    a: "Yes — 14-day Premium trial, no credit card required, cancel in one click. Trade Ideas offers a free 7-day trial that requires a card on file.",
+    a: "Reading it, yes — the daily Top 10, the full scorecard and the raw CSV/JSON record are free with no account. Running the signed-in scanner takes a card: a new account adds one at first sign-in, which starts the 14-day Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then. Trade Ideas offers a free 7-day trial that also requires a card on file.",
   },
   {
     q: "Should I use both?",

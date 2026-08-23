@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { LookupLimitReason } from "@/lib/api";
+import { freeHasWatchlist } from "@/lib/pricing";
 
 /**
  * Daily look-up wall — rendered in place of ticker data when a FREE or
@@ -70,11 +71,15 @@ export function LookupWall({
             Your free look-ups reset tomorrow.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/pricing" className="btn-primary">
-              See plans &rarr;
+            {/* Upgrade is the primary action — it goes straight to the in-app
+                billing picker where the plan is chosen, not out to the
+                marketing /pricing page. "See plans" stays as the quieter
+                detour for anyone who wants the full comparison first. */}
+            <Link href="/app/billing" className="btn-primary">
+              Upgrade now &rarr;
             </Link>
-            <Link href="/app/billing" className="btn-ghost">
-              Upgrade now
+            <Link href="/pricing" className="btn-ghost">
+              See plans
             </Link>
           </div>
           <p className="mt-5 text-xs text-subtle">
@@ -84,26 +89,33 @@ export function LookupWall({
       ) : (
         <>
           <h2 className="mt-4 text-2xl font-bold tracking-tight">
-            Sign up free to keep looking up tickers
+            Keep looking up tickers
           </h2>
+          {/* CARD HONESTY. This wall is only ever shown to an anonymous guest,
+              so the account they would create is a POST-cutover one: it adds a
+              card at first sign-in. "No card required" was true before #548 and
+              is not now. The genuinely card-free path is the published record,
+              so that is what the footnote offers instead. */}
           <p className="mt-3 text-sm leading-relaxed text-muted">
-            You&rsquo;ve reached {countPhrase} as a guest. A free account keeps
-            live scores, more look-ups each day, a watchlist, and the top-10
-            scanner &mdash; no card required.
+            You&rsquo;ve reached {countPhrase} as a guest. An account opens live scores,
+            more look-ups each day{freeHasWatchlist() ? ", a watchlist," : ","} and the full
+            scanner. Creating one adds a card at first sign-in and starts a 14-day Premium
+            trial &mdash; $0 today, one click to cancel before day 14.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
               href={`/signup${sym ? `?next=${encodeURIComponent(`/app/ticker/${sym}`)}` : ""}`}
               className="btn-primary"
             >
-              Sign up free &rarr;
+              Create an account &rarr;
             </Link>
             <Link href="/signin" className="btn-ghost">
               Sign in
             </Link>
           </div>
           <p className="mt-5 text-xs text-subtle">
-            Free forever &mdash; live scores, look-ups every day, top-10 scanner.
+            Or read the record with no account at all &mdash; the daily Top 10, the whole
+            scorecard and the raw CSV/JSON are open to everyone.
           </p>
         </>
       )}

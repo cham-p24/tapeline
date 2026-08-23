@@ -23,6 +23,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta, SITE_URL } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { TICKERS, findTicker, type TickerPost } from "../tickers";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Refresh per-page live data every 30 minutes. Long-tail SEO pages don't
 // need sub-minute freshness; longer cache = fewer API hits on each crawl.
@@ -76,6 +77,7 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
         // AbortSignal is not part of Next's fetch cache key, so the 30-min
         // ISR cache below is preserved.
         next: { revalidate: 1800 },
+        headers: ssrInternalHeaders(),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (res.ok) return (await res.json()) as TickerData;
@@ -114,6 +116,7 @@ async function fetchSymbolScorecard(symbol: string): Promise<ScorecardForSymbol 
     try {
       const res = await fetch(url, {
         next: { revalidate: 3600 }, // hourly is plenty — scorecard rolls daily
+        headers: ssrInternalHeaders(),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (res.ok) {
@@ -644,21 +647,21 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering ~2,500 US tickers is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
           </p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            Tapeline Free covers live scores for the top 10 scanner rows plus 5 look-ups a day, free forever — enough to evaluate the methodology, not enough for daily trading. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~2,500-ticker real-time universe with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4), and unlimited Telegram alerts. 14-day Premium trial, no card.
+            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~2,500-ticker real-time scanner with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4). A new account adds a card at first sign-in, which starts the 14-day Premium trial: $0 charged that day, first charge on day 14, cancel in one click before then. Accounts created before 22 August 2026 keep the free access they signed up for.
           </p>
         </section>
 
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
           <h2 className="text-xl font-semibold tracking-tight">See {t.symbol}'s live score now.</h2>
           <p className="mt-2 text-sm text-muted">
-            14-day Premium trial. No credit card. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
+            14-day Premium trial — a card at first sign-in, $0 charged that day, cancel in one click before the day-14 charge. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/t/${t.symbol}`} className="btn-accent">
               Open the live {t.symbol} page &rarr;
             </Link>
             <Link href="/signup" className="btn-ghost">
-              Try Premium free
+              Start the 14-day Premium trial
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { UserProvider } from "@/components/UserContext";
 import { ThemeProvider, themeBootScript } from "@/components/ThemeProvider";
@@ -10,6 +8,14 @@ import { UtmCapture } from "@/components/UtmCapture";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { GeneralInformationNotice } from "@/components/GeneralInformationNotice";
+import { MetaPixel } from "@/components/MetaPixel";
+import {
+  GA4_ID,
+  GOOGLE_ADS_ID,
+  META_PIXEL_ID,
+  CLARITY_ID,
+  PLAUSIBLE_DOMAIN,
+} from "@/lib/trackers";
 import { PRICING, usd } from "@/lib/pricing";
 import {
   jsonLdScript,
@@ -39,7 +45,7 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 // Env-gated analytics — set NEXT_PUBLIC_PLAUSIBLE_DOMAIN to "tapeline.io"
 // (or your custom Plausible host via NEXT_PUBLIC_PLAUSIBLE_SCRIPT) to flip
 // on. No personal data, GDPR-friendly, ~1KB script.
-const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "";
+// PLAUSIBLE_DOMAIN now comes from lib/trackers — see the import above.
 const PLAUSIBLE_SCRIPT =
   process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT || "https://plausible.io/js/script.js";
 
@@ -49,7 +55,23 @@ const PLAUSIBLE_SCRIPT =
 // to disable on a specific environment. GA4 powers the GSC ↔ signup
 // attribution loop — Search Console shows what query brought a visitor,
 // GA4 shows what they did after (event "sign_up" on the success page).
-const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
+// GA4_ID now comes from lib/trackers — see the import above.
+
+// Microsoft Clarity project ID — free session replay + heatmaps. Env-only, no
+// hardcoded default: set NEXT_PUBLIC_CLARITY_PROJECT_ID once a Clarity project
+// exists (clarity.microsoft.com) to switch it on. The highest-ROI tool for the
+// documented day-1 bounce — watch real sessions to see WHY visitors leave.
+// CLARITY_ID now comes from lib/trackers — see the import above.
+// Meta pixel. Deliberately NO default — unset means no Meta JS is fetched at
+// all, which is the correct state until an ad account actually exists. The
+// conversion events that matter (StartTrial, Purchase) are sent server-side
+// by backend/app/services/meta_capi.py; this base code exists for PageView
+// and for the _fbp/_fbc cookies that raise CAPI match quality.
+// NOTE: NEXT_PUBLIC_* is inlined at BUILD time — setting a Fly *secret* of
+// this name does nothing. The value comes from frontend/fly.toml [build.args]
+// via the Dockerfile ARG. See the "build-arg hole" suite in
+// frontend/__tests__/FunnelInstrumentation.test.tsx.
+// META_PIXEL_ID now comes from lib/trackers — see the import above.
 
 // Google Ads conversion tag (AW-XXXXXXXXXX). DISTINCT from GA4: this is what
 // makes ad clicks -> signups countable as conversions in the Google Ads
@@ -61,7 +83,7 @@ const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "G-YRK73W9NS9";
 // gtag.js loader with GA4 below; per-event send_to labels live in lib/gtag.ts
 // (NEXT_PUBLIC_GOOGLE_ADS_*_LABEL — still unset until the conversion label is
 // pulled from the Ads conversion action, at which point signups start counting).
-const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18169833652";
+// GOOGLE_ADS_ID now comes from lib/trackers — see the import above.
 
 // Title template is "%s" so each page owns its full <title>. Putting the
 // brand suffix in the template double-applies it on pages that already
@@ -101,7 +123,7 @@ export const metadata: Metadata = {
     // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
-      `Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo. 14-day Premium trial, no card.`,
+      `Read the tape. One score per US ticker, public 6-factor formula, daily back-checked scorecard. The whole record is free to read with no account. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo.`,
     url: "/",
     siteName: "Tapeline",
     type: "website",
@@ -202,19 +224,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Enhanced Measurement history-events toggle. This fires it from
             code so route-level funnel steps are always measurable. */}
         <RouteAnalytics />
-        {/* Vercel Analytics + Speed Insights. Gated behind NEXT_PUBLIC_VERCEL
-            (Vercel sets this to "1" on its builds) so they only mount on
-            Vercel-hosted deploys — off-Vercel the beacons 404 against
-            /_vercel/insights/*, so we skip rendering them entirely. Page-view
-            + custom-event tracking + Web Vitals (Core Web Vitals + custom
-            metrics). Complementary to Plausible above (Plausible is the
-            privacy-first aggregate view; Vercel adds per-route + Web Vitals). */}
-        {process.env.NEXT_PUBLIC_VERCEL === "1" && (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        )}
+        {/* Vercel Analytics + Speed Insights used to mount here, gated on an
+            env var that was set nowhere in this repo and that Vercel does not
+            inject (it ships VERCEL / VERCEL_ENV / NEXT_PUBLIC_VERCEL_ENV, never
+            the bare name the gate read). The block was therefore dead in every
+            environment, and the ~31 `track()` calls that depended on it were
+            no-ops. Both packages are removed; the funnel events they carried
+            now go to GA4 via lib/gtag.ts, and Plausible below remains the
+            privacy-first aggregate view. */}
         {/* Google tag (gtag.js) — one loader, shared by GA4 (analytics + the
             GSC attribution loop) AND Google Ads (paid-search conversion
             tracking). Loaded after-interactive so it never blocks first paint.
@@ -244,6 +261,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               }}
             />
           </>
+        )}
+        {/* Meta pixel base code. Renders only when NEXT_PUBLIC_META_PIXEL_ID is
+            set, so no Meta request is made until an ad account exists.
+            afterInteractive so it never blocks first paint — AEO is the one
+            channel that works and it depends on fast server-rendered HTML.
+            PageView only: StartTrial and Purchase are sent server-side by
+            services/meta_capi, which survives ad-blockers and the off-session
+            first charge 14 days after the click. */}
+        {/* Scoped to marketing pages — MetaPixel refuses to render on /app/*.
+            This layout is the only one carrying <html>, so an unscoped pixel
+            here would run on the whole logged-in surface and report which
+            tickers a user researches to Meta. See components/MetaPixel.tsx. */}
+        <MetaPixel pixelId={META_PIXEL_ID} />
+        {/* Microsoft Clarity — session replay + heatmaps for the day-1 bounce.
+            Loads only when NEXT_PUBLIC_CLARITY_PROJECT_ID is set (env-gated, no
+            default), afterInteractive so it never blocks first paint. */}
+        {CLARITY_ID && (
+          <Script
+            id="ms-clarity"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function(c,l,a,r,i,t,y){
+                  c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                  t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                  y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+                })(window, document, "clarity", "script", "${CLARITY_ID}");
+              `,
+            }}
+          />
         )}
         {/* Cloudflare Turnstile — only loaded when a site key is configured.
             The widget is rendered by the signup form (and any other gated form)

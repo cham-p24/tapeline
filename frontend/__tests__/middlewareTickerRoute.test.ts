@@ -19,10 +19,36 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  apexRedirectTarget,
   METADATA_ROUTE_RE,
   TICKER_PREFIX_RE,
   VALID_TICKER_RE,
 } from "../middleware";
+
+describe("canonical-host consolidation → bare tapeline.io", () => {
+  it("308-redirects www.tapeline.io + .app hosts to the same path on bare .io, query preserved", () => {
+    // www.io currently serves a 200 duplicate — redirect it to the apex.
+    expect(apexRedirectTarget("www.tapeline.io", "/pricing", "")).toBe("https://tapeline.io/pricing");
+    expect(apexRedirectTarget("www.tapeline.io", "/t/AAPL", "?ref=hn")).toBe(
+      "https://tapeline.io/t/AAPL?ref=hn",
+    );
+    // Legacy .app domain.
+    expect(apexRedirectTarget("tapeline.app", "/pricing", "")).toBe("https://tapeline.io/pricing");
+    expect(apexRedirectTarget("www.tapeline.app", "/whats-new", "")).toBe(
+      "https://tapeline.io/whats-new",
+    );
+    expect(apexRedirectTarget("TAPELINE.APP", "/whats-new", "")).toBe(
+      "https://tapeline.io/whats-new",
+    );
+  });
+
+  it("leaves the canonical bare host and everything else alone (no redirect loop)", () => {
+    expect(apexRedirectTarget("tapeline.io", "/pricing", "")).toBeNull();
+    expect(apexRedirectTarget("localhost:3000", "/", "")).toBeNull();
+    expect(apexRedirectTarget("api.tapeline.io", "/x", "")).toBeNull();
+    expect(apexRedirectTarget(null, "/x", "")).toBeNull();
+  });
+});
 
 /**
  * Mirrors handleTickerRoute's branch order. The ORDER matters: ticker shape is

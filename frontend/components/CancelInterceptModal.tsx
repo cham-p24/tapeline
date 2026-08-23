@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { track } from "@vercel/analytics";
+import { useEffect, useRef, useState } from "react";
+import { trackEvent } from "@/lib/gtag";
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
-import { FREE_LIMITS } from "@/lib/pricing";
+import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -89,6 +90,9 @@ export function CancelInterceptModal({
   const [reason, setReason] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [surveySent, setSurveySent] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useModalA11y(open, panelRef, onClose);
 
   const tierLabel = (tier || "your").replace(/^\w/, (c) => c.toUpperCase());
 
@@ -105,7 +109,7 @@ export function CancelInterceptModal({
     setFeedback("");
     setSurveySent(false);
     setLoading(true);
-    track("cancel_intercept_shown", { tier });
+    trackEvent("cancel_intercept_shown", { tier });
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/billing/retention-options`, {
@@ -163,21 +167,21 @@ export function CancelInterceptModal({
 
   const acceptSave = () =>
     action("/api/billing/save-offer", {}, () => {
-      track("save_offer_accepted", { tier });
+      trackEvent("save_offer_accepted", { tier });
       setDone({ kind: "saved" });
       setStep("done");
     }, "save");
 
   const pause = (months: number) =>
     action("/api/billing/pause", { months }, (d) => {
-      track("subscription_paused", { tier, months });
+      trackEvent("subscription_paused", { tier, months });
       setDone({ kind: "paused", detail: d.resumes_at });
       setStep("done");
     }, `pause${months}`);
 
   const resume = () =>
     action("/api/billing/resume", {}, () => {
-      track("subscription_resumed", { tier });
+      trackEvent("subscription_resumed", { tier });
       setDone({ kind: "resumed" });
       setStep("done");
     }, "resume");
@@ -186,7 +190,7 @@ export function CancelInterceptModal({
    *  survey comes after, optionally), straight to the confirmation. */
   const directCancel = () =>
     action("/api/billing/cancel", {}, (d) => {
-      track("subscription_canceled", { tier, via: "one_click" });
+      trackEvent("subscription_canceled", { tier, via: "one_click" });
       setDone({ kind: "canceled", detail: d.period_end });
       setStep("done");
     }, "cancel");
@@ -195,7 +199,7 @@ export function CancelInterceptModal({
    *  cancellation is already scheduled as survey-capture only. */
   const submitSurvey = () =>
     action("/api/billing/cancel", { reason, feedback: feedback.trim() || null }, () => {
-      track("cancel_survey_submitted", { tier, reason: reason ?? "other" });
+      trackEvent("cancel_survey_submitted", { tier, reason: reason ?? "other" });
       setSurveySent(true);
     }, "survey");
 
@@ -207,10 +211,12 @@ export function CancelInterceptModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8 backdrop-blur-sm overflow-y-auto"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="cancel-intercept-title"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-border bg-panel p-6 shadow-2xl sm:p-7"
+        ref={panelRef}
+        className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl sm:p-7"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
@@ -224,7 +230,7 @@ export function CancelInterceptModal({
               <div className="text-xs font-medium uppercase tracking-wider text-muted">
                 Cancellation scheduled
               </div>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight">Cancelled.</h2>
+              <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">Cancelled.</h2>
               <p className="mt-3 text-sm text-muted">
                 {done.detail
                   ? `You'll keep full access until ${fmtDate(done.detail)}, then drop to Free. No further charges.`
@@ -268,7 +274,7 @@ export function CancelInterceptModal({
                   <button
                     onClick={submitSurvey}
                     disabled={busy !== null || reason === null}
-                    className="mt-3 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-panel-hover disabled:opacity-50"
+                    className="mt-3 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-panel2 disabled:opacity-50"
                   >
                     {busy === "survey" ? "Sending…" : "Send feedback"}
                   </button>
@@ -278,7 +284,7 @@ export function CancelInterceptModal({
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={onClose}
-                  className="flex h-10 items-center justify-center rounded-md border border-border px-5 text-sm font-medium hover:bg-panel-hover"
+                  className="flex h-10 items-center justify-center rounded-md border border-border px-5 text-sm font-medium hover:bg-panel2"
                 >
                   Close
                 </button>
@@ -291,7 +297,7 @@ export function CancelInterceptModal({
           /* Already paused — reflect it, offer immediate resume. */
           <div>
             <div className="text-xs font-medium uppercase tracking-wider text-muted">Subscription paused</div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">
               Your plan is paused until {fmtDate(opts!.paused_until)}.
             </h2>
             <p className="mt-3 text-sm text-muted">
@@ -300,7 +306,7 @@ export function CancelInterceptModal({
             </p>
             {error && <ErrorNote text={error} />}
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover">
+              <button onClick={onClose} className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel2">
                 Keep it paused
               </button>
               <button
@@ -318,7 +324,7 @@ export function CancelInterceptModal({
             <div className="text-xs font-medium uppercase tracking-wider text-muted">
               {opts?.canceled_at ? "Scheduled to cancel" : "Cancel subscription"}
             </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">
               {opts?.canceled_at
                 ? `Your ${tierLabel} plan is set to cancel.`
                 : "Cancel now, or stay for less?"}
@@ -328,7 +334,7 @@ export function CancelInterceptModal({
                 ? "You'll keep full access until the end of your billing period. Changed your mind? Here's a reason to stay."
                 : // Downgrade description derives from FREE_LIMITS (mirrors
                   // backend tier.py) — never overstate what cancelling costs.
-                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.webPushAlerts} browser push alerts — no email or Telegram alerts. Cancel below, or take one of these instead.`}
+                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, ${freeHasWatchlist() ? `a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ` : ""}${FREE_LIMITS.webPushAlerts} browser push alerts — no email alerts. Cancel below, or take one of these instead.`}
             </p>
 
             {error && <ErrorNote text={error} />}
@@ -381,7 +387,7 @@ export function CancelInterceptModal({
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={onClose}
-                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover"
+                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel2"
                 >
                   Close
                 </button>
@@ -401,7 +407,7 @@ export function CancelInterceptModal({
                 <button
                   onClick={onClose}
                   disabled={busy !== null}
-                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel-hover disabled:opacity-50"
+                  className="rounded-md border border-border px-4 py-2 text-sm text-muted hover:bg-panel2 disabled:opacity-50"
                 >
                   Never mind, stay on {tierLabel}
                 </button>
@@ -436,12 +442,12 @@ function DonePanel({ done, onClose }: { done: { kind: DoneKind; detail?: string 
   return (
     <div>
       <div className="text-xs font-medium uppercase tracking-wider text-up">All set</div>
-      <h2 className="mt-2 text-2xl font-bold tracking-tight">{c.title}</h2>
+      <h2 id="cancel-intercept-title" className="mt-2 text-2xl font-bold tracking-tight">{c.title}</h2>
       <p className="mt-3 text-sm text-muted">{c.body}</p>
       <div className="mt-6 flex justify-end">
         <button
           onClick={onClose}
-          className="flex h-10 items-center justify-center rounded-md border border-border px-5 text-sm font-medium hover:bg-panel-hover"
+          className="flex h-10 items-center justify-center rounded-md border border-border px-5 text-sm font-medium hover:bg-panel2"
         >
           Close
         </button>

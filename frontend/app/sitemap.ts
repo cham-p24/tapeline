@@ -3,6 +3,9 @@ import { SECTORS } from "./sector/sectors";
 import { SIGNALS } from "./signal/signals";
 import { STRATEGIES } from "./best-stocks-for/[strategy]/strategies";
 import { FACTORS } from "./how-it-works/factors";
+import { TERMS } from "./glossary/terms";
+import { allComparePairs } from "@/lib/comparePairs";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Sitemap revalidates hourly so newly-discovered tickers reach Google within
 // the day, without paying a DB roundtrip on every crawler hit.
@@ -74,6 +77,7 @@ async function fetchUniverseSymbols(): Promise<string[]> {
         `${API_BASE}/api/public/signals?limit=${UNIVERSE_PAGE_SIZE}&offset=${offset}`,
         {
           next: { revalidate: 3600 },
+          headers: ssrInternalHeaders(),
           signal: AbortSignal.timeout(UNIVERSE_TIMEOUT_MS),
         },
       );
@@ -102,6 +106,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io";
   const now = new Date();
 
+  // Blog hub lastmod = the newest post date, so /blog is re-crawled whenever a
+  // post is added (its old static date told Google "nothing changed" here).
+  // POSTS is imported ONCE here and reused for the per-post entries below.
+  const { POSTS } = await import("./blog/posts");
+  const blogLastModified = POSTS.length
+    ? new Date(Math.max(...POSTS.map((p) => new Date(p.publishedAt).getTime())))
+    : new Date("2026-05-18");
+
   // Per-URL stable lastModified dates. Previously every entry used `now`,
   // which Google heuristics treat as "the whole site changed" — a signal
   // they're known to downweight (and a likely contributor to the 496
@@ -116,6 +128,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const HOWITWORKS_LAST_MODIFIED = new Date("2026-05-17");
   // Per-factor methodology pages, /why and /limitations shipped together.
   const TRUST_LAST_MODIFIED = new Date("2026-07-18");
+  // /glossary index + the per-term pages. Static definitional content, so
+  // lastmod tracks the writing, not the market.
+  const GLOSSARY_LAST_MODIFIED = new Date("2026-08-09");
 
   const staticEntries: MetadataRoute.Sitemap = [
     { url: base,                                lastModified: STATIC_LAST_MODIFIED, priority: 1.0 },
@@ -134,6 +149,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // screener you can verify / transparent screener with a downloadable
     // record" long-tail. Points skeptic-intent search at the raw CSV/JSON.
     { url: `${base}/verify`,                    lastModified: new Date("2026-07-25"), priority: 0.8 },
+    { url: `${base}/transparent-stock-screener`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // Answer-engine (AEO) pages for the winnable proof/evaluator query clusters
+    // — sibling intents to /transparent-stock-screener, each foregrounding the
+    // downloadable scorecard dataset. See growth/AEO_OFFSITE_KIT.
+    { url: `${base}/stock-screener-track-record`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // The MCP connect page — the AI-assistant channel is the only one that has
+    // produced unprompted signups, and "stock screener MCP server" is an
+    // uncontested query.
+    { url: `${base}/mcp`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    { url: `${base}/legal/extension-privacy`, lastModified: STATIC_LAST_MODIFIED, priority: 0.3 },
+    { url: `${base}/do-stock-screeners-work`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Scorecard is daily-refreshing (new top-10 picks every market close).
     { url: `${base}/scorecard`,                 lastModified: now, changeFrequency: "daily", priority: 0.9 },
     // Daily-picks newsletter lead-magnet landing — preview of what
@@ -148,13 +174,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // ranking pages (and onward to per-ticker pages). Aggregates change as
     // scores re-tick, so daily.
     { url: `${base}/sectors`,                   lastModified: now, changeFrequency: "daily", priority: 0.8 },
+    // Glossary hub — definitional/AEO surface. Answer engines cite
+    // definition pages heavily, and the hub is the crawl entry point into
+    // the per-term set below.
+    { url: `${base}/glossary`,                  lastModified: GLOSSARY_LAST_MODIFIED, changeFrequency: "monthly", priority: 0.8 },
     { url: `${base}/about`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/press`,                     lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
-    { url: `${base}/blog`,                      lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
+    { url: `${base}/blog`,                      lastModified: blogLastModified, priority: 0.7 },
     { url: `${base}/changelog`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/roadmap`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.6 },
     { url: `${base}/status`,                    lastModified: now, changeFrequency: "hourly", priority: 0.4 },
     // Comparison pages — high commercial-investigation intent.
+    { url: `${base}/whats-new`,                 lastModified: STATIC_LAST_MODIFIED, priority: 0.7 },
+    { url: `${base}/compare`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/compare/finviz`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/zacks`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/wallstreetzen`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
@@ -175,6 +207,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/compare/robinhood`,         lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/marketsmith`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/compare/bloomberg-terminal`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
+    // 2026-08 expansion — paid scanners the engaged ICP actually cross-shops
+    // (pay-inclination deep dive: beginner-intermediate swing traders compare
+    // paid tools, not free Finviz).
+    { url: `${base}/compare/trendspider`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
@@ -227,8 +263,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "monthly" as const,
     priority: 0.8,
   }));
+  // One page per glossary term — /glossary/{slug}. Purely static prose (no
+  // live data), so lastModified tracks the definition, not the market. Same
+  // treatment as the per-factor methodology pages above.
+  const glossaryEntries: MetadataRoute.Sitemap = TERMS.map((t) => ({
+    url: `${base}/glossary/${t.slug}`,
+    lastModified: GLOSSARY_LAST_MODIFIED,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
   const signalEntries: MetadataRoute.Sitemap = SIGNALS.map((s) => ({
     url: `${base}/signal/${s.slug}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.7,
+  }));
+  // Ticker-vs-ticker comparison pages — "AAPL vs MSFT" and friends, one of the
+  // highest-volume/highest-intent query classes in retail investing, and a
+  // surface only Tapeline can fill with two published six-factor scores head to
+  // head. Curated within-sector pairs (see lib/comparePairs); scores re-tick so
+  // daily. Canonical (alphabetical) slugs only — no a-vs-b / b-vs-a duplication.
+  const compareEntries: MetadataRoute.Sitemap = allComparePairs().map((p) => ({
+    url: `${base}/compare/${p.a.toLowerCase()}-vs-${p.b.toLowerCase()}`,
     lastModified: now,
     changeFrequency: "daily" as const,
     priority: 0.7,
@@ -270,7 +326,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Blog posts — pulled from the same manifest the /blog routes use so
   // adding a post automatically lands in the sitemap.
-  const { POSTS } = await import("./blog/posts");
   const postEntries: MetadataRoute.Sitemap = POSTS.map((p) => ({
     url: `${base}/blog/${p.slug}`,
     lastModified: new Date(p.publishedAt),
@@ -293,9 +348,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticEntries,
     ...factorEntries,
+    ...glossaryEntries,
     ...sectorEntries,
     ...signalEntries,
     ...strategyEntries,
+    ...compareEntries,
     ...tickerEntries,
     ...postEntries,
     ...tickerPostEntries,

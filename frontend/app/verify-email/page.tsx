@@ -216,7 +216,7 @@ function Outcome({
         </p>
         <Link
           href="/"
-          className="mt-6 flex h-10 w-full items-center justify-center rounded-md border border-border bg-bg text-sm font-medium text-muted transition-colors hover:text-fg"
+          className="mt-6 flex h-10 w-full items-center justify-center rounded-md border border-border bg-background text-sm font-medium text-muted transition-colors hover:text-fg"
         >
           Back to tapeline.io
         </Link>

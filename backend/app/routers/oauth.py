@@ -33,11 +33,12 @@ Sign In with Apple capability). Set these env vars:
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import string
 import time
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from urllib.parse import parse_qsl, urlencode
 
 import httpx
@@ -120,7 +121,49 @@ ATTRIBUTION_FIELDS: dict[str, int] = {
     "gclid": 200,
     "gbraid": 200,
     "wbraid": 200,
+    # First-touch referrer host (#444) and landing path (#458). The email path
+    # has written these since they shipped; OAuth never did — and because every
+    # real signup to date arrived via Google OAuth, both columns were NULL for
+    # 100% of real users (audit 2026-08-20). AI-assistant and social referrals,
+    # which carry no UTM, were therefore invisible on the only path anyone uses.
+    # Same cookie round-trip as the fields above; hostname-only / path-only by
+    # construction (see _clean_attribution + auth._normalise_landing_path).
+    "referrer_host": 100,
+    "landing_path": 200,
 }
+
+
+# Hostname shape only: letters, digits, dots, hyphens. The client already
+# reduces document.referrer to `new URL(ref).hostname`, so a well-formed value
+# looks like "chatgpt.com" or "l.facebook.com". Anything else — a path, a
+# scheme, a query, a stray quote — is a spoofed or mangled cookie and is
+# dropped rather than written into an aggregation column.
+_HOSTNAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)*$")
+
+
+def _clean_referrer_host(raw: str | None) -> str | None:
+    """Lower-cased hostname or None. Never raises — attribution must not be
+    able to fail a signup."""
+    if not raw:
+        return None
+    try:
+        host = raw.strip().lower()
+        if not host or len(host) > 100 or not _HOSTNAME_RE.match(host):
+            return None
+        return host
+    except Exception:
+        return None
+
+
+def _normalise_landing_path(raw: str | None) -> str | None:
+    """Same contract as routers/auth._normalise_landing_path — imported lazily
+    to avoid a router-to-router import at module load. Never raises."""
+    try:
+        from app.routers.auth import _normalise_landing_path as _norm
+
+        return _norm(raw)
+    except Exception:
+        return None
 
 
 def _clean_attribution(raw: dict[str, str | None]) -> dict[str, str]:
@@ -541,6 +584,16 @@ async def oauth_callback(
             profile = ui.json()
             email = (profile.get("email") or "").lower().strip()
             name = profile.get("name")
+            # Google reports whether it has verified control of this address
+            # (`verified_email` on the v2 userinfo endpoint, `email_verified` on
+            # OpenID). If it explicitly says the address is NOT verified, we
+            # cannot treat this login as proof of email ownership — refuse rather
+            # than risk merging into (or vouching for) an address the Google user
+            # doesn't actually control. Missing/None is treated as verified
+            # (Google practically always verifies), only an explicit false blocks.
+            _verified = profile.get("email_verified", profile.get("verified_email"))
+            if _verified is False or _verified == "false":
+                raise HTTPException(400, "Google account email is not verified")
 
     if not email:
         raise HTTPException(400, "OAuth provider did not return an email")
@@ -550,12 +603,11 @@ async def oauth_callback(
     user = result.scalar_one_or_none()
     is_new = user is None
     if user is None:
-        # Mirror the native-signup trial grant — OAuth signups land on Premium
-        # for 14 days with no card, then get dropped to Free by
-        # `_downgrade_expired_trials` if they never add a Stripe customer.
-        # Without this, Google/Microsoft/Apple signups land directly on Free
-        # and never see the product the marketing copy promised.
-        trial_ends = datetime.now(UTC) + timedelta(days=14)
+        # Mirrors the native-signup path in routers/auth.py: an account starts
+        # on FREE with no trial. The 14-day Premium trial is card-required and
+        # is granted by the Stripe `trialing` webhook, so an OAuth signup must
+        # NOT hand one out for free — otherwise Google/Microsoft/Apple is a
+        # side door around the card requirement the email path enforces.
         ref_code = _generate_referral_code()
         for _ in range(5):  # retry on the (unlikely) referral-code collision
             conflict = await session.execute(
@@ -575,9 +627,9 @@ async def oauth_callback(
             id=f"u_{uuid.uuid4().hex}",
             email=email,
             name=name,
-            tier="premium",
+            tier="free",
             password_hash=None,  # OAuth-only account
-            trial_ends_at=trial_ends,
+            trial_ends_at=None,
             referral_code=ref_code,
             signup_utm_source=attr.get("utm_source"),
             signup_utm_medium=attr.get("utm_medium"),
@@ -587,6 +639,8 @@ async def oauth_callback(
             signup_gclid=attr.get("gclid"),
             signup_gbraid=attr.get("gbraid"),
             signup_wbraid=attr.get("wbraid"),
+            signup_referrer_host=_clean_referrer_host(attr.get("referrer_host")),
+            signup_landing_path=_normalise_landing_path(attr.get("landing_path")),
             # OAuth providers proved ownership of this address — auto-stamp
             # email_verified_at so the user doesn't see a redundant
             # "verify your email" banner.
@@ -596,17 +650,38 @@ async def oauth_callback(
         await session.commit()
         await session.refresh(user)
         logger.info(
-            "oauth.user_created provider=%s email=%s trial_ends=%s utm_source=%s gclid=%s",
-            provider, email, trial_ends.isoformat(),
+            "oauth.user_created provider=%s email=%s tier=free utm_source=%s gclid=%s",
+            provider, email,
             attr.get("utm_source") or "-", "y" if attr.get("gclid") else "-",
         )
     else:
-        # Returning OAuth user. If they were never verified (signed up
-        # natively first, then later via OAuth), stamp it now — the
-        # provider just re-proved ownership.
+        # Returning user matched by email. The provider (with a verified email,
+        # checked above) proves THIS login controls the address — but a
+        # pre-existing row matched purely by email is not automatically the same
+        # person. Account pre-hijacking (Classic-Federated-Merge): an attacker
+        # POSTs /api/auth/signup for the victim's address with a known password.
+        # Native signin never gates on email verification, so that password is a
+        # live credential sitting on an UNVERIFIED native row. When the victim
+        # later signs in with Google we match that row — so before adopting it,
+        # NEUTRALISE the untrusted credential: clear the password_hash and bump
+        # session_epoch (killing any pre-existing attacker sessions). The token
+        # minted below carries the new epoch, so the victim's session survives.
+        # A VERIFIED native account is safe (its owner already proved email
+        # control via the verification link), and an OAuth-only row has no
+        # password to worry about — only the unverified-password case is touched.
+        # The legitimate owner can re-add a password via forgot-password.
+        if user.password_hash is not None and user.email_verified_at is None:
+            logger.warning(
+                "oauth.unverified_native_merge provider=%s user=%s — clearing "
+                "untrusted password + bumping session_epoch (pre-hijack guard)",
+                provider, user.id,
+            )
+            user.password_hash = None
+            user.session_epoch = (user.session_epoch or 0) + 1
         if user.email_verified_at is None:
+            # The provider re-proved ownership — stamp it (redundant banner off).
             user.email_verified_at = datetime.now(UTC)
-            await session.commit()
+        await session.commit()
         logger.info("oauth.user_login provider=%s email=%s", provider, email)
 
     next_path = _safe_next(request.cookies.get(f"oauth_next_{provider}"))
@@ -658,6 +733,18 @@ async def oauth_callback(
         except Exception:
             logger.exception("oauth.ga4_sign_up_failed user=%s", user.id)
 
+        # Same event to Meta. Kept as its own try/except rather than sharing
+        # the one above so a GA4 outage cannot suppress the Meta conversion,
+        # and vice versa — two independently env-gated destinations.
+        try:
+            from app.services import meta_capi
+
+            await meta_capi.track_complete_registration(
+                user_id=user.id, email=user.email, method=provider
+            )
+        except Exception:
+            logger.exception("oauth.meta_complete_registration_failed user=%s", user.id)
+
         # Real-time founder ping (same as native signup) so a new OAuth signup /
         # live trial never goes unnoticed. Self-guarding + never raises.
         from app.services.telegram import notify_founder_new_signup
@@ -700,7 +787,7 @@ async def oauth_callback(
             ]
             await send_email(
                 user.email,
-                "Welcome to Tapeline — your trial is live",
+                "Welcome to Tapeline — your account is live",
                 render_welcome_email(user.name or "trader", picks=picks),
             )
         except Exception:

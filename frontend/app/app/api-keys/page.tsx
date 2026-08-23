@@ -129,7 +129,9 @@ export default function ApiKeysPage() {
               <strong className="text-fg">this is the only time it&apos;s shown</strong>.
             </p>
             <div className="mt-3 flex items-center gap-2">
-              <code className="flex-1 select-all overflow-x-auto rounded bg-background px-3 py-2 text-sm nums">
+              {/* ph-mask: redacted from PostHog session replays — this is the
+                  only time the plaintext key is ever rendered. */}
+              <code className="ph-mask flex-1 select-all overflow-x-auto rounded bg-background px-3 py-2 text-sm nums">
                 {newKey}
               </code>
               <button onClick={copyKey} className="btn-primary text-sm whitespace-nowrap">

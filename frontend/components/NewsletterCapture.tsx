@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { track } from "@vercel/analytics";
+import { Input } from "@/components/Input";
 import { trackEvent } from "@/lib/gtag";
 import { getStoredUtm } from "@/lib/utm";
 
@@ -95,8 +95,11 @@ export function NewsletterCapture({
         // `newsletter_signup` event (GA4-only) rather than `sign_up`, so an
         // email opt-in is NOT miscounted as a Google Ads account-signup
         // conversion (which would pollute paid-search ROAS).
-        track("newsletter_subscribed", { source });
-        trackEvent("newsletter_signup", { method: "newsletter" });
+        // A second Vercel-Analytics `newsletter_subscribed` used to fire here.
+        // It went to a sink that never mounted, and `newsletter_signup` below
+        // already records this exact moment — remapping it would only
+        // double-count list growth. `source` is preserved as a param instead.
+        trackEvent("newsletter_signup", { method: "newsletter", source });
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Sign up failed";
@@ -176,7 +179,7 @@ export function NewsletterCapture({
       <label className="sr-only" htmlFor={`nl-email-${source}`}>
         Email address
       </label>
-      <input
+      <Input
         id={`nl-email-${source}`}
         type="email"
         autoComplete="email"
@@ -184,13 +187,13 @@ export function NewsletterCapture({
         placeholder="you@example.com"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="flex-1 rounded-md border border-border bg-panel px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        className="flex-1"
         disabled={busy}
       />
       <button
         type="submit"
         disabled={busy}
-        className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-50"
+        className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
         {busy ? "Subscribing…" : "Get free daily picks"}
       </button>

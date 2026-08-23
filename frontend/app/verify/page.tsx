@@ -143,7 +143,7 @@ export default function VerifyPage() {
           <LandingCta
             from="scorecard"
             showPreview={false}
-            primaryLabel="Try the live scanner free — no card"
+            primaryLabel="Try the live scanner — 14-day trial"
             secondaryHref="/scorecard"
             secondaryLabel="Open the public scorecard"
           />
@@ -308,7 +308,16 @@ export default function VerifyPage() {
             on{" "}
             <Link href="/how-it-works" className="link">how it works</Link>, and
             the honest list of what this product is bad at is on{" "}
-            <Link href="/limitations" className="link">limitations</Link>.
+            <Link href="/limitations" className="link">limitations</Link>. Two
+            companion explainers go wider than Tapeline: whether{" "}
+            <Link href="/do-stock-screeners-work" className="link">
+              stock screeners actually work
+            </Link>{" "}
+            and how to judge one, and what a real{" "}
+            <Link href="/stock-screener-track-record" className="link">
+              stock screener track record
+            </Link>{" "}
+            has to contain.
           </p>
         </div>
       </section>
@@ -341,8 +350,8 @@ export default function VerifyPage() {
             See the record before you sign up.
           </h2>
           <p className="mt-3 text-muted">
-            The scorecard is public and the raw data is a click away. Then try the
-            live scanner free — no card.
+            The scorecard is public and the raw data is a click away &mdash; no account
+            for either. The live scanner is the part that takes a card.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/scorecard" className="btn-primary">

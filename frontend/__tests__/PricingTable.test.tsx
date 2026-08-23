@@ -1,6 +1,6 @@
 /**
- * PricingTable should render the three plans (Free / Pro / Premium) at the
- * canonical price points. If this test fails, pricing copy has drifted from
+ * PricingTable should render the plan columns at the canonical price points.
+ * If this test fails, pricing copy has drifted from
  * `backend/app/services/tier.py` — sync them before shipping.
  *
  * Annual-default suite (founder decision 2026-07-18): the default render is
@@ -8,23 +8,37 @@
  * annual per-month figure; monthly is one toggle click away; and the plan
  * cards + ComparisonTable header share one toggle state so they can never
  * show different billing periods on the same screen.
+ *
+ * CARD GATE (2026-08-22). The $0 column used to be a "Free" plan card with a
+ * "Start free" button into /signup and a footnote promising a card-free
+ * signup. A new account now adds a card at first sign-in
+ * (`services/tier.must_add_card`), so a self-serve free tier is no longer on
+ * offer and selling one here would be the most expensive false claim on the
+ * site. The $0 column is now the PUBLIC RECORD — genuinely free, genuinely
+ * account-free — and the suite below pins that contract in both directions:
+ * the public-record column must be there, and no card-free ACCOUNT may be
+ * advertised anywhere on this component.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
-import { PRICING, FREE_LIMITS, REFUND, usd, billedAnnuallyNote } from "@/lib/pricing";
+import { PRICING, REFUND, usd, billedAnnuallyNote } from "@/lib/pricing";
 
 /** Escape a literal string for use inside a RegExp ("$8.25 (…)" etc.). */
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 describe("PricingTable", () => {
-  it("renders Free, Pro, and Premium plans", () => {
+  it("renders the public-record, Pro, and Premium columns", () => {
     render(<PricingTable />);
-    expect(screen.getByRole("heading", { name: "Free" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /public record/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Premium" })).toBeInTheDocument();
+    // The $0 column is no longer a signup destination: its CTA goes to the
+    // public record, not to /signup.
+    const free = screen.getByRole("link", { name: /read the record/i });
+    expect(free).toHaveAttribute("href", "/scorecard");
   });
 
   it("defaults to ANNUAL with the billed-annually qualifier and real totals", () => {
@@ -77,13 +91,20 @@ describe("PricingTable", () => {
     expect(screen.getByText(/sales@tapeline\.io/i)).toBeInTheDocument();
   });
 
-  it("advertises the no-card trial as a mechanism, not just a label", () => {
-    // The two genuinely-true risk reversals are stated as mechanisms — WHY
-    // the reader is safe, not merely that they are. "No card" only reassures
-    // if it's clear that nothing can be auto-charged.
+  it("states the card-required trial as a mechanism, not just a label", () => {
+    // The trial takes a card, so the disclosure has to say WHAT is charged
+    // and WHEN — $0 today, first charge on day 14 — plus a real, unpunished
+    // way out. A vague "free trial" label here would be the exact failure
+    // this test exists to catch.
     render(<PricingTable />);
-    expect(screen.getByText(/14 days of Premium, no card/i)).toBeInTheDocument();
-    expect(screen.getByText(/nothing can auto-renew/i)).toBeInTheDocument();
+    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
+    expect(screen.getByText(/card at first sign-in/i)).toBeInTheDocument();
+    expect(screen.getByText(/day 14, at the plan and billing period you picked/i)).toBeInTheDocument();
+    // The way out is a link to the free public record, not a dead sentence.
+    expect(screen.getByRole("link", { name: /public record/i })).toHaveAttribute(
+      "href",
+      "/scorecard",
+    );
   });
 
   it("advertises one-click cancel with no survey gate", () => {
@@ -92,32 +113,37 @@ describe("PricingTable", () => {
     expect(screen.getByText(/No survey to complete/i)).toBeInTheDocument();
   });
 
-  it("sells the Free tier the backend actually enforces (FREE_LIMITS)", () => {
-    // Post-#343 retune: 12 look-ups/day (24h grace), 5-ticker watchlist,
-    // top-10 rows, squeeze top-3 preview, 2 web-push alerts. The card must
-    // derive from FREE_LIMITS — a failure here means the marketing copy has
-    // drifted from backend/app/services/tier.py again.
+  it("sells the public record — the surface that is genuinely free and account-free", () => {
+    // Everything listed in the $0 column has to be reachable with no account:
+    // the daily Top 10, the scorecard, the per-ticker pages, the raw exports
+    // and the published formula. If a line here ever needs a login, it does
+    // not belong in this column.
     render(<PricingTable />);
-    expect(
-      screen.getByText(
-        new RegExp(`${FREE_LIMITS.dailyLookups} ticker look-ups per day`, "i"),
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`unmetered your first ${FREE_LIMITS.firstSessionGraceHours}h`, "i")),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`Top-${FREE_LIMITS.scannerRows} scanner rows`, "i")),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`Watchlist \\(${FREE_LIMITS.watchlistTickers} tickers\\)`, "i")),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`, "i")),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`${FREE_LIMITS.webPushAlerts} browser push alerts`, "i")),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/open to everyone — no account/i)).toBeInTheDocument();
+    expect(screen.getByText(/the daily top 10, live/i)).toBeInTheDocument();
+    expect(screen.getByText(/full scorecard/i)).toBeInTheDocument();
+    expect(screen.getByText(/raw record as CSV and JSON/i)).toBeInTheDocument();
+    expect(screen.getByText(/no account, no card, no email/i)).toBeInTheDocument();
+  });
+
+  it("never advertises a card-free ACCOUNT, and keeps the grandfather clause visible", () => {
+    // The regression this file exists to prevent from here on. Every one of
+    // these phrases was live on this component before the card gate and each
+    // is now false for a new user. The public record staying free is the
+    // claim that survives — it is asserted in the test above, not banned here.
+    const { container } = render(<PricingTable />);
+    const text = (container.textContent || "").toLowerCase();
+    for (const banned of [
+      "free forever",
+      "never asks for a card",
+      "start free",
+      "signing up asks for an email and a password",
+    ]) {
+      expect(text).not.toContain(banned);
+    }
+    // Grandfathered accounts must be told, on the pricing page, that the wall
+    // is not for them.
+    expect(text).toContain("before 22 august 2026");
   });
 
   it("states the refund guarantee from the REFUND single source of truth", () => {

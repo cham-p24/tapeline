@@ -52,6 +52,11 @@ function localeForCountry(country: string | undefined): string {
 }
 
 export function middleware(request: NextRequest) {
+  // Domain consolidation — legacy tapeline.app → canonical tapeline.io. Runs
+  // first so nothing else fires on the redirect hop.
+  const apexHandled = handleApexDomainRedirect(request);
+  if (apexHandled) return apexHandled;
+
   // Ticker route handling — three responsibilities (see handleTickerRoute):
   //   - Redirect bare /t and /t/ (no symbol) → 308 → /signals so the
   //     symbol-less root resolves instead of hard-404'ing
@@ -147,6 +152,43 @@ export const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
  */
 export const METADATA_ROUTE_RE =
   /^(opengraph-image|twitter-image|icon|apple-icon)(-[a-z0-9]+)?$/i;
+
+/**
+ * Canonical-host consolidation. The canonical host is bare `tapeline.io`.
+ * Non-canonical hosts must not serve a second indexable copy (that splits
+ * SEO/link equity):
+ *   - `www.tapeline.io` — resolves to the same Fly app and today returns a
+ *     200 duplicate; a canonical tag softens it, but a 308 is the proper fix.
+ *   - the legacy `tapeline.app` / `www.tapeline.app` domain.
+ * Any request that reaches the app on one of these is 308'd (permanent) to the
+ * same path on bare `tapeline.io`, query preserved. Returns null for the
+ * canonical host and everything else, so there is no redirect loop. Pure +
+ * exported so the decision is unit-tested without HTTP plumbing.
+ */
+export function apexRedirectTarget(
+  host: string | null,
+  pathname: string,
+  search: string,
+): string | null {
+  const h = (host ?? "").toLowerCase();
+  if (
+    h === "www.tapeline.io" ||
+    h === "tapeline.app" ||
+    h === "www.tapeline.app"
+  ) {
+    return `https://tapeline.io${pathname}${search}`;
+  }
+  return null;
+}
+
+function handleApexDomainRedirect(request: NextRequest): NextResponse | null {
+  const target = apexRedirectTarget(
+    request.headers.get("host"),
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+  );
+  return target ? NextResponse.redirect(new URL(target), 308) : null;
+}
 
 function handleTickerRoute(request: NextRequest): NextResponse | null {
   const pathname = request.nextUrl.pathname;

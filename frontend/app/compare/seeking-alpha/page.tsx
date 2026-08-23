@@ -40,13 +40,14 @@ const WINS: CompareRow[] = [
     competitor: "~$2,400/yr Pro · Alpha Picks adds another ~$499/yr",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Limited free preview; full Premium / Pro requires card upfront",
   },
   {
     label: "Plain-English Why on every row",
-    tapeline: "✓ Default sentence, every ticker, free tier included",
+    tapeline: "✓ Default sentence, every ticker — public ticker pages included",
     competitor: "Editorial articles where available; many tickers have only Quant grades, no human read",
   },
   {

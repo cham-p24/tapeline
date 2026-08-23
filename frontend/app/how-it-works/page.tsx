@@ -273,7 +273,7 @@ export default function HowItWorksPage() {
       {/* CTA */}
       <section className="section py-8 sm:py-10 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
-        <p className="mt-3 text-muted">14-day Premium trial. No credit card.</p>
+        <p className="mt-3 text-muted">14-day Premium trial &mdash; $0 today, cancel in one click.</p>
         <Link href="/signup" className="btn-primary mt-6 inline-flex h-11 px-6 text-base">
           Try Premium free &rarr;
         </Link>

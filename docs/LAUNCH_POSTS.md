@@ -1,5 +1,23 @@
 # Tapeline — Launch posts (compliant, ready to fire)
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 Corrected 2026-06-26 to the **locked positioning** (process + honesty + time-saving,
 **never performance**) and the **current product**. The prior version of this file was
 stale and non-compliant (it claimed "+0.4% above SPY", described the old 20-ticker/24h
@@ -13,8 +31,8 @@ free tier, and pitched the removed Quiver/13F feature) — all removed.
 - **Current facts:** ~2,500 US-listed tickers scored every minute · public 6-factor
   formula · one-sentence "why" per ticker · public scorecard freezes each daily top-10 and
   back-checks vs SPY, keeping the losing days · **Free forever:** live scores, top-10
-  scanner rows, 5 look-ups/day, 3-ticker watchlist, full public scorecard · 14-day Premium
-  trial, no card · **Pro** $9.99/mo ($8.25/mo annual) · **Premium** $19.99/mo
+  scanner rows, 5 look-ups/day, 3-ticker watchlist, full public scorecard, no card ever · 14-day Premium
+  trial, card required ($0 today, first charge day 14, one-click cancel) · **Pro** $9.99/mo ($8.25/mo annual) · **Premium** $19.99/mo
   ($16.58/mo annual, founding pricing — locked in for early subscribers) adds Congressional-trades feed, recent insider buys (SEC Form 4),
   unlimited Telegram + email alerts, public API. (No 13F/Quiver — removed.)
 
@@ -30,7 +48,7 @@ Tapeline publishes the whole tape: one 0–100 score on every US stock from a pu
 6-factor formula, and a scorecard that freezes every daily top-10 and grades it against
 the S&P — losing days kept on the page.
 
-14-day trial, no card. tapeline.io
+Free tier, no card. 14-day Premium trial takes one — $0 today, one click to cancel. tapeline.io
 ```
 
 **Variant B — origin:**
@@ -69,8 +87,9 @@ trusting a screenshot.
 It is NOT a tip service — no buy/sell calls. It's a fast, transparent screen; you see how
 each score is built and decide for yourself.
 
-Free tier is usable forever (live scores, top-10, 5 look-ups/day); 14-day Premium trial,
-no card. I'd love the methodology torn apart — what factor would you add or drop?
+Free tier is usable forever and needs no card (live scores, top-10, 5 look-ups/day); the
+14-day Premium trial does take one — $0 today, cancel in one click before day 14. I'd love
+the methodology torn apart — what factor would you add or drop?
 tapeline.io
 ```
 
@@ -119,7 +138,8 @@ Tapeline publishes both:
 Honest note: the record currently trails SPY, and it's all on the page. The product is the
 transparency and the time saved, not a promise of returns.
 
-Free forever tier (live scores, 5 look-ups/day); 14-day Premium trial, no card. AMA.
+Free forever tier, no card (live scores, 5 look-ups/day); 14-day Premium trial takes a card,
+charges $0 today, cancels in one click. AMA.
 Feedback I'd love: is /how-it-works clear, and would you share a /t/[ticker] page?
 ```
 
@@ -130,7 +150,7 @@ Feedback I'd love: is /how-it-works clear, and would you share a /t/[ticker] pag
 ```
 TL;DR: Tapeline scores every US ticker (~2,500) with a public 6-factor formula, writes a
 one-line why, and publishes a scorecard that back-checks each day's top-10 vs SPY — losses
-kept. tapeline.io · free forever tier · 14-day Premium trial, no card.
+kept. tapeline.io · free forever tier, no card · 14-day Premium trial, card required ($0 today).
 
 Every prosumer scanner I tried fails the same way: black-box score, no track record, and a
 free tier crippled to upgrade-trap you. So I built the opposite — public weights, a public
@@ -154,7 +174,7 @@ Subject: Tapeline is live (please beat it up)
 Tapeline is live at tapeline.io. The short version:
 · 6-factor score on every US ticker, one-sentence why per row
 · A public scorecard that keeps its losing days (honest: it currently trails SPY)
-· Free forever tier; 14-day Premium trial, no card
+· Free forever tier, no card; 14-day Premium trial takes one ($0 today, one-click cancel)
 
 Two things I'd love feedback on:
 1. /how-it-works — is the formula clear to a non-technical trader?

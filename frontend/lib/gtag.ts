@@ -44,7 +44,7 @@ export type TapelineEvent =
   | "sign_up_started"      // Signup form opened
   | "sign_up"              // Account created — primary lead conversion
   // Trial → paid funnel
-  | "start_trial"          // Card captured, trial begins
+  | "start_trial"          // 14-day Premium trial auto-starts at signup — NO card captured
   | "begin_checkout"       // Upgrade clicked — Stripe Checkout about to open
   | "subscribe"            // First paid charge — primary revenue conversion
   // Engagement signals
@@ -56,6 +56,14 @@ export type TapelineEvent =
   // "Sign-up" conversion and pollute paid ROAS).
   | "newsletter_signup"    // Email opt-in to the daily digest (NOT an account signup)
   | "first_ticker_added"   // First watchlist add of the session
+  | "alert_armed"          // User enabled push AND a real alert rule was created
+  // The three below decompose "nobody has ever armed an alert" into its actual
+  // causes. Without them a zero is unreadable: it could mean the prompt never
+  // rendered (discoverability), the browser refused permission (capability), or
+  // people saw it and said no (value). Those have completely different fixes.
+  | "alert_prompt_shown"      // The arm-alerts card actually became visible
+  | "alert_prompt_suppressed" // The card deliberately did NOT render (reason: …)
+  | "alert_arm_failed"        // Arming was attempted and did not complete (reason: …)
   // Free→paid micro-funnel — GA4-only (never forwarded to Google Ads; these are
   // on-site conversion diagnostics, not acquisition conversions). Closes the
   // chain cap_hit → upgrade_prompt_shown → upgrade_prompt_clicked →
@@ -66,7 +74,58 @@ export type TapelineEvent =
   | "cap_hit"              // A free user was refused MORE of a metered cap (client-observed)
   | "gate_encountered"     // A free user met a tier feature gate (the Paywall lock rendered)
   | "upgrade_prompt_shown" // An upgrade prompt/paywall actually became visible
-  | "upgrade_prompt_clicked"; // The upgrade CTA on that prompt was clicked
+  | "upgrade_prompt_clicked" // The upgrade CTA on that prompt was clicked
+  // Content → conversion attribution — GA4-only (deliberately absent from
+  // ADS_CONVERSION_LABEL below; these are on-site navigation diagnostics, not
+  // acquisition conversions). RouteAnalytics already fires page_view on every
+  // marketing route, so we know WHICH content pages get read. What was missing
+  // is which of them push a reader onward: a click on the page's primary
+  // product-ward CTA. See trackContentCtaClick + components/ContentCtaLink.
+  | "content_cta_click"
+  // ---------------------------------------------------------------------
+  // Recovered funnel diagnostics — ALL GA4-only.
+  //
+  // These used to be fired through `track()` from @vercel/analytics, whose
+  // <Analytics /> component was gated on `NEXT_PUBLIC_VERCEL === "1"` in
+  // app/layout.tsx. That variable is not set anywhere in the repo and is not
+  // one of the vars Vercel injects (it ships VERCEL / VERCEL_ENV /
+  // NEXT_PUBLIC_VERCEL_ENV, never bare NEXT_PUBLIC_VERCEL), so the component
+  // never mounted in ANY environment and every one of these calls was a
+  // silent no-op. They now go to GA4, which is verifiably live.
+  //
+  // NONE of them appear in ADS_CONVERSION_LABEL below, and that is deliberate:
+  // several fire at the same instant as an event that ALREADY forwards a
+  // Google Ads conversion (trial_converted alongside `subscribe`), so giving
+  // any of them a label would double-count a single real conversion. They are
+  // on-site funnel diagnostics only. Events whose meaning was already covered
+  // by an existing GA4 event (checkout_started→begin_checkout,
+  // signup_started→sign_up_started, signup_completed→sign_up,
+  // trial_started→start_trial, newsletter_subscribed→newsletter_signup) were
+  // dropped outright rather than re-fired under a second name.
+  // ---------------------------------------------------------------------
+  | "pricing_page_viewed"        // A pricing surface was seen (surface: marketing | app)
+  | "signup_turnstile_blocked"   // Submit refused because Turnstile produced no token
+  | "onboarding_submitted"       // Onboarding questionnaire saved (or skipped)
+  | "scanner_first_use"          // First scanner open on this browser (activation, once)
+  | "checkout_cancelled"         // Returned from Stripe via the cancel_url
+  | "winback_landing"            // Landed on billing from the day-90 win-back email
+  | "trial_converted"            // Trial → paid, the funnel-side mirror of `subscribe`.
+                                 // NO value/currency and NO Ads label: `subscribe`
+                                 // remains the one and only revenue conversion.
+  | "trial_downgraded"           // Expired trial observed to have dropped to Free
+  | "trial_early_capture_shown"  // Mid-trial add-a-card nudge became visible
+  | "trial_early_capture_dismissed"
+  | "trial_early_capture_clicked"
+  | "trial_ended_modal_shown"    // Post-trial modal became visible
+  | "trial_ended_modal_dismissed"
+  | "trial_ended_modal_clicked"
+  // Cancel-intercept / save-offer flow (components/CancelInterceptModal.tsx)
+  | "cancel_intercept_shown"
+  | "save_offer_accepted"
+  | "subscription_paused"
+  | "subscription_resumed"
+  | "subscription_canceled"
+  | "cancel_survey_submitted";
 
 // Production Google Ads conversion tag (Jun-2026 search campaign). Env still
 // overrides; mirrors the hardcoded GA4 default in app/layout.tsx. The sign_up
@@ -337,4 +396,72 @@ export function trackUpgradePromptClicked(
     "upgrade_prompt_clicked",
     feature ? { surface, feature } : { surface },
   );
+}
+
+/**
+ * The top-of-funnel CONTENT surfaces — the marketing pages a stranger lands on
+ * from search or an answer engine, before any account exists. Deliberately a
+ * closed union of four families rather than a free-form page name: GA4
+ * segments on this, and an unbounded string turns the report into a long tail
+ * nobody reads.
+ */
+export type ContentSurface = "glossary" | "compare" | "strategy" | "embed";
+
+/**
+ * Where a content CTA points. Also a closed union — the four conversion-ward
+ * destinations plus `methodology`, which is the dominant product-ward link on
+ * the glossary term pages and would otherwise be invisible.
+ */
+export type ContentDestination =
+  | "signup"
+  | "scanner"
+  | "pricing"
+  | "scorecard"
+  | "methodology";
+
+/** Longest slug we will report. Caps the payload; nothing legitimate is near it. */
+const MAX_CONTENT_SLUG = 48;
+
+/**
+ * Normalise the page identity into a safe, low-cardinality token.
+ *
+ * PRIVACY (mirrors the signup_referrer_host / signup_landing_path precedent):
+ * everything after `?` or `#` is dropped, so a query string can never ride
+ * along; the charset is reduced to `[a-z0-9/-]` so an email address or any
+ * other free text cannot survive intact; and the result is length-capped.
+ * Callers pass an internal slug already, but the sanitiser is what makes that
+ * a guarantee rather than a convention.
+ */
+function contentSlug(raw: string): string {
+  const cleaned = raw
+    .split(/[?#]/)[0]
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9/-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, MAX_CONTENT_SLUG);
+  return cleaned || "unknown";
+}
+
+/**
+ * A reader clicked the primary product-ward CTA on a content page.
+ *
+ * This is the missing half of content attribution. Pageviews say a glossary
+ * term or a competitor comparison got read; this says it moved someone. Pair
+ * it with the first-touch landing path captured at signup to close the loop
+ * from "which page was read" to "which page produced an account".
+ *
+ * GA4-only, fire-and-forget, and PII-free by construction — the payload is
+ * three closed-vocabulary strings and nothing else.
+ */
+export function trackContentCtaClick(
+  surface: ContentSurface,
+  destination: ContentDestination,
+  slug: string,
+): boolean {
+  return trackEvent("content_cta_click", {
+    surface,
+    destination,
+    slug: contentSlug(slug),
+  });
 }

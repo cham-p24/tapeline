@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Tapeline — Stock Score & Track Record",
+  "version": "1.2.1",
+  "description": "Tapeline's six-factor score and track record for the stock you're viewing. Free account required. Sends only the ticker.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://api.tapeline.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tapeline"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://finance.yahoo.com/*",
+        "https://*.tradingview.com/*",
+        "https://www.google.com/finance/*",
+        "https://*.marketwatch.com/*",
+        "https://seekingalpha.com/*",
+        "https://stocktwits.com/*",
+        "https://finviz.com/*",
+        "https://*.barchart.com/*",
+        "https://www.cnbc.com/quotes/*",
+        "https://*.nasdaq.com/*",
+        "https://*.investing.com/*",
+        "https://*.zacks.com/*",
+        "https://*.morningstar.com/*",
+        "https://*.tipranks.com/*",
+        "https://stockanalysis.com/*",
+        "https://simplywall.st/*",
+        "https://*.stockcharts.com/*",
+        "https://*.benzinga.com/*",
+        "https://*.fool.com/*",
+        "https://*.wsj.com/market-data/*",
+        "https://*.reuters.com/markets/*"
+      ],
+      "js": [
+        "sites.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
+}

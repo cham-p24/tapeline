@@ -343,6 +343,61 @@ export const RULES = [
       /\b(?:name|id|label|placeholder|htmlFor|aria-label)\s*=\s*["'{][^"'}\n]{0,40}?(?:risk[-_\s]?tolerance|portfolio[-_\s]?size|net[-_\s]?worth|investable[-_\s]?assets|investment[-_\s]?(?:goals?|objectives?|horizon)|experience[-_\s]?level)/i,
     ],
   },
+  {
+    id: "financial-state-targeting",
+    brief:
+      "Rule 9 — never assert or imply knowledge of the reader's financial situation",
+    message:
+      "Second-person financial-state copy (\"if your returns disappoint\", " +
+      "\"struggling with debt?\") asserts something about the reader's money. " +
+      "Qualify by WORKFLOW instead — \"if you screen 500 tickers by hand every " +
+      "weekend\" targets the same person and is compliant.",
+    /*
+     * Why this is its own rule, and not a widening of 7 or 8.
+     *
+     * Rule 7 polices telling a KNOWN user how THEIR actual holdings moved —
+     * an in-product personalisation hazard. Rule 8 polices COLLECTING
+     * suitability inputs. This rule polices a third thing that both miss:
+     * ACQUISITION copy, addressed to a stranger, that claims to know their
+     * financial position. Nothing is collected and no holding is reported, so
+     * neither existing rule fires — yet this is the class that actually gets
+     * finance ads rejected, and the class that reads most like advice.
+     *
+     * It is the #1 documented Meta finance rejection trigger (their "personal
+     * attributes" standard) — see docs/META_SAAS_ADS_PLAYBOOK.md §4.2 and
+     * docs/PAID_ADS_METRICS_BIBLE.md §7.3, which flagged the gap. Ad copy is
+     * the highest-risk surface for it AND the least protected: CI's include
+     * globs do not cover docs/**, so the copy banks are hand-linted only.
+     *
+     * FALSE-POSITIVE BOUNDARY, deliberately drawn tight. "your" plus a money
+     * word is NOT enough — the tree is full of legitimate second person:
+     *   - "your watchlist", "your account", "your trial", "your card"
+     *   - "It never tells you what to do" · "You still make every decision"
+     *   - Rule 8's own required sentence: "whether to act depends on your
+     *     portfolio, risk tolerance and time horizon — things Tapeline does
+     *     not know about you"
+     * So every pattern below needs a financial-state noun AND a
+     * deficiency/desire cue. Describing what the reader DOES (screening,
+     * scanning, reviewing) is always fine; describing what they HAVE, or
+     * lack, is not.
+     */
+    patterns: [
+      // "your returns disappoint", "your portfolio is underperforming"
+      /\byour\s+(?:returns?|portfolio|savings|investments?|gains?|profits?|losses?|balance|nest\s+egg)\b[^.?!<>\n]{0,32}?\b(?:disappoint\w*|underperform\w*|lagging|lag|shrink\w*|dwindl\w*|stuck|flat|suffering|bleeding|losing|too\s+small|not\s+enough)\b/i,
+      // "struggling with debt", "tired of losing money", "sick of bad trades".
+      // The optional gerund slot is what catches "tired of LOSING money" —
+      // the state noun is not always adjacent to the preposition.
+      /\b(?:struggl\w+|worried|frustrated|tired|sick|fed\s+up|anxious)\s+(?:with|about|of)\s+(?:your\s+)?(?:\w+ing\s+)?(?:debt|savings|returns?|portfolio|losses|investments?|money|trades?|trading\s+results?)\b/i,
+      // "want to grow your savings", "ready to double your money"
+      /\b(?:want|ready|looking|hoping)\s+to\s+(?:grow|boost|double|triple|increase|improve|maximi[sz]e|build)\s+(?:your\s+)?(?:savings|returns?|portfolio|wealth|money|investments?|gains?|nest\s+egg)\b/i,
+      // "are you losing money?", "is your portfolio down?"
+      /\b(?:are|is)\s+(?:you|your\s+(?:portfolio|returns?|investments?|savings|trades?))\b[^.?<>\n]{0,28}?\b(?:losing|down|underperform\w*|behind|struggling|in\s+the\s+red)\b/i,
+      // "not seeing the returns you want"
+      /\bnot\s+(?:seeing|getting|making|earning)\s+the\s+(?:returns?|gains?|profits?|results?)\b/i,
+      // "if your trades keep losing" / "when your picks go wrong"
+      /\b(?:if|when|because)\s+your\s+(?:trades?|picks?|positions?|investments?|portfolio)\b[^.?!<>\n]{0,28}?\b(?:keep\s+)?(?:los\w+|fail\w*|go\s+wrong|tank\w*|crash\w*)\b/i,
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------ *

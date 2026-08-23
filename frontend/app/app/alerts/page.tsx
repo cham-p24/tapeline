@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { api, type AlertEvent, type AlertRule, TierGateError, errorMessage } from "@/lib/api";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { api, type AlertEvent, type AlertRule, type SearchResult, TierGateError, errorMessage } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
+import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/Skeleton";
 import { getWebPushStatus, subscribeToWebPush } from "@/lib/webPush";
+import { trackEvent } from "@/lib/gtag";
 
 type RuleType = AlertRule["rule_type"];
 type Channel = AlertRule["channel"];
 
 const CHANNEL_HUMAN: Record<Channel, string> = {
   email: "Email alerts",
-  telegram: "Telegram alerts",
   web_push: "Web-push alerts",
 };
 
@@ -40,16 +42,42 @@ const RULE_TYPES: { value: RuleType; label: string; needsSymbol: boolean; needsT
   { value: "congress", label: "Congress trade disclosed", needsSymbol: true,  needsThreshold: false, help: "Fires when a politician discloses a trade on this ticker. Premium." },
 ];
 
+// How many tickers the picker offers. Enough to cover the names a user
+// actually watches without turning the create form into a second table.
+const TICKER_SUGGESTIONS = 8;
+
+// Outer page wraps the form in Suspense so useSearchParams() (used for the
+// ?symbol=/?type= pre-arm) doesn't break static prerender — same pattern the
+// signup page uses.
 export default function AlertsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AlertsPageInner />
+    </Suspense>
+  );
+}
+
+function AlertsPageInner() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [ruleType, setRuleType] = useState<RuleType>("score");
-  const [symbol, setSymbol] = useState("");
+  // Pre-arm from context: a deep link like /app/alerts?symbol=NVDA&type=news
+  // (e.g. from a ticker page) drops the user onto this form already filled in.
+  // Read once for the INITIAL state only — later edits are the user's, so this
+  // must not fight their typing. `?type=` is guarded against the RULE_TYPES
+  // whitelist so a junk value can't wedge the form into an unknown rule.
+  const [ruleType, setRuleType] = useState<RuleType>(() => {
+    const t = searchParams.get("type");
+    return t && RULE_TYPES.some((r) => r.value === t) ? (t as RuleType) : "score";
+  });
+  const [symbol, setSymbol] = useState(() =>
+    (searchParams.get("symbol") ?? "").toUpperCase(),
+  );
   const [threshold, setThreshold] = useState<number>(70);
   // null = user hasn't touched the channel select yet → default by tier
   // below. Free users default to web_push (the ONE channel they can actually
@@ -64,6 +92,19 @@ export default function AlertsPage() {
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushResult, setPushResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  // Ticker picker options + where they came from. The field used to be a bare
+  // free-text box, so arming an alert started from a blank screen and nobody
+  // ever finished. Suggestions are the user's OWN watched names first; an
+  // empty watchlist falls back to the current top-scored tickers.
+  const [tickerOptions, setTickerOptions] = useState<string[]>([]);
+  const [tickerSource, setTickerSource] = useState<"watchlist" | "top_scored" | null>(null);
+  // Live typeahead results from the full-universe search (api.search) — the
+  // same endpoint the ⌘K palette and public search box use. Lets the user find
+  // ANY ticker by symbol or name, not just the watchlist/top-scored shortlist
+  // in the pills below. `searchOpen` gates the dropdown so it doesn't linger
+  // after a pick or when the field is empty.
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const def = RULE_TYPES.find((r) => r.value === ruleType)!;
 
@@ -87,6 +128,63 @@ export default function AlertsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Fill the ticker picker. Same endpoints already in use elsewhere — the
+  // watchlist item feed (api.watchlist, as ArmAlerts and /app/watchlist call
+  // it) and, when that comes back empty, the score-sorted scanner feed the
+  // onboarding seeder uses. No new data path. Failures are silent: the field
+  // still accepts any symbol typed by hand.
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    (async () => {
+      try {
+        const wl = await api.watchlist(null);
+        const syms = (wl.items ?? []).map((i) => i.symbol).filter(Boolean);
+        if (!alive) return;
+        if (syms.length > 0) {
+          setTickerOptions(syms.slice(0, TICKER_SUGGESTIONS));
+          setTickerSource("watchlist");
+          return;
+        }
+      } catch {
+        /* fall through to the top-scored fallback */
+      }
+      try {
+        const r = await api.scanner({ sort: "score", order: "desc", limit: TICKER_SUGGESTIONS });
+        const syms = (r.items ?? []).map((i) => i.symbol).filter(Boolean);
+        if (alive && syms.length > 0) {
+          setTickerOptions(syms.slice(0, TICKER_SUGGESTIONS));
+          setTickerSource("top_scored");
+        }
+      } catch {
+        /* no suggestions — the picker just falls back to free text */
+      }
+    })();
+    return () => { alive = false; };
+  }, [user]);
+
+  // Ticker typeahead. Debounced ~200ms so a burst of keystrokes fires one
+  // request, then api.search(q, 8) returns full-universe matches. Failures are
+  // silent — the field still accepts any symbol typed by hand (free-text
+  // fallback), which is why the create button only needs a non-empty symbol.
+  useEffect(() => {
+    const q = symbol.trim();
+    if (q.length < 1) {
+      setSearchResults([]);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.search(q, TICKER_SUGGESTIONS);
+        if (alive) setSearchResults(r.results ?? []);
+      } catch {
+        if (alive) setSearchResults([]);
+      }
+    }, 200);
+    return () => { alive = false; clearTimeout(t); };
+  }, [symbol]);
+
   async function create() {
     setCreating(true);
     setError(null);
@@ -99,6 +197,13 @@ export default function AlertsPage() {
         symbol: def.needsSymbol ? symbol.toUpperCase().trim() : null,
         threshold: def.needsThreshold ? threshold : null,
         channel: effectiveChannel,
+      });
+      // This page is the OTHER way an alert rule gets created, and it had no
+      // instrumentation at all — so `alert_armed` only ever described the
+      // ArmAlerts card, while the event name implied it covered both.
+      trackEvent("alert_armed", {
+        surface: "alerts_page",
+        symbol: def.needsSymbol ? symbol.toUpperCase().trim() : "any",
       });
       if (def.needsSymbol) setSymbol("");
       // A web-push rule can only deliver once THIS browser has granted
@@ -131,13 +236,21 @@ export default function AlertsPage() {
   async function enablePush() {
     setPushBusy(true);
     setPushResult(null);
-    const r = await subscribeToWebPush();
-    setPushResult(
-      r.ok
-        ? { ok: true, msg: "Browser notifications enabled — your web-push alerts will land here." }
-        : { ok: false, msg: r.reason },
-    );
-    setPushBusy(false);
+    try {
+      const r = await subscribeToWebPush();
+      setPushResult(
+        r.ok
+          ? { ok: true, msg: "Browser notifications enabled — your web-push alerts will land here." }
+          : { ok: false, msg: r.reason },
+      );
+    } catch (e: unknown) {
+      // subscribeToWebPush can throw (e.g. the VAPID fetch body fails to parse,
+      // or handle401 redirects). Without this, pushBusy stuck on and the button
+      // read "Enabling…" forever with no surfaced error.
+      setPushResult({ ok: false, msg: errorMessage(e) });
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   async function remove(id: number) {
@@ -156,7 +269,7 @@ export default function AlertsPage() {
 
   const ruleTypeLabel = (t: RuleType) => RULE_TYPES.find((r) => r.value === t)?.label ?? t;
   const channelLabel = (c: Channel) =>
-    c === "telegram" ? "Telegram" : c === "web_push" ? "Web push" : "Email";
+    c === "web_push" ? "Web push" : "Email";
 
   const isPremium = user?.tier === "premium";
   const isPro = user?.tier === "pro" || isPremium;
@@ -166,7 +279,7 @@ export default function AlertsPage() {
   // actually feel an alert fire (activation lever). Kept in sync with the
   // backend single source of truth, tier.FREE_WEB_PUSH_ALERTS — if you tune
   // that constant, mirror it here. web_push is the ONLY channel free users can
-  // create; email/telegram stay paid, so their (Pro)/(Premium) tags remain.
+  // create; email stays paid, so its (Pro) tag remains.
   const FREE_WEB_PUSH_ALERTS = 2;
   const webPushRulesUsed = rules.filter((r) => r.channel === "web_push").length;
   const freeWebPushRemaining = Math.max(0, FREE_WEB_PUSH_ALERTS - webPushRulesUsed);
@@ -178,17 +291,17 @@ export default function AlertsPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Alert rules</h1>
-          <p className="mt-1 text-sm text-muted">
+      <PageHeader
+        title="Alert rules"
+        subtitle={
+          <>
             Get notified when scores, setups, or regimes change.{" "}
             {isFree
-              ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro; Telegram on Premium.`
-              : "Email + Web push on Pro; Telegram on Premium."}
-          </p>
-        </div>
-      </div>
+              ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro.`
+              : "Email + Web push on Pro."}
+          </>
+        }
+      />
 
       {/* Free "alert taste" hint — free users get a couple of real web-push
           alerts so they feel one fire, then a soft upgrade wall. Only shown to
@@ -201,18 +314,18 @@ export default function AlertsPage() {
               : `You've used all ${FREE_WEB_PUSH_ALERTS} free web-push alerts`}
           </span>{" "}
           <span className="text-muted">
-            — upgrade for 10 alerts/day plus Telegram.{" "}
+            — upgrade for 10 alerts/day.{" "}
             <Link href="/app/billing" className="link">See plans →</Link>
           </span>
         </div>
       )}
 
       {/* "Show don't hide" delivery channels — free users can only CREATE
-          web-push rules, but the Email and Telegram delivery channels stay
-          VISIBLE here as locked (never removed from view) so a free user setting
-          up a web-push alert can SEE that those channels exist on a paid plan.
-          This changes nothing a free user can actually create; it only surfaces
-          the locked value. Descriptive only — no urgency, no performance claims. */}
+          web-push rules, but the Email delivery channel stays VISIBLE here as
+          locked (never removed from view) so a free user setting up a web-push
+          alert can SEE that channel exists on a paid plan. This changes nothing
+          a free user can actually create; it only surfaces the locked value.
+          Descriptive only — no urgency, no performance claims. */}
       {isFree && (
         <div
           className="card mt-4 px-4 py-3 text-sm"
@@ -223,7 +336,7 @@ export default function AlertsPage() {
               Delivery channels
             </h2>
             <Link href="/app/billing?intent=pro" className="link text-xs">
-              Unlock email + Telegram delivery →
+              Unlock email delivery →
             </Link>
           </div>
           <ul className="mt-3 flex flex-wrap gap-2">
@@ -240,19 +353,9 @@ export default function AlertsPage() {
                 Pro
               </span>
             </li>
-            <li
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2.5 py-1 text-xs text-muted"
-              title="Telegram delivery is a Premium feature"
-            >
-              <span aria-hidden>🔒</span> Telegram
-              <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                Premium
-              </span>
-            </li>
           </ul>
           <p className="mt-2 text-xs text-muted">
-            Web-push alerts are included on Free. Email delivery is on Pro;
-            Telegram delivery is on Premium.
+            Web-push alerts are included on Free. Email delivery is on Pro.
           </p>
         </div>
       )}
@@ -286,24 +389,105 @@ export default function AlertsPage() {
               onChange={(e) => setChannel(e.target.value as Channel)}
               className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm"
             >
+              {/* Email delivery is Pro-gated. Tag it AND disable it for Free so
+                  a Free user can't select it and only discover the 403 after
+                  hitting Create — the gate is now visible at the point of choice. */}
               <option value="email">Email {isPro ? "" : "(Pro)"}</option>
               {/* web_push is now the free "taste" channel — free users can
                   create up to FREE_WEB_PUSH_ALERTS of these, so it carries a
                   "(free)" tag for them rather than "(Pro)". */}
               <option value="web_push">Web push {isFree ? "(free)" : ""}</option>
-              <option value="telegram">Telegram {isPremium ? "" : "(Premium)"}</option>
             </select>
           </div>
 
           {def.needsSymbol && (
-            <div>
-              <label className="block text-xs text-muted">Ticker</label>
+            <div className="relative">
+              <label htmlFor="alert-symbol" className="block text-xs text-muted">Ticker</label>
+              {/* Typeahead, not a blank box. Keystrokes hit api.search (the same
+                  full-universe search behind ⌘K), so the user can find ANY
+                  ticker by symbol or name; the dropdown below lists matches with
+                  their name + sector and one click sets the symbol. The field
+                  itself still takes any symbol typed by hand (free-text
+                  fallback), uppercased/trimmed on submit. */}
               <input
+                id="alert-symbol"
                 value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
+                onChange={(e) => {
+                  setSymbol(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                // Delay the close so a mousedown on a result still registers as
+                // a click before the dropdown unmounts.
+                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
                 placeholder="AAPL"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-controls="alert-symbol-results"
+                aria-expanded={searchOpen && searchResults.length > 0}
                 className="mt-1 w-full rounded-md bg-panel px-3 py-2 text-sm nums font-mono uppercase"
               />
+              {searchOpen && searchResults.length > 0 && (
+                <ul
+                  id="alert-symbol-results"
+                  role="listbox"
+                  aria-label="Ticker search results"
+                  className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-panel shadow-lg"
+                >
+                  {searchResults.map((r) => (
+                    <li key={r.symbol} role="option" aria-selected={symbol.trim().toUpperCase() === r.symbol}>
+                      <button
+                        type="button"
+                        // onMouseDown (not onClick) so the pick lands before the
+                        // input's onBlur closes the dropdown.
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSymbol(r.symbol);
+                          setSearchOpen(false);
+                        }}
+                        className="flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent/10"
+                      >
+                        <span className="font-mono font-medium">{r.symbol}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-muted">{r.name}</span>
+                        {r.sector && <span className="whitespace-nowrap text-xs text-subtle">{r.sector}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {tickerOptions.length > 0 && (
+                <>
+                  <div
+                    className="mt-2 flex flex-wrap items-center gap-1.5"
+                    role="group"
+                    aria-label="Suggested tickers"
+                  >
+                    {tickerOptions.map((s) => {
+                      const picked = symbol.trim().toUpperCase() === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setSymbol(s)}
+                          aria-pressed={picked}
+                          className={`rounded-full border px-3 py-1 text-xs font-mono transition-colors whitespace-nowrap ${
+                            picked
+                              ? "border-accent bg-accent/10 text-accent"
+                              : "border-border bg-panel hover:border-accent/50 hover:text-accent"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-subtle">
+                    {tickerSource === "watchlist"
+                      ? "From your watchlist — or type any symbol."
+                      : "Top-scored right now — or type any symbol."}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -375,14 +559,14 @@ export default function AlertsPage() {
       </h2>
 
       {loading ? (
-        <div className="card overflow-hidden"><TableSkeleton cols={6} rows={4} /></div>
+        <div className="card overflow-x-auto"><TableSkeleton cols={6} rows={4} /></div>
       ) : rules.length === 0 ? (
         <div className="card p-6 text-sm text-muted">
           No alert rules yet. Create one above, or visit the{" "}
           <Link href="/app/scanner" className="link">scanner</Link> and tap an alert button on any ticker.
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs uppercase text-muted">
               <tr>
@@ -425,7 +609,7 @@ export default function AlertsPage() {
           <h2 className="mt-8 mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
             Recent fires
           </h2>
-          <div className="card overflow-hidden">
+          <div className="card overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase text-muted">
                 <tr>

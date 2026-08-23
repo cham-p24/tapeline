@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
 import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
@@ -91,8 +92,9 @@ const WINS = [
     competitor: "Late-2000s table UI, weak on phone",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Direct paid signup",
   },
 ];
@@ -164,7 +166,7 @@ export default function VsZacksPage() {
             until the very bottom, so a comparison-shopper who skimmed the
             intro and left never saw the offer. showPreview off: the
             comparison table below is the proof on compare pages. */}
-        <LandingCta from="compare" showPreview={false} secondaryLabel="See the scorecard first" />
+        <LandingCta from="compare" showPreview={false} primaryLabel="Start the 14-day Premium trial" secondaryLabel="See the scorecard first" />
       </section>
 
       <section className="mx-auto max-w-5xl px-6 pb-8">
@@ -222,14 +224,28 @@ export default function VsZacksPage() {
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=compare" className="btn-primary">
-            Try the live scanner free — no card →
-          </Link>
-          <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
+          <ContentCtaLink
+            href="/signup?from=compare"
+            className="btn-primary"
+            surface="compare"
+            destination="signup"
+            slug="zacks"
+          >
+            Start the 14-day Premium trial →
+          </ContentCtaLink>
+          <ContentCtaLink
+            href="/scorecard"
+            className="btn-ghost"
+            surface="compare"
+            destination="scorecard"
+            slug="zacks"
+          >
+            See the scorecard first
+          </ContentCtaLink>
         </div>
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.

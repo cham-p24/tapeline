@@ -29,7 +29,11 @@ import { metadata } from "@/app/scorecard/layout";
 const APP = path.resolve(__dirname, "..", "app", "scorecard");
 const read = (f: string) => readFileSync(path.join(APP, f), "utf8");
 
-const pageSource = read("page.tsx");
+// The page was split for AI-crawler SSR (server page.tsx + ScorecardClient.tsx
+// + CitableRecord.tsx). The Rule 3/4 invariants apply to the union of what
+// ships, so the body assertions run against the concatenation — a banned
+// construct in ANY of the three files still fails the build.
+const pageSource = read("page.tsx") + read("ScorecardClient.tsx") + read("CitableRecord.tsx");
 const ogSource = read("opengraph-image.tsx");
 
 /** Any percentage figure, e.g. "50.9%", "+0.064 %", "51%". */

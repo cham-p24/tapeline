@@ -15,11 +15,15 @@ import { notFound } from "next/navigation";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
+import { RelatedLinks } from "@/components/RelatedLinks";
+import { relatedForStrategy } from "@/lib/internalLinks";
 import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Render on-demand and cache for 1 hour (ISR). Matches the per-fetch
 // `revalidate: 3600` below (data rolls daily; hourly is plenty), and
@@ -50,6 +54,7 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
     // 1-hour cache so search-engine crawls don't hammer the API (or Vercel CPU).
     const res = await fetch(url, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the fetch so a degraded backend can't hang the on-demand render
       // (this page is ISR, not build-time — see generateStaticParams). On
       // timeout we fall through to the [] fallback and render fast; ISR refills
@@ -219,7 +224,7 @@ export default async function BestStocksForStrategyPage({
             The live ranking table right below is the product proof, so
             showPreview is off here. from="screener" message-matches the
             signup H1 for scanner-intent visitors. */}
-        <LandingCta from="screener" showPreview={false} />
+        <LandingCta from="screener" showPreview={false} primaryLabel="Start the 14-day Premium trial" />
 
         <section className="mt-10">
           {rows.length === 0 ? (
@@ -350,6 +355,20 @@ export default async function BestStocksForStrategyPage({
           </div>
         </section>
 
+        {/* Cross-cluster links — the factor pages this ranking's sort/filter
+            actually leans on, plus the sector rankings that overlap it. The
+            2026-08 audit found the strategy cluster linked only sideways (to
+            its own siblings) and downward (to feature pages); the methodology
+            and sector clusters were unreachable from here even though the
+            copy above names all six factors in bold. See lib/internalLinks.ts
+            for the edge list and why it is hand-picked rather than generated. */}
+        <RelatedLinks
+          heading={`What the ${s.display} ranking leans on`}
+          intro={`This list emphasises ${s.factorEmphasis}. Each factor page explains what that reading measures, how it is derived, and where it is weak.`}
+          links={relatedForStrategy(s.slug)}
+          ariaLabel="Factors and sectors behind this ranking"
+        />
+
         {/* Sister strategies — internal links spread crawl across the set */}
         <nav
           aria-label="Other trading-strategy rankings"
@@ -415,17 +434,31 @@ export default async function BestStocksForStrategyPage({
             Run this scan live + every other strategy.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Full
             ~2,500-ticker live universe, every sort/filter combination, watchlist + alerts.
           </p>
+          {/* Instrumented, not restyled — see components/ContentCtaLink.tsx.
+              Tells us which strategy listicles move a reader onward. */}
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/signup?from=screener" className="btn-primary">
-              Try the live scanner free — no card →
-            </Link>
-            <Link href="/scorecard" className="btn-ghost">
+            <ContentCtaLink
+              href="/signup?from=screener"
+              className="btn-primary"
+              surface="strategy"
+              destination="signup"
+              slug={s.slug}
+            >
+              Start the 14-day Premium trial →
+            </ContentCtaLink>
+            <ContentCtaLink
+              href="/scorecard"
+              className="btn-ghost"
+              surface="strategy"
+              destination="scorecard"
+              slug={s.slug}
+            >
               See the public scorecard
-            </Link>
+            </ContentCtaLink>
           </div>
         </section>
 

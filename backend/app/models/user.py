@@ -82,8 +82,30 @@ class User(Base):
     # Owner/operator flag. Set via seed script or DB update, never via signup.
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
 
-    # Trial state — auto-started on signup, downgrades to free at end if no card
+    # ── Trial state (card-required trial) ──────────────────────────────────
+    #
+    # Signup no longer grants a trial. The 14-day Premium trial now starts only
+    # when the user completes a Stripe Checkout that carries a card
+    # (subscription_data.trial_end — see routers/billing.py), and it is the
+    # `trialing` subscription webhook that writes both columns below
+    # (routers/webhooks.py). A user who declines the card simply stays FREE.
+    #
+    # `trial_ends_at` is the first-charge instant, copied from the SUBSCRIPTION's
+    # own trial_end so the in-app copy can state the true date rather than a
+    # locally-guessed one. It stays set after the trial finishes, which is why
+    # it cannot answer "have they ever trialled".
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # `trial_started_at` is stamped ONCE, the first time a trial actually
+    # begins, and never cleared. Null = never trialled. That is the whole point
+    # of the column: it separates "never had a trial" from "trial finished"
+    # (both of which a downgraded user shows as tier=free), and it is what gates
+    # the one-trial-per-account check in routers/billing.py. Legacy rows from
+    # the old no-card auto-trial are null here but non-null in `trial_ends_at`,
+    # so the gate checks BOTH and those users are correctly treated as having
+    # already used their trial.
+    trial_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
 
     # Referral program — a user's own sharable code + who referred them.
     # `referral_credit_months` accumulates 1-month-free credits earned via
@@ -184,6 +206,17 @@ class User(Base):
     lookups_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lookups_reset_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Public-API daily request quota, enforced PER ACCOUNT (not per key) — a
+    # user may mint up to tier.MAX_KEYS_PER_USER keys, but `api_requests_per_day`
+    # is a single per-account entitlement (the marketed "1,000 requests/day").
+    # `api_requests_today` is the running count for the UTC day named by
+    # `api_requests_reset_on` ("YYYY-MM-DD", matching ApiKey.requests_day); both
+    # roll over on the first call of a new day. Enforced atomically in
+    # app/services/api_keys.authenticate_api_key. (Per-key ApiKey.requests_today
+    # counters are kept for the /app/api-keys usage display only.)
+    api_requests_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    api_requests_reset_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
     # Per-user email preferences bitmask. See app.services.email_prefs for
     # the bit constants. Default 15 = all four suppressable categories on.
     # Transactional emails (welcome, payment-failed, referral) ignore this
@@ -232,6 +265,31 @@ class User(Base):
     signup_gclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_gbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_wbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # First-touch EXTERNAL referrer HOSTNAME captured at landing (frontend
+    # lib/utm.ts, same localStorage 30-day-TTL mechanism as signup_utm_*,
+    # forwarded on the signup POST; written once at signup, never updated).
+    # Exists because AI-assistant referrals (Copilot/ChatGPT/Perplexity)
+    # carry no utm_* params — document.referrer's host is the only trace, so
+    # without this column those signups land as "direct". Privacy: hostname
+    # ONLY, never path/query (an AI-chat referrer path can carry the user's
+    # prompt text). Nullable — direct traffic and internal navigation
+    # legitimately have no external referrer.
+    signup_referrer_host: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # First-touch LANDING PATH on our own site, captured at landing (frontend
+    # lib/utm.ts, same localStorage 30-day-TTL first-touch mechanism as
+    # signup_utm_*, forwarded on the signup POST; written once, never
+    # updated). The signup_utm_*/referrer_host columns above answer "which
+    # CHANNEL brought this user"; this one answers "which PAGE earned them".
+    # With ~4,750 published SEO URLs (ticker pages, /compare/*,
+    # /best-stocks-for/*, /sectors, /glossary/*), "organic brought 6 signups"
+    # is unactionable without it. Privacy: PATH ONLY — the query string and
+    # hash are stripped client-side and again in the signup route (they can
+    # carry search terms or identifiers, and they wreck aggregation
+    # cardinality). Normalised lowercase, no trailing slash. Nullable —
+    # pre-existing rows and any client that doesn't forward it stay NULL.
+    signup_landing_path: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Set ONCE by the offline-conversion upload job
     # (app.scripts.upload_google_ads_conversions) the first time this

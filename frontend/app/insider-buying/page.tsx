@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 export const revalidate = 3600;
 
@@ -40,6 +41,7 @@ async function fetchInsiderBuys(): Promise<{ items: InsiderRow[]; live: boolean 
   try {
     const res = await fetch(`${API_BASE}/api/public/insider-buys?limit=10`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to SHOWCASE below.
@@ -129,7 +131,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "Can I get alerts when an insider buys a specific ticker?",
-          a: "Yes, on Premium. Add the ticker to your watchlist and create an alert rule for insider transactions on that symbol; you get an email or Telegram message the day the Form 4 hits EDGAR.",
+          a: "Yes, on Premium. Add the ticker to your watchlist and create an alert rule for insider transactions on that symbol; you get an email the day the Form 4 hits EDGAR.",
         },
         {
           q: "How often does the feed update?",
@@ -137,7 +139,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Recent insider buys is a Premium feature ($16.58/mo billed annually, or $19.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades and unlimited Telegram alerts on top of everything in Pro.",
+          a: "Recent insider buys is a Premium feature ($16.58/mo billed annually, or $19.99/mo monthly). The 14-day Premium trial includes it. Premium adds Congressional trades on top of everything in Pro.",
         },
       ]}
       tier="premium"

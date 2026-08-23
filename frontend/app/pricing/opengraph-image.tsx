@@ -69,17 +69,22 @@ export default async function OG() {
             Live scanner. Public scorecard.
           </div>
           <div style={{ fontSize: "30px", color: "#a1a1aa", lineHeight: 1.4, display: "flex" }}>
-            Three tiers. 14-day Premium trial. No credit card. Prices in USD.
+            Public record free, no account. 14-day Premium trial, card required. Prices in USD.
           </div>
         </div>
 
         {/* Pricing tiles */}
         <div style={{ marginTop: "auto", display: "flex", gap: "20px" }}>
+          {/* 2026-08-22 card gate: this tile used to advertise a signed-in
+              "Free forever" tier (and with stale limits — 5 look-ups/day, when
+              the enforced number was 12). A new account takes a card, so the
+              $0 tile now shows the thing that is genuinely $0 and account-free:
+              the published record. */}
           <Tile
-            tier="Free"
+            tier="Public record"
             price="$0"
-            sub="forever"
-            note="Live scores · top-10 scanner · 5 look-ups/day"
+            sub="no account"
+            note="Daily Top 10 · full scorecard · CSV + JSON"
           />
           <Tile
             tier="Pro"
@@ -92,7 +97,7 @@ export default async function OG() {
             tier="Premium"
             price="$16.58"
             sub="/mo annual"
-            note="+ Congress · Insider · API · Telegram"
+            note="+ Congress · Insider · API"
             highlight
           />
         </div>

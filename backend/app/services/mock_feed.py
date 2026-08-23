@@ -209,6 +209,10 @@ def fetch_snapshots(
             "change_pct_5d": round(random.gauss(0, 3.0), 2),
             "change_pct_1m": round(random.gauss(2, 6.0), 2),
             "volume": int(random.uniform(500_000, 50_000_000)),
+            # No real market-cap source on the mock path — real cap is threaded
+            # in by polygon_feed from the Finnhub profile cache. Null here renders
+            # as an em-dash in the scanner.
+            "market_cap": None,
             "sub_trend": round(sub_trend, 1),
             "sub_rs": round(sub_rs, 1),
             "sub_fundamentals": round(sub_fund, 1),

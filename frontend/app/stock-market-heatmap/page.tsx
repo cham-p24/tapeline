@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 export const revalidate = 3600;
 
@@ -39,6 +40,7 @@ async function fetchHeatmap(): Promise<{ sectors: SectorTile[]; live: boolean }>
   try {
     const res = await fetch(`${API_BASE}/api/public/heatmap`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to SHOWCASE_SECTORS below.
@@ -137,7 +139,7 @@ export default async function StockMarketHeatmapPage() {
         },
         {
           q: "What tier do I need?",
-          a: "Stock market heatmap is a Pro feature ($8.25/mo billed annually, or $9.99/mo monthly). The 14-day Premium trial includes everything in Pro. Premium adds Congressional trades, recent insider buys, and unlimited Telegram alerts.",
+          a: "Stock market heatmap is a Pro feature ($8.25/mo billed annually, or $9.99/mo monthly). The 14-day Premium trial includes everything in Pro. Premium adds Congressional trades and recent insider buys.",
         },
       ]}
       tier="pro"

@@ -1,15 +1,14 @@
-"""Telegram delivery — per-user watchlist digests + hourly market pulses."""
+"""Telegram delivery — the Bot API primitives plus the real-time founder
+alerts (which fall back to email when Telegram is unset) and the inbox
+Approve/Reject card helpers."""
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 
 import httpx
-from sqlalchemy import desc, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models import RegimeState, Ticker, User, WatchlistItem
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -52,6 +51,47 @@ async def send_message(
     return True
 
 
+async def deliver_founder_alert(*, subject: str, text: str) -> None:
+    """Push a founder alert down whichever channel is actually configured.
+
+    Telegram is instant and preferred, but it needs
+    `INBOX_FOUNDER_TELEGRAM_CHAT_ID`, which is not always set — and when it
+    isn't, an alert that only knows how to reach Telegram is a silent no-op.
+    Resend is configured wherever the app can send mail at all, so it is the
+    fallback: the founder learns about a signup or a sale without having to
+    provision anything first.
+
+    Exactly ONE channel fires, so setting the chat id later swaps the delivery
+    route rather than doubling every notification. NEVER raises — a failed
+    notification must not fail the signup or the webhook that triggered it.
+    """
+    chat_id = getattr(settings, "inbox_founder_telegram_chat_id", "")
+    if chat_id and settings.telegram_bot_token:
+        try:
+            # parse_mode="" => plain text, so emails with _ / * survive intact.
+            await send_message(chat_id, text, parse_mode="")
+            return
+        except Exception:
+            logger.exception("telegram.founder_alert_failed subject=%s", subject)
+            return
+    try:
+        from html import escape
+
+        from app.services.email import send_email
+
+        recipient = getattr(settings, "growth_digest_to", "") or "tapeline.inbox@gmail.com"
+        body = escape(text).replace("\n", "<br>")
+        await send_email(
+            to=recipient,
+            subject=subject,
+            html=f'<div style="font:15px/1.6 ui-monospace,SFMono-Regular,monospace">{body}</div>',
+            text=text,
+            persona="sales",
+        )
+    except Exception:
+        logger.exception("founder_alert.email_fallback_failed subject=%s", subject)
+
+
 async def notify_founder_new_signup(
     *,
     email: str,
@@ -59,29 +99,52 @@ async def notify_founder_new_signup(
     trial_ends_at: datetime | None,
     source: str,
 ) -> None:
-    """Real-time Telegram ping to the founder on every new signup.
+    """Real-time ping to the founder on every new signup.
 
     Without this, signups (and the live trials they start) land silently in the
     DB and the founder only finds out by manually querying — so a 14-day trial
-    can lapse unconverted before anyone reaches out. No-op when the founder
-    chat id / bot token isn't configured. NEVER raises — a notification failure
-    must not affect the signup itself.
+    can lapse unconverted before anyone reaches out.
     """
-    chat_id = settings.inbox_founder_telegram_chat_id
-    if not chat_id or not settings.telegram_bot_token:
-        return
-    try:
-        te = trial_ends_at.date().isoformat() if trial_ends_at else "no trial"
-        text = (
+    te = trial_ends_at.date().isoformat() if trial_ends_at else "no trial"
+    await deliver_founder_alert(
+        subject=f"New Tapeline signup — {email}",
+        text=(
             "🎉 New Tapeline signup\n"
             f"{email}\n"
             f"tier: {tier} · trial ends: {te}\n"
             f"via: {source}"
-        )
-        # parse_mode="" => plain text, so emails with _ / * don't break Markdown.
-        await send_message(chat_id, text, parse_mode="")
-    except Exception:
-        logger.exception("telegram.signup_alert_failed email=%s", email)
+        ),
+    )
+
+
+async def notify_founder_new_subscription(
+    *,
+    email: str,
+    tier: str,
+    billing_period: str | None,
+    amount: float | None,
+    currency: str | None,
+) -> None:
+    """Real-time ping to the founder when someone actually starts paying.
+
+    The counterpart to `notify_founder_new_signup` and the more important half:
+    a signup is a maybe, a subscription is revenue. Called from the Stripe
+    webhook on the same once-per-subscription branch that sends the customer
+    their welcome email, so it inherits that branch's de-duplication and can't
+    fire twice for one subscription.
+    """
+    price = ""
+    if amount is not None:
+        price = f" · {amount:.2f} {(currency or 'usd').upper()}"
+    period = f" ({billing_period})" if billing_period else ""
+    await deliver_founder_alert(
+        subject=f"💰 New Tapeline subscription — {email}",
+        text=(
+            "💰 New Tapeline subscription\n"
+            f"{email}\n"
+            f"tier: {tier}{period}{price}"
+        ),
+    )
 
 
 async def answer_callback_query(callback_query_id: str, text: str = "") -> bool:
@@ -163,67 +226,3 @@ async def edit_message_text(
             },
         )
         return r.status_code == 200
-
-
-async def render_watchlist_digest(session: AsyncSession, user: User) -> str:
-    """Render a Markdown digest of the user's watchlist + market context."""
-    # Fetch watchlist + current scores
-    result = await session.execute(
-        select(WatchlistItem, Ticker)
-        .outerjoin(Ticker, Ticker.symbol == WatchlistItem.symbol)
-        .where(WatchlistItem.user_id == user.id)
-        .order_by(desc(WatchlistItem.added_at))
-    )
-    items = result.all()
-
-    # Regime for context
-    regime_r = await session.execute(select(RegimeState).where(RegimeState.id == 1))
-    regime = regime_r.scalar_one_or_none()
-
-    ts = datetime.now(UTC).strftime("%H:%M UTC · %b %d")
-    lines = [f"*Tapeline hourly update* — {ts}"]
-
-    if regime:
-        emoji = {"BULL": "🟢", "NEUTRAL": "🔵", "CAUTIOUS": "🟡", "BEAR": "🔴"}.get(regime.regime, "•")
-        lines.append(f"\n{emoji} Market regime: *{regime.regime}* · VIX {regime.vix:.1f} · 10Y {regime.yield_10y:.2f}%")
-
-    if not items:
-        lines.append("\n_Your watchlist is empty. Add tickers at tapeline.io/app/watchlist_")
-    else:
-        lines.append(f"\n*Your {len(items)} watchlist:*")
-        for w, t in items[:20]:
-            if t is None or t.score is None:
-                lines.append(f"`{w.symbol:<6}` — no data")
-                continue
-            delta = (t.score - w.baseline_score) if w.baseline_score is not None else 0
-            delta_str = f"Δ{delta:+.1f}" if w.baseline_score is not None else ""
-            pct = t.change_pct_1d if t.change_pct_1d is not None else 0
-            arrow = "▲" if pct > 0 else "▼" if pct < 0 else "·"
-            lines.append(
-                f"`{w.symbol:<6}` {arrow} {pct:+5.2f}%  *{t.score:5.1f}* {delta_str}  _{t.signal or '-'}_"
-            )
-
-    lines.append("\n_Not investment advice. For informational purposes only._")
-    return "\n".join(lines)
-
-
-async def run_hourly_digest(session: AsyncSession) -> int:
-    """Send a digest to every premium user with a telegram_chat_id."""
-    result = await session.execute(
-        select(User).where(
-            User.telegram_chat_id.isnot(None),
-            User.tier == "premium",
-        )
-    )
-    users = result.scalars().all()
-    sent = 0
-    for user in users:
-        try:
-            body = await render_watchlist_digest(session, user)
-            ok = await send_message(user.telegram_chat_id, body)
-            if ok:
-                sent += 1
-        except Exception:
-            logger.exception("telegram.digest_failed user=%s", user.id)
-    logger.info("telegram.hourly_digest sent=%d/%d", sent, len(users))
-    return sent

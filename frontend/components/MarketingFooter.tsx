@@ -37,12 +37,20 @@ export function MarketingFooter() {
             <FooterLink href="/how-it-works">How it works</FooterLink>
             <FooterLink href="/pricing">Pricing</FooterLink>
             <FooterLink href="/scorecard">Public scorecard</FooterLink>
+            <FooterLink href="/daily-picks">Daily picks (no account)</FooterLink>
             <FooterLink href="/verify">Verify the record</FooterLink>
+            <FooterLink href="/transparent-stock-screener">Transparent screener</FooterLink>
+            <FooterLink href="/stock-screener-track-record">Screener track record</FooterLink>
+            <FooterLink href="/do-stock-screeners-work">Do screeners work?</FooterLink>
+            <FooterLink href="/mcp">AI assistant (MCP)</FooterLink>
             <FooterLink href="/signals">All signals</FooterLink>
             <FooterLink href="/sectors">Sectors</FooterLink>
             <FooterLink href="/stocks">Stock directory</FooterLink>
             <FooterLink href="/developers">API for developers</FooterLink>
+            <FooterLink href="/glossary">Glossary</FooterLink>
+            <FooterLink href="/embed">Embed a score badge</FooterLink>
             <FooterLink href="/blog">Blog</FooterLink>
+            <FooterLink href="/whats-new">What&rsquo;s new</FooterLink>
             <FooterLink href="/changelog">Changelog</FooterLink>
           </FooterCol>
 
@@ -52,7 +60,7 @@ export function MarketingFooter() {
             <FooterLink href="/compare/trade-ideas">vs Trade Ideas</FooterLink>
             <FooterLink href="/compare/zacks">vs Zacks</FooterLink>
             <FooterLink href="/compare/tipranks">vs Tipranks</FooterLink>
-            <FooterLink href="/best-stock-scanners">All comparisons</FooterLink>
+            <FooterLink href="/compare">All comparisons</FooterLink>
           </FooterCol>
 
           <FooterCol title="Company">
@@ -60,6 +68,7 @@ export function MarketingFooter() {
             <FooterLink href="/contact">Contact</FooterLink>
             <FooterLink href="https://x.com/tapeline_io">X · @tapeline_io</FooterLink>
             <FooterLink href="/status">Status</FooterLink>
+            <FooterLink href="/security">Security</FooterLink>
             <FooterLink href="/legal/terms">Terms</FooterLink>
             <FooterLink href="/legal/privacy">Privacy</FooterLink>
             <FooterLink href="/legal/risk">Risk disclosure</FooterLink>

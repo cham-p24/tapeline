@@ -23,6 +23,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Number of rows shown to anonymous visitors before the signup gate.
 // Big enough to demonstrate the product (top 10 = clear ranking with
@@ -75,6 +76,7 @@ async function fetchSignals(): Promise<SignalsResponse | null> {
   try {
     const res = await fetch(`${API_BASE}/api/public/signals?limit=2000`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Abort a hung/slow API so static export never blows Next's 60s
       // per-page budget. A hang is NOT caught by the try/catch (only a
       // thrown error is) — the timeout turns it into a catchable
@@ -311,8 +313,8 @@ export default async function SignalsPage() {
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
                 You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
-                Your free account includes a 14-day Premium trial — the full live universe,
-                no card, same public 6-factor formula on every row.
+                An account starts a 14-day Premium trial — the full live universe, same
+                public 6-factor formula on every row. $0 today, cancel in one click.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">

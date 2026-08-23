@@ -1,0 +1,6 @@
+# Files excluded from the Web Store package.
+# Google's own guidance: less code in the zip = less review surface = faster
+# review. These are development artefacts with no runtime role.
+test-detection.js
+icons/make-icons.js
+.storeignore

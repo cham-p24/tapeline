@@ -26,7 +26,13 @@ from app.db import session_scope
 from app.main import app
 from app.models import User
 from app.routers.me import _upgrade_nudge
-from app.services.tier import Tier, limit
+from app.services.tier import (
+    TIER_LIMITS,
+    Tier,
+    free_open_access,
+    free_watchlist_cap,
+    limit,
+)
 
 _AUTH = {"Authorization": "Bearer dev-bypass"}
 
@@ -43,12 +49,16 @@ def test_nudge_free_carries_tier_caps():
     assert nudge["watchlist_cap"] == limit(Tier.FREE, "watchlist_tickers")
     # Sanity-check the actual canonical Free values. Post-freemium-retune
     # (2026-06-20): Free is LIVE (delayed_hours 0, was 24), scanner top-10
-    # (was 20). Watchlist raised to 5 (2026-07-12) to break the day-1 seed
-    # deadlock. Conversion now comes from the row cap + the daily
-    # ticker-lookup meter, not a stale-data cliff.
-    assert nudge["scanner_cap"] == 10
+    # (was 20). Watchlist was 5 (2026-07-12), then drops to 0 on/after
+    # FREE_WATCHLIST_REMOVAL_DATE (watchlist → Pro+) — assert the date-gated
+    # source, not a literal, so this survives the cutover.
+    # scanner_cap follows the open-access-month lift (scanner_rows → Pro until
+    # PROMO_OPEN_ACCESS_UNTIL, then reverts to 10) — assert the window-aware value.
+    assert nudge["scanner_cap"] == (
+        TIER_LIMITS[Tier.PRO]["scanner_rows"] if free_open_access() else 10
+    )
     assert nudge["delayed_hours"] == 0
-    assert nudge["watchlist_cap"] == 5
+    assert nudge["watchlist_cap"] == free_watchlist_cap()
 
 
 @pytest.mark.parametrize("tier", ["pro", "premium"])
@@ -91,10 +101,16 @@ async def test_me_nudge_present_for_free_user():
             body = (await c.get("/api/me", headers=_AUTH)).json()
             assert body["nudge"] is not None
             assert body["nudge"]["id"] == "free_upgrade"
-            # Post-freemium-retune canonical Free caps (see tier.py).
-            assert body["nudge"]["scanner_cap"] == 10
+            # Post-freemium-retune canonical Free caps (see tier.py). Watchlist
+            # is date-gated → 0 on/after FREE_WATCHLIST_REMOVAL_DATE, and
+            # scanner_cap follows the open-access-month lift (→ Pro until
+            # PROMO_OPEN_ACCESS_UNTIL, then back to 10). This caller is an
+            # AUTHENTICATED free user, which is exactly who the lift is for.
+            assert body["nudge"]["scanner_cap"] == (
+                TIER_LIMITS[Tier.PRO]["scanner_rows"] if free_open_access() else 10
+            )
             assert body["nudge"]["delayed_hours"] == 0
-            assert body["nudge"]["watchlist_cap"] == 5
+            assert body["nudge"]["watchlist_cap"] == free_watchlist_cap()
             # Free users carry no billing.past_due (only paid tiers can).
             assert body["billing"]["past_due"] is False
         finally:

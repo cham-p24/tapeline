@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -19,6 +19,14 @@ from app.models import (
     StripeWebhookEvent,
     Subscription,
     User,
+)
+from app.services.embed_impressions import summarize_embed_impressions
+from app.services.growth_funnel import (
+    MAX_ENDING_SOON_DAYS,
+    MAX_ENDING_SOON_ROWS,
+    MAX_WINDOW_DAYS,
+    MIN_WINDOW_DAYS,
+    summarize_growth_funnel,
 )
 from app.services.tier import mrr_contribution
 
@@ -319,12 +327,50 @@ async def revenue_dashboard(
         select(func.count()).select_from(User).where(User.stripe_customer_id.isnot(None))
     )).scalar() or 0
 
-    # ── Activation (Growth Playbook §4.2) — % of signups who hit milestone #1
-    # (first watchlist ticker added → User.activated_at stamped). The
-    # complementary leak metric to signup->paid: a low activation rate means
-    # the funnel is leaking BEFORE the trial→paid decision. ──
+    # ── Activation (Growth Playbook §4.2) — % of signups who experienced the
+    # core value: added a watchlist ticker OR viewed a ticker's full six-factor
+    # breakdown (whichever came first → User.activated_at). The complementary
+    # leak metric to signup->paid: a low activation rate means the funnel is
+    # leaking BEFORE the trial→paid decision. ──
     activated_users = (await session.execute(
         select(func.count()).select_from(User).where(User.activated_at.isnot(None))
+    )).scalar() or 0
+
+    # ── Time-to-value — median hours from signup to activation over the
+    # activated cohort. Computed in Python (SQLite has no MEDIAN) so it works on
+    # both the test DB and prod. The onboarding target behind the activation %. ──
+    ttv_rows = (await session.execute(
+        select(User.created_at, User.activated_at).where(
+            User.activated_at.isnot(None), User.created_at.isnot(None)
+        )
+    )).all()
+    ttv_hours = sorted(
+        (r.activated_at - r.created_at).total_seconds() / 3600.0
+        for r in ttv_rows
+        if r.activated_at >= r.created_at
+    )
+    median_ttv_hours = round(ttv_hours[len(ttv_hours) // 2], 1) if ttv_hours else None
+
+    # ── Activity + cohort retention — the single most honest early signal (per
+    # the CEO strategy brief): are signups still showing up over time? active_7d/
+    # 28d count users seen in that window (last_seen_at). retained_w4 = of users
+    # who signed up ≥28 days ago, the share active in the last 14 days — a W4+
+    # retention proxy. At low volume it's directional; the point is that the
+    # instrument exists and can be watched as acquisition scales. ──
+    active_7d = (await session.execute(
+        select(func.count()).select_from(User).where(User.last_seen_at >= now - timedelta(days=7))
+    )).scalar() or 0
+    active_28d = (await session.execute(
+        select(func.count()).select_from(User).where(User.last_seen_at >= now - timedelta(days=28))
+    )).scalar() or 0
+    w4_cohort = (await session.execute(
+        select(func.count()).select_from(User).where(User.created_at <= now - timedelta(days=28))
+    )).scalar() or 0
+    w4_retained = (await session.execute(
+        select(func.count()).select_from(User).where(
+            User.created_at <= now - timedelta(days=28),
+            User.last_seen_at >= now - timedelta(days=14),
+        )
     )).scalar() or 0
 
     # ── gclid capture (Growth Playbook §3.7) — signups arriving with a Google
@@ -333,6 +379,82 @@ async def revenue_dashboard(
     gclid_capture_count = (await session.execute(
         select(func.count()).select_from(User).where(User.signup_gclid.isnot(None))
     )).scalar() or 0
+
+    # ── Acquisition channels — every signup sliced by the attribution captured
+    # at landing: utm_source, else the external referrer HOST (AI assistants /
+    # other sites that carry no utm_*), else "direct". Each channel carries how
+    # many of its signups later reached paid (stripe_customer_id set). This is
+    # the "which channel actually brings users, and which converts" readout,
+    # answered entirely from first-party columns already stored at signup — no
+    # external analytics tool or connector required. count(col) counts non-NULL,
+    # so count(stripe_customer_id) is the paid tally per channel. ──
+    channel_expr = func.coalesce(
+        func.nullif(User.signup_utm_source, ""),
+        func.nullif(User.signup_referrer_host, ""),
+        literal("direct"),
+    )
+    channel_rows = (await session.execute(
+        select(
+            channel_expr.label("channel"),
+            func.count().label("signups"),
+            func.count(User.stripe_customer_id).label("paid"),
+        )
+        .group_by(channel_expr)
+        .order_by(func.count().desc())
+    )).all()
+    acquisition_channels = {
+        row.channel: {"signups": row.signups, "paid": row.paid}
+        for row in channel_rows
+    }
+
+    # ── Top landing pages by signup — the same population as the channel
+    # readout above, but cut by WHICH page the visitor first landed on
+    # (users.signup_landing_path, first-touch, path only). The channel slice
+    # says "organic brought 6 signups"; with ~4,750 published SEO URLs that
+    # isn't actionable on its own — this says whether /compare/finviz,
+    # /glossary/rsi or a ticker page did the work, so the winning format can
+    # be doubled down on. Cross-cut by channel so a row reads
+    # "organic → /compare/finviz → 3 signups", and carries the same paid
+    # tally. Rows without a captured path (every user created before the
+    # column shipped) are excluded rather than bucketed as "unknown", which
+    # would dominate the ordering for months. Capped — this is a top-N
+    # readout, not an export. ──
+    landing_expr = func.nullif(User.signup_landing_path, "")
+    landing_rows = (await session.execute(
+        select(
+            channel_expr.label("channel"),
+            landing_expr.label("path"),
+            func.count().label("signups"),
+            func.count(User.stripe_customer_id).label("paid"),
+        )
+        .where(User.signup_landing_path.isnot(None))
+        .group_by(channel_expr, landing_expr)
+        .order_by(func.count().desc())
+        .limit(25)
+    )).all()
+    acquisition_landing_pages = [
+        {
+            "channel": row.channel,
+            "path": row.path,
+            "signups": row.signups,
+            "paid": row.paid,
+        }
+        for row in landing_rows
+        if row.path
+    ]
+
+    # ── Embed distribution loop — the /badge/{sym} SVG (README embeds) and the
+    # /embed/score/{sym} iframe widget rendered on OTHER people's sites. Both
+    # were previously uninstrumented, so this loop was invisible: no way to
+    # tell whether it works, which sites carry us, or which tickers get
+    # embedded. Hostname-only, aggregated per day (see
+    # models/embed_impression.py), and DIRECTIONAL not exact — CDN-cached
+    # renders never reach our origin, so real impressions always exceed these.
+    # Rank with them; never quote them as an absolute count.
+    #
+    # Degrades to an empty summary on any error — this readout must never take
+    # the revenue dashboard down with it. ──
+    embed_impressions = await summarize_embed_impressions(session, days=30, top=15)
 
     # ── Churn / cancellation ──────────────────────────────────────────────
     cancellations_scheduled = (await session.execute(
@@ -413,9 +535,33 @@ async def revenue_dashboard(
         # watchlist ticker. The raw count rides alongside so the % has context.
         "activated_users": activated_users,
         "activation_rate": round(activated_users / users_total * 100, 1) if users_total else 0.0,
+        # Time-to-value: median hours signup→activation over the activated cohort
+        # (null until anyone has activated). The onboarding target behind the rate.
+        "median_time_to_value_hours": median_ttv_hours,
+        # Activation → paid: of users who reached the aha (first watchlist add),
+        # the share that later paid. The complementary conversion to signup→paid.
+        "activated_to_paid_pct": round(paid_customers / activated_users * 100, 1) if activated_users else 0.0,
+        # Activity + W4+ retention (the most honest early signal).
+        "active_7d": active_7d,
+        "active_28d": active_28d,
+        "w4_cohort": w4_cohort,
+        "w4_retained": w4_retained,
+        "w4_retention_pct": round(w4_retained / w4_cohort * 100, 1) if w4_cohort else 0.0,
         # gclid capture (§3.7): signups whose Google Ads click ID is stored and
         # therefore available for the (founder-gated) offline-conversion upload.
         "gclid_capture_count": gclid_capture_count,
+        # Acquisition channels: {channel: {signups, paid}} keyed by utm_source →
+        # external referrer host → "direct". First-party "where do signups come
+        # from, and which channel converts" — no external analytics required.
+        "acquisition_channels": acquisition_channels,
+        # Top landing pages: [{channel, path, signups, paid}], ordered by
+        # signups, capped at 25. The content-level cut of the channel readout
+        # above — which of the ~4,750 SEO pages actually earns signups.
+        "acquisition_landing_pages": acquisition_landing_pages,
+        # Embed distribution: top embedding hosts / top embedded symbols /
+        # per-day totals over the last 30 days. Directional (CDN-cached renders
+        # are invisible to the origin) — for ranking and trend, not absolutes.
+        "embed_impressions": embed_impressions,
         "cancellations_scheduled": cancellations_scheduled,
         "cancellation_reasons": cancellation_reasons,
         "save_offers_redeemed": save_offers_redeemed,
@@ -428,6 +574,47 @@ async def revenue_dashboard(
         "webhook_events": webhook_events,
         "generated_at": now.isoformat(),
     }
+
+
+@router.get("/growth-funnel")
+async def growth_funnel(
+    _: None = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+    days: int = Query(
+        30,
+        ge=MIN_WINDOW_DAYS,
+        le=MAX_WINDOW_DAYS,
+        description="Cohort window: users created in the last N days.",
+    ),
+    ending_soon_days: int = Query(
+        7,
+        ge=1,
+        le=MAX_ENDING_SOON_DAYS,
+        description="Look-ahead for the trials-ending-soon list.",
+    ),
+    limit: int = Query(
+        25,
+        ge=1,
+        le=MAX_ENDING_SOON_ROWS,
+        description="Cap on trials-ending-soon rows.",
+    ),
+) -> dict:
+    """Windowed acquisition→paid funnel for the admin growth dashboard.
+
+    Separate from `/revenue` on purpose: the window is operator-selectable, so
+    changing it must not re-run the whole (much heavier) revenue roll-up, and a
+    failure in either readout must not blank the other. The service itself
+    fails open — an error returns a zeroed payload with `available: false`
+    rather than a 500.
+
+    Read-only. Everything is aggregated in SQL; no per-user queries.
+    """
+    return await summarize_growth_funnel(
+        session,
+        days=days,
+        ending_soon_days=ending_soon_days,
+        ending_soon_limit=limit,
+    )
 
 
 # ── Email preview ──────────────────────────────────────────────────────────
@@ -446,6 +633,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
     """
     from app.services.email import (
         render_activation_alert_email,
+        render_activation_arm_alerts_email,
         render_activation_watchlist_email,
         render_alert_email,
         render_annual_renewal_reminder_email,
@@ -636,6 +824,10 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
         "activation_alert": (
             "Activation · no alert rule by day 3",
             lambda: render_activation_alert_email("Alex"),
+        ),
+        "activation_arm_alerts": (
+            "Activation · watchlist built, no alert rule (engaged trialist)",
+            lambda: render_activation_arm_alerts_email("Alex", watchlist_count=7),
         ),
         # Annual upgrade nudge (~30 days post monthly conversion)
         "annual_nudge_pro": (

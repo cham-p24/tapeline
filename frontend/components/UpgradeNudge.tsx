@@ -24,6 +24,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useFirstRunTip } from "@/components/FirstRunTip";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const STORAGE_KEY = "tapeline_upgrade_nudge_dismissed_at";
@@ -42,6 +43,7 @@ type Nudge = {
 
 export function UpgradeNudge() {
   const pathname = usePathname();
+  const { tipVisible } = useFirstRunTip();
   const [nudge, setNudge] = useState<Nudge | null>(null);
   // Start dismissed so a user who closed it yesterday never sees a flash
   // before the cooldown check resolves. hidden→shown is fine; shown→hidden
@@ -87,14 +89,20 @@ export function UpgradeNudge() {
   }
 
   const suppressedHere = SUPPRESSED_PREFIXES.some((p) => pathname?.startsWith(p));
-  if (suppressedHere || dismissed || !nudge) return null;
+  // Value before ask: don't upsell over the first-run welcome. The nudge
+  // returns once the OnboardingTip is dismissed.
+  if (tipVisible || suppressedHere || dismissed || !nudge) return null;
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
       <span className="text-fg">
-        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers,{" "}
-        a {nudge.watchlist_cap}-ticker watchlist.
-        Go Pro for the full real-time universe with unlimited look-ups, plus squeeze, regime &amp; heatmap.
+        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers
+        {/* Watchlist is Pro-and-up from the 2026-08-02 cutover: for a Free user
+            the cap is 0, so drop the "N-ticker watchlist" clause and instead
+            sell the saved watchlist as one of the Pro perks below. */}
+        {nudge.watchlist_cap > 0 ? `, a ${nudge.watchlist_cap}-ticker watchlist.` : "."}{" "}
+        Go Pro for the full real-time universe with unlimited look-ups
+        {nudge.watchlist_cap > 0 ? "" : ", a saved watchlist"}, plus squeeze, regime &amp; heatmap.
       </span>
       <span className="flex shrink-0 items-center gap-2">
         <Link

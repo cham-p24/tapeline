@@ -393,7 +393,9 @@ async def test_google_callback_new_signup_still_works(
 
     async with session_scope() as s:
         row = (await s.execute(select(User).where(User.email == email))).scalar_one()
-        assert row.tier == "premium"
+        # The trial is card-required and is granted by the Stripe `trialing`
+        # webhook, so a fresh OAuth account starts on FREE with no trial.
+        assert row.tier == "free"
         await s.delete(row)
         await s.commit()
 
@@ -413,3 +415,96 @@ def test_mfa_challenge_token_mints_a_real_challenge():
     # It must never be usable as a session.
     from app.services.session import verify_session_token
     assert verify_session_token(token) is None
+
+
+# ── Finding 3 (round-5): OAuth account pre-hijacking ─────────────────────────
+#
+# An attacker POSTs /api/auth/signup for the victim's address with a known
+# password. Native signin never gates on email verification, so that password
+# is a live credential on an UNVERIFIED native row. When the victim later signs
+# in with Google we match that row by email — so before adopting it, the untrusted
+# password must be neutralised (cleared + session_epoch bumped), and Google logins
+# whose email isn't verified must be refused.
+
+@pytest.mark.asyncio
+async def test_oauth_merge_into_unverified_native_account_clears_the_password(
+    client, google_configured, monkeypatch,
+):
+    # _seed_user defaults password_hash="not-used" (a native credential) and
+    # email_verified_at=None → exactly the attacker-pre-registered shape.
+    uid, email = await _seed_user()
+    try:
+        monkeypatch.setattr(
+            oauth_module, "httpx",
+            _fake_httpx({"access_token": "fake", "id_token": None},
+                        {"email": email, "name": "Victim", "verified_email": True}),
+        )
+        async with client:
+            r = await client.get(
+                "/api/auth/oauth/google/callback",
+                params={"code": "fake-code", "state": "st"},
+                headers={"cookie": "oauth_state_google=st"},
+            )
+        # The victim IS logged in (a session cookie is minted) — the fix doesn't
+        # block the login, it disarms the attacker's password.
+        assert r.status_code == 307
+        assert SESSION_COOKIE in _set_cookies(r)
+        async with session_scope() as s:
+            row = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        assert row.password_hash is None, "untrusted native password must be cleared on merge"
+        assert (row.session_epoch or 0) >= 1, "session_epoch must be bumped to kill attacker sessions"
+        assert row.email_verified_at is not None
+    finally:
+        await _drop_user(uid)
+
+
+@pytest.mark.asyncio
+async def test_oauth_merge_into_verified_account_keeps_the_password(
+    client, google_configured, monkeypatch,
+):
+    # A VERIFIED native account proved email control via the verification link,
+    # so it's the same person — the password must be left intact.
+    uid, email = await _seed_user(email_verified_at=datetime.now(UTC))
+    try:
+        monkeypatch.setattr(
+            oauth_module, "httpx",
+            _fake_httpx({"access_token": "fake", "id_token": None},
+                        {"email": email, "name": "Owner", "verified_email": True}),
+        )
+        async with client:
+            r = await client.get(
+                "/api/auth/oauth/google/callback",
+                params={"code": "fake-code", "state": "st"},
+                headers={"cookie": "oauth_state_google=st"},
+            )
+        assert r.status_code == 307
+        assert SESSION_COOKIE in _set_cookies(r)
+        async with session_scope() as s:
+            row = (await s.execute(select(User).where(User.id == uid))).scalar_one()
+        assert row.password_hash == "not-used", "a verified account's password must be untouched"
+    finally:
+        await _drop_user(uid)
+
+
+@pytest.mark.asyncio
+async def test_google_login_with_unverified_email_is_refused(
+    client, google_configured, monkeypatch,
+):
+    email = f"unverified_{_uuid.uuid4().hex}@example.com"
+    monkeypatch.setattr(
+        oauth_module, "httpx",
+        _fake_httpx({"access_token": "fake", "id_token": None},
+                    {"email": email, "name": "Nope", "verified_email": False}),
+    )
+    async with client:
+        r = await client.get(
+            "/api/auth/oauth/google/callback",
+            params={"code": "fake-code", "state": "st"},
+            headers={"cookie": "oauth_state_google=st"},
+        )
+    assert r.status_code == 400
+    async with session_scope() as s:
+        assert (await s.execute(
+            select(User).where(User.email == email)
+        )).scalar_one_or_none() is None, "no account should be created/merged for an unverified email"
+

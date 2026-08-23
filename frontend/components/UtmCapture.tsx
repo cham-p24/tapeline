@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { captureGclidFromLocation, captureUtmFromLocation } from "@/lib/utm";
+import {
+  captureGclidFromLocation,
+  captureLandingPathFromLocation,
+  captureReferrerHostFromLocation,
+  captureUtmFromLocation,
+} from "@/lib/utm";
 
 /**
  * Client-only side-effect component. Mounted once in the root layout so
@@ -22,6 +27,14 @@ export function UtmCapture(): null {
   useEffect(() => {
     captureUtmFromLocation();
     captureGclidFromLocation();
+    // AI-assistant referrals (Copilot/ChatGPT/Perplexity) carry no utm_*
+    // params — the referrer HOSTNAME is the only attribution trace. External
+    // hosts only, first-touch, never the path/query.
+    captureReferrerHostFromLocation();
+    // Which of our ~4,750 SEO pages the visitor actually landed on. The
+    // captures above give the channel; this gives the CONTENT that earned
+    // them. Our own pathname only — never the query string or hash.
+    captureLandingPathFromLocation();
   }, []);
   return null;
 }

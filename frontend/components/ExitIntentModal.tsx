@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 /**
  * Last-chance email capture for visitors who scroll the pricing page
@@ -34,6 +35,14 @@ export function ExitIntentModal({
 }) {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setDismissed(true);
+  }, []);
+
+  useModalA11y(open, panelRef, close);
 
   useEffect(() => {
     // One-per-session — don't pester anyone who already saw it.
@@ -85,11 +94,6 @@ export function ExitIntentModal({
 
   if (dismissed || !open) return null;
 
-  function close() {
-    setOpen(false);
-    setDismissed(true);
-  }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
@@ -101,11 +105,14 @@ export function ExitIntentModal({
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-panel p-6 shadow-2xl sm:p-8">
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl sm:p-8"
+      >
         <button
           type="button"
           onClick={close}
-          className="absolute right-3 top-3 rounded-md p-1 text-muted hover:bg-bg hover:text-fg"
+          className="absolute right-3 top-3 rounded-md p-1 text-muted hover:bg-panel hover:text-fg"
           aria-label="Close"
         >
           <svg
@@ -122,7 +129,7 @@ export function ExitIntentModal({
           </svg>
         </button>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
           Before you go
         </div>

@@ -110,7 +110,7 @@ export default function AccountPage() {
           <Link
             key={c.href}
             href={c.href}
-            className="card card-link p-4 hover:border-accent/30 hover:bg-panel-hover"
+            className="card card-link p-4 hover:border-accent/30 hover:bg-panel2"
           >
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">{c.title}</h3>

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 
+from sqlalchemy import case, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
@@ -106,48 +107,44 @@ async def consume_ticker_lookup(session: AsyncSession, user: User) -> dict:
         return {"allowed": True, "used": 0, "limit": None, "remaining": None}
 
     today = _utc_today()
-    # Roll the counter over on a new UTC day.
-    if user.lookups_reset_on != today:
-        user.lookups_today = 0
-        user.lookups_reset_on = today
-
-    used = user.lookups_today
-    if used >= cap:
-        # At/over cap — reject without consuming. Persist any rollover that
-        # happened above (a same-day rollover is harmless; a day-boundary
-        # rollover that lands exactly at a 0 cap is an edge we still persist).
-        try:
-            await session.commit()
-        except Exception:
-            await session.rollback()
-        return {
-            "allowed": False,
-            "used": used,
-            "limit": cap,
-            "remaining": 0,
-        }
-
-    user.lookups_today = used + 1
+    # Atomic guarded increment — mirrors services/api_keys.authenticate_api_key.
+    # A single UPDATE resets the counter to 1 on a UTC-day rollover, else
+    # increments it via a SQL expression, and matches ONLY when the user is
+    # under cap for TODAY (encoded in the WHERE). Two overlapping lookups now
+    # serialise on the row write, so they can't both pass the cap and both
+    # increment. The previous read-then-Python-increment (used = lookups_today;
+    # if used < cap: lookups_today = used + 1) lost updates — two requests both
+    # read used=N and both wrote N+1 — letting a Free user exceed the daily cap.
+    new_today = case(
+        (User.lookups_reset_on != today, 1),
+        else_=User.lookups_today + 1,
+    )
+    result = await session.execute(
+        update(User)
+        .where(
+            User.id == user.id,
+            (User.lookups_reset_on != today) | (User.lookups_today < cap),
+        )
+        .values(lookups_today=new_today, lookups_reset_on=today)
+    )
+    over_cap = result.rowcount == 0  # type: ignore[attr-defined]  # CursorResult.rowcount (DML)
     try:
         await session.commit()
     except Exception:
+        # Fail OPEN for the user-facing read on an infra hiccup — better to
+        # serve the page than 402. The count just didn't advance this once.
         await session.rollback()
-        # On a write failure, fail OPEN for the user-facing read — better to
-        # serve the page than to 402 on an infra hiccup. The count just doesn't
-        # advance this once.
-        return {
-            "allowed": True,
-            "used": used,
-            "limit": cap,
-            "remaining": max(0, cap - used),
-        }
 
-    new_used = user.lookups_today
+    # Reflect the committed counter for the meter (the UPDATE was raw SQL, so
+    # the ORM `user` instance is stale).
+    used = (await session.execute(
+        select(User.lookups_today).where(User.id == user.id)
+    )).scalar_one() or 0
     return {
-        "allowed": True,
-        "used": new_used,
+        "allowed": not over_cap,
+        "used": used,
         "limit": cap,
-        "remaining": max(0, cap - new_used),
+        "remaining": max(0, cap - used),
     }
 
 

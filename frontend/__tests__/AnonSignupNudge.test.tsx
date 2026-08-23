@@ -29,6 +29,7 @@ vi.mock("@/components/UserContext", () => ({
 }));
 
 import { useUser } from "@/components/UserContext";
+import { freeHasWatchlist } from "@/lib/pricing";
 import {
   AnonSignupNudge,
   recordAnonTickerView,
@@ -96,8 +97,12 @@ describe("AnonSignupNudge — view counting + threshold", () => {
     render(<AnonSignupNudge symbol="NVDA" />);
     const link = await screen.findByRole("link", { name: /sign up free/i });
     expect(link).toHaveAttribute("href", "/signup?from=ticker");
+    // The heading's value prop flips at the 2026-08-02 watchlist→Pro cutover:
+    // "save your tickers, free" only holds while Free still has a watchlist.
     expect(
-      screen.getByText(/save your tickers/i),
+      screen.getByText(
+        freeHasWatchlist() ? /save your tickers/i : /sign up free to track these/i,
+      ),
     ).toBeInTheDocument();
   });
 

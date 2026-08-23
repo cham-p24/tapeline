@@ -2,8 +2,9 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { CompareIndex } from "@/components/CompareIndex";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
 import { LandingCta } from "@/components/LandingCta";
-import { PRICING, FREE_LIMITS, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -75,7 +76,7 @@ const WINS = [
   },
   {
     label: "Smart watchlist alerts",
-    tapeline: "✓ Score-change alerts via email + Telegram + browser push",
+    tapeline: "✓ Score-change alerts via email + browser push",
     competitor: "Email digest only",
   },
   {
@@ -84,8 +85,9 @@ const WINS = [
     competitor: "Intentionally long-term: \"buy and hold for the next 5+ years\"",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Annual subscription only on Premium",
   },
   {
@@ -97,10 +99,10 @@ const WINS = [
 
 const TRADEOFFS = [
   {
-    label: "Free tier strength",
-    tapeline: `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ${FREE_LIMITS.dailyLookups} look-ups/day`,
+    label: "Free access",
+    tapeline: "Daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON — no account; the app itself takes a card",
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
-    note: "WallStreetZen's free tier is the strongest in the category. Tapeline's free tier is narrower on purpose but free forever — same product, smaller window.",
+    note: "This one goes to WallStreetZen and it isn't close: their free tier is the strongest in the category and you can screen with it. Tapeline's free surface is a published record you can read and download, not a screener you can run — from 22 August 2026 a new Tapeline account takes a card at first sign-in.",
   },
   {
     label: "Cheapest paid tier",
@@ -160,8 +162,9 @@ export default function VsWallStreetZenPage() {
           Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline names all six
           factors and how they're weighted, recomputes the score sub-60s, and pairs every top-10
           with a per-pick public scorecard. If you trade on a sub-week timescale,
-          Tapeline is built for you. If you buy-and-hold for 5+ years and the strong
-          free tier is enough, WallStreetZen is the right choice.
+          Tapeline is built for you. If you buy-and-hold for 5+ years, or you want a free
+          screener you can run yourself, WallStreetZen is the right choice — Tapeline&apos;s
+          app takes a card at first sign-in.
         </p>
         {/* Hype pill removed 2026-06-16 — counting categories Tapeline "wins
             outright" reads as marketing, not honesty (matches the finviz
@@ -171,7 +174,7 @@ export default function VsWallStreetZenPage() {
             until the very bottom, so a comparison-shopper who skimmed the
             intro and left never saw the offer. showPreview off: the
             comparison table below is the proof on compare pages. */}
-        <LandingCta from="compare" showPreview={false} secondaryLabel="See the scorecard first" />
+        <LandingCta from="compare" showPreview={false} primaryLabel="Start the 14-day Premium trial" secondaryLabel="See the scorecard first" />
       </section>
 
       <section className="mx-auto max-w-5xl px-6 pb-8">
@@ -227,17 +230,33 @@ export default function VsWallStreetZenPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Try the live scanner.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier (live scores, top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day) — no card.
-          Pro from {usd(PRICING.pro.monthly)}/mo ({usd(PRICING.pro.annual)}/yr), with a
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with
+          no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial,
+          first charge on day 14, one click to cancel.
+          Pro from {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr), with a
           {" "}{REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=compare" className="btn-primary">
-            Try the live scanner free — no card →
-          </Link>
-          <Link href="/scorecard" className="btn-ghost">See the scorecard first</Link>
+          <ContentCtaLink
+            href="/signup?from=compare"
+            className="btn-primary"
+            surface="compare"
+            destination="signup"
+            slug="wallstreetzen"
+          >
+            Start the 14-day Premium trial →
+          </ContentCtaLink>
+          <ContentCtaLink
+            href="/scorecard"
+            className="btn-ghost"
+            surface="compare"
+            destination="scorecard"
+            slug="wallstreetzen"
+          >
+            See the scorecard first
+          </ContentCtaLink>
         </div>
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.

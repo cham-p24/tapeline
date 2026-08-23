@@ -405,5 +405,61 @@ These don't block launch but should land within the first month:
 - **Public scorecard** — never gate it. It's the trust mechanism. Free users see it; paying users see the live data.
 - **Owner login** — only created via `seed_owner.py`. Never expose admin promotion via the signup form.
 - **Three-tier price points** — Pro $29 / Premium $49. Don't revisit until 500+ paying users with conversion data.
-- **Free tier shows real product** — 24h delayed and 20 tickers, but real data. Not a feature-stripped mock.
+- **The public record shows real product** — the daily Top 10, the full scorecard and every per-ticker page are live, real data, readable with no account and no card. Not a feature-stripped mock. (The signed-in app takes a card at first sign-in from 2026-08-22 — see docs/PRICING.md.)
 - **Trial tier is Premium** — gives users the best, takes it away on expiry. Don't drop to Pro-trial without an A/B.
+
+---
+
+## INTERNAL_SSR_TOKEN — stop the backend rate-limiting its own frontend
+
+**Status: code shipped, secret NOT yet set. The exemption is inert until you set it.**
+
+### The problem
+
+`limit_api` caps `/api/*` at 120 req/min **per client IP**. Server-side
+rendering funnels every page render for the whole site through a *single* Fly
+egress IP, so all of it shares one bucket. A ticker page fans out to ~3 upstream
+calls, so roughly **40 cold page renders a minute drains the budget** — after
+which the backend returns 429 to its own frontend, and
+`frontend/app/t/[symbol]/page.tsx` turns that into an **HTTP 500**.
+
+Any bulk crawl trips it:
+
+* The weekly SEO digest reported **"1534 URLs returning non-2xx/3xx"** — URLs it
+  had broken itself. Every one of them served 200 to a normal visitor minutes later.
+* **Googlebot** walking the ~8,400-page ticker sitemap sees the same 500s, which
+  is a deindexing risk on the site's biggest crawl surface.
+
+(`main.py` already exempted `/api/embed/` for this identical one-shared-IP
+reason; this closes the same gap for the SSR reads themselves.)
+
+### Setting it
+
+Generate once and set the **same value on both apps**:
+
+```bash
+TOKEN=$(openssl rand -base64 32)
+fly secrets set INTERNAL_SSR_TOKEN="$TOKEN" -a tapeline-backend
+fly secrets set INTERNAL_SSR_TOKEN="$TOKEN" -a tapeline-web
+```
+
+* **Never** name it `NEXT_PUBLIC_*` — Next inlines those into the browser bundle,
+  which would hand every visitor a rate-limit bypass. It is read server-side only
+  (`frontend/lib/ssrHeaders.ts` also hard-guards on `typeof window`).
+* Rotate by setting a new value on the backend first, then the frontend; during
+  the gap SSR is merely rate-limited again, never broken.
+* Unset/mismatched ⇒ no exemption at all. The failure mode is today's behaviour,
+  not an open door — verified by `backend/tests/test_ssr_rate_limit.py`.
+
+### Verifying
+
+```bash
+# Should stay 200 well past 120 requests/min:
+for i in $(seq 1 200); do
+  curl -s -o /dev/null -w "%{http_code} " \
+    -H "x-tapeline-internal: $TOKEN" https://api.tapeline.io/api/status
+done
+```
+
+The other two halves of the fix (429-aware retry in the ticker page, and the
+audit's re-check pass) work immediately on deploy and need no secret.

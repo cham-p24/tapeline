@@ -12,6 +12,11 @@ Covers the two orchestrators added for conversion lever #2 (annual nudge) and
        "act_alert" signed up 3-5d ago, no recorded activity, alert-capable
                    tier (pro/premium) — leads with the zero-setup scorecard
                    (token name historical; see run_activation_drip)
+       "act_arm"   the INVERSE cohort, added to close a blind spot: 2-10d in,
+                   alert-capable tier, HAS a watchlist and has ZERO alert
+                   rules. Both stages above require no recorded activity, so
+                   the most engaged trialist in the funnel — watchlist built,
+                   alert never felt — matched nothing and was emailed nothing.
 
   2. run_annual_nudge_drip — monthly subscribers ~28-45 days post-conversion
        "annual_p"  switch-to-annual upsell. Monthly vs annual is INFERRED from
@@ -43,6 +48,7 @@ from app.db import session_scope
 from app.models import AlertRule, Subscription, User, WatchlistItem
 from app.services.email import (
     render_activation_alert_email,
+    render_activation_arm_alerts_email,
     render_activation_watchlist_email,
     render_annual_upgrade_email,
     run_activation_drip,
@@ -66,6 +72,7 @@ async def _seed_user(
     re_engagement: bool = True,
     drip_state: str = "",
     with_watchlist: bool = False,
+    watchlist_symbols: tuple[str, ...] = (),
     with_alert: bool = False,
     activated_at: datetime | None = None,
     last_seen_at: datetime | None = None,
@@ -79,6 +86,10 @@ async def _seed_user(
     the artefact whose ABSENCE the activation drip looks for. `activated_at`
     and `last_seen_at` simulate recorded activity (an activation stamp / a
     return visit) so the has_recorded_activity gate can be exercised.
+
+    `watchlist_symbols` overrides the single default item — the act_arm stage
+    quotes the real watchlist COUNT in its copy, so its tests need to control
+    how many rows exist.
     """
     uid = f"lc_{_uuid.uuid4().hex}"
     email = f"{uid}@example.com"
@@ -102,7 +113,8 @@ async def _seed_user(
             last_seen_at=last_seen_at,
         ))
         if with_watchlist:
-            s.add(WatchlistItem(user_id=uid, symbol="AAPL"))
+            for sym in (watchlist_symbols or ("AAPL",)):
+                s.add(WatchlistItem(user_id=uid, symbol=sym))
         if with_alert:
             s.add(AlertRule(user_id=uid, name="t", rule_type="score"))
         await s.commit()
@@ -322,6 +334,145 @@ async def test_act_alert_skips_when_rule_present(monkeypatch):
     assert await _drip_state(uid) == ""
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# Activation drip — act_arm (watchlist built, ZERO alert rules, 2-10d in)
+#
+# The blind spot this stage closes: act_wl and act_alert both require "still no
+# recorded activity", so the ENGAGED trialist — watchlist built, no alert ever —
+# matched neither and received nothing. These tests pin the cohort filter from
+# both sides: it must select the watchlist-having/zero-alert user and must NOT
+# leak onto the zero-activity user or the one who already has a rule.
+#
+# Day 7 is the anchor age throughout: outside act_wl (24-72h) and act_alert
+# (3-5d), inside act_arm (2-10d), so a bare `drip_state == "act_arm"` assertion
+# is unambiguous about WHICH stage fired.
+# ════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_act_arm_fires_for_watchlist_without_alert_rule(monkeypatch):
+    """The cohort that had no email at all: 7 days in, premium, a watchlist,
+    zero alert rules → act_arm stamped."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(days=7), tier="premium", with_watchlist=True,
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == "act_arm"
+
+
+@pytest.mark.asyncio
+async def test_act_arm_excludes_zero_activity_user(monkeypatch):
+    """Same window, but NO watchlist. act_arm is the engaged-cohort stage —
+    it must not become a second dormant-user nudge. (At day 7 the dormant
+    stages are both out of window, so this user gets nothing.)"""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(age=timedelta(days=7), tier="premium")
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_arm_excludes_user_who_already_has_an_alert_rule(monkeypatch):
+    """Watchlist AND an alert rule → the whole point of the message is already
+    done. Telling them to arm their first alert would be false."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(days=7), tier="premium",
+        with_watchlist=True, with_alert=True,
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_arm_skips_free_tier(monkeypatch):
+    """Alerts are Pro+. Nudging a Free user toward a gated feature is a dead
+    end, so the cohort is tier-restricted exactly as act_alert is."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(days=7), tier="free", with_watchlist=True,
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_arm_skips_outside_the_signup_window(monkeypatch):
+    """Bounded window, not just a lower bound — a user 40 days past signup is
+    not mid-trial and must not be swept up."""
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(days=40), tier="premium", with_watchlist=True,
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_arm_respects_trial_drip_optout(monkeypatch):
+    monkeypatch.setattr(email_module, "send_email", _fake_send_ok)
+    uid, _ = await _seed_user(
+        age=timedelta(days=7), tier="premium",
+        with_watchlist=True, trial_drip=False,
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert await _drip_state(uid) == ""
+
+
+@pytest.mark.asyncio
+async def test_act_arm_dedupes(monkeypatch):
+    """Already stamped → never re-sent, even though the user still matches the
+    cohort (they still have no alert rule). Sends are tracked so the assertion
+    proves absence of a SEND, not just an unchanged token."""
+    sends: list[str] = []
+
+    async def _track(to, *_a, **_k):
+        sends.append(to)
+        return {"id": "test-msg"}
+
+    monkeypatch.setattr(email_module, "send_email", _track)
+    uid, email = await _seed_user(
+        age=timedelta(days=7), tier="premium",
+        with_watchlist=True, drip_state="act_arm",
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+    assert email not in sends
+    assert await _drip_state(uid) == "act_arm"
+
+
+@pytest.mark.asyncio
+async def test_act_arm_quotes_the_users_real_watchlist_count(monkeypatch):
+    """The copy names a number, so the orchestrator has to wire the REAL count
+    through — a hardcoded or off-by-one figure is a truthfulness bug in a 1:1
+    email. Three items seeded; the rendered body must say three."""
+    sends: list[tuple[str, str]] = []
+
+    async def _track(to, _subject, html, *_a, **_k):
+        sends.append((to, html))
+        return {"id": "test-msg"}
+
+    monkeypatch.setattr(email_module, "send_email", _track)
+    _, email = await _seed_user(
+        age=timedelta(days=7), tier="premium",
+        with_watchlist=True, watchlist_symbols=("AAPL", "MSFT", "NVDA"),
+    )
+    async with session_scope() as s:
+        await run_activation_drip(s)
+
+    mine = [html for (to, html) in sends if to == email]
+    assert len(mine) == 1, "engaged trialist should get exactly one act_arm email"
+    assert "3 tickers" in mine[0]
+    # Sanity: not the seeded-default count from the single-item helper.
+    assert "1 ticker," not in mine[0]
+
+
 @pytest.mark.asyncio
 async def test_activation_skipped_send_does_not_stamp():
     """Without RESEND_API_KEY, send_email returns skipped:True — an eligible
@@ -462,6 +613,24 @@ def test_activation_watchlist_renderer():
     assert "scorecard" in lowered
 
 
+def test_activation_watchlist_renderer_free_recipient_drops_the_watchlist_step():
+    # act_wl reaches every tier. After the 2026-08-02 cutover a Free recipient
+    # has no saved watchlist, so telling them to "add a ticker to your watchlist"
+    # is a dead end (403). For has_watchlist=False the nudge must drop that step
+    # entirely and lead with "score a ticker you follow" — same aha, still free.
+    html = render_activation_watchlist_email("Alex", has_watchlist=False)
+    lowered = html.lower()
+    assert "Alex" in html
+    # The dead-end instruction ("add a ticker … to your watchlist") is gone.
+    # (Note: the button URL keeps utm_campaign=activation_watchlist, so we
+    # assert on the visible instruction phrases, not the bare word.)
+    assert "to your watchlist" not in lowered
+    assert "add a ticker you follow" not in lowered
+    assert "score a ticker" in lowered
+    assert "scan" in lowered
+    assert "scorecard" in lowered
+
+
 def test_activation_alert_renderer():
     html = render_activation_alert_email("Alex")
     assert "Alex" in html
@@ -470,6 +639,71 @@ def test_activation_alert_renderer():
     # scorecard (the token name "act_alert" is retained only for governor /
     # worker compatibility — see run_activation_drip).
     assert "scorecard" in html.lower()
+
+
+def test_activation_arm_alerts_renderer_names_the_count_and_the_gap():
+    html = render_activation_arm_alerts_email("Alex", watchlist_count=7)
+    assert "Alex" in html
+    assert len(html) > 200
+    # The one personal fact the message is allowed to quote (Rule 7: an
+    # ACTIVITY count, not a performance figure).
+    assert "7 tickers" in html
+    lowered = html.lower()
+    assert "alert rule" in lowered
+    # Points at the one-click arming surface, which lives on the watchlist page.
+    assert "/app/watchlist" in html
+
+
+def test_activation_arm_alerts_renderer_pluralises_a_single_ticker():
+    """A one-item watchlist must not read 'You're watching 1 tickers' — the
+    count is the whole personalisation, so getting its grammar wrong is the
+    most visible possible defect."""
+    html = render_activation_arm_alerts_email("Alex", watchlist_count=1)
+    assert "1 ticker," in html
+    assert "1 tickers" not in html
+
+
+def test_activation_arm_alerts_renderer_makes_no_outcome_claim():
+    """Rule 1/7. The engaged-trialist message is the one a growth edit would
+    most want to sharpen with 'here's what you'd have caught' — which is a
+    performance claim, since a missed setup is only regrettable for the return
+    it implies. Asserted on rendered HTML: that is what reaches the inbox."""
+    lowered = render_activation_arm_alerts_email("Alex", watchlist_count=7).lower()
+    for phrase in (
+        "you'd have caught", "would have caught", "what you missed",
+        "missed out", "since you added", "your best performer",
+        "is up", "is down", "gained", "returned", "profit",
+        "beat the market", "outperform", "you should",
+    ):
+        assert phrase not in lowered, f"outcome/advice language — {phrase!r}"
+
+
+def test_activation_arm_alerts_renderer_carries_no_urgency():
+    """Rule 6. Only the user's own real trial date may be mentioned, calmly."""
+    lowered = render_activation_arm_alerts_email("Alex", watchlist_count=7).lower()
+    # Phrase list mirrors test_lifecycle_governor._URGENCY_LANGUAGE. A bare
+    # "only " is deliberately NOT here: it matches prose in the shared email
+    # shell's CSS comments, and the scarcity forms are what Rule 6 polices.
+    for phrase in ("countdown", "act now", "hurry", "last chance",
+                   "don't miss out", "expires in", "limited time",
+                   "before it's too late", "only a few", "spots left"):
+        assert phrase not in lowered, f"Rule 6 violation — {phrase!r}"
+
+
+def test_activation_arm_alerts_renderer_trial_note_is_optional_and_calm():
+    """The trial line is the single permitted time statement. The trial now
+    runs on a card, so the note must name the first-charge date and the
+    one-click way out — calmly, with no countdown."""
+    ends = datetime(2026, 8, 1, tzinfo=UTC)
+    with_note = render_activation_arm_alerts_email(
+        "Alex", watchlist_count=7, trial_ends_at=ends,
+    )
+    assert "1 Aug 2026" in with_note
+    lowered_note = with_note.lower()
+    assert "first charge" in lowered_note
+    assert "cancel in one click" in lowered_note
+    without = render_activation_arm_alerts_email("Alex", watchlist_count=7)
+    assert "trial runs to" not in without.lower()
 
 
 def test_annual_upgrade_renderer_each_tier():

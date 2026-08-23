@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
-import { PRICING, FREE_LIMITS, usd } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, usd, freeHasWatchlist } from "@/lib/pricing";
 
 describe("ComparisonTable", () => {
   it("renders the post-#343 Free-tier limits from FREE_LIMITS", () => {
@@ -26,10 +26,17 @@ describe("ComparisonTable", () => {
     ).toBeInTheDocument();
     // Scanner rows: top-10.
     expect(screen.getByText(`Top ${FREE_LIMITS.scannerRows}`)).toBeInTheDocument();
-    // Watchlist: 5 saved tickers (raised from 3).
-    expect(
-      screen.getByText(`${FREE_LIMITS.watchlistTickers} tickers`),
-    ).toBeInTheDocument();
+    // Watchlist: 5 saved tickers on Free — but only until the 2026-08-02 Pro
+    // cutover, after which the Free column shows "—" instead of a count.
+    if (freeHasWatchlist()) {
+      expect(
+        screen.getByText(`${FREE_LIMITS.watchlistTickers} tickers`),
+      ).toBeInTheDocument();
+    } else {
+      expect(
+        screen.queryByText(`${FREE_LIMITS.watchlistTickers} tickers`),
+      ).not.toBeInTheDocument();
+    }
     // Squeeze Watch: free top-3 preview, not "—".
     expect(
       screen.getByText(`Top-${FREE_LIMITS.squeezePreviewRows} preview`),

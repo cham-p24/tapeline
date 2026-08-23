@@ -28,10 +28,10 @@ typically reads:
 
     shell(
         h1("Welcome, " + name) +
-        lead("Your 14-day Premium trial is live.") +
+        lead("Your Tapeline account is live.") +
         button("Open the scanner", "https://tapeline.io/app/scanner") +
-        muted_footnote("No card on file. We'll remind you before the trial ends."),
-        preheader="Your 14-day Premium trial is live — open the scanner.",
+        muted_footnote("The Free plan needs no card. The Premium trial does."),
+        preheader="Your Tapeline account is live — open the scanner.",
     )
 
 Never inline raw HTML in a renderer if a helper exists for it. The

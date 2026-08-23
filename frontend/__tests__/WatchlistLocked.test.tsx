@@ -27,9 +27,17 @@ vi.mock("@/components/FilterBar", () => ({
 }));
 vi.mock("@/lib/filters", () => ({ matchesQuery: () => true }));
 vi.mock("@/lib/auth", () => ({ canUse: () => false }));
+// Mock the FULL @/lib/gtag surface, not just the two fns this file asserts on.
+// A partial factory (missing trackEvent) can leak across vitest workers and
+// leave an unrelated file — e.g. SignupForm, which uses the real trackEvent —
+// seeing `trackEvent is not a function`. Mirror the complete shape the sibling
+// Scanner tests mock so this file can never poison another.
 vi.mock("@/lib/gtag", () => ({
+  trackEvent: vi.fn(),
   trackFirstTickerAdded: vi.fn(),
   trackCapHit: vi.fn(),
+  trackUpgradePromptShown: vi.fn(),
+  trackUpgradePromptClicked: vi.fn(),
 }));
 vi.mock("@/components/Paywall", () => ({
   PaywallModal: ({ open, feature }: { open: boolean; feature: string }) =>

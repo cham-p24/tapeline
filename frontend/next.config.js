@@ -51,11 +51,14 @@ const nextConfig = {
       // Exact-match: never catches /badge/{symbol}, so the SVG keeps serving.
       { source: "/badge", destination: "/embed", permanent: true },
 
-      // Temporary (307) for these two: a proper /compare and /best-stocks-for
-      // index hub is a plausible future build, so don't let browsers/Google
-      // permanently cache the fallback target. /best-stock-scanners is the
-      // existing scanner-comparison roundup; /signals is the live universe.
-      { source: "/compare", destination: "/best-stock-scanners", permanent: false },
+      // Temporary (307): /best-stocks-for has only [strategy] children and no
+      // index hub yet, so the bare parent falls back to the live universe. Not
+      // permanent — a proper index is a plausible future build.
+      //
+      // NOTE: /compare's old fallback redirect (→ /best-stock-scanners) was
+      // REMOVED once app/compare/page.tsx shipped (#465). Next.js runs redirects
+      // before pages, so the fallback was SHADOWING that real index hub — the
+      // page 307'd away and was unreachable. /compare now serves its 200 hub.
       { source: "/best-stocks-for", destination: "/signals", permanent: false },
     ];
   },
@@ -78,8 +81,10 @@ const nextConfig = {
   // Allowlist is derived from what the app actually loads:
   //   - Google tag / GA4 + Google Ads  → www.googletagmanager.com (script),
   //     *.google-analytics.com + region1 + www.google-analytics.com (connect)
-  //   - Vercel Analytics + Speed Insights → va.vercel-scripts.com (script),
-  //     *.vercel-insights.com (script+connect)   [env-gated on NEXT_PUBLIC_VERCEL]
+  //   (Vercel Analytics + Speed Insights used to need va.vercel-scripts.com +
+  //   *.vercel-insights.com here. Both packages were removed once it turned out
+  //   <Analytics /> was gated on a NEXT_PUBLIC_VERCEL that nothing ever set, so
+  //   those two origins are gone from script-src and connect-src.)
   //   - PostHog → us-assets.i.posthog.com + *.posthog.com (script),
   //     us.i.posthog.com + *.posthog.com (connect)   [env-gated on POSTHOG_KEY]
   //   - Cloudflare Turnstile → challenges.cloudflare.com (script + frame)
@@ -105,8 +110,8 @@ const nextConfig = {
       "img-src 'self' data: https:",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://va.vercel-scripts.com https://*.vercel-insights.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
-      "connect-src 'self' https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://*.vercel-insights.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.googletagmanager.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
+      "connect-src 'self' https://www.facebook.com https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
       "frame-src https://challenges.cloudflare.com https://s.tradingview.com",
     ].join("; ");
     const securityHeaders = [
@@ -162,6 +167,14 @@ const nextConfig = {
       {
         source: "/:path*/twitter-image",
         headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
+      // Press kit (/press/*) is meant to be embedded and fetched by third
+      // parties (Product Hunt, directories, journalists' CMSes) — allow
+      // cross-origin reads on these static images only. GET-only public
+      // assets; no credentials involved, so `*` is safe here.
+      {
+        source: "/press/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
       },
     ];
   },

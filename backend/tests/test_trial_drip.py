@@ -49,6 +49,7 @@ import app.services.email as email_module
 from app.db import session_scope
 from app.models import User
 from app.services.email import (
+    render_eod_watchlist_digest,
     render_subscription_canceled_email,
     render_trial_day7_email,
     render_trial_day11_email,
@@ -61,6 +62,7 @@ from app.services.tier import (
     FREE_DAILY_LOOKUPS,
     FREE_SCANNER_ROWS,
     FREE_WATCHLIST_TICKERS,
+    free_has_watchlist,
 )
 from app.workers import signal_publisher
 from app.workers.signal_publisher import _downgrade_expired_trials
@@ -136,7 +138,10 @@ def test_day7_quotes_current_free_caps():
     html = render_trial_day7_email("Alex", None)
     assert f"top {FREE_SCANNER_ROWS} rows" in html
     assert f"look-ups cap at {FREE_DAILY_LOOKUPS} a day" in html
-    assert f"watchlist caps at {FREE_WATCHLIST_TICKERS} tickers" in html
+    # The watchlist cap line is emitted only while the Free tier still HAS a
+    # watchlist; on/after FREE_WATCHLIST_REMOVAL_DATE the renderer drops it.
+    if free_has_watchlist():
+        assert f"watchlist caps at {FREE_WATCHLIST_TICKERS} tickers" in html
 
 
 def test_day13_quotes_current_free_caps():
@@ -149,7 +154,9 @@ def test_expired_quotes_current_free_caps():
     html = render_trial_expired_email("Alex", None)
     assert f"top {FREE_SCANNER_ROWS} scanner rows" in html
     assert f"{FREE_DAILY_LOOKUPS} ticker look-ups a day" in html
-    assert f"capped at {FREE_WATCHLIST_TICKERS} tickers on Free" in html
+    # See test_day7: watchlist line only present while Free still has one.
+    if free_has_watchlist():
+        assert f"capped at {FREE_WATCHLIST_TICKERS} tickers on Free" in html
 
 
 def test_subscription_canceled_quotes_current_free_caps():
@@ -387,3 +394,59 @@ async def test_expired_still_fires_after_missed_day(monkeypatch):
     assert len(mine) == 1, f"expected exactly one expired email, got {mine}"
     assert mine[0][1] == "Your Tapeline trial ended"
     assert "expired" in (await _user_row(uid)).drip_state.split(",")
+
+
+# ── Personalized watchlist-loss line (T-3 / T-1) + EOD digest trial note ────
+#
+# Production evidence (2026-08): engaged trialists build 7-8 ticker watchlists,
+# yet the two emails that carry one-click checkout links never named that
+# watchlist as the thing lost at expiry — and post-cutover Free has NO
+# watchlist, so the loss is total. These tests pin the personalized line the
+# same date-gated way the renderers emit it.
+
+
+def test_day11_names_the_users_watchlist_lock():
+    html = render_trial_day11_email("Alex", {"watchlist_count": 7})
+    if free_has_watchlist():
+        assert "lock at expiry" not in html
+    else:
+        assert "7 saved" in html
+        assert "lock at expiry" in html
+        assert "restores them instantly" in html
+
+
+def test_day11_no_watchlist_no_lock_line():
+    # No watchlist -> no loss line (nothing personal to lose).
+    for summary in (None, {"watchlist_count": 0}):
+        html = render_trial_day11_email("Alex", summary)
+        assert "lock at expiry" not in html
+
+
+def test_day13_leads_loss_list_with_watchlist_lock():
+    html = render_trial_day13_email("Alex", {"watchlist_count": 7})
+    if free_has_watchlist():
+        assert "7 saved" not in html
+    else:
+        assert "7 saved" in html
+        assert "Free no longer includes one" in html
+    # The generic caps stay present either way.
+    assert f"top {FREE_SCANNER_ROWS} rows" in html
+
+
+def test_day13_singular_ticker_grammar():
+    html = render_trial_day13_email("Alex", {"watchlist_count": 1})
+    if not free_has_watchlist():
+        assert "1 saved ticker on" in html
+        assert "1 saved tickers" not in html
+
+
+def test_eod_digest_renders_trial_note_only_when_passed():
+    items = [{
+        "symbol": "AAPL", "score": 71.0, "signal": "STRONG SETUP",
+        "change_pct_1d": 0.8, "score_delta": 1.2, "reason": "trend intact",
+    }]
+    note = "A quiet note: this daily digest is part of Pro. Your trial ends Friday, August 8."
+    with_note = render_eod_watchlist_digest("Alex", items, trial_note=note)
+    assert "this daily digest is part of Pro" in with_note
+    without = render_eod_watchlist_digest("Alex", items)
+    assert "this daily digest is part of Pro" not in without

@@ -1,9 +1,9 @@
 """Master ticker table + latest-score snapshot for the scanner."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, String, func
+from sqlalchemy import BigInteger, Date, DateTime, Float, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -27,6 +27,60 @@ class Ticker(Base):
     # BigInteger: 32-bit INTEGER overflowed on high-turnover names (e.g. ADTX
     # ~5.28B shares > 2.147B int max), failing the whole scan-tick bulk write.
     volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Absolute market cap in dollars (nullable — many rows have no read yet).
+    # Sourced from the Finnhub company profile, which reports it in MILLIONS,
+    # so the populator multiplies by 1e6 before storing. Displayed compactly in
+    # the scanner ("Mkt Cap" column); an em-dash renders when null.
+    market_cap: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Key statistics — the summary block a reader expects on a ticker page.
+    # Storage only; each value is written by the feed that already pays for it,
+    # so this comment records which feed owns which column:
+    #
+    #   SNAPSHOT  — Massive v3 snapshot, polygon_feed._to_scanner_row. Both
+    #               `session.previous_close` and `session.open` are already in
+    #               the payload today and dropped on the floor.
+    #   BARS      — the 365d daily OHLCV bars already pulled per symbol in
+    #               signal_publisher._refresh_aggregates_cache (each bar has
+    #               o/h/l/c/v/t) and currently reduced to 3 scalars.
+    #   METRIC    — Finnhub /stock/metric?metric=all, already requested and
+    #               cached for 7 days in finnhub_feed.fetch_fundamentals while
+    #               only 6 keys are kept. Widening the keep-list costs ZERO
+    #               extra API calls.
+    #   EARNINGS  — calendar_events.earnings_events (report_date), populated in
+    #               prod and not currently joined to this table.
+    #
+    # Every column is nullable with NO default: ~72% of the universe has no
+    # price/volume read at all, so most bar-derived values are legitimately
+    # absent. Null means "we do not have it" and renders as an em-dash — a zero
+    # would be a fabricated statistic, which this product must never publish.
+    # Bid/ask and the 1-year analyst target are deliberately NOT here: we have
+    # no level-1 quote feed and no analyst-target entitlement, so there is no
+    # honest value to store.
+    previous_close: Mapped[float | None] = mapped_column(Float, nullable=True)   # SNAPSHOT
+    day_open: Mapped[float | None] = mapped_column(Float, nullable=True)         # SNAPSHOT
+    # Day range, from the SNAPSHOT's `session` object (which does carry high and
+    # low). Deliberately not from the daily bars: the bar cache refreshes once
+    # per 24h, so a bar-derived "day range" would usually be the PREVIOUS
+    # session's range sitting beside a live price — a quote outside its own
+    # stated range. Same tick as the price it brackets, or nothing.
+    day_high: Mapped[float | None] = mapped_column(Float, nullable=True)         # SNAPSHOT
+    day_low: Mapped[float | None] = mapped_column(Float, nullable=True)          # SNAPSHOT
+    week52_high: Mapped[float | None] = mapped_column(Float, nullable=True)      # BARS
+    week52_low: Mapped[float | None] = mapped_column(Float, nullable=True)       # BARS
+    # BigInteger for the same reason as `volume` above — a 30-day average of a
+    # multi-billion-share tape still overflows 32-bit INTEGER.
+    avg_volume_30d: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # BARS
+    beta: Mapped[float | None] = mapped_column(Float, nullable=True)             # METRIC
+    eps_ttm: Mapped[float | None] = mapped_column(Float, nullable=True)          # METRIC
+    # Trailing-twelve-month P/E specifically. Distinct from the `pe` already in
+    # the fundamentals keep-list, which prefers peNormalizedAnnual.
+    pe_ttm: Mapped[float | None] = mapped_column(Float, nullable=True)           # METRIC
+    dividend_yield: Mapped[float | None] = mapped_column(Float, nullable=True)   # METRIC
+    # Date, not DateTime — these are calendar dates with no meaningful time of
+    # day, and storing a midnight timestamp would invent a precision we lack.
+    ex_dividend_date: Mapped[date | None] = mapped_column(Date, nullable=True)   # METRIC
+    next_earnings_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # EARNINGS
 
     # Score breakdown — the synthesis moat. Always sums (weighted) to `score`.
     sub_trend: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from "@/components/Input";
 
 type Status = "idle" | "submitting" | "sent" | "error";
 
@@ -52,7 +53,7 @@ export function ContactForm() {
 
   if (status === "sent") {
     return (
-      <div className="rounded-lg border border-border bg-bg-soft p-6 text-center">
+      <div className="rounded-lg border border-border bg-surface p-6 text-center">
         <div className="text-2xl">✉️</div>
         <p className="mt-2 font-medium">Message sent.</p>
         <p className="mt-1 text-sm text-muted">
@@ -87,7 +88,7 @@ export function ContactForm() {
           minLength={8}
           maxLength={5000}
           rows={6}
-          className="w-full rounded-md border border-border bg-bg px-3 py-2.5 text-base focus:border-accent focus:outline-none"
+          className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-base focus:border-accent focus:outline-none"
           placeholder="What's up? Bug report, feature idea, billing question — anything."
         />
       </div>
@@ -134,14 +135,13 @@ function Field({
       <label htmlFor={name} className="block text-xs font-medium text-muted mb-1">
         {label} {required && <span className="text-fg">*</span>}
       </label>
-      <input
+      <Input
         id={name}
         name={name}
         type={type}
         required={required}
         autoComplete={autoComplete}
         maxLength={type === "email" ? 200 : 200}
-        className="w-full rounded-md border border-border bg-bg px-3 py-2.5 text-base focus:border-accent focus:outline-none"
       />
     </div>
   );

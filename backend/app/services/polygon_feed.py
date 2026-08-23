@@ -87,7 +87,27 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
     raise RuntimeError(f"polygon request failed after retries: {path}")
 
 
-async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, Any]]:
+def _composite_from_subs(r: dict[str, Any]) -> float:
+    """Weighted composite from the six sub-scores, clamped to 0..100.
+
+    Weights mirror mock_feed/signal_publisher:
+    trend .25  rs .20  fund .15  smart .15  macro .15  mom .10
+    """
+    composite = (
+        r["sub_trend"] * 0.25
+        + r["sub_rs"] * 0.20
+        + r["sub_fundamentals"] * 0.15
+        + r["sub_smart_money"] * 0.15
+        + r["sub_macro"] * 0.15
+        + r["sub_momentum"] * 0.10
+    )
+    return round(max(0, min(100, composite)), 1)
+
+
+async def fetch_snapshots(
+    symbols: list[str] | None = None,
+    macro_score: float | None = None,
+) -> list[dict[str, Any]]:
     """
     Latest snapshots — returns rows in the same schema as mock_feed.fetch_snapshots
     so the worker's upsert path stays unchanged.
@@ -95,15 +115,30 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     Strategy (hybrid until the full per-factor pipeline lands):
     - **Real**: price, change_pct_1d, volume — from Massive snapshot endpoint
     - **Real**: sub_fundamentals — from Finnhub cache (if pre-fetched), else mock
-    - **Mock**: sub_trend, sub_rs, sub_momentum, sub_macro, sub_smart_money,
+    - **Real**: sub_macro — regime-derived, deterministic (see below)
+    - **Real**: market_cap — from the Finnhub company-profile cache (absolute $)
+    - **Mock**: sub_trend, sub_rs, sub_momentum, sub_smart_money,
       reason, confidence_pct — until each factor's real source is wired
 
+    sub_macro determinism: the mock base fills sub_macro with a random.gauss
+    value and nothing here used to override it, so a RANDOM macro flowed into
+    the composite and could be frozen onto the permanent public scorecard. We
+    now override it with a regime-derived, deterministic score on EVERY path
+    (including the no-key mock fallback). Pass ``macro_score`` to reuse a value
+    the caller already computed; otherwise the regime is fetched once here. An
+    unknown/unreachable regime maps to NEUTRAL 50, never a random number.
+
     The composite `score` gets recomputed after merging so real fundamentals
-    actually move the needle (they're 15% of the total weight).
+    (and the deterministic macro) actually move the needle.
     """
-    from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
+    from app.services.finnhub_feed import (
+        get_cached_market_cap,
+        get_cached_score,
+        get_cached_smart_money_score,
+    )
     from app.services.mock_feed import _signal_from_score
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots
+    from app.services.score import regime_to_macro_score
     from app.services.universe import active_universe
     # Trend / RS / Momentum caches live in this same module (populated by worker)
 
@@ -117,8 +152,31 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
     # with real Massive + Finnhub data per row.
     base_rows = _mock_snapshots(universe_override=universe_list)
 
+    # Deterministic macro (GAP #11a): derive a regime-mapped macro score once
+    # and stamp it on EVERY row, replacing the random mock value. Fetch the
+    # regime here only if the caller didn't already supply a macro_score; a
+    # failed/unknown regime falls back to NEUTRAL 50, never random.
+    if macro_score is None:
+        try:
+            regime_row = await fetch_regime()
+            macro_score = regime_to_macro_score(regime_row.get("regime"))
+        except Exception:
+            logger.exception("polygon.macro_regime_failed — using NEUTRAL 50")
+            macro_score = 50.0
+    macro_score = round(float(macro_score), 1)
+    for r in base_rows:
+        r["sub_macro"] = macro_score
+        # Real market cap (GAP #10) from the Finnhub profile cache (absolute $).
+        # None when the symbol has no cached profile yet — renders em-dash in UI.
+        r["market_cap"] = get_cached_market_cap(r["symbol"])
+        # Keep the composite consistent with the deterministic macro even on the
+        # no-key mock path below. The with-key branch recomputes again after
+        # merging real factors (which already reads this deterministic sub_macro).
+        r["score"] = _composite_from_subs(r)
+        r["signal"] = _signal_from_score(r["score"])
+
     if not _api_key():
-        # No Massive key — pure mock fallback
+        # No Massive key — pure mock fallback (now with deterministic macro).
         return base_rows
 
     # Pull real prices + volumes from Massive in one batched call
@@ -153,6 +211,12 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
             r["price"] = real["price"]
             r["change_pct_1d"] = real["change_pct_1d"]
             r["volume"] = real["volume"]
+            # Key statistics riding along in the same snapshot payload. Straight
+            # copy — None stays None so the column stays NULL (em-dash).
+            r["previous_close"] = real["previous_close"]
+            r["day_open"] = real["day_open"]
+            r["day_high"] = real["day_high"]
+            r["day_low"] = real["day_low"]
 
         # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
         fund = get_cached_score(sym)
@@ -176,28 +240,50 @@ async def fetch_snapshots(symbols: list[str] | None = None) -> list[dict[str, An
         if mom is not None:
             r["sub_momentum"] = mom
 
-        # Recompute composite from updated sub_* — keeps all 6 factors blended.
-        # Weights mirror mock_feed/signal_publisher: trend .25 rs .20 fund .15 smart .15 macro .15 mom .10
-        composite = (
-            r["sub_trend"] * 0.25
-            + r["sub_rs"] * 0.20
-            + r["sub_fundamentals"] * 0.15
-            + r["sub_smart_money"] * 0.15
-            + r["sub_macro"] * 0.15
-            + r["sub_momentum"] * 0.10
-        )
-        r["score"] = round(max(0, min(100, composite)), 1)
+        # 52-week range + 30-day average volume from the same aggregates cache,
+        # populated by the same daily worker pass as trend/RS/momentum above.
+        # Absent until that pass has run (and after a worker restart), which
+        # reads as an em-dash and self-heals — same contract as market_cap.
+        bar_stats = get_cached_bar_stats(sym)
+        if bar_stats is not None:
+            r["week52_high"] = bar_stats["week52_high"]
+            r["week52_low"] = bar_stats["week52_low"]
+            r["avg_volume_30d"] = bar_stats["avg_volume_30d"]
+
+        # Recompute composite from updated sub_* — keeps all 6 factors blended
+        # (sub_macro is the deterministic regime-derived value stamped above).
+        r["score"] = _composite_from_subs(r)
         r["signal"] = _signal_from_score(r["score"])
 
     return base_rows
 
 
+def _positive_or_none(value: Any) -> float | None:
+    """Placeholder guard for the price-like fields on a v3 session object.
+
+    Massive sends 0.0 — not null — for a session field it has no read for:
+    pre-market on a thin name, or a symbol that simply didn't print today. A
+    traded price is never 0, so a zero here means "no data". Return None so the
+    column stays NULL and the UI renders an em-dash; writing the 0.0 through
+    would publish a quote that never happened.
+    """
+    if value is None:
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round(f, 2) if f > 0 else None
+
+
 def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
     """Reshape Massive v3 snapshot result to our DB schema.
 
-    v3 shape (post-2026-Q1 migration):
+    v3 shape (post-2026-Q1 migration), abbreviated — the real `session` object
+    carries more keys than the three the scanner columns needed:
         {"ticker": "AAPL", "session": {"price": 293.41, "previous_close": 293.32,
-         "change_percent": 0.0307, "volume": 5.27e7, "close": 293.32, "open": ...},
+         "change_percent": 0.0307, "volume": 5.27e7, "close": 293.32,
+         "open": 293.80, "high": 295.12, "low": 292.06, ...},
          "last_minute": {...}}
 
     `change_percent` is already in percent units (0.0307 means 0.0307%),
@@ -212,12 +298,22 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
     if not ticker or last_price is None:
         return None
 
+    # Key statistics that were already in this payload and dropped on the floor.
+    # `open`/`previous_close` were read below for the change-% fallback and
+    # thrown away; `high`/`low` were never read at all. Straight reads — nothing
+    # here is derived, so a symbol the vendor has no session data for keeps
+    # NULLs rather than a synthesised range.
+    prev_close = _positive_or_none(session.get("previous_close"))
+    day_open = _positive_or_none(session.get("open"))
+    day_high = _positive_or_none(session.get("high"))
+    day_low = _positive_or_none(session.get("low"))
+
     # Massive provides change_percent directly — use it. Fall back to manual
     # math if missing (e.g. just-listed tickers without a previous_close).
     cp = session.get("change_percent")
     if cp is None:
-        prev_close = session.get("previous_close") or session.get("open")
-        change_1d = ((last_price / prev_close) - 1) * 100 if prev_close else 0.0
+        fallback_base = prev_close or day_open
+        change_1d = ((last_price / fallback_base) - 1) * 100 if fallback_base else 0.0
     else:
         change_1d = float(cp)
 
@@ -235,6 +331,12 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
         "change_pct_5d": 0.0,   # filled by historical pass
         "change_pct_1m": 0.0,   # filled by historical pass
         "volume": int(session.get("volume", 0) or 0),
+        # Key statistics (SNAPSHOT-sourced half) — refreshed every tick along
+        # with price, so the day range never lags the price it brackets.
+        "previous_close": prev_close,
+        "day_open": day_open,
+        "day_high": day_high,
+        "day_low": day_low,
         "last_timestamp": datetime.now(UTC).isoformat(),
     }
 
@@ -246,6 +348,11 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
 _TREND_SCORE_CACHE: dict[str, float] = {}
 _RS_SCORE_CACHE: dict[str, float] = {}
 _MOMENTUM_SCORE_CACHE: dict[str, float] = {}
+# Key statistics derived from the SAME daily bars as the three scores above.
+# One dict-valued cache rather than three scalar ones: the values come out of a
+# single pass over a single fetch, and three parallel caches would be three
+# times the bookkeeping to keep in sync for no benefit.
+_BAR_STATS_CACHE: dict[str, dict[str, Any]] = {}
 
 
 def get_cached_trend(symbol: str) -> float | None:
@@ -258,6 +365,10 @@ def get_cached_rs(symbol: str) -> float | None:
 
 def get_cached_momentum(symbol: str) -> float | None:
     return _MOMENTUM_SCORE_CACHE.get(symbol.upper())
+
+
+def get_cached_bar_stats(symbol: str) -> dict[str, Any] | None:
+    return _BAR_STATS_CACHE.get(symbol.upper())
 
 
 def set_cached_trend(symbol: str, score: float | None) -> None:
@@ -275,11 +386,17 @@ def set_cached_momentum(symbol: str, score: float | None) -> None:
         _MOMENTUM_SCORE_CACHE[symbol.upper()] = score
 
 
+def set_cached_bar_stats(symbol: str, stats: dict[str, Any] | None) -> None:
+    if stats:
+        _BAR_STATS_CACHE[symbol.upper()] = stats
+
+
 def aggregate_cache_sizes() -> dict[str, int]:
     return {
         "trend": len(_TREND_SCORE_CACHE),
         "rs": len(_RS_SCORE_CACHE),
         "momentum": len(_MOMENTUM_SCORE_CACHE),
+        "bar_stats": len(_BAR_STATS_CACHE),
     }
 
 
@@ -385,6 +502,56 @@ def compute_momentum_score(bars: list[dict[str, Any]]) -> float | None:
     return round(max(0, min(100, score)), 1)
 
 
+def compute_bar_stats(bars: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """
+    Key statistics derived from the same daily OHLCV bars the three scores
+    above already consume (o, h, l, c, v, t) — 52-week range and 30-day
+    average volume. Zero extra API calls: this is the fetch the aggregates
+    refresh was already making and reducing to three scalars.
+
+    Returns a dict rather than a scalar because the values share one pass over
+    one fetch. Each value is independently None when the bars can't support it,
+    and there is NO fallback and NO default — a symbol with 40 bars has no
+    52-week range, and NULL (an em-dash in the UI) is the honest rendering of
+    that. Returns None outright when nothing at all could be derived.
+    """
+    if not bars:
+        return None
+
+    # A "52-week" range needs an actual year of history behind it. Bar COUNT
+    # can't establish that on its own — a name that listed in March has ~110
+    # dense bars, not a year — so gate on the span between the first and last
+    # bar instead. `t` is epoch ms on the /v2/aggs shape. 350 days rather than
+    # 365 because the caller's window starts on a fixed calendar date and the
+    # first/last trading days inside it drift by a weekend either side.
+    week52_high: float | None = None
+    week52_low: float | None = None
+    highs = [b.get("h") for b in bars if b.get("h") is not None]
+    lows = [b.get("l") for b in bars if b.get("l") is not None]
+    first_t, last_t = bars[0].get("t"), bars[-1].get("t")
+    span_days = (last_t - first_t) / 86_400_000 if first_t and last_t else 0
+    if highs and lows and span_days >= 350:
+        week52_high = round(max(highs), 2)
+        week52_low = round(min(lows), 2)
+
+    # 30-day average volume: the last 30 BARS, not 30 calendar days. Requires a
+    # full 30 so a two-week-old listing doesn't report a "30-day" average
+    # computed over 9 sessions. int() for the BigInteger column — same 32-bit
+    # overflow reason as Ticker.volume.
+    avg_volume_30d: int | None = None
+    volumes = [b.get("v") for b in bars[-30:] if b.get("v") is not None]
+    if len(volumes) == 30:
+        avg_volume_30d = int(sum(volumes) / 30)
+
+    if week52_high is None and avg_volume_30d is None:
+        return None
+    return {
+        "week52_high": week52_high,
+        "week52_low": week52_low,
+        "avg_volume_30d": avg_volume_30d,
+    }
+
+
 def _naive_score_from_move(move_pct: float) -> float:
     """
     Placeholder scoring until historical aggregates are wired in.
@@ -444,13 +611,19 @@ async def fetch_squeezes() -> list[dict[str, Any]]:
     return await detect_squeezes_batch(DEFAULT_UNIVERSE)
 
 
-async def fetch_regime() -> dict[str, Any]:
+async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """
-    Classify market regime from VIX, breadth (% of S&P above 200DMA),
+    Classify market regime from VIX, breadth (advancers vs decliners),
     rate direction (10Y yield slope), and sector leader rotation.
 
     Macro indicators come from FRED when FRED_API_KEY is set; falls back
     to hardcoded values otherwise. Polygon is used for the live VIX index.
+
+    ``snapshots`` (this tick's rows, same shape as fetch_snapshots) drives a
+    REAL market-breadth read: the % of moving names that advanced today,
+    100 * advancers / (advancers + decliners) from each row's change_pct_1d.
+    Replaces the long-standing hardcoded 55.0 placeholder. NEUTRAL 50 only when
+    no snapshots are supplied or none moved.
     """
     # Try FRED first (free + reliable for daily series)
     from app.services.fred_feed import fetch_macro_indicators
@@ -485,9 +658,19 @@ async def fetch_regime() -> dict[str, Any]:
     # Defaults to SIDEWAYS when no FRED key is configured (graceful no-op).
     rate_direction = fred_data.get("rate_direction") or "SIDEWAYS"
 
-    # Placeholder — breadth requires sector-constituent walk; on Starter tier
-    # this is expensive. Schedule it as a hourly job rather than per-tick.
-    breadth_pct = 55.0
+    # Real breadth from this tick's snapshots: advancers as a % of the names
+    # that actually moved today. NEUTRAL 50 when no snapshots or nothing moved.
+    breadth_pct = 50.0
+    if snapshots:
+        changes = [
+            s.get("change_pct_1d")
+            for s in snapshots
+            if s.get("change_pct_1d") is not None
+        ]
+        moving = [c for c in changes if c != 0]
+        if moving:
+            advancers = sum(1 for c in moving if c > 0)
+            breadth_pct = 100 * advancers / len(moving)
 
     regime = (
         "BULL" if vix < 15

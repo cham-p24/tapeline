@@ -30,14 +30,16 @@ const baseProps = {
 describe("CompareLayout", () => {
   it("renders an above-the-fold signup CTA to /signup?from=compare", () => {
     render(<CompareLayout {...baseProps} />);
-    const ctas = screen.getAllByRole("link", { name: /try the live scanner free — no card/i });
+    const ctas = screen.getAllByRole("link", { name: /try the live scanner — 14-day trial/i });
     expect(ctas.length).toBeGreaterThan(0);
     ctas.forEach((cta) => expect(cta).toHaveAttribute("href", "/signup?from=compare"));
   });
 
-  it("surfaces the founding offer (free tier + money-back) on the page", () => {
+  it("surfaces the founding offer (card-free record + money-back) on the page", () => {
     render(<CompareLayout {...baseProps} />);
-    expect(screen.getAllByText(/free forever tier/i).length).toBeGreaterThan(0);
+    // Post-#548 the card-free half of the offer is the published record, not a
+    // logged-in free tier — see the CARD HONESTY note in LandingCta.
+    expect(screen.getAllByText(/free to read — no account/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/30-day money-back guarantee/i).length).toBeGreaterThan(0);
   });
 

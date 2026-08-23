@@ -11,7 +11,7 @@
  * visual weight, and the trial is described plainly — no card, nothing
  * charged, and no deadline framing (compliance Rule 6).
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 // ScannerPreview is an async server component (server-fetches the real
@@ -32,64 +32,163 @@ vi.mock("@/components/FadeIn", () => ({
 
 import LandingPage from "@/app/page";
 
+// LandingPage is now an async server component (it server-fetches the scorecard
+// summary for the usage-as-proof line, GAP #20). RTL/jsdom can't render an
+// async component as JSX, so each test awaits the component call. A default
+// fetch mock returns a representative summary; the summary carries vs-SPY
+// figures precisely so we can prove they DON'T leak onto the hero (Rule 3).
+const SUMMARY = {
+  days_tracked: 62,
+  entries_scored: 610,
+  entries_excluded_outliers: 0,
+  median_alpha_vs_spy: 0.42,
+  hit_rate_beat_spy: 51.3,
+  first_tracked_date: "2026-05-12",
+};
+
+function mockSummaryFetch(summary: unknown) {
+  global.fetch = vi.fn(() =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ summary }),
+    }),
+  ) as any;
+}
+
+beforeEach(() => {
+  mockSummaryFetch(SUMMARY);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("LandingPage hero fold", () => {
-  it("links the fold to the zero-signup /daily-picks Top 10", () => {
-    render(<LandingPage />);
+  it("links the fold to the zero-signup /daily-picks Top 10", async () => {
+    render(await LandingPage());
     const link = screen.getByRole("link", {
       name: /see today.s full top 10 — no signup/i,
     });
     expect(link).toHaveAttribute("href", "/daily-picks");
   });
 
-  it("retires the 'Live mock' framing from the fold", () => {
-    render(<LandingPage />);
+  it("retires the 'Live mock' framing from the fold", async () => {
+    render(await LandingPage());
     expect(screen.queryByText(/live mock/i)).toBeNull();
   });
 
   // ── Paired entry points ──────────────────────────────────────────────────
 
-  it("offers BOTH hero CTAs: start the trial, and browse with no account", () => {
-    render(<LandingPage />);
+  it("offers BOTH hero CTAs: see the record, and browse with no account", async () => {
+    // Proof-first repositioning (2026-08): the primary door is the public
+    // track record (/scorecard) for the newsletter-burned audience, with the
+    // no-account browse path alongside it. The trial stays reachable via the
+    // nav + the terms line below the fold.
+    render(await LandingPage());
     expect(
-      screen.getByRole("link", { name: /start the 14-day trial/i }),
-    ).toHaveAttribute("href", "/signup");
+      screen.getByRole("link", { name: /see the track record/i }),
+    ).toHaveAttribute("href", "/scorecard");
     expect(
       screen.getByRole("link", { name: /browse without an account/i }),
     ).toHaveAttribute("href", "/daily-picks");
   });
 
-  it("gives both hero CTAs equal visual weight (neither is a muted btn-ghost)", () => {
-    render(<LandingPage />);
-    const trial = screen.getByRole("link", { name: /start the 14-day trial/i });
+  it("gives both hero CTAs equal visual weight (neither is a muted btn-ghost)", async () => {
+    render(await LandingPage());
+    const record = screen.getByRole("link", { name: /see the track record/i });
     const browse = screen.getByRole("link", { name: /browse without an account/i });
     // Both are full pill buttons...
-    expect(trial.className).toMatch(/\bbtn(-primary)?\b/);
+    expect(record.className).toMatch(/\bbtn(-primary)?\b/);
     expect(browse.className).toMatch(/\bbtn\b/);
     // ...and neither is the borderless, muted treatment that buried the
     // secondary path before. `btn-ghost` here is the regression to catch.
-    expect(trial.className).not.toMatch(/btn-ghost/);
+    expect(record.className).not.toMatch(/btn-ghost/);
     expect(browse.className).not.toMatch(/btn-ghost/);
     // The browse CTA carries a real border so it reads as a button, not text.
     expect(browse.className).toMatch(/border/);
   });
 
-  it("states the trial terms plainly: no card, nothing charged, falls back to Free", () => {
-    render(<LandingPage />);
-    const terms = screen.getByText(
-      /no credit card, no payment details, nothing charged/i,
-    );
-    expect(terms).toBeInTheDocument();
-    expect(terms.textContent).toMatch(/14 days of Premium/i);
-    expect(terms.textContent).toMatch(/stays on the Free tier/i);
+  it("adds a subtle tertiary /signup link without demoting the two pills (GAP #6)", async () => {
+    render(await LandingPage());
+    // The tertiary link is present and points at /signup...
+    expect(
+      screen.getByRole("link", { name: /start the 14-day trial/i }),
+    ).toHaveAttribute("href", "/signup");
+    // ...and the two proof-first pills are still first-class (unchanged).
+    expect(
+      screen.getByRole("link", { name: /see the track record/i }),
+    ).toHaveAttribute("href", "/scorecard");
+    expect(
+      screen.getByRole("link", { name: /browse without an account/i }),
+    ).toHaveAttribute("href", "/daily-picks");
   });
 
-  it("keeps the trial CTA free of urgency and scarcity framing (Rule 6)", () => {
-    const { container } = render(<LandingPage />);
+  it("states the trial terms plainly: card at sign-in, \$0 today, day-14 charge, one-click exit", async () => {
+    render(await LandingPage());
+    // CHANGED by the #548 card gate. The old copy promised "no credit card, no
+    // payment details, nothing charged" — false for any account created from
+    // 2026-08-22. The terms must now name the card, the amount and the date.
+    const terms = screen.getByText(/your card goes on at first sign-in/i);
+    expect(terms).toBeInTheDocument();
+    expect(terms.textContent).toMatch(/14 days of Premium/i);
+    expect(terms.textContent).toMatch(/nothing is charged that day/i);
+    expect(terms.textContent).toMatch(/first charge is on day 14/i);
+    expect(terms.textContent).toMatch(/one click cancels/i);
+    // The genuinely card-free path is still offered.
+    expect(terms.textContent).toMatch(/free to read with no\s+account/i);
+  });
+
+  it("keeps the trial CTA free of urgency and scarcity framing (Rule 6)", async () => {
+    const { container } = render(await LandingPage());
     const text = container.textContent ?? "";
     // No deadline pricing, no countdown, no "N spots/seats left", no
     // "expires"/"ends soon" pressure anywhere in the fold copy.
     expect(text).not.toMatch(/only \d+ (left|remaining|spots?|seats?)/i);
     expect(text).not.toMatch(/countdown|hurry|act now|limited time|ends soon/i);
     expect(text).not.toMatch(/offer expires|last chance to/i);
+  });
+});
+
+// ── Usage-as-proof (GAP #20) ───────────────────────────────────────────────
+describe("LandingPage usage-as-proof line", () => {
+  it("renders the live raw counts and tracked-since date", async () => {
+    render(await LandingPage());
+    // Sourced from the mocked scorecard summary: entries_scored across
+    // days_tracked, with the tracked-since clause from first_tracked_date.
+    const proof = screen.getByText(
+      /610 picks logged across 62 market days/i,
+    );
+    expect(proof).toBeInTheDocument();
+    expect(proof.textContent).toMatch(/tracked since 12 May 2026/i);
+    // The summary fetch actually fired at /api/scorecard.
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/scorecard"),
+      expect.anything(),
+    );
+  });
+
+  it("surfaces NO vs-SPY figure on the landing surface (Rule 3)", async () => {
+    const { container } = render(await LandingPage());
+    const text = container.textContent ?? "";
+    // The summary carries a 51.3% hit rate and a +0.42% median alpha. The
+    // proof line must expose ONLY raw counts + the date, so neither numeric
+    // FIGURE may render. (The words "vs SPY"/"alpha" describing the mechanism
+    // are pre-existing, allowed copy — this guards the numbers, not the words.)
+    expect(text).not.toMatch(/51\.3/);
+    expect(text).not.toMatch(/0\.42/);
+    // And no percentage is tied to a beat/vs-SPY claim anywhere on the page.
+    expect(text).not.toMatch(/\d+(\.\d+)?%[^.]{0,20}(beat|vs\.?)\s*spy/i);
+    expect(text).not.toMatch(/(beat|vs\.?)\s*spy[^.]{0,20}\d+(\.\d+)?%/i);
+  });
+
+  it("renders nothing extra when the summary fetch fails", async () => {
+    global.fetch = vi.fn(() => Promise.reject(new Error("down"))) as any;
+    render(await LandingPage());
+    // No proof line, and the page still renders the rest of the fold.
+    expect(screen.queryByText(/picks logged across/i)).toBeNull();
+    expect(
+      screen.getByRole("link", { name: /see the track record/i }),
+    ).toBeInTheDocument();
   });
 });

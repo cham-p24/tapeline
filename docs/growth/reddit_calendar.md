@@ -1,5 +1,23 @@
 # Tapeline — 8-Week Reddit Posting Calendar
 
+> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+>
+> From 2026-08-22 a **new account must put a card on file at first sign-in**
+> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
+> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> Accounts created **before** that date are grandfathered: they keep the free
+> access they signed up for and are never asked for a card.
+>
+> So: **no line in this file may say an account is free, that there is a free
+> tier a new user can sign up for, or that signing up needs no card.** What is
+> still true and should be said instead — the **published record is free with no
+> account at all**: the daily Top 10, the complete scorecard, a page per scored
+> ticker, and the raw CSV/JSON export.
+>
+> Some drafts here are stale on product facts as well (a "top 20, 24-hour
+> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> copy as a draft to re-check, not as approved copy.
+
 Drafted 2026-05-14. Pairs with `docs/launch/LAUNCH_PLAYBOOK.md` §2 which has the three sub-tailored launch posts already drafted (r/algotrading, r/stocks, r/SecurityAnalysis). This calendar:
 
 1. Schedules the launch posts across weeks 1-2.
@@ -61,7 +79,7 @@ What surprised me from two weeks of running this:
 
 3. Insider clusters (multiple Form 4 buys in the same window) are the single best leading signal. I underweighted Smart Money on launch; the data is pushing me to revisit.
 
-Free tier is still top 20 tickers, 24h delayed. Pro is $9.99/mo for the full ~2,500-ticker universe. 14-day Premium trial, no card needed.
+Free tier is still top 20 tickers, 24h delayed, and needs no card. Pro is $9.99/mo for the full ~2,500-ticker universe. The 14-day Premium trial does take a card — $0 charged today, one click to cancel before day 14.
 
 What signals or factors would you want me to add weight to? The formula is versioned in the changelog so factor changes ship with a written rationale.
 ```

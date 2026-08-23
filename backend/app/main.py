@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -20,11 +21,14 @@ from app.routers import (
     calendar_routes,
     congress,
     contact,
+    embed,
     export,
+    extension,
     heatmap,
     holdings,
     inbox,
     internal,
+    mcp,
     me,
     news,
     newsletter,
@@ -33,6 +37,7 @@ from app.routers import (
     roadmap,
     scanner,
     scorecard,
+    search,
     squeeze,
     stream,
     ticker,
@@ -41,6 +46,11 @@ from app.routers import (
 )
 from app.routers import (
     telegram as telegram_router,
+)
+from app.services.news_health import (
+    NEWS_INGEST_DOWN_SECONDS,
+    NEWS_INGEST_STALE_SECONDS,
+    news_wire_canary_seconds,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -148,14 +158,60 @@ app.add_middleware(
 )
 
 
+INTERNAL_SSR_HEADER = "x-tapeline-internal"
+
+
+def _is_trusted_ssr(request: Request) -> bool:
+    """True when this request carries our own SSR shared secret.
+
+    Server-side rendering funnels EVERY page render for the whole site through
+    a single Fly egress IP, so it shares one limit_api bucket (120/min). A
+    single ticker page fans out to ~3 upstream calls, so roughly 40 cold page
+    renders a minute drains it — after which the backend 429s its OWN frontend
+    and frontend/app/t/[symbol]/page.tsx turns that into a 500. Any bulk crawl
+    trips it: the weekly SEO audit reported ~1,534 "broken" URLs it had broken
+    itself, and Googlebot walking the ~8,400-page ticker sitemap would see the
+    same 500s — a real deindexing risk on the site's biggest crawl surface.
+    (main.py already exempts /api/embed/ for exactly this one-shared-IP reason;
+    this closes the same gap for the SSR reads themselves.)
+
+    Constant-time compare, and an unset token disables the exemption entirely,
+    so a missing/mis-set secret degrades to today's behaviour rather than
+    removing rate limiting. The token is server-only on the frontend (never
+    NEXT_PUBLIC_*), so it is not reachable from a browser bundle.
+    """
+    token = settings.internal_ssr_token
+    if not token:
+        return False
+    presented = request.headers.get(INTERNAL_SSR_HEADER)
+    if not presented:
+        return False
+    return secrets.compare_digest(presented, token)
+
+
 @app.middleware("http")
 async def log_and_rate_limit(request: Request, call_next):
-    # Rate-limit all /api/* requests except health + webhooks (which have their own signature check)
+    # Rate-limit all /api/* requests except health + webhooks (which have their
+    # own signature check) + embed-impression counting.
+    #
+    # Why /api/embed/ is exempt: limit_api keys on the CLIENT IP, and every
+    # impression POST originates from the Fly frontend machine — one IP for the
+    # whole site. Sharing that 120/min bucket would let badge traffic starve the
+    # SSR calls that actually render pages (a hot README could 429 /api/ticker
+    # for everyone). The embed router applies its own per-embedding-host and
+    # global-write-volume buckets instead, which is the limit that's actually
+    # meaningful here.
     path = request.url.path
-    if path.startswith("/api/") and not path.startswith("/api/health") and not path.startswith("/api/webhooks/"):
+    if (
+        path.startswith("/api/")
+        and not path.startswith("/api/health")
+        and not path.startswith("/api/webhooks/")
+        and not path.startswith("/api/embed/")
+    ):
         from app.services.rate_limit import limit_api
         try:
-            await limit_api(request)
+            if not _is_trusted_ssr(request):
+                await limit_api(request)
         except Exception as exc:
             status = getattr(exc, "status_code", 429)
             from fastapi.responses import JSONResponse
@@ -619,8 +675,28 @@ async def status() -> dict[str, object]:
 
             # News-health probe — added 2026-05-09 after the 14h-stale incident
             # where _refresh_news was failing silently on a column-width
-            # overflow. Age is the wire-freshness floor; 24h count is the
-            # "is the worker still inserting at all" signal.
+            # overflow.
+            #
+            # TWO DIFFERENT SIGNALS, and conflating them was a bug (retuned
+            # 2026-08 after the freshness cron alerted on ~25% of runs with
+            # nothing actually wrong):
+            #
+            #   ingest heartbeat = max(created_at) — when did WE last write a
+            #     row? This is the real pipeline-health signal. It is driven by
+            #     our own 5-min refresh loop, so it is phase-INDEPENDENT:
+            #     measured over 21 days of production, p90 was 1.9–3.1 min in
+            #     EVERY session phase and the longest silence was 54 min. A
+            #     stall here means the worker, the vendor credentials, or the
+            #     DB write is genuinely broken — which is exactly what the
+            #     2026-05-09 incident was.
+            #
+            #   wire freshness = max(published_at) — how old is the newest
+            #     article the VENDOR has published to us. Dominated by
+            #     vendor-side delivery lag (measured p50 44 min, p90 96 min
+            #     even for the freshest articles we receive), NOT by our
+            #     health. Driving the pill off it flagged "degraded" on ~6% of
+            #     all ticks while ingestion was perfectly healthy, so it is now
+            #     only a loose "the wire looks dead" canary.
             from datetime import timedelta as _td
 
             latest_news = (
@@ -629,6 +705,9 @@ async def status() -> dict[str, object]:
                     .order_by(NewsItem.published_at.desc())
                     .limit(1)
                 )
+            ).scalar_one_or_none()
+            latest_ingest = (
+                await session.execute(select(func.max(NewsItem.created_at)))
             ).scalar_one_or_none()
             since_24h = datetime.now(UTC) - _td(hours=24)
             n_24h = (
@@ -640,41 +719,62 @@ async def status() -> dict[str, object]:
             ).scalar_one()
 
             if latest_news is not None:
+                now_utc = datetime.now(UTC)
                 # Same SQLite naive->UTC normalisation as the regime probe above.
                 if latest_news.tzinfo is None:
                     latest_news = latest_news.replace(tzinfo=UTC)
-                news_age = (datetime.now(UTC) - latest_news).total_seconds()
-                # Market-hours-aware thresholds (matches the freshness
-                # regression cron). The news wire goes very quiet on
-                # weekends and off-hours, so a flat 1h threshold would
-                # paint the pill yellow every weekend. Tuned to catch
-                # genuine pipeline failures without false-alarming on
-                # natural wire-quiet windows.
-                now_utc = datetime.now(UTC)
-                is_weekend = now_utc.weekday() >= 5
-                # NYSE-ish window in UTC: 13:00-24:00 Mon-Fri.
-                is_market_hours = (not is_weekend) and 13 <= now_utc.hour < 24
-                if is_market_hours:
-                    ok_threshold, stale_threshold = 1800, 14400  # 30m, 4h
-                elif is_weekend:
-                    ok_threshold, stale_threshold = 28800, 57600  # 8h, 16h
-                else:
-                    ok_threshold, stale_threshold = 7200, 28800   # 2h, 8h
-                if news_age < ok_threshold:
-                    n_status = "ok"
-                elif news_age < stale_threshold:
+                news_age = (now_utc - latest_news).total_seconds()
+
+                # --- PRIMARY: ingestion heartbeat -------------------------
+                # Flat thresholds: unlike wire freshness this does not vary by
+                # session phase, so phase tiers would add noise, not accuracy.
+                # 120 min is ~2.2x the worst silence observed in 21 days (54
+                # min) — 0 false positives across 1,992 simulated ticks — while
+                # still catching a genuine stall inside two hours.
+                ingest_age = None
+                if latest_ingest is not None:
+                    if latest_ingest.tzinfo is None:
+                        latest_ingest = latest_ingest.replace(tzinfo=UTC)
+                    ingest_age = (now_utc - latest_ingest).total_seconds()
+
+                if ingest_age is None:
+                    n_status = "unknown"
+                elif ingest_age >= NEWS_INGEST_DOWN_SECONDS:
+                    n_status = "down"
+                elif ingest_age >= NEWS_INGEST_STALE_SECONDS:
                     n_status = "stale"
                 else:
-                    n_status = "down"
+                    n_status = "ok"
+
+                # --- SECONDARY: wire-dead canary --------------------------
+                # Can only escalate ok -> stale; never "down". Thresholds are
+                # set from the measured frontier-advance distribution so a
+                # normally-lagging vendor never trips them (0/1,992 ticks).
+                wire_threshold = news_wire_canary_seconds(now_utc)
+                wire_stale = news_age >= wire_threshold
+                if wire_stale and n_status == "ok":
+                    n_status = "stale"
+
                 checks["news"] = {
                     "status": n_status,
+                    # Primary health signal — consumed by the freshness cron.
+                    "ingest_age_seconds": (
+                        int(ingest_age) if ingest_age is not None else None
+                    ),
+                    "latest_ingested_at": (
+                        latest_ingest.isoformat() if latest_ingest else None
+                    ),
+                    "ingest_stale_after_seconds": NEWS_INGEST_STALE_SECONDS,
+                    # Secondary canary — vendor publish lag, not our health.
                     "latest_article_age_seconds": int(news_age),
                     "latest_published_at": latest_news.isoformat(),
+                    "wire_stale": wire_stale,
+                    "wire_stale_after_seconds": wire_threshold,
                     "articles_last_24h": int(n_24h or 0),
                 }
                 # Bubble up to top-level status so the public /status pill
-                # turns yellow when news is stale even if everything else
-                # is fine.
+                # turns yellow when the PIPELINE is unhealthy. A merely-quiet
+                # wire no longer degrades the pill on its own.
                 if n_status in ("stale", "down"):
                     out["status"] = "degraded"
             else:
@@ -704,6 +804,7 @@ async def status() -> dict[str, object]:
 
 
 app.include_router(scanner.router, prefix="/api/scanner", tags=["scanner"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(squeeze.router, prefix="/api/squeeze", tags=["squeeze"])
 app.include_router(regime.router, prefix="/api/regime", tags=["regime"])
 app.include_router(congress.router, prefix="/api/congress", tags=["congress"])
@@ -751,6 +852,15 @@ app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(internal.router, prefix="/api/internal", tags=["internal"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+# Embed-impression counting for /badge/{sym} + /embed/score/{sym}. Public and
+# unauthenticated — it is called by the Next server on behalf of an anonymous
+# browser. It runs its own (host-keyed + global) rate limits, and is exempt from
+# the shared per-IP limiter below; see the note there.
+app.include_router(embed.router, prefix="/api/embed", tags=["embed"])
+app.include_router(extension.router, prefix="/api/extension", tags=["extension"])
+# MCP lives at the bare /mcp (not under /api) because that is the URL shape MCP
+# clients expect to paste: https://api.tapeline.io/mcp
+app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["oauth"])
 app.include_router(calendar_routes.ipo_router, prefix="/api/ipos", tags=["calendar"])

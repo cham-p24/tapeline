@@ -1,0 +1,167 @@
+name: Neon autosuspend (disable scale-to-zero)
+
+# One-click operator tool to set the Neon Postgres compute autosuspend WITHOUT
+# anyone logging into the Neon dashboard or handling the Neon API key locally.
+#
+# WHY THIS EXISTS
+#   The production frontend's /t/[symbol] pages 500 when the backend /api/ticker
+#   fetch times out, and the deepest cause (documented in the backend fly.toml)
+#   is Neon "scale to zero": after a deploy the DB compute is cold and the first
+#   queries take seconds, tripping the frontend's 7s x2 timeout. Search Console
+#   sees the result as sporadic "Server error (5xx)". Setting the compute's
+#   suspend timeout to -1 (never suspend) removes the cold-start window entirely.
+#   Uses the same NEON_API_KEY repo secret the project already stores, so the key
+#   is never typed, pasted, logged, or seen by anyone.
+#
+# COST NOTE
+#   -1 keeps the primary compute running continuously (it no longer scales to
+#   zero on idle). In practice the 60s worker tick already keeps it warm almost
+#   all the time, so the marginal cost is small — but it IS non-zero. Re-run with
+#   a positive value (e.g. 604800 = 1 week) or 0 (Neon default ~300s) to revert.
+#
+# SCOPE
+#   Targets ONLY the DEFAULT branch's read_write compute endpoint(s). Preview /
+#   dev branch computes are left untouched so they still scale to zero.
+#
+# HOW TO RUN
+#   Actions tab -> "Neon autosuspend (disable scale-to-zero)" -> Run workflow ->
+#   type the confirm phrase. Or:
+#     gh workflow run neon-autosuspend.yml -f confirm=disable-neon-autosuspend
+#   If the key is org/project-scoped, the log prints the Neon error body + any
+#   discoverable org/project id; re-run with -f project_id=<id> (and/or the key
+#   already infers org). List orgs auto-tried when a personal key sees nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type exactly: disable-neon-autosuspend"
+        required: true
+        default: ""
+      suspend_timeout_seconds:
+        description: "-1 = never suspend (disable); 0 = Neon default (~300s); or a number of seconds"
+        required: true
+        default: "-1"
+      project_id:
+        description: "Optional: Neon project id to target directly (skips listing)."
+        required: false
+        default: ""
+      org_id:
+        description: "Optional: Neon org id, if a personal key needs it to see org projects."
+        required: false
+        default: ""
+
+concurrency:
+  group: neon-autosuspend
+  cancel-in-progress: false
+
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on the confirm phrase
+        if: ${{ inputs.confirm != 'disable-neon-autosuspend' }}
+        run: |
+          echo "::error title=Not confirmed::Type 'disable-neon-autosuspend' in the confirm box to run."
+          exit 1
+
+      - name: Set Neon compute autosuspend
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TIMEOUT: ${{ inputs.suspend_timeout_seconds }}
+          PROJECT_IN: ${{ inputs.project_id }}
+          ORG_IN: ${{ inputs.org_id }}
+        run: |
+          set -uo pipefail
+          key="$(printf '%s' "${NEON_API_KEY:-}" | tr -d '[:space:]')"
+          [ -n "$key" ] || { echo "::error title=No key::NEON_API_KEY secret is empty."; exit 1; }
+          case "$TIMEOUT" in
+            ''|*[!0-9-]*) echo "::error::suspend_timeout_seconds must be an integer (got '$TIMEOUT')"; exit 1;;
+          esac
+          API="https://console.neon.tech/api/v2"
+          auth="Authorization: Bearer ${key}"
+
+          # req METHOD URL [DATA] -> sets HTTP + BODY. No -f (keep error body);
+          # -L follows redirects. Bodies never contain the key; Actions masks it.
+          req() {
+            local m="$1" u="$2" d="${3:-}" t; t="$(mktemp)"
+            if [ -n "$d" ]; then
+              HTTP="$(curl -sS -L -o "$t" -w '%{http_code}' -X "$m" -H "$auth" -H "Content-Type: application/json" "$u" -d "$d")"
+            else
+              HTTP="$(curl -sS -L -o "$t" -w '%{http_code}' -X "$m" -H "$auth" "$u")"
+            fi
+            BODY="$(cat "$t")"; rm -f "$t"
+          }
+
+          # --- who am I / what can this key see (pure diagnostics) -----------
+          req GET "$API/users/me";  echo "GET /users/me -> $HTTP"; [ "$HTTP" = "200" ] && echo "  $(echo "$BODY" | jq -c '{id,email}' 2>/dev/null || echo "$BODY" | head -c 200)"
+          req GET "$API/users/me/organizations"; echo "GET /users/me/organizations -> $HTTP"
+          [ "$HTTP" = "200" ] && echo "$BODY" | jq -r '(.organizations // [])[] | "  org \(.id)\t\(.name)"'
+          orgs="$(echo "$BODY" | jq -r '(.organizations // [])[].id' 2>/dev/null || true)"
+
+          # --- resolve the project id ---------------------------------------
+          pid=""
+          if [ -n "${PROJECT_IN}" ]; then
+            pid="${PROJECT_IN}"; echo "Using project_id from input: $pid"
+          else
+            # try personal list, then org-scoped list for each org
+            urls="$API/projects"
+            [ -n "${ORG_IN}" ] && urls="$API/projects?org_id=${ORG_IN} $urls"
+            for o in $orgs; do urls="$urls $API/projects?org_id=$o"; done
+            found=""
+            for u in $urls; do
+              req GET "$u"; echo "GET ${u#$API} -> $HTTP"
+              if [ "$HTTP" = "200" ]; then
+                echo "$BODY" | jq -r '(.projects // [])[] | "  \(.id)\t\(.name)"'
+                cand="$(echo "$BODY" | jq -r '[(.projects // [])[] | select(.name|test("tapeline";"i")) | .id] | .[0] // empty')"
+                [ -z "$cand" ] && cand="$(echo "$BODY" | jq -r 'if ((.projects // [])|length)==1 then .projects[0].id else empty end')"
+                [ -n "$cand" ] && { found="$cand"; break; }
+              else
+                echo "  body: $(echo "$BODY" | head -c 300)"
+              fi
+            done
+            pid="$found"
+          fi
+          if [ -z "$pid" ]; then
+            echo "::error title=No project resolved::See the lists/bodies above; re-run with -f project_id=<id> (and -f org_id=<id> if a personal key)."
+            exit 1
+          fi
+          echo "Target project: $pid"
+
+          # --- default branch ------------------------------------------------
+          req GET "$API/projects/$pid/branches"
+          [ "$HTTP" = "200" ] || { echo "GET branches -> $HTTP: $(echo "$BODY" | head -c 300)"; echo "::error::project id or key scope wrong"; exit 1; }
+          def_branch="$(echo "$BODY" | jq -r '(.branches[] | select(.default==true) | .id) // empty' | head -1)"
+          [ -n "$def_branch" ] || { echo "::error::no default branch for $pid"; exit 1; }
+          echo "Default branch: $def_branch"
+
+          # --- patch the default branch's read_write endpoint(s) -------------
+          req GET "$API/projects/$pid/endpoints"
+          [ "$HTTP" = "200" ] || { echo "GET endpoints -> $HTTP: $(echo "$BODY" | head -c 300)"; exit 1; }
+          echo "Endpoints on default branch:"
+          echo "$BODY" | jq -r --arg b "$def_branch" '.endpoints[] | select(.branch_id==$b) | "  \(.id)\t\(.type)\tsuspend_now=\(.suspend_timeout_seconds)"'
+          targets="$(echo "$BODY" | jq -r --arg b "$def_branch" '.endpoints[] | select(.branch_id==$b and .type=="read_write") | .id')"
+          [ -n "$targets" ] || { echo "::error::no read_write endpoint on the default branch"; exit 1; }
+          rc=0
+          for eid in $targets; do
+            echo "Patching $eid -> suspend_timeout_seconds=$TIMEOUT ..."
+            req PATCH "$API/projects/$pid/endpoints/$eid" "{\"endpoint\":{\"suspend_timeout_seconds\": $TIMEOUT}}"
+            if [ "$HTTP" != "200" ]; then echo "  PATCH -> $HTTP: $(echo "$BODY" | head -c 300)"; rc=1; continue; fi
+            now="$(echo "$BODY" | jq -r '.endpoint.suspend_timeout_seconds')"
+            echo "  -> now suspend_timeout_seconds=$now"
+            [ "$now" = "$TIMEOUT" ] || { echo "::error::verify mismatch on $eid (got $now)"; rc=1; }
+          done
+          [ "$rc" = "0" ] && [ "$TIMEOUT" = "-1" ] && echo "Done: primary compute will NO LONGER scale to zero (autosuspend disabled)."
+          [ "$rc" = "0" ] && [ "$TIMEOUT" != "-1" ] && echo "Done: primary compute suspend_timeout_seconds set to $TIMEOUT."
+          exit $rc
+
+      - name: Verify prod is healthy
+        if: ${{ always() }}
+        run: |
+          base="https://api.tapeline.io"
+          for i in $(seq 1 6); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$base/api/health?cb=${GITHUB_RUN_ID}-$i" || echo 000)
+            [ "$code" = "200" ] && { echo "api healthy ($code)"; exit 0; }
+            echo "attempt $i: $code"; sleep 5
+          done
+          echo "::warning title=Health check::api.tapeline.io not 200 yet (this config change does not restart the DB)."

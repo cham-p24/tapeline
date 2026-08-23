@@ -4,6 +4,9 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { LandingCta } from "@/components/LandingCta";
 import { CompareIndex } from "@/components/CompareIndex";
+import { ContentCtaLink } from "@/components/ContentCtaLink";
+import { RelatedLinks } from "@/components/RelatedLinks";
+import { relatedForComparison } from "@/lib/internalLinks";
 import { PRICING, usd } from "@/lib/pricing";
 import {
   breadcrumbJsonLd,
@@ -244,14 +247,31 @@ export function CompareLayout({
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
-          Free forever tier — no card. Pro from {usd(PRICING.pro.monthly)}/mo
+          The record is free to read — no account. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
+        {/* Instrumented, not restyled: these two CTAs are what tell us whether
+            a competitor comparison moves a reader onward or merely gets read.
+            See components/ContentCtaLink.tsx. */}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/signup?from=compare" className="btn-primary">
-            Try the live scanner free — no card →
-          </Link>
-          <Link href={ctaSecondaryHref} className="btn-ghost">See the scorecard first</Link>
+          <ContentCtaLink
+            href="/signup?from=compare"
+            className="btn-primary"
+            surface="compare"
+            destination="signup"
+            slug={slug}
+          >
+            Try the live scanner — 14-day trial →
+          </ContentCtaLink>
+          <ContentCtaLink
+            href={ctaSecondaryHref}
+            className="btn-ghost"
+            surface="compare"
+            destination="scorecard"
+            slug={slug}
+          >
+            See the scorecard first
+          </ContentCtaLink>
         </div>
         <p className="mt-4 text-xs text-subtle">
           Or read the <Link href="/how-it-works" className="link">methodology</Link>.
@@ -281,6 +301,23 @@ export function CompareLayout({
         <a href="mailto:support@tapeline.io" className="text-accent hover:underline">Tell us</a> —
         we update within 48 hours.
       </p>
+
+      {/* Cross-cluster links — three ranking pages picked for what this
+          specific competitor is actually used for (chart-first tools point
+          at the breakout/momentum lists, fundamentals-first tools at the
+          value/dividend lists, broker apps at the price bands). The compare
+          cluster is the highest-authority surface on the site and, before
+          2026-08, passed none of that along to the ranking pages sitting at
+          search position 11-12. Edge list in lib/internalLinks.ts. */}
+      <section className="mx-auto max-w-5xl px-6 pb-4">
+        <RelatedLinks
+          heading="See the ranked lists"
+          intro={`What the comparison above describes, applied. Each list is the live universe under a different sort and filter.`}
+          links={relatedForComparison(slug)}
+          ariaLabel="Tapeline ranked lists"
+          className="border-t border-border/60 pt-8"
+        />
+      </section>
 
       {/* Internal-linking cluster — graphs every /compare/* page to all
           the others. Per the 2026-05-21 GSC audit, the comparison cluster

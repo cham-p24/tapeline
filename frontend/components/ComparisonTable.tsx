@@ -1,7 +1,8 @@
 "use client";
 
-import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
+import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 import { useBillingPeriod } from "@/components/BillingToggle";
+import { BestValueBadge } from "@/components/BestValueBadge";
 
 /**
  * Three-column comparison: Free / Pro ($9.99/mo or $8.25/mo annual) /
@@ -69,11 +70,10 @@ const SECTIONS: Section[] = [
   {
     name: "Watchlist & alerts",
     rows: [
-      { label: "Watchlist", free: `${FREE_LIMITS.watchlistTickers} tickers`, pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
+      { label: "Watchlist", free: freeHasWatchlist() ? `${FREE_LIMITS.watchlistTickers} tickers` : "—", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
       { label: "Browser push", free: `${FREE_LIMITS.webPushAlerts} alert rules`, pro: "✓", premium: "✓" },
-      { label: "Telegram alerts", free: "—", pro: "—", premium: "Unlimited · hourly digest" },
     ],
   },
   {
@@ -129,9 +129,7 @@ export function ComparisonTable() {
                 <span className="block text-[10px] text-subtle">/forever</span>
               </th>
               <th className="relative px-3 py-5 text-center align-bottom">
-                <span className="absolute left-1/2 top-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-fg px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.08em] text-background">
-                  Best value
-                </span>
+                <BestValueBadge className="absolute left-1/2 top-2 -translate-x-1/2" />
                 <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-fg">Pro</span>
                 <span className="mt-2 block text-lg font-bold text-fg nums">
                   {usd(annual ? PRICING.pro.annualPerMonth : PRICING.pro.monthly)}

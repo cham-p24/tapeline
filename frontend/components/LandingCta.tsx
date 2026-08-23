@@ -15,7 +15,7 @@ import { PRICING, REFUND, usd } from "@/lib/pricing";
  * the top of the page.
  *
  * Renders three things, in reading order:
- *   1. A prominent primary CTA — "Try the live scanner free — no card" →
+ *   1. A prominent primary CTA — "Try the live scanner — 14-day trial" →
  *      /signup?from=<from>. The signup page personalises its H1 on ?from=
  *      (finviz | screener | scorecard | compare), so each page passes the
  *      best-fitting existing slug for message-match. Secondary CTA links to
@@ -45,7 +45,7 @@ type Props = {
       (e.g. /compare/*, where the comparison table is the proof). */
   showPreview?: boolean;
   /** Primary CTA label. Defaults to the scanner-forward "Try the live scanner
-      free — no card". Pages can override for tighter intent match. */
+      — 14-day trial". Pages can override for tighter intent match. */
   primaryLabel?: string;
   /** Secondary CTA href — defaults to the public scorecard. */
   secondaryHref?: string;
@@ -58,7 +58,7 @@ type Props = {
 export function LandingCta({
   from,
   showPreview = true,
-  primaryLabel = "Try the live scanner free — no card",
+  primaryLabel = "Try the live scanner — 14-day trial",
   secondaryHref = "/scorecard",
   secondaryLabel = "See the public scorecard",
   className = "mt-6",
@@ -88,17 +88,17 @@ export function LandingCta({
         className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted"
       >
         <li className="flex items-center gap-1.5">
-          <Check /> Free forever tier — no card
+          <Check /> The published record — free to read, no account
         </li>
         {/* The trial was previously unnamed here: the strip advertised the
             free tier and the paid price, so the 14-day Premium trial — the
             actual thing the primary CTA starts — was invisible until the
             signup page. Stated as fact, no deadline framing (R6). */}
         <li className="flex items-center gap-1.5">
-          <Check /> 14-day Premium trial — no card, nothing charged
+          <Check /> 14-day Premium trial — $0 today, cancel in one click
         </li>
         <li className="flex items-center gap-1.5">
-          <Check /> Pro from {usd(PRICING.pro.monthly)}/mo · {usd(PRICING.pro.annual)}/yr
+          <Check /> Pro from {usd(PRICING.pro.annualPerMonth)}/mo · {usd(PRICING.pro.annual)}/yr
         </li>
         <li className="flex items-center gap-1.5">
           <Check /> {REFUND.windowDays}-day money-back guarantee

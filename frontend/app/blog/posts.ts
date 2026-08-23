@@ -273,7 +273,7 @@ export const POSTS: BlogPost[] = [
 
 <p>The first is the formula. If a tool ranks the entire market and hands you a verdict, the only question that matters is: <em>what is it weighing, and why?</em> A scanner that can't answer that is asking you to trust an output with no way to audit the input. "Our AI analyzes thousands of data points" is not an answer. It's a way of not answering. You can't disagree with a weighting you're not allowed to see, and you can't tell noise from signal when the whole thing is a black box.</p>
 
-<p>The second is the track record — and this is where "AI stock signals" marketing gets genuinely misleading. Look closely at how these tools present results. It's almost always a gallery of winners: a screenshot of the ticker that ran 40%, a testimonial, a green arrow. What's missing is the denominator. How many signals fired that week? How many went nowhere? How many were flatly wrong? A wall of winning trades with no losing trades isn't a track record — it's survivorship bias with a marketing budget. Any process that only publishes its wins is telling you it doesn't want you to keep score.</p>
+<p>The second is the track record — and this is where "AI stock signals" marketing gets genuinely misleading. Look closely at how these tools present results. It's almost always a gallery of winners: a screenshot of the ticker that ran 40%, a testimonial, a green arrow. What's missing is the denominator. How many signals fired that week? How many went nowhere? How many were flatly wrong? A highlight reel of hits with every miss cropped out isn't a track record — it's survivorship bias with a marketing budget. Any process that only publishes its wins is telling you it doesn't want you to keep score.</p>
 
 <p>"AI" makes both problems worse because complexity becomes the excuse. A simple weighted score is at least legible; you could, in principle, ask what each factor contributes. Once a vendor says "deep learning," the honesty bar somehow drops to zero, as if the math being complicated relieves them of the duty to show it to you. It doesn't. The more a model influences what you look at, the <em>more</em> you're owed an explanation, not less.</p>
 
@@ -817,9 +817,13 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <h2>4. Is the cheapest tier real?</h2>
       <p>Test it. If the free or cheapest paid tier strips out so many
       features the product is unusable, the team is incentivised to
-      upgrade-trap rather than retain. Tapeline Free shows live scores for
-      the top 10 scanner rows plus 5 look-ups a day, free forever — the real
-      product, just narrower — because that's the most honest preview.</p>
+      upgrade-trap rather than retain. Tapeline's answer is to put the whole
+      published record outside the paywall entirely: the daily Top 10, every
+      pick ever made with its next-session result vs SPY, a page per scored
+      ticker, and the raw CSV/JSON — no account, no card. The signed-in app
+      itself takes a card at first sign-in and starts a 14-day Premium trial
+      ($0 that day, first charge on day 14, one click to cancel). Judge the
+      product on the record before you decide whether to open an account.</p>
 
       <h2>5. Can you cancel in one click?</h2>
       <p>If you have to email support to cancel, that's a tell about how
@@ -1091,8 +1095,11 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>Want to see RSI in context for every US ticker? The Tapeline
       composite blends RSI into a single 0–100 score along with five other
-      factors. <a href="/signup">Try the 14-day Premium trial</a> — no
-      credit card.</p>
+      factors. <a href="/signup">Try the 14-day Premium trial</a> — a new
+      account adds a card at first sign-in, $0 is charged that day, and one
+      click cancels before the day-14 charge. If you'd rather not put a card
+      down, the <a href="/scorecard">public record</a> and the daily Top 10
+      stay open with no account.</p>
     `,
     howToTime: "PT8M",
     howToSteps: [
@@ -1355,9 +1362,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       is built to answer the first question. The second question
       mostly takes care of itself once the first one is settled.</p>
 
-      <p><a href="/signup">Try the 14-day Premium trial</a> — no card,
-      cancel in one click. Read every score the same way our public
-      scorecard does.</p>
+      <p><a href="/signup">Try the 14-day Premium trial</a> — $0 charged
+      today, first charge on day 14, cancel in one click before then. Read
+      every score the same way our public scorecard does.</p>
     `,
     howToTime: "PT7M",
     howToSteps: [
@@ -1560,7 +1567,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       numbers don't hold up, we're not the right product for you. If
       they do, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=best_scanner_under_30">14-day
-      Premium trial</a> is the no-card way to see it from the inside.</p>
+      Premium trial</a> is the way to see it from the inside — a card, $0
+      charged today, and one click to cancel before the day-14 charge.</p>
     `,
   },
   {
@@ -1743,8 +1751,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       (2) raw filtered transactions at /app/holdings.</p>
 
       <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">14-day
-      Premium trial — no card</a>. Read 90 days of filtered Form 4
-      activity across the full universe. Cancel in one click.</p>
+      Premium trial — $0 today</a>. Read 90 days of filtered Form 4
+      activity across the full universe. The trial takes a card; the first
+      charge is on day 14 and one click cancels before then.</p>
     `,
   },
   {
@@ -1848,8 +1857,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       slightly different: how often does the SCORE refresh, not just
       the underlying price? Tapeline's worker ticks every 60 seconds
       during market hours, recomputing the composite from fresh
-      snapshot data. Free tier is 24-hour-delayed (intentional
-      gating); Pro is 60-second freshness.</p>
+      snapshot data — and the public ticker pages show that live score
+      without an account.</p>
 
       <h2>Test 5: What's the unsubscribe / cancel friction?</h2>
 
@@ -1885,9 +1894,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Public scoring methodology</td>
               <td>Yes — six named factors at <a href="/how-it-works">/how-it-works</a>, contribution shown per ticker</td></tr>
           <tr><td>Data freshness</td>
-              <td>60s composite refresh on Pro+; live scores on Free too (gated on breadth, not freshness)</td></tr>
+              <td>60s composite refresh; the public ticker pages show the same live score with no account</td></tr>
           <tr><td>Cancel friction</td>
-              <td>One-click cancel, 30-day refund, no card required for trial</td></tr>
+              <td>One-click cancel, 30-day refund. The trial takes a card at first sign-in and charges $0 until day 14; the published record needs no account at all</td></tr>
         </tbody>
       </table>
 
@@ -1916,8 +1925,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       product that fits you better than win it via misleading
       claims. If the scorecard convinces you, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">14-day
-      Premium trial</a> is the no-card way to see the rest. If it
-      doesn't, that's useful information too.</p>
+      Premium trial</a> is the way to see the rest — $0 charged today, one
+      click to cancel before the day-14 charge. If it doesn't, that's useful
+      information too.</p>
     `,
   },
 ];

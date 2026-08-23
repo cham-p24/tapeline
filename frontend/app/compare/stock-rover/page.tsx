@@ -16,7 +16,7 @@ const WINS: CompareRow[] = [
   },
   {
     label: "Plain-English Why on every row",
-    tapeline: "✓ Default sentence, every ticker, free tier included",
+    tapeline: "✓ Default sentence, every ticker — public ticker pages included",
     competitor: "Raw metric tables; no synthesised one-line read per ticker",
   },
   {
@@ -40,8 +40,9 @@ const WINS: CompareRow[] = [
     competitor: "Functional but desktop-first; mobile experience is limited",
   },
   {
-    label: "Try without a card",
-    tapeline: "✓ 14-day full Premium trial, no card",
+    label: "Trial terms",
+    tapeline:
+      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
     competitor: "Free tier exists but limited; paid tiers require card upfront",
   },
   {

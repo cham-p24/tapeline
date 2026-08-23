@@ -34,7 +34,16 @@ def is_sqlite() -> bool:
 
 # SQLite doesn't use connection pools the same way; skip pool args for it
 _engine_kwargs: dict = {"echo": False}
-if not settings.database_url.startswith("sqlite"):
+if settings.database_url.startswith("sqlite"):
+    # SQLite (dev + CI) raw connections default to a 0ms busy-timeout, so two
+    # concurrent writers instantly race to "sqlite3.OperationalError: database is
+    # locked" — the recurring CI flake in the session-scoped, no-rollback test DB
+    # (e.g. test_lookup_meter_surface hitting /api/auth/signup while another test
+    # writes). A 30s busy-timeout makes a contended connection WAIT for the lock
+    # (which clears in milliseconds) instead of erroring. aiosqlite forwards
+    # `timeout` straight to sqlite3.connect(). No-op for Postgres (prod).
+    _engine_kwargs["connect_args"] = {"timeout": 30}
+else:
     _engine_kwargs.update({
         "pool_pre_ping": True,
         "pool_size": 10,

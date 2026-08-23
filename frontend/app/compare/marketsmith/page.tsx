@@ -19,7 +19,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How does the pricing compare?",
-    a: "MarketSmith is approximately $74.95/mo (basic plan) or $174.95/mo (full version with industry charts). Tapeline Pro is $8.25/mo annual ($99/yr); Premium is $16.58/mo annual ($199/yr). Tapeline Premium at the annual rate is under a quarter of the cost of MarketSmith basic — and adds Congressional trades, insider Form 4, unlimited Telegram alerts.",
+    a: "MarketSmith is approximately $74.95/mo (basic plan) or $174.95/mo (full version with industry charts). Tapeline Pro is $8.25/mo annual ($99/yr); Premium is $16.58/mo annual ($199/yr). Tapeline Premium at the annual rate is under a quarter of the cost of MarketSmith basic — and adds Congressional trades and insider Form 4.",
   },
   {
     q: "Does MarketSmith publish a scorecard?",
