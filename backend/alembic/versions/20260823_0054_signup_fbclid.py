@@ -42,8 +42,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0053_signup_fbclid"
-down_revision: str | None = "0052_signin_codes"
+revision: str = "0054_signup_fbclid"
+down_revision: str | None = "0053_score_snapshots"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
