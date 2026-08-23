@@ -63,6 +63,39 @@ _CANCEL_REASONS = frozenset(
 # drift from the billed date.
 TRIAL_DAYS = 14
 
+# ── Floor on a NEW trial, and why it is not a preference ────────────────────
+#
+# We collect a card up front, so the trial ends in a real charge. The only
+# thing standing between that charge and a surprised customer is the pre-charge
+# warning email (services/email.render_trial_precharge_reminder_email), and that
+# email does not run on a timer of ours — it rides on Stripe's
+# `customer.subscription.trial_will_end`, which fires about THREE DAYS before
+# the trial ends. Its own subject line says "Your trial ends in 3 days."
+#
+# Two places promise that warning to the customer IN WRITING:
+#   * /legal/refund §4 — "we email you three days before that happens"
+#   * the trial disclosure at the card wall
+#
+# So a new trial shorter than the warning window would charge someone without
+# the notice we told them they would get. That is the chargeback-and-complaint
+# pattern the reminder exists to prevent, and on a financial product it is a
+# consumer-law problem rather than a UX one.
+#
+# Hence: this is an invariant, not a tunable. Shortening the trial below
+# MIN_TRIAL_DAYS is only safe if the pre-charge notice is first moved onto a
+# mechanism we control (a scheduled send keyed on trial_ends_at) instead of
+# Stripe's fixed T-3 event. Raise this floor freely; lower it only with that
+# work done, and update the two copy surfaces above in the same change.
+MIN_TRIAL_DAYS = 3
+
+if TRIAL_DAYS < MIN_TRIAL_DAYS:  # pragma: no cover - import-time invariant
+    raise RuntimeError(
+        f"TRIAL_DAYS={TRIAL_DAYS} is below MIN_TRIAL_DAYS={MIN_TRIAL_DAYS}. "
+        "A trial this short ends before Stripe's trial_will_end event can warn "
+        "the customer, so they would be charged without the notice /legal/refund "
+        "promises them in writing. See the comment above MIN_TRIAL_DAYS."
+    )
+
 # Why a given account may not start a trial. Machine-readable code → the plain
 # sentence we're willing to show. One trial per account, and never as a
 # substitute for a purchase someone has already made.
@@ -152,12 +185,19 @@ async def create_checkout(
     #   start_trial=False → the pre-existing mid-trial card-add: forward the
     #     user's REMAINING trial so adding a card doesn't charge today and
     #     silently forfeit the free days already promised. Unchanged.
+    #
+    # The MIN_TRIAL_DAYS floor applies to the FIRST branch only. The second one
+    # forwards a trial the user is already inside and already knows the end date
+    # of; clamping it up to 3 days would silently EXTEND someone's trial past
+    # the date we disclosed, which is a different lie. Its short-remainder case
+    # is handled where it belongs — services/billing drops trial_end under
+    # Stripe's 48h minimum rather than failing the checkout.
     trial_end: datetime | None
     if body.start_trial:
         reason = _trial_ineligible_reason(user)
         if reason is not None:
             raise HTTPException(409, _TRIAL_INELIGIBLE_MESSAGES[reason])
-        trial_end = datetime.now(UTC) + timedelta(days=TRIAL_DAYS)
+        trial_end = datetime.now(UTC) + timedelta(days=max(TRIAL_DAYS, MIN_TRIAL_DAYS))
     else:
         trial_end = (
             user.trial_ends_at

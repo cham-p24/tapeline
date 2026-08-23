@@ -77,3 +77,56 @@ def test_signup_paths_do_not_grant_a_cardless_trial():
             f"{path} still creates an account on premium — the trial is "
             f"card-required and is granted by the Stripe trialing webhook"
         )
+
+# ── The trial cannot be shortened out from under the warning ────────────────
+#
+# The reminder above fires on Stripe's `customer.subscription.trial_will_end`,
+# which lands about three days out and no earlier. A trial shorter than that
+# ends before the warning can reach anyone, so the T-3 promise on /legal/refund
+# would become false the moment TRIAL_DAYS dropped to 2. These tests make that
+# a build failure rather than a discovery in a chargeback.
+
+
+def test_trial_length_cannot_drop_below_the_warning_window():
+    from app.routers.billing import MIN_TRIAL_DAYS, TRIAL_DAYS
+
+    assert MIN_TRIAL_DAYS >= 3, (
+        "MIN_TRIAL_DAYS is the width of Stripe's trial_will_end window. Below 3 "
+        "the pre-charge email cannot fire before the charge, whatever it is set to."
+    )
+    assert TRIAL_DAYS >= MIN_TRIAL_DAYS, (
+        f"TRIAL_DAYS={TRIAL_DAYS} would charge a customer without the three-day "
+        f"notice /legal/refund promises. Move the notice off Stripe's fixed T-3 "
+        f"event before lowering this."
+    )
+
+
+def test_new_trials_are_clamped_to_the_floor():
+    """The mint site clamps, so the floor holds even if TRIAL_DAYS is edited."""
+    import pathlib
+
+    src = pathlib.Path("app/routers/billing.py").read_text(encoding="utf-8")
+    assert "max(TRIAL_DAYS, MIN_TRIAL_DAYS)" in src, (
+        "the new-trial branch must clamp to MIN_TRIAL_DAYS — without it, a "
+        "shortened TRIAL_DAYS reaches Stripe before the import-time invariant "
+        "is the only thing left protecting the customer"
+    )
+
+
+def test_refund_policy_still_promises_the_three_day_notice():
+    """The floor exists to keep this sentence true — pin them together.
+
+    If the copy is ever reworded away from a three-day promise, this test
+    should be updated in the SAME change that reconsiders MIN_TRIAL_DAYS,
+    rather than the two drifting apart silently.
+    """
+    import pathlib
+
+    page = pathlib.Path("../frontend/app/legal/refund/page.tsx")
+    if not page.exists():  # backend-only checkouts
+        return
+    text = " ".join(page.read_text(encoding="utf-8").split())
+    assert "we email you three days before" in text, (
+        "/legal/refund no longer promises the three-day pre-charge notice. If "
+        "that was deliberate, revisit MIN_TRIAL_DAYS in routers/billing.py too."
+    )
