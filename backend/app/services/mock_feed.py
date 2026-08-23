@@ -295,7 +295,16 @@ def _signal_from_score(score: float | None) -> str | None:
     return "WEAK"                                 # score 0-24
 
 
-def _render_reason(symbol: str, sector: str, trend: float, rs: float, fund: float, mom: float, macro: float, smart: float) -> str:
+def _render_reason(
+    symbol: str,
+    sector: str,
+    trend: float | None,
+    rs: float | None,
+    fund: float | None,
+    mom: float | None,
+    macro: float | None,
+    smart: float | None,
+) -> str:
     """
     Per-ticker reason string that describes WHICH of Tapeline's six factor
     scores are driving the composite, and nothing else.
@@ -313,6 +322,24 @@ def _render_reason(symbol: str, sector: str, trend: float, rs: float, fund: floa
       scores. (Real polygon_feed should pass deterministic seeds for stable
       wording across reads.)
     """
+    # A factor we hold NO READING for contributes no clause. The sentence
+    # describes which factors are driving the composite, so inventing a band
+    # for a missing one would assert a measurement we do not have — the same
+    # defect as scoring it 0 or plotting it at the chart origin.
+    #
+    # Every band test below is an interval that excludes the 50 midpoint
+    # exactly (>=80/>=65/<=20/<=35 for trend, >=75/>=60/<=25/<=40 for rs, and
+    # so on), so substituting the midpoint IS "produces no clause". Pinned by
+    # test_reason_omits_missing_factors.py so a future re-banding that touches
+    # 50 cannot silently turn absence into a claim.
+    _NO_CLAUSE = 50.0
+    trend = _NO_CLAUSE if trend is None else trend
+    rs = _NO_CLAUSE if rs is None else rs
+    fund = _NO_CLAUSE if fund is None else fund
+    mom = _NO_CLAUSE if mom is None else mom
+    macro = _NO_CLAUSE if macro is None else macro
+    smart = _NO_CLAUSE if smart is None else smart
+
     parts: list[tuple[float, str]] = []  # (abs_strength, phrase)
 
     if trend >= 80:
