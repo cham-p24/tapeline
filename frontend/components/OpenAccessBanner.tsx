@@ -45,7 +45,7 @@ export function OpenAccessBanner({
     >
       <span className="font-semibold text-accent">Open-access month:</span>{" "}
       until 8 September, every signed-in account sees the full scanner list
-      &mdash; up to {PRO_SCANNER_ROWS.toLocaleString("en-US")} rows, the same
+      &mdash; up to {PRO_SCANNER_ROWS.toLocaleString("en-US")}{" "}rows, the same
       list Pro gets &mdash; free accounts included. Signed out, you get the top{" "}
       {FREE_LIMITS.scannerRows}.{" "}
       <Link
