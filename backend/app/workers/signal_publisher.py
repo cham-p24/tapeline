@@ -315,12 +315,31 @@ async def tick() -> None:
             if not batch:
                 continue
             columns = [k for k in batch[0] if k != "symbol"]
+            # CORE update against the TABLE, deliberately — not update(Ticker).
+            #
+            # Targeting the ORM entity routes this through ORM bulk-persistence,
+            # which tries to interpret the parameter dicts as "bulk update by
+            # primary key". That path cannot coexist with the explicit WHERE this
+            # statement needs, and SQLAlchemy refuses it outright:
+            #   "bulk synchronize of persistent objects not supported when using
+            #    bulk update with additional WHERE criteria"
+            # Every tick raised that for four hours after #564 shipped — scores
+            # stopped updating, the backfills never ran, and the resulting
+            # degraded:worker_last_tick failed the post-deploy smoke check on two
+            # later deploys as well.
+            #
+            # Ticker.__table__ drops to Core, so this is a plain executemany:
+            # one UPDATE per row, bound by b_symbol, with no identity-map
+            # semantics to conflict with. `symbol` is deliberately NOT in the
+            # parameter dicts — its presence is what invites the ORM bulk-by-PK
+            # interpretation in the first place.
+            tbl = Ticker.__table__
             stmt = (
-                update(Ticker)
-                .where(Ticker.symbol == bindparam("b_symbol"))
+                update(tbl)
+                .where(tbl.c.symbol == bindparam("b_symbol"))
                 .values({
                     col: (
-                        func.coalesce(bindparam(col), getattr(Ticker, col))
+                        func.coalesce(bindparam(col), tbl.c[col])
                         if col in cache_derived
                         else bindparam(col)
                     )
@@ -329,7 +348,13 @@ async def tick() -> None:
             )
             await session.execute(
                 stmt,
-                [{**row, "b_symbol": row["symbol"]} for row in batch],
+                [
+                    {
+                        **{k: v for k, v in row.items() if k != "symbol"},
+                        "b_symbol": row["symbol"],
+                    }
+                    for row in batch
+                ],
             )
 
         # --- Replace squeeze setups ---

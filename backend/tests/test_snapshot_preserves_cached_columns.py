@@ -28,7 +28,10 @@ SRC = inspect.getsource(signal_publisher.publish_tick) if hasattr(
 
 def test_cache_derived_columns_are_coalesced():
     assert 'cache_derived = ("market_cap", "week52_high", "week52_low", "avg_volume_30d")' in SRC
-    assert "func.coalesce(bindparam(col), getattr(Ticker, col))" in SRC
+    # Core table form: update(Ticker) routes through ORM bulk-by-PK, which
+    # cannot carry an explicit WHERE — that combination took the worker down.
+    assert "func.coalesce(bindparam(col), tbl.c[col])" in SRC
+    assert "update(tbl)" in SRC
 
 
 def test_snapshot_fields_are_NOT_coalesced():
