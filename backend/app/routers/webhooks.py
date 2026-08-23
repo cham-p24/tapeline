@@ -169,9 +169,20 @@ async def _send_purchase_conversion(
             # user id, so read the address here rather than threading it
             # through every call site. Hashing happens inside meta_capi — the
             # raw address never leaves this process.
-            email = (
-                await session.execute(select(User.email).where(User.id == user_id))
-            ).scalar_one_or_none()
+            #
+            # The stored Meta click id comes along in the same read. A purchase
+            # lands ~14 days after the click with no browser present, so `fbc`
+            # can only be rebuilt server-side from the persisted fbclid — and
+            # without it the fbclid → User → Stripe join that is the only
+            # honest Meta payer count has nothing to key on.
+            row = (
+                await session.execute(
+                    select(User.email, User.signup_fbclid, User.created_at)
+                    .where(User.id == user_id)
+                )
+            ).one_or_none()
+            email = row[0] if row else None
+            purchase_fbc = meta_capi.fbc_value(row[1], row[2]) if row else None
             await meta_capi.track_purchase(
                 user_id=user_id,
                 transaction_id=str(checkout_session_id),
@@ -180,6 +191,7 @@ async def _send_purchase_conversion(
                 currency=currency,
                 tier=tier,
                 billing_period=billing_period,
+                fbc=purchase_fbc,
             )
     except Exception:
         # Analytics must never fail a money-path webhook.
@@ -435,8 +447,17 @@ async def stripe_webhook(
                     try:
                         from app.services import meta_capi
 
+                        # fbc carries the Meta click id captured at signup.
+                        # This event fires from a Stripe webhook days after
+                        # the click with no browser present, so the value is
+                        # rebuilt server-side from the stored fbclid — that is
+                        # the whole reason meta_capi.fbc_value() exists.
+                        # Unhashed by contract; hashing it zeroes its value.
                         await meta_capi.track_start_trial(
                             user_id=user.id, email=user.email,
+                            fbc=meta_capi.fbc_value(
+                                user.signup_fbclid, user.created_at,
+                            ),
                         )
                     except Exception:
                         logger.exception("stripe.meta_start_trial_failed user=%s", user.id)
