@@ -14,6 +14,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
 from app.models.scanner_preset import ScannerPreset
+from app.models.score_snapshot import ScoreSnapshot
 from app.models.scorecard import DailyScorecardEntry
 from app.models.signin_code import SigninCode
 from app.models.squeeze import SqueezeSetup
@@ -46,6 +47,7 @@ __all__ = [
     "RegimeState",
     "RoadmapVote",
     "ScannerPreset",
+    "ScoreSnapshot",
     "SigninCode",
     "SqueezeSetup",
     "StripeWebhookEvent",
