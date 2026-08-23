@@ -71,7 +71,7 @@ This reverses the recommendation in #538's PR description, for a reason that onl
 - Meta's smart bidding wants **~50 optimisation events per ad set per week** to leave the learning phase.
 - Since #536 the trial is card-required, so `StartTrial` is now *genuinely scarce* — it is a strong intent signal precisely because few people do it. At Tapeline's volume it will not come close to 50/week.
 - `Purchase` is scarcer still, and arrives 14 days late — outside Meta's 7-day click window by construction (`META_ADS_DECISION.md` §7).
-- `CompleteRegistration` (free account, no card) is the only event with any chance of volume, and since #536 decoupled it from the trial it is a clean, honest signal on its own.
+- `CompleteRegistration` (email + password only — the `/app/start` card wall follows at first sign-in, per #548) is the only event with any chance of volume, and since #536 decoupled it from the trial it is a clean, honest signal on its own.
 
 **Send all three regardless** — they are all wired, and the funnel view is what makes the test readable. *Which one you optimise toward is a campaign setting, not a code change.*
 

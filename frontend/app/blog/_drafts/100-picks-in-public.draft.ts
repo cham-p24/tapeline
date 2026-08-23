@@ -36,8 +36,8 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
   author: "{{FOUNDER_NAME}}",
   body: `
     <p>When Tapeline launched, the only thing it could honestly say about its
-    own performance was: "the formula is public, the scorecard is public, come
-    back when there are receipts." That sentence was useful exactly once.</p>
+    own performance was: "the methodology is public, the scorecard is public,
+    come back when there are receipts." That sentence was useful exactly once.</p>
 
     <p>This is the receipt. As of {{LAUNCH_DATE_HUMAN}}, the public scorecard
     holds <strong>100 top-10 daily picks</strong> — every one logged at session
@@ -65,8 +65,10 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
 
     <p>If you're new here: each evening Tapeline auto-publishes the day's
     top-10 highest-scoring tickers from a universe of ~2,500 active US
-    names. The 6-factor formula and its weights are public on
-    <a href="/how-it-works">/how-it-works</a>; the next day, the scorecard
+    names. The six factors are named on
+    <a href="/how-it-works">/how-it-works</a>, along with which carry the most
+    weight — most toward Trend and Relative Strength, least toward Momentum;
+    the next day, the scorecard
     records where each name actually closed and computes the alpha vs SPY.
     No hindsight edits, no cherry-picking.</p>
 

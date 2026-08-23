@@ -56,12 +56,12 @@ const HOW_FAQ = [
 // in backend/app/services/score.py measures the ticker's change minus the
 // broad-market benchmark's over 3M/6M/1Y and is not sector-adjusted at all.
 const FACTORS = [
-  { name: "Trend",               slug: "trend",             emphasis: "Weighted most", desc: "Direction and quality of the price trend across short-, medium-, and long-term timeframes." },
+  { name: "Trend",               slug: "trend",             emphasis: "Weighted most", desc: "How far price has moved over a multi-month window, and where it sits inside its own 52-week range." },
   { name: "Relative strength",   slug: "relative-strength", emphasis: "High",          desc: "The stock's price change minus the broad-market benchmark's, over three horizons. Not sector-adjusted." },
-  { name: "Fundamentals",        slug: "fundamentals",      emphasis: "Core",          desc: "Earnings quality, growth, profitability, and balance-sheet health." },
+  { name: "Fundamentals",        slug: "fundamentals",      emphasis: "Core",          desc: "Reported margin, return on equity, EPS and revenue growth, and an earnings multiple." },
   { name: "Smart money",         slug: "smart-money",       emphasis: "Core",          desc: "Net direction of insider transactions disclosed to the SEC on Form 4." },
   { name: "Macro",               slug: "macro",             emphasis: "Core",          desc: "The prevailing market regime, applied identically to every ticker on a given tick." },
-  { name: "Momentum",            slug: "momentum",          emphasis: "Weighted least", desc: "Short-horizon price acceleration and breakout posture." },
+  { name: "Momentum",            slug: "momentum",          emphasis: "Weighted least", desc: "Short-horizon rate of change: a momentum-quality reading blended with a short-horizon return." },
 ];
 
 const SIGNALS = [
@@ -273,9 +273,12 @@ export default function HowItWorksPage() {
       {/* CTA */}
       <section className="section py-8 sm:py-10 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
-        <p className="mt-3 text-muted">14-day Premium trial &mdash; $0 today, cancel in one click.</p>
+        <p className="mt-3 text-muted">
+          14-day Premium trial &mdash; a card at first sign-in, $0 charged that day, first
+          charge on day 14, one click to cancel.
+        </p>
         <Link href="/signup" className="btn-primary mt-6 inline-flex h-11 px-6 text-base">
-          Try Premium free &rarr;
+          Start the 14-day trial &rarr;
         </Link>
       </section>
 

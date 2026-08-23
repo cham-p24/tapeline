@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs Webull.",
     subtitle:
-      "Dedicated scanner with published 6-factor formula + public scorecard vs broker-bundled filter set. Different category of tool.",
+      "Dedicated scanner with published 6-factor methodology + public scorecard vs broker-bundled filter set. Different category of tool.",
   });
 }

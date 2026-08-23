@@ -135,7 +135,7 @@ export default async function LandingPage() {
                 href="/signup"
                 className="btn border border-accent/60 text-base text-accent transition-colors hover:bg-accent/10"
               >
-                Start the free trial
+                Start the Premium trial
               </Link>
               <Link
                 href="/daily-picks"
@@ -289,7 +289,7 @@ export default async function LandingPage() {
                   Tapeline never tells you to buy, sell, or hold. Scores describe
                   what the tape is doing &mdash; the decision is yours.{" "}
                   <Link href="/how-it-works" className="link">
-                    Read the formula
+                    Read the methodology
                   </Link>
                   .
                 </>

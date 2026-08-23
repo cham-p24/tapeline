@@ -14,6 +14,6 @@ export default async function OG() {
     eyebrow: "PRESS KIT",
     title: "Tapeline press + fact sheet.",
     subtitle:
-      "Logos, founder bio, the 6-factor formula in one paragraph, and links to the public scorecard.",
+      "Logos, founder bio, the six-factor methodology in one paragraph, and links to the public scorecard.",
   });
 }

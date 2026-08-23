@@ -1,7 +1,7 @@
 # Tapeline — every angle to get the first paying customers (2026-08-01)
 
 State: product built, funnel converts, ~16 users, **0 paying**, no budget, no aged
-social accounts, solo AU founder, USP = radical transparency (public formula +
+social accounts, solo AU founder, USP = radical transparency (published methodology — six named factors +
 public next-day-vs-SPY scorecard). Compliance: descriptive-only, no
 buy/sell/recommend/beat-market.
 

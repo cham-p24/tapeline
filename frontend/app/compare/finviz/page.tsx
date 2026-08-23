@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Finviz Elite (2026): Synthesis, Public Formula, Daily Scorecard",
+  title: "Tapeline vs Finviz Elite (2026): Synthesis, Published Methodology, Daily Scorecard",
   description:
     "Tapeline vs Finviz Elite — one composite score per ticker, plain-English Why on every row, and a public next-day scorecard, none of which Finviz publishes. 9 categories Tapeline wins, 3 honest tradeoffs.",
   path: "/compare/finviz",
@@ -28,7 +28,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Does Finviz publish its scoring formula?",
-    a: "Finviz does not publish a single composite score per ticker. It provides ~60 raw screener fields (P/E, RSI, EMA distance, insider ownership, etc.) and lets you filter against them. Tapeline names all six factors behind its composite and shows how they're weighted on /how-it-works.",
+    a: "Finviz does not publish a single composite score per ticker. It provides ~60 raw screener fields (P/E, RSI, EMA distance, insider ownership, etc.) and lets you filter against them. Tapeline names all six factors behind its composite and publishes their weight ordering on /how-it-works — most on Trend and Relative Strength, least on Momentum.",
   },
   {
     q: "Does Tapeline cover penny stocks like Finviz?",
@@ -115,7 +115,7 @@ const TRADEOFFS = [
     label: "Cheapest paid tier",
     tapeline: "$8.25/mo (Pro, billed annually)",
     competitor: "$24.96/mo (Elite, billed annually)",
-    note: "Effectively identical. Tapeline includes the score + sentence + scorecard at the same price.",
+    note: "Tapeline Pro is the cheaper of the two at the annual rate — roughly a third of Finviz Elite — and includes the score, the sentence, and the scorecard. What Finviz Elite buys at its price is the filter depth in the row above, not a lower bill.",
   },
 ];
 

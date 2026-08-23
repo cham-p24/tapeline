@@ -104,9 +104,9 @@ async def render_pricing(_body: str) -> str:
     """
     return (
         "The published record is free with no account at all: the daily top 10, "
-        "the full scorecard back-checked vs SPY, a page per scored ticker, and "
+        "the scorecard back-checked vs SPY, a page per scored ticker, and "
         "the raw CSV/JSON. For the live scanner: Pro is $8.25/mo annual "
-        "($9.99 monthly) for the full ~2,500-ticker live scan + smart "
+        "($9.99 monthly) for the full live scan + smart "
         "watchlist alerts. Premium is $16.58/mo annual ($19.99 monthly) "
         "for everything in Pro + congressional trades + insider Form 4 "
         "buys. A new account puts a card on file at first sign-in, which "
@@ -122,10 +122,10 @@ async def render_trial(_body: str) -> str:
         "There's a 14-day Premium trial — a new account adds a card at first "
         "sign-in, but nothing is charged that day. The first charge is on day "
         "14 and one click cancels before then. tapeline.io/signup. The full "
-        "~2,500-ticker universe, scorecard, watchlist alerts, "
+        "scored universe, scorecard, watchlist alerts, "
         "congressional/insider feeds — all included for the trial window. If "
-        "you'd rather not put a card down, the daily top 10 and the whole "
-        "public record are readable with no account at tapeline.io/scorecard."
+        "you'd rather not put a card down, the daily top 10 and the published "
+        "record are readable with no account at tapeline.io/scorecard."
     )
 
 

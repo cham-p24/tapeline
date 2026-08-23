@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tapeline — Stock Score & Track Record",
-  "version": "1.2.1",
-  "description": "Tapeline's six-factor score and track record for the stock you're viewing. Free account required. Sends only the ticker.",
+  "version": "1.2.2",
+  "description": "Tapeline's six-factor score and track record for the stock you're viewing. Tapeline account required. Sends only the ticker.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

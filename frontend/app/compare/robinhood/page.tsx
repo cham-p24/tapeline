@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Robinhood (2026): Research Workflow vs Gamified Discovery",
   description:
-    "Tapeline vs Robinhood — published 6-factor composite, plain-English Why, and a public scorecard, vs Robinhood's minimal in-app discovery designed for the trade-now retail flow.",
+    "Tapeline vs Robinhood — published 6-factor composite score, plain-English Why, and a public scorecard, vs Robinhood's minimal in-app discovery designed for the trade-now retail flow.",
   path: "/compare/robinhood",
 });
 
@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What does Tapeline cost compared to free Robinhood?",
-    a: "Robinhood is free; the trading account doesn't carry a subscription. Tapeline Pro is $8.25/mo billed annually. The fee buys you the published 6-factor formula, sub-60s composite refresh, public scorecard, and the alert / watchlist / squeeze tools. If you're happy with Robinhood's collections-style discovery, free works. If you want a research workflow with receipts, Tapeline.",
+    a: "Robinhood is free; the trading account doesn't carry a subscription. Tapeline Pro is $8.25/mo billed annually. The fee buys you the published 6-factor methodology, sub-60s composite refresh, public scorecard, and the alert / watchlist / squeeze tools. If you're happy with Robinhood's collections-style discovery, free works. If you want a research workflow with receipts, Tapeline.",
   },
   {
     q: "How is this different from Robinhood Gold?",
@@ -48,7 +48,7 @@ const WINS = [
     competitor: "Not available — no published track record on Collections / Top Movers",
   },
   {
-    label: "Published scoring formula",
+    label: "Published scoring methodology",
     tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Not available — Collections are editorial, no methodology disclosed",
   },
@@ -74,7 +74,7 @@ const TRADEOFFS = [
     label: "Cost",
     tapeline: "$8.25/mo (Pro, billed annually)",
     competitor: "Free (Robinhood Gold optional at $5/mo)",
-    note: "Robinhood is free. Tapeline is a paid research tool. The honest answer: if you're discovering stocks via collections and 'Top Movers', Robinhood works at $0. Tapeline starts to earn its $25/mo when you want a research workflow with a published methodology + receipts.",
+    note: "Robinhood is free. Tapeline is a paid research tool. The honest answer: if you're discovering stocks via collections and 'Top Movers', Robinhood works at $0. Tapeline starts to earn its $8.25/mo when you want a research workflow with a published methodology + receipts.",
   },
   {
     label: "Trade execution",

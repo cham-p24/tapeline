@@ -143,7 +143,13 @@ def _suggest_upgrade(tier: Tier, wl: int, alerts: int, caps: dict) -> dict | Non
     if tier == Tier.FREE:
         return {
             "reason": "upgrade",
-            "message": "Unlock live data and full features with Pro.",
+            # Deliberately does NOT say "unlock the full scanner/universe":
+            # this endpoint is auth-required, so its only audience is SIGNED-IN
+            # Free users — exactly the cohort whose scanner_rows cap is lifted
+            # to the Pro value while the open-access window runs (see
+            # tier.free_open_access). Email alerts and CSV export are Pro-gated
+            # in tier.FEATURES in both windows, so only those are claimed here.
+            "message": "Unlock email alerts and CSV export with Pro.",
             "target_tier": "pro",
         }
     return None

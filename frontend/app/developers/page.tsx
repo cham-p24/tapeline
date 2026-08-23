@@ -56,7 +56,7 @@ const ENDPOINTS: Endpoint[] = [
     method: "GET",
     path: "/api/v1/regime",
     summary:
-      "Current macro-regime snapshot — VIX, DXY, 10Y yield, rate direction, breadth, and sector leaders. The same inputs that feed the 15% macro pillar of every score.",
+      "Current macro-regime snapshot — VIX, DXY, 10Y yield, rate direction, breadth, and sector leaders.",
   },
 ];
 
@@ -106,7 +106,7 @@ const FAQ = [
   },
   {
     q: "Is the scoring formula documented?",
-    a: "Yes — the six named factors and how they're weighted are public at /how-it-works, with each factor's contribution shown per ticker. Scores are descriptive (a measurement), never prescriptive (not buy/sell advice).",
+    a: "The six named factors and the ordering of their weights are public at /how-it-works — weighted most toward Trend and Relative Strength, least toward Momentum — with each factor's contribution shown per ticker. The exact numeric weights are not published. Scores are descriptive (a measurement), never prescriptive (not buy/sell advice).",
   },
   {
     q: "Is there a free tier for the API?",
@@ -145,7 +145,7 @@ export default function DevelopersPage() {
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/signup" className="btn-primary">
-            Start a free 14-day trial &rarr;
+            Start the 14-day trial &rarr;
           </Link>
           <Link href="/app/api-keys" className="btn-ghost">
             Manage API keys
@@ -209,9 +209,11 @@ export default function DevelopersPage() {
               <code className="font-mono text-fg">GET /api/v1/me</code>.
             </li>
             <li>
-              <strong className="text-fg">Scores are descriptive, not advice.</strong> The exact
-              6-factor formula is public at{" "}
-              <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
+              <strong className="text-fg">Scores are descriptive, not advice.</strong> The six named
+              factors and the ordering of their weights are public at{" "}
+              <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>{" "}
+              &mdash; weighted most toward Trend and Relative Strength, least toward Momentum. The
+              exact numeric weights are not published.
             </li>
             <li>
               <strong className="text-fg">Stable contract.</strong> A 0&ndash;100 score, a descriptive
@@ -241,12 +243,13 @@ export default function DevelopersPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">Build on the tape.</h2>
           <p className="mt-3 text-sm text-muted">
-            Premium includes the API, 1,000 requests/day, and everything else. 14-day trial, no
-            credit card.
+            Premium includes the API, 1,000 requests/day, and everything else. 14-day Premium trial
+            &mdash; a card at first sign-in, $0 charged that day, first charge on day 14, one click
+            to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Try Premium free &rarr;
+              Start the 14-day trial &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost">
               See pricing

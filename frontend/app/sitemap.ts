@@ -62,7 +62,7 @@ const UNIVERSE_TIMEOUT_MS = 8000;
 // so EVERY scored ticker is durably listed regardless of its score rank. This
 // is the logical completion of the 250→1000→2000→"index everything" expansion.
 // Both /api/public/* endpoints are no-auth and not tier-gated; /api/scanner
-// would cap anonymous callers at the FREE-tier 20 rows, defeating it entirely.
+// would cap anonymous callers at the FREE-tier 10 rows, defeating it entirely.
 // (Frontend-only: the backend 2,000-per-response cap is untouched — we just
 // make more calls. Raising that cap would need a manual Fly deploy.)
 const UNIVERSE_PAGE_SIZE = 2000; // = backend hard cap per /api/public/signals response
@@ -167,7 +167,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/daily-picks`,               lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/signals`,                   lastModified: now, changeFrequency: "daily", priority: 0.9 },
     // Stock coverage directory — the HTML-sitemap crawl path to EVERY scored
-    // /t/{symbol} page (the /signals preview wall + top-20 sector hubs left the
+    // /t/{symbol} page (the /signals preview wall + top-30 sector hubs left the
     // long tail orphaned). Membership churns slowly via auto-discovery → daily.
     { url: `${base}/stocks`,                    lastModified: now, changeFrequency: "daily", priority: 0.8 },
     // Sector hub-of-hubs — shallow crawl entry point into the 11 /sector/{slug}

@@ -8,7 +8,7 @@
 
 ## TL;DR
 
-Tapeline is a pre-launch quantitative stock scanner. We have a strong product story (public formula, public scorecard), strong site IA (681 URLs in sitemap), and **zero presence in Google's index** as of the audit. The job is to land the technical foundations cleanly, ship enough programmatic surface to compound, and build authority via content + comparison pages — without wasting the first six months on link spam.
+Tapeline is a pre-launch quantitative stock scanner. We have a strong product story (published methodology, public scorecard), strong site IA (681 URLs in sitemap), and **zero presence in Google's index** as of the audit. The job is to land the technical foundations cleanly, ship enough programmatic surface to compound, and build authority via content + comparison pages — without wasting the first six months on link spam.
 
 This doc is the operating plan, not a one-time deliverable. Update it when something changes.
 
@@ -16,7 +16,7 @@ This doc is the operating plan, not a one-time deliverable. Update it when somet
 
 ## 1. Strategy in one paragraph
 
-We win by being the **only** stock-scanner brand that publishes (a) the exact composite scoring formula and (b) a per-pick public scorecard back-checked next-day vs SPY. Every page on the site should make one of those two transparency claims credible. SEO compounds that positioning: comparison pages capture commercial-investigation traffic ("finviz alternative", "tapeline vs zacks"), per-ticker pages capture branded-data traffic ("AAPL stock score"), programmatic sector/signal pages capture browse-mode traffic ("best technology stocks 2026"), and the blog captures top-of-funnel methodology traffic that converts via the differentiated story.
+We win by being the **only** stock-scanner brand that publishes (a) its full methodology — the six named factors, what each one measures, and their weight *ordering* (weighted most toward Trend and Relative Strength, least toward Momentum) — and (b) a per-pick public scorecard back-checked next-day vs SPY. **The exact weights and the scoring equation are a trade secret and must never appear in copy** (PR #342 stripped them; `frontend/__tests__/methodologyPages.test.ts` guards the boundary), so never write that Tapeline "publishes the formula". Every page on the site should make one of those two transparency claims credible. SEO compounds that positioning: comparison pages capture commercial-investigation traffic ("finviz alternative", "tapeline vs zacks"), per-ticker pages capture branded-data traffic ("AAPL stock score"), programmatic sector/signal pages capture browse-mode traffic ("best technology stocks 2026"), and the blog captures top-of-funnel methodology traffic that converts via the differentiated story.
 
 ---
 
@@ -56,7 +56,7 @@ We win by being the **only** stock-scanner brand that publishes (a) the exact co
 | tapeline vs tradingview                 | Comparison   | `/compare/tradingview`          | Lower volume but high intent                       |
 | {TICKER} stock score                    | Long-tail    | `/t/{TICKER}`                   | 500 ticker pages × the long-tail tail              |
 | {TICKER} tapeline score                 | Branded long-tail | `/t/{TICKER}`              | Defensible as soon as ticker pages index           |
-| stock scanner with public formula       | Niche commercial | `/how-it-works` or `/`     | Few competitors target this; we own the angle      |
+| stock scanner methodology explained     | Niche commercial | `/how-it-works` or `/`     | Few competitors target this; we own the angle      |
 | transparent stock scanner               | Niche commercial | `/`                         | Same                                               |
 
 ### 3.2 Tier-B targets (rank top-10 within 12 months — competitive but reachable)
@@ -72,8 +72,8 @@ We win by being the **only** stock-scanner brand that publishes (a) the exact co
 | best technology stocks {YEAR}           | Browse       | `/sector/technology`            | Programmatic; one URL per sector                   |
 | best healthcare stocks {YEAR}           | Browse       | `/sector/healthcare`            | Same                                               |
 | high conviction stocks                  | Specialised browse | `/signal/high-conviction` | Brand-defined term; we own it                    |
-| congressional trades stock scanner      | Niche commercial | Premium-tier feature page (TODO) | We have the data feed; build dedicated landing |
-| 13F holdings tracker                    | Niche commercial | Premium-tier feature page (TODO) | Same                                            |
+| congressional trades stock scanner      | Niche commercial | Premium-tier feature page (BLOCKED) | No feed wired — `polygon_feed.fetch_congress_trades()` returns `[]` and there is no ingestor. Source the data before writing a landing page |
+| insider buying tracker                  | Niche commercial | `/insider-buying`               | Live surface (SEC Form 4 via Finnhub)           |
 
 ### 3.3 Tier-C targets (top-20 within 12 months — broad informational, supports topical authority)
 
@@ -85,10 +85,10 @@ We win by being the **only** stock-scanner brand that publishes (a) the exact co
 | how to use MACD                         | Informational | TODO blog post                  |
 | what is bollinger band squeeze          | Informational | TODO blog post                  |
 | how do congressional stock trades work  | Informational | TODO blog post                  |
-| how to read a 13F filing                | Informational | TODO blog post                  |
+| how to read an SEC Form 4 filing        | Informational | TODO blog post                  |
 | best technical indicators for swing trading | Informational | TODO blog post              |
 | sector rotation strategy                | Informational | TODO blog post                  |
-| public formula vs proprietary score     | Informational | `/blog/the-formula-is-public` ✓ shipped |
+| published methodology vs proprietary score | Informational | `/blog/the-formula-is-public` ✓ shipped (slug predates the PR #342 disclosure withdrawal) |
 
 **Volume note:** estimates omitted on purpose — green-field tracking. Once GA4 + GSC are wired (see §6), measure actual impressions/clicks per query and reprioritise based on lift, not assumed volume.
 
@@ -96,37 +96,37 @@ We win by being the **only** stock-scanner brand that publishes (a) the exact co
 
 ## 4. Content roadmap — next 10 blog posts (briefs)
 
-Posts are ordered by ROI: each one targets a Tier-B/C keyword, internally links to a P0 or P1 surface, and uses our credibility frame (public formula, public scorecard).
+Posts are ordered by ROI: each one targets a Tier-B/C keyword, internally links to a P0 or P1 surface, and uses our credibility frame (published methodology, public scorecard).
 
-### Post 1: How to read RSI (and why it's only 1 of 6 things in our score)
+### Post 1: How to read RSI (and where one indicator stops being enough)
 
 - **Target:** "how to read RSI", "RSI indicator", "RSI explained"
-- **Angle:** Honest primer that ends with "RSI is one input — the score is the synthesis"
-- **Internal links:** `/how-it-works` (factor weight callout), `/t/{TICKER}` example
+- **Angle:** Honest primer that ends with "one indicator is one view; the Tapeline score is a synthesis of six named factors". Do NOT write that RSI is one of Tapeline's inputs — the per-factor indicator recipe is not public (PR #342), and `score.py` does not read RSI.
+- **Internal links:** `/how-it-works` (six named factors + weight ordering), `/t/{TICKER}` example
 - **Length:** 1,500–2,000 words
 - **Schema:** Article + FAQ
 - **CTA:** Trial signup
 
-### Post 2: A trader's guide to 13F filings (and how Tapeline tracks 8 elite funds)
+### Post 2: A trader's guide to SEC Form 4 insider buys (and how Tapeline reads them)
 
-- **Target:** "how to read a 13F", "13F filing tracker", "what is 13F filing"
-- **Angle:** Plain-English explainer + the 8 elite funds we curate
-- **Internal links:** Premium pricing page, `/how-it-works` (smart money factor)
+- **Target:** "how to read a Form 4", "insider buying tracker", "what is an SEC Form 4"
+- **Angle:** Plain-English explainer of Form 4 insider purchases + how they feed the Smart Money factor
+- **Internal links:** `/insider-buying`, `/how-it-works/smart-money`
 - **Length:** 1,500 words
 - **Schema:** Article + FAQ
 - **CTA:** Premium trial
 
-### Post 3: Bollinger Band squeeze — the setup, the false signals, and how we score it
+### Post 3: Bollinger Band squeeze — the setup and the false signals
 
 - **Target:** "bollinger band squeeze", "how to find squeezes"
-- **Angle:** Standalone primer + how Tapeline scores it (BB compression + volume + OBV)
-- **Internal links:** `/how-it-works` (momentum factor), `/signal/strong-setup` example
+- **Angle:** Standalone primer on the setup itself. Do NOT publish Tapeline's squeeze inputs or parameters — the indicator recipe is not public (PR #342).
+- **Internal links:** `/how-it-works` (six named factors), `/signal/strong-setup` example
 - **Length:** 1,800 words
 
 ### Post 4: Sector rotation in 2026 — what's leading and how to read the regime
 
 - **Target:** "sector rotation strategy", "current sector rotation", "what sectors are leading"
-- **Angle:** Updated quarterly with current regime + how the macro factor weights it
+- **Angle:** Updated quarterly with the current regime + how the market-regime read feeds the Macro factor
 - **Internal links:** `/sector/{leading-sector}`, `/how-it-works` (macro factor)
 - **Length:** 2,000 words
 - **Refresh quarterly** so it stays current — date the URL `/blog/sector-rotation-2026-q2`
@@ -134,21 +134,21 @@ Posts are ordered by ROI: each one targets a Tier-B/C keyword, internally links 
 ### Post 5: How to evaluate any stock scanner's track record
 
 - **Target:** "stock scanner accuracy", "stock scanner backtest", "are stock scanners worth it"
-- **Angle:** What "public scorecard" means + why 99% of competitors hide it
+- **Angle:** What "public scorecard" means + why most competitors don't publish one (don't attach a percentage — we have not counted)
 - **Internal links:** `/scorecard`, `/best-stock-scanners`
 - **Length:** 1,500 words
 
 ### Post 6: Congressional stock trades — what's actually disclosed and what it means
 
 - **Target:** "congressional stock trades", "Pelosi tracker", "house senate stock trades"
-- **Angle:** STOCK Act disclosure rules + the data feed we use + ethical caveats
+- **Angle:** STOCK Act disclosure rules + ethical caveats. **Blocked on data** — `polygon_feed.fetch_congress_trades()` returns `[]` and no ingestor exists, so do not write "the data feed we use" until a source is actually wired.
 - **Internal links:** Premium pricing page (Congress feed), `/how-it-works` (smart money)
 - **Length:** 2,000 words
 
 ### Post 7: The case against AI-powered stock scanners (from someone who built one)
 
 - **Target:** "AI stock scanner", "best AI stock picker", "AI stock signals"
-- **Angle:** Why we publish the formula instead of using a black-box ML model
+- **Angle:** Why we name every factor and its weight ordering instead of using a black-box ML model — a method a reader can reason about, plus a record that shows what it did next (never the exact weights or the equation)
 - **Internal links:** `/how-it-works`, `/compare/trade-ideas`
 - **Length:** 1,800 words
 
@@ -192,7 +192,7 @@ Posts are ordered by ROI: each one targets a Tier-B/C keyword, internally links 
 
 - r/algotrading, r/stocks, r/investing, r/quant — answer questions, link only when genuinely relevant
 - StockTwits, Twitter/X — share daily picks via per-ticker share links (the OG card sells itself)
-- Hacker News — post the "public formula" angle as a Show HN
+- Hacker News — post the "published methodology + public scorecard" angle as a Show HN
 - Discord servers for trading communities
 
 ### 5.3 Earned media (months 2-6)
@@ -204,7 +204,7 @@ Pitch list:
 - Investopedia (we have a unique angle — public scorecard)
 - Fintech newsletters: Net Interest, FinTech Brainfood, Money Stuff (Matt Levine — a long shot but the public-scorecard angle is genuinely interesting)
 
-Pitch angle: "the only retail stock scanner that publishes its formula AND its track record" — concrete, novel, easy to verify.
+Pitch angle: "the only retail stock scanner that publishes its methodology — six named factors and their weight ordering — AND its track record, winners and losers" — concrete, novel, easy to verify. (Never pitch it as publishing the formula or the weights: PR #342 withdrew those.)
 
 ### 5.4 Reciprocal / partnership links (month 3+)
 
@@ -347,7 +347,7 @@ Anchor text rule: use the **target page's keyword** as the anchor, not "click he
 - Search Console / Bing / IndexNow setup (operational, not code)
 - 10 new blog posts from §4
 - Off-site: Product Hunt, BetaList, AlternativeTo listings
-- Premium-feature dedicated landing pages (`/features/congressional-trades`, `/features/13f-holdings`)
+- Premium-feature dedicated landing pages (`/insider-buying` already covers SEC Form 4 — there is no 13F surface, Quiver was cancelled). `/features/congressional-trades` stays blocked until a disclosure feed is wired — the gate exists, the data does not
 - Backend `/api/public/scanner` endpoint so /sector and /signal pages don't depend on the auth-gated /api/scanner free-tier rows
 
 ---
@@ -357,7 +357,7 @@ Anchor text rule: use the **target page's keyword** as the anchor, not "click he
 1. **Author attribution.** Currently every blog post is "Tapeline" (org-as-author). For E-E-A-T, would benefit from a real bylined author. Decide whether to attribute to the founder (best for trust), invent a brand persona (lower trust, easier scaling), or wait until there's a writing team.
 2. **Year-stamped pages.** `/best-stock-scanners` includes "2026" in the title. Decide whether to keep year-stamped + refresh quarterly, or strip the year and rely on lastmod freshness.
 3. **Page-by-page noindex policy.** Currently every page is `index, follow`. Consider noindexing `/signin`, `/signup`, and the paginated app routes to focus crawl budget. Tradeoff: brand queries like "tapeline signin" stop landing on the right page if noindexed.
-4. **Backend SEO endpoints.** The /sector and /signal pages currently depend on /api/scanner returning the free-tier 20 rows. A dedicated `/api/public/scanner-snapshot` endpoint would let us return larger rankings (50-100) without auth gating, which would meaningfully improve those programmatic pages.
+4. **Backend SEO endpoints.** The /sector and /signal pages currently depend on /api/scanner returning the free-tier rows (`FREE_SCANNER_ROWS` = 10; the open-access promo lifts that to 1,000 for AUTHENTICATED free users only until 2026-09-08, so anonymous crawls still see 10). A dedicated `/api/public/scanner-snapshot` endpoint would let us return larger rankings (50-100) without auth gating, which would meaningfully improve those programmatic pages.
 
 ---
 

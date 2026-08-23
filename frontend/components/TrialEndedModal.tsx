@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { useCardOnFile } from "@/components/TrialBanner";
 import { trackEvent } from "@/lib/gtag";
 import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 
@@ -75,6 +76,15 @@ export function TrialEndedModal() {
     }
   }, [user]);
 
+  // Whether this account ever put a card down. Since the 2026-08-22 card gate
+  // both cohorts land here: a legacy card-free trial (nothing was charged, the
+  // account simply moved to Free) and a card-required trial that lapsed
+  // through Stripe. Guessing from tier alone would tell half of them something
+  // false about their money, so the sentence below branches on the same signal
+  // TrialBanner uses, and makes no card claim at all while it is unknown.
+  // Hooks run unconditionally, so this sits above the early return.
+  const cardOnFile = useCardOnFile(open);
+
   if (!open) return null;
 
   return (
@@ -87,9 +97,28 @@ export function TrialEndedModal() {
           Your 14-day Premium trial has ended.
         </h2>
         <p className="mt-3 text-sm text-muted">
-          Nothing was charged &mdash; the trial never took a card. Your{" "}
+          {cardOnFile === false && (
+            <>Nothing was charged &mdash; the trial never took a card. </>
+          )}
+          {cardOnFile === true && (
+            /* CARD ON FILE. What actually happened to the money is NOT knowable
+               here: `true` resolves from has_card_on_file / has_payment_method
+               / has_subscription, and the last of those is literally
+               bool(stripe_customer_id) server-side. Cancelled before day 14,
+               a failed day-14 charge and a grandfathered account that once
+               opened Checkout all look identical. So make no claim about a
+               charge or a cancellation — point at the one surface that knows. */
+            <>
+              See{" "}
+              <Link href="/app/billing" className="text-accent hover:underline">
+                Billing
+              </Link>{" "}
+              for your charge history and current status.{" "}
+            </>
+          )}
+          Your{" "}
           {freeHasWatchlist() ? "watchlist, saved scans" : "saved scans"} and alert
-          rules are all intact, and you&rsquo;re now on Free forever.
+          rules are all intact, and your account is now on Free.
           {!freeHasWatchlist() && (
             <> Your saved watchlist tickers are kept &mdash; upgrade to Pro to unlock them.</>
           )}

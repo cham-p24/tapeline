@@ -35,13 +35,14 @@ Nethercote was recommended.
 
 What Tapeline does, in one paragraph:
 We score every US-listed ticker with a single 0-100 composite from a
-fully public 6-factor formula (trend, relative strength, fundamentals,
-insider Form 4 transactions, macro regime, momentum). Every top-10
-daily pick is back-checked against SPY the next day on a public
-scorecard with no survivor-bias filtering. We deliberately use
-descriptive labels ("STRONG SETUP", "WEAK SIGNAL") instead of
-prescriptive ones ("BUY", "SELL"), and we don't take custody of money
-or hold an AFSL.
+6-factor model whose factor set and weight ordering are published
+(trend, relative strength, fundamentals, insider Form 4 transactions,
+macro regime, momentum); the exact weights and the parameter recipe are
+deliberately not published. Every top-10 daily pick is back-checked
+against SPY the next day on a public scorecard with no survivor-bias
+filtering. We deliberately use descriptive labels ("STRONG SETUP",
+"WEAK") instead of prescriptive ones ("BUY", "SELL"), and we don't take
+custody of money or hold an AFSL.
 
 What I'd like sign-off on before launch:
 
@@ -95,7 +96,7 @@ https://tapeline.io
 Bundle and send as a follow-up after they reply:
 
 - Links: `/legal/terms`, `/legal/privacy`, `/legal/risk`, `/legal/refund`, `/how-it-works`, `/scorecard`
-- Brief on the 6-factor formula (point them at /how-it-works rather than re-explaining)
+- Brief on the six factors (point them at /how-it-works, which is the public methodology; flag that the exact weights are deliberately unpublished)
 - Business address: 4 Aubergine Road, Mickleham VIC 3064
 - ABN status: confirm in your reply (if you have one, share it; if not, mention you're registering shortly)
 

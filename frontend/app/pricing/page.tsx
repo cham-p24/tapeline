@@ -27,7 +27,7 @@ export const revalidate = 21600;
 // The "(billed annually)" parenthetical directly follows and scopes both
 // listed rates; the description carries the real totals.
 export const metadata = pageMeta({
-  title: `Tapeline Pricing: Pro from ${usd(PRICING.pro.annualPerMonth)}/mo · Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (billed annually) · 14-Day Free Trial`,
+  title: `Tapeline Pricing: Pro from ${usd(PRICING.pro.annualPerMonth)}/mo · Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (billed annually) · 14-Day Premium Trial`,
   description:
     `Tapeline pricing: Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial: card required at first sign-in, $0 charged today, cancel in one click before it ends. The public scorecard and daily picks stay free with no account.`,
   path: "/pricing",

@@ -17,12 +17,12 @@ import { render, screen, within } from "@testing-library/react";
 import { ScorePanel } from "@/components/ScorePanel";
 
 const BREAKDOWN = {
-  trend: { value: 88, weight: 25, label: "Trend" },
-  rs: { value: 81, weight: 20, label: "Relative strength" },
-  fundamentals: { value: 34, weight: 15, label: "Fundamentals" },
-  smart_money: { value: 52, weight: 15, label: "Smart money" },
-  macro: { value: 61, weight: 15, label: "Macro" },
-  momentum: { value: 70, weight: 10, label: "Momentum" },
+  trend: { value: 88, label: "Trend" },
+  rs: { value: 81, label: "Relative strength" },
+  fundamentals: { value: 34, label: "Fundamentals" },
+  smart_money: { value: 52, label: "Smart money" },
+  macro: { value: 61, label: "Macro" },
+  momentum: { value: 70, label: "Momentum" },
 };
 
 const PERCENTILES = {
@@ -64,28 +64,29 @@ describe("ScorePanel", () => {
     );
   });
 
-  it("shows all six factors with their published weights", () => {
+  it("shows all six factors in descending-weight order, without the weights", () => {
+    // Was: asserted a Weight column printing 25/20/15/15/15/10. That column is
+    // gone — the numbers reached this panel from an UNAUTHENTICATED API and a
+    // client-side fallback map, both of which put the internal weight vector in
+    // public reach. The public half of the fact is the ORDER, so that is what
+    // is pinned here.
     renderPanel();
-    for (const [label, weight] of [
-      ["Trend", "25"],
-      ["Relative strength", "20"],
-      ["Fundamentals", "15"],
-      ["Smart money", "15"],
-      ["Macro", "15"],
-      ["Momentum", "10"],
-    ] as const) {
-      const cells = within(factorRow(label)).getAllByRole("cell");
-      // [score, weight, ranking]
-      expect(cells[1].textContent).toBe(weight);
-    }
+    const order = ["Trend", "Relative strength", "Fundamentals", "Smart money", "Macro", "Momentum"];
+    const rendered = screen
+      .getAllByRole("rowheader")
+      .map((h) => h.textContent)
+      .filter((t) => order.includes(t ?? ""));
+    expect(rendered).toEqual(order);
+    // And no row prints a bare weight numeral.
+    expect(screen.queryByRole("columnheader", { name: /weight/i })).toBeNull();
   });
 
   it("attaches the peer group and n to every factor percentile it prints", () => {
     renderPanel();
-    expect(within(factorRow("Trend")).getAllByRole("cell")[2].textContent).toBe(
+    expect(within(factorRow("Trend")).getAllByRole("cell")[1].textContent).toBe(
       "91st percentile of Health Care (n=612)",
     );
-    expect(within(factorRow("Macro")).getAllByRole("cell")[2].textContent).toBe(
+    expect(within(factorRow("Macro")).getAllByRole("cell")[1].textContent).toBe(
       "66th percentile of Health Care (n=601)",
     );
   });
@@ -93,14 +94,14 @@ describe("ScorePanel", () => {
   it("refuses to rank on a thin peer group, and says why", () => {
     renderPanel();
     // n=11 covered peers — a single row would move the figure by 9 points.
-    const cell = within(factorRow("Fundamentals")).getAllByRole("cell")[2];
+    const cell = within(factorRow("Fundamentals")).getAllByRole("cell")[1];
     expect(cell.textContent).toBe("not enough covered peers to rank");
     expect(cell.textContent).not.toMatch(/\d+(st|nd|rd|th)/);
   });
 
   it("prints a reason rather than a blank when a factor has no ranking at all", () => {
     renderPanel();
-    expect(within(factorRow("Smart money")).getAllByRole("cell")[2].textContent).toBe(
+    expect(within(factorRow("Smart money")).getAllByRole("cell")[1].textContent).toBe(
       "no peer ranking available",
     );
   });
@@ -109,7 +110,7 @@ describe("ScorePanel", () => {
     // A frontend deploy ahead of the backend.
     renderPanel({ percentiles: undefined });
     for (const label of ["Trend", "Relative strength", "Fundamentals", "Smart money", "Macro", "Momentum"]) {
-      expect(within(factorRow(label)).getAllByRole("cell")[2].textContent).toBe(
+      expect(within(factorRow(label)).getAllByRole("cell")[1].textContent).toBe(
         "no peer ranking available",
       );
     }
@@ -148,7 +149,8 @@ describe("ScorePanel", () => {
     expect(table!.querySelector("caption")).not.toBeNull();
     expect(table!.parentElement!.className).toContain("overflow-x-auto");
     expect(container.querySelectorAll("th[scope='row']")).toHaveLength(6);
-    expect(container.querySelectorAll("th[scope='col']")).toHaveLength(4);
+    // 3, not 4: the Weight column was removed with the disclosure fix.
+    expect(container.querySelectorAll("th[scope='col']")).toHaveLength(3);
   });
 
   it("stays descriptive — no advice, target, or performance claim anywhere", () => {

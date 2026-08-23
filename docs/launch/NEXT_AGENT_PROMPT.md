@@ -157,8 +157,14 @@ Fill placeholders with the result, post via X compose at 8 AM ET or
 - Don't add features beyond what's asked.
 - Auto-merge your OWN clean PRs without asking. Don't auto-touch other
   agents' PRs.
-- Fly.io deploys are MANUAL (`fly deploy -a tapeline-backend --remote-only`).
-  Vercel auto-deploys frontend on merge to main.
+- Deploys: **both** apps are on Fly.io. The frontend has served
+  `tapeline.io` from the Fly app `tapeline-web` since the 2026-06-14
+  migration — Vercel only builds PR previews now, it does not serve
+  production. Backend deploys run from `.github/workflows/deploy-backend.yml`
+  on merge to `main`, gated on the `FLY_API_TOKEN` repo secret; check
+  `CLAUDE.md` for the current state of that secret before assuming a merge
+  ships, and fall back to `fly deploy -a tapeline-backend --remote-only` if
+  it doesn't.
 
 ## Things NOT to change
 

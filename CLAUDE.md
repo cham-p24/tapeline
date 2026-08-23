@@ -28,13 +28,13 @@ All four other tabs (SPIKE INTELLIGENCE, MARKET INTELLIGENCE, SMART MONEY & CONG
 FastAPI + SQLAlchemy + Alembic (Python 3.12) backend. Next.js 16 + TypeScript + Tailwind frontend. SQLite dev / Postgres prod (Supabase or Neon). SSE for live updates. Native cookie-JWT auth (built) + Clerk + Google/Microsoft OAuth (env-gated). Stripe billing (env-gated). Resend email (env-gated). Hosting: Fly.io backend + Fly.io frontend (both on Fly since the 2026-06-14 Vercel migration).
 
 ## Worker
-Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: hourly Telegram digest, ~5min news refresh, daily scorecard back-check, on-boot universe + calendar seed.
+Single scoring worker at `backend/app/workers/signal_publisher.py`. Default tick = **60s** (`SCORE_REFRESH_SECONDS` in `.env.example`). Dev script overrides to 10s for faster iteration. Also: ~5min news refresh, daily scorecard back-check, daily EOD watchlist email digest, on-boot universe + calendar seed. (There is **no** Telegram digest for customers — that task is gone; see Notification channels.)
 
 ## Tier model — canonical source: `backend/app/services/tier.py`
 **Three tiers** (decided 2026-04-26, Free hardened 2026-04-27, annual charm-priced 2026-05-03, founding reprice 2026-07-03):
-- **Free** $0 — **top-10 scanner rows, LIVE (no delay)**, 12 ticker-detail lookups/UTC day, watchlist (5 tickers, 1 list), 2 web-push alert rules; no email/Telegram alerts, no CSV, no API. The old "top 20, 24-hour delayed" framing is **dead** — the 2026-06-20 freemium retune set `FREE_DATA_DELAY_MINUTES = 0` and `FREE_SCANNER_ROWS = 10`, so conversion pressure comes from breadth + the lookup meter, not stale data. The Free watchlist survives: the 2026-08-02 cutover to 0 was **reversed 2026-08-19** (#525) and `free_watchlist_cap()` now returns 5 unconditionally. **Reaching this tier now takes a card:** since 2026-08-22 a NEW account hits the `/app/start` card wall before it can use the logged-in product — see the card gate below. Accounts created before that date are grandfathered forever.
+- **Free** $0 — **top-10 scanner rows, LIVE (no delay)**, 12 ticker-detail lookups/UTC day, watchlist (5 tickers, 1 list), 2 web-push alert rules; no email alerts, no CSV, no API. The old "top 20, 24-hour delayed" framing is **dead** — the 2026-06-20 freemium retune set `FREE_DATA_DELAY_MINUTES = 0` and `FREE_SCANNER_ROWS = 10`, so conversion pressure comes from breadth + the lookup meter, not stale data. The Free watchlist survives: the 2026-08-02 cutover to 0 was **reversed 2026-08-19** (#525) and `free_watchlist_cap()` now returns 5 unconditionally. **Reaching this tier now takes a card:** since 2026-08-22 a NEW account hits the `/app/start` card wall before it can use the logged-in product — see the card gate below. Accounts created before that date are grandfathered forever.
 - **Pro** $9.99/mo OR **$8.25/mo billed annually** ($99/yr · save $20) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push
-- **Premium** $19.99/mo OR **$16.58/mo billed annually** ($199/yr · save $40) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, Telegram unlimited, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing is now surfaced: `ComparisonTable.tsx` + `PricingTable.tsx` both show the "Public API access · 1,000 requests/day" Premium line, and a public `/developers` landing page (2026-06-06) documents the live endpoints — added to the sitemap + footer, with a tailored OG card.)
+- **Premium** $19.99/mo OR **$16.58/mo billed annually** ($199/yr · save $40) — everything in Pro + Congressional trades, **Recent insider buys (SEC Form 4)**, email unlimited, watchlist 200, saved scans 100, priority support. (**Public API SHIPPED 2026-06-01, PR #247** — live at `/api/v1` with API-key auth + `api_requests_per_day=1000` daily quota from `tier.py:TIER_LIMITS`; key-management UI at `/app/api-keys`, backend in `routers/{api_v1,api_keys}.py` + `services/api_keys.py`, table via migration `0032_api_keys`. Marketing is now surfaced: `ComparisonTable.tsx` + `PricingTable.tsx` both show the "Public API access · 1,000 requests/day" Premium line, and a public `/developers` landing page (2026-06-06) documents the live endpoints — added to the sitemap + footer, with a tailored OG card.)
 
 **⚠️ OPEN-ACCESS MONTH — RUNNING NOW, AUTO-REVERTS 2026-09-08** (`tier.py:PROMO_OPEN_ACCESS_UNTIL` + `free_open_access()`). The Free bullet above is the **post-promo steady state**, not what a signed-in Free user gets today. Founder experiment (2026-08-08, at 0 payers with users who activate but don't convert): while the window is open, **`scanner_rows` and nothing else** lifts for Free from 10 → Pro's **1,000**. Last open day is 2026-09-07; the revert needs no deploy.
 
@@ -47,7 +47,7 @@ The lift is deliberately narrow, and `backend/tests/test_open_access_month.py` a
 
 **Two stale sources here — trust the `limit()` body and the test file over both:** (a) `tier.py` says to keep a matching `PROMO_OPEN_ACCESS_UNTIL` in `frontend/lib/pricing.ts`, but **there isn't one** — `FREE_LIMITS.scannerRows` is hard-coded to 10, so frontend Free-tier copy currently understates the live cap; (b) the `free_open_access()` docstring still describes the original "caps + every Pro feature" plan, which the implementation never did.
 
-**Retired channels (2026-05-04):** Discord webhook + Twilio SMS. Service files at `services/{discord,sms}.py` and DB columns left in place; can be re-enabled by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`.
+**Retired customer alert channels:** Discord webhook + Twilio SMS (2026-05-04), and **Telegram (2026-08-11)**. Discord/SMS: service files at `services/{discord,sms}.py` and DB columns left in place; re-enable by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`. **Telegram went further** — `AlertRuleCreate.channel` in `routers/alerts.py` is now `Field("email", pattern="^(email|web_push)$")`, so a `channel="telegram"` POST 422s, and `services/alerts.py:_fire` has no Telegram dispatch arm at all (regression guard: `backend/tests/test_free_alert_taste.py::test_free_user_blocked_from_email_and_telegram_channel_retired`). `tier.py` still carries a vestigial `telegram_alerts_per_day` cap with **no consumer** — do not read it as evidence the channel is live. **Never write customer-facing Telegram copy** (no "Telegram alerts", no "unlimited Telegram", no "paste your chat ID"). Telegram remains live for FOUNDER-facing notifications only — see Notification channels.
 
 Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo for 5 seats, **Enterprise** custom from $2k/mo, **Founder's Lifetime** $399 once for first 100.
 
@@ -180,12 +180,13 @@ feature only ever served mock data):
   Add `firefox` and `webkit` projects in `playwright.config.ts` when ready for cross-browser coverage. Tests boot Next.js automatically via the `webServer` block; backend isn't required (UI-rendering tests, no API hits).
 
 ## Notification channels
-Three live delivery channels for alerts (`backend/app/services/alerts.py:_fire`):
+**Two** live delivery channels for alerts — `AlertRuleCreate.channel` in `backend/app/routers/alerts.py` accepts nothing else (`pattern="^(email|web_push)$"`), and `backend/app/services/alerts.py:_fire` has arms for exactly these two:
 - **Email** (Pro+) — Resend, no extra cost. Default channel for every rule. Always on.
-- **Browser push / Web Push** (Pro+) — VAPID + Service Worker (`frontend/public/sw.js`). Free. One-click enable on Chrome/Firefox/Edge desktop + Android. iOS requires PWA install.
-- **Telegram** (Premium) — free, hourly digest + per-rule alerts. Customer adds their chat_id at `/app/billing` (Telegram card).
+- **Browser push / Web Push** — VAPID + Service Worker (`frontend/public/sw.js`). Free to deliver. The one channel a **Free** user gets a taste of: `alerts.web_push` is `Tier.FREE` and the allowance is a COUNT cap (Free = 2 rules, paid tiers effectively uncapped at 10,000), enforced at rule creation. One-click enable on Chrome/Firefox/Edge desktop + Android. iOS requires PWA install.
 
-**Retired:** Discord webhook + Twilio SMS (2026-05-04). Discord setup friction was a real conversion blocker; SMS unit economics didn't work at low volume. `services/{discord,sms}.py` + DB columns retained — re-add `alerts.discord` / `alerts.sms` to `tier.py:FEATURES` to bring them back without a migration.
+**Retired:** Discord webhook + Twilio SMS (2026-05-04), and **Telegram as a customer alert channel (2026-08-11)**. Discord setup friction was a real conversion blocker; SMS unit economics didn't work at low volume. `services/{discord,sms}.py` + DB columns retained — re-add `alerts.discord` / `alerts.sms` to `tier.py:FEATURES` to bring them back without a migration. Telegram is rejected at validation (a `channel="telegram"` POST 422s) and has no dispatch arm; the old hourly customer Telegram digest is gone from the worker, and there is no Telegram card at `/app/billing`. The leftover `telegram_alerts_per_day` cap in `tier.py` has no consumer.
+
+**Telegram IS still live — but FOUNDER-facing only, never a customer feature.** `backend/app/services/telegram.py` + `backend/app/routers/telegram.py` back `notify_founder_new_signup`, `notify_founder_new_subscription`, the weekly SEO-health digest, and the inbox Tier-1 approval bot (inline Approve/Reject buttons). `TELEGRAM_BOT_TOKEN` + `INBOX_FOUNDER_TELEGRAM_CHAT_ID` exist for those. Don't delete them, and don't market them.
 
 End-of-day watchlist email digest fires daily ~21:00 UTC for every Pro+ user with watchlist items (`services/email.py:run_eod_watchlist_digest`).
 
@@ -221,7 +222,7 @@ Server-side bot that triages inbound messages across Reddit, email, and Telegram
 
 **Observability:** `GET /api/inbox/stats` (admin-only) returns today's classification spend, cap-tripped flag, tier/channel/status counts, p50/p95 latency, cache hit ratio, pending queue depth, and the live bot_enabled / dry_run state. Surfaced as a chip strip + cap-tripped / dry-run banners at the top of `/app/inbox` (polled every 30s).
 
-**Test coverage:** 97 inbox-specific tests across `test_inbox_*.py` (classifier rule-based + LLM, kill switch, voice rules, router, reddit poller, telegram alerts, stats endpoint).
+**Test coverage:** 97 inbox-specific tests across `test_inbox_*.py` (classifier rule-based + LLM, kill switch, voice rules, router, reddit poller, the founder Telegram approval card, stats endpoint).
 
 ## Per-ticker confidence
 Each Ticker row carries a `confidence_pct` (0-100) that varies with which underlying data feeds returned data for that symbol. Mega-caps with full Quiver/Finnhub/FINRA coverage land 88-96, ETFs without traditional fundamentals land 45-70, the typical liquid stock lands 60-85. Surfaced as a column on the scanner table + as an inline pill on the ticker page. Documented on `/how-it-works`. Pattern ported from the personal signal-system. Mock value via `mock_feed._compute_mock_confidence(symbol)` (deterministic per symbol). Real polygon_feed should compute from actual data-feed presence.
@@ -256,9 +257,10 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `backend/app/services/finnhub_feed.py` — Finnhub fundamentals + earnings + IPO calendars + insider Form 4. Calendar replacement wired into `calendar_feed.upcoming_*`; fundamentals → score wiring still TODO.
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
-- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with three-channel delivery (email / web push / Telegram)
+- `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with **two**-channel delivery (email / web push)
 - `backend/app/services/sms.py` — RETIRED 2026-05-04, file kept for re-enable
 - `backend/app/services/discord.py` — RETIRED 2026-05-04, file kept for re-enable
+- `backend/app/services/telegram.py` + `backend/app/routers/telegram.py` — **FOUNDER-facing only.** Founder signup/subscription pings, weekly SEO digest, inbox approval bot. The customer Telegram alert channel was RETIRED 2026-08-11 — these files are not it.
 - `backend/app/services/web_push.py` — Web Push via VAPID + pywebpush (no-op when either is missing)
 - `frontend/public/sw.js` — Service Worker for Web Push notification handling
 - `frontend/lib/webPush.ts` — client-side subscribe/unsubscribe/test helpers
@@ -286,7 +288,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `frontend/app/app/inbox/page.tsx` — admin inbox review UI
 
 ## Pending TODOs (only the user can do these — needs accounts/cards)
-Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token, FRED, Finnhub, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Fly.io frontend.
+Full step-by-step in `docs/OPERATIONS.md`. Most of the wire-up landed in late April / early May 2026. As of **2026-05-13** verified via `fly secrets list -a tapeline-backend`, all of these are **wired in prod**: GitHub remote (push flow live), Cloudflare DNS + Turnstile, Massive (data feed), Stripe (all 6 STRIPE_* secrets — verified end-to-end including the PR #22 referral-coupon flow on cs_live sessions), Resend, Telegram bot token (founder notifications + inbox bot only — not a customer alert channel), FRED, Finnhub, Google OAuth, VAPID web push, Neon Postgres (DATABASE_URL), Fly.io backend + Fly.io frontend.
 
 **Inbox bot go-live secrets** (the bot is shipped but dormant until set):
 - `ANTHROPIC_API_KEY` — Anthropic console; without it every ambiguous message defaults to Tier 1 manual review

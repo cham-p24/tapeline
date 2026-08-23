@@ -138,7 +138,7 @@ export default async function MarketRegimePage() {
         },
         {
           q: "Does the regime change scoring weights?",
-          a: "No — Tapeline's six factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) and how they're weighted are fixed and public. The regime classifier is a separate macro context indicator. What changes per regime isn't the scoring, it's which scores you might pay more attention to: high-momentum names in Risk On, high-quality fundamentals + low-beta names in Risk Off.",
+          a: "No — Tapeline's six factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) and the ordering of their weights are fixed and public; the exact numeric weights are not published. The regime classifier is a separate macro context indicator. What changes per regime isn't the scoring, it's which scores you might pay more attention to: high-momentum names in Risk On, high-quality fundamentals + low-beta names in Risk Off.",
         },
         {
           q: "What's 'breadth' here exactly?",

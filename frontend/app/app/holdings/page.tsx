@@ -16,7 +16,7 @@ import { userLocale } from "@/lib/datetime";
  * Replaces the previous "Elite 13F holdings" page (which depended on a paid
  * Quiver feed we never wired). Source is now SEC Form 4 filings via Finnhub,
  * already powering the Smart Money sub-score on every Tapeline Score — so
- * this page is the "receipt" for the 15% Smart Money pillar.
+ * this page is the "receipt" for the Smart Money pillar.
  *
  * Full feed is Premium. 2026-07-18: the page used to wrap everything in
  * <Paywall>, which blurred an EMPTY table — the gated fetch 403'd before

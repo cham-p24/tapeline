@@ -20,18 +20,34 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Three subs, three posts. Reddit + MCP-blocked, so the agent can't drive
 the submit form — paste these into the browser yourself.
 
-**Critical correction vs LAUNCH_PLAYBOOK.md**: the r/stocks Premium bullet
-in that file still says "Elite 13F holdings (Buffett, Burry, Ackman, etc.)"
-— that line was stripped from marketing in PR #74 (Quiver Trader-tier TOS
-"No Commercial Use Rights"). The Premium smart-money surface is now
-**Recent insider buys (SEC Form 4)**. The copy below is corrected.
+**Premium smart-money surface**: "Elite 13F holdings (Buffett, Burry, Ackman,
+etc.)" was stripped from marketing in PR #74 (Quiver Trader-tier TOS
+"No Commercial Use Rights") and the adapter has since been deleted. The
+Premium smart-money surface is **Recent insider buys (SEC Form 4)** plus
+Congressional trades. Both this file and LAUNCH_PLAYBOOK.md now say so.
 
 ---
 
@@ -61,7 +77,6 @@ What costs $9.99/mo (Pro):
 What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
 - + Recent insider buys (SEC Form 4) across the active universe
-- + Unlimited Telegram alerts
 
 14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
@@ -78,23 +93,23 @@ URL: https://www.reddit.com/r/algotrading/submit
 
 **Title:**
 ```
-I built a 6-factor composite stock scoring system — formula, weights, and a public back-check page
+I built a 6-factor composite stock score with a public, unedited daily back-check vs SPY
 ```
 
-**Body:** (no edits from LAUNCH_PLAYBOOK.md — already mentions Form 4)
+**Body:** (mirrors LAUNCH_PLAYBOOK.md — already mentions Form 4)
 ```
 Three months ago I started Tapeline (tapeline.io) because every screener I tried either showed me raw filters (Finviz) or hid its methodology behind an "AI score" black box (Simply Wall St). I wanted something that picks a single number, tells me what's driving it, and lets me audit every call against SPY the next day.
 
 Here's what I shipped:
 
-**The formula** (public, version-controlled, won't change without a changelog entry)
+**The methodology** (version-controlled, changelogged). Six factors — Trend and Relative Strength carry the most weight, Momentum the least (the exact weights stay internal):
 
-- Trend 25% — 20/50/200 DMA stack, slope, days above 50DMA
-- Relative Strength 20% — Mansfield RS vs SPY, sector RS, 12-1 momentum
-- Fundamentals 15% — revenue growth, margin trend, ROE, F-score
-- Smart Money 15% — Form 4 insider transactions (net 90-day) — *not* 13F lag
-- Macro 15% — composite of VIX percentile, breadth, 10Y, regime score
-- Momentum 10% — 20-day rate-of-change, RSI position, accumulation/distribution
+- Trend — the ticker's multi-month price change, and where the latest price sits inside its own 52-week range
+- Relative Strength — the ticker's price change minus a broad-market benchmark's, over three horizons; not sector-adjusted
+- Fundamentals — reported margin, return on equity, EPS and revenue growth, and an earnings multiple
+- Smart Money — disclosed SEC Form 4 insider transactions, netted over a recent window — *not* 13F
+- Macro — a single market-wide regime classification; the same reading for every ticker on a tick
+- Momentum — a momentum-quality reading plus a short-horizon return, deliberately the lightest factor
 
 **The accountability layer**
 
@@ -103,10 +118,10 @@ Every market day I freeze the top 10 composite scores. The next day I log each n
 **What I'd like feedback on**
 
 1. Smart Money via Form 4 — is net-90-day buying the right window, or should I weight by insider role (CEO > director)?
-2. Should momentum get less weight (currently 10%) given it's already inside trend + RS?
+2. Should momentum carry even less weight than it does, given it's already inside trend + RS?
 3. What factor would you add to make this defensible for a 1Y horizon vs the current 1D back-check?
 
-Roast it. The formula is the part I want to harden.
+Roast it. The methodology is the part I want to harden.
 ```
 
 ---
@@ -124,19 +139,20 @@ Tapeline — synthesises 6 factor signals into one score, plain-English Why per 
 ```
 Live at tapeline.io. Built it because I wanted to stop manually weighing trend / RS / fundamentals / insider activity every time I screened.
 
-The 15% Fundamentals factor breaks down into:
-- Revenue growth (trailing 4 quarters)
-- Operating margin trend
-- ROE (current vs sector median)
-- F-score (Piotroski 9-point)
+The Fundamentals factor reads five reported figures:
+- Revenue growth between reported periods
+- EPS growth between reported periods
+- Profit margin, as reported
+- Return on equity, as reported
+- An earnings multiple — lower moves the reading up
 
-Score is recomputed every ~30 sec during market hours from a live data feed (Polygon/Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro).
+Score is recomputed sub-60 seconds during market hours from a live data feed (Polygon/Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro).
 
 Concrete example a SecurityAnalysis crowd might find useful: filter to /sector/financials and the score will give you a 0-100 read on every financial. Click any ticker → /t/$X → see the six-factor breakdown so you can drill into which factor is dragging or pulling.
 
-Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $9.99 unlocks the full universe. Premium $19.99 adds Congress / SEC Form 4 / Telegram alerts.
+Free tier covers everything I'd want as a generalist (score + scorecard + 5-ticker watchlist). Pro $9.99 unlocks the full universe. Premium $19.99 adds Congress / SEC Form 4.
 
-Happy to take fundamentals-specific critique. The Piotroski F-score implementation in particular — would love eyes on edge cases (financial vs non-financial scoring).
+Happy to take fundamentals-specific critique — especially on the fact that the same bands are applied to every company regardless of sector, so a bank, a biotech and a software name land on one scale.
 ```
 
 ---

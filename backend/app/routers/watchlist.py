@@ -217,10 +217,12 @@ async def add_to_watchlist(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(409, f"{symbol} already in watchlist")
 
-    # Tier cap. Free=3, Pro=50, Premium=200. Enforced server-side because the
-    # client could be old/forked. effective_limit also handles the trial-aware
-    # throttle for no-card Premium trials, though this cap isn't trial-throttled
-    # (watchlist isn't an abuse vector the same way api/telegram caps are).
+    # Tier cap, read from tier.py — effective_limit is the source of truth, so
+    # do not restate the per-tier numbers here. Enforced server-side because
+    # the client could be old/forked. effective_limit also handles the
+    # trial-aware throttle for no-card Premium trials, though this cap isn't
+    # trial-throttled (watchlist isn't an abuse vector the same way the api
+    # cap is).
     cap = effective_limit(user, "watchlist_tickers")
     count_q = await session.execute(
         select(func.count()).select_from(WatchlistItem).where(WatchlistItem.user_id == user.id)

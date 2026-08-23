@@ -15,11 +15,11 @@ const COMPARE_FAQ = [
   },
   {
     q: "What's the difference between Yahoo Finance Premium and Tapeline?",
-    a: "Yahoo Finance Plus / Premium is ~$24.95/mo and adds advanced charting, fair-value estimates, and a custom screener. Tapeline Pro is roughly a third of that ($8.25/mo annual) and adds a published 6-factor composite, sub-60s refresh, live regime classifier, squeeze setups, and a public next-day scorecard with every pick back-checked vs SPY.",
+    a: "Yahoo Finance Plus / Premium is ~$24.95/mo and adds advanced charting, fair-value estimates, and a custom screener. Tapeline Pro is roughly a third of that ($8.25/mo annual) and adds a published 6-factor composite score, sub-60s refresh, live regime classifier, squeeze setups, and a public next-day scorecard with every pick back-checked vs SPY.",
   },
   {
     q: "Does Yahoo Finance publish a scoring formula?",
-    a: "Yahoo Finance Plus surfaces analyst rating distributions and Argus fair-value estimates, but those are third-party feeds rather than a unified composite. Tapeline names all six factors behind its composite and shows how they're weighted on /how-it-works; no proprietary black box, no hidden factors.",
+    a: "Yahoo Finance Plus surfaces analyst rating distributions and Argus fair-value estimates, but those are third-party feeds rather than a unified composite. Tapeline names all six factors behind its composite and publishes their weight ordering on /how-it-works — most on Trend and Relative Strength, least on Momentum. No proprietary black box, no hidden factors.",
   },
   {
     q: "Is Yahoo Finance's free tier good enough for stock picking?",
@@ -27,7 +27,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "Many do. Yahoo Finance for news and quote aggregation; Tapeline for the daily 'where is the score, what's the regime, which setups are live'. The 14-day Tapeline trial is no-card so you can layer it onto Yahoo without committing.",
+    a: "Many do. Yahoo Finance for news and quote aggregation; Tapeline for the daily 'where is the score, what's the regime, which setups are live'. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can layer it onto Yahoo and back out before anything is charged.",
   },
 ];
 
@@ -99,7 +99,7 @@ export default function VsYahooFinancePage() {
       competitorAnnualNote="Yahoo Finance Plus ~$24.95/mo; free tier available with 15-min delayed data"
       slug="yahoo-finance"
       heading="Tapeline vs Yahoo Finance — when DIY browsing isn't enough."
-      lede="Yahoo Finance is the universal default — free, comprehensive, indispensable for quote lookup + news. Tapeline is built for the next step: turning 30 watchlist names into one ranked list, with a published formula and a public track record. Pick the second one when you're tired of doing the synthesis yourself."
+      lede="Yahoo Finance is the universal default — free, comprehensive, indispensable for quote lookup + news. Tapeline is built for the next step: turning 30 watchlist names into one ranked list, with a published methodology and a public track record. Pick the second one when you're tired of doing the synthesis yourself."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={COMPARE_FAQ}

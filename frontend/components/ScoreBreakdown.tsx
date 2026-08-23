@@ -3,7 +3,9 @@
 /**
  * The synthesis moat, made visible.
  *
- * Shows the weighted contribution of each factor to the composite score.
+ * Shows each factor's 0–100 sub-score, listed in descending weight order.
+ * NOT the weighted contribution: the exact weights are not disclosed (PR #342),
+ * so the ordering plus the qualitative emphasis label is all this can show.
  * Used as a hover popover on every scanner row + as a full panel on the
  * ticker detail page.
  */

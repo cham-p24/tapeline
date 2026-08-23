@@ -5,7 +5,7 @@
 Drive Tapeline's launch announcement and the 90-day post-launch
 content cadence across Twitter/X, LinkedIn, Reddit, Hacker News, and
 the blog. Every piece of marketing reinforces the **transparency
-moat** (public formula, public scorecard, descriptive labels) — that
+moat** (published methodology, public scorecard, descriptive labels) — that
 positioning is the brand and competitors literally cannot copy it.
 
 ## Why this matters
@@ -13,9 +13,12 @@ positioning is the brand and competitors literally cannot copy it.
 Tapeline is competing against TipRanks ($25M+ ARR), WallStreetZen,
 Simply Wall St, and Zacks — all of which spend on paid acquisition and
 have years of brand. The only way Tapeline wins is on a sharper,
-narrower wedge: **"the only retail scanner that publishes its formula
-and back-checks every call vs SPY publicly."** Every piece of
-marketing should drive that one knife-point home.
+narrower wedge: **"the only retail scanner that publishes its
+methodology — six named factors and their weight ordering — and
+back-checks every call vs SPY publicly."** Every piece of marketing
+should drive that one knife-point home. The exact weights and the
+scoring equation are NOT published (PR #342 withdrew them), so never
+write "publishes its formula" or "published weights".
 
 ## Scope
 
@@ -90,11 +93,15 @@ For each item: draft copy, posting time, expected response handling.
 
 Each post is unique, never crossposted. Subreddit-tuned.
 
-**r/algotrading** — technical audience, pitch the published formula
-- Title: "I built a stock scanner with the formula on the homepage —
-  here's the math"
-- Lead with: the literal `score = 0.25 * trend + 0.20 * rs + ...`
-  expression. Explain why each factor + weight. Link to `/how-it-works`.
+**r/algotrading** — technical audience, pitch the published methodology
+- Title: "I built a stock scanner that names every factor it scores on —
+  and publishes the record of what those scores did next"
+- Lead with: the six factors, what each one measures, and their weight
+  **ordering** (weighted most toward Trend and Relative Strength, least
+  toward Momentum). **Never publish the numeric weights or the scoring
+  equation** — PR #342 stripped them deliberately and
+  `frontend/__tests__/methodologyPages.test.ts` guards the boundary.
+  Link to `/how-it-works`.
 
 **r/stocks** — broader retail, pitch the public scorecard
 - Title: "Every stock pick we publish is back-checked against SPY the
@@ -102,8 +109,10 @@ Each post is unique, never crossposted. Subreddit-tuned.
 - Lead with: a screenshot of `/scorecard` — including a bad week.
 
 **r/investing** — methodology-curious, longer-form
-- Title: "Why we publish our scoring formula instead of treating it as
-  IP"
+- Title: "Why we name every factor in our score instead of hiding the
+  whole thing behind a black box"
+  (Not "why we publish our formula" — we don't; the weights and the
+  equation stayed behind after PR #342.)
 - Lead with: the Tipranks/Zacks/Kavout opacity problem, then explain
   Tapeline's approach.
 
@@ -115,8 +124,8 @@ within the first 6 hours. No copy-paste replies. Reddit punishes
 
 One shot. Draft, sleep on it, redraft. Target post:
 
-- Title: `Show HN: Tapeline – a stock scanner that publishes its
-  formula and back-checks every pick`
+- Title: `Show HN: Tapeline – a stock scanner that names every factor
+  it scores on and back-checks every pick`
 - Submit Monday morning US Eastern (8-10 AM ET)
 - First comment by founder: 2-3 paragraphs explaining the
   motivation, link to `/how-it-works` and `/scorecard`, and ASK FOR
@@ -134,8 +143,8 @@ Topics:
 - "Why retail finance products hide their methodology" — connects to
   fiduciary duty narrative
 - "What the public scorecard discipline taught me about my own bias"
-- "If you're a fintech building a scoring product — please publish
-  your formula"
+- "If you're a fintech building a scoring product — at least name your
+  factors and publish your record"
 
 ### 6. Podcast outreach
 

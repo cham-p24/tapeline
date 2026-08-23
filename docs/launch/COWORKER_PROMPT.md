@@ -10,7 +10,7 @@ Last refreshed: 2026-05-18
 
 ```text
 You're picking up the Tapeline launch push. Project root is C:\Project 1
-(monorepo: backend/ FastAPI on Fly.io, frontend/ Next.js 16 on Vercel,
+(monorepo: backend/ FastAPI on Fly.io, frontend/ Next.js 16 on Fly.io,
 public URL https://tapeline.io, API at https://api.tapeline.io).
 
 Read CLAUDE.md for product overview, brand rules, tier model, and the
@@ -178,16 +178,18 @@ founder posts. Agent's job is to:
   3. Help them copy from the chosen draft. URL field gets
      https://tapeline.io. Text field gets the body.
   4. Title format (≤ 80 chars):
-     "Show HN: Tapeline — One score per stock, fully public formula"
-     (or variant title).
+     "Show HN: Tapeline — one score per stock, with a public, unedited
+     track record" (or variant title).
   5. After posting: hang around for 90 MINUTES answering every comment
      in real time. HN front-page algorithm rewards reply velocity in
      the first hour. This is non-negotiable for the post to crack the
      front page. Predictable objections + responses are in
      LAUNCH_PLAYBOOK §1 — feed those to the founder as comments come
      in.
-  6. Also post the formula in a top-level comment immediately after
-     submission (people click comments before the link).
+  6. Also post the six factor names and what each measures in a
+     top-level comment immediately after submission — no weights, no
+     equation (the exact weights are deliberately unpublished; see
+     /how-it-works). People click comments before the link.
 
 Realistic outcome: 200-500 visitors, 5-30 trial signups, 1-3 paying
 in week 1.

@@ -44,7 +44,7 @@ export type TapelineEvent =
   | "sign_up_started"      // Signup form opened
   | "sign_up"              // Account created — primary lead conversion
   // Trial → paid funnel
-  | "start_trial"          // 14-day Premium trial auto-starts at signup — NO card captured
+  | "start_trial"          // 14-day Premium trial started via Stripe Checkout — the /app/start card wall or the /app/billing trial offer (card required, $0 today, first charge day 14)
   | "begin_checkout"       // Upgrade clicked — Stripe Checkout about to open
   | "subscribe"            // First paid charge — primary revenue conversion
   // Engagement signals
@@ -157,10 +157,16 @@ const ADS_CONVERSION_LABEL: Partial<Record<TapelineEvent, string>> = {
   // first-charge price the checkout-success page passes) created in Google Ads
   // account 271-638-2397 on 2026-06-06. Hardcoded default, like sign_up above.
   subscribe: process.env.NEXT_PUBLIC_GOOGLE_ADS_SUBSCRIBE_LABEL || "1GH_CIT50rkcELTRhthD",
-  // start_trial is intentionally left unset: the 14-day trial auto-starts at
-  // signup, so trackEvent("start_trial") fires at the SAME instant as
-  // trackEvent("sign_up"). A separate Ads conversion would double-count the
-  // same click. GA4 still gets the start_trial event for funnel analysis.
+  // start_trial is currently unset, and the reason it used to be unset no
+  // longer holds. The trial no longer auto-starts at signup (#536 removed
+  // that; #548 put the card wall at /app/start), so start_trial now fires on
+  // the confirmed return from Stripe Checkout — a DISTINCT step from sign_up,
+  // not the same instant, and the one that actually separates a card-on-file
+  // account from a bounce. DECISION NEEDED: either create a Google Ads
+  // conversion action for it (Manual event, SECONDARY so it doesn't compete
+  // with Subscribe for Smart Bidding) and set
+  // NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL, or record here that it is deliberately
+  // GA4-only. Until then GA4 gets it and Ads does not.
   start_trial: process.env.NEXT_PUBLIC_GOOGLE_ADS_TRIAL_LABEL || "",
   // begin_checkout has NO hardcoded default: unlike sign_up / subscribe, no
   // Google Ads conversion action exists for it yet. Create one (Goals ->

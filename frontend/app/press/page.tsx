@@ -44,7 +44,7 @@ const FACT_SHEET = [
 const ONE_LINER =
   "Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks every top-10 daily pick against the next-day SPY-relative move.";
 
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $25-40/mo price point.`;
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $10-20/mo price point (Pro $9.99/mo or $99/yr; Premium $19.99/mo or $199/yr).`;
 
 const PULL_QUOTES = [
   {
@@ -77,7 +77,7 @@ const SCREENSHOTS = [
   },
   {
     label: "Methodology",
-    desc: "The six named scoring factors, how they're weighted, and signal-label definitions.",
+    desc: "The six named scoring factors, the ordering of their weights, and signal-label definitions.",
     href: "/how-it-works",
   },
   {

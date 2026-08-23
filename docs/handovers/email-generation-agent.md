@@ -30,8 +30,9 @@ Gmail slaps on a Tapeline email costs trust forever.
 3. Draft + ship the **weekly digest** — Sunday-evening recap of top
    movers, the user's watchlist score changes, and the public
    scorecard's hit rate
-4. Draft the **trial-ended re-engagement series** — day 14 (drop-to-
-   Free), day 21 (winback offer), day 35 (final delete-warning)
+4. Draft the **trial-ended re-engagement series** — day 14 (for users
+   who cancelled before the first charge), day 21 (winback offer),
+   day 35 (final delete-warning). See the post-#548 scope note in §4.
 5. Build a **cold outreach generator** — given a name + role + company,
    generate 80-120 word personalised email referencing something real
    about them
@@ -90,8 +91,9 @@ The Tapeline Score updates every 60 seconds. The full breakdown for
 each is one click away on your watchlist page.
 
 Reminder: 4 days left in your trial. If the scanner has earned its
-keep, the Pro plan is $29/mo and Premium is $49/mo. Cancel in one
-click any time.
+keep, the Pro plan is $9.99/mo ($8.25/mo billed annually) and Premium
+is $19.99/mo ($16.58/mo billed annually). Cancel in one click any
+time before the first charge.
 
 — Christian, Tapeline founder
 {watchlist_link}
@@ -138,8 +140,13 @@ Currently `render_trial_ended_email` fires once on day 14. Extend to
 3 emails:
 
 **Day 14 (existing, polish):** *"Your trial just ended"* — calm tone,
-recap what they got + what they kept (Free tier still has scorecard
-+ top 20). One CTA: upgrade.
+recap what they kept: the public record, the live top-10 scanner,
+12 look-ups per UTC day, a 5-ticker watchlist. One CTA: upgrade.
+
+> **Scope note (post-#548, 2026-08-22):** a card-required trial converts
+> to a paid subscription on day 14, so this whole Day 14/21/35 series
+> applies only to users who **cancelled before the first charge**.
+> Everyone else gets billing copy, not win-back copy.
 
 **Day 21 (new):** *"One last reason"* — a specific scorecard win from
 their watchlist if they had one. If they didn't, generic recap of
@@ -164,10 +171,10 @@ Hi {first_name},
 must reference why_relevant, not flatter generically.}
 
 I'm building Tapeline (tapeline.io). It's a quantitative stock
-scanner that publishes its scoring formula on the homepage and
-back-checks every pick against SPY publicly. Most of the prosumer
-scanners hide both — figured you'd find the transparency
-interesting.
+scanner that publishes its methodology — the six named factors and
+which ones carry the most weight — and back-checks every pick against
+SPY publicly, winners and losers. Most of the prosumer scanners hide
+both — figured you'd find the transparency interesting.
 
 Free to play with at /t/AAPL or /scorecard — no signup needed for
 either. Worth a 60-second look?

@@ -29,10 +29,17 @@ suggests US- or UK-ish; aim for ~14:00 UTC to be safe across both.
 >
 > — Christian
 >
-> P.S. If you want a clean restart, here's a fresh 14-day Premium trial
-> on the house: [paste signup link with `?ref=` if you have a code, or
-> just `https://tapeline.io/signup` — the OAuth signup will hand her
-> the trial now that the bug fix from PR #109 is deployed]
+> P.S. If you want a clean restart, the 14-day Premium trial starts when
+> you add a card — $0 charged that day, first charge on day 14, one click
+> cancels before then. Or just say the word and I'll switch your account
+> on from my end instead.
+>
+> [Signing up does NOT hand her a trial — signup writes `tier="free"` and
+> `trial_ends_at=None`. The trial only starts via Stripe Checkout with a
+> card. Her account predates the 2026-08-22 card gate, so she is
+> grandfathered and will never be asked for one just to sign in. If you
+> want to comp her, do it directly rather than promising a trial the
+> signup flow doesn't grant.]
 
 ---
 

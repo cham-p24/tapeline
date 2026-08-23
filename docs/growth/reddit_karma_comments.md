@@ -25,7 +25,7 @@ If a thread has a specific ticker question, prefer the **ticker-discussion comme
 
 > The thing that finally clicked for me was treating "factor confluence" as the real signal, not any single factor. A trend score on its own is noisy. A trend score that lines up with rising relative strength AND a positive fundamentals delta is way more reliable, even though each input is mediocre alone.
 >
-> Practical version of this — for any ticker I'm considering, I write down whether each of these is positive: 200DMA slope, RS vs SPY (3M and 6M), revenue trend YoY, operating margin trend, and insider 90-day net buying. If 4+ of those 5 are positive in the same window, it's worth a position. If only 1-2 line up, even with a "perfect" chart, I skip. Cuts my watchlist by 80% and my win rate has been measurably better.
+> Practical version of this — for any ticker I'm considering, I write down whether each of these is positive: 200DMA slope, RS vs SPY (3M and 6M), revenue trend YoY, operating margin trend, and recent net insider buying. If 4+ of those 5 are positive in the same window it stays on the list; if only 1-2 line up, even with a "perfect" chart, I skip. Mostly what it does is keep the list short — I don't have a long enough record to claim more than that for it.
 >
 > What I'd really like is for someone to do the work of weighting these properly across regimes — same factor mix probably needs different weights in a BULL vs CAUTIOUS market — but I haven't found anyone publishing the actual numbers.
 
@@ -37,7 +37,7 @@ If a thread has a specific ticker question, prefer the **ticker-discussion comme
 >
 > The three cash-flow tests (CFO > 0, CFO > Net Income, CFO/Assets up) carry materially more signal than the equity-side tests in the data I've looked at. The leverage tests (long-term debt down) are especially noisy because they punish companies investing into a capex cycle, which is often exactly when you want to own them.
 >
-> A modified F-score that weights cash-flow inputs ~1.5x and dampens the leverage tests when revenue growth > 15% YoY backtests noticeably better, though obviously the sample I've run on is small and over-fit risk is real. The textbook 9-point version is still the right starting point if you're new to it — just don't take a perfect 9 as gospel and a 4 as automatic disqualification.
+> A version that leans harder on the cash-flow tests and eases off the leverage tests for companies visibly in a capex cycle has looked better in the samples I've run — though the samples are small and over-fit risk is real, so treat that as a direction to test rather than a setting to copy. The textbook 9-point version is still the right starting point if you're new to it — just don't take a perfect 9 as gospel and a 4 as automatic disqualification.
 
 ---
 
@@ -55,13 +55,13 @@ If a thread has a specific ticker question, prefer the **ticker-discussion comme
 
 ### M4 — `r/stocks` — "smart money / insider trades / how do you use them"
 
-> Most retail "smart money" tools either dump 13F lag in your lap (45-day stale, signal already priced in) or chase Reddit/Twitter sentiment (negative alpha most of the time).
+> Most retail "smart money" tools either dump 13F lag in your lap (a quarterly snapshot filed up to 45 days after the quarter ends) or chase Reddit/Twitter sentiment.
 >
-> What actually works for me:
+> What I actually pay attention to, for whatever one person's process is worth:
 >
-> - **SEC Form 4 cluster detection** — single insider buying is noise, 2+ insiders in the same 30-day window is signal. Form 4 lag is only 2 business days so the data is fresh.
-> - **Congressional disclosures filtered by committee** — most of the noise is from members holding passive index funds. Filtering for "trade in a sector related to a committee assignment" cuts the dataset by ~90% and what's left has real signal.
-> - **Avoid 13F entirely for active trades** — useful for narrative ("Burry is short housing again") but not for entries. The 45-day window kills it.
+> - **SEC Form 4** — due within a couple of business days of the transaction, so it's the freshest disclosed-trade record there is. Worth remembering a Form 4 records that a transaction happened, never why: 10b5-1 sales, option exercises and tax-withholding sales all arrive looking the same.
+> - **Congressional disclosures** — sparse and slow (30-45 days), and a lot of what's in there is passive fund holdings rather than anything discretionary. I read them as colour, not as an entry.
+> - **13F for narrative, not entries** — fine for "Burry is short housing again", useless for timing. The 45-day window kills it.
 >
 > The free SEC EDGAR APIs cover all three. Anyone selling you "smart money flow" is repackaging public data; you can build it yourself in a weekend.
 

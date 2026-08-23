@@ -1,4 +1,10 @@
-"""Short-lived tokens for Telegram one-click signup flow."""
+"""Short-lived tokens for the Telegram one-click account-link flow.
+
+ORPHANED — Telegram was retired as a customer alert channel on 2026-08-11 and
+nothing in the app reads or writes this table any more. The model + table are
+left in place (no migration) so the drop is a deliberate, separate decision.
+Do not read this as a shipped customer feature.
+"""
 from __future__ import annotations
 
 from datetime import datetime

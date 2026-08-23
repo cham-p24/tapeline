@@ -30,7 +30,7 @@ typically reads:
         h1("Welcome, " + name) +
         lead("Your Tapeline account is live.") +
         button("Open the scanner", "https://tapeline.io/app/scanner") +
-        muted_footnote("The Free plan needs no card. The Premium trial does."),
+        muted_footnote("30-day money back. One-click cancel."),
         preheader="Your Tapeline account is live — open the scanner.",
     )
 

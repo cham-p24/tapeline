@@ -14,6 +14,6 @@ export default async function OG() {
     eyebrow: "ABOUT",
     title: "A scanner that shows its work — built by one person in Melbourne.",
     subtitle:
-      "Why the formula is public, why every pick goes on the scorecard, and who actually built this.",
+      "Why the methodology is public, why every pick goes on the scorecard, and who actually built this.",
   });
 }

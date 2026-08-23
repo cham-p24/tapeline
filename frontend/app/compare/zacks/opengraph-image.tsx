@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs Zacks.",
     subtitle:
-      "Live scanner with sub-60s refresh vs. Zacks' daily-rebuild rating model. Honest tradeoffs at $25 vs $250/mo.",
+      "Live scanner with sub-60s refresh vs. Zacks' daily-rebuild rating model. Honest tradeoffs at $19.99 vs $250/mo.",
   });
 }

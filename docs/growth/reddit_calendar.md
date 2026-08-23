@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Drafted 2026-05-14. Pairs with `docs/launch/LAUNCH_PLAYBOOK.md` §2 which has the three sub-tailored launch posts already drafted (r/algotrading, r/stocks, r/SecurityAnalysis). This calendar:
@@ -45,7 +61,7 @@ All times are US Eastern (where Reddit's finance subs see the most traffic). Ski
 | Day | Time | Sub | Post |
 |---|---|---|---|
 | Tue 2026-05-19 | 9:00 AM ET | r/stocks (3M subs) | LAUNCH_PLAYBOOK §2 — "Built a free stock score tool — every call back-checked vs SPY next day, full history public" |
-| Thu 2026-05-21 | 10:00 AM ET | r/algotrading (~700K subs) | LAUNCH_PLAYBOOK §2 — "I built a 6-factor composite stock scoring system — formula, weights, and a public back-check page" |
+| Thu 2026-05-21 | 10:00 AM ET | r/algotrading (~700K subs) | LAUNCH_PLAYBOOK §2 — "I built a 6-factor composite stock score with a public, unedited daily back-check vs SPY" |
 
 ### Week 2 (2026-05-26) — Third launch post
 
@@ -73,15 +89,15 @@ The full record — every pick, every back-check, including the misses — is at
 
 What surprised me from two weeks of running this:
 
-1. The [SECTOR] factor weighting works better than I expected. When all four of Trend / RS / Smart Money / Momentum align, the next-day hit rate is materially higher than the composite average. When only one or two align, it's basically coin-flip.
+1. The sample is far too small to draw a factor-level conclusion from. I had half-expected two weeks to tell me something about which factor combinations hold up; it doesn't, and I'd rather say so than read a pattern into [X] calls.
 
-2. Macro turns out to scale everything. Same factor configuration in a friendly regime vs a hostile one is a different trade. /how-it-works has the full formula if you want to roast it.
+2. Macro is the same reading for every ticker on a given tick, by construction. It lifts or lowers the whole board together rather than separating names — a genuine limitation, and /how-it-works states it on the page rather than burying it.
 
-3. Insider clusters (multiple Form 4 buys in the same window) are the single best leading signal. I underweighted Smart Money on launch; the data is pushing me to revisit.
+3. Smart Money reads disclosed Form 4 transactions netted over a recent window — not 13F, and not Congressional disclosures, which are ingested and published as their own feed rather than folded into the sub-score. Whether that netting is the right construction is the thing I'd most like torn apart.
 
-Free tier is still top 20 tickers, 24h delayed, and needs no card. Pro is $9.99/mo for the full ~2,500-ticker universe. The 14-day Premium trial does take a card — $0 charged today, one click to cancel before day 14.
+The full record is readable with no account and no card. A free-tier account gets top-10 rows live and 12 look-ups a day. Pro is $9.99/mo for the full ~2,500-ticker universe. Creating an account puts a card on file at first sign-in and starts the 14-day Premium trial — $0 charged today, one click to cancel before day 14.
 
-What signals or factors would you want me to add weight to? The formula is versioned in the changelog so factor changes ship with a written rationale.
+What signals or factors would you want me to add weight to? The weighting is versioned in the changelog so factor changes ship with a written rationale.
 ```
 
 **Response playbook for this post**: if it gets ≥ 30 upvotes in the first hour, reply to every comment in the next 2 hours. Treat sceptic comments as user research, not attacks — they're free product feedback.
@@ -93,7 +109,7 @@ What signals or factors would you want me to add weight to? The formula is versi
 **Body**:
 
 ```
-Update from the r/algotrading post two weeks ago. Brief recap: Tapeline is a 6-factor composite stock score, weights public (25 trend / 20 RS / 15 fundamentals / 15 smart money / 15 macro / 10 momentum), top-10 picks frozen at each close and back-checked vs SPY at next close on a public /scorecard.
+Update from the r/algotrading post two weeks ago. Brief recap: Tapeline is a 6-factor composite stock score, six named factors with a published weight ordering (heaviest Trend + RS, lightest Momentum), top-10 picks frozen at each close and back-checked vs SPY at next close on a public /scorecard.
 
 [X] picks logged. Here's what factor-decomposition on the picks that beat SPY says:
 
@@ -110,9 +126,9 @@ Update from the r/algotrading post two weeks ago. Brief recap: Tapeline is a 6-f
 
 Three observations worth roasting:
 
-1. The Smart Money factor's hit rate exceeds its weight. Suggests I should bump it from 15% → 18-20% and reduce one of the lower-performing factors. But 14 days is too small a sample to act on; will publish the same table at 60 days and reconsider.
+1. The Smart Money factor's hit rate exceeds its weight. Suggests Smart Money may deserve more weight than it currently carries, taken from one of the lower-performing factors. But 14 days is too small a sample to act on; will publish the same table at 60 days and reconsider.
 
-2. Momentum (lowest weight at 10%) is *also* hitting above its weight. Probable explanation: Momentum overlaps heavily with Trend + RS, so its alpha is partially redundant. Don't think I'll rebalance up.
+2. Momentum, the lightest-weighted factor, is *also* hitting above its weight. Probable explanation: Momentum overlaps heavily with Trend + RS, so its alpha is partially redundant. Don't think I'll rebalance up.
 
 3. Macro factor's hit rate is *below* average on picks that scored high on Macro alone, but *above* average when it scored high in confluence with Trend + RS. This is what I expected: Macro is a confluence multiplier, not a standalone signal. Glad the data confirms.
 
@@ -123,29 +139,32 @@ If you have a backtest framework already running, I'd genuinely want eyes on the
 
 **Tue 2026-06-09 · 9:00 AM ET · r/SecurityAnalysis**
 
-**Title**: `Piotroski F-score in a 6-factor composite — how I'm using it differently from textbook`
+**Title**: `My Fundamentals factor reads five reported numbers and nothing else — roast the omissions`
 
 **Body**:
 
 ```
-Three weeks ago I posted the Tapeline launch here. Brief recap: 6-factor composite (Trend 25, RS 20, Fundamentals 15, Smart Money 15, Macro 15, Momentum 10), public scorecard, free top-20.
+Three weeks ago I posted the Tapeline launch here. Brief recap: 6-factor composite (heaviest Trend + RS, lightest Momentum), public scorecard, free top-10 rows live.
 
-I want to dig into the Fundamentals factor since this sub leans deep on it. The Tapeline Fundamentals sub-score combines:
+I want to dig into the Fundamentals factor since this sub leans deep on it. The Tapeline Fundamentals sub-score reads five figures, every one of them already reported in a filing — nothing estimated, projected or modelled:
 
-- Revenue growth, trailing 4 quarters (yoy + sequential)
-- Operating-margin trend, trailing 4 quarters
-- ROE — current vs sector median
-- Piotroski F-score — 9-point score
+- Profit margin, as reported
+- Return on equity, as reported
+- EPS growth between reported periods
+- Revenue growth between reported periods
+- An earnings multiple — a lower one moves the reading up, a higher one moves it down
 
-The Piotroski piece is where I want feedback. The textbook formula treats all 9 binary tests with equal weight. In practice:
+Each metric that is available is mapped onto a common 0-100 scale using fixed, broadly-drawn bands, and the available components are averaged. A missing metric is left out entirely rather than filled in with a guess, and the ticker's confidence percentage falls to reflect the thinner evidence.
 
-1. The cash-flow tests (CFO > 0, CFO > Net Income, CFO/Assets up) have predicted next-12mo returns substantially better than the equity tests (ROA up, gross margin up). I'm weighting cash-flow inputs ~1.5x in the composite. Sin or smart?
+Three things I already know are weak about it, and where I actually want the roast:
 
-2. The leverage tests (long-term debt down) are noisy at the start of a capex cycle — penalising companies that are actively investing for growth. I'm dampening these tests when revenue growth is > 15% yoy. Probably violates the original Piotroski paper's intent.
+1. There is no cash-flow input at all. No CFO, no CFO-versus-net-income, no accrual check. For a sub that leans on quality, that is probably the first thing you'd add. If you only got to add one more line, which would it be?
 
-3. For financial sector names the textbook F-score doesn't apply cleanly (long-term debt is the product, not a quality signal). I'm running a different fundamentals routine for sector=Financials. Documented at /how-it-works.
+2. It is not sector-relative. The same bands are applied to a bank, a biotech and a software company. I know that's blunt. Sector-median comparisons bring their own problems on thin sectors, and I haven't convinced myself the trade is worth it yet.
 
-Curious whether anyone here has done the rigorous edge-case work on F-score across sectors. If there's a literature pointer I'm missing, I'd genuinely take it.
+3. The reading is exactly as current as the last filing. Between reports it does not move, even when the business does — for most names that means static for weeks at a time.
+
+Five reported metrics is a narrow view of a company, and I'd rather say that plainly than dress it up as analysis. The factor definitions are at https://tapeline.io/how-it-works — the six factors are named there, along with their weight ordering.
 
 Full scorecard with the live Fundamentals factor on every name: https://tapeline.io/scorecard.
 ```
@@ -153,7 +172,7 @@ Full scorecard with the live Fundamentals factor on every name: https://tapeline
 ### Week 5 (2026-06-16) — r/stocks, market-event-tied post
 
 **Format**: tie this week's post to a real market event that happened in the prior 7 days. Examples:
-- A Fed announcement → "How the Tapeline Macro factor reacted: VIX impact + 10Y direction shift"
+- A Fed announcement → "How the Tapeline Macro factor reacted: the market-wide regime read shifted, and every score on the board moved with it"
 - A major earnings miss/beat → "Tapeline scored $TICKER at X before earnings; here's what the post-earnings move looked like"
 - A sector rotation event → "Energy ripped this week — the Tapeline Energy sector score had been climbing for 5 sessions"
 
@@ -164,7 +183,7 @@ Full scorecard with the live Fundamentals factor on every name: https://tapeline
 ```
 [Sentence on the event in plain English.]
 
-The Tapeline scoring formula has a [factor] component weighted at [X]%. Here's what that factor did during the event window:
+The Tapeline composite has a [factor] component. Here's what that factor did during the event window:
 
 - 2 days before event: avg sub-score across [universe] = [X]
 - Day of event: avg sub-score = [Y]
@@ -172,7 +191,7 @@ The Tapeline scoring formula has a [factor] component weighted at [X]%. Here's w
 
 [1-2 sentences on what that delta means in practice for picks.]
 
-The full live read on every ticker is at /scorecard; the public formula is at /how-it-works. Pro tier is $9.99/mo for full live data, free is delayed-top-20.
+The full live read is at /scorecard; the methodology is at /how-it-works. Pro is $9.99/mo for the full live universe; free accounts get top-10 rows live with 12 look-ups a day.
 
 Curious which factor weighting you'd argue should change after [event].
 ```
@@ -205,45 +224,43 @@ Three observations:
 
 1. None of the four methodologies have enough sample size to be statistically significant at 5 weeks. The differences below ±5 percentage points are noise.
 
-2. The most useful intersection is "ranked top decile by 2+ methodologies." Tapeline + Piotroski + IBD all-three-aligned has the highest hit rate in the sample, but only [X] picks qualified. Suggests confluence > weighting.
+2. The overlap worth looking at is "ranked top decile by 2+ methodologies" — [fill in from the table: which combinations overlapped, how many picks qualified]. Do not write a conclusion into this slot before the numbers exist; at this sample size there may not be one.
 
-3. Tapeline's Macro factor is the biggest divergence — none of the comparison methodologies include a regime overlay, which means in unfavorable regimes the comparison methods rank names that the Macro factor downweights. Whether that's good or bad depends on whether you think Macro adds alpha. Open question.
+3. Tapeline's Macro factor is the clearest structural difference — none of the comparison methodologies carry a market-regime term at all. Worth being precise about what it does: it reads a single market-wide classification, so on any given tick it is the same reading for every ticker and it lifts or lowers the whole board rather than re-ordering names within it. Whether that helps is an open question.
 
 If you're running your own composite system and want to throw a fourth methodology into the comparison, ping me — happy to share the picks list so you can run yours on the same universe.
 
-/scorecard for the live record. /how-it-works for the formula.
+/scorecard for the live record. /how-it-works for the methodology.
 ```
 
 ### Week 7 (2026-06-30) — r/SecurityAnalysis, deep-dive on one factor
 
 **Tue 2026-06-30 · 9:00 AM ET · r/SecurityAnalysis**
 
-**Title**: `Smart Money factor: how 13F lag + Form 4 cluster detection + Congressional flow combine into one sub-score`
+**Title**: `Smart Money factor: why it reads SEC Form 4 and not 13F`
 
 **Body**:
 
 ```
-Pulling out the Smart Money factor from the Tapeline composite (15% weight) because it's the part most retail tools either skip or hide.
+Pulling out the Smart Money factor from the Tapeline composite because it's the part most retail tools either skip or hide.
 
-Tapeline's Smart Money sub-score combines three data streams:
+Tapeline's Smart Money sub-score reads one data stream: disclosed SEC Form 4 insider transactions. Every disclosed transaction in a recent rolling window becomes a signed dollar value — shares changed, times the disclosed price — and the net is taken against the gross, then mapped onto a 0-100 scale around a midpoint.
 
-1. **Form 4 insider transactions** — net 90-day insider buying, weighted by cluster detection. Single insider buying noise; 2+ insiders in the same 30-day window is signal. Lag: 1-3 business days.
+Congressional disclosures are ingested by Tapeline and published as their own feed in the product, but they are not an input to this sub-score. /how-it-works says so on the page; I'd rather name the boundary than let "smart money" imply more than it covers.
 
-2. **Elite 13F holdings** — quarterly position disclosures from 8 curated funds (Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer). New-position weighting > add-to-existing > trim > exit, scaled by portfolio percentage. Lag: 45 days post quarter-end.
+Five weeks in, and what I'd actually put up for critique:
 
-3. **Congressional disclosures** — STOCK Act required filings, weighted by committee assignment + filing volume + recency. Lag: 30-45 days.
+- The 45-day 13F filing lag means that by the time you see a fund's position it is often already priced, which is why Tapeline doesn't score 13F data at all. Form 4 is due within a couple of business days of the transaction, so it is at least a fresher record of the same category of event.
 
-Five-week observations:
+- A filing records that a transaction happened, never why. Sales scheduled months ahead under a 10b5-1 plan, option exercises and share sales made purely to cover tax withholding all arrive as Form 4s and get netted like anything else. I have no clean way to strip those out and I don't pretend to.
 
-- Insider clusters predict 1-day-to-3-week returns better than 13F deltas. The 45-day 13F lag means by the time you see it, the position is often already-priced.
+- Netting by dollar value means one large filer can dominate a company with many reporting insiders. That's a weakness of the construction, not a subtlety.
 
-- 13F new positions in concentrated portfolios (e.g., Scion's typical ~10 positions) are signal-rich because the manager had to allocate a meaningful portfolio percentage. 13F adds in diversified portfolios (e.g., 200+ holdings) are noise.
-
-- Congressional flow is the noisiest signal in the trio. Most members hold passive index funds; the few who trade individual names are concentrated in committee-relevant sectors. Tapeline weights Congressional flow by committee-relevance, not raw transaction count.
+- A ticker with no filings in the window gets no reading at all and the composite substitutes a mid-range value. An absence of filings is an absence of information, not a negative.
 
 The full Smart Money factor methodology is at https://tapeline.io/how-it-works.
 
-What's the cleanest way you've seen anyone scale Congressional disclosure flow? The dual problem is signal sparsity (most weeks have ~10 disclosures across thousands of liquid names) and noise (most disclosures are unrelated to committee work).
+If you've built anything on Form 4: what's the cleanest way you've seen anyone separate a discretionary open-market purchase from a scheduled or comp-driven one, using only what's on the filing?
 ```
 
 ### Week 8 (2026-07-07) — r/stocks, two-month reflection
@@ -261,19 +278,19 @@ Two months in, the public scorecard has [X] daily top-10 cohorts logged with [Y]
 
 One change I'd make if I were starting over today:
 
-**Smart Money factor weight is too low at 15%.** Two months of data show insider-cluster events are the single best leading signal in the composite. Lifting Smart Money from 15% to 18-20% (taking the increment from Momentum which is 10% and partially redundant with Trend + RS) would mean a [Q]% hit-rate lift on the sample so far. But:
+**Smart Money may be carrying too little weight.** Stated carefully, because two months is nowhere near enough to conclude anything: disclosed insider filings look like they may carry more than the weight I gave them. Lifting it — with the increment coming from Momentum, which is the lightest factor and partially redundant with Trend + RS — would have moved the hit rate by [Q] points on the sample so far. That is an observation about a tiny sample, not a finding. But:
 
 1. Two months isn't a long enough horizon to act on. Want to see at least 6 months and a regime shift.
 
-2. The Smart Money signal degrades when an insider's buying pattern is predictable (option grants, compensation cycles). The composite already filters for cluster events, but a higher weight raises the cost of false positives.
+2. A Form 4 records that a transaction happened, never why. Scheduled 10b5-1 sales, option exercises and tax-withholding sales all arrive as filings and get netted like anything else — the sub-score does nothing to separate them out. A higher weight raises the cost of that.
 
-3. Versioned weights are a feature, not a bug. The day the weights change, you see it in the changelog and you can audit what we re-trained on. If I bumped weights to fit a 2-month sample I'd be doing exactly what the rest of the industry does — overfitting to recent data.
+3. Versioned weights are a feature, not a bug. The day the weights change, you see it in the changelog and you can audit what changed and why. If I bumped weights to fit a 2-month sample I'd be doing exactly what the rest of the industry does — overfitting to recent data.
 
-So I'm publishing the observation but not the weight change. /how-it-works has the current formula and the changelog for any future weight adjustments.
+So I'm publishing the observation but not the weight change. /how-it-works has the current methodology and the changelog for any future weight adjustments.
 
 If you want to track the next factor-weight decision: subscribe to the scorecard RSS at /scorecard/rss.xml, or follow @tapeline_io. The methodology updates land there first.
 
-Free is still top-20 24h-delayed. Pro is $9.99/mo for live full universe.
+Free accounts get top-10 rows live with 12 look-ups a day; the full record needs no account at all. Pro is $9.99/mo for the live full universe.
 ```
 
 ---

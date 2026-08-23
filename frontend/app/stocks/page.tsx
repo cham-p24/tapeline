@@ -4,7 +4,7 @@
  * WHY THIS PAGE EXISTS (orphan-rescue, 2026-06-01):
  * The 2026-05-17 /signals preview-wall pivot caps the anonymous (and
  * therefore Googlebot) view to the top-10 rows; /sector/{slug} hubs only
- * fetch the top-20 by score (the /api/scanner Free-tier row cap). Net
+ * fetch a top-30 slice by score. Net
  * effect: the long-tail small/mid-cap /t/{SYMBOL} pages lost every inbound
  * internal link and went orphan — Google "Discovered" them via the sitemap
  * but never spent crawl budget, parking ~20+ of them in
@@ -40,7 +40,7 @@ export const revalidate = 3600;
 export const metadata = pageMeta({
   title: "Free Stock Screener List — Every US Stock, by Sector",
   description:
-    "Browse every US stock we score on a public 6-factor formula, grouped " +
+    "Browse every US stock we score on a published six-factor methodology, grouped " +
     "by sector. Each links to its live 0–100 score and breakdown. Free, no signup.",
   path: "/stocks",
 });
@@ -198,7 +198,7 @@ export default async function StocksDirectoryPage() {
           GICS sector. No login, no paywall. Every name links to its live
           0–100{" "}
           <Link href="/how-it-works" className="link">6-factor score</Link> and
-          factor breakdown — the same published formula runs on every row. See
+          factor breakdown — the same six named factors run on every row. See
           how current scores have held up on the{" "}
           <Link href="/scorecard" className="link">public scorecard</Link>{" "}
           (which today trails the S&amp;P 500 — we publish it anyway).
@@ -314,11 +314,12 @@ export default async function StocksDirectoryPage() {
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
               <p className="mt-3 text-sm text-muted leading-relaxed">
-                Every stock runs through the same public 6-factor formula for a
-                0–100 composite score. The formula is published on{" "}
-                <Link href="/how-it-works" className="text-accent hover:underline">how it works</Link>;
-                the score is a descriptive snapshot of the six factors, not a buy
-                signal or a forecast.
+                Every stock runs through the same six named factors for a
+                0–100 composite score. The methodology is published on{" "}
+                <Link href="/how-it-works" className="text-accent hover:underline">how it works</Link>
+                — every factor named, and which ones carry the most weight. The score
+                is a descriptive snapshot of those six factors, not a buy signal or a
+                forecast.
               </p>
             </details>
             <details className="group py-4">

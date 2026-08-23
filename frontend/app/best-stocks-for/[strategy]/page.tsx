@@ -178,11 +178,11 @@ export default async function BestStocksForStrategyPage({
                 {s.apiParams.min_score ? (
                   <>
                     {" "}
-                    (composite {s.apiParams.min_score}+ on Tapeline&apos;s public
-                    6-factor formula)
+                    (composite {s.apiParams.min_score}+ on Tapeline&apos;s published
+                    six-factor methodology)
                   </>
                 ) : (
-                  <> on Tapeline&apos;s public 6-factor formula</>
+                  <> on Tapeline&apos;s published six-factor methodology</>
                 )}
                 . At the top of the list right now:{" "}
                 {shown.map((r, i) => (

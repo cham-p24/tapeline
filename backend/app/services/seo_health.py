@@ -232,8 +232,11 @@ async def _owner_chat_id(session: AsyncSession) -> str | None:
     """Return the founder's Telegram chat_id, or None if not configured.
 
     The owner user is seeded by scripts/seed_owner.py with email
-    settings.owner_email (defaults to owner@tapeline.io). Telegram
-    chat_id is set by the user via /app/billing → Telegram card.
+    settings.owner_email (defaults to owner@tapeline.io), and the
+    destination is that row's `telegram_chat_id` column. No endpoint
+    writes that column any more — the customer-facing Telegram alert
+    channel was retired 2026-08-11 — so it has to be set on the owner
+    row directly. This is founder-facing plumbing only.
     """
     owner_email = getattr(settings, "owner_email", None) or "owner@tapeline.io"
     r = await session.execute(select(User).where(User.email == owner_email))

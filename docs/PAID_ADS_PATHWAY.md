@@ -59,14 +59,14 @@ The #1 paid-ads mistake is optimizing toward **free trials** — you train Googl
 ### STEP 2 — Build the conversion funnel (the part that decides profit)
 **a) Dedicated landing pages — never the homepage.** One ad theme → one page → one promise → one CTA. Message-match (the page's headline echoes the ad) converts 2.5–3× better *and* raises Quality Score (cheaper clicks). Build one LP per keyword theme (e.g. `/lp/finviz-alternative`, `/lp/transparent-stock-score`, `/lp/congress-tracker`).
 
-**b) The trial decision — change the default for PAID traffic.** Your current 14-day **no-card** Premium trial is correct for *organic* traffic (more signups, more total payers). For **paid** traffic it bleeds: you pay $4/click to acquire trialists who convert at ~8.9%. For ads, move to one of:
+**b) The trial decision — change the default for PAID traffic.** ⚠️ **Superseded 2026-08-21/22 by #536/#548** — the card-required trial shipped universally, and signup no longer grants a trial at all. The organic/paid split recommended in the rest of this sub-section no longer exists; read it as the reasoning that led to the change, not as a live recommendation. *As written in June 2026:* the 14-day **no-card** Premium trial is correct for *organic* traffic (more signups, more total payers). For **paid** traffic it bleeds: you pay $4/click to acquire trialists who convert at ~8.9%. For ads, move to one of:
    - **Card-required free trial** (~31% trial→paid, ~3.5× higher) — the single biggest CAC lever, *with* clear auto-charge disclosure, a day-13 pre-charge email, and one-click cancel; **or**
    - **A $1 / 7-day paid trial** — a strong intent filter that screens out tire-kickers entirely (best for cold paid clicks).
-   Keep no-card for organic; **A/B the card requirement specifically on the paid segment.** This is the decision worth the most money.
+   ~~Keep no-card for organic; **A/B the card requirement specifically on the paid segment.**~~ **Decided and shipped 2026-08-22 (#548) — universally, not as a paid-only A/B.** The remaining open question is $1-paid-trial vs $0-card-required.
 
 **c) Engineer the "aha" inside 15 minutes.** Trial→paid is decided by activation, not signup. For Tapeline the aha = *"the live scanner surfaced a real setup I'd act on"* + *"the public scorecard proves it isn't hype."* Onboarding must drop the user straight into a live scan with their watchlist seeded and the scorecard one click away. Instrument the activation event in GA4 and treat it as a leading indicator of the paid conversion.
 
-**d) The wedge converts — but ONLY under the corrected pitch.** ⚠️ **Critical:** the live public scorecard currently shows *underperformance* (~42% hit-rate, −0.58% median alpha vs SPY per the 2026-06-26 audit). So you must NOT sell "our scores beat the market" — that's false, non-compliant, *and* a skeptical FinTwit/Reddit audience will check. Reframe the wedge to the only true and compliant claim: **process, honesty, and time-savings** — *"Most gurus show you the wins. We show you the entire record, graded vs SPY, losses included."* Under that framing the transparency moat (published formula, public scorecard, live scanner preview) is still your highest-converting asset for a previously-burned audience — feature it above the fold. (And ship the scoring "Fix-3" + Finnhub cache backfill so the record improves.) See `TAPELINE_GROWTH_STRATEGY_10X.md` §1 — this is a positioning decision the founder must consciously own.
+**d) The wedge converts — but ONLY under the corrected pitch.** ⚠️ **Critical:** the live public scorecard currently shows *underperformance* (~42% hit-rate, −0.58% median alpha vs SPY per the 2026-06-26 audit). So you must NOT sell "our scores beat the market" — that's false, non-compliant, *and* a skeptical FinTwit/Reddit audience will check. Reframe the wedge to the only true and compliant claim: **process, honesty, and time-savings** — *"Most gurus show you the wins. We show you the entire record, graded vs SPY, losses included."* Under that framing the transparency moat (six named factors with their weight ordering published — never the numbers, which PR #342 stripped; public scorecard; live scanner preview) is still your highest-converting asset for a previously-burned audience — feature it above the fold. (And ship the scoring "Fix-3" + Finnhub cache backfill so the record improves.) See `TAPELINE_GROWTH_STRATEGY_10X.md` §1 — this is a positioning decision the founder must consciously own.
 
 ### STEP 3 — Pick channels in this order
 | Rank | Channel | Why it's first/later for Tapeline | Start? |
@@ -85,10 +85,10 @@ The #1 paid-ads mistake is optimizing toward **free trials** — you train Googl
   1. **Competitor-alternative** (cheapest intent, warmest): `finviz alternative`, `trade ideas alternative`, `tipranks alternative`, `zacks alternative`, `trendspider alternative`, `stock rover alternative`.
   2. **Category tool**: `stock scanner`, `stock screener`, `real-time stock scanner`, `best stock screener`.
   3. **Use-case**: `swing trading scanner`, `momentum stock scanner`, `squeeze scanner`, `stock screener for swing trading`.
-  4. **Differentiator angle** (cheap, on-brand): `transparent stock score`, `congress stock tracker`, `13f tracker`.
+  4. **Differentiator angle** (cheap, on-brand): `transparent stock score`, `congress stock tracker`, `insider buying tracker`. (Not `13f tracker` — Quiver was cancelled and there is no 13F surface to send the click to.)
 - **Match types**: start **Phrase + Exact** (control at zero data); graduate to Broad + Smart Bidding once you have ~30 conversions.
 - **Negatives day one**: `free`, `crack`, `jobs`, `salary`, `course`, `reddit`, `excel`, `how to`, `forex`, `signals`, `robot`, `auto trade` (the last three also keep you clear of restricted-product intent).
-- **RSAs**: 2 per ad group, 8–10 headlines, all 4 descriptions, keyword in ≥1 headline; sitelinks + callouts ("Published formula", "Public scorecard", "Cancel anytime", "14-day trial").
+- **RSAs**: 2 per ad group, 8–10 headlines, all 4 descriptions, keyword in ≥1 headline; sitelinks + callouts ("Published methodology", "Public scorecard", "Cancel anytime", "14-day trial"). **Never "Published formula" / "Open 6-Factor Formula"** — PR #342 withdrew the weights and the equation, so that copy fails message-match on arrival.
 - **Settings that quietly waste money**: opt **OUT** of Search Partners + Display on Search campaigns; **auto-apply recommendations OFF**; location = **Presence** (US, + any English markets you'll support); Search Terms Report mined **weekly** (add negatives, harvest converters).
 - **Bidding ladder**: Maximize Clicks (capped) → Maximize Conversions (once the paid event fires) → **Target CPA / tROAS** at ~30 paid conversions/30 days, optimizing on the **paid** action with values from Step 1.
 
@@ -130,14 +130,14 @@ A suspended ad account erases the pathway. The good news: **Tapeline's no-advice
 **Days 0–14 — Make money measurable + clear the gates (no spend yet)**
 - Verify a live checkout (Stripe is already wired); **pass Google Ads identity verification before ~07-04**; confirm indexation + crawl-cap fix (Step 0).
 - Install GA4 + Google tag, the two conversion actions, Enhanced Conversions, GCLID capture, offline-import job (Step 1).
-- Build 3 dedicated LPs (finviz-alternative, "show-you-the-record"/transparent-process, congress-tracker) with the scorecard above the fold under the *process+honesty* reframe — not a performance claim; ship the card-on-trial variant behind a flag.
+- Build 3 dedicated LPs (finviz-alternative, "show-you-the-record"/transparent-process, congress-tracker) with the scorecard above the fold under the *process+honesty* reframe — not a performance claim. (The card-on-trial "variant" is moot: #548 shipped the card gate universally on 2026-08-22.)
 - Confirm `/legal` disclosure + "informational only, not investment advice" line on each LP; **add the AU disclaimer block and book the AU financial-services (AFSL/ASIC) lawyer before taking AU subscribers.**
 
 **Days 15–45 — Light the first paid traffic, tuned, small**
 - Google Search: 1 campaign, 3–5 STAGs, Phrase+Exact, negatives, RSAs, Search Partners/Display OFF, Max Clicks. Budget concentrated (~$50–100/day).
 - Launch 1–2 newsletter sponsorships ($200–500 each) → same LPs with a tracked UTM/promo.
 - Stand up retargeting.
-- **A/B the card-vs-no-card trial on paid traffic.** Mine Search Terms weekly. Watch *paid* conversions, not trials.
+- ~~**A/B the card-vs-no-card trial on paid traffic.**~~ **Superseded by #548 (2026-08-22)** — the card requirement shipped universally, so there is no no-card arm left to test. The live open question is $1-paid-trial vs $0-card-required. Mine Search Terms weekly. Watch *paid* conversions, not trials.
 
 **Days 45–90 — Bid toward payers, then decide**
 - Offline conversion import live → switch to Maximize Conversions, then Target CPA on the **paid** event once ≥30 paid conversions/30 days.

@@ -204,7 +204,7 @@ describe("SignUpPage", () => {
 
   it("labels the submit button as account creation, not a trial start", () => {
     render(<SignUpPage />);
-    const submit = screen.getByRole("button", { name: /create my free account/i });
+    const submit = screen.getByRole("button", { name: /^create my account$/i });
     expect(submit).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /start my free trial/i })).toBeNull();
   });

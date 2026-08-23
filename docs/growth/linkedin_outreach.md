@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Companion to `linkedin_posts_4_to_12.md` (founder-voice broadcast) and
@@ -94,7 +110,8 @@ Hi [first name],
 
 I run Tapeline (tapeline.io) — a solo-built quantitative scanner
 that scores every US ticker with a single 0-100 composite from a
-published 6-factor formula. The piece I'm proud of is the public
+published 6-factor methodology (the factors and their weight
+ordering). The piece I'm proud of is the public
 back-checked scorecard at tapeline.io/scorecard: every top-10
 daily pick logged with next-day return vs SPY, append-only, every
 miss still on the page.
@@ -153,8 +170,8 @@ I noticed [their product] is building in [adjacent space]. Two angles
 that might be useful:
 
 1. Methodology comparison — if you've thought about how to score or
-   rank inside [their product], the choice we made (Trend 25 / RS 20
-   / Fundamentals 15 / SmartMoney 15 / Macro 15 / Momentum 10) is
+   rank inside [their product], the choice we made — six named factors
+   ordered heaviest Trend and Relative Strength, lightest Momentum — is
    documented at /how-it-works with our reasoning. Happy to talk
    through what we'd do differently.
 
@@ -195,10 +212,11 @@ quote one sentence]. Wanted to share something you might find useful
 to read against.
 
 Tapeline (tapeline.io) scores every US ticker via a 6-factor composite
-— published weights, 24h-delayed free tier. Where it might be useful
-for your style: the Smart Money sub-score (15% of the composite)
-filters out 10b5-1 sales and ranks cluster Form 4 buys; for the names
-you've written up recently, the composite read is at:
+— published factor set and weight ordering, live free-tier scores.
+Where it might be useful for your style: the Smart Money sub-score nets
+disclosed SEC Form 4 transactions over a recent window — including the
+scheduled and comp-driven ones, which it makes no attempt to strip out.
+For the names you've written up recently, the composite read is at:
 
   tapeline.io/t/[SYMBOL_1]
   tapeline.io/t/[SYMBOL_2]

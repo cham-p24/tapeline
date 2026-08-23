@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "COMPARE",
     title: "Tapeline vs Finviz.",
     subtitle:
-      "Live six-factor score + public scorecard vs. the classic screener — honest head-to-head at the same price point.",
+      "Live six-factor score + public scorecard vs. the classic screener — honest head-to-head at roughly a third of Finviz Elite's annual rate.",
   });
 }

@@ -5,7 +5,7 @@ const FACTOR_LABEL = {
 };
 const TONE = {
   "STRONG SETUP": "pos", "HIGH CONVICTION": "pos", CONSTRUCTIVE: "pos",
-  NEUTRAL: "mid", WATCH: "mid", CAUTION: "neg", AVOID: "neg",
+  NEUTRAL: "mid", CAUTION: "neg", WEAK: "neg",
 };
 const out = document.getElementById("out");
 const siteEl = document.getElementById("site");
@@ -128,7 +128,7 @@ async function renderAccount() {
 
   siteEl.innerHTML =
     '<div class="site-card"><b>Connect your Tapeline account</b><br>' +
-    'The extension works with a free Tapeline account. Get your connect code, ' +
+    'The extension works with a Tapeline account. Get your connect code, ' +
     'paste it below, and you are done.' +
     '<button id="getcode">Get my connect code</button>' +
     '<input id="code" placeholder="Paste your connect code" autocomplete="off" spellcheck="false">' +

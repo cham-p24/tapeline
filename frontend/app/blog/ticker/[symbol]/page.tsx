@@ -34,7 +34,9 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
-type FactorEntry = { value: number | null; weight: number; label: string };
+// No `weight`: the unauthenticated ticker API no longer returns the factor
+// weight vector (see backend/app/routers/ticker.py).
+type FactorEntry = { value: number | null; label: string };
 
 type TickerData = {
   symbol: string;
@@ -414,7 +416,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     {
       q: `Does Tapeline factor ${t.sector ?? "sector"} dynamics into the ${t.symbol} score?`,
       a:
-        `Yes — the Relative Strength factor explicitly compares ${t.symbol}'s performance against both SPY and its sector peers. The Macro factor adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.`,
+        `Not directly. The Relative Strength factor compares ${t.symbol}'s change against the broad-market benchmark over the same periods, not against its sector, and the Macro factor reads a single market-wide regime classification that is the same number for every ticker on a given tick. A hostile macro backdrop dampens the whole board, not one sector.`,
     },
     {
       q: `How often does the ${t.symbol} Tapeline score update?`,
@@ -445,7 +447,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             Is {t.symbol} a Buy in 2026? The Tapeline Score Breakdown for {t.name}
           </h1>
           <p className="mt-4 text-lg text-muted leading-relaxed">
-            {t.name} — {t.context} — is one of the most-searched tickers on US markets. Most "is {t.symbol} a buy" tools give you a verdict and hide the formula. This page does the opposite: the live Tapeline composite, all six factor sub-scores, the plain-English reason behind today's read, and a link to the public scorecard where every prediction is back-checked vs SPY the next day.
+            {t.name} — {t.context} — is one of the most-searched tickers on US markets. Most "is {t.symbol} a buy" tools give you a verdict and name nothing that went into it. This page does the opposite: the live Tapeline composite, all six factor sub-scores, the plain-English reason behind today's read, and a link to the public scorecard where every prediction is back-checked vs SPY the next day.
           </p>
         </header>
 
@@ -608,7 +610,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
               <p className="mt-2 text-sm text-muted leading-relaxed">
-                Yes — the Relative Strength factor explicitly compares {t.symbol}'s performance against both SPY and its sector peers. The Macro factor adds the broader regime overlay (VIX, breadth, 10Y direction). A high score in a hostile macro regime gets dampened by the composite even when the name-specific factors look strong.
+                Not directly. The Relative Strength factor compares {t.symbol}'s change against the broad-market benchmark over the same periods, not against its sector, and the Macro factor reads a single market-wide regime classification that is the same number for every ticker on a given tick. A hostile macro backdrop dampens the whole board, not one sector.
               </p>
             </details>
             <details className="group py-4">

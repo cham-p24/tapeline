@@ -10,7 +10,7 @@
  *   1. SEO — every ticker becomes a landing page for "AAPL stock score" queries.
  *   2. Viral loop — existing users tweet $TICKER + a /t/TICKER link, the OG card
  *      (next to this file) shows the live score so the share previews self-sell.
- *   3. Trust — the public-formula moat needs a public surface to land on.
+ *   3. Trust — the published-methodology moat needs a public surface to land on.
  */
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -64,7 +64,10 @@ const API_BASE =
   process.env.API_URL ||
   "https://api.tapeline.io";
 
-type FactorEntry = { value: number | null; weight: number; label: string };
+// No `weight`: the API deliberately stopped returning the factor weight
+// vector on this unauthenticated endpoint — see the disclosure-boundary note
+// in backend/app/routers/ticker.py.
+type FactorEntry = { value: number | null; label: string };
 
 type TickerData = {
   symbol: string;
@@ -192,7 +195,7 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
  * rather than "this page is a generic shell with the ticker swapped
  * in".
  */
-type Sub = { value: number | null; weight: number; label: string };
+type Sub = { value: number | null; label: string };
 type Breakdown = {
   trend?: Sub;
   rs?: Sub;
@@ -264,17 +267,17 @@ function buildEditorialCommentary(d: TickerData): string {
     const tier = v >= 80 ? "very strong" : v >= 65 ? "strong" : v >= 50 ? "constructive" : v >= 35 ? "mixed" : "weak";
     switch (strongest.key) {
       case "trend":
-        return `${sym}'s strongest factor is Trend at ${v.toFixed(0)}/100 — a ${tier} read on the multi-week technical structure. Trend incorporates position vs key moving averages, slope, and participation; a high reading means price is well above structural support with consistent breadth behind it.`;
+        return `${sym}'s strongest factor is Trend at ${v.toFixed(0)}/100 — a ${tier} read on the multi-week technical structure. Trend reads how far price has moved over a multi-month window and where it sits inside its own 52-week range; a high reading means both sit near the top of the scale.`;
       case "rs":
-        return `${sym}'s strongest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance vs the broader market over the trailing 1-3 months. High RS means ${sym} has been outperforming SPY and its sector over that window. It describes what has happened, not what happens next.`;
+        return `${sym}'s strongest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance against the broad-market benchmark over roughly a quarter, half a year and a year. High RS means ${sym} changed by more than the benchmark across those windows. It describes what has happened, not what happens next.`;
       case "fundamentals":
-        return `${sym}'s strongest factor is Fundamentals at ${v.toFixed(0)}/100 — a ${tier} balance-sheet + earnings-quality + margin-trend read. High Fundamentals doesn't guarantee a near-term move, but it caps the downside in a way pure-technical setups can't.`;
+        return `${sym}'s strongest factor is Fundamentals at ${v.toFixed(0)}/100 — a ${tier} read on reported margin, return on equity, EPS and revenue growth, and the earnings multiple. High Fundamentals doesn't guarantee a near-term move, but every input is a figure the company has already published in a filing.`;
       case "smart_money":
-        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on insider buying (SEC Form 4), Congressional disclosures, and ETF flows. High Smart Money means those disclosed signals currently lean positive on this name — a descriptive read of public filings, not a signal to follow.`;
+        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on disclosed corporate-insider transactions from SEC Form 4, netted over a recent window. High Smart Money means those disclosed filings currently net toward buying on this name — a descriptive read of public filings, not a signal to follow.`;
       case "macro":
-        return `${sym}'s strongest factor is Macro at ${v.toFixed(0)}/100 — meaning the broader regime (rates, VIX, dollar, breadth) is ${tier} supportive for this kind of setup. Macro doesn't move stocks directly but it sets the tempo for everything underneath.`;
+        return `${sym}'s strongest factor is Macro at ${v.toFixed(0)}/100 — meaning the market-wide regime classification is ${tier} supportive. Macro is the same reading for every ticker on the board at a given moment, so it says nothing about ${sym} specifically.`;
       case "momentum":
-        return `${sym}'s strongest factor is Momentum at ${v.toFixed(0)}/100 — ${tier} short-horizon price acceleration (rate of change, RSI position, MACD posture, recent breakout structure). High momentum needs trend confirmation to mean anything; without it, momentum mean-reverts hard.`;
+        return `${sym}'s strongest factor is Momentum at ${v.toFixed(0)}/100 — ${tier} short-horizon rate of change — a momentum-quality reading blended with a short-horizon return. It is the shortest-memory factor of the six and the one the composite leans on least.`;
     }
     return "";
   })();
@@ -287,11 +290,11 @@ function buildEditorialCommentary(d: TickerData): string {
       case "trend":
         return `The weakest factor is Trend at ${v.toFixed(0)}/100 — a ${tier} technical read. If the rest of the picture is constructive, a soft Trend factor often reflects a re-test of support rather than structural breakdown — descriptively, not as a call to act.`;
       case "rs":
-        return `The weakest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance vs SPY and the sector. ${sym} is participating in any rally less than its peers.`;
+        return `The weakest factor is Relative Strength at ${v.toFixed(0)}/100 — ${tier} performance against the broad-market benchmark. ${sym} changed by less than the benchmark over those windows.`;
       case "fundamentals":
-        return `The weakest factor is Fundamentals at ${v.toFixed(0)}/100 — ${tier} balance-sheet and earnings-quality. A low fundamentals score is the canonical "value trap" warning: technical setups on broken fundamentals don't tend to compound.`;
+        return `The weakest factor is Fundamentals at ${v.toFixed(0)}/100 — ${tier} reported profitability and growth figures. A low fundamentals score is the canonical "value trap" warning: technical setups on broken fundamentals don't tend to compound.`;
       case "smart_money":
-        return `The weakest factor is Smart Money at ${v.toFixed(0)}/100 — ${tier} insider + Congressional activity. Could mean nobody with edge is positioning here, or just that the disclosure data is sparse for ${sym}.`;
+        return `The weakest factor is Smart Money at ${v.toFixed(0)}/100 — ${tier} net of disclosed SEC Form 4 insider transactions. Could mean nobody with edge is positioning here, or just that the disclosure data is sparse for ${sym}.`;
       case "macro":
         return `The weakest factor is Macro at ${v.toFixed(0)}/100 — ${tier} backdrop. A macro headwind drags every name in the cohort; if ${sym} is still scoring well on the composite despite this, the company-specific factors must be doing heavy lifting.`;
       case "momentum":
@@ -576,11 +579,11 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Does Tapeline have insider buying data for ${sym}?`,
-      a: `${sym}'s Smart Money sub-score blends SEC Form 4 insider transactions, Congressional disclosures where applicable, and ETF/institutional flow signals. Detailed Form 4 history per ticker is a Premium feature; the aggregate Smart Money sub-score is shown on this page for free.`,
+      a: `${sym}'s Smart Money sub-score reads disclosed SEC Form 4 insider transactions, netted over a recent window. Detailed Form 4 history per ticker is a Premium feature; the aggregate Smart Money sub-score is shown on this page for free.`,
     },
     {
       q: `Why does ${sym}'s score change between visits?`,
-      a: `Scores re-tick every minute during US market hours. Trend and Relative Strength move with price; Momentum reflects recent rate-of-change; Macro responds to VIX, breadth, and 10Y yield shifts; Smart Money updates on filing cadence; Fundamentals on quarterly earnings cycle. Across a single trading session ${sym}'s composite can drift 5-15 points in either direction even without major news — that's normal factor breathing, not data error.`,
+      a: `Scores re-tick every minute during US market hours. Trend and Relative Strength move with price; Momentum reflects recent rate-of-change; Macro responds to changes in the market-wide regime classification; Smart Money updates on filing cadence; Fundamentals on quarterly earnings cycle. Across a single trading session ${sym}'s composite can drift 5-15 points in either direction even without major news — that's normal factor breathing, not data error.`,
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
@@ -930,7 +933,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               className="btn-accent"
               rel="nofollow"
             >
-              Try Premium free for 14 days →
+              Start the 14-day Premium trial →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard
@@ -940,7 +943,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                 live score preview underneath. */}
             <a
               href={`https://twitter.com/intent/tweet?${new URLSearchParams({
-                text: `$${sym} score: ${score.toFixed(0)}/100 (${signal})\n\nTransparent 6-factor formula, public scorecard.`,
+                text: `$${sym} score: ${score.toFixed(0)}/100 (${signal})\n\nSix named factors, public scorecard.`,
                 url: `https://tapeline.io/t/${sym}`,
               }).toString()}`}
               target="_blank"
@@ -1134,7 +1137,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
 
         {/* Trust line */}
         <p className="mt-10 text-xs text-subtle text-center">
-          Score updated live (sub-60s). Public formula. Public scorecard.
+          Score updated live (sub-60s). Public methodology. Public scorecard.
           Not investment advice — see <Link href="/legal/risk" className="text-accent hover:underline">risk disclosure</Link>.
         </p>
 

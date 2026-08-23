@@ -38,7 +38,7 @@ export const STRATEGIES: StrategyConfig[] = [
     faq: [
       {
         q: "What makes a good day-trading stock?",
-        a: "For a day-trading workflow, the actionable filter is confluence: strong intraday momentum, healthy relative strength vs sector and SPY, decent liquidity, and a score that's already in the upper half of the distribution. A 90-momentum, 30-trend name is a head-fake. A 70-momentum, 70-trend, 70-RS name is a setup. Tapeline's composite is built to surface that confluence in one number.",
+        a: "For a day-trading workflow, the actionable filter is confluence: strong intraday momentum, healthy relative strength vs the broad market, decent liquidity, and a score that's already in the upper half of the distribution. A 90-momentum, 30-trend name is a head-fake. A 70-momentum, 70-trend, 70-RS name is a setup. Tapeline's composite is built to surface that confluence in one number.",
       },
       {
         q: "How often does the day-trading list update?",
@@ -73,9 +73,9 @@ export const STRATEGIES: StrategyConfig[] = [
     // "best swing trade stocks" / "swing trade stocks" / "swing trading stocks".
     metaTitle: "Best Swing Trade Stocks 2026 — Top 30 by Score | Tapeline",
     metaDescription:
-      "Today's 30 best swing trade stocks, ranked by Tapeline's public 6-factor composite — live scores, daily refresh, next-day scorecard vs SPY.",
+      "Today's 30 best swing trade stocks, ranked by Tapeline's composite score — live scores, daily refresh, next-day scorecard vs SPY.",
     lede:
-      "Swing trading rewards the names where multiple factors line up over multiple sessions. The list below ranks US tickers by Tapeline composite score — the six factors weighted at exact published percentages — filtered to a minimum score of 65 (top third of the distribution). Sorted by composite descending. The composite is the best summary number for a multi-day setup.",
+      "Swing trading rewards the names where multiple factors line up over multiple sessions. The list below ranks US tickers by Tapeline composite score — the six factors weighted most toward Trend and Relative Strength and least toward Momentum — filtered to a minimum score of 65 (top third of the distribution). Sorted by composite descending. The composite is the best summary number for a multi-day setup.",
     apiParams: { sort: "score", order: "desc", min_score: "65", limit: "30" },
     factorEmphasis: "score + relative strength",
     faq: [
@@ -116,7 +116,7 @@ export const STRATEGIES: StrategyConfig[] = [
     // and removes the old "Top…Top" repetition.
     metaTitle: "Momentum Stocks List 2026 — Top 30 5-Day Movers | Tapeline",
     metaDescription:
-      "An updated momentum stocks list — the 30 biggest 5-day US movers also scoring 60+ on Tapeline's public 6-factor composite. Live, daily refresh.",
+      "An updated momentum stocks list — the 30 biggest 5-day US movers also scoring 60+ on Tapeline's composite score. Live, daily refresh.",
     lede:
       "Momentum without score confirmation is a coin flip. Pure 'biggest 5-day movers' lists are dominated by news pops, short squeezes, and reversals that fail in the next session. The list below filters to composite 60+ before sorting by 5-day change — the move PLUS the underlying factor confluence. Trend, relative strength, smart money: if those agree with the recent momentum, you've got a structural runner. If they don't, you've got a name to fade.",
     apiParams: { sort: "change_pct_5d", order: "desc", min_score: "60", limit: "30" },
@@ -162,7 +162,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How does Tapeline read dividend safety?",
-        a: "Dividend safety isn't an explicit factor in the score, but it's heavily implied by the Fundamentals factor. Strong fundamentals — earnings quality, low debt, healthy free cash flow — is the structural backstop for a defensible payout. If the Fundamentals sub-score is below 40 on a high-yield name, that's the red flag the composite is asking you to weigh.",
+        a: "Dividend safety isn't an explicit factor in the score, but it's heavily implied by the Fundamentals factor. Strong fundamentals — reported margin, return on equity, and earnings and revenue growth — are the structural backstop for a defensible payout. If the Fundamentals sub-score is below 40 on a high-yield name, that's the red flag the composite is asking you to weigh.",
       },
       {
         q: "Should I cross-check with another tool?",
@@ -178,7 +178,7 @@ export const STRATEGIES: StrategyConfig[] = [
     metaDescription:
       "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 14-day Premium trial takes a card, $0 today.",
     lede:
-      "Value investing fails when you buy a stock just because it's cheap. The market is usually cheap-for-a-reason; the trick is separating temporarily cheap from structurally broken. Tapeline's composite is built on six factors with Fundamentals weighted at 15% — strong fundamentals score combined with a constructive overall composite (score 55-75 — the upper-middle of the distribution, not the top) is where value setups actually live. Top of the distribution is already-priced-in; bottom is broken. The middle, filtered to quality, is the value-investor zone.",
+      "Value investing fails when you buy a stock just because it's cheap. The market is usually cheap-for-a-reason; the trick is separating temporarily cheap from structurally broken. Tapeline's composite is built on six factors, with Fundamentals carrying material — but not leading — weight; a strong fundamentals score combined with a constructive overall composite (score 55-75 — the upper-middle of the distribution, not the top) is where value setups actually live. Top of the distribution is already-priced-in; bottom is broken. The middle, filtered to quality, is the value-investor zone.",
     apiParams: { sort: "score", order: "desc", min_score: "55", limit: "30" },
     factorEmphasis: "fundamentals + quality",
     faq: [
@@ -188,7 +188,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the Fundamentals factor specifically?",
-        a: "Fundamentals blends earnings quality, growth, profitability, and balance-sheet health. Sourced from a third-party data feed's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
+        a: "Fundamentals blends reported margin, return on equity, EPS and revenue growth, and an earnings multiple. Sourced from a third-party data feed's basic-financials data. A 70+ Fundamentals sub-score is the quality screen; a name passing that AND in the 55-75 composite range is the value-investor's setup.",
       },
       {
         q: "How is this different from Simply Wall St's value screen?",
@@ -211,7 +211,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Penny Stocks — Live Top 30 Under $5 by Composite Score",
     metaTitle: "Best Penny Stocks 2026 — Top 30 Under $5 by Score | Tapeline",
     metaDescription:
-      "30 US penny stocks (under $5) ranked by Tapeline's public 6-factor composite. Score-filtered so the list isn't just 'cheap and dying'. Live, daily refresh.",
+      "30 US penny stocks (under $5) ranked by Tapeline's composite score. Score-filtered so the list isn't just 'cheap and dying'. Live, daily refresh.",
     lede:
       "Pure 'cheapest stocks' lists are a guaranteed loss machine — most names under $5 are cheap for a reason (deteriorating fundamentals, failed growth stories, dilution risk). The list below filters US tickers under $5 to a composite score of 35+, which removes the structurally broken names and leaves the small-cap candidates that at least have factor confluence. Tapeline's six-factor formula treats a $3 stock the same way it treats a mega-cap: trend, fundamentals, smart money, macro, momentum. Cheap isn't a strategy. Cheap with the score behind it might be.",
     apiParams: { sort: "score", order: "desc", max_price: 5, min_score: "35", limit: "30" },
@@ -241,7 +241,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Stocks Under $10 — Live Top 30 by Tapeline Score",
     metaTitle: "Best Stocks Under $10 in 2026 — Top 30 by Score | Tapeline",
     metaDescription:
-      "30 best US stocks priced under $10, ranked by Tapeline's public 6-factor composite. Quality-filtered so cheap doesn't mean broken. Live universe, daily refresh.",
+      "30 best US stocks priced under $10, ranked by Tapeline's composite score. Quality-filtered so cheap doesn't mean broken. Live universe, daily refresh.",
     lede:
       "Stocks priced under $10 sit between the penny-stock void and the mid-cap mainstream — a sweet spot of underfollowed names where score-based scoring can still find edge. Tapeline ranks every US ticker under $10 by composite score, filters to 45+ (the lower half of CONSTRUCTIVE), and surfaces the top 30. Cheap names with the trend, fundamentals, or relative strength backing them up.",
     apiParams: { sort: "score", order: "desc", max_price: 10, min_score: "45", limit: "30" },
@@ -275,7 +275,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Growth Stocks Right Now — Live Top 30 by 1-Month Move",
     metaTitle: "Best Growth Stocks 2026 — Live Top 30 by 1M Move | Tapeline",
     metaDescription:
-      "Today's best US growth stocks, ranked by 1-month move and filtered to composite 65+ on Tapeline's public 6-factor formula. Live, daily refresh.",
+      "Today's best US growth stocks, ranked by 1-month move and filtered to composite 65+ on Tapeline's published six-factor methodology. Live, daily refresh.",
     lede:
       "Growth investing rewards stocks where the price has been moving up over weeks, not days — sustained advance backed by improving fundamentals and broadening participation. The list below ranks US tickers by 1-month percentage change, filtered to composite score 65+ (the lower half of STRONG SETUP). Pure '1-month winners' lists pick up bounces from broken names; the score filter keeps the structurally healthy ones.",
     apiParams: { sort: "change_pct_1m", order: "desc", min_score: "65", limit: "30" },
@@ -295,7 +295,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What about valuation? Won't these be expensive?",
-        a: "Tapeline doesn't have a P/E ratio cutoff — the Fundamentals factor weighs earnings quality, margins, and balance-sheet health, but not 'cheap multiple'. Growth stocks tend to trade at premium multiples by definition; the question this list answers is 'which growth names are confirmed by trend + RS', not 'which growth names are also cheap'. For value-oriented growth, see /best-stocks-for/value.",
+        a: "Tapeline doesn't have a P/E ratio cutoff — the Fundamentals factor reads reported margin, return on equity, EPS and revenue growth and an earnings multiple, and no single one of those gates a name out. Growth stocks tend to trade at premium multiples by definition; the question this list answers is 'which growth names are confirmed by trend + RS', not 'which growth names are also cheap'. For value-oriented growth, see /best-stocks-for/value.",
       },
     ],
   },
@@ -313,7 +313,7 @@ export const STRATEGIES: StrategyConfig[] = [
     faq: [
       {
         q: "What makes a 'real' breakout vs a head-fake?",
-        a: "Real breakouts have confluence: the 1-day move is supported by the longer-term trend (Trend factor), the stock is outperforming its sector + SPY (Relative Strength), and the volume confirms participation (Momentum factor). Head-fakes have the 1-day move but the score is low — meaning trend and RS aren't agreeing with the spike. The filter to score 70+ removes most head-fakes.",
+        a: "Real breakouts have confluence: the 1-day move is supported by the longer-term trend (Trend factor), the stock is outperforming the broad-market benchmark (Relative Strength), and short-horizon rate of change is still positive (Momentum factor). Head-fakes have the 1-day move but the score is low — meaning trend and RS aren't agreeing with the spike. The filter to score 70+ removes most head-fakes.",
       },
       {
         q: "How is this different from Day Traders?",
@@ -335,7 +335,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best AI Stocks — Tech-Sector Leaders Scored by the Tapeline Composite",
     metaTitle: "Best AI Stocks 2026 — Tech Leaders by Tapeline Score | Tapeline",
     metaDescription:
-      "Top 30 US Information Technology names ranked by Tapeline's public 6-factor composite. The AI cluster filtered for trend + fundamentals confluence. Live, daily refresh.",
+      "Top 30 US Information Technology names ranked by Tapeline's composite score. The AI cluster filtered for trend + fundamentals confluence. Live, daily refresh.",
     lede:
       "Every retail trader wants a piece of the AI story. The problem is that 'AI stocks' as a screen is messy — it's not a sector and the qualifying companies range from semis (NVDA, AMD) to hyperscalers (MSFT, GOOGL, META, AMZN) to applied-AI plays (PLTR, ORCL). The list below filters to Information Technology — the GICS sector with the densest AI exposure — and ranks by Tapeline composite. The score knows trend, relative strength, and fundamentals matter more than the headline label.",
     apiParams: { sort: "score", order: "desc", min_score: "60", sector: "Information Technology", limit: "30" },
@@ -365,7 +365,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Highest-Scored US Stocks Right Now — Tapeline's HIGH CONVICTION Tier",
     metaTitle: "Highest Scored Stocks Today — Top 30 HIGH CONVICTION | Tapeline",
     metaDescription:
-      "The 30 US stocks scoring highest on Tapeline's public 6-factor composite — HIGH CONVICTION tier (score 85+). Live ranking, daily public scorecard.",
+      "The 30 US stocks scoring highest on Tapeline's composite score — HIGH CONVICTION tier (score 85+). Live ranking, daily public scorecard.",
     lede:
       "The HIGH CONVICTION tier is the top 1-3% of the universe at any time — names where Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum all agree. The list below ranks them by composite score. Every name here is back-checked daily against next-session SPY return at /scorecard, no edits. This is the most concentrated view of the model's strongest signals.",
     apiParams: { sort: "score", order: "desc", signal: "HIGH CONVICTION", limit: "30" },

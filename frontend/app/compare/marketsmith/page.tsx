@@ -2,9 +2,9 @@ import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs MarketSmith (2026): Public Formula vs Proprietary CAN SLIM Ranks",
+  title: "Tapeline vs MarketSmith (2026): Six Named Factors vs Proprietary CAN SLIM Ranks",
   description:
-    "Tapeline vs MarketSmith — published 6-factor composite at $8.25/mo annual, vs IBD's proprietary CAN SLIM-based ranks at $74.95/mo. Honest comparison of methodology, price, and scorecard.",
+    "Tapeline vs MarketSmith — published 6-factor composite score at $8.25/mo annual, vs IBD's proprietary CAN SLIM-based ranks at $74.95/mo. Honest comparison of methodology, price, and scorecard.",
   path: "/compare/marketsmith",
 });
 
@@ -33,7 +33,7 @@ const COMPARE_FAQ = [
 
 const WINS = [
   {
-    label: "Published scoring formula",
+    label: "Published scoring methodology",
     tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Not published — Composite Rating weighting is proprietary",
   },
@@ -99,7 +99,7 @@ export default function VsMarketSmithPage() {
       competitorAnnualNote="MarketSmith basic ~$74.95/mo ($899/yr); full version ~$174.95/mo. Annual-only billing."
       slug="marketsmith"
       heading="Tapeline vs MarketSmith — when transparency matters."
-      lede="MarketSmith is the institutional pedigree — IBD's Composite Rating, 40+ years of CAN SLIM methodology, deep chart annotations. Tapeline is the transparent newcomer — published 6-factor formula, sub-60s scoring, a public scorecard with every pick back-checked. Pick the second one if you want methodology you can audit and a price you can actually pay monthly."
+      lede="MarketSmith is the institutional pedigree — IBD's Composite Rating, 40+ years of CAN SLIM methodology, deep chart annotations. Tapeline is the transparent newcomer — published 6-factor methodology, sub-60s scoring, a public scorecard with every pick back-checked. Pick the second one if you want methodology you can audit and a price you can actually pay monthly."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={COMPARE_FAQ}

@@ -291,7 +291,7 @@ The bot is "shipped" when:
 ## Open questions the founder will need to answer
 
 1. **Founder's Reddit username** — needed for PRAW auth. (Check `tapeline_outreach_identity.md` memory first.)
-2. **Founder's Telegram chat_id** — needed for `INBOX_FOUNDER_TELEGRAM_CHAT_ID`. The `/app/billing` Telegram setup card shows this in his account.
+2. **Founder's Telegram chat_id** — needed for `INBOX_FOUNDER_TELEGRAM_CHAT_ID`. See `docs/launch/INBOX_BOT_GO_LIVE.md` step 2 — message the bot, then read the chat id off its `getUpdates` response. (There is no Telegram setup card in the product; the customer-facing Telegram alert channel was retired.)
 3. **Reddit app credentials** — founder creates a script-tier app at https://www.reddit.com/prefs/apps (`name: tapeline-inbox-bot`, `type: script`, `redirect_uri: http://localhost`). Returns `client_id` and `client_secret`.
 4. **Resend inbound domain** — does `inbound@tapeline.io` already MX-route to Resend, or does the founder need to add MX records in Cloudflare? If MX records aren't set, this is a blocker for Phase B.
 5. **The Tier 2 templates use placeholder dollar amounts** ($8.25, $16.58). Confirm these are still canonical — `services/tier.py` is the source of truth.

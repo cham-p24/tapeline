@@ -927,7 +927,7 @@ export default function BillingPage() {
             <Plan
               name="Free"
               price="$0"
-              note="Forever free"
+              note="No monthly charge"
               items={[
                 `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
                 "Public scorecard + basic regime",
@@ -1073,8 +1073,8 @@ export default function BillingPage() {
               body="Every score we publish is back-checked against next-day prices and shown on /scorecard. No newsletter shop publishes its losses. We do it automatically."
             />
             <Selling
-              title="Open formula"
-              body="The 6-factor weights are on /how-it-works. TipRanks, Zacks, Kavout, WallStreetZen all hide theirs. Ours is the only one you can audit."
+              title="Named factors, shown per ticker"
+              body="All six factors are named on /how-it-works — weighted most toward Trend and Relative Strength, least toward Momentum — with each factor's contribution shown per ticker."
             />
           </div>
         </section>
@@ -1261,11 +1261,11 @@ function TrialOfferPanel({
       </div>
 
       <p className="mt-4 text-xs text-muted leading-relaxed">
-        The Free plan costs nothing and never asks for a card: live scores,
+        Declining costs you nothing: you stay on the Free plan &mdash; live scores,
         top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups a day
-        {freeHasWatchlist() ? `, and a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
-        You can start the trial later from this page &mdash; it is here whenever
-        you want it.
+        {freeHasWatchlist() ? `, and a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}{" "}
+        &mdash; and no further charge is made. You can start the trial later from this
+        page &mdash; it is here whenever you want it.
       </p>
     </section>
   );

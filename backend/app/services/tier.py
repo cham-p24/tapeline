@@ -40,7 +40,7 @@ FEATURES: dict[str, Tier] = {
     # first action (adding their OWN ticker). The real gate is the COUNT cap
     # (watchlist_tickers, Free=5) enforced at add-time in routers/watchlist.py,
     # NOT a binary feature flag. Smart alerts on watchlist items stay paid
-    # (email/telegram caps are 0 for Free). Was Tier.PRO, which made /api/me
+    # (the email alert cap is 0 for Free). Was Tier.PRO, which made /api/me
     # report features.watchlist=false and risked the UI hiding the add control.
     "watchlist": Tier.FREE,
     "ticker.full_detail": Tier.PRO,
@@ -54,7 +54,7 @@ FEATURES: dict[str, Tier] = {
     # Web push is the ONE alert channel free users get a taste of — see the
     # FREE_WEB_PUSH_ALERTS cap + the activation rationale in the "Free-tier
     # alert taste" block below. It's free-to-deliver (no per-send cost like
-    # email/Telegram) and one-click to enable, so it's the natural channel to
+    # email) and one-click to enable, so it's the natural channel to
     # let a free user actually FEEL an alert fire. The binary feature gate is
     # therefore Tier.FREE (any logged-in user may create/subscribe); the
     # SMALL free allowance is enforced as a COUNT cap (web_push_alerts) at
@@ -191,7 +191,7 @@ FREE_FIRST_SESSION_GRACE_HOURS = 24
 # ZERO free users ever experienced one firing — so nobody felt the gap the paid
 # tier fills. This constant gives the FREE tier a SMALL push-alert allowance:
 # they can create up to N web-push alert rules on their watchlist tickers and
-# actually feel one land in the browser. Email/Telegram/SMS stay fully paid.
+# actually feel one land in the browser. Email alerts stay fully paid.
 #
 # This is a deliberate, REVERSIBLE config bet. To UNDO it completely:
 #   1. set FREE_WEB_PUSH_ALERTS = 0   (free users can create zero → hard wall),
@@ -220,6 +220,11 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         # into themed buckets like "Tech" / "AI Plays" / "My Core".
         "watchlists": 1,
         "email_alerts_per_day": 0,
+        # VESTIGIAL — Telegram was retired as a customer alert channel on
+        # 2026-08-11. routers/alerts.py only accepts email|web_push and
+        # services/alerts.py has no Telegram dispatch arm, so NOTHING reads
+        # this key on any tier. It is kept only so the three tier dicts stay
+        # the same shape; do not treat any value here as a shipped promise.
         "telegram_alerts_per_day": 0,
         # web_push_alerts: max number of web-push alert RULES a user may create
         # (a total count, not a per-day rate). This is the free "alert taste"
@@ -238,7 +243,7 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "watchlist_tickers": 50,
         "watchlists": 5,
         "email_alerts_per_day": 10,
-        "telegram_alerts_per_day": 0,
+        "telegram_alerts_per_day": 0,     # vestigial — see the FREE block above
         "web_push_alerts": 10_000,   # effectively unlimited for paid tiers
         "api_requests_per_day": 0,
         "saved_scans": 10,
@@ -250,7 +255,9 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "watchlist_tickers": 200,
         "watchlists": 20,
         "email_alerts_per_day": 10_000,    # effectively unlimited
-        "telegram_alerts_per_day": 10_000, # effectively unlimited
+        "telegram_alerts_per_day": 10_000, # vestigial + dead — Telegram alerts were
+                                           # retired 2026-08-11 and nothing reads this.
+                                           # Premium does NOT ship a Telegram channel.
         "web_push_alerts": 10_000,         # effectively unlimited
         "api_requests_per_day": 1_000,
         "saved_scans": 100,
@@ -277,7 +284,7 @@ def limit(
     """
     actual = Tier(user_tier) if isinstance(user_tier, str) else user_tier
     # Open-access month: lift the single biggest, safest FREE limitation — the
-    # scanner ROW cap (top-10 → the full ~2,500-row universe) — until
+    # scanner ROW cap (top-10 → the Pro row cap, below) — until
     # PROMO_OPEN_ACCESS_UNTIL, then auto-revert. Scoped tightly on purpose:
     # lifting daily_lookups defeats the lookup-metering guards, and unlocking Pro
     # FEATURES / re-adding the watchlist removes the paid moat + yo-yos users. So
@@ -297,9 +304,10 @@ def limit(
         and key == "scanner_rows"
     ):
         return TIER_LIMITS[Tier.PRO]["scanner_rows"]
-    # FREE watchlist cap is date-gated (→ 0 on the removal-date cutover); the
-    # static TIER_LIMITS entry is the pre-cutover value, overridden here so the
-    # cutover needs no restart/redeploy. Paid tiers are unaffected.
+    # FREE watchlist cap is resolved through free_watchlist_cap() so enforcement
+    # and every copy surface read the same number. The 2026-08-02 cutover to 0 was
+    # REVERSED 2026-08-19, so this now returns FREE_WATCHLIST_TICKERS. Paid tiers
+    # are unaffected.
     if actual is Tier.FREE and key == "watchlist_tickers":
         return free_watchlist_cap()
     return TIER_LIMITS[actual].get(key, 0)
@@ -364,8 +372,11 @@ def mrr_contribution(user_tier: str | None, billing_period: str | None) -> float
 
 # ---- Trial-aware throttling -------------------------------------------------
 #
-# A user is "on trial" when their tier was auto-elevated to PREMIUM at signup
-# and they haven't added a card yet. During this window we want them to taste
+# `is_on_trial` matches the LEGACY no-card Premium trial: tier PREMIUM, a
+# trial_ends_at still in the future, and no Stripe customer. Signup no longer
+# auto-elevates anyone — since PR #536 every new trial goes through Stripe
+# Checkout and therefore carries a stripe_customer_id, so a card-required
+# trial is NOT throttled here. During the legacy window we wanted them to taste
 # Premium for conversion-test purposes — but we don't want a determined trial-
 # farmer to extract material amounts of high-value Premium-only data over
 # repeated trial cycles.

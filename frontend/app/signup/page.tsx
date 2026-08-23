@@ -83,20 +83,20 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
     sub: "Email and password to start. At first sign-in you add a card and your 14-day Premium trial begins — $0 today, cancel in one click.",
   },
   finviz: {
-    h1: "The Finviz alternative — free to start.",
-    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. 14-day Premium trial, $0 today.",
+    h1: "The Finviz alternative.",
+    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: "One score, one sentence, and every pick logged public vs SPY. 14-day Premium trial, $0 today.",
+    sub: "One score, one sentence, and every pick logged public vs SPY. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: "The full live universe, every name scored. 14-day Premium trial — $0 today, cancel in one click.",
+    sub: "The full live universe, every name scored. 14-day Premium trial — a card at first sign-in, $0 charged that day, cancel in one click.",
   },
   compare: {
     h1: "Switching to Tapeline?",
-    sub: "One transparent score per ticker plus a public track record. 14-day Premium trial, $0 today.",
+    sub: "One transparent score per ticker plus a public track record. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
   },
 };
 
@@ -556,7 +556,7 @@ function SignUpForm() {
               disabled={busy}
               className="flex h-11 w-full items-center justify-center rounded-md bg-gradient-to-r from-accent to-accent2 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
             >
-              {busy ? "Creating your account…" : "Create my free account"}
+              {busy ? "Creating your account…" : "Create my account"}
             </button>
             {/* Reassurance adjacent to the highest-intent click — kills the
                 "will I be charged?" objection right where hesitation happens,

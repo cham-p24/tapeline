@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 Drafted 2026-05-14. 5 finance newsletters where Tapeline's audience fit + the price point work for a first sponsorship test. Budget assumption: $300-1,200 single-newsletter buy or 2 × $300-500 small-newsletter buys. The brief said $300; spend may need to flex up to land a single placement with the right audience.
@@ -37,7 +53,7 @@ A $300 budget at $50 CPM = ~6,000 opens worth of exposure. That's tight for a ne
 
 **Site**: thedailyupside.com
 **Audience**: ~1M subscribers (largest in the list). Mass-affluent retail, broad finance daily.
-**Why a fit**: Tapeline's free tier + transparent positioning matches Daily Upside's editorial voice (substance-over-hype). Audience is exactly the cohort that would try a free stock-scoring tool.
+**Why a fit**: Tapeline's free public record + transparent positioning matches Daily Upside's editorial voice (substance-over-hype). Audience is exactly the cohort that would try a free stock-scoring tool.
 **Rate-card link**: thedailyupside.com → "Advertise" or "Partnerships" in footer. As of 2026, primary placement is reportedly $5K-$15K depending on day and slot — likely OUT of $300 budget.
 **Recommended action**: send a feeler email asking specifically for a "secondary placement / footer slot" rate. Some major newsletters discount lower-funnel inventory by 50-70%.
 **Contact email** (guess based on common convention): `sponsorships [at] thedailyupside dot com`. Verify on their site before sending.
@@ -47,12 +63,12 @@ A $300 budget at $50 CPM = ~6,000 opens worth of exposure. That's tight for a ne
 ```
 Hi Daily Upside team,
 
-Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stock-scoring tool for US retail traders, with one positioning choice that matches Daily Upside's editorial voice: a fully published formula and a public scorecard that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI" branding.
+Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stock-scoring tool for US retail traders, with one positioning choice that matches Daily Upside's editorial voice: a fully published methodology (six named factors and their weight ordering) and a public scorecard that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI" branding.
 
 Why your audience fits:
-— Free tier (top 20 tickers, 24h delay) is a genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
+— The published record is complete and needs no account; a free account adds top-10 live rows and 12 look-ups a day. Genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
 — Pro tier is $8.25/mo (annual) — accessible price point for retail traders considering a paid tool.
-— Free tier requires no card at all. The 14-day Premium trial does take one, charges $0 today, and cancels in one click.
+— The published record requires no account and no card. An account takes a card at first sign-in and starts the 14-day Premium trial — $0 today, cancels in one click.
 
 I'm specifically asking about a *secondary* placement (footer slot, sponsored link, etc.) rather than primary because we're testing the channel at $300-1.2K budget. Happy to take whichever slot/date makes sense for your inventory.
 
@@ -78,7 +94,7 @@ Christian
 ```
 Hi Finimize team,
 
-Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published formula and a public scorecard. Free tier (no card), $9.99/mo Pro, and a 14-day Premium trial that takes a card but charges $0 until day 14.
+Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published methodology and a public scorecard. A free public record (no account, no card), $9.99/mo Pro, and a 14-day Premium trial that takes a card but charges $0 until day 14.
 
 The reason it's a fit for Finimize: your audience is in the "I want to learn how investing works" cohort. Tapeline's positioning lands there — the entire product is built around showing you HOW each score is computed, not just giving you a verdict. The /how-it-works page is half the product.
 
@@ -93,7 +109,7 @@ Christian Piyatilaka, founder.
 
 **Site**: netinterest.co (Substack)
 **Audience**: 90K+ free subscribers, 1,000+ paid at $25/mo. Banking + finance industry focus. Smaller than Daily Upside but the right *cohort* — professionals who care deeply about methodology.
-**Why a fit**: Net Interest readers are exactly the methodology-curious cohort. Tapeline's published formula will resonate; the Smart Money factor (13F + Form 4 + Congressional) is the kind of plumbing this audience appreciates.
+**Why a fit**: Net Interest readers are exactly the methodology-curious cohort. Tapeline's published methodology will resonate; the Smart Money factor (disclosed SEC Form 4 insider transactions, netted over a recent window) is the kind of plumbing this audience appreciates.
 **Rate card**: Marc takes occasional sponsors but the rate isn't public. Substacks at this scale typically charge $1,500-$3,000 for a "classifieds-style" sponsored block in 1 issue. Specifically ASK for this rate; sometimes individual writers discount further for product alignment.
 **Contact**: Marc directly via the Net Interest contact page → marc [at] netinterest dot co.
 
@@ -102,12 +118,12 @@ Christian Piyatilaka, founder.
 ```
 Marc — long-time Net Interest reader (the Schwab-vs-Robinhood deep dive last year was a highlight).
 
-Pitching Tapeline (tapeline.io) for a single-issue sponsorship. The angle: Tapeline is a 6-factor composite stock score with the entire formula published on /how-it-works and a /scorecard page that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI score" framing.
+Pitching Tapeline (tapeline.io) for a single-issue sponsorship. The angle: Tapeline is a 6-factor composite stock score with the six factors and their weight ordering published on /how-it-works and a /scorecard page that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI score" framing.
 
 Why your audience fits specifically:
-— Net Interest readers are professionals who read 10-Ks and quarterly filings. The Smart Money factor (Form 4 cluster detection + elite 13F + Congressional disclosure) speaks to that audience directly. Every other retail scoring tool either hides the smart-money methodology or skips it.
-— The formula transparency matches Net Interest's editorial standard. The product positioning is the inverse of "trust us, our AI works."
-— Pricing is retail-friendly ($9.99/mo Pro, card-free free tier, 14-day Premium trial at $0 today), so the placement converts on direct-response, not just brand-awareness.
+— Net Interest readers are professionals who read 10-Ks and quarterly filings. The Smart Money factor reads disclosed SEC Form 4 insider transactions and nets them over a recent window — not 13F, and not Congressional disclosure, which Tapeline publishes as its own feed rather than folding into the sub-score. Every other retail scoring tool either hides the smart-money methodology or skips it.
+— The methodology transparency matches Net Interest's editorial standard. The product positioning is the inverse of "trust us, our AI works."
+— Pricing is retail-friendly ($9.99/mo Pro, a free public record with no account, 14-day Premium trial at $0 today), so the placement converts on direct-response, not just brand-awareness.
 
 Asking about a single-issue sponsored block. Happy to take any format that fits your usual inventory. Budget on our side starts at $300 and we can flex upward if a primary-placement slot makes sense for both of us.
 
@@ -131,12 +147,12 @@ Edwin — long-time Bear Cave reader.
 
 Pitching Tapeline (tapeline.io) for a single-issue sponsored block. The angle that's right for Bear Cave specifically: I built a stock-scanning tool with a public scorecard that records every top-10 daily pick and its next-day return vs SPY — including misses. Nothing gets quietly removed. Five months of forward-test history live on /scorecard.
 
-Your audience is the cohort that most cares about this. Most retail scoring tools (Tipranks, Zacks, WallStreetZen) hide their formulas and don't publish a per-pick track record. Tapeline does both. The framing matches Bear Cave's quantitative-accountability ethos.
+Your audience is the cohort that most cares about this. Most retail scoring tools (Tipranks, Zacks, WallStreetZen) won't tell you what's in the score and don't publish a per-pick track record. Tapeline names its six factors and publishes the record. The framing matches Bear Cave's quantitative-accountability ethos.
 
 Specific angles for the placement:
-— Free tier (top 20 tickers, 24h delay) is real product, not a stripped preview.
-— Pro is $9.99/mo. Free tier needs no card; the 14-day Premium trial takes one and charges $0 today.
-— Smart Money factor is decomposed into Form 4 cluster + elite 13F + Congressional disclosure — methodology Bear Cave readers appreciate.
+— The published record is real product and needs no account; free accounts get top-10 live rows and 12 look-ups a day.
+— Pro is $9.99/mo. The published record needs no account or card; creating an account takes a card and starts the 14-day Premium trial at $0 today.
+— Smart Money factor reads disclosed SEC Form 4 insider transactions, netted over a recent window — named on the methodology page, which is the sort of thing Bear Cave readers appreciate.
 
 Budget on our side starts at $300 and can flex upward if the placement timing/format matches. Open to whatever inventory works best for you.
 
@@ -158,9 +174,9 @@ Christian Piyatilaka, founder.
 ```
 Hi Andrew,
 
-Pitching Tapeline (tapeline.io) for a sponsorship slot. Quick overview: stock-scanning tool for retail traders with a published 6-factor formula and a public scorecard that back-checks every daily pick against SPY the next session. Free tier (top 20 tickers, 24h delayed); Pro at $8.25/mo annual.
+Pitching Tapeline (tapeline.io) for a sponsorship slot. Quick overview: stock-scanning tool for retail traders with a published 6-factor methodology and a public scorecard that back-checks every daily pick against SPY the next session. The record is free with no account; free-tier accounts get top-10 live rows. Pro at $8.25/mo annual.
 
-Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The free tier is a low-friction way for them to try it — no card, ever. The 14-day Premium trial does take a card, charges $0 today, and cancels in one click.
+Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The published record is a low-friction way for them to try it — no account, no card, ever. The 14-day Premium trial does take a card, charges $0 today, and cancels in one click.
 
 Asking what your sponsorship inventory looks like. Budget on our side starts at $300; happy to flex up to $1,200 if a primary slot is the right fit. Lower-tier / footer inventory is also fine for a first test.
 

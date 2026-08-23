@@ -70,7 +70,7 @@ export default async function ShortSqueezeScannerPage() {
       signupFrom="screener"
       eyebrow="Feature · Squeeze Watch"
       h1="Short Squeeze Scanner — Live Setups Across ~2,500 US Stocks"
-      lede="A short squeeze starts as a compressed price range with OBV (on-balance volume) drifting up — accumulation that the chart hasn't priced in yet. Tapeline's squeeze scanner ranks every name in the universe by this confluence and surfaces the setups before the breakout. Public formula, public scorecard, no edits after the fact."
+      lede="A short squeeze starts as a compressed price range with OBV (on-balance volume) drifting up — accumulation that the chart hasn't priced in yet. Tapeline's squeeze scanner ranks every name in the universe by this confluence and surfaces the setups before the breakout. Named factors, public scorecard, no edits after the fact."
       methodology={{
         heading: "How the squeeze score is computed",
         body: (

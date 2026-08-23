@@ -209,7 +209,7 @@ async def _send_welcome(*, email: str, token: str) -> None:
     text = (
         "Welcome to the Tapeline daily Top 10.\n\n"
         "Every market day morning we send the 10 highest-scoring US tickers "
-        "from our public 6-factor composite — same numbers anyone can see on "
+        "from our 6-factor composite — the same public numbers anyone can see on "
         "tapeline.io/scorecard, just delivered straight to your inbox before "
         "the open.\n\n"
         f"Today's scorecard: {scorecard_url}\n"
@@ -229,7 +229,7 @@ async def _send_welcome(*, email: str, token: str) -> None:
     <h1 style="margin:0 0 16px;font-size:22px;font-weight:600;">You're in.</h1>
     <p style="margin:0 0 16px;line-height:1.55;color:#d4d4d8;">
       Every market day morning, we send the 10 highest-scoring US tickers
-      from our public 6-factor composite — same numbers anyone can see on
+      from our 6-factor composite — the same public numbers anyone can see on
       <a href="{scorecard_url}" style="color:#fb923c;">tapeline.io/scorecard</a>,
       delivered straight to your inbox before the open.
     </p>
@@ -469,9 +469,9 @@ def _render_daily_digest(
       <a href="{scorecard_url}" style="color:#fb923c;font-size:13px;text-decoration:none;">Full scorecard →</a>
     </div>
     <p style="margin:0 0 20px;color:#9ca3af;font-size:13px;line-height:1.55;">
-      The 10 highest-scoring US tickers from the public 6-factor composite,
+      The 10 highest-scoring US tickers from the 6-factor composite,
       pre-open. Score is 0–100, blended from trend / RS / fundamentals /
-      smart-money / macro / momentum at <a href="{utm('/how-it-works')}" style="color:#fb923c;">published weights</a>.
+      smart-money / macro / momentum — <a href="{utm('/how-it-works')}" style="color:#fb923c;">how the scoring works</a>.
     </p>
     <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
       <thead>
@@ -496,7 +496,7 @@ def _render_daily_digest(
     </div>
 
     <p style="margin:28px 0 0;padding-top:16px;border-top:1px solid #1f1f23;color:#6b7280;font-size:11px;line-height:1.55;">
-      Tapeline scores every US-listed ticker from a publicly documented 6-factor formula.
+      Tapeline scores the most liquid US names on six publicly named factors.
       Composite labels (HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK)
       are descriptive readings of the score, not buy/sell recommendations.
       Tapeline operates under the publisher exemption from AFSL requirements; we do not hold

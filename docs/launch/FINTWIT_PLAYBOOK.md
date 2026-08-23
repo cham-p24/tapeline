@@ -14,8 +14,24 @@
 > account at all**: the daily Top 10, the complete scorecard, a page per scored
 > ticker, and the raw CSV/JSON export.
 >
+> **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
+> equation.** `/how-it-works` names the six factors and their weight *ordering*
+> ("weighted most toward Trend and Relative Strength, least toward Momentum") and
+> nothing more. No line here may say Tapeline publishes "the formula" or "the
+> exact weights". Nor may it publish a factor's inputs at parameter level —
+> named lookback windows, thresholds, indicator recipes or sub-weights are all
+> out of bounds. Describe what a factor measures and stop.
+>
+> **OPEN-ACCESS MONTH — reverts 2026-09-08.** While it runs, a **signed-in**
+> Free account sees the full 1,000-row scanner rather than the standard top 10.
+> Nothing else lifts — look-ups, watchlist and push-rule caps are unchanged and
+> no Pro feature unlocks — and logged-out visitors still see the top 10. Lines
+> below that describe the Free row cap are the **post-promo** steady state, so
+> re-check them against `tier.py` before posting them as today's product.
+>
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier and Telegram alerts are both long gone). Treat unmarked
+> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
 A self-contained pre-launch distribution kit for daily X / LinkedIn posting.
@@ -77,35 +93,36 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 ### Methodology tweets — earn the quant crowd
 
 > **6.**
-> The Tapeline Score is one number per ticker, 0-100. Formula:
-> 0.25·trend + 0.20·rs + 0.15·fundamentals + 0.15·smart_money + 0.15·macro + 0.10·momentum
-> Weights are published. Sub-scores visible per ticker.
-> The whole thing fits in a tweet.
+> The Tapeline Score is one number per ticker, 0-100, from six named
+> factors: trend, relative strength, fundamentals, smart money, macro,
+> momentum. Weighted most toward trend and relative strength, least
+> toward momentum. Sub-scores visible per ticker.
 
 > **7.**
 > Why six factors and not 60?
 > 60-factor models look impressive in a deck. They overfit on the back-test
 > and degrade silently in live trading.
-> Six well-chosen factors with published weights you can verify >
-> 60 factors weighted by "proprietary."
+> Six named factors with a published ordering and a public per-pick
+> record you can verify > 60 factors weighted by "proprietary."
 
 > **8.**
-> Smart-money signal in Tapeline = Congressional trades (House + Senate
-> disclosures) + live SEC Form 4 insider activity.
+> The Smart Money factor in Tapeline reads live SEC Form 4 insider activity —
+> disclosed trades, netted over a recent window. Congressional trades are
+> published as their own Premium feed, not folded into that factor.
 > Not "guru picks." Not whisper numbers.
 > Actual disclosed trades by people whose disclosures are legally required.
 
 > **9.**
-> Tapeline's regime factor flips RISING / FALLING / SIDEWAYS based on the
-> 10Y yield's last 30 obs from FRED.
-> A 15% weight in the score reacts when macro shifts.
-> A scanner that ignores macro will tell you to buy growth in a 5% rate cycle.
+> Tapeline's Macro factor reads a single market-wide regime classification —
+> rising, sideways or falling — so the backdrop sits inside the score instead
+> of being left to the reader. It's the same reading for every ticker on a tick.
+> A scanner that ignores macro ranks a growth name identically in any rate cycle.
 
 > **10.**
 > Three things I will never do with Tapeline:
 > 1. Edit historical scorecard entries
 > 2. Hide picks that didn't work
-> 3. Change the published weights without a public changelog
+> 3. Change the factor weighting without a public changelog
 > If any of those happen, the moat is gone.
 
 ### Anti-marketing tweets — work because everyone else is salesy
@@ -118,10 +135,11 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > that. Process does.
 
 > **12.**
-> The Tapeline Free tier shows the top 20 tickers with 24-hour delayed
-> data. That's the entire free product.
-> No "free for 7 days then $99/mo." The free tier has no clock and no card.
-> No marketing pop-ups. The product is the funnel.
+> The Tapeline Free tier shows the top 10 rows, live, plus 12 ticker
+> look-ups a day and the full scorecard. That's the entire free product.
+> No "free for 7 days then $99/mo." The published record has no clock and
+> no card — no account needed at all. An account puts a card on file and
+> starts the 14-day Premium trial: $0 that day, one click cancels.
 
 > **13.**
 > Best feedback I've gotten this week: "Your scorecard makes me trust
@@ -149,46 +167,43 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 
 ### Thread A — "Six factors, in the open"
 
-(Six-tweet thread explaining the formula. Designed to anchor Tapeline as
-the transparent option in a category where most products hide the formula.)
+(Six-tweet thread explaining the methodology. Designed to anchor Tapeline as
+the transparent option in a category where most products name nothing at all.)
 
-> **1/** Every stock scanner has a ranking system. Almost none publish
-> the formula. Here's Tapeline's six-factor model in six tweets.
+> **1/** Every stock scanner has a ranking system. Almost none will even
+> tell you what goes into it. Here's Tapeline's six-factor model in six
+> tweets.
 >
-> Weights:
-> · Trend 25%
-> · Relative Strength 20%
-> · Fundamentals 15%
-> · Smart Money 15%
-> · Macro 15%
-> · Momentum 10%
+> Six factors, published ordering — heaviest Trend, then Relative
+> Strength, then Fundamentals / Smart Money / Macro, lightest Momentum.
 
-> **2/** Trend (25%) — the heaviest factor because nothing matters
-> if the ticker is in a downtrend. We compute it from price relative
-> to its own 50/200-day moving averages plus the slope of those averages.
-> A ticker bleeding under its 200dma can never score high.
+> **2/** Trend — the heaviest factor, because nothing matters
+> if the ticker is in a downtrend. We read the ticker's multi-month price
+> change and where the latest price sits inside its own 52-week range.
+> Both describe price that has already happened. It's a description, not
+> a forecast.
 
-> **3/** Relative Strength (20%) — how the ticker has performed vs SPY
-> over the last 1m / 3m / 6m windows. Rewards outperformance vs the
-> market regardless of direction. A ticker up 5% in a market down 10%
-> scores higher than one up 2% in a market up 8%.
+> **3/** Relative Strength — how the ticker has performed against a
+> broad-market benchmark over three horizons. Not sector-adjusted.
+> It reads the difference regardless of direction: a ticker up 5% in a
+> market down 10% reads higher than one up 2% in a market up 8%.
 
-> **4/** Fundamentals (15%) — five-metric composite: P/E vs sector,
-> revenue growth YoY, gross margin trajectory, ROE, debt-to-equity.
+> **4/** Fundamentals — a small composite: reported margin, return on
+> equity, EPS and revenue growth, and an earnings multiple.
 > Deliberately small. A 60-metric fundamental composite over-engineers
 > noise into the score.
 
-> **5/** Smart Money (15%) — Congressional trades (House + Senate
-> disclosures) + live SEC Form 4 insider activity. Officers and directors
-> trading their own stock is real signal. Politicians' disclosed trades
-> are less consistent but worth a factor weight.
+> **5/** Smart Money — disclosed SEC Form 4 insider transactions, netted
+> by direction and size over a recent window. Officers and directors filing
+> on their own stock, because the law makes them. Congressional trades are
+> published in Tapeline as their own Premium feed, not folded into this factor.
 
-> **6/** Macro (15%) — 10Y yield direction (FRED), VIX regime, DXY trend.
-> Composite tilts the score against equities when macro turns hostile.
-> Momentum (10%) — recent breakouts + volume confirmation, the lightest
-> weight because it's the noisiest.
+> **6/** Macro — a single market-wide regime classification, the same
+> reading for every ticker on a tick.
+> Momentum — a momentum-quality reading plus a short-horizon return,
+> the lightest factor because it's the noisiest.
 >
-> Whole formula here: tapeline.io/how-it-works
+> Full methodology here: tapeline.io/how-it-works
 
 ### Thread B — "What I'd build differently if I started over"
 
@@ -204,21 +219,21 @@ to Tapeline so it doesn't read as generic "lessons learned" content.)
 > months on the scanner before publishing a single back-check.
 > Should have shipped the scorecard week one and let it accumulate.
 
-> **3/** Mistake two: 14-day trial without a card. Sounds founder-friendly,
-> but at low traffic volume it just means trial users vanish silently at
-> day 14. If I'd required a card with auto-cancel-anytime, I'd have caught
-> more conversion data by now.
-> [if you change your mind on this later, this tweet ages]
+> **3/** Mistake two: I launched with a no-card trial. Sounds
+> founder-friendly, but at low traffic volume it just means trial users
+> vanish silently at day 14. Fixed in August — a card goes on file at
+> first sign-in, $0 charged that day, auto-cancel-anytime in one click.
+> Conversion data is finally readable.
 
 > **4/** Mistake three: not picking a single SEO long-tail to dominate
 > in month one. I tried to rank for "stock scanner" (impossible) when I
 > could have owned "Tapeline alternative to Finviz" in a week. Pick the
 > niche that's two layers deep before the big one.
 
-> **5/** Mistake four: building three notification channels (email,
-> browser, Telegram) before launch. Should have built one. The optionality
-> compounds support burden; the marginal email-vs-Telegram converter doesn't
-> exist at < 1,000 users.
+> **5/** Mistake four: building three alert channels (email, browser push,
+> Telegram) before launch. Should have built one. I've since retired the
+> Telegram one — the optionality compounds support burden and the marginal
+> extra-channel converter doesn't exist at < 1,000 users.
 
 > **6/** Mistake five: announcing too late. I'm only writing this thread
 > now, after the conversion machine is built. The honest order would be:
@@ -227,33 +242,34 @@ to Tapeline so it doesn't read as generic "lessons learned" content.)
 >
 > Anything you'd do differently in your build? Reply, I'm reading.
 
-### Thread C — "Why the formula is public" (positioning thread)
+### Thread C — "Why the factor set is public but the exact recipe isn't" (positioning thread)
 
-> **1/** The whole Tapeline Score formula fits in a tweet. Weights:
-> 0.25·trend + 0.20·rs + 0.15·fundamentals + 0.15·smart_money +
-> 0.15·macro + 0.10·momentum.
-> Half of fintwit thinks I've sabotaged my own moat. Here's why I haven't.
+> **1/** The whole Tapeline Score is six named factors: trend, relative
+> strength, fundamentals, smart money, macro, momentum — weighted most
+> toward trend and relative strength, least toward momentum.
+> Half of fintwit thinks naming them sabotages my own moat. Here's why
+> it doesn't.
 
-> **2/** The formula isn't the moat. The execution is. Any of you can
-> rebuild this in a spreadsheet. Almost none of you will. The ones who
-> do will discover the data acquisition, the scoring throughput, the
-> back-check infrastructure is 80% of the work — the formula is 5%.
+> **2/** The factor set isn't the moat. The execution is. Any of you can
+> rebuild something like this in a spreadsheet. Almost none of you will.
+> The ones who do will discover the data acquisition, the scoring
+> throughput and the back-check infrastructure is 80% of the work.
 
-> **3/** Hidden weights breed superstition. "BUY signal" without the
-> weights is a coin flip you're trusting because someone in a hoodie
-> says trust them. Tapeline isn't that.
+> **3/** A black box breeds superstition. A "BUY signal" with nothing
+> named behind it is a coin flip you're trusting because someone in a
+> hoodie says trust them. Tapeline isn't that.
 >
-> A 0-100 score with the formula attached is auditable. Auditable beats
-> magical every time once you've been burned.
+> A 0-100 score with a public, unedited record attached is auditable.
+> Auditable beats magical every time once you've been burned.
 
 > **4/** The biggest competitor in this space is the "Smart Score" from
-> a $250M-valued fintech. They publish a number, they don't publish the
-> weights. They have eight digit revenue. So why share?
+> a $250M-valued fintech. They publish a number and won't tell you what's
+> in it. They have eight digit revenue. So why share anything?
 >
 > Different bet. They monetised opacity. I'm betting trust compounds
 > faster long-term.
 
-> **5/** If you find a flaw in the formula, tell me and I'll fix it. If
+> **5/** If you find a flaw in the methodology, tell me and I'll fix it. If
 > the fix changes the score, the scorecard's prior entries stay frozen
 > with the old version noted. Methodology changes are themselves logged
 > publicly. Reputational integrity > looking smart on any single update.
@@ -278,12 +294,12 @@ That's ~15 signups over 30 days from outreach alone — at zero cost.
 > [name] — I see you trade [setup type]. I built Tapeline (stock scanner
 > with a public scorecard, every pick back-checked vs SPY). 30-day hit
 > rate is at [X]%. Curious if you'd find the regime + smart-money factors
-> useful. Free tier, no card — link in bio.
+> useful. The full record is free to read with no account at all — link in bio.
 
 ### Quant-curious / engineer persona
 
 > Saw your thread on factor models. Built Tapeline — six-factor composite
-> score, weights published in a tweet, every daily top-10 logged with
+> score, all six factors named and ranked, every daily top-10 logged with
 > next-day SPY-relative move. Would love your eyes on the methodology
 > page. tapeline.io/how-it-works
 

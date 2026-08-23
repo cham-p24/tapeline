@@ -88,7 +88,7 @@ This is also the one documented buyer objection in the review corpus: *actionabi
 |---|---|---|---|---|---|
 | 1 | Activation | Signup routes to a survey before the product (`signup/page.tsx:301`) | Blocker | 3 FH | Best candidate |
 | 2 | Activation | Alert form is a blank text box — no picker, no pre-armed default | Blocker | 3 FH | Best candidate |
-| 3 | Activation | Free watchlist cap auto-dropped to 0 on 2026-08-02 (`tier.py:125,137`), orphaning `FREE_WEB_PUSH_ALERTS = 2` | Drag | 1 FH | **No** — 16 days old, and every signup gets a 14-day *Premium* trial, so the Free cap never binds during activation |
+| 3 | Activation | Free watchlist cap auto-dropped to 0 on 2026-08-02 (`tier.py:125,137`), orphaning `FREE_WEB_PUSH_ALERTS = 2` | Drag | 1 FH | **No** — 16 days old, and every signup gets a 14-day *Premium* trial, so the Free cap never binds during activation. *(Superseded by #536/#548, 2026-08-21/22: signup no longer grants a trial, so the Free caps now bind from the first session for anyone who declines the card — re-assess this row.)* |
 | 4 | Conversion | Mobile hides the "Why" sentence (`ScannerPreview.tsx:167`) | Blocker | 1 FH | Contributes |
 | 5 | Conversion | Hero row 1 clipped below the 812px fold | Drag | 0.5 FH | Contributes |
 | 6 | Conversion | Primary + tertiary above-fold CTAs both → `/scorecard`; no trial CTA on the fold | Drag | 1 FH | **No** — 3 days old |
@@ -167,8 +167,8 @@ Written down so it is not relitigated.
 1. **Pre-account visibility of the real artefact.** All ten picks with reasons are free at `/daily-picks`, no signup. TrendSpider now charges $19–$49 just to look (paid 14-day trial, no free tier). Trade Ideas has no free trial and states all sales are final. Benzinga's real-time scanner starts at $197/mo. Tapeline is more open than every paid rival, and **the site never says so** — that is a one-line landing-page fix.
 2. **The Free tier is genuinely live, not delayed.** `tier.py:110` — `FREE_DATA_DELAY_MINUTES = 0`. Trade Ideas' free tier is a single chart with limited scanning; Benzinga keeps real-time quotes and the real-time scanner behind the $197 plan. A live top-10 for $0 is a real, checkable claim.
 3. **The forward-logged, loss-inclusive record.** Not a moat yet. But it is the only artefact of its kind in the ICP's consideration set, and it is the only asset here that cannot be cloned retroactively.
-4. **Bundle density at $19.99.** Congressional trades + SEC Form 4 insider buys + unlimited Telegram/email alerts + a public API at 1,000 req/day, against Benzinga Essential at $197/mo and Trade Ideas Premium at $178–254/mo.
-5. **Honest terms in a category whose largest complaint volume is billing disputes.** No card for the trial, 30-day money back, plain renewal language. Two portable, compliance-clean proof patterns rivals use and Tapeline does not: usage-as-proof ("638 picks logged across 68 market days") and a third-party review wall.
+4. **Bundle density at $19.99.** Congressional trades + SEC Form 4 insider buys + unlimited email alerts + a public API at 1,000 req/day, against Benzinga Essential at $197/mo and Trade Ideas Premium at $178–254/mo.
+5. **Honest terms in a category whose largest complaint volume is billing disputes.** A card-required trial that charges $0 today, discloses the exact first-charge date before the card is entered, sends a T-3 reminder email (`render_trial_precharge_reminder_email`, fired from `customer.subscription.trial_will_end`), cancels in one click, and carries 30-day money back (monthly in full, annual prorated). Plus a public record — scorecard, daily picks, ticker pages — readable with no account and no card. Two portable, compliance-clean proof patterns rivals use and Tapeline does not: usage-as-proof ("638 picks logged across 68 market days") and a third-party review wall.
 6. **Feature discipline.** The product has resisted feature-envy. Preserve that.
 
 ---

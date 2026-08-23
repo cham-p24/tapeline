@@ -93,7 +93,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Reasonable if you're an active intraday trader. The 14-day Tapeline trial is no-credit-card so you can run them in parallel for two weeks. Common workflow: Benzinga for the live news + WIM commentary, Tapeline for the daily multi-factor synthesis + watchlist of names worth watching.",
+    a: "Reasonable if you're an active intraday trader. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can still run them in parallel for two weeks. Common workflow: Benzinga for the live news + WIM commentary, Tapeline for the daily multi-factor synthesis + watchlist of names worth watching.",
   },
 ];
 
@@ -106,7 +106,7 @@ export default function VsBenzingaProPage() {
       competitorAnnualNote="Basic ~$37/mo annual; Essential ~$99/mo annual; Options Mentorship ~$457/mo"
       slug="benzinga-pro"
       heading="Tapeline vs Benzinga Pro — composite score vs real-time news squawk."
-      lede="Benzinga Pro is a real-time news + audio squawk terminal for intraday traders who react to catalysts — the original retail squawk, still the fastest. Tapeline is a composite scanner — one 0-100 score per US ticker from a published 6-factor formula, refreshed sub-60s, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if your edge is identifying setups before the news. Pick Benzinga if your edge is reacting first when the news breaks. Many traders run both — Tapeline starts at $8.25/mo annual vs Benzinga's ~$37/mo entry."
+      lede="Benzinga Pro is a real-time news + audio squawk terminal for intraday traders who react to catalysts — the original retail squawk, still the fastest. Tapeline is a composite scanner — one 0-100 score per US ticker from a published 6-factor methodology, refreshed sub-60s, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if your edge is identifying setups before the news. Pick Benzinga if your edge is reacting first when the news breaks. Many traders run both — Tapeline starts at $8.25/mo annual vs Benzinga's ~$37/mo entry."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

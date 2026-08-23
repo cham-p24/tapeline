@@ -15,7 +15,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // "| Tapeline" brand suffix so brand impressions accrue alongside
 // category CTR. Description leads with the user's job-to-be-done
 // ("actually worth paying for") and ends with the public-evidence hook
-// (scorecard + public formula) — the Tapeline-specific differentiators.
+// (scorecard + named factors) — the Tapeline-specific differentiators.
 export const metadata = pageMeta({
   title: "Best Stock Scanners 2026 — 10 Tools Hand-Tested + Compared | Tapeline",
   description:
@@ -28,7 +28,7 @@ type Tool = {
   name: string;
   bestFor: string;
   price: string;
-  scoring: "Public formula" | "Proprietary score" | "No composite";
+  scoring: "Named factors" | "Proprietary score" | "No composite";
   scorecard: "Per-pick public" | "Aggregate" | "None";
   tagline: string;
   comparePath?: string;
@@ -40,7 +40,7 @@ const TOOLS: Tool[] = [
     name: "Tapeline",
     bestFor: "Multi-factor composite scoring + public scorecard",
     price: "$8.25/mo Pro · $16.58/mo Premium (annual) · 14-day trial",
-    scoring: "Public formula",
+    scoring: "Named factors",
     scorecard: "Per-pick public",
     tagline:
       "The only scanner that names all six scoring factors AND back-checks every top-10 pick next-day vs SPY.",
@@ -147,7 +147,7 @@ const TOOLS: Tool[] = [
 const FAQ = [
   {
     q: "What's the best stock scanner overall in 2026?",
-    a: "It depends on your workflow. For traders who want a multi-factor composite score with a transparent formula and per-pick public scorecard, Tapeline. For raw screener fields across the broadest universe, Finviz Elite. For charting and community ideas, TradingView. For institutional-quality fundamentals, Koyfin. For intraday day-trading with AI auto-execution, Trade Ideas. The 'best' depends on which job you're hiring the tool to do.",
+    a: "It depends on your workflow. For traders who want a multi-factor composite score whose six factors are all named, plus a per-pick public scorecard, Tapeline. For raw screener fields across the broadest universe, Finviz Elite. For charting and community ideas, TradingView. For institutional-quality fundamentals, Koyfin. For intraday day-trading with AI auto-execution, Trade Ideas. The 'best' depends on which job you're hiring the tool to do.",
   },
   {
     q: "What's the best free stock scanner?",
@@ -163,7 +163,7 @@ const FAQ = [
   },
   {
     q: "How was this list ranked?",
-    a: "Five weighted criteria: transparency of methodology, freshness of data, evidence of past performance, completeness of the workflow, and value at the entry price. Tapeline ranks #1 because it's the only tool combining a public composite formula with a per-pick public scorecard. We're upfront about which competitor wins for which specific workflow — picking the wrong tool wastes 90 days.",
+    a: "Five weighted criteria: transparency of methodology, freshness of data, evidence of past performance, completeness of the workflow, and value at the entry price. Tapeline ranks #1 because it's the only tool that names every factor in its composite and pairs it with a per-pick public scorecard. We're upfront about which competitor wins for which specific workflow — picking the wrong tool wastes 90 days.",
   },
 ];
 
@@ -183,7 +183,7 @@ const ITEM_LIST_JSON_LD = {
 };
 
 function transparencyChip(s: Tool["scoring"]) {
-  if (s === "Public formula") return "text-up";
+  if (s === "Named factors") return "text-up";
   if (s === "Proprietary score") return "text-warn";
   return "text-subtle";
 }
@@ -210,8 +210,8 @@ export default function BestStockScannersPage() {
           in 2026 — ranked by transparency of methodology, evidence of past performance, and
           honest value at the entry price. Our pick, Tapeline, is a stock scanner that shows its
           work: one score per stock, a plain-English reason, and every top pick logged in public.
-          Try it free below, then read the full ranking — we're upfront about which competitor
-          wins for which workflow.
+          See the live preview below, then read the full ranking — we're upfront about which
+          competitor wins for which workflow.
         </p>
 
         {/* Above-the-fold conversion block. This page is ~50% of all site
@@ -290,15 +290,15 @@ export default function BestStockScannersPage() {
         <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we ranked them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Five weighted criteria: <strong>transparency of methodology</strong> (does the formula
-            exist publicly?); <strong>data freshness</strong>; <strong>evidence of performance</strong>{" "}
+            Five weighted criteria: <strong>transparency of methodology</strong> (is the scoring
+            method disclosed?); <strong>data freshness</strong>; <strong>evidence of performance</strong>{" "}
             (per-pick scorecard, aggregate stats, or none); <strong>workflow completeness</strong>{" "}
             (screening through to alerts); and <strong>value at the entry price</strong>.
           </p>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             The two transparency rows in the at-a-glance table — <em>Scoring</em> and <em>Scorecard</em>{" "}
             — are the criteria most prosumer reviews skip and the ones we weight most heavily.
-            "Public formula" + "Per-pick public" together is rare. Right now it's just us; we'd
+            "Named factors" + "Per-pick public" together is rare. Right now it's just us; we'd
             be happy to be #2 in a year.
           </p>
         </section>

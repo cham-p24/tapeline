@@ -8,7 +8,7 @@ The public scorecard is currently **negative** (~42% hit, −0.58% median alpha 
 
 Good news: your copy is already ~70% there ("shows its work," "the losers stay on the page," "descriptive, not prescriptive"). This is a surgical edit, not a rewrite. Three jobs:
 1. **Kill prescriptive words** ("buy signals", "picks", "every call") — compliance + brand consistency.
-2. **Add the missing process/time-savings leg** ("scan 2,500 tickers in 60s on a transparent formula").
+2. **Add the missing process/time-savings leg** ("scan 2,500 tickers in 60s against a published methodology").
 3. **Add the honesty hook** as a headline — your single strongest line, currently unused.
 
 ---
@@ -29,7 +29,7 @@ These contradict your own "Tapeline never tells you to buy, sell, or hold" promi
 
 Also scrub descriptions: replace "top-10 **picks**" → "top-10 highest-**scoring**" wherever it appears. Keep "wins and losses stay" — that's the honest core and it's compliant.
 
-**Banned in all ad copy** (Google finance policy + unreliable-claims): "beat the market", "buy signal(s)", "picks to buy", "next 10x", "guaranteed", "stop losing", "profit". **Safe:** "score", "rank", "surface", "highest-scoring", "back-checked vs SPY", "transparent formula", "read the tape", "save hours".
+**Banned in all ad copy** (Google finance policy + unreliable-claims): "beat the market", "buy signal(s)", "picks to buy", "next 10x", "guaranteed", "stop losing", "profit" — and, per PR #342, any claim that the formula, the equation or the weights are public: "transparent formula", "published formula", "open 6-factor formula", "public formula" (see `PAID_ADS_PATHWAY.md` STEP 4). **Safe:** "score", "rank", "surface", "highest-scoring", "back-checked vs SPY", "published methodology", "six named factors", "read the tape", "save hours".
 
 ### A2. Site language (`frontend/app/page.tsx` + newsletter + `/daily-picks` route)
 Replace the recommendation-flavored "picks" with score-flavored language everywhere it implies a recommendation:
@@ -48,13 +48,13 @@ Replace the recommendation-flavored "picks" with score-flavored language everywh
 
 **Current:**
 > # A scanner that shows its work.
-> The **Tapeline Score** blends six factors at published weights into one read on every ticker. Every call goes on a permanent public record — same day, no edits.
+> The **Tapeline Score** blends six named factors into one read on every ticker. Every call goes on a permanent public record — same day, no edits.
 
 **Reframe (keep the H1, rewrite the subhead to add time-savings + soften "call"):**
 > # A scanner that shows its work.
-> Scan **~2,500 US tickers in under 60 seconds** on one transparent 0–100 score — six factors, published weights, no black box. Then check the receipts: **every score we publish is back-checked against SPY and stays on the record — the misses too.**
+> Scan **~2,500 US tickers in under 60 seconds** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **every score we publish is back-checked against SPY and stays on the record — the misses too.**
 
-CTAs stay: **"Start the 14-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click") — the free tier is where "no card" still belongs.
+CTAs stay: **"Start the 14-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click") — the public record (no account, no card) is the only place the card-free line still belongs. Since the 2026-08-22 card gate there is no account tier a new user can reach without a card.
 
 *Why:* leads with the concrete time-saving (the benefit a burned audience actually buys), keeps the transparency wedge, drops "every call" (prescriptive) for "every score we publish" (descriptive), and pre-frames the negative record as honesty ("the misses too") instead of letting a visitor discover it as a gotcha.
 
@@ -80,7 +80,7 @@ This is your strongest single line and it's nowhere on the site. It does double 
 
 **Current:** "One score. One sentence. One public record." / "See your watchlist scored the same way..."
 **Add one line under the subhead:**
-> No hype, no hidden track record, no "trust me." Just the formula and the receipts — free tier with no card, or 14 days of Premium for $0 today.
+> No hype, no hidden track record, no "trust me." Just the method and the receipts — the public record with no account at all, or 14 days of Premium for $0 today (card required, first charge on day 14, one click to cancel).
 
 ### B5. Scorecard page (`/scorecard`) — frame the number honestly *before* the visitor reads it
 Add a one-line framing at the top of the scorecard:
@@ -92,7 +92,7 @@ This converts the negative number from a credibility hit into the proof-point of
 ## PART C — Carry the reframe into the un-fired launches
 
 When you fire Show HN / Reddit / FinTwit (Strategy §4), lead with the **honest** angle, not "beat the market":
-- **Show HN title:** *"Show HN: A stock scanner that publishes its formula and back-checks every pick vs SPY — including the losers"* (the transparency IS the story; HN respects honesty and roasts hype).
+- **Show HN title:** *"Show HN: A stock scanner that back-checks every top-10 pick vs SPY — including the losers"* (the transparency IS the story; HN respects honesty and roasts hype).
 - **FinTwit pinned + weekly:** *"Here's how our 10 highest-scoring tickers did vs SPY this week — winners AND losers. We never delete a miss. [screenshot]"* The losses are the content that builds trust; lean in.
 - **Reddit:** open with the methodology + the public record (incl. the down weeks); never "buy these." The audience there punishes promotion and rewards receipts.
 

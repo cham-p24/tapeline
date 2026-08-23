@@ -312,8 +312,10 @@ async def revenue_dashboard(
     mrr_usd = round(mrr, 2)
     arr_usd = round(mrr * 12, 2)
 
-    # ── Funnel — every signup auto-starts a trial, so signup->paid IS the
-    # trial->paid rate. paid_customers = anyone who reached Stripe billing. ─
+    # ── Funnel — signup no longer auto-starts a trial (it is card-required and
+    # opt-in since PR #536), so signup->paid and trial->paid are DIFFERENT
+    # rates over different cohorts. trials_active below counts only accounts
+    # that actually started one. paid_customers = anyone who reached Stripe. ─
     users_total = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
     trials_active = (await session.execute(
         select(func.count()).select_from(User).where(

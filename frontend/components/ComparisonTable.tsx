@@ -110,8 +110,8 @@ export function ComparisonTable() {
         <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
           {/* Explicit column widths so the FEATURE column doesn't greedily
               absorb all the leftover space on wide screens. ~36% feature,
-              ~21% per plan column (slightly wider Premium for the
-              "Unlimited · hourly digest" string). */}
+              ~21% per plan column (slightly wider Premium for its longer
+              cell values). */}
           <colgroup>
             <col style={{ width: "36%" }} />
             <col style={{ width: "21%" }} />
@@ -126,7 +126,7 @@ export function ComparisonTable() {
               <th className="px-3 py-5 text-center align-bottom">
                 <span className="block text-xs font-semibold uppercase tracking-wider text-muted">Free</span>
                 <span className="mt-2 block text-lg font-bold text-fg nums">$0</span>
-                <span className="block text-[10px] text-subtle">/forever</span>
+                <span className="block text-[10px] text-subtle">existing &amp; lapsed accounts</span>
               </th>
               <th className="relative px-3 py-5 text-center align-bottom">
                 <BestValueBadge className="absolute left-1/2 top-2 -translate-x-1/2" />
@@ -160,6 +160,20 @@ export function ComparisonTable() {
           </tbody>
         </table>
       </div>
+      {/* The Free column is not something a new visitor can sign up into.
+          Since the 2026-08-22 card gate it describes grandfathered accounts AND
+          the tier a lapsed subscription lands on — this table also renders
+          inside /app/billing, where a post-cutover reader whose trial or
+          subscription ended is standing in that very column, so the rendered
+          text has to name both, not just the grandfathered half. */}
+      <p className="border-t border-border/60 px-5 py-3 text-[11px] text-subtle">
+        Free is not a plan a new visitor can sign up into. It covers accounts created before
+        22 August 2026 &mdash; which keep the free access they signed up for and are never asked
+        for a card &mdash; and it is where an account lands when a trial or subscription ends. A
+        new account adds a card at first sign-in, and that starts the 14-day Premium trial. The
+        public record &mdash; scorecard, daily picks, ticker pages and exports &mdash; stays open
+        with no account and no card.
+      </p>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
         {annual
           ? `All prices in USD · billed annually — Pro ${usdCompact(PRICING.pro.annual)}/yr · Premium ${usdCompact(PRICING.premium.annual)}/yr`

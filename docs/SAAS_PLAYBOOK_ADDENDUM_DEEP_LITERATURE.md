@@ -194,7 +194,7 @@ This addendum does **not** recommend changing price now (rule: strategy changes 
 
 **Net:** ~+10–14 founder-hours across 90 days (≈ +8–11 in month one, +2 in month two, ≤1 in month three), 0 engineering-days, no new channel before day 90, no change to any gate. (The draft's "+6–9 FH" omitted the Safari; the 30-hour Safari it also contained would have made the net ~+30 — both are corrected by capping the Safari at 8 h.)
 
-**Housekeeping for CLAUDE.md (founder's call, not done here):** Free tier is top-10 live, not "top 20 / 24-hour delayed" (`tier.py` L108–109); the Free watchlist is 5 tickers (the 2026-08-02 removal was reversed 2026-08-19, #525); user-facing Telegram alerts / the hourly digest were removed (#474); the Trader $59 SKU is omitted; the MCP server (#511/#516) is not mentioned.
+**Housekeeping for CLAUDE.md (founder's call, not done here):** ~~Free tier is top-10 live, not "top 20 / 24-hour delayed" (`tier.py` L108–109); the Free watchlist is 5 tickers (the 2026-08-02 removal was reversed 2026-08-19, #525);~~ — **those two are done**: CLAUDE.md now states top-10 rows live, 12 look-ups/UTC day and a 5-ticker Free watchlist, including the #525 reversal. Still open: user-facing Telegram alerts / the hourly digest were removed (#474); the Trader $59 SKU is omitted; the MCP server (#511/#516) is not mentioned.
 
 ---
 

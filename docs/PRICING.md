@@ -46,7 +46,8 @@ stay true and should stay.
 - Scanner: **top 10 tickers, live** (`FREE_DATA_DELAY_MINUTES = 0`,
   `FREE_SCANNER_ROWS = 10` in `services/tier.py`)
 - Market regime: basic view (bull/neutral/bear label only)
-- Watchlist: 5 tickers, no alerts
+- Watchlist: 5 tickers
+- Alerts: 2 browser-push rules (the only channel Free gets — no email alerts)
 - Public scorecard access
 - **No longer self-serve.** From 2026-08-22 a new visitor cannot sign up for
   this tier. It remains the tier for accounts created before the cutover, and
@@ -63,18 +64,26 @@ stay true and should stay.
 - Email alerts: up to 10 per day
 - Daily briefing email · CSV export
 - Browser push alerts
-- No Congress data, no Telegram, no API
+- No Congress data, no insider Form 4 feed, no API
 
 ### Premium — "Analyst"
 **$19.99/mo** or **$16.58/mo billed annually** ($199/yr · save $40)
 - Everything in Pro
 - **Congressional trade feed** (daily updates, ticker aggregation)
 - **Recent insider buys** — live SEC Form 4 transactions across the active universe, refreshed daily
-- **Telegram alerts** (unlimited)
 - **API access** (1,000 requests/day)
 - Email alerts: unlimited
 - Watchlist (200) · saved scans (100)
 - Priority support
+
+**Alert channels are email and browser push — nothing else.** Telegram was
+retired as a customer alert channel on 2026-08-11 (Discord + SMS went
+2026-05-04). `AlertRuleCreate.channel` in `backend/app/routers/alerts.py` only
+accepts `email` / `web_push`, and `services/alerts.py:_fire` has no Telegram
+arm. The `telegram_alerts_per_day` entry still sitting in `tier.py:TIER_LIMITS`
+has no consumer — do not price or advertise against it. (Telegram is still used
+for FOUNDER notifications and the inbox approval bot; that is not a customer
+feature.)
 
 ---
 

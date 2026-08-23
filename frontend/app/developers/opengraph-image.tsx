@@ -18,7 +18,7 @@ export default function Image() {
     headline: "One score per US stock, as JSON.",
     subhead:
       "A read-only REST API for the full scored universe, any ticker, and the live macro regime. Key-authenticated, 1,000 requests/day on Premium.",
-    footerNote: "Public formula. Stable contract.",
+    footerNote: "Public methodology. Stable contract.",
     path: "tapeline.io/developers",
   });
 }

@@ -87,7 +87,7 @@
  */
 export const MIN_PEER_N = 30;
 
-/** The six factors, in published-weight order (heaviest first). */
+/** The six factors, in descending weight order (heaviest first). */
 export const FACTOR_ORDER = [
   "trend",
   "rs",
@@ -109,24 +109,22 @@ export const FACTOR_LABEL: Record<FactorKey, string> = {
   momentum: "Momentum",
 };
 
-/**
- * The published factor weights.
+/*
+ * There is deliberately no FACTOR_WEIGHT map here any more.
  *
- * These are ALREADY public — the ticker endpoint returns them on every
- * `breakdown` entry and /how-it-works prints the formula — so showing them on
- * the page is disclosure, not a leak. They are duplicated here only as a
- * fallback for a payload that omits the weight; the value that renders comes
- * from the API response wherever the response carries one, so the page can
- * never disagree with the API about its own formula.
+ * It used to hold { trend: 25, rs: 20, fundamentals: 15, smart_money: 15,
+ * macro: 15, momentum: 10 } as a fallback for payloads that omitted the
+ * weight. Two things were wrong with that. The comment claimed the ticker
+ * endpoint was authenticated — it is not (routers/ticker.py has no auth
+ * dependency and backs the public SSR pages), so the API was serving the
+ * vector to anyone. And this constant is client code: it shipped the numbers
+ * in the public JS bundle, readable without so much as an account.
+ *
+ * FACTOR_ORDER below IS the disclosure-safe form of the same information —
+ * it lists the factors in descending weight order, which is exactly the
+ * "weighted most toward Trend and Relative Strength, least toward Momentum"
+ * ordering /how-it-works publishes. Sort with it; never reintroduce numbers.
  */
-export const FACTOR_WEIGHT: Record<FactorKey, number> = {
-  trend: 25,
-  rs: 20,
-  fundamentals: 15,
-  smart_money: 15,
-  macro: 15,
-  momentum: 10,
-};
 
 /** Keys we look for rankings under: the composite plus the six factors. */
 export const RANKING_KEYS = ["score", ...FACTOR_ORDER] as const;
@@ -320,17 +318,16 @@ export type FactorRow = {
   label: string;
   /** The 0-100 sub-score. Null when we hold no value — never 0 as a stand-in. */
   value: number | null;
-  /** Published weight, from the API response where it carries one. */
-  weight: number;
   ranking: Ranking;
 };
 
 /**
- * The API's `breakdown` block → the six rows, in published-weight order.
+ * The API's `breakdown` block → the six rows, in descending weight order.
  *
- * `value` and `weight` are read defensively for the same reason the percentile
- * fields are: a non-numeric or absent value becomes null (an em-dash on the
- * page), never 0.
+ * The order comes from FACTOR_ORDER, not from the payload: the API no longer
+ * sends a numeric weight (see the note above FACTOR_ORDER). `value` is read
+ * defensively for the same reason the percentile fields are — a non-numeric or
+ * absent value becomes null (an em-dash on the page), never 0.
  */
 export function buildFactorRows(
   breakdown: unknown,
@@ -340,13 +337,11 @@ export function buildFactorRows(
   return FACTOR_ORDER.map((key) => {
     const entry = isRecord(src[key]) ? (src[key] as Record<string, unknown>) : {};
     const value = readNumber(entry, ["value"]);
-    const weight = readNumber(entry, ["weight"]);
     const label = readString(entry, ["label"]) ?? FACTOR_LABEL[key];
     return {
       key,
       label,
       value,
-      weight: weight ?? FACTOR_WEIGHT[key],
       ranking: percentiles[key],
       // Keep the API's label when it sends one so the page and the payload can
       // never disagree about what a factor is called.
@@ -369,18 +364,22 @@ export function buildFactorRows(
 
 /**
  * Strict total order over ranked factors: percentile descending, then heavier
- * published weight, then the fixed factor order. Ties therefore resolve the
+ * weight, then the fixed factor order. Ties therefore resolve the
  * same way on every render — "highest" and "lowest" are the first and last
  * elements of ONE ordering, so they can never contradict each other.
  */
 function compareRanked(
-  a: { ranking: Extract<Ranking, { kind: "ranked" }>; weight: number; key: FactorKey },
-  b: { ranking: Extract<Ranking, { kind: "ranked" }>; weight: number; key: FactorKey },
+  a: { ranking: Extract<Ranking, { kind: "ranked" }>; key: FactorKey },
+  b: { ranking: Extract<Ranking, { kind: "ranked" }>; key: FactorKey },
 ): number {
   if (a.ranking.percentile !== b.ranking.percentile) {
     return b.ranking.percentile - a.ranking.percentile;
   }
-  if (a.weight !== b.weight) return b.weight - a.weight;
+  // Ties break by weight, descending — which is precisely FACTOR_ORDER, since
+  // that array IS the descending weight order. Comparing the numeric weights
+  // here (as this did) produced identical output while requiring the vector to
+  // exist client-side, so the index comparison is the same rule without the
+  // disclosure.
   return FACTOR_ORDER.indexOf(a.key) - FACTOR_ORDER.indexOf(b.key);
 }
 
@@ -414,7 +413,7 @@ export function buildTickerRead(input: {
       (f): f is FactorRow & { ranking: Extract<Ranking, { kind: "ranked" }> } =>
         f.ranking.kind === "ranked",
     )
-    .map((f) => ({ key: f.key, label: f.label, weight: f.weight, ranking: f.ranking }))
+    .map((f) => ({ key: f.key, label: f.label, ranking: f.ranking }))
     .sort(compareRanked);
 
   // Does one peer group cover everything we are about to cite? If so we name

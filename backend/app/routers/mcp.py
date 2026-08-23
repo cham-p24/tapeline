@@ -70,7 +70,7 @@ LATEST_PROTOCOL = SUPPORTED_PROTOCOLS[0]
 SERVER_INFO = {"name": "tapeline", "title": "Tapeline", "version": "1.0.0"}
 
 INSTRUCTIONS = (
-    "Tapeline scores ~2,500 US stocks daily on six published factors (trend, "
+    "Tapeline scores actively traded US stocks daily on six published factors (trend, "
     "relative strength, fundamentals, smart money, macro, momentum) and logs "
     "every daily top-10 pick to a public record that is never edited — "
     "including the picks that lose. Call `get_track_record` before quoting any "
@@ -187,7 +187,7 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
     if ticker is None or ticker.score is None:
         return {
             "error": f"{symbol} is not in Tapeline's covered universe.",
-            "note": "Coverage is the ~2,500 most actively traded US names.",
+            "note": "Coverage is limited to actively traded US names.",
         }
     return {
         "symbol": ticker.symbol,

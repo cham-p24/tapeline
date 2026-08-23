@@ -11,14 +11,14 @@ import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/
 export const metadata = pageMeta({
   title: "Tapeline vs Zacks (2026): Live Scoring vs Daily-Updated Proprietary Ranks",
   description:
-    "Tapeline vs Zacks Premium — sub-60s live scoring, public 6-factor formula, plain-English Why, and per-pick public scorecard, vs Zacks' once-daily proprietary ranks. Honest comparison.",
+    "Tapeline vs Zacks Premium — sub-60s live scoring, public 6-factor methodology, plain-English Why, and per-pick public scorecard, vs Zacks' once-daily proprietary ranks. Honest comparison.",
   path: "/compare/zacks",
 });
 
 const COMPARE_FAQ = [
   {
     q: "Is Tapeline a Zacks alternative?",
-    a: "Yes. Both score US equities, but Tapeline names all six factors and how they're weighted, shows each factor's contribution per ticker, updates scores sub-60s during market hours, and back-checks every top-10 call publicly vs SPY. Zacks Rank is updated daily, the underlying earnings-revision model is proprietary, and there's no public per-pick scorecard.",
+    a: "Yes. Both score US equities, but Tapeline names all six factors and publishes their weight ordering, shows each factor's contribution per ticker, updates scores sub-60s during market hours, and back-checks every top-10 call publicly vs SPY. Zacks Rank is updated daily, the underlying earnings-revision model is proprietary, and there's no public per-pick scorecard.",
   },
   {
     q: "How is the Tapeline score different from Zacks Rank?",
@@ -34,7 +34,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "Plenty do. Zacks Premium for the curated research and Equity Research Reports; Tapeline for the live multi-factor synthesis and the public scorecard. The 14-day Tapeline trial is no-credit-card so you can run them side-by-side before deciding.",
+    a: "Plenty do. Zacks Premium for the curated research and Equity Research Reports; Tapeline for the live multi-factor synthesis and the public scorecard. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can run them side-by-side before deciding.",
   },
 ];
 
@@ -42,7 +42,7 @@ const COMPARE_FAQ = [
 // punch — not just "✓ vs —", but a one-line reason it matters.
 const WINS = [
   {
-    label: "Public scoring formula",
+    label: "Public scoring methodology",
     tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Factors named, weights opaque",
   },
@@ -110,7 +110,7 @@ const TRADEOFFS = [
     label: "Cheapest paid tier",
     tapeline: "$8.25/mo (Pro, billed annually)",
     competitor: "~$21/mo (Premium, $249/yr only)",
-    note: "Effectively the same. Tapeline has month-to-month pricing too; Zacks Premium is annual-only with no monthly option.",
+    note: "Tapeline is the cheaper entry at the annual rate, and it has month-to-month pricing too; Zacks Premium is annual-only with no monthly option. What Zacks buys at its price is the research library, not a lower bill.",
   },
   {
     label: "Universe size",
@@ -153,7 +153,7 @@ export default function VsZacksPage() {
         <p className="mt-4 text-lg text-muted">
           Zacks built a 37-year reputation on the Zacks Rank — a proprietary,
           opaque-weighted, daily-rebuilt #1–#5 grade that emails you the picks. Tapeline
-          names all six factors and how they're weighted, recomputes the score sub-60s on every
+          names all six factors and publishes their weight ordering, recomputes the score sub-60s on every
           ticker, and back-checks every top-10 against the next-day price publicly. Pick
           Tapeline if you want transparency + speed; pick Zacks if 37 years of brand
           history outweighs everything else.

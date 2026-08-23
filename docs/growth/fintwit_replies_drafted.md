@@ -2,8 +2,8 @@
 
 Round 1 of PR #80's pivot from cold DMs to substantive public replies. Drafted
 against each account's most recent substantive tweet, anchored on live
-Tapeline composite scores from `api.tapeline.io/api/ticker/{symbol}` (24h-delayed
-feed, free-tier — same data anyone visiting `tapeline.io/t/SYMBOL` would see).
+Tapeline composite scores from `api.tapeline.io/api/ticker/{symbol}` (live
+free-tier feed — the same data anyone visiting `tapeline.io/t/SYMBOL` would see).
 
 Founder reviews each draft, opens the target tweet, hits Reply, posts. Avatar
 + banner are now live on @tapeline_io so this no longer looks like a 0-asset
@@ -71,22 +71,22 @@ displace all software leaders. Software is more than code. $CSU.to"
 **Reply draft:**
 
 > Same widening gap in the US software comp: MSFT 58 CONSTRUCTIVE (uptrend
-> intact, RS tilting up vs sector), CRM 40 NEUTRAL ("underperforming the
-> sector on every timeframe"), ORCL 44 NEUTRAL ("breakdown from prior
+> intact, RS tilting up), CRM 40 NEUTRAL ("underperforming the
+> market on every timeframe"), ORCL 44 NEUTRAL ("breakdown from prior
 > support, no reclaim"). The "more than code" moat is showing up as
 > structural alpha between entrenched compounders and the long tail.
 
-**Char count:** 343 · over by 63. Trim:
+**Char count:** 333 · over by 53. Trim:
 
 > US software comp echoes this: MSFT 58 CONSTRUCTIVE (uptrend intact, RS
-> tilting up), CRM 40 NEUTRAL ("underperforming sector on every timeframe"),
+> tilting up), CRM 40 NEUTRAL ("underperforming market on every timeframe"),
 > ORCL 44 NEUTRAL ("breakdown from prior support, no reclaim"). "More than
 > code" is printing as a widening gap between compounders and the tail.
 
 **Char count:** 282 · trim 2 more. v3:
 
 > US software comp echoes it: MSFT 58 CONSTRUCTIVE (uptrend intact, RS
-> tilting up), CRM 40 NEUTRAL ("underperforming sector every timeframe"),
+> tilting up), CRM 40 NEUTRAL ("underperforming market every timeframe"),
 > ORCL 44 NEUTRAL ("breakdown from prior support, no reclaim"). "More than
 > code" is printing as a widening gap between compounders and the tail.
 

@@ -12,9 +12,22 @@ The on-site SEO work (the `claude/seo-foundations` branch) only goes so far. To 
 
 This doc is the operational checklist for creating each of those off-site profiles. Work through it in the priority order below — each one is one-time setup that compounds for years.
 
-**Naming consistency rule:** every profile uses **"Tapeline"** as the display name and **`@tapeline_io`** as the handle where available. If a handle is taken, fall back to **`tapelineio`** (no underscore). Bio: same one-liner everywhere — *"Live quantitative stock scanner. Public 6-factor formula. Public scorecard. tapeline.io"*
+**Naming consistency rule:** every profile uses **"Tapeline"** as the display name and **`@tapeline_io`** as the handle where available. If a handle is taken, fall back to **`tapelineio`** (no underscore). Bio: same one-liner everywhere — *"Live quantitative stock scanner. Six named factors. Public scorecard. tapeline.io"*
 
 > **Paste-ready copy:** this doc says *where* to create each profile. For the exact field-by-field text to paste (taglines, descriptions, char-counted bios for Product Hunt / Crunchbase / G2 / Capterra / AlternativeTo / StockTwits) plus the launch press + backlink pitch (Show HN, Indie Hackers, cold-email template), see **[BRAND_SERP_KIT.md](./BRAND_SERP_KIT.md)**. All strings there are pulled verbatim from [/press](../frontend/app/press/page.tsx) so the entity stays consistent across every platform.
+
+> ⛔ **DO NOT SEND THE STORED PRESS SCREENSHOTS.** The PNGs in
+> `frontend/public/press/` were captured 2026-08-20 — two days before the card
+> gate (`CARD_GATE_START = 2026-08-22`). Verified false copy is baked into the
+> pixels of `tapeline-scanner.png` ("No credit card, no payment details,
+> nothing charged — it simply ends and your account stays on the Free tier"),
+> `tapeline-scorecard.png` and `tapeline-verify.png` ("Free forever tier — no
+> card", "14-day Premium trial — no card, nothing charged", "Start free — no
+> card"). `tapeline-ticker.png` is from the same pre-gate batch — treat it the
+> same. Uploading any of them to a directory, a journalist or a listing
+> publishes a false claim about a financial product. **Do not delete the
+> files** — re-shoot them from the live site first. Shooting fresh from the
+> `/press` **screenshot kit** links is safe: those point at live URLs.
 
 ---
 
@@ -101,9 +114,9 @@ These aren't "profile" pages but they belong on the week-1 list because everythi
 - **Setup:**
   1. Maker account first (sign in with X)
   2. Submit Tapeline as a product
-  3. Tagline (max 60 chars): *"Stock scanner that shows its work — public formula, public scorecard"*
+  3. Tagline (max 60 chars): *"One score, one sentence, and a public track record."* (canonical string — see BRAND_SERP_KIT.md)
   4. Description: 2-3 paragraphs from [/press](../frontend/app/press/page.tsx)
-  5. Screenshots from `/screenshot kit` section of /press
+  5. Screenshots: shoot fresh from the `/screenshot kit` section of /press — those are live URLs. Never upload the stored `frontend/public/press/*.png` (see the DO-NOT-SEND warning at the top)
   6. Pricing: link to `/pricing`
   7. **Schedule the launch for a Tuesday at 12:01am PT** — the algorithm window is Pacific midnight; weekday days >> weekends
 - **Recurring (one-time):** ask 5-10 active users to upvote in the first 4 hours; the comment thread is the primary ranking signal
@@ -120,7 +133,7 @@ These aren't "profile" pages but they belong on the week-1 list because everythi
   4. Pricing: Free / Freemium
   5. Platforms: Web
   6. Description: one-paragraph from [/press](../frontend/app/press/page.tsx)
-  7. Add the same screenshots as Product Hunt
+  7. Add the same freshly-shot screenshots as Product Hunt (not the stored `frontend/public/press/*.png` — see the DO-NOT-SEND warning at the top)
 
 ### ☐ G2
 
@@ -131,7 +144,7 @@ These aren't "profile" pages but they belong on the week-1 list because everythi
   1. Create vendor account
   2. Submit product: **Tapeline**
   3. Category: *Stock Analysis Software* / *Investment Research Software*
-  4. Use the same one-paragraph + screenshots as everywhere else
+  4. Use the same one-paragraph + freshly-shot screenshots as everywhere else (never the stored `frontend/public/press/*.png` — see the DO-NOT-SEND warning at the top)
   5. Add comparison set: Finviz, Zacks, TradingView (G2 builds comparison pages automatically)
 - **Recurring:** ask paying users for reviews via email after 30 days. Aim for 10 reviews in the first 90 days.
 
@@ -207,7 +220,7 @@ These aren't "profile" pages but they belong on the week-1 list because everythi
 
 These are PR/outreach moves that need a finished off-site graph (priorities 1-3) before they're worth attempting — journalists Google a brand before responding.
 
-- **Hacker News** — Show HN with the angle "Stock scanner that publishes its formula and its scorecard"
+- **Hacker News** — Show HN with the angle "Stock scanner that back-checks every top-10 pick against SPY" (see SHOW_HN_VARIANTS.md for the drafted variants)
 - **Indie Hackers** — bootstrapped-SaaS post (Tapeline is bootstrapped, that's a qualifier)
 - **Newsletter pitches:** Net Interest, FinTech Brainfood, Money Stuff (Matt Levine), The Tokenist, Benzinga
 - **Podcasts:** Trader Mike, Top Trading Performance, Animal Spirits
@@ -219,7 +232,7 @@ These are PR/outreach moves that need a finished off-site graph (priorities 1-3)
 
 - **Display name** is always **Tapeline** (no qualifier, no "io")
 - **Handle** is `@tapeline_io` first, `tapelineio` second, `tapeline` third (depending on availability per platform)
-- **One-liner** is identical everywhere: *"Live quantitative stock scanner. Public 6-factor formula. Public scorecard. tapeline.io"*
+- **One-liner** is identical everywhere: *"Live quantitative stock scanner. Six named factors. Public scorecard. tapeline.io"*
 - **One-paragraph** lives in [/press](../frontend/app/press/page.tsx); copy from there, never write a fresh one (drift = fragmented entity in Google's eyes)
 - **Logo and brand assets** all come from `/favicon.svg` and `/opengraph-image`
 - **Founder bio** stays consistent across every personal LinkedIn / Crunchbase Person / About page byline

@@ -23,16 +23,24 @@ import {
  * thing under the price, ahead of the quote grid, because a grid of raw fields
  * locatable against nothing is not what anyone came for.
  *
- * Every factor row carries four things and needs all four to be useful:
+ * Every factor row carries three things and needs all three to be useful:
  *   • the factor's 0-100 value            — what we measured
- *   • its PUBLISHED weight                — how much that measurement counts
  *   • its percentile among covered peers  — where that value actually sits
  *   • the peer group and its size (n)     — what "sits" was measured against
  *
- * The weights are already public: the API returns them on every `breakdown`
- * entry and /how-it-works prints the whole formula. Showing them here is
- * disclosure, not a leak, and it is what lets a reader reconstruct the
- * composite instead of taking it on faith.
+ * There used to be a fourth: a numeric Weight column. It came out, because the
+ * premise under it was wrong. The comment here asserted that the ticker
+ * endpoint was authenticated and that this panel therefore stayed inside the
+ * disclosure boundary. routers/ticker.py has no auth dependency — it backs the
+ * public SSR pages and the badge — so the API was handing the weight vector to
+ * anonymous callers, and percentiles.ts shipped the same numbers in the public
+ * JS bundle as a fallback. Both are gone.
+ *
+ * What survives is the ordering, which IS public: the rows render in
+ * FACTOR_ORDER, i.e. descending weight — most toward Trend and Relative
+ * Strength, least toward Momentum (PR #342, guarded by
+ * __tests__/methodologyPages.test.ts). A reader still sees which factors carry
+ * the most, without being handed the vector.
  *
  * WHAT IT WILL NOT DO
  * -------------------
@@ -99,7 +107,7 @@ export function ScorePanel({
           Tapeline Score
         </h2>
         <p className="mt-0.5 text-xs text-muted">
-          Six factors, published weights, one 0&ndash;100 composite. Every
+          Six named factors, one 0&ndash;100 composite. Every
           percentile here names the peer group it was computed in and how many
           covered peers were in it.
         </p>
@@ -162,8 +170,7 @@ export function ScorePanel({
       <div className="overflow-x-auto border-t border-border">
         <table className="w-full min-w-[34rem] text-sm">
           <caption className="sr-only">
-            {symbol} factor scores, their published weights, and where each sits
-            among covered peers
+            {symbol} factor scores and where each sits among covered peers
           </caption>
           <thead>
             <tr className="text-xs uppercase tracking-wide text-muted">
@@ -172,9 +179,6 @@ export function ScorePanel({
               </th>
               <th scope="col" className="px-4 py-2 text-right font-normal">
                 Score
-              </th>
-              <th scope="col" className="px-4 py-2 text-right font-normal">
-                Weight
               </th>
               <th scope="col" className="px-4 py-2 text-left font-normal">
                 Among covered peers
@@ -190,8 +194,6 @@ export function ScorePanel({
                 <td className="nums px-4 py-2 text-right font-medium">
                   {r.value != null ? r.value.toFixed(0) : EMPTY}
                 </td>
-                {/* The published weight, straight off the API response. */}
-                <td className="nums px-4 py-2 text-right text-muted">{r.weight}</td>
                 <td className="px-4 py-2 text-left">
                   <RankingText ranking={r.ranking} />
                 </td>
@@ -202,7 +204,7 @@ export function ScorePanel({
       </div>
 
       <p className="border-t border-border p-4 text-xs text-subtle">
-        Weights are the published formula and sum to 100. A percentile is
+        Weights sum to 100 and are applied identically to every ticker. A percentile is
         computed only over tickers we actually hold a value for, and only where
         that peer group has at least {MIN_PEER_N} of them &mdash; below that a
         single peer moves the figure by more than three points, so we print the

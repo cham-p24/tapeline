@@ -100,7 +100,7 @@ function sectorFaq(display: string) {
     },
     {
       q: `How are ${display} stocks scored?`,
-      a: `The same six named factors apply across every sector: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, and least toward Momentum. Sector-specific peer comparisons feed Relative Strength; the Macro factor weighs sector-rotation signals.`,
+      a: `The same six named factors apply across every sector: Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum — weighted most toward Trend and Relative Strength, and least toward Momentum. Relative Strength is measured against a single broad-market benchmark rather than a sector one, and the Macro factor reads a market-wide regime classification that is the same number for every ticker — so neither is sector-adjusted.`,
     },
     {
       q: `What's the difference between sector ranking and the public scorecard?`,
@@ -234,8 +234,9 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
             <strong>Fundamentals</strong>, <strong>Smart Money</strong>,{" "}
             <strong>Macro</strong>, and <strong>Momentum</strong> — weighted most toward Trend and
             Relative Strength, least toward Momentum. Within the{" "}
-            {sector.display} sector, Relative Strength compares each ticker to its{" "}
-            sector-ETF peer; the Macro factor reflects current sector-rotation positioning.
+            {sector.display} sector, Relative Strength still compares each ticker to a single{" "}
+            broad-market benchmark rather than a sector one, and the Macro factor is the same
+            market-wide reading for every ticker on the board.
           </p>
           <p className="mt-3 text-sm text-muted leading-relaxed">
             Read the full methodology on{" "}

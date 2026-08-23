@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs WallStreetZen (2026): Public Weights, Live Data, Per-Pick Scorecard",
+  title: "Tapeline vs WallStreetZen (2026): Named Factors, Live Data, Per-Pick Scorecard",
   description:
     "Tapeline vs WallStreetZen Premium — 6-factor model with named factors + published methodology, sub-60s live data, per-pick public scorecard, vs WallStreetZen's 115-factor proprietary Zen Ratings. Honest comparison.",
   path: "/compare/wallstreetzen",
@@ -18,7 +18,7 @@ export const metadata = pageMeta({
 const COMPARE_FAQ = [
   {
     q: "Is Tapeline a WallStreetZen alternative?",
-    a: "Yes. Both score US stocks, but Tapeline names all six factors and how they're weighted, shows each factor's contribution per ticker, recomputes the score sub-60s, and back-checks every top-10 pick publicly vs SPY the next day. WallStreetZen's Zen Ratings combine 115 factors at undisclosed weights and update less frequently.",
+    a: "Yes. Both score US stocks, but Tapeline names all six factors and publishes their weight ordering, shows each factor's contribution per ticker, recomputes the score sub-60s, and back-checks every top-10 pick publicly vs SPY the next day. WallStreetZen's Zen Ratings combine 115 factors at undisclosed weights and update less frequently.",
   },
   {
     q: "How is the Tapeline Score different from WallStreetZen Zen Ratings?",
@@ -26,7 +26,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "How do prices compare?",
-    a: "Tapeline Pro is $8.25/mo billed annually; Premium is $16.58/mo billed annually. WallStreetZen Premium is approximately $24.50/mo billed annually. Tapeline Pro runs at roughly a third of that, with Tapeline including the public scorecard, plain-English Why on every row, and Congressional + insider activity feeds (Premium tier).",
+    a: "Tapeline Pro is $8.25/mo billed annually ($99/yr); Premium is $16.58/mo billed annually ($199/yr). WallStreetZen Premium is billed annually; we have not re-verified their rate since 4 May 2026, so check wallstreetzen.com for the current figure before comparing. What Tapeline includes at its price: the public scorecard, plain-English Why on every row, and Congressional + insider activity feeds (Premium tier).",
   },
   {
     q: "Does WallStreetZen publish a per-pick track record?",
@@ -34,13 +34,13 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. The 14-day no-credit-card Tapeline trial lets you compare directly against your existing WallStreetZen workflow.",
+    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can compare directly against your existing WallStreetZen workflow.",
   },
 ];
 
 const WINS = [
   {
-    label: "Factor weights — fully public",
+    label: "Factor weight ordering — public",
     tapeline: "✓ Six named factors on /how-it-works",
     competitor: "115 factors, weights derived from docs (not published)",
   },
@@ -107,8 +107,8 @@ const TRADEOFFS = [
   {
     label: "Cheapest paid tier",
     tapeline: "$8.25/mo (Pro, billed annually)",
-    competitor: "$19.50/mo (Premium, billed annually)",
-    note: "WallStreetZen is ~$5/mo cheaper. You're getting fewer features for the saving — Tapeline includes the live tick, scorecard, and squeeze module at the same price band.",
+    competitor: "Premium, annual billing",
+    note: "Tapeline Pro's annual rate is $8.25/mo, and it includes the live tick, the public scorecard, and the squeeze module. We last verified WallStreetZen's Premium rate on 4 May 2026, so check wallstreetzen.com rather than trusting a stale number here. Either way, WallStreetZen's pricing edge is the free tier in the row above, not the paid entry.",
   },
   {
     label: "Brand history",
@@ -144,8 +144,10 @@ export default function VsWallStreetZenPage() {
       {compareJsonLd({
         competitorName: "WallStreetZen",
         competitorUrl: "https://www.wallstreetzen.com",
-        competitorPriceMonthly: 24.5,
-        competitorAnnualNote: "Premium ~$24.50/mo billed annually",
+        // Competitor price deliberately omitted from schema: the two figures
+        // this page used to carry disagreed and we cannot verify WallStreetZen's
+        // current rate from our side. Better no machine-readable price than a
+        // wrong one. Re-add both fields once the rate is re-checked.
         pageUrl: "https://tapeline.io/compare/wallstreetzen",
       }).map((g, i) => (
         <script key={`wszld-${i}`} {...jsonLdScript(g)} />
@@ -160,7 +162,7 @@ export default function VsWallStreetZenPage() {
         <p className="mt-4 text-lg text-muted">
           WallStreetZen built a strong long-term-investor product around their 115-factor
           Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline names all six
-          factors and how they're weighted, recomputes the score sub-60s, and pairs every top-10
+          factors and publishes their weight ordering, recomputes the score sub-60s, and pairs every top-10
           with a per-pick public scorecard. If you trade on a sub-week timescale,
           Tapeline is built for you. If you buy-and-hold for 5+ years, or you want a free
           screener you can run yourself, WallStreetZen is the right choice — Tapeline&apos;s

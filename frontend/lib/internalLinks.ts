@@ -101,12 +101,12 @@ const STRATEGY_ANCHORS: Record<string, { label: string; blurb: string }> = {
 };
 
 const FACTOR_BLURBS: Record<string, string> = {
-  trend: "How price sits against its moving-average structure.",
-  "relative-strength": "How a ticker tracks against its sector and SPY.",
-  fundamentals: "Earnings quality, margins and balance-sheet health.",
-  "smart-money": "Insider Form 4 and congressional disclosure activity.",
-  macro: "Rates, volatility and the current market regime.",
-  momentum: "Short-horizon price acceleration and breakout posture.",
+  trend: "Multi-month price change and position in the 52-week range.",
+  "relative-strength": "A ticker's price change minus the broad-market benchmark's.",
+  fundamentals: "Reported margins, returns and growth from company filings.",
+  "smart-money": "Disclosed corporate-insider transactions from SEC Form 4.",
+  macro: "The market-wide regime classification behind every score.",
+  momentum: "Short-horizon rate of change, weighted least of the six.",
 };
 
 /* ------------------------------------------------------------------ *
@@ -194,8 +194,7 @@ const FACTOR_STRATEGIES: Record<string, string[]> = {
 
 /**
  * Sector → the rankings whose filter overlaps that sector, plus the two
- * factors a sector page already discusses in prose (Relative Strength is
- * measured against the sector-ETF peer; Macro carries sector rotation).
+ * factors every sector page links out to (see SECTOR_FACTORS below).
  */
 const SECTOR_STRATEGIES: Record<string, string[]> = {
   "information-technology": ["ai-stocks", "growth-stocks"],

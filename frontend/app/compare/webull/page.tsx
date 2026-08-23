@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline vs Webull (2026): Dedicated Scanner vs Broker-Bundled Tools",
   description:
-    "Tapeline vs Webull's built-in scanner — published 6-factor composite, sub-60s scoring, public scorecard, vs Webull's broker-bundled filter set that comes with the trading account.",
+    "Tapeline vs Webull's built-in scanner — published 6-factor composite score, sub-60s scoring, public scorecard, vs Webull's broker-bundled filter set that comes with the trading account.",
   path: "/compare/webull",
 });
 
@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "What does Tapeline cost compared to free Webull scanning?",
-    a: "Webull's scanner is included with the brokerage account at no cost. Tapeline Pro is $8.25/mo billed annually. The price difference is the scoring layer — published 6-factor formula, sub-60s composite, public scorecard. If you're happy assembling your own thesis from raw filters, Webull is fine. If you want the synthesised answer, Tapeline.",
+    a: "Webull's scanner is included with the brokerage account at no cost. Tapeline Pro is $8.25/mo billed annually. The price difference is the scoring layer — published 6-factor methodology, sub-60s composite, public scorecard. If you're happy assembling your own thesis from raw filters, Webull is fine. If you want the synthesised answer, Tapeline.",
   },
   {
     q: "What's the 14-day Tapeline trial?",
@@ -59,7 +59,7 @@ const WINS = [
   },
   {
     label: "Live regime classifier",
-    tapeline: "✓ Risk On / Neutral / Risk Off with VIX + breadth + rates",
+    tapeline: "✓ BULL / NEUTRAL / CAUTIOUS / BEAR, with VIX, breadth and rate direction on the panel",
     competitor: "Not available — basic market widgets only",
   },
   {
@@ -98,7 +98,7 @@ export default function VsWebullPage() {
       competitorAnnualNote="Webull scanner is bundled free with the brokerage account; no standalone subscription tier."
       slug="webull"
       heading="Tapeline vs Webull — when the broker scanner isn't enough."
-      lede="Webull's built-in scanner is fine for filter-based discovery — and it's free with the brokerage account. Tapeline is the dedicated layer on top: one synthesised score per ticker, a published formula, a public scorecard. Pick the second one when you want the research workflow separated from the trade window."
+      lede="Webull's built-in scanner is fine for filter-based discovery — and it's free with the brokerage account. Tapeline is the dedicated layer on top: one synthesised score per ticker, a published methodology, a public scorecard. Pick the second one when you want the research workflow separated from the trade window."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={COMPARE_FAQ}

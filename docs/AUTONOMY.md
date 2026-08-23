@@ -55,8 +55,11 @@ deliberate. Ranked by leverage:
   is hardcoded in `lib/gtag.ts`, and `/app/billing` fires it on Stripe
   checkout-success with the tier's first-charge value in USD (PR #269, verified
   live in prod). The campaign can now optimise toward paying customers, not just
-  signups. (`start_trial` is intentionally left unwired — it fires at the same
-  instant as `sign_up`, so a separate conversion would double-count.)
+  signups. (`start_trial` was left unwired because it used to fire at the same
+  instant as `sign_up`, so a separate conversion would have double-counted.
+  **#536/#548 decoupled them** — since 2026-08-21/22 the trial starts only
+  after the `/app/start` card wall, so `start_trial` is now a distinct,
+  high-intent conversion. Re-decide whether to wire it to `trial_started_at`.)
 - **Ad groups 2–3 + 28 campaign negatives confirmed already applied.** Verified
   live in account 271-638-2397 on 2026-06-06 (the founder uploaded them
   2026-06-01). The campaign has 3 ad groups (Finviz Alternative, Best Stock

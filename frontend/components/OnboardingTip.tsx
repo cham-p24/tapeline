@@ -59,6 +59,13 @@ export function OnboardingTip() {
 
   if (!show) return null;
 
+  // The tip fires on account age alone, and signup grants no trial (#536), so
+  // a new account that has not been through the /app/start card wall has no
+  // trial to announce. Read the same field TrialBanner does rather than
+  // assuming one exists — the three things to try below stand on their own.
+  const trialEndsAt = user?.trial_ends_at ? new Date(user.trial_ends_at).getTime() : NaN;
+  const onTrial = Number.isFinite(trialEndsAt) && trialEndsAt > Date.now();
+
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel">
       <div className="flex items-start gap-4 p-5">
@@ -69,9 +76,11 @@ export function OnboardingTip() {
           <h3 className="text-base font-semibold tracking-tight">
             Welcome{user?.name ? `, ${user.name.split(" ")[0]}` : ""}. Three things to try first.
           </h3>
-          <p className="mt-1 text-sm text-muted">
-            Your 14-day Premium trial is live.
-          </p>
+          {onTrial && (
+            <p className="mt-1 text-sm text-muted">
+              Your 14-day Premium trial is live.
+            </p>
+          )}
           <ul className="mt-3 space-y-1.5 text-sm">
             <li className="flex items-start gap-2">
               <span className="text-accent flex-shrink-0">→</span>

@@ -47,16 +47,27 @@ CRLF normalization noise on existing files):
 text are filled with Variant A (back-check angle, live scorecard
 numbers as of this morning).
 
-To launch: hit Submit. Then **immediately** post the 6-factor formula
-as the first comment on your own post:
+To launch: hit Submit. Then **immediately** post the six factors as the
+first comment on your own post — names and what each measures, **no
+weights and no equation** (those aren't public; see `/how-it-works`):
 
 ```
-score = 0.25 × Trend
-      + 0.20 × Relative Strength
-      + 0.15 × Fundamentals
-      + 0.15 × Smart Money
-      + 0.15 × Macro
-      + 0.10 × Momentum
+Six factors — Trend and Relative Strength carry the most weight, Momentum the least (the exact weights stay internal):
+
+Trend             — the ticker's multi-month price change, and where the
+                    latest price sits inside its own 52-week range
+Relative Strength — that same price change minus a broad-market
+                    benchmark's, over three horizons; not sector-adjusted
+Fundamentals      — reported margin, return on equity, EPS and revenue
+                    growth, and an earnings multiple
+Smart Money       — disclosed SEC Form 4 insider transactions, netted
+                    over a recent window; not 13F
+Macro             — a single market-wide regime classification; the same
+                    reading for every ticker on a tick
+Momentum          — a momentum-quality reading plus a short-horizon
+                    return, deliberately the lightest
+
+Full methodology: https://tapeline.io/how-it-works
 ```
 
 **Hang around for 90 minutes after submission.** First-hour reply

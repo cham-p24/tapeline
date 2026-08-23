@@ -198,11 +198,19 @@ describe("trial offer — the decline is a real, equal choice", () => {
     expect(decline.className).not.toMatch(/opacity-\d|text-xs|text-subtle|underline/);
   });
 
-  it("restates that Free needs no card and costs nothing", async () => {
+  // The decline must state the Free OUTCOME without claiming the account is
+  // card-free. "never asks for a card" was true before the 2026-08-22 card
+  // gate and is false for any account created since — PricingTable.test.tsx
+  // bans that exact phrase, so asserting it here put the two guards in direct
+  // conflict. What is still true, and what this now checks, is that declining
+  // costs nothing and lands the user on Free with its real caps.
+  it("restates the Free outcome without claiming a card-free account", async () => {
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
     const text = (panel.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(/free plan costs nothing and never asks for a card/i);
+    expect(text).toMatch(/declining costs you nothing/i);
+    expect(text).toMatch(/stay on the Free plan/i);
+    expect(text).not.toMatch(/never asks for a card/i);
     expect(text).toMatch(new RegExp(`top-${FREE_LIMITS.scannerRows}`, "i"));
     // …and the trial stays available later, so declining costs nothing either.
     expect(text).toMatch(/start the trial later/i);

@@ -332,7 +332,7 @@ const TOOLS: Tool[] = [
 // + why. Honest about pointing AT competitors when their fit is better.
 const QUICK_PICKS = [
   {
-    intent: "A multi-factor composite score per ticker with a published formula and public scorecard",
+    intent: "A multi-factor composite score per ticker with a published methodology and public scorecard",
     pick: "Tapeline",
     href: "/",
   },
@@ -379,7 +379,7 @@ const QUICK_PICKS = [
 const WHY_LOOK_BEYOND = [
   {
     title: "You want a composite score, not 60 raw fields to filter against",
-    body: "Finviz Elite gives you a screener with 60+ technical and fundamental fields. That's powerful if your workflow is 'I have a thesis, let me filter the universe to match it.' It's exhausting if your workflow is 'I have an hour on Sunday — surface which 10 names are worth looking at this week.' Tapeline and Zacks both synthesise the data into a single number per ticker. Tapeline publishes the formula; Zacks keeps it proprietary.",
+    body: "Finviz Elite gives you a screener with 60+ technical and fundamental fields. That's powerful if your workflow is 'I have a thesis, let me filter the universe to match it.' It's exhausting if your workflow is 'I have an hour on Sunday — surface which 10 names are worth looking at this week.' Tapeline and Zacks both synthesise the data into a single number per ticker. Tapeline names all six factors behind that number and the order they're weighted in; Zacks names its inputs at a high level but not their weights.",
   },
   {
     title: "You want an audit-able track record, not just self-reported stats",
@@ -454,7 +454,7 @@ const FAQ = [
   },
   {
     q: "How was this list ranked?",
-    a: "The ranking weighs five things: transparency of methodology, freshness of data, evidence of past performance, completeness of the workflow (from screening to alerts to per-ticker pages), and value at the price. Tapeline ranks #1 because it's the only tool that combines a public composite formula with a per-pick public scorecard — but the right tool for you depends on whether your workflow needs charting (TradingView), institutional data (Koyfin), or AI auto-execution (Trade Ideas).",
+    a: "The ranking weighs five things: transparency of methodology, freshness of data, evidence of past performance, completeness of the workflow (from screening to alerts to per-ticker pages), and value at the price. Tapeline ranks #1 because it's the only tool that names every factor in its composite and pairs it with a per-pick public scorecard — but the right tool for you depends on whether your workflow needs charting (TradingView), institutional data (Koyfin), or AI auto-execution (Trade Ideas).",
   },
   {
     q: "Is there a Finviz alternative that beats it on raw screener filter count?",
@@ -625,8 +625,8 @@ export default function BestFinvizAlternativesPage() {
           </h2>
           <ul className="mt-3 space-y-2 text-sm text-fg leading-relaxed">
             <li>
-              <strong>Best overall Finviz alternative:</strong> Tapeline — public 6-factor
-              formula, per-pick scorecard, plain-English Why. $8.25/mo annual, starting with a{" "}
+              <strong>Best overall Finviz alternative:</strong> Tapeline — six named scoring
+              factors, per-pick scorecard, plain-English Why. $8.25/mo annual, starting with a{" "}
               <Link href="/signup?from=finviz" className="text-accent hover:underline">
                 14-day Premium trial
               </Link>{" "}
@@ -912,15 +912,16 @@ export default function BestFinvizAlternativesPage() {
         <section className="mt-16 border-t border-border/60 pt-8">
           <h2 className="text-xl font-semibold tracking-tight">How we ranked them</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Five weighted criteria: <strong>transparency</strong> of methodology (does the formula
-            exist publicly?); <strong>data freshness</strong> (intraday vs once-daily);{" "}
+            Five weighted criteria: <strong>transparency</strong> of methodology (is the scoring
+            method disclosed?); <strong>data freshness</strong> (intraday vs once-daily);{" "}
             <strong>evidence of performance</strong> (per-pick scorecard, aggregate stats, or
             none); <strong>workflow completeness</strong> (screening through to per-ticker pages,
             alerts, and watchlists); and <strong>value at the entry price</strong>.
           </p>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            We ranked Tapeline #1 because it&apos;s the only tool that combines a public composite
-            formula with a per-pick public scorecard — the two transparency criteria. We were
+            We ranked Tapeline #1 because it&apos;s the only tool that names every factor in its
+            composite and pairs it with a per-pick public scorecard — the two transparency
+            criteria. We were
             honest in every section about which competitor wins for which workflow: we&apos;d rather
             you pick TradingView for charting or Trade Ideas for intraday than churn out of the
             wrong tool in three months.

@@ -1,13 +1,16 @@
-"""Tapeline composite scoring — the 6-factor formula advertised on /how-it-works.
+"""Tapeline composite scoring — the 6-factor composite described on /how-it-works.
 
 Before this module existed, `sheet_feed` took the signal-system Google Sheet's
 column F "Score" verbatim and called it Tapeline's score. That meant:
 
-  1. The published `score = 0.25*trend + 0.20*rs + 0.15*fundamentals
+  1. The composite `score = 0.25*trend + 0.20*rs + 0.15*fundamentals
      + 0.15*smart_money + 0.15*macro + 0.10*momentum` was marketing copy,
-     not running code. Visitors to /how-it-works were told the formula but
-     it wasn't actually applied — the score came from a different (external,
-     opaque) algorithm.
+     not running code. /how-it-works spelled the equation out at the time
+     and it wasn't actually applied — the score came from a different
+     (external, opaque) algorithm. PR #342 has since stripped the numbers
+     from the public site: the weights are internal and stay that way, and
+     the public methodology names the six factors and their weight ORDERING
+     only.
   2. The per-factor breakdown shown on /t/{symbol} pages was mostly empty
      because the sheet only populates `sub_rs` derivation data.
   3. Scores could leak above 100 (we observed 131-133 live) until clamped
@@ -28,8 +31,10 @@ a missing factor doesn't drag the composite toward zero. That's intentional:
 ETFs without P/E shouldn't be penalised on `sub_fundamentals` — they just
 get the average score on that axis.
 
-Weights match exactly what /how-it-works documents. Touching them is a
-brand-promise change and needs a corresponding `/changelog` entry.
+These weights are INTERNAL. /how-it-works documents the factor set and the
+weight ORDERING only — never the numbers (PR #342) — so changing them is not a
+public-disclosure change, but it does change every score the product has ever
+published and still needs a corresponding `/changelog` entry.
 """
 
 from __future__ import annotations
@@ -298,7 +303,7 @@ def compute_tapeline_composite(
     get_fund: Any | None = None,
     get_sm: Any | None = None,
 ) -> tuple[float, dict[str, float]]:
-    """Compute Tapeline's published 6-factor composite for one ticker row.
+    """Compute Tapeline's six-factor composite for one ticker row.
 
     Returns (composite, sub_scores). `composite` is clamped 0-100.
     `sub_scores` is a dict with keys: trend, rs, fundamentals, smart_money,

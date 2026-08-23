@@ -188,6 +188,14 @@ capture · #445 trial-expiry save offer + mid-trial card prompt · #446 scorecar
 SSR for AI crawlers · #447 press kit at /press/* · #448 CORS for press assets ·
 #449 daily growth-bot enabled (weekday funnel email, always-on).
 
+> ⛔ **The stored press images from #447/#448 are not sendable.** The PNGs in
+> `frontend/public/press/` were captured 2026-08-20, two days before the card
+> gate (`CARD_GATE_START = 2026-08-22`), and `tapeline-scanner.png`,
+> `tapeline-scorecard.png` and `tapeline-verify.png` have "no credit card" /
+> "Free forever tier — no card" copy baked into the pixels. Do not delete them
+> — re-shoot from the live site before any outreach uses them. Same warning in
+> [OFFSITE.md](./OFFSITE.md).
+
 **Waiting on the founder (nobody else can):** reply to trialist emails in
 christian@tapeline.io · SaaSHub verification link · Rewardful account ·
 AlternativeTo password account · sustained posting on any human channel.

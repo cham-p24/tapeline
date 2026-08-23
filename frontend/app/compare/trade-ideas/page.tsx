@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Trade Ideas (2026): Public Formula at $25/mo vs Holly AI at $120+/mo",
+  title: "Tapeline vs Trade Ideas (2026): Six Named Factors at $8.25/mo vs Holly AI at $120+/mo",
   description:
     "Tapeline vs Trade Ideas — transparent 6-factor scoring at $8.25/mo annual vs Trade Ideas' Holly AI scanner at $120+/mo. Public scorecard, plain-English Why, no proprietary AI black box.",
   path: "/compare/trade-ideas",
@@ -15,7 +15,7 @@ const WINS: CompareRow[] = [
     competitor: "~$120/mo Standard, $240/mo Premium",
   },
   {
-    label: "Public scoring formula",
+    label: "Public scoring methodology",
     tapeline: "✓ Six named factors, published methodology",
     competitor: "—  Holly AI is a proprietary ML black box",
   },
@@ -76,7 +76,7 @@ const TRADEOFFS: CompareTradeoff[] = [
 const FAQ: CompareFaq[] = [
   {
     q: "Is Tapeline a Trade Ideas alternative?",
-    a: "For traders who want a multi-factor composite score with a transparent formula at a sub-$30/mo entry price, yes. Trade Ideas remains the better pick if your workflow needs sub-second intraday signals, custom strategy backtesting, or AI auto-execution via Holly Trader.",
+    a: "For traders who want a multi-factor composite score with a transparent methodology at a sub-$10/mo entry price, yes. Trade Ideas remains the better pick if your workflow needs sub-second intraday signals, custom strategy backtesting, or AI auto-execution via Holly Trader.",
   },
   {
     q: "How does Tapeline pricing compare to Trade Ideas?",
@@ -92,7 +92,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Some traders do — Trade Ideas for intraday scalping signals and Holly's auto-execution layer, Tapeline for the swing/positional composite ranking and the public scorecard. The Tapeline trial is no-card, so running them in parallel for a week is easy.",
+    a: "Some traders do — Trade Ideas for intraday scalping signals and Holly's auto-execution layer, Tapeline for the swing/positional composite ranking and the public scorecard. The Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so running them in parallel for a week is easy.",
   },
 ];
 
@@ -104,8 +104,8 @@ export default function VsTradeIdeasPage() {
       competitorPriceMonthly={120}
       competitorAnnualNote="Standard ~$120/mo, Premium with Holly AI ~$240/mo"
       slug="trade-ideas"
-      heading="Tapeline vs Trade Ideas — transparent score at 1/5 the price."
-      lede="Trade Ideas is a $120-240/mo intraday scanner with proprietary Holly AI signals and an auto-trading layer. Tapeline is a 2026-built quantitative scanner with one composite score per ticker at a published 6-factor formula, a plain-English Why on every row, and a public scorecard back-checking every call vs SPY — at $8.25-16.58/mo. Pick Tapeline if transparency and price matter; pick Trade Ideas if you need sub-second intraday signals or AI auto-execution."
+      heading="Tapeline vs Trade Ideas — transparent score at a fraction of the price."
+      lede="Trade Ideas is a $120-240/mo intraday scanner with proprietary Holly AI signals and an auto-trading layer. Tapeline is a 2026-built quantitative scanner with one composite score per ticker from a published 6-factor methodology, a plain-English Why on every row, and a public scorecard back-checking every call vs SPY — at $8.25-16.58/mo. Pick Tapeline if transparency and price matter; pick Trade Ideas if you need sub-second intraday signals or AI auto-execution."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

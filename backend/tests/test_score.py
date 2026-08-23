@@ -1,6 +1,10 @@
 """Tests for the Tapeline 6-factor composite (services/score.py).
 
-These tests pin the contract that /how-it-works advertises:
+These tests pin the internal composite contract. The weight vector itself is
+NOT published — PR #342 stripped the numbers from the public site, and
+/how-it-works names the six factors and their weight ORDERING only. Pinning
+them here keeps the implementation stable; it is not a public promise.
+
   - Composite is always 0-100
   - Weights sum to 1.0
   - Cache misses degrade to NEUTRAL (50) per factor, never None in the
@@ -25,12 +29,13 @@ from app.services.score import (
 
 
 def test_weights_sum_to_one():
-    """The 6-factor formula on /how-it-works must sum to 100%."""
+    """The six factor weights must sum to 100%."""
     assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9
 
 
-def test_weights_match_advertised():
-    """Touching these is a brand-promise change. Pin them."""
+def test_weights_match_implementation():
+    """The internal weight vector. Changing it changes every score ever
+    published, so pin it — and keep the numbers off the public site."""
     assert WEIGHTS == {
         "trend":        0.25,
         "rs":           0.20,

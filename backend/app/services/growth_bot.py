@@ -250,8 +250,8 @@ def draft_daily_tweet(picks: list[TopPick]) -> str:
     """
     if not picks:
         return (
-            "Tapeline is scoring every US ticker on a public 6-factor formula "
-            "right now. Tomorrow's Top 10 ranks at tapeline.io/scorecard."
+            "Tapeline is scoring the most liquid US names on six publicly named "
+            "factors right now. Tomorrow's Top 10 ranks at tapeline.io/scorecard."
         )
 
     today = date.today().strftime("%b %d")
@@ -280,11 +280,13 @@ def draft_daily_tweet(picks: list[TopPick]) -> str:
 # soft close).
 _LINKEDIN_TOPIC_ROTATION: list[tuple[str, str]] = [
     (
-        "Why we publish the 6-factor formula",
+        "Why we publish the six factors",
         "Most stock scanners hide their methodology behind 'proprietary'. "
-        "Tapeline publishes the exact weights — Trend 25%, RS 20%, "
-        "Fundamentals 15%, Smart Money 15%, Macro 15%, Momentum 10%. "
-        "The full breakdown lives at tapeline.io/how-it-works.",
+        "Tapeline names all six — trend, relative strength, fundamentals, "
+        "smart money, macro, momentum — says what each one measures, and says "
+        "which carry the most weight: most toward trend and relative strength, "
+        "least toward momentum. The full breakdown lives at "
+        "tapeline.io/how-it-works.",
     ),
     (
         "Today's largest factor divergence",
@@ -299,9 +301,10 @@ _LINKEDIN_TOPIC_ROTATION: list[tuple[str, str]] = [
     ),
     (
         "The Smart Money sub-score explained",
-        "Smart Money is 15% of the Tapeline composite. It filters out "
-        "10b5-1 plan sales and ranks cluster Form 4 buys. The 90% noise "
-        "filter is the work; one number is the output.",
+        "Smart Money is one of the six factors in the Tapeline composite. It "
+        "reads SEC Form 4 insider transactions and nets buying against selling "
+        "by dollar value: net buying scores above the midpoint, net selling "
+        "below. One number is the output.",
     ),
     (
         "How to evaluate any stock scanner before paying",
@@ -349,7 +352,7 @@ def draft_fintwit_reply_candidates(picks: list[TopPick]) -> list[dict[str, str]]
         reason = (pick.reason or "").strip().rstrip(".") or "factor confluence"
         body = (
             f"${pick.symbol} on our composite right now: {score_int} {signal}. "
-            f"{reason.capitalize()}. Public formula + back-checked scorecard at "
+            f"{reason.capitalize()}. Six published factors + back-checked scorecard at "
             f"tapeline.io/t/{pick.symbol}."
         )
         # Tight cap — fintwit replies live or die under 280
