@@ -121,6 +121,13 @@ ATTRIBUTION_FIELDS: dict[str, int] = {
     "gclid": 200,
     "gbraid": 200,
     "wbraid": 200,
+    # Meta click ID (gap G4). Carried here for the same reason the
+    # referrer host and landing path below had to be: OAuth is the
+    # designed-primary signup path, so a capture wired only into the email
+    # form leaves the column NULL for very nearly every real account — which
+    # is precisely what the 2026-08-20 audit found for the other two. Raw
+    # fbclid; the `fb.1.<ts>.<fbclid>` wire value is derived at send time.
+    "fbclid": 200,
     # First-touch referrer host (#444) and landing path (#458). The email path
     # has written these since they shipped; OAuth never did — and because every
     # real signup to date arrived via Google OAuth, both columns were NULL for
@@ -639,6 +646,7 @@ async def oauth_callback(
             signup_gclid=attr.get("gclid"),
             signup_gbraid=attr.get("gbraid"),
             signup_wbraid=attr.get("wbraid"),
+            signup_fbclid=attr.get("fbclid"),
             signup_referrer_host=_clean_referrer_host(attr.get("referrer_host")),
             signup_landing_path=_normalise_landing_path(attr.get("landing_path")),
             # OAuth providers proved ownership of this address — auto-stamp
@@ -739,8 +747,13 @@ async def oauth_callback(
         try:
             from app.services import meta_capi
 
+            # fbc rides along UNHASHED — see services/meta_capi. `fbp` is not
+            # available on this path: it lives in a browser cookie and this
+            # request is the provider's redirect back to us, not the visitor's
+            # own page. The click ID is the half that survives the round-trip.
             await meta_capi.track_complete_registration(
-                user_id=user.id, email=user.email, method=provider
+                user_id=user.id, email=user.email, method=provider,
+                fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
             )
         except Exception:
             logger.exception("oauth.meta_complete_registration_failed user=%s", user.id)

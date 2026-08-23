@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import {
+  getStoredFbclid,
   getStoredGclid,
   getStoredLandingPath,
   getStoredReferrerHost,
@@ -91,7 +92,15 @@ export function OAuthButtons({
   useEffect(() => {
     try {
       const params = new URLSearchParams();
-      for (const [k, v] of Object.entries({ ...getStoredUtm(), ...getStoredGclid() })) {
+      // `fbclid` keys straight through — oauth.py:ATTRIBUTION_FIELDS uses the
+      // same name. It has to travel this path too: OAuth is the primary
+      // signup route, so a Meta capture wired only into the email form would
+      // leave signup_fbclid empty for nearly every real account.
+      for (const [k, v] of Object.entries({
+        ...getStoredUtm(),
+        ...getStoredGclid(),
+        ...getStoredFbclid(),
+      })) {
         if (typeof v === "string" && v.length > 0) params.set(k, v);
       }
       // First-touch referrer host (#444) + landing path (#458). The email form

@@ -101,6 +101,37 @@ class SignupBody(BaseModel):
     gclid: str | None = Field(None, max_length=200)
     gbraid: str | None = Field(None, max_length=200)
     wbraid: str | None = Field(None, max_length=200)
+    # Meta click ID — same capture/forward mechanism as gclid above, for the
+    # other paid-click platform. Written once to users.signup_fbclid. The RAW
+    # param, not the `fb.1.<ts>.<fbclid>` wire format; meta_capi.fbc_value()
+    # builds that. Without it Meta's match quality is capped and there is no
+    # honest way to count Meta payers (the 14-day trial puts every first
+    # charge outside Meta's 7-day click window) — see migration 0053.
+    fbclid: str | None = Field(None, max_length=200)
+    # The `_fbp` first-party cookie the Meta pixel writes on the landing
+    # visit, read from document.cookie at submit. NOT persisted — there is no
+    # column and no second use for it: it is forwarded straight onto the
+    # CompleteRegistration event as the other unhashed identifier Meta
+    # matches on. Absent whenever the pixel was blocked or never ran.
+    fbp: str | None = Field(None, max_length=200)
+    # Self-reported attribution — the OPTIONAL free-text "How did you hear
+    # about us?" answer (gap G2). Written to users.referral_source, the same
+    # column the onboarding survey used to own.
+    #
+    # Why free text and not a dropdown: a fixed option list can only ever
+    # count channels we already thought of, and this field exists precisely
+    # to surface the ones we cannot see — AI assistants and dark social
+    # arrive with no referrer and no UTM, so a self-report is the ONLY
+    # instrument that will ever credit them (§2.3).
+    #
+    # NOT a suitability input. It records where someone heard of us; it never
+    # touches capital, holdings, risk tolerance, goals or experience, and it
+    # must never change which securities or factor weightings a user is
+    # shown. Keep it that way — see docs/COMPLIANCE_COPY_RULES.md Rule 8.
+    # max_length is deliberately WIDER than the 40-char column so a chatty
+    # answer truncates instead of 422-ing the signup; attribution must never
+    # be able to block an account being created.
+    referral_source: str | None = Field(None, max_length=400)
     # First-touch EXTERNAL referrer HOSTNAME captured by lib/utm.ts on the
     # landing visit (same localStorage mechanism as utm_*) and forwarded
     # here. AI-assistant referrals (Copilot/ChatGPT/Perplexity) carry no
@@ -137,6 +168,35 @@ class SigninBody(BaseModel):
 
 
 _LANDING_PATH_MAX = 200  # matches users.signup_landing_path
+_REFERRAL_SOURCE_MAX = 40  # matches users.referral_source
+
+
+def _normalise_referral_source(raw: str | None) -> str | None:
+    """Clean the free-text "How did you hear about us?" answer, or None.
+
+    The column (users.referral_source, String(40)) predates this field: it
+    used to hold slugs from the onboarding survey's dropdown ("reddit",
+    "ai_copilot"). Free text now lands in the same column so one GROUP BY
+    reads both eras, which means cleaning it before it gets there:
+      - collapse all whitespace, so "  reddit \n r/stocks " and
+        "reddit r/stocks" aggregate as one row rather than two
+      - drop control characters (a hostile client can post anything)
+      - truncate to the column width rather than rejecting — a long answer is
+        still a usable answer, and attribution must never fail a signup
+
+    Never raises, for the same reason.
+    """
+    if not raw:
+        return None
+    try:
+        cleaned = " ".join(
+            raw.replace("\x7f", " ").split()
+        )
+        cleaned = "".join(c for c in cleaned if ord(c) >= 0x20)
+        cleaned = cleaned.strip()[:_REFERRAL_SOURCE_MAX].strip()
+        return cleaned or None
+    except Exception:
+        return None
 
 
 def _normalise_landing_path(raw: str | None) -> str | None:
@@ -357,6 +417,13 @@ async def signup(
         signup_gclid=(body.gclid or None),
         signup_gbraid=(body.gbraid or None),
         signup_wbraid=(body.wbraid or None),
+        # Meta click ID — same write-once contract. Raw fbclid; the
+        # `fb.1.<ts>.<fbclid>` wire value is derived at send time.
+        signup_fbclid=(body.fbclid or None),
+        # Self-reported "How did you hear about us?" (optional, free text).
+        # The only instrument that can credit AI-assistant and dark-social
+        # referrals, both of which arrive with no referrer and no UTM.
+        referral_source=_normalise_referral_source(body.referral_source),
         # First-touch external referrer host — the only attribution trace
         # AI-assistant referrals leave (no utm_* params). Hostname only.
         signup_referrer_host=(body.signup_referrer_host or None),
@@ -449,8 +516,15 @@ async def signup(
     try:
         from app.services import meta_capi
 
+        # fbc/fbp ride along UNHASHED (meta_capi enforces that) — they are the
+        # EMQ upgrade that costs no new PII. With only a hashed email +
+        # hashed user id, match quality caps around 5-6, and this is the event
+        # the campaign optimises toward, so it is the one whose match quality
+        # the delivery model actually learns from.
         await meta_capi.track_complete_registration(
-            user_id=user.id, email=user.email, method="email"
+            user_id=user.id, email=user.email, method="email",
+            fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
+            fbp=(body.fbp or None),
         )
     except Exception:
         logger.exception("auth.meta_complete_registration_failed user=%s", user.id)

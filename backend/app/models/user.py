@@ -266,6 +266,23 @@ class User(Base):
     signup_gbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_wbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Meta (Facebook/Instagram) click ID captured at signup — the same
+    # capture/forward/write-once mechanism as signup_gclid above, for the other
+    # paid-click platform. Two things depend on it (see migration 0053 and
+    # docs/PAID_ADS_METRICS_BIBLE.md §7.1):
+    #   1. Event Match Quality. The Conversions API otherwise sees only a
+    #      hashed email + hashed user id, which caps EMQ around 5-6. `fbc`,
+    #      derived from this value, is the cheapest upgrade available and
+    #      needs no new PII.
+    #   2. The ONLY honest Meta payer count. Tapeline's trial is 14 days, so
+    #      the first charge always falls outside Meta's 7-day click window and
+    #      the in-platform Purchase column reads ~0 whatever the truth is.
+    #      Counting payers means joining this column to Stripe ourselves.
+    # Stores the RAW fbclid, not the `fb.1.<ts>.<fbclid>` wire format — the
+    # wire value is derived at send time by services/meta_capi.fbc_value().
+    # Nullable: only paid Meta traffic carries it.
+    signup_fbclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     # First-touch EXTERNAL referrer HOSTNAME captured at landing (frontend
     # lib/utm.ts, same localStorage 30-day-TTL mechanism as signup_utm_*,
     # forwarded on the signup POST; written once at signup, never updated).

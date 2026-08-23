@@ -108,6 +108,9 @@ type Props = {
   autoComplete?: string;
   required?: boolean;
   minLength?: number;
+  /** Hard input cap. Set it to the backing column width so a long answer is
+      stopped visibly at the keyboard rather than truncated silently later. */
+  maxLength?: number;
   autoFocus?: boolean;
   inputMode?: "numeric" | "text" | "email";
   placeholder?: string;
@@ -127,6 +130,7 @@ export function FormField({
   autoComplete,
   required,
   minLength,
+  maxLength,
   autoFocus,
   inputMode,
   placeholder,
@@ -151,6 +155,7 @@ export function FormField({
         autoComplete={autoComplete}
         required={required}
         minLength={minLength}
+        maxLength={maxLength}
         autoFocus={autoFocus}
         inputMode={inputMode}
         placeholder={placeholder}
