@@ -16,18 +16,28 @@ This doc is the operational checklist for creating each of those off-site profil
 
 > **Paste-ready copy:** this doc says *where* to create each profile. For the exact field-by-field text to paste (taglines, descriptions, char-counted bios for Product Hunt / Crunchbase / G2 / Capterra / AlternativeTo / StockTwits) plus the launch press + backlink pitch (Show HN, Indie Hackers, cold-email template), see **[BRAND_SERP_KIT.md](./BRAND_SERP_KIT.md)**. All strings there are pulled verbatim from [/press](../frontend/app/press/page.tsx) so the entity stays consistent across every platform.
 
-> ⛔ **DO NOT SEND THE STORED PRESS SCREENSHOTS.** The PNGs in
-> `frontend/public/press/` were captured 2026-08-20 — two days before the card
-> gate (`CARD_GATE_START = 2026-08-22`). Verified false copy is baked into the
-> pixels of `tapeline-scanner.png` ("No credit card, no payment details,
-> nothing charged — it simply ends and your account stays on the Free tier"),
-> `tapeline-scorecard.png` and `tapeline-verify.png` ("Free forever tier — no
-> card", "14-day Premium trial — no card, nothing charged", "Start free — no
-> card"). `tapeline-ticker.png` is from the same pre-gate batch — treat it the
-> same. Uploading any of them to a directory, a journalist or a listing
-> publishes a false claim about a financial product. **Do not delete the
-> files** — re-shoot them from the live site first. Shooting fresh from the
-> `/press` **screenshot kit** links is safe: those point at live URLs.
+> ✅ **Press screenshots — safe to send, and re-shoot them after any copy change.**
+> The four PNGs in `frontend/public/press/` were re-shot from the live site on
+> 2026-08-24 and carry the current terms. The batch they replaced was captured
+> 2026-08-20, two days before the card gate (`CARD_GATE_START = 2026-08-22`),
+> and had "Free forever tier — no card", "14-day Premium trial — no card,
+> nothing charged" and "No credit card, no payment details, nothing charged"
+> baked into the pixels — where no linter, test or grep could see them. Sending
+> one to a journalist or a directory would have published a false claim about a
+> financial product.
+>
+> They are reproducible now, so keep them that way:
+>
+> ```bash
+> cd frontend && node scripts/capture-press-shots.mjs
+> ```
+>
+> It re-shoots all four from production at the original 2540x1520 and REFUSES to
+> write an asset whose page still renders a card-free account or trial claim.
+> Run it after any change to the landing page, /scorecard, /t/[symbol] or
+> /verify. Shooting by hand from the `/press` **screenshot kit** links is also
+> fine — those point at live URLs — but the script is what keeps the stored
+> files honest.
 
 ---
 
