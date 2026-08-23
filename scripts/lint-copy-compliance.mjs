@@ -259,6 +259,32 @@ export const RULES = [
     ],
   },
   {
+    id: "card-free-trial",
+    brief: "Rule 10 — never advertise the trial or a new account as card-free",
+    message:
+      "Card-free TRIAL/ACCOUNT claim. Since the 2026-08-22 card gate the 14-day " +
+      "Premium trial is card-required ($0 today, first charge on day 14) and a NEW " +
+      "account adds a card at first sign-in, so 'no credit card' next to 'trial' or " +
+      "'account' is false advertising on a financial product. Saying the PUBLIC " +
+      "RECORD needs no card is still true and does not match this rule — only " +
+      "card-free wording within ~40 characters of trial/account/sign-up does. " +
+      "For a dated historical entry (e.g. /changelog), use an inline " +
+      "copy-compliance-allow with a reason.",
+    patterns: [
+      // "14-day trial ... no credit card" / "trial is no-card".
+      // Two temperings, both for honest copy that names the constraint:
+      //   (?<!\bno\s) / (?!\bno\b) — "no card, no trial" on the newsletter
+      //     capture rules the trial OUT; it does not offer a card-free one.
+      //   (?![-\s]free) — "there is no card-free tier to sign up for" is the
+      //     honest negation on /best-finviz-alternatives, not a claim.
+      /(?<!\bno\s)\btrial\b(?:(?!\bno\b)[^.!?]){0,40}\bno[-\s]?(?:credit[-\s]?)?card\b(?![-\s]free)/i,
+      // "no-credit-card trial" / "no card required to sign up"
+      /\bno[-\s]?(?:credit[-\s]?)?card\b(?![-\s]free)(?:(?!\bno\b)[^.!?]){0,40}\b(?:trial|account|sign[-\s]?up)\b/i,
+      // "card-free trial/account"
+      /(?<!\bno\s)\bcard[-\s]free\b[^.!?]{0,20}\b(?:trial|account|signup|sign[-\s]?up)\b/i,
+    ],
+  },
+  {
     id: "urgency-scarcity",
     brief: "Rule 6 — no manufactured urgency or scarcity",
     message:
