@@ -86,10 +86,28 @@ def client_ip(request: Request) -> str:
 
 
 def _client_key(request: Request) -> str:
-    """Prefer Authorization user, fall back to IP."""
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        return f"tok:{auth[-20:]}"  # last 20 chars is enough to distinguish users
+    """Rate-limit bucket key. ALWAYS the client IP.
+
+    This used to prefer the Authorization header ("tok:" + its last 20 chars) so
+    authenticated users got their own bucket. That header is NOT verified here —
+    the limiter runs in middleware, long before any token is validated — so the
+    key was entirely attacker-chosen: sending `Authorization: Bearer <random>`
+    minted a brand-new empty bucket on every request, and rotating the random
+    part made limit_api (120/min) and limit_strict (10/min) unenforceable. Any
+    scraper or credential-stuffer could opt out of rate limiting by adding one
+    header, which is strictly worse than having no per-user bucketing at all.
+
+    Keying on the IP is safe because client_ip() reads Fly-Client-IP, which Fly
+    sets from the real TCP peer and a client cannot forge (see client_ip). The
+    cost is that several users behind one NAT share a bucket — the same
+    behaviour anonymous traffic already had, and the correct trade against a
+    trivially-bypassable limit.
+
+    (Genuine per-user fairness would need verified identity, which is only
+    available after auth resolution — i.e. inside the endpoint, not here. Our
+    own SSR is handled separately by the INTERNAL_SSR_TOKEN exemption in
+    main.py, and API keys carry their own per-account daily quota.)
+    """
     return f"ip:{client_ip(request)}"
 
 

@@ -446,6 +446,11 @@ async def subscribe_web_push(
     """Register a browser push subscription. Pro+ feature."""
     if not has_feature(Tier(user.tier), "alerts.web_push"):
         raise HTTPException(403, "Web push alerts require Pro tier")
+    # SSRF guard — we POST to this URL on every alert fire, so it must be a
+    # real push service, not an internal address of the caller's choosing.
+    from app.services.web_push import is_allowed_push_endpoint
+    if not is_allowed_push_endpoint(body.endpoint):
+        raise HTTPException(400, "Unrecognised push endpoint.")
     from sqlalchemy import select
 
     from app.models import WebPushSubscription
