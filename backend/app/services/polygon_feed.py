@@ -98,34 +98,60 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
     raise RuntimeError(f"polygon request failed after retries: {path}")
 
 
+#: Composite weights, mirroring mock_feed / signal_publisher / score.py.
+FACTOR_WEIGHTS: dict[str, float] = {
+    "sub_trend": 0.25,
+    "sub_rs": 0.20,
+    "sub_fundamentals": 0.15,
+    "sub_smart_money": 0.15,
+    "sub_macro": 0.15,
+    "sub_momentum": 0.10,
+}
+
+#: Fewest factors that can produce a composite. Matches the floor
+#: ticker_freshness already applies to decide what a user may see, so a row
+#: cannot be scored here and then rejected as unscorable there.
+MIN_FACTORS_FOR_COMPOSITE = 2
+
+
 def _composite_from_subs(r: dict[str, Any]) -> float | None:
-    """Weighted composite from the six sub-scores, clamped to 0..100.
+    """Weighted average of the factors we actually hold, or None below the floor.
 
-    Weights mirror mock_feed/signal_publisher:
-    trend .25  rs .20  fund .15  smart .15  macro .15  mom .10
+    Weights: trend .25  rs .20  fund .15  smart .15  macro .15  mom .10.
+    With all six present the divisor is 1.0 and this is the plain weighted sum
+    — identical to what it has always computed.
 
-    Returns None when ANY factor is missing. A six-factor composite computed from
-    four factors is a different number wearing the same name, and silently
-    treating a gap as zero would drag the score toward the floor — so the honest
-    answer to "what is the composite" with an incomplete input set is that we do
-    not have one. The caller writes NULL, and the snapshot upsert COALESCEs it,
-    which means the previous good score stands until the daily factor pass
-    refills the caches.
+    RE-NORMALISED over the present factors, deliberately. Two wrong answers
+    were available and both are worse:
+
+    * Treat a missing factor as 0. Drags every incompletely-covered row toward
+      the floor, so "we have no fundamentals read" renders as "the fundamentals
+      are terrible". It is the same false-zero defect as plotting a missing
+      axis at the origin.
+    * Refuse to score below six. In production 4,780 rows hold exactly four
+      factors, because the Finnhub fundamentals/insider backfill is rate-capped
+      and will never reach the whole universe. Those rows would freeze at their
+      last value forever — and since the tick COALESCEs the score, the frozen
+      value is the one computed back when missing factors were random draws.
+      Refusing to recompute would preserve the fabrication instead of washing
+      it out.
+
+    So: average what we hold, disclose how much that is. `confidence_pct` on
+    the same row counts the sourced inputs, which is what makes this honest
+    rather than merely convenient — a four-factor composite is published
+    alongside the fact that it rests on four factors.
     """
-    factors = (
-        r.get("sub_trend"), r.get("sub_rs"), r.get("sub_fundamentals"),
-        r.get("sub_smart_money"), r.get("sub_macro"), r.get("sub_momentum"),
-    )
-    if any(f is None for f in factors):
+    present = {
+        k: float(r[k]) for k in FACTOR_WEIGHTS
+        if r.get(k) is not None
+    }
+    if len(present) < MIN_FACTORS_FOR_COMPOSITE:
+        # One factor is not a six-factor composite by any stretch, and the
+        # freshness floor would reject the row anyway. NULL; the upsert
+        # COALESCEs it, so the last real score stands.
         return None
-    composite = (
-        r["sub_trend"] * 0.25
-        + r["sub_rs"] * 0.20
-        + r["sub_fundamentals"] * 0.15
-        + r["sub_smart_money"] * 0.15
-        + r["sub_macro"] * 0.15
-        + r["sub_momentum"] * 0.10
-    )
+    divisor = sum(FACTOR_WEIGHTS[k] for k in present)
+    composite = sum(v * FACTOR_WEIGHTS[k] for k, v in present.items()) / divisor
     return round(max(0, min(100, composite)), 1)
 
 
@@ -343,10 +369,9 @@ async def fetch_snapshots(
         # the six real sub-scores on the scanner, and it goes out in the welcome
         # email. Explaining a score with numbers that are not that score is the
         # worst version of this bug class.
-        # Only render when all six factors are present. With a factor missing the
-        # sentence would have to describe a gap, and the composite it explains is
-        # itself None — so we write NULL and the upsert's COALESCE keeps the last
-        # sentence that WAS true, matching the score it is printed beside.
+        # Rendered whenever there IS a composite. _render_reason contributes no
+        # clause for a factor it holds no reading for, so a four-factor row gets
+        # a sentence about those four — never a claim about the two we lack.
         if r["score"] is not None:
             r["reason"] = _render_reason(
                 sym,
