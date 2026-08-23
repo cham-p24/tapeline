@@ -270,19 +270,45 @@ async def test_revenue_drip_reach_counts_lever_tokens(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_revenue_acquisition_channels_group_and_count_paid(client, monkeypatch):
+async def test_revenue_acquisition_channels_split_trials_from_payers(client, monkeypatch):
     """Signups group by utm_source → external referrer host → 'direct', and each
-    channel carries how many of its signups later reached paid (card on file)."""
+    channel reports TRIALS and PAYERS as separate tallies.
+
+    This is metrics-bible gap G12. The old readout counted a channel's payers
+    as count(stripe_customer_id), which was fair until 2026-08-22: the #548
+    card gate now stamps a Stripe customer at TRIAL start, so from that date
+    every trialist read as a payer and every channel's conversion column
+    silently inflated. `paid` is now an ACTIVE-subscription join, and a card at
+    the wall counts only in `trials_started`.
+    """
     async with client:
         cookies = await _make_admin_cookies(client, monkeypatch)
         before = await _revenue(client, cookies)
 
-        # Two from a utm_source; one of them converted (has a Stripe customer id).
+        # 1. Plain signup, no card.
         await _seed_user(signup_utm_source="google")
+        # 2. Card at the wall: Stripe customer + trial stamp, NO subscription.
+        #    This is the row that used to be miscounted as paid.
         await _seed_user(
             signup_utm_source="google",
+            trial_started_at=datetime.now(UTC),
             stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
         )
+        # 3. A real payer: trialled, then an active subscription.
+        payer = await _seed_user(
+            signup_utm_source="google",
+            tier="pro",
+            trial_started_at=datetime.now(UTC) - timedelta(days=20),
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        await _seed_sub(payer, tier="pro", billing_period="monthly", status="active")
+        # 4. A lapsed payer — cancelled subscription is not a payer today.
+        churned = await _seed_user(
+            signup_utm_source="google",
+            trial_started_at=datetime.now(UTC) - timedelta(days=60),
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        await _seed_sub(churned, tier="pro", billing_period="monthly", status="canceled")
         # One from an AI-assistant referrer that carries NO utm — must fall back
         # to the referrer host, not collapse into "direct".
         await _seed_user(signup_referrer_host="chat.openai.com")
@@ -295,11 +321,64 @@ async def test_revenue_acquisition_channels_group_and_count_paid(client, monkeyp
         def ch(chan: str, field: str) -> int:
             return a.get(chan, {}).get(field, 0) - b.get(chan, {}).get(field, 0)
 
-        assert ch("google", "signups") == 2
+        assert ch("google", "signups") == 4
+        assert ch("google", "trials_started") == 3
+        assert ch("google", "paid_active_subs") == 1
+        # `paid` is a back-compat alias of paid_active_subs, not a third number.
         assert ch("google", "paid") == 1
         assert ch("chat.openai.com", "signups") == 1
-        assert ch("chat.openai.com", "paid") == 0
+        assert ch("chat.openai.com", "trials_started") == 0
+        assert ch("chat.openai.com", "paid_active_subs") == 0
         assert ch("direct", "signups") == 1
+
+
+@pytest.mark.asyncio
+async def test_revenue_channel_row_is_not_multiplied_by_extra_subscriptions(
+    client, monkeypatch,
+):
+    """A user holding two active subscriptions is ONE signup and ONE payer —
+    the active-subscription join must not multiply the per-channel counts."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        before = await _revenue(client, cookies)
+
+        uid = await _seed_user(
+            signup_utm_source="doublesub",
+            tier="premium",
+            stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
+        )
+        await _seed_sub(uid, tier="pro", billing_period="monthly", status="active")
+        await _seed_sub(uid, tier="premium", billing_period="annual", status="active")
+
+        after = await _revenue(client, cookies)
+        b, a = before["acquisition_channels"], after["acquisition_channels"]
+
+        def ch(field: str) -> int:
+            return (
+                a.get("doublesub", {}).get(field, 0)
+                - b.get("doublesub", {}).get(field, 0)
+            )
+
+        assert ch("signups") == 1
+        assert ch("paid_active_subs") == 1
+
+
+@pytest.mark.asyncio
+async def test_revenue_carries_the_read_only_cohort_blocks(client, monkeypatch):
+    """The three previously-unread roll-ups (G3 cap events, G8 payer cohorts,
+    G11 day-0 trial cancels) are actually mounted on the endpoint — the whole
+    point of the gaps was that the data existed and nothing exposed it."""
+    async with client:
+        cookies = await _make_admin_cookies(client, monkeypatch)
+        data = await _revenue(client, cookies)
+
+        assert data["cap_events"]["available"] is True
+        assert isinstance(data["cap_events"]["by_cap"], dict)
+        assert isinstance(data["cap_events"]["by_week"], list)
+        assert data["paid_cohorts"]["available"] is True
+        assert isinstance(data["paid_cohorts"]["cohorts"], list)
+        assert data["trial_cancels"]["available"] is True
+        assert "day0_cancel_pct" in data["trial_cancels"]
 
 
 @pytest.mark.asyncio
@@ -311,13 +390,19 @@ async def test_revenue_landing_pages_group_by_channel_and_path(client, monkeypat
         cookies = await _make_admin_cookies(client, monkeypatch)
         before = await _revenue(client, cookies)
 
-        # Two organic signups off the SAME comparison page; one converted.
+        # Two organic signups off the SAME comparison page; one converted. The
+        # payer needs an ACTIVE subscription, not just a Stripe customer id —
+        # this table carries the same trials/payers split as the channel table
+        # (gap G12), because a card added at the #548 wall is not a sale.
         await _seed_user(signup_utm_source="organic", signup_landing_path="/compare/finviz")
-        await _seed_user(
+        lp_payer = await _seed_user(
             signup_utm_source="organic",
             signup_landing_path="/compare/finviz",
+            tier="pro",
+            trial_started_at=datetime.now(UTC) - timedelta(days=20),
             stripe_customer_id=f"cus_{_uuid.uuid4().hex[:16]}",
         )
+        await _seed_sub(lp_payer, tier="pro", billing_period="monthly", status="active")
         # Same channel, DIFFERENT page — must not collapse into the row above.
         await _seed_user(signup_utm_source="organic", signup_landing_path="/glossary/rsi")
         # Same page, DIFFERENT channel — must not collapse either.
@@ -342,9 +427,11 @@ async def test_revenue_landing_pages_group_by_channel_and_path(client, monkeypat
             return a.get(key, {}).get(field, 0) - b.get(key, {}).get(field, 0)
 
         assert d("organic", "/compare/finviz", "signups") == 2
+        assert d("organic", "/compare/finviz", "trials_started") == 1
+        assert d("organic", "/compare/finviz", "paid_active_subs") == 1
         assert d("organic", "/compare/finviz", "paid") == 1
         assert d("organic", "/glossary/rsi", "signups") == 1
-        assert d("organic", "/glossary/rsi", "paid") == 0
+        assert d("organic", "/glossary/rsi", "paid_active_subs") == 0
         # Same path, other channel — tracked as its own row.
         assert d("chat.openai.com", "/compare/finviz", "signups") == 1
         # A path is never reported as empty/None.

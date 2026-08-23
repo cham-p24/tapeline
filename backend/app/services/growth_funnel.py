@@ -37,6 +37,46 @@ DEFINITIONS (deliberately spelled out — every one of these is arguable)
 * **paying** — `stripe_customer_id` is set. Same definition the lifetime
   `paid_customers` stat uses, so the two are comparable.
 
+THE CARD-WALL ROW (`card_wall`)
+-------------------------------
+Since `tier.CARD_GATE_START` (2026-08-22) a NEW account has to put a card on
+file before it can use the logged-in product. That wall's completion rate is
+the first quality read on any acquisition channel — a channel that fills the
+wall and stops is buying signups the product never sees — and nothing anywhere
+computed it: `begin_checkout(surface:"card_gate")` fires on entry and nothing
+fires on exit. This block is the server-side, DB-truth answer.
+
+  * **gated_total** — accounts in the window that actually faced the wall.
+  * **cards_added** — of those, the ones carrying a `trial_started_at` stamp,
+    which is written only by the `trialing` subscription webhook, i.e. only
+    after a card cleared Stripe Checkout.
+
+The cohort filter MIRRORS `tier.must_add_card`, which is the single predicate
+every surface reads, and the exemptions are the load-bearing part:
+
+  - `is_admin` / `is_lifetime` accounts are never walled → never counted;
+  - hand-comped paid accounts (pro/premium tier with no Stripe customer and no
+    trial stamp — the founder's design partners) are never walled → never
+    counted;
+  - accounts created BEFORE the cutover are grandfathered forever → excluded by
+    the date floor, never by "is this user currently free".
+
+`stripe_customer_id` and `trial_started_at` are deliberately NOT cohort
+exclusions even though `must_add_card` returns False for them: those two are
+the OUTCOME the row measures, so filtering on them would define the completion
+rate to be 0%.
+
+`gated_since` names the effective floor — `max(window cutoff, CARD_GATE_START)`
+— so the denominator is never ambiguous. Until the window start passes the
+cutover date it reads as the cutover; after that the row is window-scoped like
+the rest of this payload.
+
+KNOWN EDGE: an account that skipped the wall by buying a subscription outright
+(card on file, no trial) reads as gated-but-incomplete. `must_add_card` exempts
+them, so they are no longer walled; the gap list specifies `trial_started_at`
+as the success signal, and at zero payers the case is theoretical — but it is a
+real, if tiny, understatement of completion once anyone buys without trialling.
+
 EFFICIENCY
 ----------
 The five cohort counts come from ONE query: two pre-aggregated subqueries
@@ -63,10 +103,11 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Integer, case, func, select
+from sqlalchemy import Integer, and_, case, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AlertRule, User, WatchlistItem
+from app.services.tier import CARD_GATE_START
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +140,12 @@ def _empty(window_days: int, ending_soon_days: int) -> dict[str, Any]:
         "trial_start_rate_pct": 0.0,
         "trial_to_paid_pct": 0.0,
         "signup_to_paid_pct": 0.0,
+        "card_wall": {
+            "gated_since": None,
+            "gated_total": 0,
+            "cards_added": 0,
+            "completion_pct": 0.0,
+        },
         "trials_ending_soon": [],
         "trials_ending_soon_count": 0,
     }
@@ -155,6 +202,29 @@ async def summarize_growth_funnel(
                 func.sum(case((condition, 1), else_=0)), 0,
             ).cast(Integer)
 
+        # ── Card-wall cohort (see the module docstring) ────────────────────
+        # The floor is the LATER of the window start and the gate cutover, so
+        # the condition is always a narrowing of the outer WHERE and rides the
+        # same single table scan.
+        gate_start = datetime(
+            CARD_GATE_START.year, CARD_GATE_START.month, CARD_GATE_START.day, tzinfo=UTC,
+        )
+        gated_since = max(cutoff, gate_start)
+        # Mirrors tier.must_add_card's exemptions — admins, lifetime accounts,
+        # and hand-comped paid accounts were never walled. `stripe_customer_id`
+        # / `trial_started_at` are NOT exclusions here: they are the outcome.
+        hand_comped = and_(
+            User.tier.in_(("pro", "premium")),
+            User.stripe_customer_id.is_(None),
+            User.trial_started_at.is_(None),
+        )
+        gated = and_(
+            User.created_at >= gated_since,
+            or_(User.is_admin.is_(False), User.is_admin.is_(None)),
+            or_(User.is_lifetime.is_(False), User.is_lifetime.is_(None)),
+            not_(hand_comped),
+        )
+
         funnel_row = (
             await session.execute(
                 select(
@@ -167,6 +237,10 @@ async def summarize_growth_funnel(
                         & User.stripe_customer_id.is_(None),
                     ).label("trials_active"),
                     _bucket(User.stripe_customer_id.isnot(None)).label("paying"),
+                    _bucket(gated).label("gated_total"),
+                    _bucket(
+                        and_(gated, User.trial_started_at.isnot(None)),
+                    ).label("cards_added"),
                 )
                 .select_from(User)
                 .outerjoin(wl, wl.c.user_id == User.id)
@@ -180,6 +254,8 @@ async def summarize_growth_funnel(
         trials_started = int(funnel_row.trials_started or 0)
         trials_active = int(funnel_row.trials_active or 0)
         paying = int(funnel_row.paying or 0)
+        gated_total = int(funnel_row.gated_total or 0)
+        cards_added = int(funnel_row.cards_added or 0)
 
         # ── Trials ending soon ────────────────────────────────────────────
         # NOT window-scoped: this is a forward-looking action list, and a user
@@ -250,6 +326,15 @@ async def summarize_growth_funnel(
             "trial_start_rate_pct": _pct(trials_started, signups),
             "trial_to_paid_pct": _pct(paying, trials_started),
             "signup_to_paid_pct": _pct(paying, signups),
+            # Card wall (#548): of the accounts in this window that actually
+            # faced the wall, how many put a card on file. `gated_since` names
+            # the effective cohort floor so the denominator is never ambiguous.
+            "card_wall": {
+                "gated_since": gated_since.isoformat(),
+                "gated_total": gated_total,
+                "cards_added": cards_added,
+                "completion_pct": _pct(cards_added, gated_total),
+            },
             "trials_ending_soon": ending_soon,
             "trials_ending_soon_count": len(ending_soon),
         }
