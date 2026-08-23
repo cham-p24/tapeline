@@ -195,6 +195,48 @@ def is_trading_day(d: date) -> bool:
     return d not in _US_MARKET_HOLIDAYS
 
 
+# Post-close boundary, UTC. Must match _SCORECARD_FREEZE_UTC_{HOUR,MINUTE} in
+# workers/signal_publisher.py — the freeze deliberately waits until after this
+# so `price_at_flag` IS a real close, and the back-check has to hold the same
+# line so `price_next_day` is one too. Pinned by a test so the two can't drift.
+BACKCHECK_CLOSE_UTC_HOUR = 21
+BACKCHECK_CLOSE_UTC_MINUTE = 15
+
+
+def _session_is_complete(next_day: date, today: date, now: datetime | None = None) -> bool:
+    """True once `next_day`'s session has actually finished.
+
+    The gate used to be a bare `next_day > today`, which ACCEPTS
+    `next_day == today` — i.e. it scored the session that is still open.
+    Massive/Polygon `/v2/aggs` returns the CURRENT session's PARTIAL daily bar
+    (its `c` is the last trade so far, not the close), so a run landing during
+    US cash hours read an intraday print as "the next-day close" for both SPY
+    and every pick. The row was then written with a non-NULL `price_next_day`,
+    which is exactly the predicate `backcheck_all_pending` uses to find pending
+    work — so the row was never revisited and the wrong number became permanent.
+
+    It was systematic, not occasional: the worker dispatches the back-check on a
+    bare 6-hour cadence with no post-close gate, and the cash session is 6.5h
+    (13:30-20:00 UTC), so at least one run falls inside the session every single
+    trading day AND precedes that day's post-close run. The published hit rate,
+    median alpha and the JSON-LD Dataset markup on /scorecard were computed from
+    midday-vs-close numbers.
+
+    This is also the asymmetry the freeze side already avoids: it waits until
+    21:15 UTC precisely so its price IS a real close.
+    """
+    if next_day > today:
+        return False
+    if next_day < today:
+        return True
+    # next_day == today: only once we are past the post-close boundary.
+    now = now or datetime.now(UTC)
+    return (now.hour, now.minute) >= (
+        BACKCHECK_CLOSE_UTC_HOUR,
+        BACKCHECK_CLOSE_UTC_MINUTE,
+    )
+
+
 def _next_trading_day(d: date) -> date:
     """First trading day strictly after `d`."""
     nxt = d + timedelta(days=1)
@@ -276,8 +318,10 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
         return 0
 
     next_day = _next_trading_day(target)
-    if next_day > today:
-        # Back-check fired before the next market session — nothing to compare yet.
+    if not _session_is_complete(next_day, today):
+        # Back-check fired before the next market session FINISHED — nothing
+        # real to compare yet. Leaving the date pending is the correct,
+        # self-healing behaviour: the drain retries it once a true close exists.
         logger.info("backcheck.skip_too_early target=%s next=%s today=%s", target, next_day, today)
         return 0
 
@@ -343,12 +387,34 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
 
         next_close = await _fetch_close(e.symbol, next_day)
         if next_close is None or next_close <= 0:
-            # Fallback: live snapshot, only if it's not the stale-equals-flag value.
+            # Fallback: the live Ticker.price snapshot.
+            #
+            # The module docstring says this is for "dev / mock mode (no key)",
+            # but the code never checked — so in PRODUCTION it fired on any
+            # per-symbol fetch failure: a delisted/renamed ticker whose
+            # aggregates come back empty, or a 429/5xx that exhausts _request's
+            # retries. `Ticker.price` is TODAY's live price, which has nothing
+            # to do with `next_day` for any date the drain is replaying, and
+            # backcheck_all_pending exists specifically to replay old pending
+            # dates (up to _MAX_BACKCHECK_AGE_DAYS = 90) — so the gap can be
+            # weeks. The result was a multi-session drift published as a
+            # ONE-DAY return against SPY's genuine one-day move, and setting
+            # price_next_day meant the row was never re-examined.
+            #
+            # Gate it on both conditions the docstring already claims: no vendor
+            # key configured, AND next_day is the session we just closed (so the
+            # live snapshot legitimately IS that session's last price). Anything
+            # else stays pending — _MAX_BACKCHECK_AGE_DAYS + _mark_terminal
+            # already handle a close that is genuinely never coming, without
+            # inventing a number the vendor never gave.
             snap = snapshots.get(e.symbol)
-            if snap is None or snap == e.price_at_flag:
-                # Either no data at all, or the bug pattern (snapshot identical
-                # to flag — back-check ran before any real next-session price
-                # showed up). Skip; tomorrow's run will retry.
+            usable_snapshot = (
+                not _polygon_key()
+                and next_day == today
+                and snap is not None
+                and snap != e.price_at_flag
+            )
+            if not usable_snapshot:
                 skipped_stale += 1
                 continue
             next_close = float(snap)

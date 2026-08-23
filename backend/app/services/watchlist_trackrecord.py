@@ -35,6 +35,7 @@ from app.services.scorecard_backcheck import (
     _fetch_close,
     _fetch_close_window,
     _next_trading_day,
+    _session_is_complete,
     is_trading_day,
 )
 
@@ -156,8 +157,14 @@ async def backcheck_watchlist(
             # there is no next-day comparison across a closed session.
             continue
         next_day = _next_trading_day(as_of)
-        if next_day > today:
-            # The next session hasn't happened yet — nothing to compare.
+        if not _session_is_complete(next_day, today):
+            # The next session hasn't FINISHED yet — nothing real to compare.
+            # `next_day > today` alone accepted next_day == today, i.e. the
+            # session still in progress, and the vendor's daily bar for an open
+            # session carries the last trade so far rather than the close. Same
+            # defect and same permanence as the public scorecard's back-check
+            # (see services/scorecard_backcheck._session_is_complete): the row
+            # gets a non-NULL price_next_day, so nothing revisits it.
             continue
 
         # SPY once for the whole date (the benchmark leg of every alpha).
