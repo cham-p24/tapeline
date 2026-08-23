@@ -317,19 +317,34 @@ async def revenue_dashboard(
     mrr_usd = round(mrr, 2)
     arr_usd = round(mrr * 12, 2)
 
-    # ── Funnel — every signup auto-starts a trial, so signup->paid IS the
-    # trial->paid rate. paid_customers = anyone who reached Stripe billing. ─
+    # ── Funnel ────────────────────────────────────────────────────────────
+    # The comment that stood here said "every signup auto-starts a trial, so
+    # signup->paid IS the trial->paid rate". That stopped being true at #536
+    # (signup no longer grants a trial) and #548 (the trial is card-required),
+    # and the queries under it had drifted the same way:
+    #
+    #   paid_customers counted `stripe_customer_id IS NOT NULL` — which the
+    #   card gate now stamps on day 0 of every TRIAL, so trialists were being
+    #   reported as paying customers on the founder's revenue dashboard.
+    #
+    #   trials_active required that same column to be NULL, so it was
+    #   structurally ZERO for every card-required trial.
+    #
+    # Both now use the same predicates as the per-channel tally below and as
+    # services/growth_funnel — one definition of "paying" per surface, because
+    # the two disagreeing is exactly how this was caught.
     users_total = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
     trials_active = (await session.execute(
         select(func.count()).select_from(User).where(
             User.trial_ends_at.isnot(None),
             User.trial_ends_at >= now,
             User.tier.in_(["pro", "premium"]),
-            User.stripe_customer_id.is_(None),
         )
     )).scalar() or 0
     paid_customers = (await session.execute(
-        select(func.count()).select_from(User).where(User.stripe_customer_id.isnot(None))
+        select(func.count(func.distinct(Subscription.user_id)))
+        .select_from(Subscription)
+        .where(Subscription.status == "active")
     )).scalar() or 0
 
     # ── Activation (Growth Playbook §4.2) — % of signups who experienced the

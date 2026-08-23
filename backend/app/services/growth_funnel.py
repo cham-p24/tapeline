@@ -106,7 +106,7 @@ from typing import Any
 from sqlalchemy import Integer, and_, case, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AlertRule, User, WatchlistItem
+from app.models import AlertRule, Subscription, User, WatchlistItem
 from app.services.tier import CARD_GATE_START
 
 logger = logging.getLogger(__name__)
@@ -225,18 +225,52 @@ async def summarize_growth_funnel(
             not_(hand_comped),
         )
 
+        # Users holding a genuinely PAYING subscription. One row per user so
+        # the outer join cannot multiply the signup count.
+        #
+        # WHY NOT stripe_customer_id: it used to be a fair proxy for "reached
+        # billing", and before the #548 card gate that was nearly the same
+        # population as "paid". It is not any more. Every card-required trial
+        # creates a Stripe customer on day 0, so counting that column made a
+        # trialist indistinguishable from a payer — and since
+        # trial_to_paid_pct divides one by the other, the single metric
+        # PAID_ADS_METRICS_BIBLE.md §2.4 calls "THE gate metric" read ~100%
+        # while the true value was 0%. A dashboard that reports the broken
+        # step as solved is worse than one that reports nothing.
+        #
+        # status == "active" only: trialing / past_due / canceled are excluded,
+        # so this can only ever mean "paying today". Same predicate the
+        # per-channel tally in routers/admin.py uses — deliberately identical,
+        # because the page contradicting itself is how this was found.
+        paying_ids = (
+            select(Subscription.user_id.label("user_id"))
+            .where(Subscription.status == "active")
+            .group_by(Subscription.user_id)
+            .subquery()
+        )
+
         funnel_row = (
             await session.execute(
                 select(
                     func.count().label("signups"),
                     _bucket((wl_n > 0) | (ar_n > 0)).label("activated"),
+                    # Deliberately still trial_ends_at, NOT trial_started_at.
+                    # trial_started_at is only written by the `trialing`
+                    # webhook, so it is absent on every legacy auto-granted
+                    # trial (pre-#536). Switching to it would drop those from
+                    # the denominator and inflate trial_to_paid_pct in the
+                    # opposite direction to the bug fixed below. This counts
+                    # both eras, which is what the rate needs.
                     _bucket(User.trial_ends_at.isnot(None)).label("trials_started"),
+                    # In-trial NOW. The old version also required
+                    # stripe_customer_id IS NULL, which made this structurally
+                    # zero for every card-required trial — i.e. for every trial
+                    # started since #548.
                     _bucket(
                         User.trial_ends_at.isnot(None)
-                        & (User.trial_ends_at >= now)
-                        & User.stripe_customer_id.is_(None),
+                        & (User.trial_ends_at >= now),
                     ).label("trials_active"),
-                    _bucket(User.stripe_customer_id.isnot(None)).label("paying"),
+                    _bucket(paying_ids.c.user_id.isnot(None)).label("paying"),
                     _bucket(gated).label("gated_total"),
                     _bucket(
                         and_(gated, User.trial_started_at.isnot(None)),
@@ -245,6 +279,7 @@ async def summarize_growth_funnel(
                 .select_from(User)
                 .outerjoin(wl, wl.c.user_id == User.id)
                 .outerjoin(ar, ar.c.user_id == User.id)
+                .outerjoin(paying_ids, paying_ids.c.user_id == User.id)
                 .where(User.created_at >= cutoff)
             )
         ).one()
