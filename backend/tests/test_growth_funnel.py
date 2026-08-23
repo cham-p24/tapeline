@@ -26,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.db import session_scope
-from app.models import AlertRule, User, WatchlistItem
+from app.models import AlertRule, Subscription, User, WatchlistItem
 from app.services.growth_funnel import summarize_growth_funnel
 
 
@@ -102,13 +102,29 @@ async def test_funnel_buckets_each_distinct_state_once():
     #    as active.
     await _seed_user(trial_ends_at=now - timedelta(days=2))
 
-    # 6. Converted: trial still dated in the future BUT a card is on file, so
-    #    they are paying, not a running trial.
-    await _seed_user(
-        trial_ends_at=now + timedelta(days=3),
+    # 6. Genuinely converted: the trial ENDED and an active subscription row
+    #    exists.
+    #
+    #    This case used to be "future trial + a card on file, so they are
+    #    paying, not a running trial". The #548 card gate inverted that: every
+    #    card-required trial now has a stripe_customer_id from day 0, so a card
+    #    marks a TRIALIST, not a payer. Leaving it as it was is what made
+    #    `paying` count trialists and `trial_to_paid_pct` read ~100% against
+    #    zero real payers. Paying now requires an active Subscription row.
+    u_paid = await _seed_user(
+        trial_ends_at=now - timedelta(days=1),
         stripe_customer_id=f"cus_{_uuid.uuid4().hex[:14]}",
         tier="pro",
     )
+    async with session_scope() as s:
+        s.add(Subscription(
+            id=f"sub_{_uuid.uuid4().hex[:14]}",
+            user_id=u_paid,
+            status="active",
+            tier="pro",
+            current_period_end=now + timedelta(days=30),
+        ))
+        await s.commit()
 
     after = await _funnel(days=30)
 
@@ -117,9 +133,10 @@ async def test_funnel_buckets_each_distinct_state_once():
     assert _delta(before, after, "activated") == 2
     # Users 4, 5, 6 all have trial_ends_at set.
     assert _delta(before, after, "trials_started") == 3
-    # Only user 4: future end date AND no card.
+    # Only user 4 has a future end date. User 6 ended yesterday.
+    # (This no longer excludes carded users — see the user-6 comment above.)
     assert _delta(before, after, "trials_active") == 1
-    # Only user 6.
+    # Only user 6 — the one with an ACTIVE subscription row, not merely a card.
     assert _delta(before, after, "paying") == 1
 
 
