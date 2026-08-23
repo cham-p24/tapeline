@@ -25,7 +25,7 @@ const WINS: CompareRow[] = [
     competitor: "Default view: deep individual-stock analysis (research tool, not scanner)",
   },
   {
-    label: "Smart-money factor (insider + Congressional)",
+    label: "Smart-money factor (institutional + insider + Congressional)",
     tapeline: "✓ Named factor in the composite, contribution shown per ticker",
     competitor: "Some insider transaction visibility; no Congressional disclosures",
   },
@@ -103,7 +103,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Common pattern: Simply Wall St for portfolio-level fundamental research before a meaningful position, Tapeline for active scanning and timing decisions. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can run them side-by-side. They're not zero-sum; they answer different questions.",
+    a: "Common pattern: Simply Wall St for portfolio-level fundamental research before a meaningful position, Tapeline for active scanning and timing decisions. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. They're not zero-sum; they answer different questions.",
   },
 ];
 

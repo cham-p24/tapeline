@@ -272,6 +272,147 @@ export function clearStoredGclid(): void {
 }
 
 /**
+ * Meta click-ID capture + persistence — the same mechanism as the gclid block
+ * above, for the other paid-click platform.
+ *
+ * Why this exists (Paid Ads Metrics Bible §7.1, gap G4). Meta stamps every
+ * paid click with `?fbclid=`. Two things depend on us keeping it:
+ *
+ *   1. **Event Match Quality.** The Conversions API otherwise sees only a
+ *      hashed email and a hashed user id, which caps EMQ around 5-6 — at
+ *      Meta's "good" floor and well short of what a high-intent event wants.
+ *      `fbc`, derived from this value, is the cheapest available upgrade and
+ *      requires NO new personal data. (Do not chase EMQ by collecting phone
+ *      or date of birth: a scanner signup has no legitimate reason to hold
+ *      them.)
+ *   2. **Counting Meta payers at all.** The trial is 14 days, so the first
+ *      charge always lands outside Meta's 7-day click window and the
+ *      in-platform Purchase column reads ~0 no matter what really happened.
+ *      Joining this click ID to our own Stripe rows is the only honest count.
+ *
+ * We store the RAW fbclid. Meta's wire format is `fb.1.<ms>.<fbclid>` and a
+ * bare fbclid is rejected — but that string is built server-side by
+ * `services/meta_capi.fbc_value()`, so one function owns the format for both
+ * the signup event and the webhook-fired events days later, where no browser
+ * exists to have built it.
+ *
+ * Same persistence contract as the rest: capture on landing, localStorage
+ * with a 30-day TTL, first-touch wins, forward on the signup POST. No PII —
+ * an fbclid is an opaque Meta-issued click token.
+ */
+
+const FBCLID_STORAGE_KEY = "tapeline_fbclid_v1";
+
+export type FbclidPayload = {
+  fbclid?: string;
+};
+
+type StoredFbclid = FbclidPayload & { captured_at: number };
+
+/**
+ * Read the persisted Meta click ID. Returns {} if nothing's stored, the
+ * stored value is malformed, the TTL has expired, or storage is unavailable.
+ * Safe to call from SSR — returns {} on the server.
+ */
+export function getStoredFbclid(): FbclidPayload {
+  if (!isStorageAvailable()) return {};
+  try {
+    const raw = window.localStorage.getItem(FBCLID_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as StoredFbclid;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    if (
+      typeof parsed.captured_at !== "number" ||
+      Date.now() - parsed.captured_at > TTL_MS
+    ) {
+      // Expired — clear so we don't return stale data on later visits.
+      window.localStorage.removeItem(FBCLID_STORAGE_KEY);
+      return {};
+    }
+    const v = parsed.fbclid;
+    if (typeof v === "string" && v.length > 0) return { fbclid: v };
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * If the current URL has an `?fbclid=` param, capture it to localStorage.
+ * First-touch wins: if a fresh capture already exists this is a no-op, so the
+ * paid click that originally brought the visitor keeps credit over a later
+ * direct refresh.
+ *
+ * Returns the captured (or already-stored) payload for convenience.
+ */
+export function captureFbclidFromLocation(): FbclidPayload {
+  if (typeof window === "undefined") return {};
+  if (!isStorageAvailable()) return {};
+
+  // First-touch: don't overwrite an existing fresh capture.
+  const existing = getStoredFbclid();
+  if (Object.keys(existing).length > 0) return existing;
+
+  let url: URL;
+  try {
+    url = new URL(window.location.href);
+  } catch {
+    return {};
+  }
+
+  const v = url.searchParams.get("fbclid");
+  if (!v || v.length === 0) return {};
+  // Cap defensively — backend col is 200 chars, same as the gclid family.
+  const captured: FbclidPayload = { fbclid: v.slice(0, 200) };
+
+  try {
+    const toStore: StoredFbclid = { ...captured, captured_at: Date.now() };
+    window.localStorage.setItem(FBCLID_STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // Best-effort — return the captured payload anyway so the caller can
+    // still forward it to the backend in-flight.
+  }
+  return captured;
+}
+
+/**
+ * Reset the captured Meta click ID. Called after a successful signup so a
+ * later signup on the same device starts a fresh attribution chain.
+ */
+export function clearStoredFbclid(): void {
+  if (!isStorageAvailable()) return;
+  try {
+    window.localStorage.removeItem(FBCLID_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Read Meta's `_fbp` first-party browser cookie, if the pixel has written
+ * one. Unlike the captures above this is NOT ours to persist: the pixel owns
+ * the cookie, its own TTL and its own value, and there is no column for it —
+ * it is read at submit time and forwarded straight onto the server-side
+ * CompleteRegistration event as the second unhashed identifier Meta matches
+ * on. Returns "" whenever the pixel was blocked or never ran, which is
+ * common in this audience and must degrade silently.
+ */
+export function readFbpCookie(): string {
+  if (typeof document === "undefined") return "";
+  try {
+    for (const part of document.cookie.split(";")) {
+      const [rawName, ...rest] = part.split("=");
+      if (rawName.trim() !== "_fbp") continue;
+      const value = decodeURIComponent(rest.join("=").trim());
+      return value.slice(0, 200);
+    }
+  } catch {
+    /* cookies unavailable — the event just goes without it */
+  }
+  return "";
+}
+
+/**
  * Referrer-host capture + persistence — same mechanism as the UTM and gclid
  * blocks above, kept here so all attribution captures share one storage
  * helper.

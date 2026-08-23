@@ -134,7 +134,32 @@ export function middleware(request: NextRequest) {
  * fair trade for working social cards.
  */
 export const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/([^/]+)$/;
-export const VALID_TICKER_RE = /^[A-Z]{1,6}(\.[A-Z])?$/;
+
+/**
+ * Ticker shape — MUST stay aligned with the backend's single source of truth,
+ * `VALID_SYMBOL_RE = ^[A-Z][A-Z0-9.=/^-]{0,11}$` in
+ * backend/app/services/symbols.py.
+ *
+ * This was `^[A-Z]{1,6}(\.[A-Z])?$`, far narrower than what the backend
+ * actually serves. The backend deliberately admits class shares (BRK-B),
+ * continuous futures (CL=F, ZC=F, RB=F) and index notation (^GSPC) —
+ * ticker_freshness.py says these "must be kept", and there are backend tests
+ * asserting BRK-B and CL=F are real servable symbols. /api/public/signals
+ * returns them, so sitemap.ts emitted <loc>/t/CL=F</loc> and /stocks linked
+ * to them, while THIS regex rejected them and 308'd to /search — which
+ * robots.ts Disallows. Every such URL landed in GSC as "Page with redirect"
+ * onto a target "Blocked by robots.txt": permanently unindexable, canonical
+ * never served. Verified in production before the fix:
+ *
+ *   /t/BRK-B → 308 /search?q=BRK-B      (api /api/ticker/BRK-B → 200)
+ *   /t/CL=F  → 308 /search?q=CL%3DF     (api /api/ticker/CL=F  → 200)
+ *
+ * `/` is omitted from the class: TICKER_PREFIX_RE captures a single segment
+ * ([^/]+), so a symbol containing a slash can never reach here anyway.
+ * Symbols containing a dot never reach the middleware at all — the matcher
+ * excludes any path with a '.' — which is why the dot case was never noticed.
+ */
+export const VALID_TICKER_RE = /^[A-Z][A-Z0-9.=^-]{0,11}$/;
 
 /**
  * Next.js metadata routes that sit DIRECTLY under a ticker-prefix segment
@@ -190,47 +215,88 @@ function handleApexDomainRedirect(request: NextRequest): NextResponse | null {
   return target ? NextResponse.redirect(new URL(target), 308) : null;
 }
 
-function handleTickerRoute(request: NextRequest): NextResponse | null {
-  const pathname = request.nextUrl.pathname;
+/**
+ * What the middleware decides to do with a ticker-prefix path.
+ *
+ * Exported and PURE so the tests can exercise the real branch order. The test
+ * suite previously kept its own `decide()` helper that "mirrors" this logic;
+ * it imported the regexes but duplicated the branches, so when the branch
+ * order changed here the copy silently kept testing the old shape. Anything
+ * that matters about the ordering must live in this one function.
+ */
+export type TickerRouteDecision =
+  | { kind: "fall-through" }
+  | { kind: "signals-root" }
+  | { kind: "search"; q: string }
+  | { kind: "canonicalise"; to: string };
 
+export function tickerRouteDecision(pathname: string): TickerRouteDecision {
   // Bare ticker-section root — /t and /t/ carry no symbol, so the [symbol]
   // dynamic route can't match and Next serves a hard 404. GSC logged /t in
   // its "Not found (404)" bucket. Redirect to the public signals universe so
   // the URL resolves (308 → 200) and the 404 clears on Validate Fix.
   // Exact-match ONLY: /scorecard and /blog/ticker are real index pages served
   // by their own route files and must never be caught here.
-  if (pathname === "/t" || pathname === "/t/") {
-    return NextResponse.redirect(new URL("/signals", request.url), 308);
-  }
+  if (pathname === "/t" || pathname === "/t/") return { kind: "signals-root" };
 
   const m = TICKER_PREFIX_RE.exec(pathname);
-  if (!m) return null;
+  if (!m) return { kind: "fall-through" };
   const [, prefix, raw] = m;
 
   const upper = raw.toUpperCase();
+
+  // A section's OWN metadata route, checked BEFORE the ticker test — but only
+  // for HYPHENATED names.
+  //
+  // Widening VALID_TICKER_RE to admit class shares (BRK-B) makes the hyphen a
+  // legal ticker character, and `apple-icon` is 10 chars, so it now matches the
+  // ticker shape. Left to the post-test check below it would be treated as the
+  // ticker "APPLE-ICON" and 308'd to /scorecard/APPLE-ICON, breaking that PNG.
+  // (`opengraph-image` at 15 and `twitter-image` at 13 exceed the 12-char
+  // limit, so apple-icon is the only real collision today — but keying the
+  // rule on the hyphen rather than one name keeps it true if the list grows.)
+  //
+  // Restricting this to hyphenated names preserves the original guarantee that
+  // a real symbol is never shadowed: bare `ICON` has no hyphen, so it still
+  // falls through to the ticker path and is handled as the ticker ICON.
+  // Genuine hyphenated tickers (BRK-B, RDS-A) don't match METADATA_ROUTE_RE.
+  if (raw.includes("-") && METADATA_ROUTE_RE.test(raw)) return { kind: "fall-through" };
 
   // Non-ticker symbol (template placeholder, garbage, or just gibberish).
   // Send to /search?q=<raw> so the visitor lands somewhere useful and
   // Google can crawl a 200 instead of a 404.
   if (!VALID_TICKER_RE.test(upper)) {
-    // ...unless it's this section's OWN metadata route. Checked HERE, after
-    // the ticker-shape test, so a real symbol can never be shadowed: anything
-    // matching VALID_TICKER_RE (e.g. ICON) is still handled as a ticker and
-    // never reaches this branch. Only hyphenated metadata names —
-    // opengraph-image, twitter-image, apple-icon — get through, and those
-    // cannot be valid tickers. Falling through lets Next serve the PNG.
-    if (METADATA_ROUTE_RE.test(raw)) return null;
-
-    const target = new URL("/search", request.url);
+    // ...unless it's this section's OWN non-hyphenated metadata route (`icon`).
+    // Checked here, after the ticker-shape test, so a real symbol is never
+    // shadowed by a metadata name that happens to look like one.
+    if (METADATA_ROUTE_RE.test(raw)) return { kind: "fall-through" };
     // Don't URL-encode the placeholder twice — pass through whatever the
     // crawler had. If raw is literally "{search_term_string}", that's what
     // /search shows back as the "didn't look like a ticker" hint.
-    target.searchParams.set("q", raw);
-    return NextResponse.redirect(target, 308);
+    return { kind: "search", q: raw };
   }
 
   // Valid ticker but wrong case → canonicalise.
   const canonical = `/${prefix}/${upper}`;
+  if (canonical === pathname) return { kind: "fall-through" };
+  return { kind: "canonicalise", to: canonical };
+}
+
+function handleTickerRoute(request: NextRequest): NextResponse | null {
+  const pathname = request.nextUrl.pathname;
+  const decision = tickerRouteDecision(pathname);
+
+  if (decision.kind === "fall-through") return null;
+  if (decision.kind === "signals-root") {
+    return NextResponse.redirect(new URL("/signals", request.url), 308);
+  }
+  if (decision.kind === "search") {
+    const target = new URL("/search", request.url);
+    target.searchParams.set("q", decision.q);
+    return NextResponse.redirect(target, 308);
+  }
+
+  const canonical = decision.to;
   if (canonical === pathname) return null;
   const target = new URL(canonical, request.url);
   // Preserve query + hash so links like /t/aapl?ref=hn keep their UTM.

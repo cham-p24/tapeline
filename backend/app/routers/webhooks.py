@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import delete, select
@@ -169,9 +170,20 @@ async def _send_purchase_conversion(
             # user id, so read the address here rather than threading it
             # through every call site. Hashing happens inside meta_capi — the
             # raw address never leaves this process.
-            email = (
-                await session.execute(select(User.email).where(User.id == user_id))
-            ).scalar_one_or_none()
+            #
+            # The stored Meta click id comes along in the same read. A purchase
+            # lands ~14 days after the click with no browser present, so `fbc`
+            # can only be rebuilt server-side from the persisted fbclid — and
+            # without it the fbclid → User → Stripe join that is the only
+            # honest Meta payer count has nothing to key on.
+            row = (
+                await session.execute(
+                    select(User.email, User.signup_fbclid, User.created_at)
+                    .where(User.id == user_id)
+                )
+            ).one_or_none()
+            email = row[0] if row else None
+            purchase_fbc = meta_capi.fbc_value(row[1], row[2]) if row else None
             await meta_capi.track_purchase(
                 user_id=user_id,
                 transaction_id=str(checkout_session_id),
@@ -180,6 +192,7 @@ async def _send_purchase_conversion(
                 currency=currency,
                 tier=tier,
                 billing_period=billing_period,
+                fbc=purchase_fbc,
             )
     except Exception:
         # Analytics must never fail a money-path webhook.
@@ -322,8 +335,28 @@ async def stripe_webhook(
             (obj.get("metadata") or {}).get("trial_save_offer") == "1"
             and user.save_offer_redeemed_at is None
         ):
-            from datetime import UTC, datetime
             user.save_offer_redeemed_at = datetime.now(UTC)
+
+        # An unrecognised price resolves to tier=None, which means "we don't
+        # know", NOT "free". Downgrading here would lock a still-paying
+        # customer out of every paid surface (price rotation leaves old price
+        # ids on live subscriptions; hand-sold Team/Enterprise/Trader prices
+        # are never in the four STRIPE_PRICE_* env vars) and book them at $0
+        # MRR, so the loss would be invisible. Log loudly and leave the tier
+        # untouched — the founder can add the price id or set the tier by hand.
+        unknown_price = p["tier"] is None
+        price_id = p.pop("price_id", None)
+        # For customer-facing copy and the founder notification, fall back to
+        # the tier the ACCOUNT actually holds. Never render "None" at a
+        # customer, and never call .capitalize() on it.
+        tier_label = p["tier"] or user.tier
+        if unknown_price:
+            logger.error(
+                "stripe.unknown_price price=%s sub=%s user=%s status=%s — tier "
+                "left unchanged (add this price to STRIPE_PRICE_* or set the "
+                "tier manually)",
+                price_id, p["id"], user.id, p["status"],
+            )
 
         # Upsert subscription
         sub_result = await session.execute(select(Subscription).where(Subscription.id == p["id"]))
@@ -336,16 +369,30 @@ async def stripe_webhook(
         prior_status = existing.status if existing else None
         if existing:
             existing.status = p["status"]
-            existing.tier = p["tier"]
+            # Skip the tier write on an unknown price — keep what we last knew.
+            if not unknown_price:
+                existing.tier = p["tier"]
             existing.current_period_end = p["current_period_end"]
             existing.cancel_at_period_end = p["cancel_at_period_end"]
             existing.billing_period = p["billing_period"]
         else:
-            session.add(Subscription(user_id=user.id, **p))
+            # Subscription.tier is NOT NULL, so a brand-new row for an unknown
+            # price stores the user's CURRENT tier rather than inventing one.
+            # That keeps a hand-sold plan (mapped to premium by an admin grant)
+            # booked at its real tier instead of $0.
+            new_sub = dict(p)
+            if unknown_price:
+                new_sub["tier"] = user.tier
+            session.add(Subscription(user_id=user.id, **new_sub))
 
         # Update user tier if subscription is active/trialing
         if p["status"] in ("active", "trialing"):
-            user.tier = p["tier"]
+            # ONLY the tier write is skipped for an unrecognised price —
+            # everything below (customer linking, retention bookkeeping) must
+            # still run, or an unknown price would strand the account in a
+            # worse state than the downgrade it replaced.
+            if not unknown_price:
+                user.tier = p["tier"]
             # Link the Stripe customer if we resolved this user via the metadata
             # fallback (stripe_customer_id still NULL — a first-time subscriber
             # whose checkout.session.completed hasn't been processed yet). Stripe
@@ -402,7 +449,6 @@ async def stripe_webhook(
                 # this handler drops redelivered events outright, and these two
                 # writes are idempotent anyway — the same trial_end re-lands on
                 # the same column, and trial_started_at is write-once.
-                from datetime import UTC, datetime
 
                 raw_trial_end = obj.get("trial_end")
                 if raw_trial_end:
@@ -435,8 +481,17 @@ async def stripe_webhook(
                     try:
                         from app.services import meta_capi
 
+                        # fbc carries the Meta click id captured at signup.
+                        # This event fires from a Stripe webhook days after
+                        # the click with no browser present, so the value is
+                        # rebuilt server-side from the stored fbclid — that is
+                        # the whole reason meta_capi.fbc_value() exists.
+                        # Unhashed by contract; hashing it zeroes its value.
                         await meta_capi.track_start_trial(
                             user_id=user.id, email=user.email,
+                            fbc=meta_capi.fbc_value(
+                                user.signup_fbclid, user.created_at,
+                            ),
                         )
                     except Exception:
                         logger.exception("stripe.meta_start_trial_failed user=%s", user.id)
@@ -449,7 +504,13 @@ async def stripe_webhook(
             # only drops when retries exhaust and Stripe moves the sub to a
             # terminal status (unpaid / canceled), handled by the else below
             # and by customer.subscription.deleted.
-            user.tier = p["tier"]
+            #
+            # Same unknown-price rule as the active/trialing branch: an
+            # unrecognised price means "leave the tier alone", so a dunning
+            # event on a rotated or hand-sold price can't quietly downgrade a
+            # customer Stripe is still trying to charge.
+            if not unknown_price:
+                user.tier = p["tier"]
         else:
             # Mirror the customer.subscription.deleted guard: only drop to free
             # if NO other subscription of theirs is still live. A duplicate-
@@ -547,7 +608,7 @@ async def stripe_webhook(
                     charge_date_label = "when your trial ends"
                 html = render_trial_started_email(
                     (user.name or "trader"),
-                    tier=p["tier"],
+                    tier=tier_label,
                     amount_label=amount_label,
                     charge_date_label=charge_date_label,
                 )
@@ -560,7 +621,7 @@ async def stripe_webhook(
                 )
                 logger.info(
                     "stripe.trial_started_email user=%s tier=%s first_charge=%s",
-                    user.id, p["tier"], charge_date_label,
+                    user.id, tier_label, charge_date_label,
                 )
             except Exception:
                 logger.exception("stripe.trial_started_email_failed user=%s", user.id)
@@ -582,7 +643,6 @@ async def stripe_webhook(
                 billing_period = p["billing_period"]
                 next_charge_iso: str | None = None
                 try:
-                    from datetime import UTC, datetime
                     next_charge_iso = datetime.fromtimestamp(
                         obj["current_period_end"], UTC,
                     ).isoformat()
@@ -590,17 +650,17 @@ async def stripe_webhook(
                     next_charge_iso = None
                 html = render_subscription_started_email(
                     user_name=(user.name or "trader"),
-                    tier=p["tier"],
+                    tier=tier_label,
                     billing_period=billing_period,
                     amount_cents=amount_cents,
                     currency=currency,
                     next_charge_iso=next_charge_iso,
                 )
-                subject = f"You're in — welcome to Tapeline {p['tier'].capitalize()}"
+                subject = f"You're in — welcome to Tapeline {tier_label.capitalize()}"
                 await send_email(user.email, subject, html, persona="billing")
                 logger.info(
                     "stripe.welcome_to_paid_sent user=%s tier=%s billing=%s",
-                    user.id, p["tier"], billing_period,
+                    user.id, tier_label, billing_period,
                 )
             except Exception:
                 logger.exception("stripe.welcome_to_paid_send_failed user=%s", user.id)
@@ -617,7 +677,7 @@ async def stripe_webhook(
                 unit_amount = sub_price.get("unit_amount")
                 await notify_founder_new_subscription(
                     email=user.email,
-                    tier=p["tier"],
+                    tier=tier_label,
                     billing_period=p["billing_period"],
                     amount=(unit_amount / 100) if unit_amount else None,
                     currency=sub_price.get("currency") or "usd",
@@ -1014,7 +1074,6 @@ async def resend_webhook(
     if not recipients:
         return {"ok": True, "noop": True}
 
-    from datetime import UTC, datetime
     now = datetime.now(UTC)
 
     affected = 0

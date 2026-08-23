@@ -22,13 +22,14 @@ SEO endpoints.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Security
-from sqlalchemy import desc, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import ApiKey, RegimeState, Ticker, User
 from app.services.api_keys import api_key_context, api_key_header, api_key_user
 from app.services.ticker_freshness import live_clauses
+from app.services.ticker_ordering import deterministic_order_by
 from app.services.tier import effective_limit
 
 router = APIRouter()
@@ -126,7 +127,24 @@ async def api_signals(
         # Case-insensitive, whitespace-tolerant exact match so 'high conviction'
         # and 'HIGH CONVICTION' both resolve to the same descriptive label.
         stmt = stmt.where(func.upper(Ticker.signal) == signal.strip().upper())
-    stmt = stmt.order_by(desc(Ticker.score)).limit(capped).offset(max(0, offset))
+    # Total-order pagination. Shared with /api/scanner and
+    # /api/public/signals via services/ticker_ordering. `score` alone is NOT a
+    # unique key: services/score.py rounds the composite to one decimal, so
+    # ~2,500 live rows land on ~500 distinct values — roughly five rows per
+    # value. LIMIT/OFFSET over a non-total order lets the planner arrange tied
+    # rows differently between two executions (a LIMIT 2000 OFFSET 0 top-N
+    # heapsort vs a LIMIT 2000 OFFSET 2000 full sort are different plans), so
+    # rows straddling a page boundary could be delivered TWICE or never at all.
+    # `symbol` is the primary key, so appending it makes the sort key unique
+    # and paging reproducible. This is the surface Premium customers pipe into
+    # their own tooling, and because `capped` maxes at 2000 while the universe
+    # is larger, pulling everything REQUIRES crossing a boundary — the client
+    # cannot avoid the bug on its own.
+    stmt = (
+        stmt.order_by(*deterministic_order_by("score", "desc"))
+        .limit(capped)
+        .offset(max(0, offset))
+    )
 
     rows = (await session.execute(stmt)).scalars().all()
     return {

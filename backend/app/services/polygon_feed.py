@@ -136,7 +136,7 @@ async def fetch_snapshots(
         get_cached_score,
         get_cached_smart_money_score,
     )
-    from app.services.mock_feed import _signal_from_score
+    from app.services.mock_feed import _render_reason, _signal_from_score
     from app.services.mock_feed import fetch_snapshots as _mock_snapshots
     from app.services.score import regime_to_macro_score
     from app.services.universe import active_universe
@@ -217,6 +217,20 @@ async def fetch_snapshots(
             r["day_open"] = real["day_open"]
             r["day_high"] = real["day_high"]
             r["day_low"] = real["day_low"]
+        else:
+            # The vendor call SUCCEEDED but returned nothing for this symbol.
+            # Every row here started life as a _mock_snapshots() row, so leaving
+            # these fields alone publishes mock_feed's random-walk price and
+            # volume as a real quote. NULL is the only honest value: the columns
+            # are nullable and the UI already renders them as an em-dash, the
+            # same contract market_cap and the 52-week range use.
+            r["price"] = None
+            r["change_pct_1d"] = None
+            r["volume"] = None
+            r["previous_close"] = None
+            r["day_open"] = None
+            r["day_high"] = None
+            r["day_low"] = None
 
         # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
         fund = get_cached_score(sym)
@@ -245,15 +259,69 @@ async def fetch_snapshots(
         # Absent until that pass has run (and after a worker restart), which
         # reads as an em-dash and self-heals — same contract as market_cap.
         bar_stats = get_cached_bar_stats(sym)
+        # Multi-session price changes come from real daily bars or not at all.
+        # Clear them FIRST so mock_feed's random.gauss() placeholders can never
+        # survive into the DB, even when the aggregates cache is cold (worker
+        # restart, first boot, or a symbol the daily pass hasn't reached).
+        r["change_pct_5d"] = None
+        r["change_pct_1m"] = None
         if bar_stats is not None:
             r["week52_high"] = bar_stats["week52_high"]
             r["week52_low"] = bar_stats["week52_low"]
             r["avg_volume_30d"] = bar_stats["avg_volume_30d"]
+            r["change_pct_5d"] = bar_stats.get("change_pct_5d")
+            r["change_pct_1m"] = bar_stats.get("change_pct_1m")
 
         # Recompute composite from updated sub_* — keeps all 6 factors blended
         # (sub_macro is the deterministic regime-derived value stamped above).
         r["score"] = _composite_from_subs(r)
         r["signal"] = _signal_from_score(r["score"])
+
+        # REGENERATE the one-sentence reason from the sub-scores we just wrote.
+        #
+        # Without this the sentence describes a DIFFERENT SET OF NUMBERS than the
+        # ones published beside it. Every row starts as a _mock_snapshots() row,
+        # where _render_reason is called on six random.gauss draws; the block
+        # above then replaces five of those six with real cached values and
+        # recomputes the composite — but the sentence was left describing the
+        # discarded draws. A ticker whose published Trend is 20 could carry
+        # "trend factor in the top band", because the thrown-away draw was 88.
+        #
+        # It is the product's stated differentiator, it renders directly beneath
+        # the six real sub-scores on the scanner, and it goes out in the welcome
+        # email. Explaining a score with numbers that are not that score is the
+        # worst version of this bug class.
+        r["reason"] = _render_reason(
+            sym,
+            r.get("sector") or "",
+            r["sub_trend"], r["sub_rs"], r["sub_fundamentals"],
+            r["sub_momentum"], r["sub_macro"], r["sub_smart_money"],
+        )
+
+        # CONFIDENCE = how much of this row is actually sourced.
+        #
+        # mock_feed derives confidence_pct from a hash of the symbol bucketed by
+        # two hardcoded symbol lists — a stable random number that measures
+        # nothing. Every user-facing description of the field says it reflects
+        # which underlying data feeds returned data, so the honest implementation
+        # is to count exactly that: how many of the six factors came from a real
+        # source for THIS symbol, plus whether we hold a live price.
+        #
+        # Macro is regime-derived and deterministic for every symbol, so it
+        # always counts. The other five count only when their cache produced a
+        # value on this pass.
+        sourced = sum((
+            fund is not None,
+            sm is not None,
+            trend is not None,
+            rs is not None,
+            mom is not None,
+            True,  # macro: deterministic, always real
+        ))
+        has_price = r.get("price") is not None
+        # Seven signals: six factors plus a live price read. Rounded to a whole
+        # percent because a decimal implies a precision this does not have.
+        r["confidence_pct"] = round(100.0 * (sourced + (1 if has_price else 0)) / 7)
 
     return base_rows
 
@@ -543,12 +611,41 @@ def compute_bar_stats(bars: list[dict[str, Any]]) -> dict[str, Any] | None:
     if len(volumes) == 30:
         avg_volume_30d = int(sum(volumes) / 30)
 
-    if week52_high is None and avg_volume_30d is None:
+    # Real 5-day and 1-month price change, off the same daily closes.
+    #
+    # These were previously NEVER derived from market data: fetch_snapshots
+    # builds every row from _mock_snapshots() and then overwrites only
+    # price/change_pct_1d/volume/previous_close/day_* with the vendor snapshot.
+    # change_pct_5d and change_pct_1m were left holding mock_feed's
+    # `random.gauss(0, 3.0)` / `random.gauss(2, 6.0)` values — i.e. production
+    # published randomly generated 5-day and 1-month moves as real market data,
+    # re-randomised on every 60s tick. For a financial product that is the most
+    # serious class of bug there is, so they are computed here or left NULL.
+    #
+    # Offsets are in TRADING sessions, not calendar days: closes[-6] is five
+    # sessions back, closes[-22] is ~21 sessions ≈ one month. Insufficient
+    # history yields None, which renders as an em-dash — the honest answer.
+    change_pct_5d: float | None = None
+    change_pct_1m: float | None = None
+    closes = [b.get("c") for b in bars if b.get("c") is not None]
+    if len(closes) >= 6 and closes[-6]:
+        change_pct_5d = round((closes[-1] / closes[-6] - 1) * 100, 2)
+    if len(closes) >= 22 and closes[-22]:
+        change_pct_1m = round((closes[-1] / closes[-22] - 1) * 100, 2)
+
+    if (
+        week52_high is None
+        and avg_volume_30d is None
+        and change_pct_5d is None
+        and change_pct_1m is None
+    ):
         return None
     return {
         "week52_high": week52_high,
         "week52_low": week52_low,
         "avg_volume_30d": avg_volume_30d,
+        "change_pct_5d": change_pct_5d,
+        "change_pct_1m": change_pct_1m,
     }
 
 

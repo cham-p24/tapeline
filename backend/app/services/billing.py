@@ -33,13 +33,49 @@ stripe.max_network_retries = 1
 AUTOMATIC_TAX_ENABLED = False
 
 
-def _tier_from_price(price_id: str) -> str:
-    """Map Stripe price ID to Tapeline tier (handles both monthly + annual)."""
+def tier_from_price(price_id: str) -> str | None:
+    """Map a Stripe price ID to a Tapeline tier, or None if we don't know it.
+
+    None means "unrecognised price", NOT "free". The distinction is the whole
+    point: the caller must leave the tier alone rather than downgrade.
+
+    Two reachable ways a live, paying subscription carries a price we don't
+    recognise:
+
+      * Price rotation. Founding pricing is advertised as "locked in for early
+        subscribers" and the STRIPE_PRICE_* env vars were already swapped once
+        at the 2026-07 reprice. A subscriber who bought before a swap still has
+        the OLD price id on their Stripe subscription; every renewal fires
+        customer.subscription.updated with status="active" and that old price.
+      * Hand-sold anchor tiers. Team ($149/mo), Enterprise (from $2k/mo) and
+        Trader ($59/mo) are created in the Stripe dashboard against price ids
+        that are not in the four env vars.
+
+    Resolving either to "free" meant the customer kept being charged while
+    being locked out of every paid surface, and the admin revenue dashboard
+    booked them at $0 MRR (_MRR_CONTRIBUTION has no "free" key), so the loss
+    was invisible.
+    """
+    # An UNSET STRIPE_PRICE_* env var is the empty string, so a missing or
+    # empty price id would otherwise `in`-match whichever tier is unconfigured
+    # and grant it. Reject falsy ids before comparing.
+    if not price_id:
+        return None
     if price_id in (settings.stripe_price_pro_monthly, settings.stripe_price_pro_annual):
         return "pro"
     if price_id in (settings.stripe_price_premium_monthly, settings.stripe_price_premium_annual):
         return "premium"
-    return "free"
+    return None
+
+
+def _tier_from_price(price_id: str) -> str:
+    """Lossy variant for PRICING-DISPLAY paths that need a concrete tier.
+
+    Only for computing an amount to quote (see the retention coupon path).
+    Never use this to decide entitlement — use `tier_from_price` and handle
+    None, or an unknown price silently becomes a downgrade.
+    """
+    return tier_from_price(price_id) or "free"
 
 
 async def _monthly_unit_amount(tier: str) -> tuple[int, str]:
@@ -670,7 +706,10 @@ def subscription_payload(sub: Any) -> dict[str, Any]:
     return {
         "id": sub["id"],
         "status": sub["status"],
-        "tier": _tier_from_price(item["price"]["id"]),
+        # May be None — an unrecognised price. The webhook MUST treat that as
+        # "leave the tier alone", never as free. See tier_from_price.
+        "tier": tier_from_price(item["price"]["id"]),
+        "price_id": item["price"]["id"],
         "current_period_end": datetime.fromtimestamp(sub["current_period_end"], UTC),
         "cancel_at_period_end": bool(sub.get("cancel_at_period_end", False)),
         "billing_period": "annual" if interval == "year" else "monthly",

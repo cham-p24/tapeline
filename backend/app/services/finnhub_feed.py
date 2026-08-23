@@ -180,29 +180,77 @@ async def set_recent_insider_transactions_db(
     from app.models import InsiderTransaction
 
     sym = symbol.upper()
-    async with session_scope() as session:
-        await session.execute(delete(InsiderTransaction).where(InsiderTransaction.symbol == sym))
-        for t in txns or []:
-            share_change = int(t.get("share_change") or 0)
-            price = float(t.get("transaction_price") or 0)
-            row = InsiderTransaction(
+
+    # Dedupe on the NATURAL KEY before touching the DB.
+    #
+    # InsiderTransaction carries
+    #   UniqueConstraint(symbol, transaction_date, insider_name, share_change)
+    # which deliberately excludes transaction_price and code — but
+    # fetch_insider_transactions maps Finnhub's payload ONE ROW PER LINE ITEM
+    # with no dedupe, and share_change falls back to 0 when `change` is absent.
+    # Two Form 4 lines therefore collide routinely.
+    #
+    # When they did, the single commit raised IntegrityError and the handler
+    # below rolled back — which also rolled back the DELETE. The symbol kept its
+    # OLD rows, and because the trigger is deterministic VENDOR DATA rather than
+    # a race, the next run failed identically. fetch_insider_transactions
+    # re-requests the same rolling 90-day window daily, so the offending pair
+    # kept reappearing until it aged out: a Premium feature's data frozen for up
+    # to three months.
+    #
+    # It was invisible too — only a warning fired, the worker still counted
+    # `refreshed += 1`, and compute_smart_money_score cached the FRESH score, so
+    # the displayed transactions and the sub_smart_money factor disagreed.
+    #
+    # By the schema's own definition two rows sharing the 4-tuple ARE the same
+    # transaction, so collapsing them is consistent with it. First occurrence
+    # wins (vendor order, deterministic) and the collapse is logged so the
+    # narrowness of the key stays visible rather than silently losing lines.
+    rows: list[InsiderTransaction] = []
+    seen: set[tuple[str, str, int]] = set()
+    collapsed = 0
+    for t in txns or []:
+        share_change = int(t.get("share_change") or 0)
+        price = float(t.get("transaction_price") or 0)
+        insider_name = (t.get("filer_name") or "")[:120]
+        transaction_date = (t.get("transaction_date") or "")[:10]
+        key = (transaction_date, insider_name, share_change)
+        if key in seen:
+            collapsed += 1
+            continue
+        seen.add(key)
+        rows.append(
+            InsiderTransaction(
                 symbol=sym,
-                insider_name=(t.get("filer_name") or "")[:120],
-                transaction_date=(t.get("transaction_date") or "")[:10],
+                insider_name=insider_name,
+                transaction_date=transaction_date,
                 share_change=share_change,
                 transaction_price=round(price, 4),
                 transaction_value=round(abs(share_change * price), 2),
                 code=(t.get("code") or "")[:4],
             )
+        )
+    if collapsed:
+        logger.info(
+            "insider.collapsed_duplicate_natural_key symbol=%s dropped=%d kept=%d "
+            "(uq_insider_natural excludes price+code)",
+            sym, collapsed, len(rows),
+        )
+
+    async with session_scope() as session:
+        await session.execute(delete(InsiderTransaction).where(InsiderTransaction.symbol == sym))
+        for row in rows:
             session.add(row)
         try:
             await session.commit()
         except IntegrityError:
-            # Race against another concurrent refresh — the unique constraint
-            # caught a duplicate. Roll back and let the next refresh re-run
-            # cleanly. Doesn't bring the worker tick down.
+            # With the payload deduped above, this can only be a genuine race
+            # against another concurrent refresh of the SAME symbol. Roll back
+            # and let the next refresh re-run cleanly — that really is transient.
+            # Logged at ERROR, not warning: it should now be rare, and if it
+            # starts recurring for one symbol the dedupe above has a hole.
             await session.rollback()
-            logger.warning("insider.write_race symbol=%s", sym)
+            logger.error("insider.write_race symbol=%s rows=%d", sym, len(rows))
 
 
 # Legacy alias for the worker, which still calls the sync-named helper.

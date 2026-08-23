@@ -52,6 +52,7 @@ from app.config import get_settings
 from app.db import get_session
 from app.models import User
 from app.services.session import issue_session_token, session_cookie_kwargs
+from app.services.trial_abuse import normalise_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -121,6 +122,13 @@ ATTRIBUTION_FIELDS: dict[str, int] = {
     "gclid": 200,
     "gbraid": 200,
     "wbraid": 200,
+    # Meta click ID (gap G4). Carried here for the same reason the
+    # referrer host and landing path below had to be: OAuth is the
+    # designed-primary signup path, so a capture wired only into the email
+    # form leaves the column NULL for very nearly every real account — which
+    # is precisely what the 2026-08-20 audit found for the other two. Raw
+    # fbclid; the `fb.1.<ts>.<fbclid>` wire value is derived at send time.
+    "fbclid": 200,
     # First-touch referrer host (#444) and landing path (#458). The email path
     # has written these since they shipped; OAuth never did — and because every
     # real signup to date arrived via Google OAuth, both columns were NULL for
@@ -598,9 +606,34 @@ async def oauth_callback(
     if not email:
         raise HTTPException(400, "OAuth provider did not return an email")
 
-    # Find or create user
-    result = await session.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+    # Find or create user.
+    #
+    # Look the address up BOTH as the provider supplied it and in the canonical
+    # form signup stores. Native signup writes `normalise_email(body.email)`,
+    # which for gmail.com / googlemail.com / outlook.com / hotmail.com /
+    # live.com / msn.com strips dots AND +tags from the local part. This
+    # callback did an exact match on the provider address, lowercased only — so
+    # the two strings differ whenever the address contains a dot or a +tag in a
+    # normalising domain, the lookup missed the user's real row, and the
+    # `user is None` branch below created a SECOND account.
+    #
+    # That is the worst kind of miss: a returning PAID user signing in with
+    # Google lands on a brand-new FREE account, with none of their watchlists,
+    # alerts or subscription, while their real (still-billing) row sits
+    # untouched under the canonical address.
+    #
+    # Both other identity lookups — POST /api/auth/signin and
+    # /api/auth/forgot-password — were already fixed this way, for exactly this
+    # reason; the OAuth callback never got the treatment. Both candidates go in
+    # ONE query, and an exact hit still wins over a canonical one so an account
+    # genuinely registered at the as-typed address is never shadowed.
+    candidates = {email, normalise_email(email)}
+    rows = (
+        await session.execute(select(User).where(User.email.in_(candidates)))
+    ).scalars().all()
+    user = next((u for u in rows if u.email == email), None) or (
+        rows[0] if rows else None
+    )
     is_new = user is None
     if user is None:
         # Mirrors the native-signup path in routers/auth.py: an account starts
@@ -639,6 +672,7 @@ async def oauth_callback(
             signup_gclid=attr.get("gclid"),
             signup_gbraid=attr.get("gbraid"),
             signup_wbraid=attr.get("wbraid"),
+            signup_fbclid=attr.get("fbclid"),
             signup_referrer_host=_clean_referrer_host(attr.get("referrer_host")),
             signup_landing_path=_normalise_landing_path(attr.get("landing_path")),
             # OAuth providers proved ownership of this address — auto-stamp
@@ -739,8 +773,13 @@ async def oauth_callback(
         try:
             from app.services import meta_capi
 
+            # fbc rides along UNHASHED — see services/meta_capi. `fbp` is not
+            # available on this path: it lives in a browser cookie and this
+            # request is the provider's redirect back to us, not the visitor's
+            # own page. The click ID is the half that survives the round-trip.
             await meta_capi.track_complete_registration(
-                user_id=user.id, email=user.email, method=provider
+                user_id=user.id, email=user.email, method=provider,
+                fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
             )
         except Exception:
             logger.exception("oauth.meta_complete_registration_failed user=%s", user.id)

@@ -9,10 +9,12 @@ import { authApi } from "@/lib/auth";
 import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
 import {
+  getStoredFbclid,
   getStoredGclid,
   getStoredLandingPath,
   getStoredReferrerHost,
   getStoredUtm,
+  readFbpCookie,
 } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import {
@@ -98,6 +100,29 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
     h1: "Switching to Tapeline?",
     sub: "One transparent score per ticker plus a public track record. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
   },
+  // Destination for the ad variant that sells the SAFETY of the card trial
+  // rather than trying to talk around it (Metrics Bible §7.3, variant 9 —
+  // "$0 today. The charge date is on the page."). The H1 restates the ad's
+  // promise verbatim, which is the whole point of the ?from= mechanism: a
+  // visitor who clicked a card-objection ad and landed on a generic hero is
+  // measuring the page's translation of the message, not the message.
+  //
+  // Every clause below is a fact this codebase can produce on demand, which
+  // is the bar this key has to clear:
+  //   $0 today + exact first-charge date  → Stripe Checkout, PR #548
+  //   one click cancels                   → the billing page's cancel flow
+  //   we email before the first charge    → render_trial_precharge_reminder_
+  //                                         email, fired T-3 from the
+  //                                         customer.subscription.trial_will_
+  //                                         end webhook
+  //   the record needs no account         → /scorecard, /daily-picks, ticker
+  //                                         pages, CSV/JSON exports
+  // Nothing here may drift into "no credit card" — the trial takes one. See
+  // the CARD HONESTY block above.
+  trial: {
+    h1: "$0 today. The charge date is on the page.",
+    sub: "The 14-day Premium trial takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you three days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.",
+  },
 };
 
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
@@ -164,6 +189,19 @@ function SignUpForm() {
   // the Daily Top 10 at all.
   const [weeklyDigestOptIn, setWeeklyDigestOptIn] = useState(false);
   const [dailyTop10OptIn, setDailyTop10OptIn] = useState(false);
+  // Self-reported attribution — optional, free text, never required (gap G2).
+  // Deliberately NOT a dropdown: a fixed list can only count channels we
+  // already thought of, and this field exists to surface the ones we cannot
+  // see. AI assistants and dark social arrive with no referrer and no UTM, so
+  // every other instrument in lib/utm.ts is blind to them and this self-report
+  // is the only thing that will ever credit them.
+  //
+  // It is ATTRIBUTION, not suitability. It records where someone heard of us
+  // and nothing about their money — no capital, holdings, risk tolerance,
+  // goals or experience — and it must never change which securities or factor
+  // weightings anyone is shown. Keep it that way; compliance Rule 8 is not a
+  // style preference.
+  const [referralSource, setReferralSource] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const turnstileRef = useRef<HTMLDivElement | null>(null);
@@ -283,6 +321,16 @@ function SignUpForm() {
       // Stored on the User row so the founder-gated offline-conversion
       // upload to Google can later tie this subscriber back to the click.
       const gclid = getStoredGclid();
+      // Meta click ID captured on landing. Stored on the User row: it carries
+      // the Conversions API's match quality, and because the 14-day trial
+      // puts every first charge outside Meta's 7-day click window, joining it
+      // to our own Stripe rows is the only honest way to count Meta payers.
+      const fbclid = getStoredFbclid();
+      // Meta's own `_fbp` cookie, if its pixel wrote one. Not stored anywhere
+      // — forwarded once so the server-side registration event carries both
+      // unhashed identifiers Meta matches on. Empty whenever the pixel was
+      // blocked, which is common in this audience and must not matter.
+      const fbp = readFbpCookie();
       // First-touch external referrer HOSTNAME captured on landing — the
       // only attribution trace AI-assistant referrals (Copilot etc.) leave,
       // since they carry no utm_* params. Hostname only, never path/query.
@@ -301,8 +349,14 @@ function SignUpForm() {
         // the backend writes/enrols NOTHING in that case.
         marketing_opt_in: weeklyDigestOptIn,
         daily_top10_opt_in: dailyTop10OptIn,
+        // Optional free-text "How did you hear about us?". Omitted entirely
+        // when left blank, so an untouched field writes nothing rather than
+        // an empty string that would show up as its own aggregation row.
+        referral_source: referralSource.trim() || undefined,
         ...utm,
         ...gclid,
+        ...fbclid,
+        fbp: fbp || undefined,
         ...referrer,
         ...landing,
       });
@@ -516,6 +570,37 @@ function SignUpForm() {
               autoComplete="name"
               value={name}
               onChange={setName}
+            />
+
+            {/* Self-reported attribution. Optional, free text, no validator,
+                and the form submits fine when it's blank — it must never be
+                a reason someone fails to create an account.
+
+                Free text on purpose: a dropdown can only count the channels
+                we already listed, and the channels worth finding are the ones
+                we can't see. AI assistants and dark social (a DM, a group
+                chat, a forwarded link) arrive with no referrer and no UTM, so
+                every automatic capture in lib/utm.ts is blind to them and
+                this answer is the only signal that will ever credit them.
+
+                It asks where someone HEARD of us and nothing else. It is not
+                a suitability question and must never become one — no capital,
+                holdings, risk tolerance, goals or experience, and the answer
+                never changes which securities or factor weightings anyone is
+                shown (compliance Rule 8).
+
+                maxLength matches users.referral_source (40 chars) so the cap
+                is visible at the keyboard rather than a silent truncation
+                after submit. */}
+            <FormField
+              id="signup-referral-source"
+              label="How did you hear about us? (optional)"
+              type="text"
+              autoComplete="off"
+              maxLength={40}
+              value={referralSource}
+              onChange={setReferralSource}
+              hint="A few words is plenty. It's the only way we can tell which channels actually reach people."
             />
 
             {/* Email consent — descriptive labels, UNCHECKED by default, and

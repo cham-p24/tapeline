@@ -609,3 +609,87 @@ async def test_a_legacy_sha256_recovery_row_still_signs_the_user_in(
         )
     assert r.status_code == 200, r.text
     assert r.json()["user"]["id"] == user.id
+
+
+@pytest.mark.asyncio
+async def test_recovery_code_cannot_mint_two_sessions_concurrently(client, fake_totp_mfa):
+    """One recovery code, two overlapping requests → exactly one session.
+
+    The TOTP branch above this one is deliberately hardened with a CONDITIONAL
+    UPDATE, and its comment spells out why: "an adversary who controls request
+    timing ... will submit the relayed code ALONGSIDE the victim" and an
+    in-memory assignment "lets both through and mints two sessions from one
+    code".
+
+    The recovery branch then did exactly that in-memory assignment. It SELECTed
+    the rows with `used_at IS NULL`, spent ~1.9s in bcrypt off the event loop
+    (10 rows x ~190ms, no early exit), and only then assigned
+    `rc.used_at = ...` before the commit. That bcrypt scan makes the window
+    enormous: both requests read the row unused, both stamp it, and both fall
+    through to issue_session_token + set_cookie.
+
+    The burn is now a conditional UPDATE with `WHERE used_at IS NULL`, so the
+    database is the arbiter and the loser matches zero rows and 401s.
+    """
+    mfa, _fake = fake_totp_mfa
+    generate_recovery_codes = mfa.generate_recovery_codes
+    hash_recovery_code = mfa.hash_recovery_code
+    issue_mfa_token = mfa.issue_mfa_token
+
+    user = await _seed_user(mfa_enabled=True, totp_secret="JBSWY3DPEHPK3PXP")
+    codes = generate_recovery_codes()
+    async with session_scope() as s:
+        for c in codes:
+            s.add(MfaRecoveryCode(user_id=user.id, code_hash=hash_recovery_code(c)))
+        await s.commit()
+
+    chosen = codes[3]
+
+    async def _redeem():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            return await c.post(
+                "/api/auth/2fa",
+                json={"mfa_token": issue_mfa_token(user.id), "code": chosen},
+            )
+
+    a, b = await asyncio.gather(_redeem(), _redeem(), return_exceptions=True)
+    statuses = sorted(
+        r.status_code for r in (a, b) if not isinstance(r, BaseException)
+    )
+    assert statuses.count(200) == 1, (
+        f"one recovery code minted {statuses.count(200)} sessions "
+        f"(statuses={statuses}) — the burn is not atomic"
+    )
+
+    async with session_scope() as s:
+        rows = (await s.execute(
+            select(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user.id)
+        )).scalars().all()
+    assert sum(1 for r in rows if r.used_at is not None) == 1, (
+        "more than one row was consumed for a single redemption"
+    )
+
+
+def test_recovery_burn_uses_a_conditional_update():
+    """Structural guard. The atomicity lives in the WHERE clause; an edit that
+    reverts to `rc.used_at = ...` reintroduces the double-mint, and on SQLite
+    the concurrency test above may not always expose it."""
+    import inspect
+
+    from app.routers import auth as auth_mod
+
+    src = inspect.getsource(auth_mod.signin_2fa)
+    # Must be an UPDATE ... WHERE used_at IS NULL, not an in-memory assignment.
+    # Matching the bare `used_at.is_(None)` is NOT enough — the SELECT that
+    # finds candidate rows contains that too, so the check passed against the
+    # reverted code. Verified: the assertions below fail on revert.
+    assert "update(_MfaRecoveryCode)" in src, (
+        "the recovery-code burn is no longer a conditional UPDATE — an "
+        "in-memory `rc.used_at = ...` lets two overlapping requests both spend "
+        "the same code and mint two sessions"
+    )
+    assert "burned.rowcount" in src, (
+        "the burn's rowcount is not checked, so the request that LOST the race "
+        "still falls through to issue_session_token"
+    )

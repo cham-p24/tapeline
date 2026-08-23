@@ -25,7 +25,7 @@ yet. See email_design.py for the design system rationale.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import httpx
@@ -3225,8 +3225,27 @@ async def run_eod_watchlist_digest(
     )
     users = users_r.scalars().all()
 
+    # Durable per-user dedupe. This was the ONLY email orchestrator without one
+    # — run_daily_drip stamps drip_state, run_weekly_newsletter stamps a
+    # weekly_* token, newsletter.run_daily_digest stamps
+    # NewsletterSubscriber.last_sent_at, all committed per user. Here the only
+    # guard was the worker's process-global `_last_eod_digest_date` latch, set
+    # AFTER the whole batch returned cleanly, so a partial run left it unset and
+    # the gate re-armed on the next tick — re-mailing the entire already-sent
+    # prefix, for a ~180-tick window (it re-arms every tick while hour >= 21).
+    #
+    # A partial run is not hypothetical: this batch runs inline under the
+    # worker's `asyncio.wait_for(tick(), timeout=60)` watchdog, and
+    # CancelledError is a BaseException that slips past the `except Exception`
+    # around the call. The frequency governor is no backstop either — EOD is
+    # SendClass.SCHEDULED, and `allows` early-returns True for SCHEDULED before
+    # any ledger check.
+    today_utc = datetime.now(UTC).date()
+
     sent = 0
     for user in users:
+        if user.eod_digest_sent_on == today_utc:
+            continue
         from app.services.email_prefs import EmailPref, wants
         if not wants(user, EmailPref.DAILY_DIGEST):
             continue
@@ -3273,7 +3292,7 @@ async def run_eod_watchlist_digest(
         # all — the T-3/T-1 drip emails could land while the user's daily
         # email said nothing. Truthful deadline only; no countdown framing.
         trial_note = None
-        from datetime import UTC, timedelta
+        from datetime import timedelta
         _now = datetime.now(UTC)
         if (
             user.trial_ends_at is not None
@@ -3297,6 +3316,13 @@ async def run_eod_watchlist_digest(
                 unsubscribe_category="daily_digest",
             )
             if not res.get("skipped", False):
+                # Stamp and COMMIT per user, immediately after the send — the
+                # same shape every other orchestrator uses. Committing per
+                # recipient is what makes a mid-batch cancellation cost at most
+                # the in-flight user rather than replaying everyone already
+                # mailed.
+                user.eod_digest_sent_on = today_utc
+                await session.commit()
                 sent += 1
                 if governor is not None:
                     governor.record(user, SendClass.SCHEDULED)

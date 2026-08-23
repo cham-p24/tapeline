@@ -10,7 +10,7 @@ export const metadata = pageMeta({
 
 const WINS: CompareRow[] = [
   {
-    label: "Factor weight ordering — published",
+    label: "Factor weights — fully published",
     tapeline: "✓ Six named factors on /how-it-works",
     competitor: "Quant Ratings published as letter grades; underlying weighting not disclosed",
   },
@@ -103,7 +103,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Reasonable if you value SA's transcript library and contributor essays — those are genuinely best-in-class on the retail internet. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can run them side-by-side. Many traders keep SA for the editorial layer and add Tapeline for the live multi-factor synthesis with public accountability.",
+    a: "Reasonable if you value SA's transcript library and contributor essays — those are genuinely best-in-class on the retail internet. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. Many traders keep SA for the editorial layer and add Tapeline for the live multi-factor synthesis with public accountability.",
   },
 ];
 
@@ -116,7 +116,7 @@ export default function VsSeekingAlphaPage() {
       competitorAnnualNote="Premium ~$239/yr (~$19.92/mo); Pro ~$2,400/yr; Alpha Picks ~$499/yr"
       slug="seeking-alpha"
       heading="Tapeline vs Seeking Alpha — deterministic score vs 31K-contributor editorial."
-      lede="Seeking Alpha is a 21-year-old editorial platform where 31,000+ contributors publish ~15,000 articles a month, with Quant Ratings as a letter-grade overlay. Tapeline is a deterministic scanner — one 0-100 score per US ticker from a published 6-factor methodology, refreshed sub-60s, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if you want one decisive number per ticker with the methodology in the open. Pick SA if you primarily read for the contributor essays and transcript library."
+      lede="Seeking Alpha is a 21-year-old editorial platform where 31,000+ contributors publish ~15,000 articles a month, with Quant Ratings as a letter-grade overlay. Tapeline is a deterministic scanner — one 0-100 score per US ticker from a published 6-factor formula, refreshed sub-60s, with every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if you want one decisive number per ticker with the formula in the open. Pick SA if you primarily read for the contributor essays and transcript library."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

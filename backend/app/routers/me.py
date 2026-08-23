@@ -367,7 +367,17 @@ async def submit_onboarding(
     sectors = [s for s in sectors if s in _ALLOWED_SECTORS]
 
     user.trading_style = body.trading_style
-    user.referral_source = body.referral_source
+    # Only an EXPLICIT answer changes the stored attribution, mirroring the
+    # marketing_opt_in rule below. This used to assign unconditionally, which
+    # was harmless while onboarding was the only writer — but the signup form
+    # now captures the free-text "How did you hear about us?" (gap G2), and
+    # /app/onboarding sits between signup and the first working screen posting
+    # `referral_source: null` on every single account. Unconditional
+    # assignment would therefore have wiped every answer the new field
+    # collects, seconds after it was given, and the gap would have looked
+    # shipped while measuring nothing.
+    if body.referral_source is not None:
+        user.referral_source = body.referral_source
     user.sectors_of_interest = ",".join(sectors) if sectors else None
     user.onboarding_completed_at = datetime.now(UTC)
     # Consent is only ever changed by an EXPLICIT answer. None means the user

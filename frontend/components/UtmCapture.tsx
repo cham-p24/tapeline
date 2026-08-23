@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import {
+  captureFbclidFromLocation,
   captureGclidFromLocation,
   captureLandingPathFromLocation,
   captureReferrerHostFromLocation,
@@ -27,6 +28,11 @@ export function UtmCapture(): null {
   useEffect(() => {
     captureUtmFromLocation();
     captureGclidFromLocation();
+    // Meta's click ID (`?fbclid`). Without it the Conversions API can only
+    // match on a hashed email, and — because the 14-day trial puts every
+    // first charge outside Meta's 7-day click window — there is no honest
+    // way to count Meta payers at all.
+    captureFbclidFromLocation();
     // AI-assistant referrals (Copilot/ChatGPT/Perplexity) carry no utm_*
     // params — the referrer HOSTNAME is the only attribution trace. External
     // hosts only, first-touch, never the path/query.

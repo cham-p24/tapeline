@@ -46,9 +46,9 @@ const WINS: CompareRow[] = [
     competitor: "Free tier exists but limited; paid tiers require card upfront",
   },
   {
-    label: "Scoring methodology is public",
+    label: "Score formula is public + auditable",
     tapeline: "✓ Six named factors, published methodology on /how-it-works",
-    competitor: "Each screener / metric defined, but no Stock Rover-published composite score with a disclosed methodology",
+    competitor: "Each screener / metric defined, but no Stock Rover-published composite score with disclosed weights",
   },
 ];
 
@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Sensible if you're a fundamental investor who also wants a live multi-factor view. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can run them side-by-side. Common workflow: Stock Rover for monthly portfolio-level analysis + multi-screen fundamental filters, Tapeline for daily 'what's worth a look right now' synthesis.",
+    a: "Sensible if you're a fundamental investor who also wants a live multi-factor view. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. Common workflow: Stock Rover for monthly portfolio-level analysis + multi-screen fundamental filters, Tapeline for daily 'what's worth a look right now' synthesis.",
   },
 ];
 
@@ -111,7 +111,7 @@ export default function VsStockRoverPage() {
       competitorAnnualNote="Essentials ~$7.99/mo; Premium ~$17.99/mo; Premium Plus ~$27.99/mo (annual)"
       slug="stock-rover"
       heading="Tapeline vs Stock Rover — composite score vs 650-metric fundamental screener."
-      lede="Stock Rover is a fundamental screener — 650+ metrics, 8,500 stocks, 10-year histories, daily refresh, strong portfolio analytics. Tapeline is a live composite scanner — one 0-100 score per ticker from a published 6-factor methodology, sub-60s refresh, every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if you want one decisive number that synthesises the multi-factor picture live. Pick Stock Rover if you're a fundamental investor running multi-screen filters on a wide universe."
+      lede="Stock Rover is a fundamental screener — 650+ metrics, 8,500 stocks, 10-year histories, daily refresh, strong portfolio analytics. Tapeline is a live composite scanner — one 0-100 score per ticker from a published 6-factor formula, sub-60s refresh, every top-10 pick back-checked publicly at /scorecard. Pick Tapeline if you want one decisive number that synthesises the multi-factor picture live. Pick Stock Rover if you're a fundamental investor running multi-screen filters on a wide universe."
       wins={WINS}
       tradeoffs={TRADEOFFS}
       faq={FAQ}

@@ -80,14 +80,14 @@ const TRADEOFFS: CompareTradeoff[] = [
     label: "Hedge fund holdings tracker",
     tapeline: "Live SEC Form 4 insider activity (Premium tier): officers, directors, and 10%+ owners trading their own stock",
     competitor: "Hedge Fund Sentiment is a Smart Score factor; broader fund coverage",
-    note: "Tipranks' fund-position data is broader and feeds directly into the score. Tapeline doesn't track fund positions at all — the Premium smart-money surface is SEC Form 4 insider transactions plus Congressional disclosures, shown as their own feed and also read by the Smart Money factor.",
+    note: "Tipranks' hedge-fund data is broader and feeds directly into the score. Tapeline's tracker is curated to eight elites we've explicitly chosen as signal-rich and surfaces them as a separate Premium feature, not as a hidden score input.",
   },
 ];
 
 const FAQ: CompareFaq[] = [
   {
     q: "Is Tapeline a Tipranks alternative?",
-    a: "Yes. Both produce a per-ticker quantitative score from multiple signals, but Tapeline names all six factors and publishes their weight ordering (most on Trend and Relative Strength, least on Momentum), recomputes the score sub-60s during market hours, and back-checks every top-10 daily pick publicly vs SPY. Tipranks' Smart Score aggregates eight factors at undisclosed weights and updates once daily.",
+    a: "Yes. Both produce a per-ticker quantitative score from multiple signals, but Tapeline publishes the exact six-factor formula and weights, recomputes the score sub-60s during market hours, and back-checks every top-10 daily pick publicly vs SPY. Tipranks' Smart Score aggregates eight factors at undisclosed weights and updates once daily.",
   },
   {
     q: "How is the Tapeline Score different from Tipranks Smart Score?",
@@ -103,7 +103,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Sensible if you need the analyst-consensus data and broader coverage Tipranks provides — those are genuinely unique. The 14-day Tapeline Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so you can run them side-by-side. Many traders run Tipranks for the analyst layer and Tapeline for the live multi-factor synthesis with public accountability.",
+    a: "Sensible if you need the analyst-consensus data and broader coverage Tipranks provides — those are genuinely unique. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare them side-by-side first. Many traders run Tipranks for the analyst layer and Tapeline for the live multi-factor synthesis with public accountability.",
   },
 ];
 

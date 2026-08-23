@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from sqlalchemy import delete
 
+from app.db import session_scope
 from app.main import app
+from app.models import Ticker
 
 
 @pytest.fixture
@@ -18,8 +21,39 @@ def client():
     return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
+@pytest.fixture
+async def aapl_row():
+    """/financials now resolves the symbol against our universe before calling
+    Finnhub, so these contract tests need the row to exist.
+
+    The endpoint used to skip that check entirely, which is exactly the bug
+    (see tests/test_financials_vendor_guard.py): an anonymous caller chose our
+    vendor call volume and our on-disk cache cardinality by typing URLs. These
+    tests still assert what they always did — public access, no auth, a stable
+    envelope, uppercasing — just against a symbol that exists.
+    """
+    from datetime import UTC, datetime
+
+    async with session_scope() as s:
+        await s.execute(delete(Ticker).where(Ticker.symbol == "AAPL"))
+        s.add(
+            Ticker(
+                symbol="AAPL", name="Apple Inc.", asset_class="equity",
+                sector="Information Technology", score=70.0, signal="STRONG SETUP",
+                updated_at=datetime.now(UTC), price=200.0, volume=1_000_000,
+                change_pct_1d=0.2, confidence_pct=85,
+                sub_trend=70, sub_rs=70, sub_momentum=70,
+            )
+        )
+        await s.commit()
+    yield
+    async with session_scope() as s:
+        await s.execute(delete(Ticker).where(Ticker.symbol == "AAPL"))
+        await s.commit()
+
+
 @pytest.mark.asyncio
-async def test_financials_public_no_auth(client):
+async def test_financials_public_no_auth(client, aapl_row):
     """Financials endpoint is public — same access surface as /{symbol}
     and /{symbol}/history. Unauthenticated callers get 200 with the
     standard envelope."""
@@ -39,7 +73,7 @@ async def test_financials_public_no_auth(client):
 
 
 @pytest.mark.asyncio
-async def test_financials_uppercases_symbol(client):
+async def test_financials_uppercases_symbol(client, aapl_row):
     """Symbol is uppercased before the adapter call so /aapl and /AAPL
     return the same cached row."""
     async with client:

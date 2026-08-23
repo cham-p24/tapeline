@@ -61,7 +61,7 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Macro and economic data",
-    tapeline: "Macro regime factor baked into the composite; VIX / DXY / 10Y shown on the regime panel",
+    tapeline: "Macro factor (regime, DXY, 10Y, VIX) baked into the composite",
     competitor: "Deep macro module — global rates, FX, commodities, FOMC dot plots",
     note: "Koyfin's macro coverage rivals paid Bloomberg modules. Tapeline integrates the macro factor into the per-ticker score; we don't try to be a standalone macro terminal.",
   },
@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Yes, that's the natural pairing. Koyfin for institutional-quality fundamentals/macro/charting; Tapeline for the multi-factor composite score and public scorecard. Tapeline's 14-day Premium trial takes a card at first sign-in — $0 charged today, first charge on day 14, cancel in one click before then — so side-by-side comparison is easy either way.",
+    a: "Yes, that's the natural pairing. Koyfin for institutional-quality fundamentals/macro/charting; Tapeline for the multi-factor composite score and public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so side-by-side comparison costs nothing.",
   },
 ];
 

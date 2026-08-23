@@ -141,6 +141,19 @@ class User(Base):
     # entry per week and overran the old String(40) within a month (Postgres
     # raised StringDataRightTruncation on commit).
     drip_state: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    # UTC date of the last EOD watchlist digest actually delivered to this user.
+    #
+    # run_eod_watchlist_digest was the ONLY email orchestrator with no durable
+    # per-recipient dedupe — run_daily_drip stamps drip_state,
+    # run_weekly_newsletter stamps a weekly_* token, newsletter.run_daily_digest
+    # stamps NewsletterSubscriber.last_sent_at. Its only guard was a
+    # process-global date latch set after the whole batch returned cleanly, so a
+    # partial run re-mailed the already-sent prefix on every tick until 24:00
+    # UTC. A Date (not a bool/token list) because this send recurs daily.
+    # See migration 0056_eod_digest_sent_on.
+    eod_digest_sent_on: Mapped[date | None] = mapped_column(
+        Date, nullable=True, index=True
+    )
 
     # ── Subscription-lifecycle / retention state (migration 0029) ──────────
     # Set when a paid user pauses billing via the cancel intercept (Stripe
@@ -269,6 +282,23 @@ class User(Base):
     signup_gbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_wbraid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Meta (Facebook/Instagram) click ID captured at signup — the same
+    # capture/forward/write-once mechanism as signup_gclid above, for the other
+    # paid-click platform. Two things depend on it (see migration 0053 and
+    # docs/PAID_ADS_METRICS_BIBLE.md §7.1):
+    #   1. Event Match Quality. The Conversions API otherwise sees only a
+    #      hashed email + hashed user id, which caps EMQ around 5-6. `fbc`,
+    #      derived from this value, is the cheapest upgrade available and
+    #      needs no new PII.
+    #   2. The ONLY honest Meta payer count. Tapeline's trial is 14 days, so
+    #      the first charge always falls outside Meta's 7-day click window and
+    #      the in-platform Purchase column reads ~0 whatever the truth is.
+    #      Counting payers means joining this column to Stripe ourselves.
+    # Stores the RAW fbclid, not the `fb.1.<ts>.<fbclid>` wire format — the
+    # wire value is derived at send time by services/meta_capi.fbc_value().
+    # Nullable: only paid Meta traffic carries it.
+    signup_fbclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     # First-touch EXTERNAL referrer HOSTNAME captured at landing (frontend
     # lib/utm.ts, same localStorage 30-day-TTL mechanism as signup_utm_*,
     # forwarded on the signup POST; written once at signup, never updated).
@@ -370,7 +400,13 @@ class AlertEvent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String(60), ForeignKey("users.id"), nullable=False, index=True)
-    rule_id: Mapped[int] = mapped_column(Integer, ForeignKey("alert_rules.id"), nullable=False)
+    # Nullable: watchlist smart-alert emails are a rule-less path, but they
+    # must still land on the SAME meter the email_alerts_per_day cap reads
+    # (delivered AlertEvent rows), rather than being uncapped and uncounted.
+    # See migration 0055_alert_event_rule_null.
+    rule_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("alert_rules.id"), nullable=True
+    )
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)
     message: Mapped[str] = mapped_column(String(400), nullable=False)
     channel: Mapped[str] = mapped_column(String(20), nullable=False)

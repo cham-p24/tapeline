@@ -26,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.db import session_scope
-from app.models import AlertRule, User, WatchlistItem
+from app.models import AlertRule, Subscription, User, WatchlistItem
 from app.services.growth_funnel import summarize_growth_funnel
 
 
@@ -102,13 +102,29 @@ async def test_funnel_buckets_each_distinct_state_once():
     #    as active.
     await _seed_user(trial_ends_at=now - timedelta(days=2))
 
-    # 6. Converted: trial still dated in the future BUT a card is on file, so
-    #    they are paying, not a running trial.
-    await _seed_user(
-        trial_ends_at=now + timedelta(days=3),
+    # 6. Genuinely converted: the trial ENDED and an active subscription row
+    #    exists.
+    #
+    #    This case used to be "future trial + a card on file, so they are
+    #    paying, not a running trial". The #548 card gate inverted that: every
+    #    card-required trial now has a stripe_customer_id from day 0, so a card
+    #    marks a TRIALIST, not a payer. Leaving it as it was is what made
+    #    `paying` count trialists and `trial_to_paid_pct` read ~100% against
+    #    zero real payers. Paying now requires an active Subscription row.
+    u_paid = await _seed_user(
+        trial_ends_at=now - timedelta(days=1),
         stripe_customer_id=f"cus_{_uuid.uuid4().hex[:14]}",
         tier="pro",
     )
+    async with session_scope() as s:
+        s.add(Subscription(
+            id=f"sub_{_uuid.uuid4().hex[:14]}",
+            user_id=u_paid,
+            status="active",
+            tier="pro",
+            current_period_end=now + timedelta(days=30),
+        ))
+        await s.commit()
 
     after = await _funnel(days=30)
 
@@ -117,9 +133,10 @@ async def test_funnel_buckets_each_distinct_state_once():
     assert _delta(before, after, "activated") == 2
     # Users 4, 5, 6 all have trial_ends_at set.
     assert _delta(before, after, "trials_started") == 3
-    # Only user 4: future end date AND no card.
+    # Only user 4 has a future end date. User 6 ended yesterday.
+    # (This no longer excludes carded users — see the user-6 comment above.)
     assert _delta(before, after, "trials_active") == 1
-    # Only user 6.
+    # Only user 6 — the one with an ACTIVE subscription row, not merely a card.
     assert _delta(before, after, "paying") == 1
 
 
@@ -275,6 +292,104 @@ async def test_trials_ending_soon_respects_the_row_cap():
     assert data["trials_ending_soon_count"] == 2
 
 
+# ── Card wall (#548) ────────────────────────────────────────────────────────
+#
+# The gated cohort has to mirror `tier.must_add_card` EXACTLY, and the two
+# halves of that predicate fail in opposite directions:
+#
+#   * too wide  — counting an admin / lifetime / hand-comped account, or an
+#     account grandfathered in before the cutover, invents a denominator of
+#     people who never saw the wall and reads as a collapsed completion rate;
+#   * too narrow — excluding the users who DID put a card in (they no longer
+#     satisfy must_add_card, by design) defines completion to be 0% forever.
+
+
+@pytest.mark.asyncio
+async def test_card_wall_counts_gated_cohort_and_its_completions():
+    """Gated accounts move the denominator; a trial stamp moves the numerator."""
+    before = await _funnel(days=30)
+    now = datetime.now(UTC)
+
+    # Signed up under the wall, no card yet → denominator only.
+    await _seed_user(created_at=now)
+    await _seed_user(created_at=now)
+    # Signed up under the wall and completed it: trial_started_at is written
+    # only by the `trialing` subscription webhook, i.e. only after a card
+    # cleared Stripe Checkout.
+    await _seed_user(
+        created_at=now,
+        tier="premium",
+        trial_started_at=now,
+        trial_ends_at=now + timedelta(days=14),
+        stripe_customer_id=f"cus_{_uuid.uuid4().hex[:14]}",
+    )
+
+    after = await _funnel(days=30)
+    b, a = before["card_wall"], after["card_wall"]
+
+    assert a["gated_total"] - b["gated_total"] == 3
+    assert a["cards_added"] - b["cards_added"] == 1
+    assert a["completion_pct"] == round(a["cards_added"] / a["gated_total"] * 100, 1)
+
+
+@pytest.mark.asyncio
+async def test_card_wall_mirrors_must_add_card_exemptions():
+    """Admins, lifetime accounts, hand-comped paid accounts and every
+    pre-cutover signup are exempt from the wall — so none of them may appear in
+    its denominator."""
+    from app.services.tier import CARD_GATE_START, must_add_card
+
+    before = await _funnel(days=30)
+    now = datetime.now(UTC)
+    # One day BEFORE the cutover: grandfathered forever, whatever the window.
+    grandfathered_at = datetime(
+        CARD_GATE_START.year, CARD_GATE_START.month, CARD_GATE_START.day, tzinfo=UTC,
+    ) - timedelta(days=1)
+
+    exempt = [
+        # admin
+        await _seed_user(created_at=now, is_admin=True),
+        # lifetime purchase
+        await _seed_user(created_at=now, is_lifetime=True, tier="premium"),
+        # hand-comped paid account: paid tier, no Stripe customer, never trialled
+        await _seed_user(created_at=now, tier="pro"),
+        # signed up under the old "free, no card" deal
+        await _seed_user(created_at=grandfathered_at),
+    ]
+
+    after = await _funnel(days=30)
+    assert after["card_wall"]["gated_total"] - before["card_wall"]["gated_total"] == 0
+    assert after["card_wall"]["cards_added"] - before["card_wall"]["cards_added"] == 0
+
+    # And the canonical predicate agrees about every one of them — if this
+    # drifts, the readout is measuring a cohort the product does not wall.
+    async with session_scope() as s:
+        for uid in exempt:
+            user = await s.get(User, uid)
+            assert user is not None
+            assert must_add_card(user) is False
+
+
+@pytest.mark.asyncio
+async def test_card_wall_floor_is_the_later_of_window_start_and_cutover():
+    """`gated_since` names the denominator's floor so it can never be read
+    ambiguously: a window that reaches back past the cutover is clipped to the
+    cutover, and a narrower window wins over it."""
+    from app.services.tier import CARD_GATE_START
+
+    gate = datetime(
+        CARD_GATE_START.year, CARD_GATE_START.month, CARD_GATE_START.day, tzinfo=UTC,
+    )
+    wide = await _funnel(days=365)
+    assert datetime.fromisoformat(wide["card_wall"]["gated_since"]) >= gate
+
+    narrow = await _funnel(days=1)
+    assert datetime.fromisoformat(narrow["card_wall"]["gated_since"]) >= gate
+    assert datetime.fromisoformat(narrow["card_wall"]["gated_since"]) >= datetime.fromisoformat(
+        wide["card_wall"]["gated_since"],
+    )
+
+
 # ── Fail-open ───────────────────────────────────────────────────────────────
 
 
@@ -292,6 +407,9 @@ async def test_summarize_fails_open_instead_of_raising():
     assert data["signups"] == 0
     assert data["trials_ending_soon"] == []
     assert data["window_days"] == 30
+    # The card-wall block keeps its shape too — the caller renders it blind.
+    assert data["card_wall"]["gated_total"] == 0
+    assert data["card_wall"]["completion_pct"] == 0.0
 
 
 # ── Endpoint gating ─────────────────────────────────────────────────────────

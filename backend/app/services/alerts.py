@@ -131,6 +131,23 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
         if abs(delta) < threshold:
             continue
 
+        # Enforce the SAME email budget the rule-driven path enforces.
+        #
+        # This is a second, independent email path: it never calls _fire, so it
+        # never called _email_cap_reached and never created an AlertEvent row.
+        # Its sends were therefore neither capped nor counted, and they did not
+        # consume the rule-driven budget either — `email_alerts_per_day`
+        # (Pro = 10) simply did not apply here. The cap's own docstring records
+        # that it was added because "a noisy rule set could bill zero and email
+        # without limit"; that fix never reached this path, and a Pro watchlist
+        # holds up to 50 tickers.
+        if await _email_cap_reached(session, user):
+            logger.info(
+                "alert.watchlist_email_cap_reached user=%s symbol=%s",
+                user.id, item.symbol,
+            )
+            continue
+
         try:
             html = render_watchlist_alert_email(
                 user_name=user.name or "trader",
@@ -151,7 +168,43 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
                 unsubscribe_category="alert_emails",
             )
             delivered = not res.get("skipped", False)
+            # Record it on the SAME meter the cap reads, so this send actually
+            # consumes the budget instead of being invisible to it (and so
+            # /api/usage stops under-reporting the user's alert emails).
+            # rule_id is NULL — there is no rule behind a watchlist alert; see
+            # migration 0055_alert_event_rule_null.
+            session.add(
+                AlertEvent(
+                    user_id=user.id,
+                    rule_id=None,
+                    symbol=item.symbol,
+                    message=subject[:400],
+                    channel="email",
+                    delivered=delivered,
+                )
+            )
             item.last_alert_at = now
+            # Commit the debounce PER ITEM, immediately after the send.
+            #
+            # This used to be written in memory and persisted only by a single
+            # commit AFTER the whole loop. This loop runs inline inside tick(),
+            # which the worker wraps in `asyncio.wait_for(tick(), timeout=60)`.
+            # CancelledError is a BaseException: it is not caught by the per-item
+            # `except Exception` below, nor by the worker's `except Exception`,
+            # and db.session_scope only rolls back on Exception — so the session
+            # closed with every pending last_alert_at discarded, while the emails
+            # had already gone out.
+            #
+            # And the trigger is stable, not transient: WatchlistItem
+            # .baseline_score is captured once at add time and never refreshed,
+            # so once a symbol has drifted past alert_threshold_delta it STAYS
+            # past it. The same items re-qualify on the very next 60s tick and
+            # the whole batch re-sends, indefinitely.
+            #
+            # Every other email orchestrator commits per-recipient for exactly
+            # this reason (run_daily_drip, run_daily_digest, every run_*_drip);
+            # this path was never converted.
+            await session.commit()
             fired += 1
             logger.info(
                 "alert.watchlist user=%s symbol=%s score=%.1f delta=%+.1f delivered=%s",
@@ -162,8 +215,6 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
                 "alert.watchlist_failed user=%s symbol=%s", user.id, item.symbol,
             )
 
-    if fired:
-        await session.commit()
     return fired
 
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ScannerPreview } from "@/components/ScannerPreview";
 import { MarketingNav } from "@/components/MarketingNav";
+import { OpenAccessBanner } from "@/components/OpenAccessBanner";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { LiveCounters } from "@/components/LiveCounters";
 import { FadeIn } from "@/components/FadeIn";
@@ -62,6 +63,14 @@ export default async function LandingPage() {
     // visible, so the sticky nav keeps floating.
     <main id="main" className="relative min-h-screen overflow-x-clip">
       <MarketingNav />
+
+      {/* Open-access month strip — sits ABOVE the hero, never replacing it.
+          Date-gated inside the component (freeOpenAccess); renders nothing
+          from 8 September, and the 30-min ISR on this page picks that up
+          without a deploy. */}
+      <div className="mx-auto max-w-6xl px-6 pt-4">
+        <OpenAccessBanner />
+      </div>
 
       {/* HERO — single-purpose fold.
           Left: one sentence value prop + the record/trial CTA pair + the

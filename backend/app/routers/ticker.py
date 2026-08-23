@@ -814,7 +814,39 @@ async def ticker_financials(symbol: str) -> dict:
     keeps a stable shape (`available: false`, empty `metrics`) so the
     frontend can render a clean empty state instead of broken null fields.
     """
-    sym = symbol.upper()
+    # Resolve the symbol against OUR universe before touching the vendor.
+    #
+    # This endpoint had neither auth, nor clean_symbol(), nor a Ticker lookup —
+    # so the cardinality of both the upstream Finnhub call and the on-disk cache
+    # file was chosen entirely by the URL path an anonymous caller typed. Every
+    # distinct symbol is a guaranteed cache miss, and on a miss
+    # fetch_basic_financials issues a live GET to Finnhub and then
+    # _save_cache() writes .cache/finnhub_metric_<SYM>.json unconditionally —
+    # even for the empty blob Finnhub returns for an unrecognised symbol.
+    #
+    # Finnhub is a shared, hard-capped dependency: the same key serves per-tick
+    # fundamentals, the IPO/earnings calendars, insider Form 4, analyst ratings,
+    # the daily sector backfill (deliberately budgeted at 200 calls/day) and half
+    # the news feed. A loop over invented symbols exhausts the free tier's
+    # 60 calls/min in about a second and degrades every one of those for
+    # everybody, while growing .cache/ by one inode per attacker-chosen symbol
+    # with no bound and no eviction.
+    #
+    # /{symbol} — which this docstring calls the same access surface — already
+    # 404s an unknown symbol without any upstream call. Matching it caps both the
+    # vendor calls and the cache files at the size of the scored universe.
+    cleaned = clean_symbol(symbol)
+    if cleaned is None:
+        raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
+    sym = cleaned
+
+    async with SessionLocal() as session:
+        known = (
+            await session.execute(select(Ticker.symbol).where(Ticker.symbol == sym))
+        ).scalar_one_or_none()
+    if known is None:
+        raise HTTPException(404, f"Ticker {sym} not found")
+
     metrics = await fetch_basic_financials(sym)
     return {
         "symbol": sym,

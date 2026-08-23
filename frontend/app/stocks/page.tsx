@@ -69,14 +69,24 @@ type SignalsResponse = {
 // &offset= until a short page so the directory lists EVERY scored ticker,
 // durably, matching the sitemap (app/sitemap.ts → fetchUniverseSymbols) exactly.
 const UNIVERSE_PAGE_SIZE = 2000;
-const UNIVERSE_MAX_PAGES = 8; // safety bound: 8 × 2000 = 16k ≫ today's ~4.6k pool
+const UNIVERSE_MAX_PAGES = 8; // safety bound: 8 × 1500 + 2000 = 12.5k ≫ today's ~4.6k pool
+
+// Advance by LESS than a page so consecutive windows OVERLAP by 500 rows.
+// Each offset URL is its own `revalidate: 3600` cache entry, so adjacent pages
+// are routinely read from snapshots up to an hour apart while the worker
+// re-scores every 60s — a ticker whose rank drifts across the boundary in
+// between falls into NEITHER window and disappears from the directory. The
+// `seen` dedupe below already absorbs the duplicates overlapping introduces;
+// it could never recover a skip. Kept identical to app/sitemap.ts, which the
+// comment above promises this page matches exactly.
+const UNIVERSE_STRIDE = 1500;
 
 async function fetchUniverse(): Promise<DirectoryRow[]> {
   const all: DirectoryRow[] = [];
   const seen = new Set<string>();
   try {
     for (let page = 0; page < UNIVERSE_MAX_PAGES; page++) {
-      const offset = page * UNIVERSE_PAGE_SIZE;
+      const offset = page * UNIVERSE_STRIDE;
       // revalidate keeps each page behind the 1h ISR cache so crawlers don't
       // hit the API live; each distinct offset URL is cached separately.
       const res = await fetch(

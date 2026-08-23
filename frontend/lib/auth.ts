@@ -68,6 +68,24 @@ type SignupExtras = {
   gclid?: string;
   gbraid?: string;
   wbraid?: string;
+  // Meta click ID — read from localStorage on submit via
+  // lib/utm.ts:getStoredFbclid(). Backend writes it once to
+  // users.signup_fbclid. It carries the Conversions API's match quality (a
+  // hashed email alone caps it) and is the only join key that can count Meta
+  // payers, since the 14-day trial puts every first charge outside Meta's
+  // 7-day click window. Optional — only paid Meta clicks carry it.
+  fbclid?: string;
+  // Meta's `_fbp` browser cookie, read at submit via
+  // lib/utm.ts:readFbpCookie(). NOT persisted — forwarded straight onto the
+  // server-side CompleteRegistration event as the second unhashed identifier
+  // Meta matches on. Absent whenever the pixel was blocked or never ran.
+  fbp?: string;
+  // Self-reported "How did you hear about us?" — optional free text from the
+  // signup form. Backend writes it to users.referral_source. The only
+  // instrument that can ever credit AI-assistant and dark-social referrals,
+  // which arrive with no referrer and no UTM. Attribution only: it must
+  // never become a suitability input (compliance Rule 8).
+  referral_source?: string;
   // First-touch EXTERNAL referrer hostname — read from localStorage on
   // submit via lib/utm.ts:getStoredReferrerHost(). The only attribution
   // trace AI-assistant referrals (Copilot/ChatGPT/Perplexity) leave, since

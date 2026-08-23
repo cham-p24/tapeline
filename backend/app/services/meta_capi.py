@@ -56,11 +56,21 @@ primary Google conversion in `PAID_MARKETING_PLAYBOOK.md` §1 item 5.
 
 PII handling
 ------------
-Meta requires hashed identifiers for match quality. Everything in `user_data`
-is SHA-256 of a normalised value (lower-cased, trimmed) — Meta's documented
-Advanced Matching format. Raw email never leaves this process. `external_id`
-is a hash of Tapeline's own opaque user id, so it is not reversible to a
-person even by Meta.
+Meta requires hashed identifiers for match quality. Every *PII* field in
+`user_data` is SHA-256 of a normalised value (lower-cased, trimmed) — Meta's
+documented Advanced Matching format. Raw email never leaves this process.
+`external_id` is a hash of Tapeline's own opaque user id, so it is not
+reversible to a person even by Meta.
+
+**`fbc` and `fbp` are the documented exceptions and must be sent UNHASHED.**
+They are Meta's own click/browser identifiers — opaque tokens Meta issued
+itself, carrying no personal data of ours to protect — and Meta matches them
+by exact string. Hashing them produces NO error: the payload is accepted, the
+identifier simply never matches anything, and the account ends up with a
+permanently mediocre match rate that looks like bad luck. The same applies to
+IP and user-agent if those are ever added. `test_meta_capi.py` guards this
+both ways: raw email must never appear on the wire, and fbc/fbp must appear
+on it verbatim.
 
 GO-LIVE CHECKLIST (none of this is done by shipping this file)
 --------------------------------------------------------------
@@ -88,6 +98,7 @@ import hashlib
 import logging
 import os
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -137,6 +148,46 @@ def hash_pii(value: str | None) -> str | None:
     return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
 
 
+def fbc_value(fbclid: str | None, click_time: datetime | None = None) -> str | None:
+    """Build Meta's `_fbc` wire value from a raw fbclid, or None.
+
+    FORMAT MATTERS. Meta expects `fb.<subdomain_index>.<creation_ms>.<fbclid>`
+    and rejects a bare fbclid outright — the version prefix and the timestamp
+    are not decoration. We always emit subdomain index 1 (tapeline.io is the
+    domain the cookie would belong to) and milliseconds since the epoch.
+
+    WHERE THE FORMAT IS BUILT, and why here rather than at capture. The
+    browser knows the exact instant it saw the fbclid, so constructing the
+    string in `lib/utm.ts` would be marginally more accurate. It is built here
+    instead so that ONE function owns the format for every event — the
+    registration sent seconds after signup and, later, a StartTrial or
+    Purchase fired from a Stripe webhook days afterwards, where no browser is
+    involved and only the stored fbclid survives. A second construction site
+    is a second thing to get wrong silently.
+
+    The cost of that choice, stated plainly: `click_time` is the caller's best
+    available proxy for the click (in practice the account's `created_at`),
+    and first-touch capture holds an fbclid for up to 30 days — so on a
+    delayed signup the timestamp can trail the real click by that much. Meta
+    documents falling back to observation time when the true click time is
+    unavailable, and matches primarily on the fbclid itself, so an approximate
+    timestamp degrades nothing; an absent or malformed `_fbc` would.
+
+    Returns None for an empty fbclid so callers can omit the key entirely.
+    """
+    if not fbclid:
+        return None
+    token = fbclid.strip()
+    if not token:
+        return None
+    when = click_time or datetime.now(UTC)
+    # A naive datetime from SQLite reads as UTC here; the value is a cookie
+    # creation stamp, not an audited timestamp, so this is safe.
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return f"fb.1.{int(when.timestamp() * 1000)}.{token}"
+
+
 def event_id_for(kind: str, stable_id: str) -> str:
     """Deterministic `event_id` shared by the browser pixel and this module.
 
@@ -155,11 +206,19 @@ async def send_event(
     event_id: str,
     email: str | None = None,
     user_id: str | None = None,
+    fbc: str | None = None,
+    fbp: str | None = None,
     custom_data: dict[str, Any] | None = None,
     event_source_url: str | None = None,
     action_source: str = "website",
 ) -> bool:
     """POST one event to the Conversions API.
+
+    `fbc` is Meta's click identifier in `fb.1.<ms>.<fbclid>` form (build it
+    with `fbc_value`); `fbp` is the `_fbp` first-party browser cookie the
+    pixel writes. Both are OPTIONAL and both go on the wire UNHASHED — see
+    the PII section of the module docstring. They are the EMQ upgrade that
+    costs no new PII (docs/PAID_ADS_METRICS_BIBLE.md §7.1).
 
     Returns True if Meta accepted the payload, False on any no-op or failure.
     Never raises — the return value is informational only.
@@ -179,6 +238,14 @@ async def send_event(
     hashed_uid = hash_pii(user_id)
     if hashed_uid:
         user_data["external_id"] = [hashed_uid]
+    # NOT hashed, and not lists. `fbc`/`fbp` are Meta's own opaque tokens,
+    # matched by exact string — hashing them is accepted silently and matches
+    # nothing, which is worse than omitting them because it looks like it
+    # worked. Do not "tidy" these into hash_pii().
+    if fbc:
+        user_data["fbc"] = fbc
+    if fbp:
+        user_data["fbp"] = fbp
 
     event: dict[str, Any] = {
         "event_name": event_name,
@@ -233,6 +300,8 @@ async def track_start_trial(
     email: str | None = None,
     value: float | None = None,
     currency: str = "USD",
+    fbc: str | None = None,
+    fbp: str | None = None,
 ) -> bool:
     """`StartTrial` — the card-required trial began.
 
@@ -249,6 +318,8 @@ async def track_start_trial(
         email=email,
         user_id=user_id,
         custom_data=custom,
+        fbc=fbc,
+        fbp=fbp,
     )
 
 
@@ -261,6 +332,8 @@ async def track_purchase(
     currency: str = "USD",
     tier: str | None = None,
     billing_period: str | None = None,
+    fbc: str | None = None,
+    fbp: str | None = None,
 ) -> bool:
     """`Purchase` — the first real charge succeeded.
 
@@ -281,20 +354,36 @@ async def track_purchase(
         email=email,
         user_id=user_id,
         custom_data=custom,
+        fbc=fbc,
+        fbp=fbp,
     )
 
 
 async def track_complete_registration(*, user_id: str, email: str | None = None,
-                                      method: str = "email") -> bool:
+                                      method: str = "email",
+                                      fbc: str | None = None,
+                                      fbp: str | None = None) -> bool:
     """`CompleteRegistration` — an account was created (no card yet).
 
-    Lower intent than StartTrial now that the trial is card-required (#536),
-    so it is reported but is NOT the optimisation target.
+    Lower intent than StartTrial now that the trial is card-required (#536).
+
+    The pre-existing note here — "reported, NOT the optimisation target" —
+    reads backwards against the campaign plan that has since been written, and
+    is corrected rather than left standing: `PAID_ADS_METRICS_BIBLE.md` §7.2
+    makes this the ad set's optimisation event *precisely because* the
+    card-required trial is scarce, and Meta needs ~50 events/week to leave
+    learning. Which event a campaign optimises toward is an Ads Manager
+    setting, not a code path — all three still flow from here regardless.
+
+    That is why `fbc`/`fbp` matter most on this event: match quality on the
+    OPTIMISATION event is what the delivery model learns from.
     """
     return await send_event(
         event_name="CompleteRegistration",
         event_id=event_id_for("signup", user_id),
         email=email,
         user_id=user_id,
+        fbc=fbc,
+        fbp=fbp,
         custom_data={"content_name": method},
     )

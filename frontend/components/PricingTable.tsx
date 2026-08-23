@@ -6,7 +6,15 @@ import { Button } from "@/components/Button";
 // describes the public record (which has no per-account limits), not a
 // logged-in free tier. The constants still exist for the surfaces that
 // legitimately describe grandfathered Free accounts.
-import { PRICING, REFUND, annualSaving, billedAnnuallyNote } from "@/lib/pricing";
+import {
+  PRICING,
+  REFUND,
+  annualSaving,
+  billedAnnuallyNote,
+  freeOpenAccess,
+  PRO_SCANNER_ROWS,
+  FREE_LIMITS,
+} from "@/lib/pricing";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
@@ -49,6 +57,11 @@ const PLANS = [
     // already have.
     footnote:
       "Nothing here asks for anything. Signing in to the app is separate and does take a card — see the trial terms below. Accounts created before 22 August 2026 keep the free access they signed up for and are never asked for a card.",
+    // Marks the card that carries the date-gated open-access note below. The
+    // note describes a SIGNED-IN entitlement, so it lives with the footnote
+    // (which already covers signed-in matters), never in the highlights list —
+    // every highlight above must stay reachable with no account.
+    openAccessNote: true,
   },
   {
     name: "Pro",
@@ -128,12 +141,18 @@ const PLANS = [
   },
 ];
 
-export function PricingTable() {
+export function PricingTable({ now }: { now?: Date } = {}) {
   // ANNUAL is the default (founder decision 2026-07-18) — monthly stays one
   // click away. State lives in the shared BillingPeriod context so the
   // ComparisonTable header on the same page can never disagree with these
   // cards; standalone renders fall back to the same annual default.
   const { billing, setBilling } = useBillingPeriod();
+  // Open-access month (backend tier.py free_open_access, mirrored in
+  // lib/pricing.ts): while the window runs, a SIGNED-IN Free account's
+  // scanner row cap lifts from the top 10 to the Pro cap. Date-gated so the
+  // note vanishes from 8 September with no code change; `now` is injectable
+  // for tests, mirroring the backend's `today` argument.
+  const openAccess = freeOpenAccess(now ?? new Date());
   // What Stripe will actually take, derived from the live Price object plus
   // the session kwargs the backend sends — never a hardcoded guess. Falls
   // back to the PRICING.currency constant and stays silent about tax until
@@ -234,6 +253,21 @@ export function PricingTable() {
               {(p as { footnote?: string }).footnote && (
                 <p className="mt-4 text-xs text-muted leading-relaxed">
                   {(p as { footnote?: string }).footnote}
+                </p>
+              )}
+              {/* Open-access month — one factual line, stated where the $0
+                  column meets the signed-in world. The lift is rows-only and
+                  signed-in-only (tier.py limit()): no lifted look-ups, no
+                  Pro features, nothing for anonymous callers — so the copy
+                  says exactly that and nothing more. Factual end date only;
+                  no urgency (Rule 6). */}
+              {(p as { openAccessNote?: boolean }).openAccessNote && openAccess && (
+                <p className="mt-3 text-xs leading-relaxed text-accent/90">
+                  Open-access month: until 8 September, signing in to a free
+                  account lifts the scanner cap from the top{" "}
+                  {FREE_LIMITS.scannerRows} to the full list &mdash; up to{" "}
+                  {PRO_SCANNER_ROWS.toLocaleString("en-US")} rows, the same as
+                  Pro.
                 </p>
               )}
               <Button
