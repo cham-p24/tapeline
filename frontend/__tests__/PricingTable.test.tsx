@@ -146,6 +146,43 @@ describe("PricingTable", () => {
     expect(text).toContain("before 22 august 2026");
   });
 
+  // ── Open-access month note (backend tier.py free_open_access, #523) ──────
+  // One factual line on the $0 column while the promo window runs. It
+  // describes a SIGNED-IN entitlement, so it lives in the footnote area —
+  // never in the highlights list, whose lines must all be account-free.
+  describe("open-access month note", () => {
+    const DURING = new Date("2026-08-23T12:00:00Z");
+    const CUTOFF = new Date("2026-09-08T00:00:00Z");
+
+    it("carries the factual promo line while the window runs", () => {
+      render(<PricingTable now={DURING} />);
+      const note = screen.getByText(/open-access month/i);
+      const text = note.textContent || "";
+      expect(text).toMatch(/until 8 September/i);
+      // The honest mechanism: sign in, rows-only lift, real numbers.
+      expect(text).toMatch(/signing in to a free account/i);
+      expect(text).toMatch(/top\s+10/i);
+      expect(text).toMatch(/1,000 rows/);
+      expect(text).toMatch(/the same as\s+Pro/i);
+    });
+
+    it("drops the line at the backend cutoff instant (d < UNTIL mirror)", () => {
+      render(<PricingTable now={CUTOFF} />);
+      expect(screen.queryByText(/open-access month/i)).toBeNull();
+    });
+
+    it("keeps the promo line free of urgency and card-free-account claims", () => {
+      render(<PricingTable now={DURING} />);
+      const text = (screen.getByText(/open-access month/i).textContent || "").toLowerCase();
+      expect(text).not.toMatch(
+        /hurry|act now|last chance|limited time|countdown|only \d+ (left|remaining)/i,
+      );
+      for (const banned of ["no card", "no credit card", "free forever", "start free"]) {
+        expect(text).not.toContain(banned);
+      }
+    });
+  });
+
   it("states the refund guarantee from the REFUND single source of truth", () => {
     render(<PricingTable />);
     expect(screen.getByText(REFUND.short)).toBeInTheDocument();

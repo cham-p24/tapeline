@@ -150,6 +150,50 @@ describe("LandingPage hero fold", () => {
   });
 });
 
+// ── Open-access month strip (backend tier.py free_open_access, #523) ───────
+describe("LandingPage open-access strip", () => {
+  // The page reads the real clock (no `now` prop threads through an async
+  // server component), so pin Date only — timers/promises stay real, which
+  // keeps the awaited fetch mocks working.
+  function pinDate(iso: string) {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+  }
+
+  it("shows the strip ABOVE the hero while the window runs — hero intact", async () => {
+    pinDate("2026-08-23T12:00:00Z");
+    try {
+      render(await LandingPage());
+      const strip = screen.getByTestId("open-access-banner");
+      expect(strip.textContent).toMatch(/until 8 September/i);
+      expect(strip.textContent).toMatch(/signed-in account/i);
+      // The strip supplements the hero, never replaces it: h1 + both CTAs stay.
+      expect(
+        screen.getByRole("heading", { level: 1 }).textContent,
+      ).toMatch(/every pick on the public record/i);
+      expect(
+        screen.getByRole("link", { name: /see the track record/i }),
+      ).toHaveAttribute("href", "/scorecard");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("renders no strip once the window has closed", async () => {
+    pinDate("2026-09-09T00:00:00Z");
+    try {
+      render(await LandingPage());
+      expect(screen.queryByTestId("open-access-banner")).toBeNull();
+      // The page itself is unaffected by the promo ending.
+      expect(
+        screen.getByRole("heading", { level: 1 }).textContent,
+      ).toMatch(/every pick on the public record/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 // ── Usage-as-proof (GAP #20) ───────────────────────────────────────────────
 describe("LandingPage usage-as-proof line", () => {
   it("renders the live raw counts and tracked-since date", async () => {

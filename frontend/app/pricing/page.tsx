@@ -6,6 +6,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { TrackPageView } from "@/components/TrackPageView";
 import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { LiveCounters } from "@/components/LiveCounters";
+import { OpenAccessBanner } from "@/components/OpenAccessBanner";
 import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
@@ -15,10 +16,11 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { PRICING, REFUND, usd, annualRateLabel } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 
-// ISR: regenerate periodically so the date-gated FREE_WATCHLIST_REMOVAL_DATE
-// cutover (watchlist → Pro+ on 2026-08-02) flips the Free-tier copy here without
-// waiting for the next deploy. 6h keeps the marketing copy within a quarter-day
-// of the cutover.
+// ISR: regenerate periodically so date-gated copy flips here without waiting
+// for the next deploy — originally the FREE_WATCHLIST_REMOVAL_DATE cutover,
+// now also the open-access month strip + Free-column note (gone from
+// 8 September via freeOpenAccess()). 6h keeps the marketing copy within a
+// quarter-day of any cutover.
 export const revalidate = 21600;
 
 // SERP title keeps the $8.25 headline but ALWAYS qualified — a bare annual
@@ -126,6 +128,14 @@ export default function PricingPage() {
             rate is locked in for as long as your subscription stays active
             &mdash; if prices rise later, yours doesn&rsquo;t.
           </p>
+        </div>
+
+        {/* Open-access month strip — above the tier grid so the promo is
+            stated where the tiers are compared. Date-gated inside the
+            component; renders nothing from 8 September (picked up within the
+            6h ISR window above). */}
+        <div className="mx-auto mt-6 max-w-2xl">
+          <OpenAccessBanner />
         </div>
 
         <div className="mt-12">
