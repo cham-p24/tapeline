@@ -66,13 +66,30 @@ const UNIVERSE_TIMEOUT_MS = 8000;
 // (Frontend-only: the backend 2,000-per-response cap is untouched — we just
 // make more calls. Raising that cap would need a manual Fly deploy.)
 const UNIVERSE_PAGE_SIZE = 2000; // = backend hard cap per /api/public/signals response
-const UNIVERSE_MAX_PAGES = 8;    // safety bound: 8 × 2000 = 16k ≫ today's ~4.6k pool
+const UNIVERSE_MAX_PAGES = 8;    // safety bound: 8 × 1500 + 2000 = 12.5k ≫ today's ~4.6k pool
+
+// Advance by LESS than a page so consecutive windows OVERLAP by 500 rows.
+//
+// Each offset URL is its own `revalidate: 3600` cache entry, so page 0 and
+// page 1 are routinely read from snapshots up to an hour apart — while the
+// worker re-scores the whole universe every 60s. A ticker whose rank drifts
+// across a page boundary between those two snapshots is in NEITHER window:
+// absent from the older page-0 (it ranked below the cut then) and absent from
+// the newer page-1 (it ranks above the cut now). It then vanishes from
+// sitemap.xml entirely — the exact "Crawled - currently not indexed" failure
+// this pagination was added to fix. The dedupe below already tolerates the
+// duplicates that overlapping introduces; it could never recover a skip.
+//
+// 500 rows of slack comfortably exceeds the rank drift a low-volatility name
+// shows in an hour. It costs nothing here: at ~4,600 tickers both a 2000 and a
+// 1500 stride need 3 requests.
+const UNIVERSE_STRIDE = 1500;
 
 async function fetchUniverseSymbols(): Promise<string[]> {
   const all: string[] = [];
   try {
     for (let page = 0; page < UNIVERSE_MAX_PAGES; page++) {
-      const offset = page * UNIVERSE_PAGE_SIZE;
+      const offset = page * UNIVERSE_STRIDE;
       const res = await fetch(
         `${API_BASE}/api/public/signals?limit=${UNIVERSE_PAGE_SIZE}&offset=${offset}`,
         {
