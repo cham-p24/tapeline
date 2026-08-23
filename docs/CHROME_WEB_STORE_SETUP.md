@@ -27,7 +27,7 @@ Already true:
   (client IDs are not secret; the secret is).
 - Consent screen publishing status: **In production** (deliberately — see 2.3).
 - Listing copy, final, written: `C:/Tapeline/CHROME_STORE_LISTING.md`
-- Package ready to upload: `C:/Tapeline/tapeline-extension-v1.2.1.zip`
+- Package ready to upload: `C:/Tapeline/tapeline-extension-v1.2.3.zip`
   (verified: `manifest.json` at the archive root, 11 files, no dev artefacts)
 
 **Next action:** section 1 — pay the US$5 registration fee, create the item, paste the
@@ -73,7 +73,7 @@ Can, from then on — the workflow does these with no dashboard visit:
    started with a "your extension violates policy" email. Treat any such email as
    phishing until you have confirmed it inside the dashboard.
 3. Pay the one-off **US$5** registration fee.
-4. **Add new item** → upload `C:/Tapeline/tapeline-extension-v1.2.1.zip`.
+4. **Add new item** → upload `C:/Tapeline/tapeline-extension-v1.2.3.zip`.
 5. Fill the listing from `C:/Tapeline/CHROME_STORE_LISTING.md` — description, category,
    privacy answers, and the per-permission justifications. Do not improvise these; the
    justifications are the part that gets a submission rejected.
@@ -114,7 +114,7 @@ Two things that matter about that `pwsh` line:
   5.1's `Compress-Archive` writes backslash path separators, which the store rejects.
   Verified on this machine: pwsh 7.6.5 produces forward slashes with `manifest.json` at
   the root, 11 entries, byte-for-byte the same file list as
-  `C:/Tapeline/tapeline-extension-v1.2.1.zip`.
+  `C:/Tapeline/tapeline-extension-v1.2.3.zip`.
 - On Linux or macOS, `cd build && zip -rq ../extension.zip . && cd ..` does the same
   job — that is exactly what the CI runner does, and CI has `zip` installed.
 
@@ -367,9 +367,9 @@ few seconds of the run rather than halfway through an upload.
 1. Bump `version` in `extension/manifest.json`. It must be strictly higher than what is
    in the store; the API rejects anything else.
 
-   **Note for the very first run:** section 1 step 4 puts version **1.2.1** into the
-   store, and the repo manifest is still **1.2.1**. So the first workflow run must ship
-   **1.2.2 or higher** — including a run you only intend as a `publish: none` smoke test
+   **Note for the very first run:** section 1 step 4 puts version **1.2.3** into the
+   store, and the repo manifest is also **1.2.3**. So the first workflow run must ship
+   **1.2.4 or higher** — including a run you only intend as a `publish: none` smoke test
    of the secrets. Bump before you test, or the run fails on the version clash and tells
    you nothing about whether the refresh token works.
 2. Merge that.
@@ -471,6 +471,6 @@ is why the script inspects `uploadState` rather than trusting the status code.
 | Client secret lost | It cannot be read back. Client → **Add secret** (max 2), update `CWS_CLIENT_SECRET`. The existing refresh token survives (2.2). |
 | `Missing secret(s): ...` | Exactly what it says — check the names in section 4 character for character. |
 | `Could not read the package at extension.zip` | The packaging step did not run or failed. Read the earlier steps in the run log. |
-| Upload rejected, version error | `extension/manifest.json` version is not higher than the published one. On the first run that is 1.2.1 against 1.2.1 — see section 5 step 1. Bump and re-run. |
+| Upload rejected, version error | `extension/manifest.json` version is not higher than the published one. On the first run that is 1.2.3 against 1.2.3 — see section 5 step 1. Bump and re-run. |
 | `ITEM_NOT_UPDATABLE` | The item is already in review. Wait for that review to finish. |
 | Store rejects the upload: "manifest.json not at root" | You uploaded the GitHub artifact download, which wraps `extension.zip`. Unzip once and upload the inner file (1.1). CI will not catch this for you — its check only greps for the substring (5). |

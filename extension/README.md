@@ -10,15 +10,19 @@ not ask to read your entire browsing history" pull against each other:
    Finance, MarketWatch, Seeking Alpha, Stocktwits, Finviz, Barchart, CNBC,
    Nasdaq, Investing.com, Zacks, Morningstar, TipRanks, stockanalysis.com,
    Simply Wall St, StockCharts, Benzinga, Motley Fool, WSJ market data and
-   Reuters markets. All public research pages. Robinhood is *not* one of them
-   — it was dropped from the manifest in PR #526, and it does not fall through
-   to layer 2 either: `sites.js` still carries a Robinhood rule, so
-   `isKnownHost("robinhood.com")` is true, and `popup.js` only offers *Enable
-   on this site* when that is false. So the extension currently does nothing on
-   Robinhood unless the origin is granted outside the popup —
-   `syncEnabledSites()` registers the script for any granted origin. Removing
-   the `robinhood.com` entry from `TAPELINE_SITES` would put it back on the
-   normal opt-in path.
+   Reuters markets. All public research pages. Robinhood is *not* one of them —
+   it was dropped from the manifest in PR #526, like every other broker, and
+   reaches the score through the opt-in path in layer 2.
+
+   That path was broken until the `optIn` flag existed. `sites.js` keeps a
+   Robinhood rule so that a granted origin is parsed by a rule written for it
+   rather than by the loose generic patterns — but `isKnownHost` used to mean
+   merely "a rule exists", which made it true for Robinhood, and `popup.js`
+   only offers *Enable on this site* when it is false. The result was a silent
+   dead end: nothing rendered, and no button to grant the origin. Marking the
+   rule `optIn: true` separates "we can parse this host" from "this host works
+   out of the box", so the button appears and the precise rule still wins once
+   granted. `test-detection.js` guards both halves.
 2. **Anything else, one click** — open the popup on a site that is not already
    covered and press *Enable on this site*. That grants access to **that origin
    only**, and the generic URL patterns take over. This is how brokers are
