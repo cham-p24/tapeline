@@ -44,11 +44,19 @@ type ScannerRow = {
 
 async function fetchSectorTickers(apiSector: string): Promise<ScannerRow[]> {
   try {
-    const url = `${API_BASE}/api/scanner?${new URLSearchParams({
+    // /api/public/signals, NOT /api/scanner. This is anonymous SSR, and the
+    // scanner tier-gates row count: an anonymous caller is clamped to the Free
+    // cap (10), so this "Top {sector} Stocks Ranked" page asked for 30 and
+    // silently published 10. The public endpoint applies the same filters and
+    // the same ORDER BY (shared via backend services/ticker_ordering) with no
+    // row cap. min_dollar_volume mirrors the scanner's default so the same
+    // near-untradeable names stay out of the ranked list.
+    const url = `${API_BASE}/api/public/signals?${new URLSearchParams({
       sector: apiSector,
       limit: "30",
       sort: "score",
       order: "desc",
+      min_dollar_volume: "50000",
     }).toString()}`;
     const res = await fetch(url, {
       next: { revalidate: 3600 },
