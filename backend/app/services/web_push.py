@@ -40,6 +40,45 @@ except ImportError:
     logger.info("web_push.pywebpush_not_installed run 'pip install pywebpush' to activate")
 
 
+
+# Hosts real browsers hand out as Web Push endpoints. We POST to whatever is
+# stored, so an unvalidated endpoint is a server-side request forgery primitive:
+# a Pro+ user could register `https://169.254.169.254/...` (cloud metadata) or an
+# internal admin port and have OUR server issue that request, from inside the
+# network, on every alert fire.
+#
+# An allowlist beats blocking private IPs: hostname->IP blocklists lose to DNS
+# rebinding and to redirects, while every genuine subscription comes from one of
+# these four services. An unknown browser fails closed with a clear error rather
+# than silently opening a hole.
+ALLOWED_PUSH_HOSTS = (
+    "fcm.googleapis.com",                 # Chrome / Chromium / Android
+    "updates.push.services.mozilla.com",  # Firefox
+    "web.push.apple.com",                 # Safari / iOS PWA
+    "notify.windows.com",                 # Edge (regional sub-domains)
+)
+
+
+def is_allowed_push_endpoint(url: str) -> bool:
+    """True if `url` is an https endpoint at a known push service.
+
+    Anchored on a leading dot for the sub-domain case so a lookalike such as
+    "evil-notify.windows.com.attacker.tld" cannot pass.
+    """
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url or "")
+    except ValueError:
+        return False
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return False
+    return any(host == h or host.endswith("." + h) for h in ALLOWED_PUSH_HOSTS)
+
+
 def _vapid_configured() -> bool:
     return bool(
         getattr(settings, "vapid_private_key", "")
@@ -64,6 +103,15 @@ async def send_web_push(
     configured, or the push service rejects the delivery (e.g. 410 Gone for
     expired subscriptions — caller should delete those rows).
     """
+    # Defence in depth: rows written before the subscribe-time allowlist existed
+    # (or by any future path that skips it) must not turn this into an SSRF
+    # egress. Validate at the point of the actual outbound request.
+    if not is_allowed_push_endpoint(str(subscription.get("endpoint") or "")):
+        logger.warning(
+            "web_push.blocked_endpoint host_not_allowlisted endpoint=%s",
+            str(subscription.get("endpoint") or "")[:80],
+        )
+        return False
     if not PYWEBPUSH_AVAILABLE:
         logger.warning("web_push.skipped reason=pywebpush_not_installed")
         return False
