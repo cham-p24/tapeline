@@ -31,6 +31,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Refresh every 30 min — this is a marketing snapshot of the daily Top 10,
 // not the live in-app scanner, so sub-minute freshness is wasted budget.
@@ -65,6 +66,7 @@ async function fetchTopTen(): Promise<ScannerRow[]> {
     // We slice to 10 to match the email digest exactly.
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       // Bound the build-time fetch so a degraded/slow API can't hang static
       // export past Next's 60s budget (a hang isn't caught by try/catch).
       // Matches /stocks + /signals; falls back to [] below, ISR backfills.

@@ -23,6 +23,7 @@ import { PRICING, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Render on-demand and cache for 1 hour (ISR). Matches the per-fetch
 // `revalidate: 3600` below (data rolls daily; hourly is plenty), and
@@ -53,6 +54,7 @@ async function fetchStrategyTickers(params: Record<string, string | number>): Pr
     // 1-hour cache so search-engine crawls don't hammer the API (or Vercel CPU).
     const res = await fetch(url, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the fetch so a degraded backend can't hang the on-demand render
       // (this page is ISR, not build-time — see generateStaticParams). On
       // timeout we fall through to the [] fallback and render fast; ISR refills

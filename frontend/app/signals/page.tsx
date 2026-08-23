@@ -23,6 +23,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Number of rows shown to anonymous visitors before the signup gate.
 // Big enough to demonstrate the product (top 10 = clear ranking with
@@ -75,6 +76,7 @@ async function fetchSignals(): Promise<SignalsResponse | null> {
   try {
     const res = await fetch(`${API_BASE}/api/public/signals?limit=2000`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Abort a hung/slow API so static export never blows Next's 60s
       // per-page budget. A hang is NOT caught by the try/catch (only a
       // thrown error is) — the timeout turns it into a catchable

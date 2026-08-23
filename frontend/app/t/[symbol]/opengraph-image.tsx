@@ -10,6 +10,7 @@
  * tweet that gets thousands of crawls doesn't hammer the API.
  */
 import { ImageResponse } from "next/og";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
@@ -49,6 +50,7 @@ async function fetchTicker(symbol: string): Promise<TickerData | null> {
   try {
     const res = await fetch(`${API_BASE}/api/ticker/${symbol.toUpperCase()}`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;

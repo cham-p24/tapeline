@@ -29,6 +29,7 @@
 import { NextRequest } from "next/server";
 
 import { trackEmbedImpression } from "@/lib/embedImpression";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -45,6 +46,7 @@ async function fetchTickerForBadge(symbol: string): Promise<TickerData | null> {
   try {
     const res = await fetch(`${API_BASE}/api/ticker/${symbol.toUpperCase()}`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;

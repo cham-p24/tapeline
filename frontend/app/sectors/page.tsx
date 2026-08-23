@@ -24,6 +24,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -50,6 +51,7 @@ async function fetchSignals(): Promise<SignalRow[]> {
   try {
     const res = await fetch(`${API_BASE}/api/public/signals?limit=1000`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Abort a hung/slow API so static export never exceeds Next's 60s
       // per-page budget (a hang isn't caught by the try/catch — only a
       // thrown error is). Matches the /stocks + sitemap pattern; ISR

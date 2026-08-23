@@ -20,6 +20,7 @@ import { relatedForSector } from "@/lib/internalLinks";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "../sectors";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Render on-demand and cache for 1 hour (ISR). Matches the per-fetch
 // `revalidate: 3600` below (data rolls daily; hourly is plenty), and keeps this
@@ -51,6 +52,7 @@ async function fetchSectorTickers(apiSector: string): Promise<ScannerRow[]> {
     }).toString()}`;
     const res = await fetch(url, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the fetch so a degraded backend can't hang the on-demand render
       // (this page is ISR, not build-time — see generateStaticParams). On
       // timeout we fall through to the [] fallback and render fast; ISR refills

@@ -13,6 +13,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SIGNALS } from "../signals";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
 // Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
 // `revalidate: 3600` below and the "5-minute snapshot" contract, and keeps this
@@ -44,6 +45,7 @@ async function fetchSignalTickers(signalLabel: string): Promise<ScannerRow[]> {
     }).toString()}`;
     const res = await fetch(url, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
       // Bound the fetch so a degraded backend can't hang the on-demand render
       // (this page is ISR, not build-time — see generateStaticParams). On
       // timeout we fall through to the [] fallback and render fast; ISR refills

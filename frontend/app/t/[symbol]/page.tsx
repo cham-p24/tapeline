@@ -356,7 +356,7 @@ async function fetchTickerNews(symbol: string): Promise<NewsArticle[]> {
       `${API_BASE}/api/news?symbol=${symbol.toUpperCase()}&limit=5`,
       // 5-min cache; news changes much slower than the score, no point
       // hammering the API on every crawl. Matches /api/scanner cadence.
-      { next: { revalidate: 3600 } },
+      { next: { revalidate: 3600 }, headers: ssrInternalHeaders() },
     );
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: NewsArticle[] };
@@ -401,6 +401,7 @@ async function fetchRelatedTickers(
     });
     const res = await fetch(`${API_BASE}/api/scanner?${params.toString()}`, {
       next: { revalidate: 3600 },
+      headers: ssrInternalHeaders(),
     });
     if (!res.ok) return [];
     const body = (await res.json()) as { items?: RelatedRow[] };

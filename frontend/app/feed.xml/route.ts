@@ -28,6 +28,7 @@
  *     every 15–60 min so longer caching makes sense than for a human
  *     browsing surface.
  */
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
@@ -62,6 +63,7 @@ export async function GET(): Promise<Response> {
   try {
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
       signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
