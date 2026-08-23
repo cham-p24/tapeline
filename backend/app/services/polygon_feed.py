@@ -868,7 +868,12 @@ async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[st
     # Massive Stocks Starter does NOT include indices entitlement, so this
     # endpoint 403s every call. Probe once per worker boot and skip thereafter
     # so we don't spam the warning log (FRED's daily VIX close is the fallback).
-    vix = fred_data.get("vix") or 20.0
+    # NO HARDCODED FALLBACK. This used to be `or 20.0` — a specific, plausible
+    # number published as today's reading, and worse, the input the regime
+    # label is derived from four lines down. A FRED outage would have printed
+    # "NEUTRAL" on the strength of a VIX nobody measured. None means we hold no
+    # reading, and the caller declines to write a regime at all.
+    vix = fred_data.get("vix")
     global _vix_endpoint_disabled
     if not _vix_endpoint_disabled:
         try:
@@ -887,8 +892,9 @@ async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[st
                 vix,
             )
 
-    dxy = fred_data.get("dxy") or 103.5
-    y10 = fred_data.get("yield_10y") or 4.25
+    # Same reasoning: 103.5 and 4.25 are not defaults, they are inventions.
+    dxy = fred_data.get("dxy")
+    y10 = fred_data.get("yield_10y")
     # FRED returns RISING / FALLING / SIDEWAYS based on the 10Y's last 30 obs.
     # Defaults to SIDEWAYS when no FRED key is configured (graceful no-op).
     rate_direction = fred_data.get("rate_direction") or "SIDEWAYS"
@@ -906,6 +912,21 @@ async def fetch_regime(snapshots: list[dict[str, Any]] | None = None) -> dict[st
         if moving:
             advancers = sum(1 for c in moving if c > 0)
             breadth_pct = 100 * advancers / len(moving)
+
+    # The label is a claim about the VIX. With no VIX there is no label, and
+    # returning {} tells the caller to leave the previous regime standing — a
+    # real past reading going stale, which is visible and self-heals, rather
+    # than a fresh-looking row built on a number we made up.
+    #
+    # regime_state's columns are NOT NULL, so "publish nothing" is also the only
+    # honest option available here without a migration.
+    if vix is None or dxy is None or y10 is None:
+        logger.warning(
+            "polygon.regime_unavailable — vix=%r dxy=%r y10=%r; leaving the "
+            "previous regime in place rather than publishing a fabricated one",
+            vix, dxy, y10,
+        )
+        return {}
 
     regime = (
         "BULL" if vix < 15

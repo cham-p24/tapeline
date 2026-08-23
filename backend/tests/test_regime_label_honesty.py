@@ -23,6 +23,24 @@ import pytest
 
 
 # ── sector_leaders: absence is absence ───────────────────────────────────────
+def _stub_fred(monkeypatch, vix: float = 16.0):
+    """Real macro inputs for tests that are not about the fallbacks.
+
+    fetch_regime no longer invents VIX 20.0 / DXY 103.5 / 10Y 4.25 — with no
+    reading it publishes no regime at all (see
+    tests/test_regime_needs_real_inputs.py). A test about BREADTH or about
+    sector_leaders therefore has to supply the readings those are reported
+    alongside.
+    """
+    async def fake_macro():
+        return {"vix": vix, "dxy": 103.0, "yield_10y": 4.5,
+                "rate_direction": "RISING"}
+
+    monkeypatch.setattr(
+        "app.services.fred_feed.fetch_macro_indicators", fake_macro
+    )
+
+
 @pytest.mark.asyncio
 async def test_fetch_regime_returns_no_sector_leaders(monkeypatch):
     """fetch_regime has no sector data, so it must report none — not a
@@ -31,6 +49,7 @@ async def test_fetch_regime_returns_no_sector_leaders(monkeypatch):
 
     # Skip the live VIX probe so the test makes no network call.
     monkeypatch.setattr(polygon_feed, "_vix_endpoint_disabled", True)
+    _stub_fred(monkeypatch)
 
     regime = await polygon_feed.fetch_regime([{"change_pct_1d": 1.0}])
 
@@ -90,6 +109,7 @@ async def test_breadth_is_an_advance_decline_ratio_balanced_at_50(monkeypatch):
     from app.services import polygon_feed
 
     monkeypatch.setattr(polygon_feed, "_vix_endpoint_disabled", True)
+    _stub_fred(monkeypatch)
 
     snaps = [{"change_pct_1d": 1.0}] * 5 + [{"change_pct_1d": -1.0}] * 5
     regime = await polygon_feed.fetch_regime(snaps)
@@ -104,6 +124,7 @@ async def test_breadth_denominator_excludes_unchanged_and_unread(monkeypatch):
     from app.services import polygon_feed
 
     monkeypatch.setattr(polygon_feed, "_vix_endpoint_disabled", True)
+    _stub_fred(monkeypatch)
 
     # 3 up, 1 down => 75.0. The 20 unchanged/unread rows must not dilute it.
     snaps = (
@@ -143,7 +164,11 @@ async def test_regime_label_is_decided_by_vix_alone(monkeypatch, vix, expected):
     monkeypatch.setattr(polygon_feed, "_vix_endpoint_disabled", True)
 
     async def fake_macro():
-        return {"vix": vix}
+        # dxy / yield_10y are supplied because fetch_regime no longer invents
+        # them (it used to default to 103.5 / 4.25). They are irrelevant to the
+        # ladder under test; without them there is correctly no regime at all.
+        return {"vix": vix, "dxy": 103.0, "yield_10y": 4.5,
+                "rate_direction": "RISING"}
 
     monkeypatch.setattr(
         "app.services.fred_feed.fetch_macro_indicators", fake_macro

@@ -19,6 +19,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _is_production() -> bool:
+    """Mirrors signal_publisher._mock_writes_enabled(), inverted."""
+    from app.config import get_settings
+
+    return get_settings().app_env == "production"
+
+
 # Handful of real upcoming-IPO style names for dev mode (fake dates)
 _IPO_SAMPLE = [
     ("STRP", "Stripe Inc.", "Financials", "NYSE", 82, 95, "Goldman Sachs"),
@@ -103,6 +110,20 @@ async def upcoming_ipos(days_ahead: int = 90) -> list[dict[str, Any]]:
                     r["expected_date"] = date.fromisoformat(r["expected_date"])
         logger.info("calendar.ipos source=finnhub count=%d", len(real))
         return real
+    # NEVER in production. _IPO_SAMPLE invents offerings for REAL, NAMED
+    # private companies — Stripe, Databricks, Canva, Reddit, Klarna, Figma,
+    # Anthropic — with specific price ranges, share counts, expected dates and
+    # named lead underwriters ("Goldman Sachs", "Morgan Stanley"). Writing
+    # those to ipo_events publishes an invented securities offering, attributed
+    # to real firms, on a public page. That is not a wrong number; it is a
+    # fabricated claim about companies and banks that did not make it.
+    #
+    # The docstring said the fallback existed "so the /app/ipos page is never
+    # empty". An empty calendar is a true statement about a quiet week. This
+    # is the same defect as the /insider-buying showcase rows removed in #622.
+    if _is_production():
+        logger.warning("calendar.ipos unavailable — publishing no rows")
+        return []
     logger.info("calendar.ipos source=mock")
     return mock_upcoming_ipos(days_ahead=days_ahead)
 
@@ -136,5 +157,12 @@ async def upcoming_earnings(days_ahead: int = 90) -> list[dict[str, Any]]:
                     r["report_date"] = date.fromisoformat(r["report_date"])
         logger.info("calendar.earnings source=finnhub count=%d", len(real))
         return real
+    # Same rule. The mock invents an EPS estimate and a revenue estimate for
+    # 80% of the universe — numbers users are invited to trade around, that no
+    # analyst produced. An empty earnings calendar is honest; an invented one
+    # is not.
+    if _is_production():
+        logger.warning("calendar.earnings unavailable — publishing no rows")
+        return []
     logger.info("calendar.earnings source=mock")
     return mock_upcoming_earnings(days_ahead=days_ahead)
