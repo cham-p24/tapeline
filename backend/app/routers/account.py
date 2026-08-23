@@ -7,23 +7,16 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import (
     AlertEvent,
     AlertRule,
-    ApiKey,
-    NewsletterSubscriber,
-    RoadmapVote,
-    ScannerPreset,
     Subscription,
     User,
-    Watchlist,
     WatchlistItem,
-    WatchlistTrackRecordEntry,
-    WebPushSubscription,
 )
 from app.services.auth import current_user_required
 
@@ -130,42 +123,22 @@ async def delete_my_account(
                 user_id, user.stripe_customer_id,
             )
 
-    # Cascade delete user-owned rows
-    await session.execute(delete(AlertEvent).where(AlertEvent.user_id == user_id))
-    await session.execute(delete(AlertRule).where(AlertRule.user_id == user_id))
-    # WatchlistItem before Watchlist — items FK the parent list (ON DELETE
-    # CASCADE), but both also key users.id directly, so delete child first.
-    await session.execute(delete(WatchlistItem).where(WatchlistItem.user_id == user_id))
-    await session.execute(delete(Watchlist).where(Watchlist.user_id == user_id))
-    await session.execute(delete(ScannerPreset).where(ScannerPreset.user_id == user_id))
-    await session.execute(delete(WebPushSubscription).where(WebPushSubscription.user_id == user_id))
-    await session.execute(delete(RoadmapVote).where(RoadmapVote.user_id == user_id))
-    # watchlist_track_record (migration 0042) has a user_id FK with NO ON DELETE
-    # CASCADE, and — unlike some sibling tables — it isn't cascaded from
-    # delete(User). Without this explicit delete, delete(User) below raises a
-    # ForeignKeyViolation on Postgres and the whole commit rolls back: the
-    # account survives even though the deletion email + Stripe cancel already
-    # fired (a misleading half-done erasure). On SQLite it would instead orphan
-    # the rows (user data surviving a GDPR erasure). Delete it explicitly, in
-    # the same style as the other non-cascade children above.
-    await session.execute(
-        delete(WatchlistTrackRecordEntry).where(WatchlistTrackRecordEntry.user_id == user_id)
-    )
-    await session.execute(delete(Subscription).where(Subscription.user_id == user_id))
-    await session.execute(delete(ApiKey).where(ApiKey.user_id == user_id))
+    # Cascade delete user-owned rows, then the user.
+    #
+    # The order and the full table list live in services/account_purge so the
+    # "this wasn't me" cancel path in routers/auth.py shares them — it used to
+    # do a bare delete(user) with no child cleanup, which raised a
+    # ForeignKeyViolation on Postgres and left the account alive. Keeping one
+    # copy means a newly-added child table can't be handled here and missed
+    # there.
+    #
     # newsletter_subscribers is keyed by email (no user_id FK), so it isn't
-    # cascaded from delete(User). If this person also subscribed to the daily
-    # digest (signup opt-in, or a footer capture with the same address), their
-    # email + full UTM attribution would survive the Art. 17 erasure and the
-    # digest would keep mailing them. Purge the row matching this account's
-    # email (case-insensitive — both surfaces lower-case on write).
-    if user_email:
-        await session.execute(
-            delete(NewsletterSubscriber).where(
-                func.lower(NewsletterSubscriber.email) == user_email.lower()
-            )
-        )
-    await session.execute(delete(User).where(User.id == user_id))
+    # cascaded from delete(User). Passing the address purges it too: otherwise
+    # the email + full UTM attribution would survive the Art. 17 erasure and the
+    # digest would keep mailing them.
+    from app.services.account_purge import purge_user
+
+    await purge_user(session, user_id, user_email)
     await session.commit()
     logger.info("account.deleted user=%s", user_id)
     # NOTE: Clerk user deletion should also be triggered from the frontend via Clerk SDK
