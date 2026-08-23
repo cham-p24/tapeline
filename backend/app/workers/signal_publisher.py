@@ -43,6 +43,33 @@ from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_all_pending, is_trading_day
 
 logger = logging.getLogger(__name__)
+
+
+#: Columns the tick writes from IN-MEMORY caches, COALESCE'd on update so a
+#: cold cache preserves the last good value instead of erasing it.
+#:
+#: Every column here is filled by a once-daily pass into a process-local dict.
+#: Those dicts are empty after any restart, so on the first tick following a
+#: deploy the tick has nothing to say about these fields. Writing the plain
+#: value stamped NULL over good data (observed: 52-week coverage 2,190 -> 100
+#: rows from a single restart); COALESCE(:incoming, existing) keeps what we
+#: hold. The snapshot fields NOT listed here — price, volume, the intraday
+#: change and the day OHLC — come fresh from the vendor every tick, so a NULL
+#: there is a real "no read" and preserving a stale one would be dishonest.
+#:
+#: This is module-level so tests import the REAL tuple. A four-hour outage on
+#: 2026-08-23 shipped behind tests that re-declared the tick's statement from
+#: memory and asserted the source string contained "COALESCE"; anything a test
+#: restates by hand can drift away from what production runs.
+CACHE_DERIVED_COLUMNS: tuple[str, ...] = (
+    # Vendor profile / daily-bar caches
+    "market_cap", "week52_high", "week52_low", "avg_volume_30d",
+    # The six factors, the composite they produce, and the fields derived from
+    # that composite. All six come from caches the daily factor pass fills.
+    "sub_trend", "sub_rs", "sub_fundamentals",
+    "sub_smart_money", "sub_macro", "sub_momentum",
+    "score", "signal", "reason", "confidence_pct",
+)
 settings = get_settings()
 
 # Strong references to detached fire-and-forget tasks. asyncio only keeps a
@@ -315,7 +342,17 @@ async def tick() -> None:
         # NOT protected this way — they come fresh from the vendor on every
         # tick, so a NULL there is a real "no read", and preserving a stale one
         # would be the dishonest choice.
-        cache_derived = ("market_cap", "week52_high", "week52_low", "avg_volume_30d")
+        # The six factors, the composite they produce, and the two fields derived
+        # from that composite belong in this tuple for exactly the same reason as
+        # the four above: all of them are fed by in-memory caches that a daily
+        # pass fills, so all of them are NULL on the first tick after a restart.
+        # Before the polygon_feed fix that pairs with this, a cache miss left the
+        # mock's random.gauss draw in place instead of a NULL — so the first tick
+        # after every deploy overwrote the entire non-sheet universe's SCORE with
+        # a number derived from random factors and kept it until the daily pass
+        # ran. Making the miss honest (NULL) is only safe because of this guard:
+        # NULL now means "nothing new to say", and the last real score stands.
+        cache_derived = CACHE_DERIVED_COLUMNS
         for batch in (full_updates, market_updates):
             if not batch:
                 continue

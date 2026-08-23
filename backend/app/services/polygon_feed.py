@@ -39,6 +39,17 @@ import os
 BASE_URL = os.environ.get("MASSIVE_BASE_URL", "https://api.massive.com")
 
 
+def _is_production() -> bool:
+    """Mirrors signal_publisher._mock_writes_enabled(), inverted.
+
+    Imported inline there rather than here to avoid the import cycle
+    (signal_publisher already imports this module).
+    """
+    from app.config import get_settings
+
+    return get_settings().app_env == "production"
+
+
 def _api_key() -> str:
     """Returns whichever vendor key is configured. Prefer the new MASSIVE_API_KEY
     when both are set so accounts created post-rebrand work cleanly."""
@@ -87,12 +98,26 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
     raise RuntimeError(f"polygon request failed after retries: {path}")
 
 
-def _composite_from_subs(r: dict[str, Any]) -> float:
+def _composite_from_subs(r: dict[str, Any]) -> float | None:
     """Weighted composite from the six sub-scores, clamped to 0..100.
 
     Weights mirror mock_feed/signal_publisher:
     trend .25  rs .20  fund .15  smart .15  macro .15  mom .10
+
+    Returns None when ANY factor is missing. A six-factor composite computed from
+    four factors is a different number wearing the same name, and silently
+    treating a gap as zero would drag the score toward the floor — so the honest
+    answer to "what is the composite" with an incomplete input set is that we do
+    not have one. The caller writes NULL, and the snapshot upsert COALESCEs it,
+    which means the previous good score stands until the daily factor pass
+    refills the caches.
     """
+    factors = (
+        r.get("sub_trend"), r.get("sub_rs"), r.get("sub_fundamentals"),
+        r.get("sub_smart_money"), r.get("sub_macro"), r.get("sub_momentum"),
+    )
+    if any(f is None for f in factors):
+        return None
     composite = (
         r["sub_trend"] * 0.25
         + r["sub_rs"] * 0.20
@@ -176,7 +201,16 @@ async def fetch_snapshots(
         r["signal"] = _signal_from_score(r["score"])
 
     if not _api_key():
-        # No Massive key — pure mock fallback (now with deterministic macro).
+        # No Massive key. In dev this is the point — the mock rows are what make
+        # a local instance browsable. In PRODUCTION it is a misconfiguration, and
+        # returning these rows hands the tick a full universe of random.gauss
+        # prices and factors to persist as fact. Publishing nothing is the honest
+        # failure: the tick writes no updates, every existing row keeps the last
+        # real value it had, and the missing key surfaces as a stalled feed
+        # instead of as plausible-looking numbers nobody can distinguish.
+        if _is_production():
+            logger.error("polygon.no_api_key_in_production — publishing no rows")
+            return []
         return base_rows
 
     # Pull real prices + volumes from Massive in one batched call
@@ -200,6 +234,14 @@ async def fetch_snapshots(
                     if naive is not None:
                         real_by_sym[naive["symbol"]] = naive
     except Exception:
+        # Same reasoning as the no-key exit above: a vendor outage must not be
+        # laundered into a universe of fabricated quotes and scores. Returning
+        # no rows leaves every existing row untouched — prices and scores go
+        # STALE, which is visible and self-heals on the next successful tick,
+        # rather than silently WRONG.
+        if _is_production():
+            logger.exception("polygon.fetch_snapshots_failed — publishing no rows")
+            return []
         logger.exception("polygon.fetch_snapshots_failed — returning mock-only rows")
         return base_rows
 
@@ -233,26 +275,36 @@ async def fetch_snapshots(
             r["day_low"] = None
 
         # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
+        # ASSIGN UNCONDITIONALLY — a cache miss must leave the factor NULL.
+        #
+        # These were `if x is not None:` guards, which sounds defensive and is the
+        # opposite. Every row starts as a _mock_snapshots() row whose six factors
+        # are random.gauss draws, so a guard that skips on a miss KEEPS THE RANDOM
+        # NUMBER. The caches are in-memory and empty after every process start, and
+        # they are refilled by a once-daily pass — so on the first tick after each
+        # deploy the entire non-sheet universe was scored from random factors, and
+        # stayed that way until the daily pass ran. That is the composite itself,
+        # not a side column.
+        #
+        # None here is the honest value: it means "the daily pass has not produced
+        # this factor yet". The snapshot write COALESCEs these columns, so a NULL
+        # preserves the last good value rather than erasing it — which is why this
+        # assignment can be unconditional without blanking the product.
         fund = get_cached_score(sym)
-        if fund is not None:
-            r["sub_fundamentals"] = fund
+        r["sub_fundamentals"] = fund
 
         # Real smart-money from Finnhub insider Form 4 cache
         sm = get_cached_smart_money_score(sym)
-        if sm is not None:
-            r["sub_smart_money"] = sm
+        r["sub_smart_money"] = sm
 
         # Real trend / RS / momentum from Massive aggregates cache
         # (populated daily by worker via _refresh_aggregates_cache)
         trend = get_cached_trend(sym)
-        if trend is not None:
-            r["sub_trend"] = trend
+        r["sub_trend"] = trend
         rs = get_cached_rs(sym)
-        if rs is not None:
-            r["sub_rs"] = rs
+        r["sub_rs"] = rs
         mom = get_cached_momentum(sym)
-        if mom is not None:
-            r["sub_momentum"] = mom
+        r["sub_momentum"] = mom
 
         # 52-week range + 30-day average volume from the same aggregates cache,
         # populated by the same daily worker pass as trend/RS/momentum above.
@@ -291,12 +343,19 @@ async def fetch_snapshots(
         # the six real sub-scores on the scanner, and it goes out in the welcome
         # email. Explaining a score with numbers that are not that score is the
         # worst version of this bug class.
-        r["reason"] = _render_reason(
-            sym,
-            r.get("sector") or "",
-            r["sub_trend"], r["sub_rs"], r["sub_fundamentals"],
-            r["sub_momentum"], r["sub_macro"], r["sub_smart_money"],
-        )
+        # Only render when all six factors are present. With a factor missing the
+        # sentence would have to describe a gap, and the composite it explains is
+        # itself None — so we write NULL and the upsert's COALESCE keeps the last
+        # sentence that WAS true, matching the score it is printed beside.
+        if r["score"] is not None:
+            r["reason"] = _render_reason(
+                sym,
+                r.get("sector") or "",
+                r["sub_trend"], r["sub_rs"], r["sub_fundamentals"],
+                r["sub_momentum"], r["sub_macro"], r["sub_smart_money"],
+            )
+        else:
+            r["reason"] = None
 
         # CONFIDENCE = how much of this row is actually sourced.
         #
@@ -659,13 +718,18 @@ def _naive_score_from_move(move_pct: float) -> float:
     return max(0.0, min(100.0, s))
 
 
-def _signal_from_score(score: float) -> str:
+def _signal_from_score(score: float | None) -> str | None:
     """
     Descriptive (not prescriptive) labels describing the STATE of the factor data.
     Legal posture: never tells the user what to do. See LEGAL_CHECKLIST.md.
     Mirrors the same buckets used in mock_feed._signal_from_score so labels
     stay consistent regardless of which feed produced the score.
+
+    None in, None out: a label is a claim about a score, so with no score there
+    is no label to make. The upsert COALESCEs it to the previous one.
     """
+    if score is None:
+        return None
     if score >= 85: return "HIGH CONVICTION"
     if score >= 70: return "STRONG SETUP"
     if score >= 55: return "CONSTRUCTIVE"
