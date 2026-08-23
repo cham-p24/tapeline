@@ -315,7 +315,11 @@ async def tick() -> None:
                 key=lambda kv: kv[1],
                 reverse=True,
             )
-            regime["sector_leaders"] = ", ".join(sec for sec, _ in ranked[:3])
+            # `if regime` — with no regime to publish there is nothing to
+            # attach a sector ranking to, and setting a key here would turn the
+            # empty dict truthy and write a row with no VIX.
+            if regime:
+                regime["sector_leaders"] = ", ".join(sec for sec, _ in ranked[:3])
     except Exception:
         # Don't let regime breakage propagate — keep whatever fetch_regime returned
         logger.exception("regime.sector_leaders_compute_failed")
@@ -473,8 +477,15 @@ async def tick() -> None:
                 session.add(SqueezeSetup(**s))
 
         # --- Upsert regime (single row) ---
-        await session.execute(delete(RegimeState))
-        session.add(RegimeState(id=1, **regime))
+        # An empty dict means fetch_regime held no real VIX / DXY / 10Y this
+        # pass. Deleting the row and writing a fabricated replacement is the
+        # thing we are avoiding, and the columns are NOT NULL so a partial row
+        # is not available either. Leave the previous reading in place: it is a
+        # real past measurement going stale, which is visible via updated_at
+        # and self-heals on the next successful fetch.
+        if regime:
+            await session.execute(delete(RegimeState))
+            session.add(RegimeState(id=1, **regime))
 
         # --- Append new congress trades ---
         # Idempotent on the natural key (politician + symbol + trade_date +
@@ -1118,7 +1129,8 @@ async def tick() -> None:
     elapsed = (datetime.now(UTC) - started).total_seconds()
     logger.info(
         "tick.done snapshots=%d squeezes=%d regime=%s trades_added=%d elapsed=%.2fs",
-        len(snapshots), len(squeezes), regime["regime"], len(new_trades), elapsed,
+        len(snapshots), len(squeezes), regime.get("regime") or "unavailable",
+        len(new_trades), elapsed,
     )
 
 
@@ -2364,16 +2376,32 @@ async def _seed_calendar() -> None:
     from app.models import EarningsEvent, IPOEvent
     from app.services.calendar_feed import upcoming_earnings, upcoming_ipos
 
-    async with session_scope() as session:
-        # IPOs — replace whole table with the fresh window
-        await session.execute(delete(IPOEvent))
-        for row in await upcoming_ipos():
-            session.add(IPOEvent(**row))
+    # Fetch BEFORE deleting anything. These are replace-the-whole-table
+    # refreshes, so an empty result would otherwise wipe the calendar: the
+    # earnings table holds ~2,700 real rows, and a transient Finnhub failure
+    # is not a statement that no company reports this quarter. Now that the
+    # feeds return [] in production rather than inventing rows (see
+    # calendar_feed), "empty" means "unavailable" and the previous window
+    # stands until the next daily refresh succeeds. Past-dated rows going
+    # stale is visible and self-correcting; an empty calendar is a false
+    # claim that nothing is scheduled.
+    ipos = await upcoming_ipos()
+    earnings = await upcoming_earnings()
 
-        # Earnings — same pattern
-        await session.execute(delete(EarningsEvent))
-        for row in await upcoming_earnings():
-            session.add(EarningsEvent(**row))
+    async with session_scope() as session:
+        if ipos:
+            await session.execute(delete(IPOEvent))
+            for row in ipos:
+                session.add(IPOEvent(**row))
+        else:
+            logger.warning("calendar.ipos_empty — keeping the previous window")
+
+        if earnings:
+            await session.execute(delete(EarningsEvent))
+            for row in earnings:
+                session.add(EarningsEvent(**row))
+        else:
+            logger.warning("calendar.earnings_empty — keeping the previous window")
 
     await _sync_next_earnings_dates()
     logger.info("calendar.refreshed")

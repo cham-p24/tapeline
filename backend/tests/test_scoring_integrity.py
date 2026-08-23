@@ -86,6 +86,7 @@ async def test_fetch_regime_breadth_from_snapshots(monkeypatch):
 
     # Skip the live VIX probe so the test makes no network call.
     monkeypatch.setattr(polygon_feed, "_vix_endpoint_disabled", True)
+    _stub_fred(monkeypatch)
 
     snaps = (
         [{"change_pct_1d": 1.0}] * 6
@@ -103,10 +104,27 @@ async def test_fetch_regime_breadth_neutral_when_empty(monkeypatch):
     from app.services import polygon_feed
 
     monkeypatch.setattr(polygon_feed, "_vix_endpoint_disabled", True)
+    _stub_fred(monkeypatch)
 
     regime = await polygon_feed.fetch_regime([])
     assert regime["breadth_pct"] == 50.0
 
+
+
+def _stub_fred(monkeypatch):
+    """Real macro inputs.
+
+    fetch_regime no longer falls back to hardcoded VIX 20.0 / DXY 103.5 /
+    10Y 4.25 — with no reading it publishes no regime at all — so a test about
+    BREADTH has to supply the inputs breadth is reported alongside.
+    """
+    async def fake_macro():
+        return {"vix": 16.0, "dxy": 103.0, "yield_10y": 4.5,
+                "rate_direction": "RISING"}
+
+    monkeypatch.setattr(
+        "app.services.fred_feed.fetch_macro_indicators", fake_macro
+    )
 
 # ── GAP #11b — sheet regime upsert writes breadth on UPDATE ───────────────────
 @pytest.mark.asyncio
