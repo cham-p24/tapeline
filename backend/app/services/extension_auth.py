@@ -101,7 +101,22 @@ def parse_token(token: str | None) -> tuple[str, int] | None:
         return None
 
     expected = _sign(secret, f"{user_id}|{epoch_s}|{issued}")
-    if not hmac.compare_digest(sig, expected):
+    try:
+        if not hmac.compare_digest(sig, expected):
+            return None
+    except TypeError:
+        # `sig` is arbitrary attacker-chosen UTF-8: it comes straight off
+        # `raw.decode().split("|")`. hmac.compare_digest raises
+        #   TypeError: comparing strings with non-ASCII characters is not supported
+        # for a non-ASCII str, and this call used to sit OUTSIDE the decode
+        # try/except — so the exception propagated out of the extension_user
+        # dependency into the global handler and produced a 500 instead of the
+        # documented 401.
+        #
+        # That breaks this module's stated contract ("Returns None on every
+        # failure mode … a probe learns nothing from the response") and hands an
+        # anonymous caller a switch for the service's error rate and Sentry
+        # volume. Treat it as what it is: a malformed signature.
         return None
 
     try:

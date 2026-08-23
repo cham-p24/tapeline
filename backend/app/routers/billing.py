@@ -575,6 +575,34 @@ async def accept_save_offer(
     }
 
 
+def _pause_blocked_until(user: User) -> datetime | None:
+    """The instant an in-flight pause resumes, or None if none is running.
+
+    The 1-3 month cap in `pause_subscription` is a PER-CALL bound, not a
+    lifetime one, and nothing else bounded the feature. `pause_collection` is
+    set with `behavior="void"`, which voids every invoice raised during the
+    pause while Stripe deliberately keeps the subscription `status="active"` —
+    so the webhook's active branch leaves `user.tier` at pro/premium the whole
+    time. Re-calling on day 89 simply pushed `resumes_at` 90 days further out.
+
+    Repeat every ~89 days and you have unlimited Premium — full universe,
+    congress + insider feeds, unlimited alerts, the 1,000/day API quota — with
+    zero further charges. `limit_strict` is irrelevant at a 3-month cadence, and
+    the account still counts as an active subscription in the admin dashboard,
+    so the missing revenue never shows up anywhere.
+
+    `retention_options` already returns `paused_until`, but only so the modal
+    can render differently. That is presentation; this is enforcement.
+    """
+    until = user.subscription_paused_until
+    if until is None:
+        return None
+    # Rows written before the column was tz-aware may be naive.
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=UTC)
+    return until if until > datetime.now(UTC) else None
+
+
 @router.post("/pause", dependencies=[Depends(limit_strict)])
 async def pause(
     body: PauseRequest,
@@ -583,6 +611,16 @@ async def pause(
 ) -> dict:
     """Pause billing for 1-3 months instead of cancelling."""
     _require_paid(user)
+    blocked_until = _pause_blocked_until(user)
+    if blocked_until is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Your billing is already paused until "
+                f"{blocked_until:%B} {blocked_until.day}, {blocked_until.year}. "
+                "Resume first if you want to change it."
+            ),
+        )
     resumes_at = await pause_subscription(user.stripe_customer_id, body.months)
     user.subscription_paused_until = resumes_at
     user.canceled_at = None
