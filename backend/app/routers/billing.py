@@ -224,7 +224,19 @@ async def create_checkout(
         # Stripe substitutes the real cs_… id on redirect, and the client uses
         # it as the GA4/Ads `transaction_id` plus a one-shot dedupe key, so
         # reloading the success URL can no longer re-fire the purchase event.
-        success_url=f"{settings.app_url}/app/billing?checkout=success&tier={body.tier}&billing_period={body.billing_period}&session_id={{CHECKOUT_SESSION_ID}}",
+        # `trial=1` marks a $0-today trial start. app/app/billing/page.tsx:279
+        # reads exactly this param (and its comment at line 87 calls it the
+        # fallback when storage is blocked) to decide whether to report a
+        # `purchase` or a trial conversion. It was never appended here, so a
+        # card-gate trial that charges $0 today was reported to GA4/Google Ads
+        # as a completed purchase at full plan value — inflating conversion
+        # value and training Smart Bidding on revenue that has not happened yet.
+        success_url=(
+            f"{settings.app_url}/app/billing?checkout=success"
+            f"&tier={body.tier}&billing_period={body.billing_period}"
+            f"{'&trial=1' if body.start_trial else ''}"
+            f"&session_id={{CHECKOUT_SESSION_ID}}"
+        ),
         # Stripe's "back" link. Carries the tier + period the user was part-way
         # through so /app/billing can restate the choice and offer ONE resume
         # button instead of dumping them on a generic plan grid. Read by the

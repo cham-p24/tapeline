@@ -526,3 +526,99 @@ async def test_duplicate_checkout_completion_pages_the_founder(monkeypatch):
         assert "cus_first" in alerts[0] and "cus_second" in alerts[0]
     finally:
         await _delete_user(uid)
+
+
+async def test_winback_resubscribe_is_not_called_a_confirmed_double_billing(monkeypatch):
+    """A returning customer must not be described as a confirmed double-billing.
+
+    A churned user who re-subscribes months later always gets a FRESH Stripe
+    Customer, so `old_customer != new_customer` is true for every legitimate
+    win-back. The alert used to end with a flat instruction to "cancel + refund
+    one of the two subscriptions" — which, followed literally, refunds a
+    perfectly good new customer.
+
+    The founder still gets paged (a possible double-billing is never silently
+    absorbed — Stripe does not guarantee that the first subscription's
+    `created` event arrives before the second checkout's `completed`, so an
+    absent Subscription row means "unconfirmed", not "safe"). Only the
+    recommended ACTION changes: verify first, refund only if both are live.
+    """
+    from app.routers import webhooks as webhooks_router
+
+    alerts: list[str] = []
+
+    async def _capture_tg(chat_id, text, **_k):
+        alerts.append(text)
+        return 1
+
+    monkeypatch.setattr("app.services.telegram.send_message_with_id", _capture_tg)
+    monkeypatch.setattr(webhooks_router.settings, "inbox_founder_telegram_chat_id", "42")
+    monkeypatch.setattr(webhooks_router.settings, "telegram_bot_token", "test-token")
+
+    # Churned win-back: an old customer id, but NO live subscription row.
+    uid = await _seed_user(stripe_customer_id="cus_old", tier="free")
+    try:
+        r = await _fire(monkeypatch, _evt(
+            "checkout.session.completed",
+            {"client_reference_id": uid, "customer": "cus_new"},
+        ))
+        assert r.status_code == 200
+        assert len(alerts) == 1, "the founder must still be paged"
+        body = alerts[0]
+        assert "cus_old" in body and "cus_new" in body
+        # The load-bearing assertion: no unconditional refund instruction.
+        assert "win-back" in body
+        assert "only if both are" in body
+        assert "so this is a real double-billing" not in body
+    finally:
+        await _delete_user(uid)
+
+
+async def test_trial_email_survives_updated_arriving_before_created(monkeypatch):
+    """Out-of-order Stripe delivery must not swallow the trial disclosure.
+
+    The once-per-subscription emails used to require BOTH
+    `evt_type == "customer.subscription.created"` AND `existing is None`.
+    Stripe guarantees neither ordering nor exclusivity, so when `.updated`
+    arrived first it inserted the Subscription row itself — and then:
+
+      * that `.updated` declined to send (wrong event type), and
+      * the later `.created` declined to send (existing was no longer None).
+
+    Net effect on a real paying customer: no first-charge disclosure, no
+    receipt, and no founder revenue alert — silently. The latch is now the row
+    insert alone, which is the actual "first time we have seen this
+    subscription" condition.
+    """
+    sent: list[str] = []
+
+    async def _capture_email(to, subject, html, **_k):
+        sent.append(subject)
+        return True
+
+    monkeypatch.setattr("app.services.email.send_email", _capture_email)
+
+    uid = await _seed_user(tier="free", stripe_customer_id="cus_ooo")
+    try:
+        r = await _fire(monkeypatch, _evt("customer.subscription.updated", {
+            "id": f"sub_{uuid.uuid4().hex[:12]}",
+            "customer": "cus_ooo",
+            "status": "trialing",
+            "cancel_at_period_end": False,
+            "metadata": {"user_id": uid},
+            "items": {"data": [{
+                "current_period_end": 1790000000,
+                "price": {
+                    "id": get_settings().stripe_price_premium_monthly or "price_prem_m",
+                    "recurring": {"interval": "month"},
+                    "unit_amount": 1999,
+                    "currency": "usd",
+                },
+            }]},
+        }))
+        assert r.status_code == 200
+        assert any("trial has started" in s for s in sent), (
+            f"trial disclosure was not sent on an out-of-order .updated; sent={sent}"
+        )
+    finally:
+        await _delete_user(uid)

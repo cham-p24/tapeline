@@ -18,6 +18,7 @@ import { handle401, errorMessage } from "@/lib/api";
 import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
+import { errorText } from "@/lib/errorText";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -519,7 +520,7 @@ export default function BillingPage() {
       } else if (res.status === 502 || res.status === 503 || body.detail?.includes("not configured")) {
         setMsg({ kind: "info", text: "Checkout isn't live yet — Stripe activation pending. Email support@tapeline.io if you want to upgrade in the meantime." });
       } else {
-        setMsg({ kind: "err", text: body.detail || `Checkout failed (${res.status})` });
+        setMsg({ kind: "err", text: errorText(body, `Checkout failed (${res.status})`) });
       }
     } catch (e: unknown) {
       setMsg({ kind: "err", text: errorMessage(e) || "Checkout failed" });
@@ -549,7 +550,7 @@ export default function BillingPage() {
       const body = await res.json();
       if (res.ok && body.url) window.location.href = body.url;
       else if (res.status === 401) handle401(res.status);
-      else setMsg({ kind: "err", text: body.detail || "Portal not available — Stripe activation pending." });
+      else setMsg({ kind: "err", text: errorText(body, "Portal not available — Stripe activation pending.") });
     } catch (e: unknown) {
       setMsg({ kind: "err", text: errorMessage(e) });
     }

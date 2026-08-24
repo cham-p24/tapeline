@@ -8,6 +8,7 @@
  */
 
 import { handle401, errorMessage } from "@/lib/api";
+import { errorText } from "./errorText";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -91,7 +92,7 @@ export async function subscribeToWebPush(): Promise<{ ok: true } | { ok: false; 
   if (!post.ok) {
     handle401(post.status);
     const body = await post.json().catch(() => ({} as any));
-    return { ok: false, reason: body.detail || `Server rejected subscription (${post.status})` };
+    return { ok: false, reason: errorText(body, `Server rejected subscription (${post.status})`) };
   }
 
   return { ok: true };
@@ -115,7 +116,7 @@ export async function unsubscribeFromWebPush(): Promise<{ ok: true } | { ok: fal
 export async function testWebPush(): Promise<{ ok: true; delivered: number; total: number } | { ok: false; reason: string }> {
   const r = await fetch(`${API_BASE}/api/me/push/test`, { method: "POST", credentials: "include" });
   if (!r.ok) handle401(r.status);
-  const body = await r.json();
-  if (!r.ok) return { ok: false, reason: body.detail || `${r.status}` };
+  const body = await r.json().catch(() => ({} as any));
+  if (!r.ok) return { ok: false, reason: errorText(body, `${r.status}`) };
   return { ok: true, delivered: body.delivered, total: body.total };
 }
