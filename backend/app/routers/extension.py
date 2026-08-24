@@ -136,7 +136,7 @@ async def ticker(
 @router.get("/record/{symbol}")
 async def record(
     symbol: str,
-    _user: User = Depends(extension_user),
+    user: User = Depends(extension_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """This ticker's history in the published record — losses included."""
@@ -145,8 +145,18 @@ async def record(
     cleaned = clean_symbol(symbol)
     if cleaned is None:
         raise HTTPException(404, "Not a valid ticker symbol.")
+    # `user`, not None. This endpoint is already authenticated, and passing
+    # None pinned every caller to the free tier's publication delay — so a
+    # paying user's extension reported a `lastSeen` up to a week behind the
+    # same user's view of the same record on the website. The tier gate is
+    # the scorecard router's own (_can_see_live_picks), so this surface now
+    # shows exactly what the account is entitled to, no more and no less.
+    #
+    # The summary stats below are tier-invariant by design and were already
+    # complete for everyone; only the row list, and therefore lastSeen, was
+    # affected.
     data = await get_scorecard_for_symbol(
-        symbol=cleaned, session=session, user=None, limit_rows=365
+        symbol=cleaned, session=session, user=user, limit_rows=365
     )
     s = (data or {}).get("summary") or {}
     rows = (data or {}).get("rows") or []

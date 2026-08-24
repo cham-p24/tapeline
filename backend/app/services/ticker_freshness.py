@@ -59,6 +59,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import Ticker
+from app.services.score import MIN_FACTORS_FOR_COMPOSITE
 
 # How far back from the latest refresh a row may be and still count as "live".
 # 7 days: longer than the worst-case legitimate gap between refreshes (a
@@ -72,7 +73,12 @@ MAX_VALID_SCORE = 100.0
 # Minimum populated sub-factors for a row to be a real "composite". A genuine
 # composite tolerates a missing feed or two (NEUTRAL=50 fallback); a single
 # populated factor means the row predates the composite and is a raw ghost.
-MIN_FACTORS = 2
+#
+# IMPORTED, not redeclared. This is the same threshold the composite itself
+# refuses below, and the two must not be able to disagree: a lower number here
+# would surface rows carrying a score that is mostly fallback, a higher one
+# would hide rows the scorer considers legitimate.
+MIN_FACTORS = MIN_FACTORS_FOR_COMPOSITE
 
 # The six factors that make up the composite (see score.compute_tapeline_composite).
 _FACTOR_COLUMNS = (

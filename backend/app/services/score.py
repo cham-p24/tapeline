@@ -56,6 +56,50 @@ WEIGHTS: dict[str, float] = {
 # tickers without insider history. Documented on /how-it-works.
 NEUTRAL = 50.0
 
+# Fewest factors that can produce a composite. Below this the number would be
+# a statement about the NEUTRAL fallback rather than about the security, so
+# there is no composite at all. `ticker_freshness` imports this rather than
+# declaring its own, so a row cannot be scored here and then rejected as
+# unscorable by the surfaces that decide what a user may see.
+MIN_FACTORS_FOR_COMPOSITE = 2
+
+
+def composite_from_factors(subs: dict[str, float | None]) -> float | None:
+    """THE six-factor composite. Every feed must reach this function.
+
+    `subs` is keyed by WEIGHTS' names (trend, rs, fundamentals, smart_money,
+    macro, momentum). Returns None below MIN_FACTORS_FOR_COMPOSITE; otherwise
+    the weighted sum with NEUTRAL for each missing factor, clamped 0-100 and
+    rounded to one decimal.
+
+    This exists because the arithmetic used to be written out twice — here for
+    the sheet path and again in polygon_feed for the market path — and on
+    2026-08-24 the two drifted: one re-normalised over the factors held while
+    the other used the NEUTRAL fallback, so CDNA scored 80.2 or 93.2 depending
+    purely on which feed happened to write the row. A product whose pitch is an
+    unedited record cannot have two numbers for the same name, so there is now
+    one implementation and the callers are adapters onto it.
+
+    NEUTRAL, not zero, and not a re-normalised average:
+
+    * Zero drags every incompletely-covered row toward the floor, so "we hold
+      no fundamentals read" renders as "the fundamentals are terrible".
+    * Re-normalising lets four strong factors produce a score a full six-factor
+      read would never have justified — it upgrades thin coverage into high
+      conviction.
+    * NEUTRAL lets a missing factor neither help nor hurt. The sub-score itself
+      is still stored as None so the UI renders an em-dash: the gap is
+      disclosed, it just does not move the number.
+    """
+    held = sum(1 for k in WEIGHTS if subs.get(k) is not None)
+    if held < MIN_FACTORS_FOR_COMPOSITE:
+        return None
+    composite = sum(
+        w * (v if (v := subs.get(k)) is not None else NEUTRAL)
+        for k, w in WEIGHTS.items()
+    )
+    return round(_clamp(composite), 1)
+
 
 # ---------------------------------------------------------------------------
 # Per-factor scorers — each takes a sheet row (dict) plus optional cache
@@ -302,14 +346,15 @@ def compute_tapeline_composite(
     row: dict[str, Any],
     get_fund: Any | None = None,
     get_sm: Any | None = None,
-) -> tuple[float, dict[str, float]]:
+) -> tuple[float | None, dict[str, float | None]]:
     """Compute Tapeline's six-factor composite for one ticker row.
 
-    Returns (composite, sub_scores). `composite` is clamped 0-100.
-    `sub_scores` is a dict with keys: trend, rs, fundamentals, smart_money,
-    macro, momentum. Missing factors are filled with NEUTRAL (50) in the
-    composite math but recorded as None in the returned dict so the UI
-    can display "—" instead of "50" when data is genuinely absent.
+    Returns (composite, sub_scores). `composite` is clamped 0-100, or None
+    when fewer than MIN_FACTORS_FOR_COMPOSITE factors are held. `sub_scores`
+    is a dict with keys: trend, rs, fundamentals, smart_money, macro,
+    momentum. Missing factors are filled with NEUTRAL (50) in the composite
+    math but recorded as None in the returned dict so the UI can display "—"
+    instead of "50" when data is genuinely absent.
 
     `get_fund` and `get_sm` are injectable cache lookups for tests. In
     production, we lazy-import the live finnhub caches.
@@ -325,11 +370,6 @@ def compute_tapeline_composite(
         "momentum":     sub_momentum(row),
     }
 
-    # Composite: weighted sum with NEUTRAL fallback on cache miss
-    composite = sum(
-        WEIGHTS[k] * (v if v is not None else NEUTRAL)
-        for k, v in subs.items()
-    )
-    composite = round(_clamp(composite), 1)
-
-    return composite, subs
+    # One implementation, shared with the market path — see
+    # composite_from_factors. None when fewer than two factors are held.
+    return composite_from_factors(subs), subs
