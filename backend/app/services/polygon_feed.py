@@ -98,12 +98,8 @@ async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] 
     raise RuntimeError(f"polygon request failed after retries: {path}")
 
 
-#: Fewest factors that can produce a composite. Matches the floor
-#: ticker_freshness already applies to decide what a user may see, so a row
-#: cannot be scored here and then rejected as unscorable there.
-MIN_FACTORS_FOR_COMPOSITE = 2
-
-#: Row key for each of score.WEIGHTS' factor names.
+#: Row key for each of score.WEIGHTS' factor names. The row uses `sub_*`
+#: column names; the composite is defined over the bare factor names.
 _WEIGHT_KEY_TO_COLUMN = {
     "trend": "sub_trend",
     "rs": "sub_rs",
@@ -115,51 +111,24 @@ _WEIGHT_KEY_TO_COLUMN = {
 
 
 def _composite_from_subs(r: dict[str, Any]) -> float | None:
-    """The six-factor composite, or None when too little is held to have one.
+    """Adapter: read the six factors off a snapshot row and score them.
 
-    Delegates the WEIGHTS and the NEUTRAL cache-miss fallback to
-    app.services.score, which is the definition of record — the sheet path
-    (score.compute_tapeline_composite) has always used it. Two composite
-    conventions in one product is itself a misstatement: the same ticker would
-    score differently depending on which feed happened to write it. Measured in
-    production, CDNA scored 80.2 through the sheet and would have scored 93.2
-    through a re-normalising version of this function.
+    All the arithmetic — the weights, the NEUTRAL cache-miss fallback, the
+    two-factor floor, the clamp — lives in score.composite_from_factors, which
+    the sheet path also calls. This function only renames the keys.
 
-    NEUTRAL, not zero, and not a re-normalised average of what we hold:
-
-    * Zero drags every incompletely-covered row toward the floor, so "we have
-      no fundamentals read" renders as "the fundamentals are terrible". Same
-      false-zero defect as plotting a missing axis at the chart origin.
-    * Re-normalising lets four strong factors produce a 93 that a full
-      six-factor read would never have justified — it quietly upgrades thin
-      coverage into high conviction, which is the overclaim this product
-      exists not to make.
-    * NEUTRAL lets a missing factor neither help nor hurt. It is the
-      conservative reading, and it is what the sub-score columns already
-      document: the value is stored as None so the UI renders an em-dash,
-      while the composite treats the gap as neither good nor bad.
-
-    Below MIN_FACTORS_FOR_COMPOSITE there is no composite at all — a number
-    built almost entirely from the fallback would be a statement about the
-    fallback, not about the security. NULL there, and the tick's COALESCE
-    keeps the last real score.
+    It is deliberately nothing more than that. The arithmetic used to be
+    written out here as well as in score.py, and on 2026-08-24 the two copies
+    drifted: one re-normalised over the factors held while the other used the
+    NEUTRAL fallback, so the same ticker scored 80.2 or 93.2 depending on which
+    feed wrote the row. Keeping this an adapter is what makes that class of
+    divergence impossible rather than merely tested-for.
     """
-    from app.services.score import NEUTRAL, WEIGHTS
+    from app.services.score import composite_from_factors
 
-    held = sum(
-        1 for col in _WEIGHT_KEY_TO_COLUMN.values() if r.get(col) is not None
+    return composite_from_factors(
+        {k: r.get(col) for k, col in _WEIGHT_KEY_TO_COLUMN.items()}
     )
-    if held < MIN_FACTORS_FOR_COMPOSITE:
-        return None
-
-    composite = sum(
-        w * (
-            v if (v := r.get(_WEIGHT_KEY_TO_COLUMN[k])) is not None
-            else NEUTRAL
-        )
-        for k, w in WEIGHTS.items()
-    )
-    return round(max(0, min(100, composite)), 1)
 
 
 async def fetch_snapshots(

@@ -25,12 +25,13 @@ from __future__ import annotations
 import pytest
 
 from app.services.mock_feed import _render_reason
-from app.services.polygon_feed import (
+from app.services.polygon_feed import _WEIGHT_KEY_TO_COLUMN, _composite_from_subs
+from app.services.score import (
     MIN_FACTORS_FOR_COMPOSITE,
-    _WEIGHT_KEY_TO_COLUMN,
-    _composite_from_subs,
+    NEUTRAL,
+    WEIGHTS,
+    composite_from_factors,
 )
-from app.services.score import NEUTRAL, WEIGHTS
 
 FACTOR_COLUMNS = tuple(_WEIGHT_KEY_TO_COLUMN.values())
 
@@ -84,25 +85,44 @@ def test_a_missing_factor_does_not_upgrade_thin_coverage():
 
 
 def test_it_matches_the_sheet_paths_composite_exactly():
-    """One product, one composite definition.
+    """One product, one composite definition — now structurally, not by luck.
 
-    score.compute_tapeline_composite is the definition of record and the sheet
-    path has always used it. If these diverge, the same ticker scores
-    differently depending on which feed happened to write it — measured in
-    production, CDNA scored 80.2 through the sheet while a re-normalising
-    version of this function would have given it 93.2.
+    Both paths call score.composite_from_factors; polygon_feed only renames
+    sub_trend -> trend and so on. Before the arithmetic was shared, the same
+    factor set scored 80.2 through the sheet and 93.2 through the market feed.
     """
     subs = {
         "trend": 100.0, "rs": 100.0, "momentum": 90.0, "macro": 75.0,
         "fundamentals": None, "smart_money": None,
     }
-    sheet_side = round(
-        sum(WEIGHTS[k] * (v if v is not None else NEUTRAL) for k, v in subs.items()), 1
-    )
-    ours = _composite_from_subs(
+    sheet_side = composite_from_factors(subs)
+    market_side = _composite_from_subs(
         _row(**{_WEIGHT_KEY_TO_COLUMN[k]: v for k, v in subs.items()})
     )
-    assert ours == sheet_side == 80.2
+    assert sheet_side == market_side == 80.2
+
+
+def test_the_market_adapter_only_renames_keys():
+    """It must delegate, not reimplement.
+
+    Asserted across the whole coverage range rather than on one example: if
+    the adapter ever grew arithmetic of its own, some input would diverge.
+    """
+    cases = [
+        {"trend": 90.0, "rs": 80.0, "fundamentals": 70.0,
+         "smart_money": 60.0, "macro": 50.0, "momentum": 40.0},
+        {"trend": None, "rs": None, "fundamentals": None,
+         "smart_money": None, "macro": 50.0, "momentum": None},
+        {"trend": 0.0, "rs": 0.0, "fundamentals": None,
+         "smart_money": None, "macro": 0.0, "momentum": 0.0},
+        {"trend": 100.0, "rs": None, "fundamentals": 100.0,
+         "smart_money": None, "macro": 100.0, "momentum": None},
+        dict.fromkeys(WEIGHTS, None),
+    ]
+    for subs in cases:
+        assert _composite_from_subs(
+            _row(**{_WEIGHT_KEY_TO_COLUMN[k]: v for k, v in subs.items()})
+        ) == composite_from_factors(subs), f"adapter diverged on {subs}"
 
 
 def test_below_the_floor_there_is_no_composite():
