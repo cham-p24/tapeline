@@ -236,6 +236,17 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 ## Things NOT to change without thinking
 - 6-factor scoring formula and weights
 - Descriptive (not prescriptive) signal labels
+- **The scorecard is measured CLOSE-TO-CLOSE.** `price_at_flag` reads
+  `Ticker.day_close` (`session["close"]`, migration 0059), falling back to
+  `Ticker.price` only when the vendor gave no close. Do not "simplify" it back
+  to `price`: `price` is `session["price"]` — the last trade INCLUDING extended
+  hours — and the freeze runs at 21:15 UTC = 17:15 ET, inside after-hours. That
+  was the bug (PR #643): 34% of frozen rows sat 2-18% off the real close, and
+  since `spy_change_pct_1d` comes from SPY's daily-bar closes, the published
+  alpha subtracted a close-to-close move from an after-hours-to-close move.
+  `backend/app/scripts/rederive_scorecard.py` repairs already-published rows by
+  rebasing BOTH legs; run it via the `rederive-scorecard.yml` workflow, which
+  slices the ~2.5h pass so a dropped ssh session can't half-rewrite the record.
 - Public scorecard SUMMARY from day 1 (the trust mechanism). Per-day picks
   are gated since 2026-05-18: anonymous + Free see picks delayed 7 days,
   Pro + Premium see live. Summary stats (hit rate, median alpha, days
