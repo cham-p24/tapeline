@@ -151,7 +151,7 @@ After applying, **reload the ad set editor** — Budget & schedule and Audience 
 
 So while it stays on, **neither the FPS declaration nor the AU exclusion can be set.**
 
-**Status 2026-08-24: the campaign and ad set are now configured.** Name, Sales objective, dataset, , FPS declared, Countries = United States, ad-set budget strategy, Highest Volume, A$25.00/day, start date reset to now. Remaining: the end-date duration still reads 30 days (needs 14), ad-set Locations, and the three ads themselves. Nothing can spend — no payment method on the account.
+**Status 2026-08-24: the campaign and ad set are now configured.** Name, Sales objective, dataset, conversion event = Complete registration, FPS declared, Countries = United States, ad-set budget strategy, Highest Volume, A$25.00/day, start date reset to now. Remaining: the end-date duration still reads 30 days (needs 14), ad-set Locations, and the three ads themselves. Nothing can spend — no payment method on the account.
 
 **The fix:** switch **Budget strategy → Ad set budget**. Campaign-budget is one of the three conditions holding Advantage+ on (Budget · Audience · Placements); breaking it should drop Advantage+ and restore both controls. This is a two-click change in the Budget section that resisted automation but is trivial by hand.
 
