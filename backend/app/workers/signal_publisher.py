@@ -375,6 +375,10 @@ async def tick() -> None:
                 # the UI) rather than become a zero.
                 # From the snapshot payload, refreshed every tick:
                 "previous_close": snap.get("previous_close"),
+                # The OFFICIAL close, as distinct from "price" (the last
+                # trade INCLUDING extended hours). The scorecard freeze
+                # reads this; see models/ticker.day_close.
+                "day_close": snap.get("day_close"),
                 "day_open": snap.get("day_open"),
                 "day_high": snap.get("day_high"),
                 "day_low": snap.get("day_low"),
@@ -1380,7 +1384,14 @@ async def _ensure_daily_scorecard(today: date) -> None:
                 # record (the 2026-05-22..06-05 137-score rows came from a
                 # pre-live_clauses snapshot path).
                 score_at_flag=min(t.score, 100.0) if t.score else 0,
-                price_at_flag=float(t.price),
+                # The OFFICIAL close, not `price`. `price` is session["price"]
+                # — the last trade INCLUDING extended hours — and this freeze
+                # runs at 21:15 UTC = 17:15 ET, inside after-hours. Measured:
+                # 34% of frozen rows sat 2-18% off the real close, which made
+                # alpha_vs_spy compare an after-hours print against SPY's
+                # official close. Fall back to price only when the vendor gave
+                # us no close (pre-0059 rows, or a snapshot missing the field).
+                price_at_flag=float(t.day_close or t.price),
             ))
 
         logger.info(

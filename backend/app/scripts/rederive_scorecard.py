@@ -25,8 +25,19 @@ recompute `price_next_day`, `change_pct_1d_after`, `spy_change_pct_1d` and
 `alpha_vs_spy` — using the SAME arithmetic and rounding as the fixed
 back-check, so a repaired row is byte-identical to one the worker would write.
 
-`price_at_flag` is NEVER touched: the freeze side already waits until 21:15 UTC
-so that leg IS a real close. Only the next-day leg was ever suspect.
+BOTH legs are rebased onto official closes. `price_at_flag` was never a close:
+it is float(Ticker.price), and polygon_feed._to_scanner_row sets that from
+`session["price"]` — the last trade INCLUDING extended hours — preferring it
+over `session["close"]`. The freeze runs at 21:15 UTC = 17:15 ET and after-hours
+trades until 20:00 ET, so the frozen price is routinely an after-hours print.
+Measured over 11 dates: 37 of ~110 rows (34%) sat 2-18% off the official close,
+in both directions.
+
+That matters because `spy_change_pct_1d` comes from SPY's daily bars — official
+closes. So alpha compared an after-hours flag price against a next-day close:
+the same mixed-basis defect as the partial-bar bug, on the other leg. Rebasing
+both legs makes the return close-to-close, which is what a track record means
+and what the benchmark leg already used.
 
 THREE THINGS THIS GETS RIGHT THAT ARE EASY TO GET WRONG
 -------------------------------------------------------
@@ -260,29 +271,41 @@ async def _rederive(since: date | None, apply: bool, pace: float, estimate: bool
             for e in entries:
                 w = windows.get(e.symbol) or {}
                 true_close = w.get(next_day)
-                vendor_flag = w.get(as_of)
+                true_flag = w.get(as_of)
                 if not true_close or true_close <= 0:
                     unresolved += 1
                     continue
-                if not e.price_at_flag or e.price_at_flag <= 0:
+                if not true_flag or true_flag <= 0:
                     unresolved += 1
                     continue
-                # Integrity check on the leg we are NOT allowed to change.
-                # Both are as-traded closes for the same session, so they should
-                # agree closely. A large gap means an unrecorded corporate
-                # action or a bad freeze — skip rather than publish a return
-                # computed against a denominator we cannot vouch for.
-                if vendor_flag and vendor_flag > 0:
-                    drift = abs((e.price_at_flag / vendor_flag) - 1)
+                # How far the STORED flag price sat from the official close.
+                #
+                # This used to SKIP the row. It no longer does, because the
+                # stored value is not a close at all: price_at_flag is
+                # float(Ticker.price), and polygon_feed._to_scanner_row sets
+                # that from `session["price"]` — the last trade INCLUDING
+                # extended hours — preferring it over `session["close"]`. The
+                # freeze runs at 21:15 UTC = 17:15 ET, and after-hours trades
+                # until 20:00 ET, so the frozen price is routinely an
+                # after-hours print. Measured over 11 dates: 37 of ~110 rows
+                # (34%) sat 2-18% off the official close, both directions.
+                #
+                # That matters because spy_change_pct_1d comes from SPY's daily
+                # bars — official closes. So alpha compared an after-hours flag
+                # price against a next-day close: the same mixed-basis defect
+                # as the partial-bar bug, on the other leg. Both legs are now
+                # rebased onto official closes, which is what a track record
+                # means and what the benchmark already used.
+                if e.price_at_flag and e.price_at_flag > 0:
+                    drift = abs((e.price_at_flag / true_flag) - 1)
                     if drift > _FLAG_DRIFT_TOLERANCE:
-                        logger.warning(
-                            "  %s %-6s flag price disagrees with the vendor "
-                            "(%.4f vs %.4f, %.1f%%) — left as-is",
-                            as_of, e.symbol, e.price_at_flag, vendor_flag,
-                            drift * 100,
-                        )
                         flag_mismatch += 1
-                        continue
+                        if drift > 0.05:
+                            logger.info(
+                                "  %s %-6s flag %.4f -> close %.4f (%.1f%%)",
+                                as_of, e.symbol, e.price_at_flag, true_flag,
+                                drift * 100,
+                            )
 
                 # EXACTLY the fixed back-check's arithmetic and rounding:
                 #   pct   = ((close / flag) - 1) * 100
@@ -290,7 +313,9 @@ async def _rederive(since: date | None, apply: bool, pace: float, estimate: bool
                 # Rounding pct first and subtracting would produce a different
                 # number from what the worker writes, so already-correct rows
                 # would be rewritten and miscounted as damage.
-                pct = _pct(true_close, e.price_at_flag)
+                # Close-to-close, both legs on the official close — the same
+                # basis spy_move already uses.
+                pct = _pct(true_close, true_flag)
                 new_pct = round(pct, 3)
                 new_spy = round(spy_move, 3)
                 new_alpha = round(pct - spy_move, 3)
@@ -301,6 +326,8 @@ async def _rederive(since: date | None, apply: bool, pace: float, estimate: bool
                 same = (
                     e.price_next_day is not None
                     and abs(e.price_next_day - true_close) < 0.005
+                    and e.price_at_flag is not None
+                    and abs(e.price_at_flag - true_flag) < 0.005
                     and e.change_pct_1d_after == new_pct
                     and e.spy_change_pct_1d == new_spy
                     and e.alpha_vs_spy == new_alpha
@@ -317,6 +344,7 @@ async def _rederive(since: date | None, apply: bool, pace: float, estimate: bool
                 if apply:
                     live = await session.get(DailyScorecardEntry, e.id)
                     if live is not None:
+                        live.price_at_flag = round(true_flag, 4)
                         live.price_next_day = round(true_close, 4)
                         live.change_pct_1d_after = new_pct
                         live.spy_change_pct_1d = new_spy
@@ -334,7 +362,7 @@ async def _rederive(since: date | None, apply: bool, pace: float, estimate: bool
     logger.info("unchanged    : %d", unchanged)
     logger.info("unresolved   : %d  (left exactly as-is — never invented)", unresolved)
     logger.info("session open : %d  (next session not closed yet; retry later)", skipped_open)
-    logger.info("flag mismatch: %d  (stored price_at_flag disagrees with the vendor)", flag_mismatch)
+    logger.info("flag rebased : %d  (after-hours print -> official close)", flag_mismatch)
     if before and after:
         b = _published_stats(before)
         a = _published_stats(after)
