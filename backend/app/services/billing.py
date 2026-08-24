@@ -33,6 +33,35 @@ stripe.max_network_retries = 1
 AUTOMATIC_TAX_ENABLED = False
 
 
+# ── Coupon names: Stripe's 40-char cap is a payment-path landmine ───────────
+#
+# stripe.Coupon.create rejects a `name` longer than 40 characters with a 400,
+# and every coupon we mint sits INSIDE the try/except that turns a StripeError
+# into `HTTPException(502)`. So an over-long discount label doesn't degrade the
+# discount — it kills the whole checkout the customer just clicked. That is
+# exactly how it failed in production on 2026-08-10 (Sentry TAPELINE-BACKEND-26,
+# "Invalid string: Tape...ual); must be at most 40 characters"): the annual
+# trial-save name was 52 chars, so the save offer 502'd instead of saving.
+#
+# Two defences, because the names live at eight call sites and are edited as
+# copy:
+#   1. Every name below is short by construction (the redundant "Tapeline "
+#      prefix is gone — these render on a Tapeline invoice already).
+#   2. _coupon_name clamps at runtime. Truncating a discount LABEL is a
+#      cosmetic loss; 502ing a payment is a revenue loss. Never let a copy
+#      edit take the checkout down again.
+# test_stripe_coupon_names.py asserts (1) so the clamp in (2) stays unreachable.
+STRIPE_COUPON_NAME_MAX = 40
+
+
+def _coupon_name(name: str) -> str:
+    """Clamp a coupon label to Stripe's 40-char limit (see note above)."""
+    if len(name) <= STRIPE_COUPON_NAME_MAX:
+        return name
+    logger.warning("stripe.coupon_name_truncated len=%d name=%r", len(name), name)
+    return name[:STRIPE_COUPON_NAME_MAX]
+
+
 def tier_from_price(price_id: str) -> str | None:
     """Map a Stripe price ID to a Tapeline tier, or None if we don't know it.
 
@@ -245,7 +274,7 @@ async def create_checkout_session(
                     amount_off=referral_credit_months * amount,
                     currency=currency,
                     duration="once",
-                    name=f"Tapeline referral credit ({referral_credit_months} mo, annual)",
+                    name=_coupon_name(f"Referral credit ({referral_credit_months} mo, annual)"),
                     metadata={"user_id": user_id, "kind": "referral"},
                 )
             else:
@@ -254,7 +283,7 @@ async def create_checkout_session(
                     percent_off=100,
                     duration="repeating",
                     duration_in_months=referral_credit_months,
-                    name=f"Tapeline referral credit ({referral_credit_months} mo)",
+                    name=_coupon_name(f"Referral credit ({referral_credit_months} mo)"),
                     metadata={"user_id": user_id, "kind": "referral"},
                 )
             kwargs["discounts"] = [{"coupon": coupon.id}]
@@ -269,7 +298,7 @@ async def create_checkout_session(
                     amount_off=round(0.40 * 3 * amount),
                     currency=currency,
                     duration="once",
-                    name="Tapeline win-back (40% off 3 months, annual)",
+                    name=_coupon_name("Win-back (40% off 3 months, annual)"),
                     metadata={"user_id": user_id, "kind": "winback"},
                 )
             else:
@@ -278,7 +307,7 @@ async def create_checkout_session(
                     percent_off=40,
                     duration="repeating",
                     duration_in_months=3,
-                    name="Tapeline win-back (40% off 3 months)",
+                    name=_coupon_name("Win-back (40% off 3 months)"),
                     metadata={"user_id": user_id, "kind": "winback"},
                 )
             kwargs["discounts"] = [{"coupon": coupon.id}]
@@ -300,7 +329,7 @@ async def create_checkout_session(
                     amount_off=round(0.50 * 3 * amount),
                     currency=currency,
                     duration="once",
-                    name="Tapeline trial save offer (50% off 3 months, annual)",
+                    name=_coupon_name("Trial save (50% off 3 months, annual)"),
                     metadata={"user_id": user_id, "kind": "trial_save"},
                 )
             else:
@@ -309,7 +338,7 @@ async def create_checkout_session(
                     percent_off=50,
                     duration="repeating",
                     duration_in_months=3,
-                    name="Tapeline trial save offer (50% off 3 months)",
+                    name=_coupon_name("Trial save (50% off 3 months)"),
                     metadata={"user_id": user_id, "kind": "trial_save"},
                 )
             kwargs["discounts"] = [{"coupon": coupon.id}]
@@ -317,19 +346,29 @@ async def create_checkout_session(
         else:
             kwargs["allow_promotion_codes"] = True
 
-        # Dunning prerequisite. Stripe's Smart Retries can only re-attempt a
-        # failed renewal against a payment method stored ON THE SUBSCRIPTION;
-        # without this the card collected at Checkout is attached to the
-        # customer but is not the subscription's default, and a retry can find
-        # nothing to charge. That turns a recoverable soft decline (expired
-        # card, temporary insufficient funds) into silent involuntary churn —
-        # roughly a quarter of all SaaS churn by vendor benchmark. The retry
-        # SCHEDULE itself is dashboard config (see the runbook note in the PR);
-        # this is the half that has to be set per-subscription in code.
-        subscription_data: dict[str, Any] = {
-            "metadata": sub_metadata,
-            "payment_settings": {"save_default_payment_method": "on_subscription"},
-        }
+        # Dunning prerequisite — already handled by Checkout, NOT by us.
+        #
+        # Smart Retries can only re-attempt a failed renewal against a payment
+        # method stored ON THE SUBSCRIPTION. In mode="subscription" Checkout
+        # does exactly that on its own: it attaches the collected card to the
+        # customer and sets it as the subscription's default_payment_method.
+        #
+        # This dict used to also carry
+        #   "payment_settings": {"save_default_payment_method": "on_subscription"}
+        # which is a real field on Subscription.create/modify but is NOT a field
+        # of a Checkout Session's subscription_data. Stripe therefore rejected
+        # the ENTIRE request — "Received unknown parameter:
+        # subscription_data[payment_settings]" — and the except-StripeError
+        # below turned that 400 into a 502 on the customer's checkout. It
+        # shipped 2026-07-18 (#363) and broke every single checkout until
+        # 2026-08-24 (Sentry TAPELINE-BACKEND-20/21): no purchase, trial start,
+        # or card-gate completion could succeed for 37 days.
+        #
+        # Do not re-add it. If a subscription ever needs non-default
+        # payment_settings, apply them with Subscription.modify after the
+        # customer.subscription.created webhook — never here.
+        # test_checkout_subscription_data_keys.py pins the allowed key set.
+        subscription_data: dict[str, Any] = {"metadata": sub_metadata}
         if trial_end is not None:
             # Older rows can carry naive datetimes — stored values are UTC.
             if trial_end.tzinfo is None:
@@ -602,7 +641,7 @@ async def apply_save_offer_coupon(customer_id: str) -> None:
                 amount_off=round(0.50 * 3 * amount),
                 currency=currency,
                 duration="once",
-                name="Tapeline retention — 50% off 3 months (annual)",
+                name=_coupon_name("Retention (50% off 3 months, annual)"),
                 metadata={"customer_id": customer_id, "kind": "save_offer"},
             )
         else:
@@ -611,7 +650,7 @@ async def apply_save_offer_coupon(customer_id: str) -> None:
                 percent_off=50,
                 duration="repeating",
                 duration_in_months=3,
-                name="Tapeline retention — 50% off 3 months",
+                name=_coupon_name("Retention (50% off 3 months)"),
                 metadata={"customer_id": customer_id, "kind": "save_offer"},
             )
         # Apply the discount AND clear any scheduled cancellation in the same

@@ -224,14 +224,30 @@ async def test_checkout_tax_posture_matches_the_disclosed_copy(monkeypatch):
     assert captured["automatic_tax"] == {"enabled": billing.AUTOMATIC_TAX_ENABLED}
 
 
-async def test_checkout_saves_default_payment_method_for_retries(monkeypatch):
-    """Dunning prerequisite: Stripe Smart Retries can only re-attempt against a
-    payment method stored on the SUBSCRIPTION. Without this the collected card
-    is attached to the customer but not the subscription default, and a
-    recoverable soft decline becomes involuntary churn."""
+async def test_checkout_does_not_send_payment_settings(monkeypatch):
+    """Dunning prerequisite is Checkout's job, not ours — and asking for it
+    here broke every checkout for 37 days.
+
+    This test used to assert the OPPOSITE: that subscription_data carried
+    `payment_settings={"save_default_payment_method": "on_subscription"}`.
+    That field is real on Subscription.create/modify but does not exist on a
+    Checkout Session's subscription_data, so Stripe rejected every request
+    ("Received unknown parameter: subscription_data[payment_settings]") and
+    create_checkout_session turned the 400 into a 502 for the customer.
+
+    The mock here accepts any kwargs, so the old assertion passed happily
+    while production 502'd on every purchase, trial start and card-gate
+    completion from 2026-07-18 (#363) to 2026-08-24 — a test that encoded the
+    bug and then vouched for it. Inverting it is the point: the intent
+    (a retryable card on the subscription) is satisfied by Checkout itself in
+    mode="subscription", which attaches the collected card and sets it as the
+    subscription's default_payment_method with no parameter from us.
+
+    See test_checkout_subscription_data_keys.py for the allowlist that stops
+    the next plausible-but-invalid key.
+    """
     captured = await _capture_session_kwargs(monkeypatch)
-    settings_ = captured["subscription_data"]["payment_settings"]
-    assert settings_["save_default_payment_method"] == "on_subscription"
+    assert "payment_settings" not in captured["subscription_data"]
 
 
 # ── Charge disclosure ───────────────────────────────────────────────────────
