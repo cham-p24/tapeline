@@ -715,11 +715,42 @@ async def status() -> dict[str, object]:
                 if regime_updated.tzinfo is None:
                     regime_updated = regime_updated.replace(tzinfo=UTC)
                 age = (datetime.now(UTC) - regime_updated).total_seconds()
+                # `age` is the age of the REGIME row, which the tick writes
+                # roughly a third of the way through its work. That is a
+                # heartbeat for "a tick started recently", not for "a tick
+                # finished" — and on 2026-08-24 the difference mattered: the
+                # daily stale-link audit saturated the worker's event loop, 180
+                # consecutive ticks hit the 60s timeout and were killed mid-way,
+                # and scoring froze for ~3 hours while this check reported "ok"
+                # the entire time. The cloud watchdog reads this field, so it
+                # never fired either.
+                #
+                # `Ticker.updated_at` is only advanced by the bulk upsert, and
+                # the tick reaches that upsert only after the vendor fetch and
+                # the merge have both completed. A fresh max(updated_at) is
+                # therefore evidence the tick got through its actual work.
+                # Reported alongside the regime age rather than replacing it, so
+                # a mismatch between the two is visible instead of averaged away.
+                tick_written = (await session.execute(
+                    select(func.max(Ticker.updated_at))
+                )).scalar_one_or_none()
+                write_age = None
+                if tick_written is not None:
+                    # Same naive->UTC guard as the regime timestamp above.
+                    if tick_written.tzinfo is None:
+                        tick_written = tick_written.replace(tzinfo=UTC)
+                    write_age = (datetime.now(UTC) - tick_written).total_seconds()
+                stale = age >= 300 or write_age is None or write_age >= 300
                 checks["worker_last_tick"] = {
-                    "status": "ok" if age < 300 else "stale",
+                    "status": "stale" if stale else "ok",
                     "regime": regime_row.regime,
                     "updated_at": regime_updated.isoformat(),
                     "age_seconds": int(age),
+                    # The load-bearing one: a tick that starts but never
+                    # finishes leaves this climbing while age_seconds stays low.
+                    "last_write_age_seconds": (
+                        int(write_age) if write_age is not None else None
+                    ),
                 }
             else:
                 checks["worker_last_tick"] = {"status": "unknown", "detail": "no regime row yet"}

@@ -169,7 +169,6 @@ _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run 
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
 _last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
-_last_stale_audit_date: str | None = None  # "YYYY-MM-DD" of last stale-link audit + alert
 _last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
 _last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
@@ -1036,25 +1035,26 @@ async def tick() -> None:
         _last_indexnow_date = today_str
         asyncio.create_task(_run_daily_indexnow())
 
-    # Daily stale-link audit — fires once per UTC day at/after 08:00
-    # UTC. Crawls every URL in the sitemap; alerts the founder via
-    # Telegram ONLY if broken URLs are present (no broken = no noise).
-    # Catches 404s introduced by route renames, 5xx outages, and
-    # accidental disconnects between sitemap entries and live pages
-    # within ~24 hours instead of relying on the next user/Google to
-    # surface them.
-    global _last_stale_audit_date
-    if started.hour >= 8 and _last_stale_audit_date != today_str:
-        # Latch BEFORE spawning, then run detached. The audit crawls the full
-        # sitemap (~1k URLs, minutes) — far longer than the 60s tick watchdog.
-        # Awaiting it inline previously WEDGED the worker: wait_for killed
-        # tick() mid-audit before the latch was set, so the audit re-ran every
-        # cycle — a self-inflicted crawl storm that hammered /api/ticker
-        # (cold-news 15s with a DB connection held) and spammed the
-        # tick.timeout_streak CRITICAL. Detached + latched, it runs once/day
-        # and tick() returns in ~6s.
-        _last_stale_audit_date = today_str
-        asyncio.create_task(_run_daily_stale_audit())
+    # The daily stale-link audit USED TO BE SPAWNED HERE. It is not any more:
+    # it runs from .github/workflows/stale-link-audit.yml instead.
+    #
+    # It wedged the worker for ~3h on 2026-08-24 (180 consecutive
+    # tick.timeout, scoring frozen table-wide). Detaching it was not enough,
+    # and the previous comment here said so with misplaced confidence.
+    # `asyncio.create_task` removes the AWAIT dependency; it does not remove
+    # RESOURCE contention. A ~1k-URL HTTP crawl on a shared-cpu-1x/512MB box
+    # saturates the same event loop the 60s tick needs, so the tick stopped
+    # finishing — while the crawl itself was fine.
+    #
+    # The latch made it worse rather than better. `_last_stale_audit_date` is a
+    # module global, so it re-arms on every process start; ~10 deploys in one
+    # day meant ~10 fresh full-site crawls per machine, overlapping across both
+    # worker machines. A restart could not clear it either: the machine came
+    # back, saw an unset latch, and immediately spawned another crawl.
+    #
+    # A 512MB box whose contract is "finish a tick every 60 seconds" is the
+    # wrong place to crawl a website from. GitHub Actions is the right place,
+    # is free, and cannot take production scoring down when it runs long.
 
     # Weekly SEO digest — Monday at/after 09:00 UTC (~7pm Sydney
     # post-Monday-close, ~5am ET pre-market). Sends a Markdown summary
@@ -1222,22 +1222,6 @@ async def _run_daily_indexnow() -> None:
             logger.warning("indexnow.daily_batch.empty no_sitemap_urls")
     except Exception:
         logger.exception("indexnow.daily_batch.failed")
-
-
-async def _run_daily_stale_audit() -> None:
-    """Detached daily stale-link audit (spawned, never awaited, from tick()).
-
-    Crawls the full sitemap (~1k URLs, minutes) and alerts the founder via
-    Telegram only if broken URLs are present. Opens its own session and
-    swallows its own exceptions so the fire-and-forget task is self-contained
-    and can't stall or wedge the 60s tick watchdog."""
-    try:
-        from app.services.seo_health import run_stale_audit_alert
-        async with session_scope() as audit_session:
-            alerted = await run_stale_audit_alert(audit_session)
-        logger.info("stale_audit.daily.ran alerted=%s", alerted)
-    except Exception:
-        logger.exception("stale_audit.daily.failed")
 
 
 async def _run_inbox_tick() -> None:

@@ -1,0 +1,71 @@
+name: Stale-link audit (daily sitemap crawl)
+
+# Crawls every URL in the sitemap and alerts the founder ONLY if broken URLs
+# are present (no broken = no message). Catches 404s from route renames, 5xx
+# outages, and sitemap entries that no longer resolve, within ~24h instead of
+# waiting for Google or a user to find them.
+#
+# THIS USED TO RUN INSIDE THE WORKER TICK. It wedged production on 2026-08-24:
+# 180 consecutive tick.timeout, scoring frozen table-wide for ~3 hours. The
+# crawl was already "detached" via asyncio.create_task, which removes the await
+# dependency but not resource contention — ~1k HTTP requests saturate the same
+# event loop that a shared-cpu-1x/512MB worker needs to finish a 60s tick.
+#
+# Worse, its once-a-day latch was a module global, so it re-armed on every
+# process start. Roughly ten deploys that day meant roughly ten overlapping
+# full-site crawls per machine, and restarting the machine could not clear it —
+# the worker came back, saw an unset latch, and immediately started crawling
+# again.
+#
+# Here it has its own runner, its own clock, and no ability to take scoring
+# down when it runs long. Same script, same alerting, same schedule.
+#
+# Mirrors prod-pulse.yml: the audit is exec'd inside the prod backend's Python
+# via `flyctl ssh console`, so it uses the live DB and the configured alert
+# channel, and always runs current code without waiting for a deploy.
+
+on:
+  schedule:
+    # 08:23 UTC daily — matches the old in-worker trigger (>= 08:00 UTC), off
+    # the :00 mark because Actions cron is best-effort and clusters on the hour.
+    - cron: "23 8 * * *"
+  workflow_dispatch:        # Manual "run one now" from the Actions tab
+
+# A crawl that overruns must never overlap itself. This is the failure mode
+# that caused the incident; the in-worker version had no such guard.
+concurrency:
+  group: stale-link-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Crawl the sitemap and alert only on broken URLs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/stale_audit.py <<'PY'
+          import asyncio
+
+          from app.db import session_scope
+          from app.services.seo_health import run_stale_audit_alert
+
+
+          async def main() -> None:
+              async with session_scope() as session:
+                  alerted = await run_stale_audit_alert(session)
+              print(f"stale_audit.ran alerted={alerted}")
+
+
+          asyncio.run(main())
+          PY
+          B64=$(base64 -w0 /tmp/stale_audit.py)
+          flyctl ssh console -a tapeline-backend \
+            -C "python -c \"import base64;exec(base64.b64decode('$B64').decode())\""
