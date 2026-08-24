@@ -17,6 +17,7 @@ import {
   readFbpCookie,
 } from "@/lib/utm";
 import { OAuthButtons } from "@/components/OAuthButtons";
+import { deviceFingerprint } from "@/lib/fingerprint";
 import {
   FormAlert,
   FormField,
@@ -310,7 +311,15 @@ function SignUpForm() {
     }
     setBusy(true);
     try {
-      const { deviceFingerprint } = await import("@/lib/fingerprint");
+      // Statically imported. This was a dynamic import(), which put a
+      // network fetch for a separate JS chunk in the middle of the signup
+      // submit handler: if that chunk 404s — which happens routinely to a
+      // user sitting on an old HTML document after a redeploy, and shows up
+      // in Sentry as "Failed to load chunk /_next/static/chunks/..." — the
+      // whole submit rejects and the would-be user is dead-ended with a raw
+      // bundler error. The module is ~2KB, has no dependencies, and guards
+      // SSR internally, so the split bought nothing and cost the single most
+      // valuable interaction on the site.
       const device_fp = await deviceFingerprint();
       // First-touch UTM attribution. lib/utm.ts persisted these on the
       // landing visit with a 30-day TTL; we forward whatever's stored so
