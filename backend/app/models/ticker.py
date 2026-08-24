@@ -58,6 +58,14 @@ class Ticker(Base):
     # no level-1 quote feed and no analyst-target entitlement, so there is no
     # honest value to store.
     previous_close: Mapped[float | None] = mapped_column(Float, nullable=True)   # SNAPSHOT
+    # The OFFICIAL consolidated close for the current session (session["close"]),
+    # as distinct from `price`, which is session["price"] — the last trade
+    # INCLUDING extended hours. The scorecard freeze runs at 21:15 UTC = 17:15 ET,
+    # inside after-hours, so `price` there is routinely an after-hours print and
+    # is NOT what a close-to-close track record should measure. Measured: 34% of
+    # frozen rows sat 2-18% off the official close. Nullable — pre-existing rows
+    # and any snapshot without the field fall back to `price`.
+    day_close: Mapped[float | None] = mapped_column(Float, nullable=True)        # SNAPSHOT
     day_open: Mapped[float | None] = mapped_column(Float, nullable=True)         # SNAPSHOT
     # Day range, from the SNAPSHOT's `session` object (which does carry high and
     # low). Deliberately not from the daily bars: the bar cache refreshes once

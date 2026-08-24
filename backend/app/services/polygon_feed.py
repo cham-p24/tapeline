@@ -258,6 +258,7 @@ async def fetch_snapshots(
             # Key statistics riding along in the same snapshot payload. Straight
             # copy — None stays None so the column stays NULL (em-dash).
             r["previous_close"] = real["previous_close"]
+            r["day_close"] = real["day_close"]
             r["day_open"] = real["day_open"]
             r["day_high"] = real["day_high"]
             r["day_low"] = real["day_low"]
@@ -272,6 +273,7 @@ async def fetch_snapshots(
             r["change_pct_1d"] = None
             r["volume"] = None
             r["previous_close"] = None
+            r["day_close"] = None
             r["day_open"] = None
             r["day_high"] = None
             r["day_low"] = None
@@ -491,6 +493,10 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
         # Key statistics (SNAPSHOT-sourced half) — refreshed every tick along
         # with price, so the day range never lags the price it brackets.
         "previous_close": prev_close,
+        # The OFFICIAL close, kept separate from "price" (which is
+        # session["price"] — the last trade including extended hours). The
+        # scorecard freeze needs a real close; see models/ticker.day_close.
+        "day_close": _positive_or_none(session.get("close")),
         "day_open": day_open,
         "day_high": day_high,
         "day_low": day_low,

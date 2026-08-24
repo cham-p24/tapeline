@@ -226,18 +226,53 @@ def test_published_stats_handles_an_all_outlier_population():
 # --------------------------------------------------------------------------
 
 
-def test_price_at_flag_is_never_written():
-    """The freeze side already waits until 21:15 UTC, so that leg is a real
-    close. Touching it would corrupt the ONE value that was always right."""
-    assert "price_at_flag =" not in _SRC.replace("e.price_at_flag ==", ""), (
-        "the script assigns to price_at_flag"
-    )
+def test_both_legs_are_rebased_onto_official_closes():
+    """This test used to assert the OPPOSITE, and the assumption behind it was
+    wrong.
+
+    The old reasoning: "the freeze waits until 21:15 UTC, so price_at_flag is
+    already a real close — touching it would corrupt the one value that was
+    right." 21:15 UTC is 17:15 ET, which is inside the AFTER-HOURS session, and
+    the freeze recorded `Ticker.price` — the vendor's `session["price"]`, i.e.
+    the last trade INCLUDING extended hours. Measured over the 11 frozen dates
+    on 2026-08-24: 37 of ~110 rows (34%) sat 2-18% away from the official close
+    for their own session, in both directions.
+
+    That made the published alpha incoherent rather than merely imprecise:
+    `spy_change_pct_1d` comes from SPY's daily bars — official closes — so the
+    subtraction compared an after-hours print against a close. A track record
+    means close-to-close, so BOTH legs get rebased.
+
+    The forward fix (`Ticker.day_close`, migration 0059) stops new freezes from
+    creating more of these; this script repairs the rows already published.
+    """
     tree = ast.parse(_SRC)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for t in node.targets:
-                if isinstance(t, ast.Attribute) and t.attr == "price_at_flag":
-                    raise AssertionError("price_at_flag is assigned somewhere")
+    assigned = {
+        t.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        for t in node.targets
+        if isinstance(t, ast.Attribute)
+    }
+    assert "price_at_flag" in assigned, (
+        "the flag leg is not rebased, so the repaired rows still divide an "
+        "official close by an after-hours print"
+    )
+    assert "price_next_day" in assigned, "the next-day leg is not rebased"
+
+
+def test_the_return_is_computed_close_to_close():
+    """Both legs must come out of the same daily-bar window, not one bar and
+    one frozen snapshot value. If `pct` were still computed against the stored
+    `e.price_at_flag`, rebasing the column would be cosmetic — the published
+    percentage would keep the mixed basis."""
+    fn = inspect.getsource(rs._rederive)
+    code = ast.unparse(ast.parse(fn))  # strip comments/docstrings before matching
+    assert "_pct(true_close, true_flag)" in code, (
+        "the return is not computed from the two vendor closes"
+    )
+    for bad in ("_pct(true_close, e.price_at_flag)", "_pct(true_close, entry.price_at_flag)"):
+        assert bad not in code, f"the return still divides by the stored flag price ({bad})"
 
 
 def test_dry_run_is_the_default():
@@ -282,9 +317,11 @@ def test_both_legs_come_from_one_window():
 
 
 def test_flag_price_is_verified_before_being_used_as_a_denominator():
-    """price_at_flag is the ONE leg we may not change, so if the vendor
-    disagrees with it for its own session we must not publish a return computed
-    against it. A split shows up here as ~50/67/75%."""
+    """The flag leg is now rebased rather than trusted, but it is still a
+    DENOMINATOR, so it must be a real positive close before anything divides by
+    it. The drift tolerance stays because the size of the gap is diagnostic:
+    after-hours drift is small, whereas a split reads as ~50/67/75% and means
+    the window was fetched on the wrong basis."""
     assert "_FLAG_DRIFT_TOLERANCE" in _SRC
     assert rs._FLAG_DRIFT_TOLERANCE <= 0.05, (
         f"tolerance {rs._FLAG_DRIFT_TOLERANCE} is too loose to catch a "
@@ -293,10 +330,24 @@ def test_flag_price_is_verified_before_being_used_as_a_denominator():
     assert "flag_mismatch += 1" in _SRC, "a mismatching row is not skipped"
 
 
-def test_flag_mismatch_skips_rather_than_repairs():
-    """The mismatch branch must `continue`, never fall through to a write."""
+def test_flag_mismatch_is_counted_and_reported_not_silently_swallowed():
+    """A large gap between the frozen flag price and that session's official
+    close is the DEFECT this script repairs, so it can no longer be a skip
+    condition — skipping would leave exactly the worst rows unfixed.
+
+    It must still be counted and surfaced, because a gap far beyond the
+    after-hours range (a 4:1 split reads as ~-75%) means something other than
+    after-hours drift and a human should look before trusting the rewrite.
+    """
+    assert "flag_mismatch += 1" in _SRC, "mismatching rows are not counted"
     for chunk in _SRC.split("flag_mismatch += 1")[1:]:
         head = chunk.strip().splitlines()[0].strip()
-        assert head == "continue", (
-            f"a flag-mismatch row does not immediately continue (found {head!r})"
+        assert head != "continue", (
+            "a flag-mismatch row is skipped — that leaves the most damaged "
+            "rows on the public record"
         )
+    body = inspect.getsource(rs._rederive)
+    tail = body.rsplit("flag_mismatch += 1", 1)[1]
+    assert "flag_mismatch" in tail, (
+        "the mismatch count is tallied but never surfaced to the operator"
+    )
