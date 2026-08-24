@@ -76,7 +76,7 @@ jobs:
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
         run: |
           node -e '
-            const { readFile } = require("node:fs/promises");
+            const { readFile } = await import("node:fs/promises");
             const { CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN } = process.env;
             const missing = Object.entries({ CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN })
               .filter(([, v]) => !v).map(([k]) => k);
