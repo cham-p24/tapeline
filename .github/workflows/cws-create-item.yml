@@ -1,0 +1,131 @@
+# Creates the Chrome Web Store item and prints its id.
+#
+# Run this ONCE. `items.insert` creates a brand new item every time it is
+# called, so a second run means a second orphaned draft in the dashboard with
+# no way to merge them. There is a deliberate confirmation input for that
+# reason. After it succeeds, store the id as CWS_EXTENSION_ID and use
+# "Publish extension" for every version after this one.
+#
+# Contrary to what most guides say, the API CAN create an item — the endpoint
+# is POST /upload/chromewebstore/v1.1/items with the zip as the raw body. What
+# it cannot do is write listing metadata: description, category, screenshots,
+# and the privacy answers are dashboard-only, and the item cannot pass review
+# until those are filled in. So this gets you the id and a draft holding the
+# real package; the listing copy is still a human step.
+#
+# Nothing here publishes. The item is created as a draft.
+
+name: CWS create item (ONE TIME)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type CREATE to confirm — this makes a NEW store item and cannot be undone'
+        required: true
+        default: ""
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.confirm }}" != "CREATE" ]; then
+            echo "✖ Not confirmed. Re-run and type CREATE in the confirm box."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Show what is being created
+        run: |
+          set -euo pipefail
+          echo "name    : $(node -p "require('./extension/manifest.json').name")"
+          echo "version : $(node -p "require('./extension/manifest.json').version")"
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          # Same staging rules as publish-extension.yml: delete dev artefacts
+          # rather than rely on zip -x patterns, whose matching depends on how
+          # paths are stored and can silently fail open.
+          rm -rf build && mkdir -p build
+          cp -r extension/. build/
+          rm -f build/test-detection.js build/icons/make-icons.js build/.storeignore build/README.md
+          cd build && zip -rq ../extension.zip . && cd ..
+          echo "packaged $(du -h extension.zip | cut -f1)"
+          unzip -l extension.zip
+
+      - name: Verify the package
+        run: |
+          set -euo pipefail
+          if unzip -l extension.zip | grep -qE 'test-detection|make-icons|README'; then
+            echo "✖ dev artefacts leaked into the package"; exit 1
+          fi
+          if ! unzip -l extension.zip | grep -qE ' manifest\.json$'; then
+            echo "✖ manifest.json is not at the package root"; exit 1
+          fi
+          echo "✓ package contents look right"
+
+      - name: Create the item
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          node -e '
+            const { readFile } = require("node:fs/promises");
+            const { CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN } = process.env;
+            const missing = Object.entries({ CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN })
+              .filter(([, v]) => !v).map(([k]) => k);
+            if (missing.length) { console.error(`\n✖ Missing secret(s): ${missing.join(", ")}`); process.exit(1); }
+
+            const tokRes = await fetch("https://oauth2.googleapis.com/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                client_id: CWS_CLIENT_ID, client_secret: CWS_CLIENT_SECRET,
+                refresh_token: CWS_REFRESH_TOKEN, grant_type: "refresh_token",
+              }),
+            });
+            const tok = await tokRes.json().catch(() => ({}));
+            if (!tokRes.ok || !tok.access_token) {
+              console.error("\n✖ Could not mint an access token.", JSON.stringify(tok, null, 2));
+              process.exit(1);
+            }
+
+            const zip = await readFile("extension.zip");
+            const res = await fetch("https://www.googleapis.com/upload/chromewebstore/v1.1/items", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${tok.access_token}`,
+                "x-goog-api-version": "2",
+                "Content-Type": "application/zip",
+              },
+              body: zip,
+            });
+            const body = await res.json().catch(() => ({}));
+
+            // The API reports rejections in-band with HTTP 200, so status alone
+            // does not tell you whether this worked.
+            if (body.uploadState === "SUCCESS" && body.id) {
+              console.log(`\n✓ item created`);
+              console.log(`ITEM_ID=${body.id}`);
+              console.log(`\nStore it as the CWS_EXTENSION_ID repo secret, then finish the`);
+              console.log(`listing in the dashboard: https://chrome.google.com/webstore/devconsole`);
+              process.exit(0);
+            }
+            console.error(`\n✖ Create failed (uploadState=${body.uploadState || res.status}).`);
+            const errs = body.itemError || [];
+            if (errs.some((e) => /developer|account|registration|terms/i.test(e.error_detail || ""))) {
+              console.error(
+                "This looks like the developer account is not fully registered.\n" +
+                "The one-off US$5 fee and the developer agreement must be done by hand at\n" +
+                "https://chrome.google.com/webstore/devconsole before the API will accept an item."
+              );
+            }
+            console.error(JSON.stringify(errs.length ? errs : body, null, 2));
+            process.exit(1);
+          '
