@@ -133,6 +133,57 @@ async def test_payment_settings_never_returns(monkeypatch, label, overrides):
     )
 
 
+# Top-level Checkout Session fields we knowingly send, plus the neighbouring
+# ones a future change would plausibly reach for. Same discipline as the
+# subscription_data allowlist: `payment_settings` was invalid at the nested
+# level, and nothing stops the next wrong-but-plausible key from being passed
+# at the top level instead — `payment_settings` and `payment_method_options`
+# are one autocomplete apart.
+ALLOWED_SESSION_KEYS = frozenset({
+    "allow_promotion_codes",
+    "automatic_tax",
+    "billing_address_collection",
+    "cancel_url",
+    "client_reference_id",
+    "consent_collection",
+    "currency",
+    "customer",
+    "customer_creation",
+    "customer_email",
+    "customer_update",
+    "discounts",
+    "expires_at",
+    "invoice_creation",
+    "line_items",
+    "locale",
+    "metadata",
+    "mode",
+    "payment_method_collection",
+    "payment_method_options",
+    "payment_method_types",
+    "phone_number_collection",
+    "submit_type",
+    "subscription_data",
+    "success_url",
+    "tax_id_collection",
+    "ui_mode",
+})
+
+
+@pytest.mark.parametrize("label,overrides", CHECKOUT_VARIANTS, ids=[c[0] for c in CHECKOUT_VARIANTS])
+async def test_top_level_session_keys_are_valid(monkeypatch, label, overrides):
+    captured = await _run(monkeypatch, **overrides)
+    sent = {k for k in captured if not k.startswith("_")}
+    unknown = sent - ALLOWED_SESSION_KEYS
+    assert not unknown, (
+        f"[{label}] Checkout Session called with key(s) not on the reviewed "
+        f"allowlist: {sorted(unknown)}. Either it is not a real Checkout "
+        "parameter (Stripe will 400 the whole request → 502 for the customer), "
+        "or it is legitimate and belongs in ALLOWED_SESSION_KEYS — add it "
+        "deliberately after checking Stripe's docs for THIS endpoint."
+    )
+
+
 async def test_metadata_still_travels(monkeypatch):
     """Removing payment_settings must not take the metadata with it.
 
