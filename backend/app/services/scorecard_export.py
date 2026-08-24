@@ -47,6 +47,44 @@ WEB_VIEW_URL = "https://tapeline.io/scorecard"
 CORRECTIONS_URL = "https://tapeline.io/contact"
 CORRECTIONS_EMAIL = "support@tapeline.io"
 
+#: Dated restatements of already-published rows.
+#:
+#: This file is designed to be read DETACHED from the site and cited, so a
+#: consumer holding an older copy has no other way to learn that the numbers
+#: moved. `append_only` below promises entries are never edited; that promise
+#: is only honest if the exceptions are enumerated here, in the artefact
+#: itself, rather than only in a note on a web page they may never load.
+#:
+#: Append, never edit. One entry per restatement, newest last.
+RESTATEMENTS: list[dict[str, str]] = [
+    {
+        "date": "2026-08-25",
+        "scope": "every scored row published up to 2026-08-21",
+        "fields_changed": "price_at_flag, price_next_day, change_pct_1d_after, "
+                          "spy_change_pct_1d, alpha_vs_spy",
+        "fields_unchanged": "as_of, symbol, rank, score_at_flag",
+        "reason": (
+            "price_at_flag was recorded from the vendor's last trade INCLUDING "
+            "extended-hours trading rather than the official consolidated close, "
+            "because the daily freeze runs at 21:15 UTC (17:15 ET), inside the "
+            "after-hours session. spy_change_pct_1d was always taken from SPY's "
+            "official daily-bar closes, so the two legs of alpha_vs_spy were "
+            "measured on different bases. About 34% of rows differed from the "
+            "official close by 2-18%, in both directions."
+        ),
+        "remedy": (
+            "Both legs re-derived from the vendor's UNADJUSTED daily closes for "
+            "the same two sessions, so the change is close-to-close and on one "
+            "scale. Unadjusted because price_at_flag was frozen unadjusted; "
+            "mixing scales would fabricate a return for any symbol that split."
+        ),
+        "effect_on_summary": (
+            "Moved the published medians slightly against Tapeline. Disclosed "
+            "regardless of direction."
+        ),
+    },
+]
+
 # Column order is part of the published contract — consumers will index by
 # position. Append new columns at the end; never reorder or remove.
 COLUMNS: list[str] = [
@@ -114,10 +152,16 @@ def dataset_meta(*, row_count: int, session_count: int, delay_days: int,
         "corrections_url": CORRECTIONS_URL,
         "corrections_email": CORRECTIONS_EMAIL,
         "append_only": (
-            "Entries are written once and never edited, re-ranked, back-filled or "
-            "deleted. What was published on a given date is what is in this file, "
-            "including entries that later looked bad."
+            "Entries are written once and never re-ranked, back-filled or deleted. "
+            "What was published on a given date is what is in this file, including "
+            "entries that later looked bad. A recorded PRICE is corrected only when "
+            "it was read from the wrong source, and every such correction is "
+            "enumerated under `restatements` below with its date, scope and cause. "
+            "If `restatements` is empty, no published row has ever been altered."
         ),
+        # Enumerated in the file itself, not merely on the website, because this
+        # artefact is meant to survive being read detached from the site.
+        "restatements": RESTATEMENTS,
         "publication_delay_days": delay_days,
         "publication_delay": (
             f"Entries are published in this export about {delay_days} days after the "
