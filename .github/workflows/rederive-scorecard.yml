@@ -50,6 +50,10 @@ on:
         description: "Seconds between vendor calls. 12 = 5/min (Starter ceiling). Lower ONLY on Developer tier."
         required: false
         default: "12"
+      slice_days:
+        description: "Days per ssh session (0 = one long session). 30 keeps each slice well inside the ~45min the stream survives."
+        required: false
+        default: "30"
       confirm:
         description: "For mode=apply ONLY, type exactly: rewrite-the-public-record"
         required: false
@@ -85,6 +89,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           SINCE: ${{ inputs.since }}
           PACE: ${{ inputs.pace }}
+          SLICE_DAYS: ${{ inputs.slice_days }}
         run: |
           set -euo pipefail
           if [ -z "${FLY_API_TOKEN:-}" ]; then
@@ -99,15 +104,57 @@ jobs:
             apply)    args="--apply" ;;
             *) echo "::error::unknown mode $MODE"; exit 1 ;;
           esac
-          [ -n "${SINCE:-}" ] && args="$args --since ${SINCE}"
           [ -n "${PACE:-}" ]  && args="$args --pace ${PACE}"
+          # The sliced path appends its own --since/--until per slice, so keep
+          # a copy of the flags WITHOUT the operator's --since to build on.
+          sliceargs="$args"
+          [ -n "${SINCE:-}" ] && args="$args --since ${SINCE}"
 
           echo "mode=$MODE  args='$args'"
           echo "--------------------------------------------------------------"
-          # -C runs one command and streams its output back. The script writes
-          # a full per-date report plus the before/after published statistics.
-          flyctl ssh console -a tapeline-backend \
-            -C "python -m app.scripts.rederive_scorecard ${args}"
+          # -C runs one command and streams its output back. A FULL Starter-tier
+          # pass is ~2.6h and the stream does not survive that: an earlier run
+          # was torn down at ~45 minutes with "ssh shell: wait: remote command
+          # exited without exit status", which left the PUBLIC record half
+          # repaired and no record of where it stopped.
+          #
+          # So the window is walked in slices, one ssh session each. Every row
+          # the script touches is idempotent (a row already matching the vendor
+          # is counted `same` and not rewritten), so a slice that dies is just
+          # re-run, and every completed slice is durable. `estimate` makes no
+          # vendor calls at all, so it always runs as a single session.
+          if [ "$MODE" = "estimate" ] || [ "${SLICE_DAYS:-0}" -le 0 ]; then
+            flyctl ssh console -a tapeline-backend \
+              -C "python -m app.scripts.rederive_scorecard ${args}"
+            exit 0
+          fi
+
+          # The public scorecard starts 2026-05-18; `since` narrows it further.
+          cur="${SINCE:-2026-05-01}"
+          end=$(date -u +%Y-%m-%d)
+          slice=0
+          failed=0
+          while [ "$(date -u -d "$cur" +%s)" -le "$(date -u -d "$end" +%s)" ]; do
+            stop=$(date -u -d "$cur + $((SLICE_DAYS - 1)) days" +%Y-%m-%d)
+            slice=$((slice + 1))
+            echo ""
+            echo "=============================================================="
+            echo "SLICE $slice:  $cur .. $stop"
+            echo "=============================================================="
+            # A torn-down slice must not abort the remaining ones — the run is
+            # resumable by design and the later dates are independent. Record
+            # it and fail the job at the end so it cannot be read as a clean
+            # pass.
+            if ! flyctl ssh console -a tapeline-backend \
+              -C "python -m app.scripts.rederive_scorecard ${sliceargs} --since ${cur} --until ${stop}"; then
+              echo "::warning title=Slice failed::$cur..$stop did not complete; re-run this window."
+              failed=$((failed + 1))
+            fi
+            cur=$(date -u -d "$stop + 1 day" +%Y-%m-%d)
+          done
+          echo ""
+          echo "slices run: $slice   failed: $failed"
+          [ "$failed" -eq 0 ] || { echo "::error::$failed slice(s) failed"; exit 1; }
 
       - name: Confirm the public scorecard still serves
         if: ${{ inputs.mode == 'apply' }}

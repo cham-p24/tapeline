@@ -164,13 +164,24 @@ def _published_stats(pairs: list[tuple[float, float]]) -> dict[str, float | int]
     }
 
 
-async def _load(since: date | None) -> list[DailyScorecardEntry]:
+async def _load(since: date | None, until: date | None = None) -> list[DailyScorecardEntry]:
+    """Rows to consider, optionally bounded to a [since, until] window.
+
+    The window exists so a full pass can be split into slices short enough to
+    outlive a `flyctl ssh console` session — a 2.6h stream gets torn down
+    mid-run ("remote command exited without exit status"), and a torn-down run
+    leaves the record half-repaired with no record of where it stopped. `until`
+    is INCLUSIVE so consecutive slices can be expressed as calendar months
+    without an off-by-one at the boundary.
+    """
     async with session_scope() as session:
         stmt = select(DailyScorecardEntry).where(
             DailyScorecardEntry.price_next_day.isnot(None)
         )
         if since is not None:
             stmt = stmt.where(DailyScorecardEntry.as_of >= since)
+        if until is not None:
+            stmt = stmt.where(DailyScorecardEntry.as_of <= until)
         return list(
             (await session.execute(stmt.order_by(DailyScorecardEntry.as_of))).scalars()
         )
@@ -192,8 +203,14 @@ def _plan(rows: list[DailyScorecardEntry]) -> tuple[dict[date, list], int]:
     return by_date, calls
 
 
-async def _rederive(since: date | None, apply: bool, pace: float, estimate: bool) -> int:
-    rows = await _load(since)
+async def _rederive(
+    since: date | None,
+    apply: bool,
+    pace: float,
+    estimate: bool,
+    until: date | None = None,
+) -> int:
+    rows = await _load(since, until)
     if not rows:
         logger.info("no scored entries found — nothing to do")
         return 0
@@ -393,6 +410,11 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Re-derive scorecard rows from real closes.")
     p.add_argument("--since", type=str, default=None, help="only dates >= YYYY-MM-DD")
     p.add_argument(
+        "--until", type=str, default=None,
+        help="only dates <= YYYY-MM-DD (inclusive). Pair with --since to run "
+             "the pass in slices short enough to outlive an ssh session.",
+    )
+    p.add_argument(
         "--apply", action="store_true",
         help="actually write (default is a dry run that reports only)",
     )
@@ -407,7 +429,10 @@ def main() -> None:
     )
     args = p.parse_args()
     since = datetime.strptime(args.since, "%Y-%m-%d").date() if args.since else None
-    asyncio.run(_rederive(since, args.apply, args.pace, args.estimate))
+    until = datetime.strptime(args.until, "%Y-%m-%d").date() if args.until else None
+    if since and until and until < since:
+        p.error(f"--until {until} is before --since {since}")
+    asyncio.run(_rederive(since, args.apply, args.pace, args.estimate, until))
 
 
 if __name__ == "__main__":

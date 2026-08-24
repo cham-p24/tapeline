@@ -29,6 +29,7 @@ from datetime import UTC, date, datetime
 from statistics import median
 
 import pytest
+from sqlalchemy import select
 
 from app.scripts import rederive_scorecard as rs
 
@@ -350,4 +351,81 @@ def test_flag_mismatch_is_counted_and_reported_not_silently_swallowed():
     tail = body.rsplit("flag_mismatch += 1", 1)[1]
     assert "flag_mismatch" in tail, (
         "the mismatch count is tallied but never surfaced to the operator"
+    )
+
+
+# --------------------------------------------------------------------------
+# 8. Sliceable, resumable runs
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_until_bounds_the_window_inclusively():
+    """A full Starter-tier pass is ~2.6h and the `flyctl ssh console` stream
+    does not survive that — a real run was torn down at ~45 minutes, leaving
+    the PUBLIC record half repaired with no record of where it stopped.
+
+    `--until` is what makes the pass sliceable. Inclusive on both ends so
+    consecutive slices can be expressed as calendar windows without an
+    off-by-one dropping a trading day between them — a silently skipped date
+    is a row left wrong forever, which is exactly the failure this repairs.
+    """
+    from app.db import session_scope
+    from app.models import DailyScorecardEntry
+
+    made = [date(2026, 6, 1), date(2026, 6, 15), date(2026, 6, 30)]
+    async with session_scope() as s:
+        for d in made:
+            s.add(DailyScorecardEntry(
+                as_of=d, symbol="ZZUNT", rank=1,
+                score_at_flag=90.0, price_at_flag=100.0, price_next_day=101.0,
+            ))
+        await s.commit()
+    try:
+        window = {e.as_of for e in await rs._load(date(2026, 6, 1), date(2026, 6, 15))
+                  if e.symbol == "ZZUNT"}
+        assert window == {date(2026, 6, 1), date(2026, 6, 15)}, (
+            "the window is not inclusive at both ends — a boundary date is "
+            "dropped, so slicing silently skips it"
+        )
+        assert date(2026, 6, 30) not in window, "--until did not bound the window"
+
+        unbounded = {e.as_of for e in await rs._load(date(2026, 6, 1))
+                     if e.symbol == "ZZUNT"}
+        assert unbounded == set(made), "omitting --until must not filter anything"
+    finally:
+        async with session_scope() as s:
+            for e in (await s.execute(
+                select(DailyScorecardEntry).where(DailyScorecardEntry.symbol == "ZZUNT")
+            )).scalars().all():
+                await s.delete(e)
+            await s.commit()
+
+
+def test_until_before_since_is_rejected():
+    """An inverted window silently matches zero rows and reports a clean
+    'nothing to do', which reads exactly like a completed repair."""
+    src = inspect.getsource(rs.main)
+    assert "p.error" in src and "before --since" in src, (
+        "an inverted --since/--until window is accepted silently"
+    )
+
+
+def test_the_operator_workflow_runs_the_pass_in_slices():
+    """The script being sliceable is useless if the workflow still issues one
+    2.6-hour ssh command. This pins the loop and, more importantly, that a
+    dead slice fails the JOB — a run that quietly skipped a window while
+    printing success is how a half-repaired record gets signed off as done."""
+    wf = pathlib.Path(__file__).resolve().parents[2] / ".github" / "workflows" / "rederive-scorecard.yml"
+    body = wf.read_text(encoding="utf-8")
+    # Strip YAML comments so an assertion cannot pass against prose that
+    # merely describes the behaviour (this repo has been bitten by that).
+    code = "\n".join(
+        ln for ln in body.splitlines() if not ln.lstrip().startswith("#")
+    )
+    assert "--until ${stop}" in code, "the workflow does not bound each slice"
+    assert "--since ${cur}" in code, "the workflow does not advance the slice start"
+    assert "SLICE_DAYS" in code, "slice width is not operator-controlled"
+    assert 'failed=$((failed + 1))' in code and 'exit 1' in code, (
+        "a failed slice does not fail the job"
     )
