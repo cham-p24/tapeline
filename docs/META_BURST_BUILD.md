@@ -108,7 +108,40 @@ utm_source=facebook&utm_medium=paid-social&utm_campaign={{campaign.id}}&utm_cont
 
 ---
 
-## 5. 🔴 The blocker, and what it is
+## 4b. ✅ SOLVED — the two settings that unlock everything (2026-08-24)
+
+**Both were found by doing it, not by reading. Neither appears in any playbook.**
+
+### The lever: Budget strategy → Ad set budget
+
+Advantage+ sales campaign is not a switch — it is a *status* derived from three conditions (Budget · Audience · Placements all at recommended settings). Breaking any one drops it.
+
+Switching **Budget strategy from "Campaign budget" to "Ad set budget"** is the cheapest break. The moment it is set, **Special Ad Categories appears in the campaign editor** where it was previously absent from the DOM entirely.
+
+### 🔴 The trap: Special Ad Categories → Countries defaults to AUSTRALIA
+
+This is the single most dangerous default in the whole build, and it is **not** the same field as ad-set geo targeting.
+
+When you declare Financial Products & Services, a **Countries** field appears directly beneath it: *"Select where you want to run this campaign. If there are additional requirements to run your ads in those locations, your advertising options will be adjusted."*
+
+**It pre-fills with Australia**, taken from the ad account's own country — under a group header literally labelled "Based on ad account".
+
+That field is what selects which country's special-category regime applies. Left as Australia, the campaign is declared into the **AU financial-advertiser regime** — the AFSL-or-exemption self-declaration and the public **"AFS licence: exemption claimed"** label archived in the Ad Library. Excluding Australia in ad-set geo targeting does **not** undo it; they are different fields.
+
+**Set Countries to United States and uncheck Australia.** Australia appears twice in that picker — once under "Based on ad account" and once in the alphabetical country list — and **both must be unchecked**.
+
+### Then: apply the category restrictions
+
+A banner appears: *"Updates needed for your selections."* Click **Review Special Ad Category updates** → **Modify ad sets**. Meta lists exactly what FPS locks, matching §7.2:
+
+- **Limited:** Location, Detailed targeting
+- **Unavailable:** Age and gender, Postcode, Lookalike audiences, Saved audiences
+
+After applying, **reload the ad set editor** — Budget & schedule and Audience controls do not appear until you do. The estimated audience jumps to ~257–302M, which is the FPS-forced broad US pool.
+
+---
+
+## 5. The blocker as originally found (kept for the record — SOLVED, see §4b)
 
 **Advantage+ sales campaign is ON and this account's UI exposes no control to turn it off.** Verified directly against the DOM, not inferred:
 
@@ -118,7 +151,7 @@ utm_source=facebook&utm_medium=paid-social&utm_campaign={{campaign.id}}&utm_cont
 
 So while it stays on, **neither the FPS declaration nor the AU exclusion can be set.**
 
-**Do not publish the existing draft.** It has the right name, objective, dataset, conversion event, budget (A$25/day) and bid strategy — but no geo exclusion, which means it could serve to Australian users. It cannot spend today (no payment method), so nothing is at risk while it sits.
+**Status 2026-08-24: the campaign and ad set are now configured.** Name, Sales objective, dataset, , FPS declared, Countries = United States, ad-set budget strategy, Highest Volume, A$25.00/day, start date reset to now. Remaining: the end-date duration still reads 30 days (needs 14), ad-set Locations, and the three ads themselves. Nothing can spend — no payment method on the account.
 
 **The fix:** switch **Budget strategy → Ad set budget**. Campaign-budget is one of the three conditions holding Advantage+ on (Budget · Audience · Placements); breaking it should drop Advantage+ and restore both controls. This is a two-click change in the Budget section that resisted automation but is trivial by hand.
 
