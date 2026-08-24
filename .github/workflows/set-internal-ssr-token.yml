@@ -1,0 +1,174 @@
+name: Set INTERNAL_SSR_TOKEN (bootstrap / rotate)
+
+# One-click operator tool to provision the SSR shared secret on BOTH Fly apps
+# WITHOUT anyone installing flyctl or handling the value.
+#
+# WHY THIS EXISTS
+#   Every server-rendered page makes its upstream API calls from a single Fly
+#   egress IP, so the whole site shares ONE backend limit_api bucket (120/min).
+#   A ticker page fans out to ~3 upstream calls, so ~40 cold renders a minute
+#   drains it — after which the backend 429s its own frontend and the page turns
+#   that into an HTTP 500. Any bulk crawl trips it: the weekly SEO audit once
+#   reported ~1,534 "broken" URLs it had broken itself, and Googlebot walking
+#   the ~8,400-page ticker sitemap sees the same 500s (a real deindexing risk on
+#   the site's biggest crawl surface).
+#
+#   The exemption is already shipped on both sides — backend
+#   `main._is_trusted_ssr` (constant-time compare) and frontend
+#   `lib/ssrHeaders.ssrInternalHeaders` — but it FAILS CLOSED while the secret
+#   is unset, so today it does nothing.
+#
+# WHY BOTH APPS, IN ONE JOB
+#   The backend VERIFIES the token and the frontend SENDS it, so the two values
+#   must be identical. This generates ONE value and sets it on both, so they can
+#   never drift. Setting only one side is worse than setting neither: the
+#   frontend would send a token the backend rejects, or the backend would trust
+#   a header nobody sends.
+#
+# HOW TO RUN
+#   Actions tab -> "Set INTERNAL_SSR_TOKEN (bootstrap / rotate)" -> Run workflow
+#   -> type the confirm phrase. Or:
+#     gh workflow run set-internal-ssr-token.yml -f confirm=set-internal-ssr-token
+#
+# MODES
+#   bootstrap (default) - set only if it is not already set on BOTH apps.
+#                         Safe to re-run.
+#   rotate              - overwrite with a fresh value on both. Safe at any
+#                         time: the token only affects rate-limit EXEMPTION, so
+#                         the worst case during the few seconds between the two
+#                         app restarts is that SSR calls fall back to the normal
+#                         per-IP limit. No user is signed out, nothing 500s that
+#                         wasn't already going to.
+#
+# SECURITY NOTE
+#   The value is generated in CI and never printed, logged, or echoed. It is
+#   deliberately NOT named NEXT_PUBLIC_*, so Next only exposes it to the server
+#   runtime — it is never inlined into a browser bundle.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type exactly: set-internal-ssr-token"
+        required: true
+        default: ""
+      mode:
+        description: "bootstrap = set only if unset; rotate = overwrite on both apps"
+        required: true
+        default: bootstrap
+        type: choice
+        options:
+          - bootstrap
+          - rotate
+
+concurrency:
+  group: internal-ssr-token
+  cancel-in-progress: false
+
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on the confirm phrase
+        if: ${{ inputs.confirm != 'set-internal-ssr-token' }}
+        run: |
+          echo "::error title=Not confirmed::Type 'set-internal-ssr-token' in the confirm box to run."
+          exit 1
+
+      # Pinned to the same immutable SHA as deploy-backend.yml and
+      # set-session-secret.yml. This job holds BOTH production Fly tokens, so
+      # never loosen this to a branch/tag.
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Check both Fly tokens are present
+        env:
+          BACKEND_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          WEB_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -z "${BACKEND_TOKEN:-}" ] && missing="$missing FLY_API_TOKEN"
+          [ -z "${WEB_TOKEN:-}" ] && missing="$missing FLY_WEB_API_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repo secret::Needed for both apps:$missing"
+            exit 1
+          fi
+
+      - name: Set INTERNAL_SSR_TOKEN on backend + frontend
+        env:
+          BACKEND_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          WEB_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+
+          be_set=false
+          fe_set=false
+          FLY_API_TOKEN="$BACKEND_TOKEN" flyctl secrets list -a tapeline-backend \
+            | grep -qw INTERNAL_SSR_TOKEN && be_set=true || true
+          FLY_API_TOKEN="$WEB_TOKEN" flyctl secrets list -a tapeline-web \
+            | grep -qw INTERNAL_SSR_TOKEN && fe_set=true || true
+
+          echo "backend already set: $be_set"
+          echo "frontend already set: $fe_set"
+
+          if [ "$be_set" = "true" ] && [ "$fe_set" = "true" ] && [ "$MODE" != "rotate" ]; then
+            echo "Both apps already have INTERNAL_SSR_TOKEN — bootstrap is a no-op."
+            echo "Re-run with mode=rotate to issue a fresh value on both."
+            exit 0
+          fi
+
+          # ONE value for both apps — they must match or the exemption is worse
+          # than useless. Generated here; never printed.
+          value="$(openssl rand -hex 32)"
+
+          FLY_API_TOKEN="$BACKEND_TOKEN" \
+            flyctl secrets set "INTERNAL_SSR_TOKEN=${value}" -a tapeline-backend >/dev/null
+          echo "backend set."
+
+          FLY_API_TOKEN="$WEB_TOKEN" \
+            flyctl secrets set "INTERNAL_SSR_TOKEN=${value}" -a tapeline-web >/dev/null
+          echo "frontend set."
+
+          unset value
+          echo "Both apps now share the same INTERNAL_SSR_TOKEN."
+
+      - name: Verify both apps come back healthy
+        run: |
+          set -euo pipefail
+          check() {
+            name="$1"; url="$2"
+            for i in $(seq 1 18); do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 \
+                "$url?cb=${GITHUB_RUN_ID}-$i" || echo 000)
+              [ "$code" = "200" ] && { echo "$name healthy after restart"; return 0; }
+              echo "$name attempt $i: $code — waiting for the secret-change restart"
+              sleep 10
+            done
+            echo "::error title=Unhealthy::$name did not return 200 after the secret change"
+            return 1
+          }
+          check "backend" "https://api.tapeline.io/api/health"
+          # The Fly frontend has no dedicated health route (/api/health/ping
+          # 404s there — that path is the BACKEND's). The root page is the
+          # honest liveness check for tapeline-web.
+          check "frontend" "https://tapeline.io/"
+
+      - name: Confirm the exemption is actually live
+        run: |
+          set -euo pipefail
+          # The whole point of the secret is that SSR stops sharing the per-IP
+          # bucket. We can't send the token from here (we don't hold it), but we
+          # CAN confirm a real server-rendered page still serves 200 — i.e. the
+          # frontend didn't break on the new env var.
+          for path in "/t/NVDA" "/sector/energy" "/scorecard"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 \
+              "https://tapeline.io${path}?cb=${GITHUB_RUN_ID}" || echo 000)
+            echo "  ${path} -> ${code}"
+            [ "$code" = "200" ] || {
+              echo "::error title=SSR broken::${path} returned ${code} after the secret change"
+              exit 1
+            }
+          done
+          echo "SSR pages render fine with the token in place."
