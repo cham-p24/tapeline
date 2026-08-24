@@ -119,12 +119,26 @@ jobs:
             }
             console.error(`\n✖ Create failed (uploadState=${body.uploadState || res.status}).`);
             const errs = body.itemError || [];
-            if (errs.some((e) => /developer|account|registration|terms/i.test(e.error_detail || ""))) {
-              console.error(
-                "This looks like the developer account is not fully registered.\n" +
-                "The one-off US$5 fee and the developer agreement must be done by hand at\n" +
-                "https://chrome.google.com/webstore/devconsole before the API will accept an item."
-              );
+            // Map on error_code, never on prose. A substring match over
+            // error_detail sent the first run to "pay the registration fee"
+            // because the 2FA message happens to contain the word "account".
+            const codes = new Set(errs.map((e) => e.error_code));
+            const HINTS = {
+              PKG_NO_TWO_FACTOR_AUTH: [
+                "Turn on 2-Step Verification for the developer Google account:",
+                "  https://myaccount.google.com/signinoptions/twosv",
+                "then re-run this workflow. This is NOT the registration fee - the store",
+                "refuses a package from an account without 2SV whether or not the fee is paid.",
+              ].join("\n"),
+              ITEM_NOT_UPDATABLE: "The item is already in review. Wait for it to finish.",
+            };
+            for (const c of codes) if (HINTS[c]) console.error("\n" + HINTS[c]);
+            if (!codes.size) {
+              console.error([
+                "No itemError returned. If the developer account was never registered,",
+                "the one-off US$5 fee and the developer agreement must be done by hand at",
+                "https://chrome.google.com/webstore/devconsole first.",
+              ].join("\n"));
             }
             console.error(JSON.stringify(errs.length ? errs : body, null, 2));
             process.exit(1);
