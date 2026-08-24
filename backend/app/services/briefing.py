@@ -89,9 +89,23 @@ async def _generate_personalised(session: AsyncSession, user: User) -> str:
     # Sort: by absolute delta-since-added descending so "movers" lead.
     # Tickers with no baseline (added before baseline_score column existed)
     # fall back to current score sort.
+    #
+    # `t.score or 0.0` was load-bearing in the wrong direction. A watchlist
+    # ticker we hold no score for became 0.0, so its delta computed as
+    # abs(0 - baseline) — i.e. the whole baseline, a large number — and it
+    # sorted STRAIGHT TO THE TOP as the biggest mover. The row itself prints an
+    # em-dash for its score (fixed separately), so the email led with a ticker
+    # showing no score at all, ranked first for a move it never made. Null
+    # scores are reachable: the factor caches are empty after every restart,
+    # and 409 pre-composite rows were nulled outright in the 2026-08-24 repair.
+    #
+    # No score means no move to rank. -1.0 puts these below every real delta
+    # under reverse=True, alongside the no-baseline case.
     def _key(t: Ticker) -> tuple[float, float]:
         base = baseline_by_symbol.get(t.symbol)
-        cur  = t.score or 0.0
+        cur = t.score
+        if cur is None:
+            return (-1.0, -1.0)
         delta = abs(cur - base) if base is not None else -1.0
         return (delta, cur)
 
