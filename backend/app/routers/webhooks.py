@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import delete, select
@@ -235,6 +235,23 @@ async def stripe_webhook(
             result = await session.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
             if user:
+                # A DIFFERENT customer id is not by itself a duplicate. A
+                # legitimate win-back (churned to free, re-subscribes months
+                # later) always mints a fresh Stripe Customer, so comparing ids
+                # alone paged the founder to "cancel + refund one of the two"
+                # on every single returning customer — advice that would refund
+                # a valid new subscription. Only alarm when the OLD customer
+                # still has a live subscription, i.e. the user really is
+                # double-billed right now.
+                still_live = False
+                if user.stripe_customer_id and user.stripe_customer_id != customer_id:
+                    live_rows = await session.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == user.id,
+                            Subscription.status.in_(("active", "trialing", "past_due")),
+                        )
+                    )
+                    still_live = live_rows.scalars().first() is not None
                 if user.stripe_customer_id and user.stripe_customer_id != customer_id:
                     # DUPLICATE CONVERSION: a second checkout completed while a
                     # different Stripe customer is already linked (two checkout
@@ -260,8 +277,17 @@ async def stripe_webhook(
                                 f"User <code>{user_id}</code> ({user.email}) completed a "
                                 f"second checkout.\nOld customer: <code>{user.stripe_customer_id}</code>\n"
                                 f"New customer: <code>{customer_id}</code>\n\n"
-                                "Cancel + refund one of the two subscriptions in the "
-                                "Stripe dashboard.",
+                                + (
+                                    "A LIVE subscription is recorded on the old customer, "
+                                    "so this is a real double-billing. Cancel + refund one "
+                                    "of the two subscriptions in the Stripe dashboard."
+                                    if still_live else
+                                    "No live subscription is recorded against the old "
+                                    "customer — this is also what a normal returning "
+                                    "(win-back) customer looks like. Confirm in Stripe that "
+                                    "only ONE subscription is active; cancel + refund the "
+                                    "other only if both are."
+                                ),
                                 parse_mode="HTML",
                             )
                     except Exception:  # alert must never fail the webhook
@@ -372,7 +398,12 @@ async def stripe_webhook(
             # Skip the tier write on an unknown price — keep what we last knew.
             if not unknown_price:
                 existing.tier = p["tier"]
-            existing.current_period_end = p["current_period_end"]
+            # Never clobber a known-good renewal date with None. p[...] is
+            # None only for a malformed event missing current_period_end on
+            # both the item and the subscription; the previously stored value
+            # is strictly better information than nothing.
+            if p["current_period_end"] is not None:
+                existing.current_period_end = p["current_period_end"]
             existing.cancel_at_period_end = p["cancel_at_period_end"]
             existing.billing_period = p["billing_period"]
         else:
@@ -383,6 +414,19 @@ async def stripe_webhook(
             new_sub = dict(p)
             if unknown_price:
                 new_sub["tier"] = user.tier
+            if new_sub["current_period_end"] is None:
+                # Subscription.current_period_end is NOT NULL. A malformed
+                # event that omits it must not become an IntegrityError — that
+                # would 500 the webhook and strand a PAYING customer on free,
+                # which is the exact failure this whole change removes. Store a
+                # conservative placeholder and log loudly; the next renewal
+                # webhook overwrites it with the real date.
+                span = timedelta(days=365 if p["billing_period"] == "annual" else 31)
+                new_sub["current_period_end"] = datetime.now(UTC) + span
+                logger.error(
+                    "stripe.missing_current_period_end sub=%s user=%s — stored placeholder",
+                    p["id"], user.id,
+                )
             session.add(Subscription(user_id=user.id, **new_sub))
 
         # Update user tier if subscription is active/trialing
@@ -570,17 +614,19 @@ async def stripe_webhook(
         # that they are "in" on a paid plan — a receipt for a charge that never
         # happened, and the shortest path to an "I never agreed to pay" dispute.
         # Trials get the terms restated instead; the receipt waits for real money.
-        is_trial_start = (
-            evt_type == "customer.subscription.created"
-            and existing is None
-            and p["status"] == "trialing"
-        )
+        # Latched on `existing is None` — the row insert — NOT on the event
+        # type. Stripe does not guarantee ordering, and when .updated arrived
+        # before .created it created the row itself, so .created then saw
+        # existing != None and BOTH events declined to send: the customer got
+        # no trial disclosure and no receipt, and the founder got no revenue
+        # alert. The insert happens exactly once per subscription id, which is
+        # precisely the "first time we ever saw this subscription" condition
+        # these emails want.
+        is_trial_start = (existing is None and p["status"] == "trialing")
         # The first REAL charge: either a straight purchase, or a trial that
         # just converted (trialing -> active on an .updated event).
         is_paid_start = (
-            evt_type == "customer.subscription.created"
-            and existing is None
-            and p["status"] == "active"
+            existing is None and p["status"] == "active"
         ) or (prior_status == "trialing" and p["status"] == "active")
 
         if is_trial_start and user.email:
@@ -614,7 +660,14 @@ async def stripe_webhook(
                 )
                 await send_email(
                     user.email,
-                    f"Your Tapeline {p['tier'].capitalize()} trial has started",
+                    # tier_label, NOT p["tier"]: tier_from_price returns None
+                    # for an unrecognised price (a rotated/hand-sold price id),
+                    # and None.capitalize() would raise here — killing the
+                    # first-charge disclosure email that a card-required trial
+                    # is legally required to send. tier_label is already the
+                    # resolved, non-None label used everywhere else in this
+                    # branch (see the paid-start subject below).
+                    f"Your Tapeline {tier_label.capitalize()} trial has started",
                     html,
                     persona="billing",
                     skip_if_undeliverable=False,
@@ -641,13 +694,16 @@ async def stripe_webhook(
                 amount_cents = price.get("unit_amount") or None
                 currency = (price.get("currency") or "usd").lower()
                 billing_period = p["billing_period"]
-                next_charge_iso: str | None = None
-                try:
-                    next_charge_iso = datetime.fromtimestamp(
-                        obj["current_period_end"], UTC,
-                    ).isoformat()
-                except Exception:
-                    next_charge_iso = None
+                # p["current_period_end"] already resolved the basil field move
+                # (item first, subscription second). Reading obj[...] directly
+                # here raised KeyError on every real event, and the bare except
+                # turned that into a silently missing next-charge date on the
+                # customer's receipt.
+                next_charge_iso = (
+                    p["current_period_end"].isoformat()
+                    if p["current_period_end"] is not None
+                    else None
+                )
                 html = render_subscription_started_email(
                     user_name=(user.name or "trader"),
                     tier=tier_label,

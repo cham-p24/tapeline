@@ -6,6 +6,7 @@ import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { errorText } from "@/lib/errorText";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -122,7 +123,7 @@ export function CancelInterceptModal({
         }
         const body = await res.json();
         if (res.ok) setOpts(body as RetentionOptions);
-        else setError(body.detail || "Couldn't load your plan options.");
+        else setError(errorText(body, "Couldn't load your plan options."));
       } catch (e: unknown) {
         setError(errorMessage(e));
       } finally {
@@ -156,7 +157,7 @@ export function CancelInterceptModal({
       } else if (res.status === 401) {
         handle401(res.status);
       } else {
-        setError(data.detail || `Something went wrong (${res.status}).`);
+        setError(errorText(data, `Something went wrong (${res.status}).`));
       }
     } catch (e: unknown) {
       setError(errorMessage(e));

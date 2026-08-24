@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/Input";
+import { errorText } from "@/lib/errorText";
 
 type Status = "idle" | "submitting" | "sent" | "error";
 
@@ -40,7 +41,7 @@ export function ContactForm() {
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
         setStatus("error");
-        setErrorMsg(body.detail || `Could not send (HTTP ${r.status}).`);
+        setErrorMsg(errorText(body, `Could not send (HTTP ${r.status}).`));
         return;
       }
       setStatus("sent");

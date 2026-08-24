@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -685,9 +686,15 @@ async def set_cancel_at_period_end(customer_id: str) -> datetime | None:
     except stripe.error.StripeError as exc:
         logger.exception("stripe.cancel_failed customer=%s", customer_id)
         raise HTTPException(502, f"Stripe error: {exc}") from exc
-    period_end = _sub_field(updated, "current_period_end")
+    # Same field move as subscription_payload: from API 2025-04-30.basil
+    # `current_period_end` lives on the subscription ITEM, and the SDK pins
+    # 2026-03-25.dahlia — so reading it off the Subscription returned None
+    # every time and the cancellation confirmation silently dropped its
+    # "access until X" date. Reuse the shared resolver.
+    item = _nested(_sub_field(updated, "items"), "data") or [None]
+    period_end = _period_end_ts(updated, item[0])
     if period_end:
-        return datetime.fromtimestamp(int(period_end), UTC)
+        return datetime.fromtimestamp(period_end, UTC)
     return None
 
 
@@ -728,20 +735,79 @@ async def cancel_all_subscriptions_now(customer_id: str) -> int:
     return cancelled
 
 
-def parse_webhook(payload: bytes, signature: str) -> stripe.Event:
-    """Verify and parse a Stripe webhook."""
+def parse_webhook(payload: bytes, signature: str) -> dict[str, Any]:
+    """Verify a Stripe webhook signature and return the event as a PLAIN DICT.
+
+    Returning a dict rather than the `stripe.Event` is load-bearing, not a
+    convenience. In stripe-python >= 12 (15.0.1 is installed, and
+    pyproject pins only `stripe>=11.3.0` with no lock file) `StripeObject`
+    is NOT a dict subclass — its MRO is literally ('StripeObject', 'object')
+    and it defines no `get`, `keys`, `items` or `__iter__`. `__getitem__`
+    works, so `event["type"]` reads fine, but `event.get("id")` falls through
+    to `__getattr__("get")`, misses `_data`, and raises `AttributeError: get`.
+
+    routers/webhooks.py uses `.get(...)` on the event and its nested objects in
+    ~34 places, starting at the first statement after the signature check. So
+    against REAL Stripe traffic the handler raised on every single delivery and
+    the global handler turned it into a 500 — meaning Stripe charged the card
+    and the customer was never granted their tier. Every webhook test hid this
+    by monkeypatching this function to return a plain dict, which does have
+    `.get()`; only the real vendor object does not. Same archetype as the
+    #635 checkout outage: a mock accepting a shape the vendor rejects.
+
+    `construct_event` still does the security-critical work — it verifies the
+    HMAC over exactly these bytes and raises if it does not match — so parsing
+    the same bytes with `json.loads` afterwards is verifying, then reading what
+    was verified. Nothing is trusted that Stripe did not sign.
+    """
     try:
-        return stripe.Webhook.construct_event(
+        stripe.Webhook.construct_event(
             payload, signature, settings.stripe_webhook_secret,
         )
     except (ValueError, stripe.error.SignatureVerificationError) as exc:
         raise HTTPException(400, f"Invalid webhook: {exc}") from exc
+    # Signature verified above; re-read the same bytes as plain Python.
+    parsed: dict[str, Any] = json.loads(payload)
+    return parsed
+
+
+def _period_end_ts(sub: Any, item: Any) -> int | None:
+    """Unix timestamp for the end of the current billing period.
+
+    Stripe MOVED this field. Up to API 2025-04-30.basil it sat on the
+    Subscription; from that version on it lives on each subscription ITEM, and
+    the Subscription object no longer carries it at all. The installed SDK
+    (15.0.1) pins api_version 2026-03-25.dahlia — far past the move — and
+    `stripe/_subscription.py` declares no `current_period_end`, while
+    `stripe/_subscription_item.py` declares it at line 63.
+
+    So `sub["current_period_end"]` raised KeyError on every real subscription
+    webhook, which the global handler turned into a 500: the paid tier was
+    never granted and Stripe eventually disabled the endpoint. Read the item
+    first, fall back to the subscription for pre-basil payloads (and for the
+    fixtures in older tests), and return None rather than raising if neither
+    has it — a missing renewal date must degrade one email line, not kill the
+    webhook that grants access.
+    """
+    for src in (item, sub):
+        try:
+            ts = src["current_period_end"]
+        except (KeyError, TypeError):
+            continue
+        if ts is not None:
+            return int(ts)
+    return None
 
 
 def subscription_payload(sub: Any) -> dict[str, Any]:
     """Extract the fields we persist from a Stripe subscription object."""
     item = sub["items"]["data"][0]
-    interval = (item["price"].get("recurring") or {}).get("interval", "month")
+    # `_nested` on both hops: `item["price"]` and its "recurring" are plain
+    # dicts when this is called from the webhook (parse_webhook coerces), but
+    # StripeObjects when called with a live Subscription.retrieve result — and
+    # those have no `.get()`. See parse_webhook's docstring.
+    interval = _nested(_nested(item["price"], "recurring"), "interval") or "month"
+    period_end_ts = _period_end_ts(sub, item)
     return {
         "id": sub["id"],
         "status": sub["status"],
@@ -749,7 +815,10 @@ def subscription_payload(sub: Any) -> dict[str, Any]:
         # "leave the tier alone", never as free. See tier_from_price.
         "tier": tier_from_price(item["price"]["id"]),
         "price_id": item["price"]["id"],
-        "current_period_end": datetime.fromtimestamp(sub["current_period_end"], UTC),
-        "cancel_at_period_end": bool(sub.get("cancel_at_period_end", False)),
+        # None when Stripe sent no period end; callers must handle it.
+        "current_period_end": (
+            datetime.fromtimestamp(period_end_ts, UTC) if period_end_ts else None
+        ),
+        "cancel_at_period_end": bool(_sub_field(sub, "cancel_at_period_end") or False),
         "billing_period": "annual" if interval == "year" else "monthly",
     }
