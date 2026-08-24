@@ -1,0 +1,128 @@
+name: Re-derive scorecard from real closes
+
+# Operator tool for the one remaining piece of the #605 fix.
+#
+# #605 stopped the back-check writing `price_next_day` from an in-progress
+# daily bar. It did NOT repair the rows already published — and /scorecard's
+# hit rate, median alpha and JSON-LD Dataset markup are computed from them.
+#
+# This runs `app.scripts.rederive_scorecard` ON THE FLY MACHINE, which is the
+# only place that has both the database and the vendor key. (It cannot run from
+# a Windows dev box at all: psycopg refuses the ProactorEventLoop.)
+#
+# ── READ THIS BEFORE CHOOSING `apply` ────────────────────────────────────────
+# COST. polygon_feed documents the Starter tier at 5 requests/min, and the SAME
+# key serves the per-tick fundamentals, calendars, insider Form 4, analyst
+# ratings and the daily sector backfill. A full pass is roughly 790 vendor calls
+# => ~2.6 HOURS at the 12s default pacing, during which the live worker is
+# competing for that budget.
+#
+# Two ways to make that acceptable:
+#   * Use `since` to repair in chunks (a month at a time), off-hours.
+#   * Or upgrade to the Developer tier (unlimited req/min) and pass a small
+#     `pace`, which turns the whole job into minutes.
+#
+# Run `estimate` FIRST — it reads the DB, makes zero vendor calls, and prints
+# the exact call count and wall-clock for the window you chose.
+#
+# ORDER OF OPERATIONS
+#   1. mode=estimate            — cost only, no vendor calls, no writes
+#   2. mode=dry-run             — real fetches, reports before/after, NO writes
+#   3. mode=apply               — writes. Irreversible; rewrites the public record.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "estimate = cost only | dry-run = fetch + report | apply = WRITE"
+        required: true
+        default: estimate
+        type: choice
+        options:
+          - estimate
+          - dry-run
+          - apply
+      since:
+        description: "Only repair dates >= YYYY-MM-DD (blank = all). Use this to chunk."
+        required: false
+        default: ""
+      pace:
+        description: "Seconds between vendor calls. 12 = 5/min (Starter ceiling). Lower ONLY on Developer tier."
+        required: false
+        default: "12"
+      confirm:
+        description: "For mode=apply ONLY, type exactly: rewrite-the-public-record"
+        required: false
+        default: ""
+
+concurrency:
+  group: rederive-scorecard
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    # A full Starter-tier pass is ~2.6h; leave headroom but stay under the
+    # 6h job ceiling so a wedged run fails loudly rather than hanging.
+    timeout-minutes: 330
+    steps:
+      - name: Gate the destructive mode behind an explicit phrase
+        if: ${{ inputs.mode == 'apply' && inputs.confirm != 'rewrite-the-public-record' }}
+        run: |
+          echo "::error title=Not confirmed::mode=apply rewrites the PUBLIC track record."
+          echo "Type 'rewrite-the-public-record' in the confirm box, and run"
+          echo "mode=dry-run first so you have seen the before/after numbers."
+          exit 1
+
+      # Pinned to the same immutable SHA as every other workflow that holds the
+      # production Fly token.
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Run the re-derivation on the Fly machine
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          MODE: ${{ inputs.mode }}
+          SINCE: ${{ inputs.since }}
+          PACE: ${{ inputs.pace }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+
+          args=""
+          case "$MODE" in
+            estimate) args="--estimate" ;;
+            dry-run)  args="" ;;
+            apply)    args="--apply" ;;
+            *) echo "::error::unknown mode $MODE"; exit 1 ;;
+          esac
+          [ -n "${SINCE:-}" ] && args="$args --since ${SINCE}"
+          [ -n "${PACE:-}" ]  && args="$args --pace ${PACE}"
+
+          echo "mode=$MODE  args='$args'"
+          echo "--------------------------------------------------------------"
+          # -C runs one command and streams its output back. The script writes
+          # a full per-date report plus the before/after published statistics.
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.rederive_scorecard ${args}"
+
+      - name: Confirm the public scorecard still serves
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/sc.json -w "%{http_code}" --max-time 30 \
+            "https://api.tapeline.io/api/scorecard?cb=${GITHUB_RUN_ID}")
+          echo "GET /api/scorecard -> $code"
+          [ "$code" = "200" ] || { echo "::error::scorecard is not serving"; exit 1; }
+          python3 - <<'PY'
+          import json
+          d = json.load(open("/tmp/sc.json"))
+          s = d.get("summary", {})
+          print("published after the repair:")
+          for k in ("days_tracked", "entries_scored", "entries_excluded_outliers",
+                    "hit_rate_beat_spy", "median_alpha_vs_spy", "avg_alpha_vs_spy"):
+              print(f"  {k}: {s.get(k)}")
+          PY

@@ -773,8 +773,21 @@ async def fetch_aggregates(
     from_date: date | None = None,
     to_date: date | None = None,
     timespan: str = "day",
+    adjusted: bool = True,
 ) -> list[dict[str, Any]]:
-    """Historical OHLCV bars for scoring indicators. Uses v2 aggregates endpoint."""
+    """Historical OHLCV bars for scoring indicators. Uses v2 aggregates endpoint.
+
+    `adjusted` defaults to True — split/dividend-adjusted, which is what every
+    indicator wants, and what every existing caller already got.
+
+    Pass adjusted=False when comparing against a price we STORED at the time.
+    Scorecard rows freeze `price_at_flag` from the live unadjusted snapshot, so
+    dividing an adjusted historical close by it mixes two scales: any symbol
+    that split in between yields a plausible-looking but fabricated return (a
+    4:1 split reads as roughly -75%). Unadjusted-vs-unadjusted is the return a
+    holder actually experienced on the day, which is what the track record
+    claims to measure.
+    """
     to_date = to_date or date.today()
     from_date = from_date or (to_date - timedelta(days=400))
 
@@ -782,7 +795,11 @@ async def fetch_aggregates(
         body = await _request(
             client,
             f"/v2/aggs/ticker/{symbol}/range/1/{timespan}/{from_date.isoformat()}/{to_date.isoformat()}",
-            params={"adjusted": "true", "sort": "asc", "limit": 500},
+            params={
+                "adjusted": "true" if adjusted else "false",
+                "sort": "asc",
+                "limit": 500,
+            },
         )
     return body.get("results", []) or []
 
