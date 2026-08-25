@@ -259,3 +259,79 @@ The ad set shows *"The dataset that you've selected doesn't have any conversion 
 up."* That is correct and not a misconfiguration: the pixel has never received a
 `CompleteRegistration`, because the CAPI token is still unset and no browser event has
 fired. §6 step 7 clears it.
+
+---
+
+## 10. Page created — 2026-08-25, and a new blocker
+
+**Blocker 1 from §9 is cleared. A Facebook Page now exists.**
+
+| | |
+|---|---|
+| Name | **Tapeline** |
+| Category | **Software company** |
+| Bio | "One 0-100 score and one plain sentence per ticker. Public track record. Informational only." |
+| Profile picture | `frontend/public/press/tapeline-logo-1024.png` |
+| Page id (Ads Manager) | `1287813397746040` |
+| Public profile id | `61594024430217` |
+
+**The category is a deliberate choice, not a default.** Meta offered *Financial service* and
+*Investing service*; both were declined. Tapeline's whole posture is publisher-not-adviser
+(§3, and the descriptive-labels rule in `CLAUDE.md`), and the Page category is a **public
+self-description** that would cut against it. *Software company* is accurate — Tapeline is SaaS —
+and says nothing about providing financial services. This is independent of the ad-set **Special
+Ad Category = Financial products and services**, which is Meta's *ad-policy* classification and is
+still correctly declared; the two are different fields answering different questions.
+
+**Creating it took three attempts, and the failures were misleading.** The `Create Page` dialog
+embedded in Ads Manager returned *"There was a problem with creating your Page"* — **but it had
+actually created the Page**. The retry then failed with *"There's an issue with your Page name"*,
+which reads like a name-policy rejection and is not: the name was simply taken, by the attempt
+that had just claimed to fail. A third attempt under `Tapeline.io` failed for real. Confirmed at
+`facebook.com/pages/?category=your_pages` that **exactly one** Page exists and there are no
+duplicates to clean up. If this flow is ever re-run: **check the Pages list before retrying**, and
+prefer `facebook.com/pages/create` over the Ads Manager dialog — the canonical form validated the
+name inline (green tick) and reported errors honestly.
+
+### 🔴 New blocker: account security checkpoint
+
+Partway through attaching the Page to the three ads, Ads Manager raised:
+
+> *"We think that someone may have tried to access your account without permission. For your
+> protection, you won't be able to create or modify ads until you've authenticated your account in
+> Ads Manager. Your existing ads will continue to run normally."* **(#3858385)**
+
+**Founder-only.** It is an identity-authentication flow behind a `Start Authentication` button;
+nobody else should complete it. Ad edits stopped there rather than poking at it, since retrying
+around a security checkpoint is how a soft flag becomes a hard one.
+
+Being straight about the likely cause: this session drove Ads Manager programmatically at
+machine speed — dozens of rapid edits, three failed Page creations, and file inputs injected into
+the DOM to work around the native upload dialog. That is a plausible trigger. Treat it as a cost
+of automating this surface, and go slower after re-authenticating.
+
+**State at the checkpoint:**
+
+| Ad | Facebook Page | Note |
+|---|---|---|
+| `C - We publish the record` | **Tapeline** selected | Preview renders; ad-level warnings went 20 → 1. Shows *"Verifying your changes"*, so treat as pending until re-checked. |
+| `B - Zero dollars today` | not set | |
+| `A - Sunday-night spreadsheet` | not set | |
+
+### Remaining, in order
+
+1. **Founder:** complete `Start Authentication` in Ads Manager.
+2. Re-open each ad and confirm/select **Facebook Page = Tapeline** on all three.
+3. **Untick `Multi-advertiser ads`** on all three (it is ON by default). It places the ad in a
+   shared unit next to other advertisers and permits resizing — neither is wanted for
+   compliance-locked artwork on a financial ad. This was spotted but could not be changed before
+   the checkpoint.
+4. **Founder:** add the payment method — still the only step that spends.
+5. §6 steps 7–9: CAPI token, test-event verification, unset the code, EMQ, baselines.
+
+**Optional Page polish, not blocking:** a cover image is rendered at
+`docs/ads/meta-burst-2026-08/tapeline-fb-cover.png` (1640×856, safe-zone centred) and the website
+field is still empty. Both need *Switch into Tapeline's Page*, which changes the acting Facebook
+identity for the session and would have disturbed the Ads Manager work, so they were left. A
+brand-new Page with no cover and no website running finance ads is a weaker review profile —
+worth two minutes before activating.
