@@ -90,9 +90,11 @@ function ScorecardHero() {
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
         At each US market close the six-factor composite produces a ranking. We write the top 10 down &mdash;
-        symbol, rank, score, price &mdash; and never touch the row again. The next session we record what the
-        price did and what SPY did over the same two closes. Entries are never re-ranked, back-filled or
-        removed, so what is here is what was published on the day, whichever way it went.
+        symbol, rank, score, price &mdash; and the membership of that list is fixed from that moment. The next
+        session we record what the price did and what SPY did over the same two closes. Entries are never
+        re-ranked, back-filled or removed, so what is here is what was published on the day, whichever way it
+        went. When a recorded price turns out to have been read wrong, we correct it and say so &mdash; see the
+        restatement note below.
       </p>
       {/* Offer + price + CTA. Server-rendered so a paid ad landing page has an
           in-body CTA and a price at first paint. LandingCta is

@@ -40,6 +40,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { Skeleton } from "@/components/Skeleton";
 import { userLocale } from "@/lib/datetime";
 import { trackEvent } from "@/lib/gtag";
+import RestatementNotice from "./RestatementNotice";
 
 /**
  * Raw-dataset endpoints. Relative paths: next.config.js rewrites /api/* to
@@ -161,6 +162,11 @@ export function ScorecardClient() {
           above the summary, because that ordering is the argument: here is
           the data and the method first, our reading of it second. */}
       <VerifyYourself />
+
+      {/* Disclosed BEFORE the summary stats, for the same reason VerifyYourself
+          sits above them: if a number on this page was corrected, the reader
+          should know that before they read the number, not after. */}
+      <RestatementNotice />
 
       <SummaryTable summary={data.summary} />
 
