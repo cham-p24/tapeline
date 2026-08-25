@@ -188,3 +188,74 @@ Steps 1–6 cost nothing and can be done now. **Step 10 is the only one that spe
 ## 8. What this test cannot measure
 
 Trial→paid. Zero payers, ever. No amount of Meta spend measures it, and the instrument remains the six customer interviews at $0 that `OPERATING_RULES.md` gates engineering behind.
+
+---
+
+## 9. Build record — 2026-08-25
+
+Everything in §6 steps 1–5 is **done**. The campaign, ad set and all three ads exist as
+drafts in Ads Manager. Nothing can spend.
+
+**IDs.** Ad account `274761096383152` · pixel `28351455154543230` · campaign
+`120246296540020292` · ad set `120246296540010292`.
+
+**Ad set — `US - FPS - 3 concept message test`**
+
+| Setting | Value |
+|---|---|
+| Special Ad Category | Financial products and services |
+| Conversion event | Complete registration |
+| Budget | **A$25.00/day** (≈US$16 — the account bills in AUD, so A$25 × 14 ≈ **A$350** total) |
+| Schedule | 25 Aug 2026 21:00 → **8 Sep 2026 21:00 GMT+8** (14 days) |
+| Locations | **United States only** — Australia is not targeted |
+| Advantage+ audience | audience suggestion empty |
+| Dynamic creative | Off |
+| Estimated audience | 256.6M–301.9M |
+
+**The three ads.** Copy is §1 verbatim, with ASCII `-` substituted for the typographic
+dashes so the browser could type it; nothing else differs. All three: CTA **Sign up**,
+**Advantage+ creative enhancements off**, tracking on the Tapeline pixel, UTMs
+`utm_source=facebook&utm_medium=paid-social&utm_campaign={{campaign.id}}&utm_content={{ad.id}}&utm_term={{placement}}`.
+
+| Ad | Landing | Feed asset | Stories/Reels | Right column |
+|---|---|---|---|---|
+| `A - Sunday-night spreadsheet` | `/signup?from=screener` | `concept-a-screener-1x1` | `concept-a-screener-9x16` | `concept-a-screener` |
+| `B - Zero dollars today` | `/signup?from=trial` | `concept-b-trial-1x1` | `concept-b-trial-9x16` | `concept-b-trial` |
+| `C - We publish the record` | `/signup?from=scorecard` | `concept-c-record-1x1` | `concept-c-record-9x16` | `concept-c-record` |
+
+**Creatives** live in `docs/ads/meta-burst-2026-08/`, three aspect ratios each
+(1200×628 · 1080×1080 · 1080×1920), regenerable from the `make_*.ps1` scripts beside
+them. Each is text-led on the Tapeline navy, carries the headline it is paired with, and
+prints *"Informational only. Descriptive scores, not recommendations."* in the footer —
+so the disclaimer survives even where Meta truncates the primary text. Every placement
+gets its native ratio; **no Meta AI crop-and-expand and no Advantage+ visual touch-ups**,
+because both rewrite compliance-locked artwork and copy.
+
+### Two blockers remain, and neither is engineering
+
+1. **There is no Facebook Page.** `Identity → Facebook Page · Required` reads *"A Facebook
+   Page is required to run ads"* and offers only **Create Page**. The ads cannot publish
+   or even preview without one. Creating it is a founder decision, not a mechanical step:
+   the Page is a permanent public identity, it becomes the advertiser record in Meta's
+   **Ad Library** (the same surface the §3 AFSL note is about), and its name, category and
+   handle are the founder's call. Left undone deliberately.
+2. **Payment method.** Unchanged from §6 step 10 — the only step that spends.
+
+Then §6 steps 7–9 still apply in order: CAPI token, test-event verification, unset the
+test code, read EMQ, record baselines.
+
+### Two things worth knowing before editing these ads by hand
+
+- **The creative wizard does not persist ad text.** Copy typed into the wizard's Text step
+  was silently empty afterwards, and every per-placement media edit re-clears it. Use the
+  **inline Ad-creative form** on the ad page — that is the one that sticks. Concept A was
+  written twice for this reason; verify text is still present after any media change.
+- **Duplicating an ad carries media but not always text**, and its dialog pre-ticks
+  **Advantage+ creative**. Untick it every time.
+
+### Conversion-event warning is expected
+
+The ad set shows *"The dataset that you've selected doesn't have any conversion events set
+up."* That is correct and not a misconfiguration: the pixel has never received a
+`CompleteRegistration`, because the CAPI token is still unset and no browser event has
+fired. §6 step 7 clears it.
