@@ -335,3 +335,53 @@ field is still empty. Both need *Switch into Tapeline's Page*, which changes the
 identity for the session and would have disturbed the Ads Manager work, so they were left. A
 brand-new Page with no cover and no website running finance ads is a weaker review profile —
 worth two minutes before activating.
+
+---
+
+## 11. Everything but the card — 2026-08-26
+
+The founder completed the `#3858385` authentication, and the checkpoint cleared. Everything
+that can be done without a payment method is now done.
+
+**All three ads are complete and their previews render.** Ad-level warnings went **20 → 1–2**.
+
+| Ad | Page | Instagram | Threads | Multi-advertiser | Warnings |
+|---|---|---|---|---|---|
+| `A - Sunday-night spreadsheet` | Tapeline | Use Facebook Page | Use Facebook Page | off | 1 |
+| `B - Zero dollars today` | Tapeline | (shows set; IG Stories still flagged) | not set | off | 2 |
+| `C - We publish the record` | Tapeline | not set | not set | off | 2 |
+
+**Multi-advertiser ads is now OFF on all three.** It was ON by default and would have placed the
+ad in a shared unit beside other advertisers *and* permitted resizing/cropping — unacceptable for
+compliance-locked artwork on a financial ad.
+
+**Instagram/Threads identity: partially done, deliberately abandoned.** With no Instagram account,
+Meta offers *"Use Facebook Page"* as the IG and Threads identity, which unlocks those placements.
+It applied cleanly on ad A; on B and C the custom React combobox would not commit the selection
+(clicking the option row, and `form_input` against the combobox ref, both failed — the control is
+a `DIV`, not a real form element). Given the account had just come off a security checkpoint
+triggered by exactly this kind of automated hammering, hammering it further was the wrong trade
+for one placement on two ads. **Left as a ~30-second manual fix**: open ads B and C → Identity →
+set Instagram profile and Threads profile to *Use Facebook Page*.
+
+The other warning, *Audience Network rewarded videos*, is permanent and irrelevant — it wants a
+video, and these are image ads.
+
+**Schedule reset**: start **26 Aug 2026 06:09 GMT+8**, end **8 Sep 2026 21:00**. That is ~13.6
+days, not 14, because the end date stayed anchored while the start moved forward. Left alone on
+purpose: at A$25/day it caps total spend near **A$340**, just under the pre-committed A$350 stop
+in §7. Erring under the cap is the right side to err on.
+
+### 🔴 The only remaining blocker is the card, and it is a hard stop
+
+Clicking **Publish** does not submit the ads for review. It opens **"Add payment information"** —
+card or PayPal — and goes no further. Meta gates publication on a payment method being on file,
+so the ads *cannot* be posted until the founder adds one.
+
+I closed that dialog without entering anything. Entering card or bank details is not something I
+will do under any framing: not typed into Meta, not accepted in chat. That is the founder's step,
+in the founder's browser, and it is the last one.
+
+**After the card is added, publishing takes one click** — everything else is configured and saved.
+Then §6 steps 7–9 remain: CAPI token via `scripts/meta-capi-golive.ps1`, verify signup → card wall
+→ StartTrial with a test event code, unset the code, read EMQ, record baselines.
