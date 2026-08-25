@@ -13,6 +13,8 @@
  */
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import RestatementNotice from "../app/scorecard/RestatementNotice";
 
 describe("scorecard restatement note", () => {
@@ -71,6 +73,46 @@ describe("scorecard restatement note", () => {
     const body = (document.body.textContent ?? "").toLowerCase();
     for (const banned of ["beat the market", "outperform", "guarantee", "will "]) {
       expect(body).not.toContain(banned);
+    }
+  });
+});
+
+describe("restatement note placement", () => {
+  it("is rendered from the SERVER component, not the client one", () => {
+    /**
+     * It first shipped inside ScorecardClient, which returns a skeleton until
+     * its fetch resolves — so the note was missing from the initial HTML
+     * entirely (verified against the live page: the reworded hero paragraph
+     * was present, the note was not).
+     *
+     * A correction notice that only exists once JavaScript has run is
+     * invisible to crawlers, to LLM readers, and to anyone reading the raw
+     * document — a large share of the people who would cite a track record,
+     * and exactly the audience a restatement is owed to. The hero paragraph
+     * also points at it, so client-only rendering leaves that pointer
+     * dangling.
+     */
+    const page = readFileSync(
+      join(__dirname, "..", "app", "scorecard", "page.tsx"),
+      "utf8",
+    );
+    const client = readFileSync(
+      join(__dirname, "..", "app", "scorecard", "ScorecardClient.tsx"),
+      "utf8",
+    );
+    expect(page).toMatch(/<RestatementNotice\s*\/>/);
+    expect(client).not.toMatch(/<RestatementNotice\s*\/>/);
+    // page.tsx must stay a server component for that to mean anything.
+    expect(page.trimStart()).not.toMatch(/^["']use client["']/);
+  });
+
+  it("the hero paragraph's pointer resolves", () => {
+    const page = readFileSync(
+      join(__dirname, "..", "app", "scorecard", "page.tsx"),
+      "utf8",
+    );
+    if (/restatement note below/i.test(page)) {
+      expect(page).toMatch(/<RestatementNotice\s*\/>/);
     }
   });
 });

@@ -39,6 +39,7 @@ import type { CitableSummary } from "@/lib/scorecardCitation";
 import { CitableRecord } from "./CitableRecord";
 import { ScorecardClient } from "./ScorecardClient";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import RestatementNotice from "./RestatementNotice";
 
 // ISR: the archive gains at most one session a trading day, so a 30-minute
 // revalidate keeps the static citation fresh without a request-time fetch.
@@ -96,6 +97,17 @@ function ScorecardHero() {
         went. When a recorded price turns out to have been read wrong, we correct it and say so &mdash; see the
         restatement note below.
       </p>
+
+      {/* SERVER-rendered, deliberately.
+          This lived inside ScorecardClient, which returns a skeleton until its
+          fetch resolves — so the note was absent from the initial HTML. A
+          correction notice that only exists after JavaScript runs is invisible
+          to crawlers, to LLM readers, and to anyone reading the raw document,
+          which is a large share of the people who cite a track record. The
+          sentence above also points at it ("see the restatement note below"),
+          and that pointer must not dangle. It has no data dependency, so
+          there is no reason for it to wait on one. */}
+      <RestatementNotice />
       {/* Offer + price + CTA. Server-rendered so a paid ad landing page has an
           in-body CTA and a price at first paint. LandingCta is
           descriptive-only (offer/pricing facts, no performance claims), so it
