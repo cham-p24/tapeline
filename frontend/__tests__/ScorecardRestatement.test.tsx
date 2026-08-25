@@ -35,13 +35,29 @@ describe("scorecard restatement note", () => {
     expect(body).not.toMatch(/improved our data|data quality improvements/i);
   });
 
-  it("states the size and the direction of the correction", () => {
+  it("quantifies the error rather than gesturing at it", () => {
     render(<RestatementNotice />);
     const body = document.body.textContent ?? "";
-    expect(body).toMatch(/2–18%|2-18%/);
-    // The correction moved the medians against us. Disclosing only favourable
-    // restatements is the failure mode this guards.
-    expect(body).toMatch(/against us/i);
+    // How many rows were wrong, and by how much. "some rows were affected"
+    // is not a disclosure.
+    expect(body).toMatch(/197 rows/);
+    expect(body).toMatch(/29%/);
+    expect(body).toMatch(/18%/);
+    // How many could NOT be fixed. Silently leaving four rows on the old
+    // basis while claiming a complete recomputation is the quiet version of
+    // the same dishonesty this note exists to avoid.
+    expect(body).toMatch(/684 of the 688|remaining 4/);
+  });
+
+  it("does not claim a net direction it cannot substantiate", () => {
+    render(<RestatementNotice />);
+    const body = document.body.textContent ?? "";
+    // Rows and per-window summaries moved BOTH ways. Reporting only the
+    // flattering half — or asserting a net improvement we cannot show — is
+    // the failure mode here.
+    expect(body).toMatch(/both directions/i);
+    expect(body).toMatch(/up in four and down in four/i);
+    expect(body).not.toMatch(/improved the record|in our favour|better than previously/i);
   });
 
   it("is explicit that membership, ranks and scores were NOT changed", () => {

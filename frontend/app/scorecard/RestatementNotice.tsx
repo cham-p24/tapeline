@@ -39,18 +39,29 @@ export default function RestatementNotice() {
         Restatement note &mdash; 25 August 2026
       </h2>
       <p className="mt-3 text-sm text-muted">
-        Every scored row on this page was recomputed on 25 August 2026. The
+        Every scored row on this page was recomputed on 25 August 2026, bar
+        four the data vendor could no longer price. The
         &ldquo;price at flag&rdquo; column had been recorded from the last trade of the
         day <em>including</em> extended-hours trading, rather than the official
         closing price. The SPY column was always taken from official closes, so
         the two columns were measured on different bases.
       </p>
       <p className="mt-2 text-sm text-muted">
-        Both columns are now the official close, and every row has been
+        Both columns are now the official close. 684 of the 688 scored rows were
         re-derived from the vendor&rsquo;s unadjusted daily closes for the same two
-        sessions. Around a third of rows had been off by 2&ndash;18%, in both
-        directions. The correction moved the summary figures on this page in
-        both directions too, and the medians slightly against us.
+        sessions; the remaining 4 are unchanged, because the vendor no longer
+        returns daily bars for those symbols and we would rather leave a row
+        alone than estimate it. 197 rows &mdash; 29% &mdash; had a flag price more
+        than 2% away from the close, the largest 18%.
+      </p>
+      <p className="mt-2 text-sm text-muted">
+        Individual rows moved in both directions, by up to 8.8 points of the
+        SPY-relative column. The summary figures moved in both directions too:
+        across the nine windows the correction was applied in, the share of
+        entries that moved further than SPY went up in four and down in four.
+        We are not claiming the correction flattered or hurt the record overall,
+        because we cannot show that, and the current figures are on this page
+        either way.
       </p>
       <p className="mt-2 text-sm text-muted">
         No entry was added, removed, re-ranked or re-scored. The dates, the

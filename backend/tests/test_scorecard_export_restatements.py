@@ -63,7 +63,8 @@ def test_each_restatement_is_self_describing():
     what did not, why, and which way it moved."""
     for r in ex.RESTATEMENTS:
         for key in ("date", "scope", "fields_changed", "fields_unchanged",
-                    "reason", "remedy", "effect_on_summary"):
+                    "reason", "remedy", "magnitude", "not_restated",
+                    "effect_on_summary"):
             assert r.get(key), f"restatement {r.get('date')!r} is missing {key}"
         date.fromisoformat(r["date"])  # raises if not a real ISO date
 
@@ -76,8 +77,31 @@ def test_the_2026_08_25_entry_names_the_actual_cause():
     # the whole reason the record is still worth anything.
     for col in ("as_of", "symbol", "rank", "score_at_flag"):
         assert col in r["fields_unchanged"]
-    # Direction disclosed even though it is unfavourable.
-    assert "against Tapeline" in r["effect_on_summary"]
+    # Rows moved BOTH ways. Claiming a net direction we did not establish
+    # would be a different kind of dishonesty from hiding the restatement,
+    # but the same kind of unreliable.
+    #
+    # Checked as ABSENCE of claim-language, not presence of a disclaimer: an
+    # earlier version of this test asserted only that "no claim" appeared,
+    # and passed against a string that said "makes no claim that the
+    # correction was net favourable; the correction improved the record".
+    # A disclaimer sitting next to the claim it disclaims is not a
+    # disclaimer, so the assertion has to be able to see the claim.
+    effect = r["effect_on_summary"]
+    assert "BOTH" in effect
+    assert "no claim" in effect
+    for boast in ("improved the record", "in our favour", "in Tapeline's favour",
+                  "flattered", "better than previously", "was net favourable;",
+                  "understated"):
+        assert boast not in effect, (
+            f"the restatement asserts a net direction ({boast!r}) that was "
+            f"never established"
+        )
+    # The rows that could NOT be repaired are stated, not glossed. A partial
+    # repair described as a complete one is the quiet version of the same
+    # problem this whole disclosure exists to avoid.
+    assert "4 rows" in r["not_restated"]
+    assert "684" in r["scope"]
 
 
 @pytest.mark.asyncio

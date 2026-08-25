@@ -59,7 +59,7 @@ CORRECTIONS_EMAIL = "support@tapeline.io"
 RESTATEMENTS: list[dict[str, str]] = [
     {
         "date": "2026-08-25",
-        "scope": "every scored row published up to 2026-08-21",
+        "scope": "684 of the 688 scored rows published up to 2026-08-21",
         "fields_changed": "price_at_flag, price_next_day, change_pct_1d_after, "
                           "spy_change_pct_1d, alpha_vs_spy",
         "fields_unchanged": "as_of, symbol, rank, score_at_flag",
@@ -78,9 +78,23 @@ RESTATEMENTS: list[dict[str, str]] = [
             "scale. Unadjusted because price_at_flag was frozen unadjusted; "
             "mixing scales would fabricate a return for any symbol that split."
         ),
+        "not_restated": (
+            "4 rows were left exactly as published, because the vendor no longer "
+            "returns daily bars for those symbols. Nothing about them was "
+            "estimated or interpolated; they still carry the original basis."
+        ),
+        "magnitude": (
+            "197 of 688 rows (29%) had a price_at_flag more than 2% away from "
+            "that session's official close; the largest was 18%. The largest "
+            "single change to alpha_vs_spy was 8.8 points."
+        ),
         "effect_on_summary": (
-            "Moved the published medians slightly against Tapeline. Disclosed "
-            "regardless of direction."
+            "Individual rows and per-window summary figures moved in BOTH "
+            "directions. Across the nine windows the correction was applied in, "
+            "the share of entries that moved further than SPY rose in four and "
+            "fell in four. Tapeline makes no claim that the correction was net "
+            "favourable or net unfavourable, because that is not established; "
+            "the corrected rows are in this file and can be summarised directly."
         ),
     },
 ]
