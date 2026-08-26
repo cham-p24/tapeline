@@ -385,3 +385,55 @@ in the founder's browser, and it is the last one.
 **After the card is added, publishing takes one click** — everything else is configured and saved.
 Then §6 steps 7–9 remain: CAPI token via `scripts/meta-capi-golive.ps1`, verify signup → card wall
 → StartTrial with a test event code, unset the code, read EMQ, record baselines.
+
+---
+
+## 12. LIVE — published 2026-08-27
+
+**The burst is running.** Card on file (MasterCard ···· 4451, automatic payments). All three ads
+published and sitting in Meta review with status **Processing**, toggles on, A$25.00/day shared,
+A$0.00 spent at publish time.
+
+**Publishing was blocked by two real errors that the draft view did not surface**, and they only
+appeared in *Review and publish → per-ad Errors*: ads **B** and **C** were missing the **Instagram
+profile**. Meta treats that as a hard publish error, not a warning. Checking the review dialog
+before hitting Publish is what caught it — the ad editor showed only a soft "won't deliver to N
+placements" notice.
+
+**The founder has no Instagram or Threads account, and none was needed.** Meta's *"Use Facebook
+Page"* option makes the Tapeline Page the identity on those surfaces. Nothing was created and no
+new account exists. Final identity state:
+
+| Ad | Facebook Page | Instagram | Threads |
+|---|---|---|---|
+| `A - Sunday-night spreadsheet` | Tapeline | Use Facebook Page | Use Facebook Page |
+| `B - Zero dollars today` | Tapeline | Use Facebook Page | None |
+| `C - We publish the record` | Tapeline | Use Facebook Page | Use Facebook Page |
+
+`Threads profile: None` on B is not an error — it costs the Threads placement only, and B
+published cleanly with it.
+
+**Verified in the publish summary before confirming**: Special Ad Categories = Financial products
+and services; **Special ad category countries = United States**; objective Sales; bid strategy
+Highest volume; daily budget A$25.00; start Wed 26 Aug 2026 06:09, end Tue 8 Sep 2026 21:00 Perth
+Time; **Locations included = US**; minimum age 18; Advantage+ creative **Off**; Multi-advertiser
+ads **Off**; Meta pixel `28351455154543230` attached; UTMs intact on all three.
+
+**Billing shape worth knowing:** Meta charges when the balance reaches **A$60.00** *or* on **9 Sep
+2026**, whichever comes first — so expect several small charges across the burst, not one lump.
+Meta's own account daily cap is A$510.32, far above the A$25/day here. The *"Verify your tax info"*
+(ABN) banner is still outstanding and optional; without it Meta adds GST.
+
+### What happens next
+
+1. **Review**: `Processing` → `Active` usually within a few hours, up to 24h. A rejection shows
+   here too — §1 copy is descriptive-only and has been linted, but FPS review is stricter than the
+   linter.
+2. **CAPI token** — `scripts/meta-capi-golive.ps1`, then verify signup → card wall → StartTrial
+   with a test event code, **then unset the code**. Until this is done the pixel records browser
+   events only and `CompleteRegistration` stays sparse, which is what the optimisation is bidding
+   on.
+3. **EMQ** ~48h after events flow. Expect ~5–6.
+4. **Baselines** (§7.5 item 9) and the week-before row in `WEEKLY_LEDGER.md`.
+5. **Kill criteria are already written down in §7 — do not renegotiate them mid-flight.** Stop at
+   A$350. Stop if cost per registration exceeds ~$50 after 100+ clicks. Verdict at burst-end + 7.
