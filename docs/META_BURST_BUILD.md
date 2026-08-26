@@ -437,3 +437,62 @@ Meta's own account daily cap is A$510.32, far above the A$25/day here. The *"Ver
 4. **Baselines** (§7.5 item 9) and the week-before row in `WEEKLY_LEDGER.md`.
 5. **Kill criteria are already written down in §7 — do not renegotiate them mid-flight.** Stop at
    A$350. Stop if cost per registration exceeds ~$50 after 100+ clicks. Verdict at burst-end + 7.
+
+---
+
+## 13. Post-launch check, 2026-08-27 — one thing changed that the decision doc keys on
+
+Opened the live landing page (`/signup?from=screener` with paid-social UTMs) and checked the pixel
+against Events Manager rather than against the browser.
+
+**The pixel is healthy.** Events Manager: `PageView` **Active**, connection method **Browser**,
+**138 events, last received 1 hour ago**, 1 website (tapeline.io). Diagnostics: *"No errors at this
+time."*
+
+**A false alarm worth recording so nobody re-raises it.** In-browser, `connect.facebook.net/en_US/fbevents.js`
+returned **503**, and no `facebook.com/tr` beacon fired. That looks like a broken pixel and is not
+— `analytics.google.com`, `google.com/ccm/collect` and `rmkt/collect` all 503'd in the same trace
+while other Google endpoints returned 200. It is tracker-blocking in the inspecting browser, not a
+production fault. **Events Manager is the authority here, not devtools.** (`window.fbq` is
+`function` either way, because the Meta snippet defines a stub before the library loads — so that
+check alone proves nothing.)
+
+### 🔴 `Core setup` has flipped ON for tapeline.io
+
+Events Manager now shows **"Data sharing restrictions applied"**:
+
+> *"One or more websites or apps are in categories that apply core setup. Specifically, you won't
+> be able to send custom parameters and anything in a URL following the domain."*
+
+**This reverses the go/no-go read in `META_ADS_DECISION.md` §7 condition 2**, which recorded
+`Core setup: Off` — i.e. that tapeline.io was *not* under Meta's financial-services data
+restriction. It is now. That condition was one of the reasons the burst was greenlit, so it should
+not be quietly overwritten in memory; it is a changed fact, discovered after spend started.
+
+**Be precise about what it actually costs, because the banner sounds worse than it is:**
+- **Ad-level reporting is unaffected.** Which ad drove a result comes from Meta's own ad IDs, not
+  from the URL, so the A/B/C ranking — the entire deliverable of this burst (§7) — still works.
+- **The backend still gets its own attribution.** `signup_utm_*` / `signup_referrer_host` are read
+  from the real URL the browser navigates to, server-side. Meta being blind to the query string
+  does not blind Tapeline to it.
+- **What is genuinely lost**: custom parameters, and the path/query in what Meta receives. That
+  degrades Meta's own optimisation signal quality, not the experiment's readout.
+- Meta offers *"request a review"* if the category was applied wrongly. Worth doing — Tapeline is a
+  descriptive publisher, not a financial-services provider (§10, same reasoning as the Page
+  category) — but it is a founder decision and not urgent.
+
+### 🔴 The campaign is optimising toward an event Meta has never received
+
+The dataset lists exactly **one** event: `PageView`. There is **no `CompleteRegistration`**, ever.
+The live ad set optimises for **Complete registration**. Meta is currently bidding toward a
+conversion it has no examples of, which is the worst case for a fresh account already fighting
+Learning Limited (§0).
+
+Two causes, both known: the **CAPI token is still unset**, and no signup has happened since the
+pixel went live. §6 step 7 is therefore not optional polish any more — it is the single highest-
+value thing left, and it is now costing money to defer.
+
+**Note for whoever does the verification signup:** it requires creating an account, setting a
+password, and passing the `/app/start` card wall. Those are founder actions. Claude does not create
+accounts, enter passwords, or enter card details, so the signup half of §6 step 7 cannot be
+delegated — only the watching half (Events Manager → Test events) can.
