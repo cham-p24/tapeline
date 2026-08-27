@@ -36,6 +36,34 @@ import os as _os
 
 ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "2500"))
 
+# Extra slots handed to NEVER-SCORED tickers on every refresh, on top of
+# ACTIVE_UNIVERSE_SIZE.
+#
+# Without these the universe cannot grow. The main selection below requires
+# `score IS NOT NULL`, and a freshly discovered ticker has no score — so it
+# is excluded from the active universe, therefore never included in
+# `fetch_snapshots`, therefore never gets a price or volume, therefore never
+# gets a score. Excluded forever, having never once been looked at.
+#
+# That is the SAME chicken-and-egg the comment inside refresh_active_universe
+# describes fixing on 2026-05-24 for `volume IS NOT NULL AND price IS NOT
+# NULL`. Swapping the predicate to `score IS NOT NULL` moved the trap up one
+# level rather than removing it. Discovery (#658) made it visible: it added
+# thousands of real tickers and not one of them could ever be scored, so the
+# published universe stayed frozen at ~2,460 rows — 750 A-tickers, 626 B, 671
+# C, and a single E-ticker.
+#
+# These slots are ADDITIVE and only widen the bulk `/v3/snapshot` call, which
+# batches 250 symbols per request — so this costs one extra request per tick.
+# The expensive per-symbol passes (aggregates, fundamentals, insider, key
+# stats) cap themselves at ACTIVE_UNIVERSE_SIZE by dollar volume
+# independently, and are untouched by this.
+#
+# The point is to let liquidity be MEASURED rather than assumed. A ticker
+# that gets its snapshot and turns out to be illiquid then loses on dollar
+# volume like everything else — which is a real answer. Never looking is not.
+BOOTSTRAP_SLOTS = int(_os.environ.get("UNIVERSE_BOOTSTRAP_SLOTS", "250"))
+
 # Module-level cache of (symbol, name, sector) tuples.
 _active_universe: list[tuple[str, str, str]] = []
 _refreshed_at: float = 0.0
@@ -90,6 +118,36 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
                 for row in r.all()
                 if row[0]
             ]
+
+            # Bootstrap slots for never-scored tickers. See BOOTSTRAP_SLOTS —
+            # without this the `score IS NOT NULL` predicate above makes the
+            # universe unable to grow, because a ticker needs a snapshot to
+            # earn a score and needs a score to be snapshotted.
+            #
+            # Ordered by symbol so the intake is deterministic and every
+            # discovered ticker gets its turn: once a symbol is scored it
+            # drops out of this query, so the next refresh picks up where this
+            # one left off rather than re-offering the same names.
+            if BOOTSTRAP_SLOTS > 0:
+                seen = {row[0] for row in rows}
+                b = await session.execute(
+                    select(Ticker.symbol, Ticker.name, Ticker.sector)
+                    .where(Ticker.score.is_(None))
+                    .order_by(Ticker.symbol.asc())
+                    .limit(BOOTSTRAP_SLOTS)
+                )
+                added = [
+                    (row[0], row[1] or row[0], row[2] or "Unknown")
+                    for row in b.all()
+                    if row[0] and row[0] not in seen
+                ]
+                if added:
+                    logger.info(
+                        "universe.bootstrap admitting %d never-scored tickers "
+                        "(first=%s last=%s)",
+                        len(added), added[0][0], added[-1][0],
+                    )
+                rows.extend(added)
     except Exception:
         logger.exception("universe.refresh_failed — keeping previous cache")
         return len(_active_universe)
