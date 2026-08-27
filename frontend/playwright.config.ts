@@ -49,6 +49,13 @@ export default defineConfig({
   ],
 
   webServer: {
+    // Dev server in CI too, deliberately. `next start` warns and misbehaves
+    // under this project's `output: standalone` config, and serving the
+    // standalone bundle needs its static assets copied into place by hand —
+    // machinery that can break for reasons unrelated to the UI and would make
+    // this gate flaky. These specs assert DOM structure and form behaviour,
+    // which dev renders identically; the production build is already
+    // type-checked and compiled by the `frontend` job.
     command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
