@@ -172,7 +172,16 @@ async def create_checkout(
     if user.stripe_customer_id and user.tier in ("pro", "premium"):
         raise HTTPException(
             409,
-            "You already have an active subscription — contact support to switch plans.",
+            # Points at the SELF-SERVE portal, not "support". The portal is
+            # already wired end to end (POST /api/billing/portal, with buttons
+            # on /app/billing), so telling a paying subscriber to email a
+            # human was sending them to a slower path that already existed —
+            # and reads as "we cannot do this" rather than "here is where".
+            # Whether the portal offers plan switching is a Stripe dashboard
+            # setting; this message is correct either way, because cancel and
+            # payment-method changes live there too.
+            "You already have an active subscription. Manage or switch your "
+            "plan from the billing portal on your account page.",
         )
 
     # Which trial_end (if any) this session carries. Exactly one of the two
