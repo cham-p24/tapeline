@@ -560,3 +560,66 @@ portfolio and the CAPI token afterwards**, before any second flight. Doing it so
 if the founder wants server-side coverage now — but it is an account-structure change made against
 a live campaign, and should be a deliberate choice rather than a step taken because a button looked
 like it ought to work.
+
+---
+
+## 15. Business portfolio built; token generation still fails — 2026-08-28
+
+### Done
+
+**Tapeline business portfolio created** — `business_id=1084589284120485`, admin Chamara Piyatilaka
+(`christian@tapeline.io`), **Full control**. The **Tapeline Facebook Page** was claimed into it at
+creation, and the founder then claimed **ad account `274761096383152`** into it, which brought
+pixel `28351455154543230` with it. Events Manager now loads under the Tapeline portfolio.
+
+**Deliberately NOT the old portfolio.** "My Inspination" (`543607862654068`) already existed but is
+defunct — its Instagram is dead. Claiming an ad account into a portfolio is **irreversible**
+("Once claimed, you can't remove the ad account from the business portfolio"), so putting Tapeline
+there would have welded it to a dead business permanently.
+
+**Established by testing, not assumption:** Business Settings → Data sources → Datasets & pixels →
+Add offers **only "Create a new dataset"** in *both* portfolios. There is no claim-existing-dataset
+path. Since the pixel is owned by the ad account, claiming the **ad account** is the only route.
+
+### The prerequisite cleared — and a different failure replaced it
+
+`Generate access token` is still inert (`color: rgba(28,43,51,0.6)`, `cursor: auto`), but the hover
+tooltip has **changed**, which is the useful signal:
+
+| Before the claim | After the claim |
+|---|---|
+| *"You must be an admin or developer for this business portfolio to create an access token."* | *"An access token failed to be generated. To see other options for how you might generate an access token, please visit this link."* |
+
+So the portfolio work did its job. What remains is that Meta's one-click generation fails for this
+dataset, and it points at the manual route. **The production-correct route is a System User token**
+— Business Settings → Users → System users → add user → assign the dataset with full control →
+Generate new token with `ads_management`. That requires a **Meta App** registered under the
+portfolio, and Business Settings → Apps is currently empty.
+
+### Nothing harmful was switched on — verified
+
+A toast read *"Conversions API is now active"* during the attempt, which would be alarming if it had
+created Meta's **codeless** CAPI integration: that derives server events from browser events, would
+not carry our deterministic `event_id`, and would therefore **double-count** against the
+browser-side `CompleteRegistration` from #652 — corrupting the exact cost-per-registration figure
+the §7 kill criterion depends on.
+
+It did not. The dataset's event table still lists exactly one row: `PageView`, connection method
+**Browser**, 206 events. No server connection method exists.
+
+**Do not click "Connect now" under "Set up with Meta".** That is the codeless integration described
+above. Tapeline already has a real server integration in `services/meta_capi` waiting on a token;
+adding Meta's inferred one alongside it is how the double-count happens.
+
+Also verified intact after all the ownership changes: **Automatic advanced matching: Off**.
+
+### Where this actually leaves the campaign
+
+Unblocked and unaffected. Campaign, ad set and all three ads still Active and delivering.
+`CompleteRegistration` fires from the browser on every email signup and is dedupe-safe for the day
+the token lands. The dataset shows only `PageView` because **nobody has signed up since #652
+deployed** — the event fires on a real signup, not on page load.
+
+**Still founder-only, and now genuinely the last thing:** registering a Meta App and generating a
+System User token, then `.\scripts\meta-capi-golive.ps1 -TestEventCode <CODE>` (after
+`fly auth login`). Claude does not create developer apps or generate/handle access tokens.
