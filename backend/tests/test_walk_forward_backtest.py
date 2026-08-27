@@ -364,9 +364,11 @@ def test_historical_bars_provider_returns_shape(monkeypatch, fresh_cache_dir):
     monkeypatch.setenv("MASSIVE_API_KEY", "test-key-not-real")
 
     captured_urls: list[str] = []
+    captured_auth: list[str | None] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured_urls.append(str(request.url))
+        captured_auth.append(request.headers.get("Authorization"))
         return httpx.Response(200, json=_make_massive_response("AAPL", n_bars=5))
 
     transport = httpx.MockTransport(handler)
@@ -400,7 +402,20 @@ def test_historical_bars_provider_returns_shape(monkeypatch, fresh_cache_dir):
     assert "/v2/aggs/ticker/AAPL/range/1/day/2024-01-01/2024-01-31" in url
     assert "adjusted=true" in url
     assert "sort=asc" in url
-    assert "apiKey=test-key-not-real" in url
+
+    # The key travels as a HEADER, never in the URL.
+    #
+    # This assertion used to read `assert "apiKey=test-key-not-real" in url`,
+    # i.e. it PINNED the leak in place. httpx logs full request URLs at INFO
+    # and `main.py` sets INFO globally, so a key in the query string reaches
+    # application logs, `HTTPStatusError` messages and Sentry on every call —
+    # and on 2026-08-27 it reached world-readable GitHub Actions logs on a
+    # public repo, 1,086 times, via the workflow that streams this output.
+    assert "apiKey" not in url, "the vendor key is back in the URL"
+    assert captured_auth == ["Bearer test-key-not-real"], (
+        "the key is no longer in the URL but is not in the Authorization "
+        "header either — every vendor call would 401"
+    )
 
     # Cache file was written + has the bars JSON-serialised
     cache_files = list(fresh_cache_dir.iterdir())
