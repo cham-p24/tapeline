@@ -2369,6 +2369,14 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
                 backfilled, len(symbols), KEY_STATS_CAP)
 
 
+#: Rows per write transaction in _refresh_universe.
+#:
+#: 500 keeps each transaction short enough that a failure costs one batch
+#: rather than the whole pass, and keeps a Neon connection from being pinned
+#: across thousands of round-trips. Same reasoning as _SECTOR_BACKFILL_BATCH.
+_UNIVERSE_WRITE_BATCH = 500
+
+
 def _is_placeholder_name(name: str | None, symbol: str) -> bool:
     """True when a Ticker.name carries no information beyond the symbol.
 
@@ -2403,57 +2411,117 @@ async def _refresh_universe() -> None:
         logger.info("universe.refresh_skipped reason=empty_response")
         return
 
+    # READ first, in its own short transaction. Everything after this is
+    # planned in memory and applied in small batches — see _apply below.
     async with session_scope() as session:
         existing_r = await session.execute(
             select(Ticker.symbol, Ticker.name, Ticker.asset_class)
         )
         existing = {r[0]: (r[1], r[2]) for r in existing_r.all()}
-        added = renamed = retyped = 0
-        for row in new_rows:
-            sym = row["symbol"]
-            if sym not in existing:
-                session.add(Ticker(**row))
-                added += 1
-                continue
 
-            # RECONCILE. This used to be insert-only, which meant the weekly
-            # pull of Polygon's reference data — the authoritative source for
-            # both of these fields — was fetched and then thrown away for every
-            # symbol that already existed. Whatever the FIRST writer guessed
-            # was therefore permanent, and nothing else ever repaired it:
-            # _backfill_sectors selects on `sector` and writes only `sector`,
-            # and the tick creates rows with `name=symbol` (see the snapshot
-            # upsert). Measured on 2026-08-27: 168 of 2,463 live tickers (6.8%)
-            # displayed a bare symbol instead of a company name, and SPY, QQQ,
-            # IWM, DIA, VTI, GLD, SMH, XLK and ARKG were all typed `equity` —
-            # which silently drops them from the scanner's ETF filter and
-            # renders "Equity" on their ticker pages.
-            stored_name, stored_class = existing[sym]
-            updates: dict[str, str] = {}
+    inserts: list[dict[str, str]] = []
+    edits: list[dict[str, str]] = []
+    added = renamed = retyped = 0
+    for row in new_rows:
+        sym = row["symbol"]
+        if sym not in existing:
+            inserts.append(row)
+            added += 1
+            continue
 
-            # asset_class: the vendor's instrument type is authoritative and
-            # cheap to be sure about (CS vs ETF), so any disagreement is ours.
-            if row["asset_class"] and row["asset_class"] != stored_class:
-                updates["asset_class"] = row["asset_class"]
-                retyped += 1
+        # RECONCILE. This used to be insert-only, which meant the weekly
+        # pull of Polygon's reference data — the authoritative source for
+        # both of these fields — was fetched and then thrown away for every
+        # symbol that already existed. Whatever the FIRST writer guessed
+        # was therefore permanent, and nothing else ever repaired it:
+        # _backfill_sectors selects on `sector` and writes only `sector`,
+        # and the tick creates rows with `name=symbol` (see the snapshot
+        # upsert). Measured on 2026-08-27: 168 of 2,463 live tickers (6.8%)
+        # displayed a bare symbol instead of a company name, and SPY, QQQ,
+        # IWM, DIA, VTI, GLD, SMH, XLK and ARKG were all typed `equity` —
+        # which silently drops them from the scanner's ETF filter and
+        # renders "Equity" on their ticker pages.
+        stored_name, stored_class = existing[sym]
+        updates: dict[str, str] = {}
 
-            # name: only fill a PLACEHOLDER. A stored name that is real may
-            # well be better than Polygon's (the sheet and Finnhub both write
-            # here), so this repairs the blank case and never overwrites a
-            # genuine one. `name == symbol` is the placeholder signature.
-            vendor_name = (row.get("name") or "").strip()
-            if _is_placeholder_name(stored_name, sym) and vendor_name and vendor_name != sym:
-                updates["name"] = vendor_name
-                renamed += 1
+        # asset_class: the vendor's instrument type is authoritative and
+        # cheap to be sure about (CS vs ETF), so any disagreement is ours.
+        if row["asset_class"] and row["asset_class"] != stored_class:
+            updates["asset_class"] = row["asset_class"]
+            retyped += 1
 
-            if updates:
-                await session.execute(
-                    update(Ticker).where(Ticker.symbol == sym).values(**updates)
-                )
+        # name: only fill a PLACEHOLDER. A stored name that is real may
+        # well be better than Polygon's (the sheet and Finnhub both write
+        # here), so this repairs the blank case and never overwrites a
+        # genuine one. `name == symbol` is the placeholder signature.
+        vendor_name = (row.get("name") or "").strip()
+        if _is_placeholder_name(stored_name, sym) and vendor_name and vendor_name != sym:
+            updates["name"] = vendor_name
+            renamed += 1
+
+        if updates:
+            edits.append({"symbol": sym, **updates})
+
+
+    # APPLY in small batches, each in its OWN short transaction.
+    #
+    # This used to be one transaction wrapping the whole pass, which was fine
+    # when the function was insert-only and added a handful of new listings a
+    # week. Widening discovery (#658) turned that into ~8,900 INSERTs plus
+    # ~2,400 single-row UPDATEs — thousands of round-trips to Neon inside one
+    # open write transaction. Live result: the pass never committed, so
+    # EBAY/EOG/EQT/EXC and the rest of D-Z stayed absent from the table even
+    # though `discover_active_us_tickers` was returning all 11,364 of them.
+    #
+    # Same lesson `_backfill_sectors` records for its own long run: do the
+    # work outside a session and land it in short batched transactions, so a
+    # single failure costs one batch instead of the entire pass.
+    applied_i = applied_e = failed = 0
+
+    async def _flush_inserts(batch: list[dict[str, str]]) -> int:
+        try:
+            async with session_scope() as s2:
+                for r in batch:
+                    s2.add(Ticker(**r))
+            return len(batch)
+        except Exception:
+            logger.exception("universe.insert_batch_failed size=%d", len(batch))
+            return 0
+
+    async def _flush_edits(batch: list[dict[str, str]]) -> int:
+        try:
+            async with session_scope() as s2:
+                for r in batch:
+                    vals = {k: v for k, v in r.items() if k != "symbol"}
+                    await s2.execute(
+                        update(Ticker).where(Ticker.symbol == r["symbol"]).values(**vals)
+                    )
+            return len(batch)
+        except Exception:
+            logger.exception("universe.edit_batch_failed size=%d", len(batch))
+            return 0
+
+    for i in range(0, len(inserts), _UNIVERSE_WRITE_BATCH):
+        chunk = inserts[i : i + _UNIVERSE_WRITE_BATCH]
+        n = await _flush_inserts(chunk)
+        applied_i += n
+        failed += len(chunk) - n
+
+    for i in range(0, len(edits), _UNIVERSE_WRITE_BATCH):
+        chunk = edits[i : i + _UNIVERSE_WRITE_BATCH]
+        n = await _flush_edits(chunk)
+        applied_e += n
+        failed += len(chunk) - n
 
     logger.info(
         "universe.refreshed added=%d renamed=%d retyped=%d total_polygon=%d",
-        added, renamed, retyped, len(new_rows),
+        applied_i, renamed, retyped, len(new_rows),
+    )
+    if failed:
+        logger.error("universe.rows_not_written=%d", failed)
+    logger.info(
+        "universe.write_detail planned_inserts=%d applied=%d planned_edits=%d applied=%d",
+        added, applied_i, len(edits), applied_e,
     )
 
 
