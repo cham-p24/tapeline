@@ -1974,6 +1974,15 @@ async def _refresh_aggregates_cache() -> bool:
         )
         symbols = [row[0] for row in result.all() if row[0] != "SPY"]
 
+    # SPY is excluded from the loop below because its bars were already
+    # fetched above as the RS benchmark — re-fetching would be a wasted call.
+    # But that loop is ALSO where the 52-week range and 30-day average volume
+    # are derived, so skipping SPY silently skipped its key statistics too:
+    # every other major ETF carried them and the single most-viewed symbol on
+    # the site showed em-dashes. `spy_bars` is a full 365-day window sitting
+    # in memory, so this costs nothing.
+    set_cached_bar_stats("SPY", compute_bar_stats(spy_bars))
+
     logger.info("aggregates.refresh_started count=%d", len(symbols))
     refreshed = 0
     for sym in symbols:
@@ -2094,12 +2103,24 @@ async def _backfill_sectors(cap: int = 2500) -> None:
 
     async with session_scope() as session:
         result = await session.execute(
-            select(Ticker.symbol, Ticker.asset_class).where(
+            select(Ticker.symbol, Ticker.asset_class, Ticker.name).where(
                 or_(
                     Ticker.sector.is_(None),
                     Ticker.sector == "Unknown",
                     Ticker.sector == "N/A",
                     Ticker.sector == "Uncategorized",
+                    # A row whose sector is already good but whose NAME is
+                    # still the placeholder was invisible to this pass, because
+                    # the selection only ever asked about sector. That is how
+                    # 168 of 2,463 live tickers (ASML, PAYC, QLYS, ONTO, MT,
+                    # OVV...) ended up displaying a bare ticker symbol
+                    # indefinitely: they got a sector once and were never
+                    # looked at again.
+                    #
+                    # The profile call below already returns the company name,
+                    # so repairing it here costs no extra vendor request.
+                    Ticker.name.is_(None),
+                    Ticker.name == Ticker.symbol,
                 )
             ).limit(cap)
         )
@@ -2109,16 +2130,22 @@ async def _backfill_sectors(cap: int = 2500) -> None:
         logger.info("sector_backfill.no_unknown_tickers")
         return
 
-    async def _flush(batch: list[tuple[str, str]]) -> int:
+    async def _flush(batch: list[tuple[str, str, str | None]]) -> int:
         """Write one small batch in its own short-lived transaction."""
         if not batch:
             return 0
         try:
             async with session_scope() as session:
-                for sym, target in batch:
+                for sym, target, name in batch:
+                    values: dict[str, str] = {"sector": target}
+                    # Only ever ADD a name, never replace a real one — the
+                    # sheet and Finnhub also write this column and may hold a
+                    # better value than the profile endpoint does.
+                    if name:
+                        values["name"] = name
                     await session.execute(
                         update(Ticker).where(Ticker.symbol == sym)
-                        .values(sector=target)
+                        .values(**values)
                     )
             return len(batch)
         except Exception:
@@ -2131,16 +2158,26 @@ async def _backfill_sectors(cap: int = 2500) -> None:
     # uncommitted write txn open against Neon. Now the network work happens
     # unsessioned and results land in short batched transactions.
     backfilled = 0
-    pending: list[tuple[str, str]] = []
-    for sym, asset_class in rows:
+    pending: list[tuple[str, str, str | None]] = []
+    for sym, asset_class, stored_name in rows:
         try:
             profile = await fetch_company_profile(sym)
             raw_sector = (profile or {}).get("sector") if profile else None
+            # Free ride on the same call: repair the name when ours is a
+            # placeholder and the vendor actually gave us one.
+            vendor_name = ((profile or {}).get("name") or "").strip() or None
+            new_name = (
+                vendor_name
+                if vendor_name
+                and vendor_name.upper() != sym.upper()
+                and _is_placeholder_name(stored_name, sym)
+                else None
+            )
             # Apply the canonical mapping at write time so storage matches
             # the heatmap's render-time grouping. If Finnhub returned no
             # sector, canonical_sector still routes by asset_class (e.g.
             # ETFs → Funds & ETFs) instead of leaving "Unknown" in the DB.
-            pending.append((sym, canonical_sector(raw_sector, asset_class)))
+            pending.append((sym, canonical_sector(raw_sector, asset_class), new_name))
         except Exception:
             logger.exception("sector_backfill.fetch_failed symbol=%s", sym)
         await asyncio.sleep(1.1)
@@ -2332,6 +2369,27 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
                 backfilled, len(symbols), KEY_STATS_CAP)
 
 
+def _is_placeholder_name(name: str | None, symbol: str) -> bool:
+    """True when a Ticker.name carries no information beyond the symbol.
+
+    Two paths mint these. Universe discovery falls back to the symbol when
+    Polygon omits a name (`t.get("name") or sym`), and the snapshot tick
+    creates a brand-new row as `Ticker(symbol=..., name=snap["symbol"], ...)`
+    because a snapshot payload has no company name in it. Neither is wrong at
+    the moment of writing — the row has to exist before anything can name it —
+    but nothing used to come back and fix them, so the placeholder was the
+    final answer.
+
+    Callers use this as the "safe to overwrite" test, which is why it is
+    deliberately narrow: it must never report True for a real company whose
+    name genuinely resembles its ticker.
+    """
+    if name is None:
+        return True
+    stripped = name.strip()
+    return not stripped or stripped.upper() == symbol.strip().upper()
+
+
 async def _refresh_universe() -> None:
     """
     Weekly universe refresh from Polygon /v3/reference/tickers.
@@ -2346,15 +2404,57 @@ async def _refresh_universe() -> None:
         return
 
     async with session_scope() as session:
-        existing_r = await session.execute(select(Ticker.symbol))
-        existing = {r[0] for r in existing_r.all()}
-        added = 0
+        existing_r = await session.execute(
+            select(Ticker.symbol, Ticker.name, Ticker.asset_class)
+        )
+        existing = {r[0]: (r[1], r[2]) for r in existing_r.all()}
+        added = renamed = retyped = 0
         for row in new_rows:
-            if row["symbol"] not in existing:
+            sym = row["symbol"]
+            if sym not in existing:
                 session.add(Ticker(**row))
                 added += 1
+                continue
 
-    logger.info("universe.refreshed added=%d total_polygon=%d", added, len(new_rows))
+            # RECONCILE. This used to be insert-only, which meant the weekly
+            # pull of Polygon's reference data — the authoritative source for
+            # both of these fields — was fetched and then thrown away for every
+            # symbol that already existed. Whatever the FIRST writer guessed
+            # was therefore permanent, and nothing else ever repaired it:
+            # _backfill_sectors selects on `sector` and writes only `sector`,
+            # and the tick creates rows with `name=symbol` (see the snapshot
+            # upsert). Measured on 2026-08-27: 168 of 2,463 live tickers (6.8%)
+            # displayed a bare symbol instead of a company name, and SPY, QQQ,
+            # IWM, DIA, VTI, GLD, SMH, XLK and ARKG were all typed `equity` —
+            # which silently drops them from the scanner's ETF filter and
+            # renders "Equity" on their ticker pages.
+            stored_name, stored_class = existing[sym]
+            updates: dict[str, str] = {}
+
+            # asset_class: the vendor's instrument type is authoritative and
+            # cheap to be sure about (CS vs ETF), so any disagreement is ours.
+            if row["asset_class"] and row["asset_class"] != stored_class:
+                updates["asset_class"] = row["asset_class"]
+                retyped += 1
+
+            # name: only fill a PLACEHOLDER. A stored name that is real may
+            # well be better than Polygon's (the sheet and Finnhub both write
+            # here), so this repairs the blank case and never overwrites a
+            # genuine one. `name == symbol` is the placeholder signature.
+            vendor_name = (row.get("name") or "").strip()
+            if _is_placeholder_name(stored_name, sym) and vendor_name and vendor_name != sym:
+                updates["name"] = vendor_name
+                renamed += 1
+
+            if updates:
+                await session.execute(
+                    update(Ticker).where(Ticker.symbol == sym).values(**updates)
+                )
+
+    logger.info(
+        "universe.refreshed added=%d renamed=%d retyped=%d total_polygon=%d",
+        added, renamed, retyped, len(new_rows),
+    )
 
 
 async def _seed_calendar() -> None:
