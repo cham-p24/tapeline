@@ -496,3 +496,67 @@ value thing left, and it is now costing money to defer.
 password, and passing the `/app/start` card wall. Those are founder actions. Claude does not create
 accounts, enter passwords, or enter card details, so the signup half of §6 step 7 cannot be
 delegated — only the watching half (Events Manager → Test events) can.
+
+---
+
+## 14. Two corrections and the real CAPI blocker — 2026-08-28
+
+### Correction to §13: "Core setup flipped ON" was overstated
+
+§13 said Core setup had flipped ON and that this reversed `META_ADS_DECISION.md` §7 condition 2.
+That is stronger than the evidence.
+
+What was actually observed, on two different surfaces:
+
+| Surface | Says |
+|---|---|
+| Events Manager **Overview** banner | *"Data sharing restrictions applied. One or more websites or apps are in categories that apply core setup."* |
+| Events Manager **Settings** → Data controls | **`Core setup: Off`**, with a `Turn on` button |
+
+These are two different mechanisms — a category-driven advisory, and the dataset's own opt-in
+toggle — and §13 collapsed them into one claim. **The dataset's Core setup toggle is OFF.** Do not
+repeat "Core setup flipped ON" as settled fact.
+
+What remains genuinely unresolved: whether the category-driven restriction described in the banner
+is actually stripping custom parameters and URL paths in practice. That is measurable once
+server-side events flow (compare what is sent against what Events Manager shows) and should be
+settled by measurement, not by reading either banner again. The §13 impact analysis still holds
+*if* it is applied: ad-level reporting and backend `signup_utm_*` are unaffected either way, so the
+A/B/C ranking — the burst's actual deliverable — is not at risk.
+
+### The CAPI token is blocked by account structure, not by a missing step
+
+`Generate access token` in Events Manager → Settings → Conversions API is an inert `<div>`:
+no link/button role, `color: rgba(28,43,51,0.6)`, `cursor: auto`. Hovering reveals why:
+
+> **Missing prerequisite** — *"You must be an admin or developer for this business portfolio to
+> create an access token."*
+
+Verified it is not the radio choice: the link stays greyed under **both** "Set up with Dataset
+Quality API" and "Set up without". The pixel is owned by the **personal ad account**
+`274761096383152` (Settings → Details lists Creator "Chamara Piyatilaka", Owner = the ad account id),
+not by a Business portfolio the user administers. Meta will not issue a CAPI token for a dataset in
+that state.
+
+**The unblock is a Business portfolio**, with the dataset added to it and the user as admin —
+`business.facebook.com/settings`. An unrelated portfolio ("My Inspination") already exists; Tapeline
+should get its own rather than being mixed into it.
+
+### Recommendation: do NOT restructure asset ownership mid-burst
+
+The campaign is live and spending against a card on file. Moving a dataset — and potentially the ad
+account — between owners while ads deliver risks billing and asset-permission friction on a
+running experiment, to buy something the burst does not actually need:
+
+- `CompleteRegistration`, the **optimisation event**, is already covered by the browser-side sender
+  shipped in #652.
+- What the token adds is the ad-blocked share of registrations, plus server-side `StartTrial` and
+  `Purchase`.
+- `Purchase` cannot inform this test anyway — §8 already records that trial→paid is unmeasurable
+  here, and the first charge lands 14 days out, past Meta's 7-day click window by construction.
+
+So the honest sequencing is: **finish the burst on the browser-side signal, set up the Business
+portfolio and the CAPI token afterwards**, before any second flight. Doing it sooner is defensible
+if the founder wants server-side coverage now — but it is an account-structure change made against
+a live campaign, and should be a deliberate choice rather than a step taken because a button looked
+like it ought to work.
