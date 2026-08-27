@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
+import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
 import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
 import {
@@ -348,7 +349,7 @@ function SignUpForm() {
       // (/compare/finviz, /glossary/rsi, a ticker page…). The channel fields
       // above can't answer that. Path only, never query/hash.
       const landing = getStoredLandingPath();
-      await authApi.signup(email, password, name, {
+      const created = await authApi.signup(email, password, name, {
         company: honeypot,
         turnstile_token: token || undefined,
         device_fingerprint: device_fp || undefined,
@@ -386,6 +387,22 @@ function SignUpForm() {
       // is gone rather than remapped: `sign_up` already records exactly this
       // moment, and a second GA4 name for the same instant would double-count.
       trackEvent("sign_up", { method: "email" });
+      // Meta `CompleteRegistration` — the event the paid burst's ad set
+      // OPTIMISES toward, so its absence is not a reporting gap, it is Smart
+      // Bidding with nothing to learn from. The server-side copy in
+      // `meta_capi.track_complete_registration` is gated on a Conversions API
+      // token that is not set, which is why Events Manager held only PageView
+      // while the campaign was already spending.
+      //
+      // Both copies carry the SAME deterministic `event_id`, so when that token
+      // is set Meta collapses them into one conversion instead of counting two.
+      // Awaited (SubtleCrypto is async) but never allowed to fail the signup —
+      // it resolves to null whenever the pixel is off or blocked, which is the
+      // common case in this audience.
+      await trackMetaCompleteRegistration({
+        userId: created.user.id,
+        method: "email",
+      });
       // Hand off through /app/onboarding, which ASKS NOTHING: it is a silent
       // provisioning route that stamps the account, seeds the day-1 watchlist
       // server-side, and forwards on. It used to be a four-question survey
