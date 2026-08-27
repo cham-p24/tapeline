@@ -106,27 +106,46 @@ _ASSET_CLASS_MAP: dict[str, str] = {
 }
 
 
-def normalize_asset_class(raw: Any) -> str:
-    """Map a raw sheet Asset Class cell to a clean enum value.
+def normalize_asset_class(raw: Any) -> str | None:
+    """Map a raw sheet Asset Class cell to a clean enum value, or None.
 
     Strips a leading emoji / non-ascii decoration + surrounding whitespace,
     lowercases, then maps via `_ASSET_CLASS_MAP`. A trailing "etf" wins
-    (so "commodity etf", "sector etf", etc. → "etf"). Anything unrecognised
-    (or blank) falls back to "equity", the asset_class column's default.
+    (so "commodity etf", "sector etf", etc. → "etf").
+
+    Returns **None** when the cell is blank or unrecognised. That is the whole
+    point of this signature; it used to return "equity" instead.
+
+    Why it mattered: `upsert_tickers` rewrites `t.asset_class` on EVERY sheet
+    refresh (every 5 minutes) so dirty legacy values self-heal. With a blank
+    cell normalising to "equity", that line was not self-healing — it was
+    ASSERTING, and it overwrote the vendor's correct value four times an hour.
+    Measured 2026-08-28: SPY, QQQ, IWM, DIA, VTI, GLD, SMH, XLK and ARKG were
+    all stored as `equity` because they are sheet-governed and the sheet's
+    Asset Class column is blank for them — so `_refresh_universe` would fix
+    them and the next sheet tick would put them straight back.
+    `frontend/lib/filters.ts` buckets the scanner's asset-class filter off that
+    column, so those ETFs went missing whenever a user filtered to ETFs, and
+    `/t/SPY` read "Equity".
+
+    "The sheet said nothing" and "the sheet said equity" are different facts,
+    and only the second licenses an overwrite. Same rule the tick's
+    CACHE_DERIVED_COLUMNS COALESCE enforces: a no-read is not a value.
     """
     if raw is None:
-        return "equity"
+        return None
     # Drop leading non-ascii (emoji/icons) + whitespace, collapse inner spacing.
     s = re.sub(r"^[^\x00-\x7f\s]+", "", str(raw)).strip().lower()
     s = re.sub(r"\s+", " ", s)
     if not s:
-        return "equity"
+        return None
     if s in _ASSET_CLASS_MAP:
         return _ASSET_CLASS_MAP[s]
     # "* etf" (commodity etf, sector etf, bond etf, …) → etf
     if s.endswith(" etf") or s == "etf":
         return "etf"
-    return "equity"
+    # Unrecognised is a no-read, not a vote for "equity".
+    return None
 
 
 def score_to_signal(score: float | None) -> str | None:
@@ -436,6 +455,10 @@ async def upsert_tickers(
             t = Ticker(
                 symbol=r["symbol"],
                 name=r["symbol"],          # placeholder; sector backfill names later
+                # A brand-new row needs *something* and "equity" is the
+                # column's documented default. Unlike the update path below,
+                # this cannot clobber a better value — there isn't one yet, and
+                # _refresh_universe reconciles it against the vendor.
                 asset_class=r["asset_class"] or "equity",
             )
             session.add(t)
@@ -443,10 +466,20 @@ async def upsert_tickers(
         else:
             updated += 1
 
-        # Overwrite asset_class on existing rows too, so any dirty value
-        # written before normalize_asset_class existed (emoji-prefixed
-        # "📈 stock", "🥇 commodity etf", …) self-heals on the next refresh.
-        t.asset_class = r["asset_class"] or "equity"
+        # Overwrite asset_class on existing rows ONLY when the sheet actually
+        # says something. The self-heal this exists for (emoji-prefixed
+        # "📈 stock", "🥇 commodity etf", …) still works — those DO normalise
+        # to a value.
+        #
+        # What is no longer allowed is writing a DEFAULT. This line used to
+        # read `r["asset_class"] or "equity"`, and normalize_asset_class turned
+        # a blank cell into "equity", so every sheet-governed row with an empty
+        # Asset Class column had "equity" asserted over it every 5 minutes.
+        # That silently undid _refresh_universe's reconciliation between
+        # refreshes, which is why SPY/QQQ/GLD stayed `equity` even after
+        # discovery had corrected them.
+        if r["asset_class"]:
+            t.asset_class = r["asset_class"]
         # Clamp to the documented 0-100 composite AT THE COLUMN BOUNDARY. The
         # composite already clamps in score.compute_tapeline_composite, but
         # guarding the write itself means no future scorer change or new write
