@@ -989,14 +989,73 @@ def universe() -> list[dict[str, str]]:
     ]
 
 
-async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, str]]:
+#: Vendor instrument types Tapeline scores, mapped to its two asset classes.
+#:
+#: This used to be the bare tuple ("CS", "ETF"), which silently dropped two
+#: whole categories that the product already sells:
+#:
+#:   * ADRC — American Depositary Receipt Common. EVERY US-listed foreign
+#:     company. Massive types ASML as ADRC, not CS, so ASML could never be
+#:     discovered or repaired; 376 active US tickers sit in this bucket.
+#:   * ETV — Exchange Traded Vehicle, the commodity trusts. GLD, SLV, USO.
+#:     That is Tapeline's entire "Commodities" sector (see the universe notes
+#:     in CLAUDE.md), 90 active tickers, none of them discoverable.
+#:
+#: ETS (single-security ETF) and ETN (exchange-traded note) join them: both
+#: trade continuously against a published index, which is what the six-factor
+#: composite assumes.
+#:
+#: Deliberately still EXCLUDED, and why — these are not oversights:
+#:   PFD/WARRANT/RIGHT/UNIT/SP  not equities in the sense the factors assume;
+#:                              a trend/momentum read on a warrant or a SPAC
+#:                              unit is noise, not signal.
+#:   FUND                       closed-end funds trade at NAV premiums and
+#:                              discounts, so a price-derived composite says
+#:                              something different for them than for a stock.
+#:                              Adding them is a product decision, not a bug
+#:                              fix, so it is left out of this change.
+#:   BOND/AGEN/EQLK/BASKET/LT/OTHER   no continuous equity-like price series.
+VENDOR_TYPE_TO_ASSET_CLASS: dict[str, str] = {
+    "CS": "equity",
+    "ADRC": "equity",
+    "ETF": "etf",
+    "ETV": "etf",
+    "ETS": "etf",
+    "ETN": "etf",
+}
+
+#: High enough that the walk covers the whole market rather than truncating it.
+#:
+#: The old default was 5,000 — and because the cap counts ACCEPTED rows, the
+#: walk stopped partway through the alphabet. Measured against the vendor on
+#: 2026-08-27: 13,148 active US tickers, of which ~11,400 match the types
+#: above, and 5,000 accepted rows is reached around letter H/I. Everything
+#: from roughly I to Z was therefore never discovered, and never had its name
+#: or asset_class reconciled. The live symptom was a universe of 2,463 rows
+#: holding 750 A-tickers, 626 B, 671 C — and exactly ONE E.
+#:
+#: The walk costs one request per 1,000 rows (14 today) and runs weekly, so
+#: there is no reason for it to be tight. The cap stays only as a runaway
+#: guard, and hitting it now logs loudly instead of silently truncating.
+DISCOVERY_MAX_TICKERS = 25_000
+
+
+async def discover_active_us_tickers(
+    max_tickers: int = DISCOVERY_MAX_TICKERS,
+) -> list[dict[str, str]]:
     """
-    Walk Polygon's `/v3/reference/tickers` and return active US common stocks
-    plus ETFs, capped at `max_tickers` for sanity. Used by the worker's weekly
-    universe-refresh task to discover new IPOs and new ETF launches.
+    Walk Polygon's `/v3/reference/tickers` and return the active US universe:
+    common stock, ADRs, ETFs, commodity trusts, single-security ETFs and ETNs.
+    Used by the worker's weekly universe-refresh task to discover new IPOs and
+    new listings, and to reconcile `name` / `asset_class` on existing rows.
 
     Returns rows in the same shape as `universe()` — drop-in replacement for
     the static seed list.
+
+    `max_tickers` is a runaway guard, NOT a sizing knob: the vendor returns
+    tickers in ascending symbol order, so any cap that actually binds truncates
+    the universe ALPHABETICALLY rather than sampling it. See
+    DISCOVERY_MAX_TICKERS.
     """
     if not _api_key():
         return []
@@ -1011,7 +1070,9 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
             "active": "true",
             "limit": 1000,
         }
+        pages = 0
         while next_url and len(rows) < max_tickers:
+            pages += 1
             try:
                 r = await client.get(next_url, params=params, headers=auth_headers())
                 r.raise_for_status()
@@ -1022,9 +1083,8 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
 
             for t in data.get("results", []):
                 ttype = t.get("type") or ""
-                # CS = Common Stock, ETF = exchange-traded fund. Skip warrants,
-                # rights, units, OTC, etc. — we don't score those.
-                if ttype not in ("CS", "ETF"):
+                asset_class = VENDOR_TYPE_TO_ASSET_CLASS.get(ttype)
+                if asset_class is None:
                     continue
                 sym = (t.get("ticker") or "").upper()
                 if not sym or sym in seen:
@@ -1037,7 +1097,7 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
                     # call — too rate-limited on Starter to do for every name.
                     # Worker can backfill sectors lazily for tickers users actually look at.
                     "sector": "Unknown",
-                    "asset_class": "etf" if ttype == "ETF" else "equity",
+                    "asset_class": asset_class,
                 })
 
             cursor = data.get("next_url")
@@ -1050,5 +1110,18 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
             else:
                 next_url = None
 
-    logger.info("polygon.universe_discovered count=%d", len(rows))
+    if len(rows) >= max_tickers:
+        # Loud, because the failure mode is invisible: the vendor returns
+        # symbols in ascending order, so a binding cap does not sample the
+        # market, it CUTS IT OFF at a letter. That is how the universe ended
+        # up with 750 A-tickers and one E-ticker.
+        logger.error(
+            "polygon.universe_TRUNCATED at cap=%d — the universe is being cut "
+            "off alphabetically; raise DISCOVERY_MAX_TICKERS",
+            max_tickers,
+        )
+    logger.info(
+        "polygon.universe_discovered count=%d pages=%d cap=%d",
+        len(rows), pages, max_tickers,
+    )
     return rows
