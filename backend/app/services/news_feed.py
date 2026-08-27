@@ -245,7 +245,6 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
     works during the rebrand grace period.
     """
     params: dict[str, Any] = {
-        "apiKey": _vendor_key(),
         "limit": limit,
         "order": "desc",
         "sort": "published_utc",
@@ -254,7 +253,13 @@ async def _fetch_from_polygon(tickers: list[str] | None, limit: int) -> list[dic
         params["ticker"] = tickers[0]
 
     async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get("https://api.massive.com/v2/reference/news", params=params)
+        from app.services.polygon_feed import auth_headers
+
+        r = await c.get(
+            "https://api.massive.com/v2/reference/news",
+            params=params,
+            headers=auth_headers(_vendor_key()),
+        )
         r.raise_for_status()
         body = r.json()
 

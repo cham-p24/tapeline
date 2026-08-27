@@ -408,7 +408,6 @@ def _fetch_from_massive(
         "adjusted": "true",
         "sort": "asc",
         "limit": "50000",  # Massive caps at 50k bars/req — plenty for ~200 trading days
-        "apiKey": _api_key(),
     }
     url = f"{_base_url()}{path}"
 
@@ -417,7 +416,9 @@ def _fetch_from_massive(
         client = httpx.Client(timeout=30.0)
     try:
         assert client is not None  # narrow the type for mypy
-        resp = client.get(url, params=params)
+        from app.services.polygon_feed import auth_headers
+
+        resp = client.get(url, params=params, headers=auth_headers(_api_key()))
         resp.raise_for_status()
         body = resp.json()
     finally:

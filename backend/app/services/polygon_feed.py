@@ -50,6 +50,30 @@ def _is_production() -> bool:
     return get_settings().app_env == "production"
 
 
+def auth_headers(key: str | None = None) -> dict[str, str]:
+    """Vendor auth as a HEADER, never a query parameter.
+
+    Massive/Polygon accept `Authorization: Bearer <key>` as an equivalent to
+    `?apiKey=<key>`, and the header form is the only safe one: httpx logs the
+    full request URL at INFO, `main.py` configures INFO globally, and
+    `httpx.HTTPStatusError` embeds the URL in its message — so a key in the
+    query string reaches application logs, exception text and Sentry
+    breadcrumbs on every single call.
+
+    That is not hypothetical. The `rederive-scorecard` workflow streams this
+    module's log output into GitHub Actions, and on a PUBLIC repository four
+    runs published the live key 1,086 times in world-readable logs. GitHub
+    masks values registered as GitHub secrets; this one lives in Fly, so
+    nothing masked it.
+
+    Keep the key out of URLs. A header is not logged by httpx, is redacted by
+    Sentry's default `Authorization` scrubber, and never lands in a stack
+    trace.
+    """
+    k = key if key is not None else _api_key()
+    return {"Authorization": f"Bearer {k}"} if k else {}
+
+
 def _api_key() -> str:
     """Returns whichever vendor key is configured. Prefer the new MASSIVE_API_KEY
     when both are set so accounts created post-rebrand work cleanly."""
@@ -78,10 +102,15 @@ DEFAULT_UNIVERSE = [
 
 async def _request(client: httpx.AsyncClient, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """One GET with retries on 429/5xx."""
-    params = {**(params or {}), "apiKey": _api_key()}
+    params = dict(params or {})
     for attempt in range(5):
         try:
-            resp = await client.get(f"{BASE_URL}{path}", params=params, timeout=20.0)
+            resp = await client.get(
+                f"{BASE_URL}{path}",
+                params=params,
+                timeout=20.0,
+                headers=auth_headers(),
+            )
             if resp.status_code == 429:
                 # Rate-limited — back off progressively
                 wait = 2 ** attempt
@@ -981,11 +1010,10 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
             "market": "stocks",
             "active": "true",
             "limit": 1000,
-            "apiKey": _api_key(),
         }
         while next_url and len(rows) < max_tickers:
             try:
-                r = await client.get(next_url, params=params)
+                r = await client.get(next_url, params=params, headers=auth_headers())
                 r.raise_for_status()
                 data = r.json()
             except (httpx.HTTPError, ValueError):
@@ -1013,11 +1041,10 @@ async def discover_active_us_tickers(max_tickers: int = 5000) -> list[dict[str, 
                 })
 
             cursor = data.get("next_url")
-            # Polygon's next_url omits the apiKey — re-add it
+            # next_url carries the cursor only; auth rides in the header, so
+            # there is nothing to re-append here (this used to splice the key
+            # back into the URL, which is exactly what leaked it into logs).
             if cursor:
-                if "apiKey=" not in cursor:
-                    sep = "&" if "?" in cursor else "?"
-                    cursor = f"{cursor}{sep}apiKey={_api_key()}"
                 next_url = cursor
                 params = None  # next_url already encodes everything
             else:
