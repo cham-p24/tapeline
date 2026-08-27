@@ -45,7 +45,11 @@ test.describe("Landing page", () => {
 
     await page.getByRole("link", { name: "Pricing", exact: true }).first().click();
     await expect(page).toHaveURL(/\/pricing$/);
-    await expect(page.getByRole("heading", { name: /pick your tier/i })).toBeVisible();
+    // Assert the page LOADED, not what its headline says. The old assertion
+    // pinned "pick your tier", which the pricing hero stopped saying months
+    // before anyone noticed — a nav test failing on a copy edit tells you
+    // nothing about the nav.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     await page.goBack();
     await page.getByRole("link", { name: /how it works/i }).first().click();
@@ -56,6 +60,8 @@ test.describe("Landing page", () => {
     await page.goto("/");
     const footer = page.locator("footer");
     await expect(footer).toContainText(/not investment advice/i);
-    await expect(footer.getByRole("link", { name: /risk/i })).toBeVisible();
+    // .first(): the footer legitimately links the risk disclosure twice (nav
+    // column + the disclaimer sentence), which trips Playwright's strict mode.
+    await expect(footer.getByRole("link", { name: /risk/i }).first()).toBeVisible();
   });
 });

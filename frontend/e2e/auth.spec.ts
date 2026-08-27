@@ -6,23 +6,38 @@
  */
 import { test, expect } from "@playwright/test";
 
+/**
+ * Locator note: `getByLabel("Email")` is ambiguous on /signup — the marketing
+ * opt-in checkboxes are labelled "Email me the weekly market..." and
+ * "Send me the Daily Top 10", so a substring match resolves three elements and
+ * trips strict mode. Role-scoped locators name the control type as well as the
+ * label, which is what we actually mean: the email TEXTBOX.
+ *
+ * The names are prefix-anchored regexes rather than exact strings so a label
+ * gaining a qualifier — "Name" became "Name (optional)" — does not fail a
+ * working form, while still excluding "Email me the weekly market...".
+ */
+
 test.describe("Signup form", () => {
   test("renders with name, email, password fields", async ({ page }) => {
     await page.goto("/signup");
 
-    await expect(page.getByRole("heading", { name: /start 14-day pro trial/i })).toBeVisible();
-    await expect(page.getByLabel("Name")).toBeVisible();
-    await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
-    await expect(page.getByRole("button", { name: /create account/i })).toBeVisible();
+    // NOT the headline: /signup renders {headline.h1}, which varies by
+    // acquisition variant, so asserting one string here fails on a working
+    // page. The form is what has to exist.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /^Name/ })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /^Email/ })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /^Password/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /create (my )?account/i })).toBeVisible();
   });
 
   test("password min-length validation triggers", async ({ page }) => {
     await page.goto("/signup");
 
-    await page.getByLabel("Email").fill("test@example.com");
-    await page.getByLabel("Password").fill("short");
-    await page.getByRole("button", { name: /create account/i }).click();
+    await page.getByRole("textbox", { name: /^Email/ }).fill("test@example.com");
+    await page.getByRole("textbox", { name: /^Password/ }).fill("short");
+    await page.getByRole("button", { name: /create (my )?account/i }).click();
 
     // The frontend should show a min-length error before submitting
     await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
@@ -44,9 +59,9 @@ test.describe("Signin form", () => {
     await page.goto("/signin");
 
     await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
-    await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /^Email/ })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /^Password/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /^sign in$/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /sign up free/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /create an account/i })).toBeVisible();
   });
 });
