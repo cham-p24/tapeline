@@ -1,0 +1,48 @@
+name: Universe diagnostics (read-only)
+
+# Why this exists: the universe refresh was verified working locally against
+# the live vendor (11,364 rows) while the production table stayed unchanged.
+# Diagnosing that from the outside is guesswork — this reads what the worker
+# actually logged and what the table actually holds.
+#
+# READ-ONLY. It runs a fixed query and greps existing log output. It writes
+# nothing and takes no arguments that could turn it into an arbitrary-command
+# runner on production.
+#
+# Log output is filtered to `universe.`/`polygon.universe` lines and passed
+# through a redactor, because application logs are not a safe place to assume
+# nothing sensitive ever appears.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: universe-diagnostics
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: What did the worker log about the universe?
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          [ -n "${FLY_API_TOKEN:-}" ] || { echo "::error::FLY_API_TOKEN not set"; exit 1; }
+          echo "=== recent universe/discovery log lines ==="
+          timeout 90 flyctl logs -a tapeline-backend --no-tail 2>/dev/null \
+            | grep -iE "universe|reference_tickers|discover" \
+            | sed -E 's/(apiKey|api_key|token|Bearer)[=: ][A-Za-z0-9_-]+/\1=***REDACTED***/gi' \
+            | tail -60 || echo "(no matching lines in the retained window)"
+
+      - name: What does the table actually hold?
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          flyctl ssh console -a tapeline-backend -C "python -m app.scripts.universe_report"
