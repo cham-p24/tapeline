@@ -269,14 +269,41 @@ export default function CardGateStartPage() {
         </div>
       )}
 
-      <h1 className="text-3xl font-bold tracking-tight">
-        Add a card to open Tapeline
+      {/* Step 2 of the sign-up, named as such. /signup now says a card step is
+          coming; this is that step, so the visitor arrives at something they
+          were told about. */}
+      <ol
+        aria-label="Sign-up steps"
+        className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted"
+      >
+        <li>1. Your details</li>
+        <li aria-hidden="true">&rarr;</li>
+        <li aria-current="step" className="font-semibold text-fg">
+          2. Card
+        </li>
+      </ol>
+
+      {/* LEADS WITH THE TRIAL, NOT THE COST — and the card is still in the very
+          next sentence, not a screen later.
+
+          The old h1 was "Add a card to open Tapeline", which named the price of
+          entry and never the thing being bought. That is honest but it is not
+          the whole truth: what the card starts is {TRIAL_DAYS} days of Premium
+          for $0. Stating the ask first and the offer second understates our own
+          product to the one person who has already said yes to everything else.
+
+          This is NOT a licence to soften the card. Rule 1 at the top of this
+          file still stands: the full terms are real body text above the button,
+          the exact first-charge date and amount are below, and "no credit card"
+          never appears anywhere near the trial. */}
+      <h1 className="mt-4 text-3xl font-bold tracking-tight">
+        Start your {TRIAL_DAYS}-day Premium trial
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        New accounts start on a {TRIAL_DAYS}-day Premium trial, and starting it
-        takes a card &mdash; because it turns into a paid subscription if you
-        keep it. That card is what opens the app. Here is exactly what it means,
-        before you enter anything.
+        It takes a card and charges <strong className="text-fg">$0 today</strong>
+        {" "}&mdash; the card is what opens the app, and the trial becomes a paid
+        subscription if you keep it. Here is exactly what that means, before you
+        enter anything.
       </p>
 
       {/* Billing period. Nothing is pre-ticked beyond the site-wide default,

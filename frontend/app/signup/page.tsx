@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
+import { TRIAL_LENGTH_LABEL } from "@/lib/trial";
 import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
 import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
@@ -84,23 +85,23 @@ if (typeof window !== "undefined") {
 const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   _default: {
     h1: "Create your Tapeline account",
-    sub: "Email and password to start. At first sign-in you add a card and your 14-day Premium trial begins — $0 today, cancel in one click.",
+    sub: `Email and password to start. At first sign-in you add a card and your ${TRIAL_LENGTH_LABEL} Premium trial begins — $0 today, cancel in one click.`,
   },
   finviz: {
     h1: "The Finviz alternative.",
-    sub: "One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
+    sub: `One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day.`,
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: "One score, one sentence, and every pick logged public vs SPY. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
+    sub: `One score, one sentence, and every pick logged public vs SPY. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day.`,
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: "The full live universe, every name scored. 14-day Premium trial — a card at first sign-in, $0 charged that day, cancel in one click.",
+    sub: `The full live universe, every name scored. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day, cancel in one click.`,
   },
   compare: {
     h1: "Switching to Tapeline?",
-    sub: "One transparent score per ticker plus a public track record. 14-day Premium trial — a card at first sign-in, $0 charged that day.",
+    sub: `One transparent score per ticker plus a public track record. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day.`,
   },
   // Destination for the ad variant that sells the SAFETY of the card trial
   // rather than trying to talk around it (Metrics Bible §7.3, variant 9 —
@@ -123,7 +124,7 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   // the CARD HONESTY block above.
   trial: {
     h1: "$0 today. The charge date is on the page.",
-    sub: "The 14-day Premium trial takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you three days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.",
+    sub: `The ${TRIAL_LENGTH_LABEL} Premium trial takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you three days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
   },
 };
 
@@ -161,7 +162,7 @@ function SignUpForm() {
   //   3. otherwise → the TRIAL OFFER, /app/billing?trial=start
   //
   // (3) is new. Signup no longer starts a trial, so if nothing presented the
-  // choice the 14-day Premium trial would simply never be offered to anyone.
+  // choice the ${TRIAL_LENGTH_LABEL} Premium trial would simply never be offered to anyone.
   // The offer screen is a two-option fork — start the trial (card, disclosed
   // in full, user clicks) or continue on the Free plan (one click to the
   // scanner, no card, nothing lost). It is NOT an auto-redirect into Stripe:
@@ -376,7 +377,7 @@ function SignUpForm() {
       // signup conversion.
       //
       // `start_trial` DELIBERATELY DOES NOT FIRE HERE any more. It used to,
-      // because signup auto-granted a 14-day Premium trial. Since the trial
+      // because signup auto-granted a ${TRIAL_LENGTH_LABEL} Premium trial. Since the trial
       // became a separate card-required opt-in, firing it at account creation
       // would report a trial that hasn't started — inflating the trial count
       // and, worse, teaching Smart Bidding that every signup is a trial. It
@@ -437,7 +438,28 @@ function SignUpForm() {
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
           </Link>
 
-          <h1 className="mt-10 text-3xl font-bold tracking-tight">{headline.h1}</h1>
+          {/* TWO-STEP SIGNPOST. The card gate at /app/start was arriving as a
+              surprise: a visitor filled in email + password believing they
+              were done, then met an unannounced ask for a card. Naming both
+              steps here costs nothing and means the wall is the step they were
+              told about rather than a bait-and-switch — which is also the only
+              framing consistent with a product whose pitch is that it does not
+              misstate things.
+
+              Factual, not a progress bar with a countdown: no urgency, no
+              scarcity, and it does not imply step 2 is optional. */}
+          <ol
+            aria-label="Sign-up steps"
+            className="mt-10 flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted"
+          >
+            <li aria-current="step" className="font-semibold text-fg">
+              1. Your details
+            </li>
+            <li aria-hidden="true">&rarr;</li>
+            <li>2. Card &mdash; starts the {TRIAL_LENGTH_LABEL} trial, $0 today</li>
+          </ol>
+
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">{headline.h1}</h1>
           <p className="mt-2 text-sm text-muted">{headline.sub}</p>
 
           {/* Value strip at the decision point. Post-#548 the honest headline
@@ -446,7 +468,7 @@ function SignUpForm() {
               learn that from us here, before they are anywhere near a card
               field — not discover it at the wall on the next screen. */}
           <p className="mt-4 text-xs text-muted">
-            14-day Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
+            ${TRIAL_LENGTH_LABEL} Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
           </p>
 
           {/* PRIMARY signup path: Google-first, above the fold, first thing the
@@ -687,7 +709,7 @@ function SignUpForm() {
 
           {/* Card transparency footer. The single most common pre-signup
               objection is "am I going to get auto-charged?" — and now that the
-              14-day Premium trial takes a card, the only acceptable answer is
+              ${TRIAL_LENGTH_LABEL} Premium trial takes a card, the only acceptable answer is
               to state the whole rule BEFORE the account exists, not after.
               What the card does, when it charges, how to leave, and what you can
               still read without an account at all. */}
@@ -700,7 +722,7 @@ function SignUpForm() {
                 three and had already drifted once). */}
             <p className="mt-1.5">
               This form takes an email and a password. At first sign-in you add a card, and
-              that starts your <span className="text-fg">14-day Premium trial</span>:{" "}
+              that starts your <span className="text-fg">${TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
               <span className="text-fg">$0 is charged today</span>, the first charge is 14 days
               later at the plan you pick, we email you three days before, and one click ends it
               before then with nothing taken. Paid plans start at{" "}
