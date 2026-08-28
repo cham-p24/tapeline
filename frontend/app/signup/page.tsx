@@ -6,7 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
-import { TRIAL_LENGTH_LABEL } from "@/lib/trial";
+import { TRIAL_DAYS, TRIAL_LENGTH_LABEL } from "@/lib/trial";
 import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
 import { PRICING, REFUND, usd } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
@@ -162,7 +162,7 @@ function SignUpForm() {
   //   3. otherwise → the TRIAL OFFER, /app/billing?trial=start
   //
   // (3) is new. Signup no longer starts a trial, so if nothing presented the
-  // choice the ${TRIAL_LENGTH_LABEL} Premium trial would simply never be offered to anyone.
+  // choice the Premium trial would simply never be offered to anyone.
   // The offer screen is a two-option fork — start the trial (card, disclosed
   // in full, user clicks) or continue on the Free plan (one click to the
   // scanner, no card, nothing lost). It is NOT an auto-redirect into Stripe:
@@ -377,7 +377,7 @@ function SignUpForm() {
       // signup conversion.
       //
       // `start_trial` DELIBERATELY DOES NOT FIRE HERE any more. It used to,
-      // because signup auto-granted a ${TRIAL_LENGTH_LABEL} Premium trial. Since the trial
+      // because signup auto-granted a Premium trial. Since the trial
       // became a separate card-required opt-in, firing it at account creation
       // would report a trial that hasn't started — inflating the trial count
       // and, worse, teaching Smart Bidding that every signup is a trial. It
@@ -468,7 +468,7 @@ function SignUpForm() {
               learn that from us here, before they are anywhere near a card
               field — not discover it at the wall on the next screen. */}
           <p className="mt-4 text-xs text-muted">
-            ${TRIAL_LENGTH_LABEL} Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
+            {TRIAL_LENGTH_LABEL} Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
           </p>
 
           {/* PRIMARY signup path: Google-first, above the fold, first thing the
@@ -697,7 +697,7 @@ function SignUpForm() {
                 this button does not collect one, but the very next screen does,
                 so the true reassurance is the AMOUNT, not the absence. */}
             <p className="text-center text-xs text-muted">
-              $0 charged today &mdash; the first charge is 14 days away
+              $0 charged today &mdash; the first charge is {TRIAL_DAYS} days away
             </p>
 
             <p className="text-xs text-subtle">
@@ -709,7 +709,7 @@ function SignUpForm() {
 
           {/* Card transparency footer. The single most common pre-signup
               objection is "am I going to get auto-charged?" — and now that the
-              ${TRIAL_LENGTH_LABEL} Premium trial takes a card, the only acceptable answer is
+              Premium trial takes a card, the only acceptable answer is
               to state the whole rule BEFORE the account exists, not after.
               What the card does, when it charges, how to leave, and what you can
               still read without an account at all. */}
@@ -722,8 +722,8 @@ function SignUpForm() {
                 three and had already drifted once). */}
             <p className="mt-1.5">
               This form takes an email and a password. At first sign-in you add a card, and
-              that starts your <span className="text-fg">${TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
-              <span className="text-fg">$0 is charged today</span>, the first charge is 14 days
+              that starts your <span className="text-fg">{TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
+              <span className="text-fg">$0 is charged today</span>, the first charge is {TRIAL_DAYS} days
               later at the plan you pick, we email you three days before, and one click ends it
               before then with nothing taken. Paid plans start at{" "}
               <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span>.
