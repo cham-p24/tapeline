@@ -43,6 +43,25 @@ test.describe("Signup form", () => {
     await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
   });
 
+  test("the trial length renders as a number, not as template syntax", async ({ page }) => {
+    // Regression: the trial length was moved into a constant, and the
+    // replacement was applied to JSX TEXT NODES as well as to string literals.
+    // In a template literal `${X}` interpolates; in JSX only `{X}` does, so the
+    // `$` rendered as a character and the live signup page read
+    // "$14-day Premium trial". Typecheck cannot see it — it is valid JSX text —
+    // and a source scan for a hardcoded "14-day" passes, because the number
+    // genuinely is interpolated. Only the rendered page shows it.
+    await page.goto("/signup");
+    const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
+
+    expect(body).not.toMatch(/\$\d+-day/);          // "$14-day"
+    expect(body).not.toContain("${");                // raw template syntax
+    expect(body).not.toContain("TRIAL_LENGTH_LABEL"); // uninterpolated identifier
+
+    // ...and the real thing is present, so this cannot pass by rendering nothing.
+    expect(body).toMatch(/\d+-day Premium trial/);
+  });
+
   test("Terms + Privacy links route correctly", async ({ page }) => {
     await page.goto("/signup");
 
