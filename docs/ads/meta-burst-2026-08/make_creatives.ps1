@@ -1,8 +1,10 @@
 Add-Type -AssemblyName System.Drawing
 
-$out = "C:\Users\Chamara\AppData\Local\Temp\claude\C--Project-1\54061250-568f-4a4d-b24c-9ea6df2f0c68\scratchpad\ads"
-New-Item -ItemType Directory -Force $out | Out-Null
-
+# Write next to this script, so a clean checkout reproduces the committed
+# assets. This previously hardcoded a machine-specific scratchpad path, which
+# meant regeneration silently wrote somewhere else and the committed PNGs went
+# stale while the source looked correct.
+$out = $PSScriptRoot
 $concepts = @(
   @{ file = "concept-a-screener.png"
      l1   = "Retire the Sunday-night"
@@ -15,7 +17,7 @@ $concepts = @(
   @{ file = "concept-c-record.png"
      l1   = "We publish the record,"
      l2   = "misses included."
-     sub  = "Every top-10 pick, logged daily, measured against SPY." }
+     sub  = "Top 10 scores, logged daily, measured against SPY." }
 )
 
 foreach ($c in $concepts) {
@@ -48,7 +50,7 @@ foreach ($c in $concepts) {
   $g.DrawLine($pen, 80, 500, 1120, 500)
 
   $fFont = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Regular)
-  $bF    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#6B7B92"))
+  $bF    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#8FA0B6"))
   $g.DrawString("Informational only. Descriptive scores, not recommendations.", $fFont, $bF, 78, 530)
 
   $uFont = New-Object System.Drawing.Font("Segoe UI Semibold", 15, [System.Drawing.FontStyle]::Bold)

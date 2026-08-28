@@ -623,3 +623,139 @@ deployed** — the event fires on a real signup, not on page load.
 **Still founder-only, and now genuinely the last thing:** registering a Meta App and generating a
 System User token, then `.\scripts\meta-capi-golive.ps1 -TestEventCode <CODE>` (after
 `fly auth login`). Claude does not create developer apps or generate/handle access tokens.
+
+---
+
+## 16. Deep-dive audit — 2026-08-29
+
+A 99-agent workflow audited the live burst against `META_SAAS_ADS_PLAYBOOK.md`,
+`PAID_ADS_METRICS_BIBLE.md` and this file, then researched Meta advertising for retail-trading
+SaaS under Special Ad Category. 92 findings were adversarially verified against Tapeline's
+compliance constraints; **25 survived, 67 were rejected** — several of the rejected ones were
+claims made earlier in the same session.
+
+### A hard-banned token was live, and is now fixed
+
+Concept C's artwork read **"Every top-10 pick, logged daily, measured against SPY."**
+`META_SAAS_ADS_PLAYBOOK.md` bans that token explicitly: *"no 'picks' token in ad copy — Meta's
+finance classifier pattern-matches it to stock-tip services, so it is 'score(s)' everywhere."*
+It ran for three days on an FPS account that had just come off a security checkpoint.
+
+C was also the lowest-delivery ad by a wide margin (A$1.06 / 60 impressions, CPM A$17.67 against
+A$85–110 on its siblings) — consistent with **classifier suppression rather than message failure**,
+which means C's arm was never a message read at all.
+
+**Actions taken:** ad C paused in Ads Manager; the string changed to *"Top 10 scores, logged daily,
+measured against SPY."* in all three generators; all nine assets regenerated.
+
+### How it got through — two gaps, both now closed
+
+1. **The linter never had the rule.** The ban lived only in playbook prose. Verified by running
+   the linter on the exact offending string: 0 findings. So "the ad copy passed the linter" was
+   true and beside the point.
+2. **The on-image words were never linted at all.** Only primary text, headline and description
+   went through it; the subtitle strings live in the PowerShell generators, and CI's include globs
+   exclude `docs/`.
+
+Rule 10 `ad-trading-vocabulary` now catches `picks`, `calls`, `stock tips`, `hot stocks` — and is
+**path-scoped to the ad-creative directory**, because "picks" is legitimate product vocabulary
+elsewhere (`/daily-picks` is a real public route, and the word appears across the scanner,
+watchlist and about pages). A repo-wide ban would be wrong and would fail CI everywhere.
+
+### A reproducibility bug in the committed generators
+
+`$out` was a hardcoded machine-specific scratchpad path, so regeneration silently wrote somewhere
+else and the committed PNGs went stale while the source looked correct. Caught only because a
+regenerated image still showed the old text. Now `$out = $PSScriptRoot`.
+
+Also fixed while in there: the footer ran ~4.35:1 contrast on the navy (under WCAG AA 4.5:1) and is
+now `#8FA0B6`; and on the 9:16 assets the compliance line sat inside the Stories bottom safe-zone
+exclusion, where platform UI can overlay it — moved up ~130px.
+
+### Corrections to claims made earlier in this session
+
+- **"Delivery is at 39% of budget"** — the denominator counted review days as delivery days.
+  Recomputed on actual delivery days it is **~59–78%**. Underdelivery is real but materially less
+  severe than was reported.
+- **"Meta has picked a favourite (B)"** — spend share is not a performance metric. No CTR was
+  cited, and the ranking **inverts by measure**: B/A/C by dollars, B/C/A by impressions. The
+  playbook predicted concentration in advance and said *record it, don't rebalance*.
+- **The A$78 blended CPM is not diagnostic** at 376 impressions (minimum readable sample
+  ~5,000–10,000; per-ad CPMs span 6x; the applicable finance median is US$28.44, so ~1.8x not 2–3x).
+
+### The structural finding: this ad set cannot exit learning
+
+Smart bidding wants ~50 conversions per ad set per week. At A$25/day that is **arithmetically
+unreachable** — a genuinely registration-optimised flight needs roughly **A$107–286/day**, which at
+0 payers and ~4x over the CAC ceiling is not defensible spend. This is not a patience problem and
+will not resolve by waiting.
+
+Consequences to accept now, before the verdict date, rather than rationalise later:
+
+- **The three-way ranking — the burst's sole pre-registered deliverable — will not be produced.**
+  A and C will not clear the per-ad evaluation floor under any plausible pacing. At verdict time
+  this reads *"the instrument did not run"*, **not** *"B beat A and C"*.
+- **Kill criterion 3 (cost per registration after 100+ clicks) will likely never become
+  evaluable.** Report it as *insufficient data*, not *passed*. What stays enforceable is the A$350
+  cap and the structural stop.
+
+**Confirmed 29 Aug:** the Results column reads `—` for all three ads. `CompleteRegistration` has
+never reached Meta. Every impression bought while that is true is bought blind.
+
+### Constraints discovered that bind all future flights
+
+- **Lookalikes are permanently unavailable under FPS.** Special Ad Audiences were fully deprecated
+  in 2022 with no replacement. Even at 100+ payers, the customer list cannot become Meta
+  prospecting reach while the campaign sits in FPS. Any source saying otherwise is stale.
+- **Meta lead forms are closed** — financial-product ads may not request PII in-platform.
+- **A "DM us a ticker" hook is closed** — US investment-product ads may not prompt direct-message
+  interaction, despite the inbox bot having a `ticker_score` template. The funnel stays
+  click-to-site.
+- **Location exclusions are not permitted under SAC at all**, so US-only *inclusion* is the only
+  mechanism protecting the Australia constraint. The docs treat the eight-country exclusion list as
+  a legal gate; it may not be enterable. Reconcile before the next flight.
+- **Never reframe the ads as non-financial to escape SAC.** The FPS exemptions cover bank/insurer
+  brand ads, loan-management education, news articles and mention-only ads. A paid stock scanner
+  linking to signup fits none. Mis-declaration risks a retroactive evasion flag.
+
+### Cold vs retargeting — the live three
+
+| Ad | Verdict |
+|---|---|
+| **A — Sunday-night spreadsheet** | **Cold-appropriate.** Problem-recognition hook on an existing behaviour; asserts nothing about the reader, so it is clean under Meta's Personal Attributes standard. |
+| **B — $0 today** | **An objection-handler, not a cold hook** — it answers a question a stranger has not yet asked. Highest *policy* value of the three. Best used in retargeting and as landing-page copy. Its delivery share is not evidence it is the best cold message. |
+| **C — We publish the record** | **Cold-appropriate in concept**, but the live execution carried the banned token and its arm is uninterpretable. Keep the angle, rebuild the asset. |
+
+**Live risk on B to carry into any reuse:** *"$0 today"* alone is functionally "free trial, no
+card" — the banned claim. Advantage+ auto-crops and can truncate, so the card-and-charge-date
+clause must live in the primary text, not only baked into the image.
+
+### Creative direction for the next flight
+
+The three live ads are **one visual concept with three headlines** — same navy, same layout, same
+rule, same footer. Concept diversity beats variation volume, so the next flight must vary the
+*visual concept*, not just the words. In priority order:
+
+1. **Real-UI static** — the scanner surface itself. Text-on-colour is static's weakest variant.
+2. **Screen recording** of the scanner and methodology surface. Descriptive numerals only.
+   **Review the capture so the 6-factor weights cannot be derived** — factor names are public, the
+   weights are not.
+3. **Scorecard-artifact static** — crop the per-day entries *including misses*, and **exclude the
+   summary-stat strip**. The record's existence goes in the ad; the numbers stay on the page.
+
+**Banned forever in future variants** (Meta Personal Attributes — implying knowledge of the
+reader's financial state, including indirect you/your phrasing): *"Tired of losing money?"*,
+*"Still guessing?"*, *"Bad at picking stocks?"*, *"Portfolio down?"*. This costs nothing — the
+descriptive-only rule already forbids that voice.
+
+### Rejected on compliance grounds — do not revive
+
+- A compressed *"$0 today. Start your 14-day trial."* headline — implies card-free by omission.
+- Adding *"Past results do not indicate future results"* to the statics — a past-performance
+  disclaimer presupposes a performance representation and imports the exact frame the rules exist
+  to keep out. Most tempting on C, most dangerous there.
+- Hit-rate / median-alpha / vs-SPY **figures** in the ad or the landing H1 / title / OG card.
+- Rewriting the banned line as *"every call"* — "call" is prescriptive trading vocabulary. Rule 10
+  now catches it too.
+- Uploading the 25 users as a customer-list audience — exceeds the current privacy disclosure.
+- Widening geo, UGC testimonials, or switching the optimisation event mid-flight.

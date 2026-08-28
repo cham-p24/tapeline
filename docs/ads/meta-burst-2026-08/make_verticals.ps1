@@ -1,7 +1,10 @@
 Add-Type -AssemblyName System.Drawing
 
-$out = "C:\Users\Chamara\AppData\Local\Temp\claude\C--Project-1\54061250-568f-4a4d-b24c-9ea6df2f0c68\scratchpad\ads"
-
+# Write next to this script, so a clean checkout reproduces the committed
+# assets. This previously hardcoded a machine-specific scratchpad path, which
+# meant regeneration silently wrote somewhere else and the committed PNGs went
+# stale while the source looked correct.
+$out = $PSScriptRoot
 $concepts = @(
   @{ file = "concept-a-screener-9x16.png"
      head = @("Retire the", "Sunday-night", "spreadsheet.")
@@ -11,7 +14,7 @@ $concepts = @(
      sub  = @("14-day Premium trial.", "Card required.", "Cancel in one click.") },
   @{ file = "concept-c-record-9x16.png"
      head = @("We publish", "the record,", "misses", "included.")
-     sub  = @("Every top-10 pick,", "logged daily,", "measured against SPY.") }
+     sub  = @("Top 10 scores,", "logged daily,", "measured against SPY.") }
 )
 
 foreach ($c in $concepts) {
@@ -40,16 +43,16 @@ foreach ($c in $concepts) {
   foreach ($line in $c.sub) { $g.DrawString($line, $sFont, $bS, 86, $y); $y += 44 }
 
   $pen = New-Object System.Drawing.Pen ([System.Drawing.ColorTranslator]::FromHtml("#1C2839")), 2
-  $g.DrawLine($pen, 88, 1450, 992, 1450)
+  $g.DrawLine($pen, 88, 1320, 992, 1320)
 
   $fFont = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Regular)
-  $bF    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#6B7B92"))
-  $g.DrawString("Informational only.", $fFont, $bF, 86, 1490)
-  $g.DrawString("Descriptive scores, not recommendations.", $fFont, $bF, 86, 1522)
+  $bF    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#8FA0B6"))
+  $g.DrawString("Informational only.", $fFont, $bF, 86, 1360)
+  $g.DrawString("Descriptive scores, not recommendations.", $fFont, $bF, 86, 1392)
 
   $uFont = New-Object System.Drawing.Font("Segoe UI Semibold", 18, [System.Drawing.FontStyle]::Bold)
   $bU    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#2D7DF6"))
-  $g.DrawString("tapeline.io", $uFont, $bU, 86, 1572)
+  $g.DrawString("tapeline.io", $uFont, $bU, 86, 1444)
 
   $g.Dispose()
   $path = Join-Path $out $c.file
