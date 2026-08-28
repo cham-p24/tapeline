@@ -51,7 +51,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
  * "14-day" figure used across the pricing surfaces. Local because
  * `lib/pricing.ts` has no trial constant yet — see the PR body follow-up.
  */
-export const TRIAL_DAYS = 14;
+// Re-exported so existing importers keep working; the number itself now
+// lives in lib/trial.ts alongside the label, pinned to the backend.
+export { TRIAL_DAYS } from "@/lib/trial";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 /** Days remaining at which the banner is still explaining the trial's START. */
 const START_PHASE_DAYS_LEFT = TRIAL_DAYS - 1;
