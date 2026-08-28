@@ -1,7 +1,10 @@
 Add-Type -AssemblyName System.Drawing
 
-$out = "C:\Users\Chamara\AppData\Local\Temp\claude\C--Project-1\54061250-568f-4a4d-b24c-9ea6df2f0c68\scratchpad\ads"
-
+# Write next to this script, so a clean checkout reproduces the committed
+# assets. This previously hardcoded a machine-specific scratchpad path, which
+# meant regeneration silently wrote somewhere else and the committed PNGs went
+# stale while the source looked correct.
+$out = $PSScriptRoot
 $concepts = @(
   @{ file = "concept-a-screener-1x1.png"
      head = @("Retire the", "Sunday-night", "spreadsheet.")
@@ -11,7 +14,7 @@ $concepts = @(
      sub  = @("14-day Premium trial.", "Card required. Cancel in one click.") },
   @{ file = "concept-c-record-1x1.png"
      head = @("We publish", "the record,", "misses included.")
-     sub  = @("Every top-10 pick, logged daily,", "measured against SPY.") }
+     sub  = @("Top 10 scores, logged daily,", "measured against SPY.") }
 )
 
 foreach ($c in $concepts) {
@@ -42,7 +45,7 @@ foreach ($c in $concepts) {
   $g.DrawLine($pen, 88, 900, 992, 900)
 
   $fFont = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Regular)
-  $bF    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#6B7B92"))
+  $bF    = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]::FromHtml("#8FA0B6"))
   $g.DrawString("Informational only. Descriptive scores,", $fFont, $bF, 86, 930)
   $g.DrawString("not recommendations.", $fFont, $bF, 86, 958)
 

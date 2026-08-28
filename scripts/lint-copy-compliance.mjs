@@ -467,6 +467,57 @@ const HEADLINE_RULE = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Rule 10 — trading vocabulary that is banned in AD CREATIVE ONLY.
+ *
+ * WHY THIS IS PATH-SCOPED AND NOT A GLOBAL RULE
+ * ---------------------------------------------
+ * "picks" is legitimate, load-bearing product vocabulary on the site —
+ * `/daily-picks` is a real public route, and the word appears across the
+ * scanner, watchlist and about pages. Banning it repo-wide would be wrong
+ * and would fail CI everywhere.
+ *
+ * In an AD UNIT it is different, and the ban is documented in
+ * `docs/META_SAAS_ADS_PLAYBOOK.md`: *"no 'picks' token in ad copy — Meta's
+ * finance classifier pattern-matches it to stock-tip services, so it is
+ * 'score(s)' everywhere"*. That is an account-safety rule about how Meta's
+ * classifier reads a paid financial ad, not a claim about the word's meaning.
+ *
+ * WHY IT EXISTS AT ALL
+ * --------------------
+ * Concept C of the 2026-08 burst shipped with "Every top-10 pick, logged
+ * daily, measured against SPY" burned into all three of its images, and ran
+ * live on an FPS account for three days. Two gaps let it through: the ban
+ * lived only in prose, and the on-image strings live in the PowerShell
+ * generators, which were never linted — only the primary text and headline
+ * were. So "the ad copy passed the linter" was true and beside the point.
+ * ------------------------------------------------------------------ */
+const AD_CREATIVE_PATH = /(?:^|[\\/])docs[\\/]ads[\\/]/i;
+
+/** Does this file contain words that get burned into, or submitted as, an ad? */
+function isAdCreativePath(filePath) {
+  return AD_CREATIVE_PATH.test(String(filePath).replace(/\\/g, "/"));
+}
+
+const AD_VOCAB_RULE = {
+  id: "ad-trading-vocabulary",
+  brief: "Playbook — no stock-tip vocabulary in ad creative (use 'score(s)')",
+  message:
+    "Meta's finance classifier pattern-matches this token to stock-tip " +
+    "services, which risks rejection or silent suppression on a Special Ad " +
+    "Category account. Say 'score(s)' or 'flagged ticker' instead. This rule " +
+    "is scoped to ad creative — the word is fine on the site.",
+};
+
+const AD_VOCAB_PATTERNS = [
+  /\bpicks?\b/gi,
+  // "call" as a prediction ("our calls", "every call") is the same frame and
+  // is equally prescriptive trading vocabulary.
+  /\bcalls?\b/gi,
+  /\bstock\s+tips?\b/gi,
+  /\bhot\s+stocks?\b/gi,
+];
+
+/* ------------------------------------------------------------------ *
  * Comment stripping.
  *
  * Comments are not user-facing copy, and stripping them is the single
@@ -779,6 +830,20 @@ export function scanSource(text, filePath = "<input>", options = {}) {
           m.index,
           value.trim().replace(/\s+/g, " ").slice(0, 120),
         );
+      }
+    }
+  }
+
+  // Rule 10 — stock-tip vocabulary, ad creative only. Scoped by path because
+  // "picks" is legitimate site copy (/daily-picks) and only dangerous in a
+  // paid financial ad unit. See AD_VOCAB_RULE above.
+  if (isAdCreativePath(filePath)) {
+    for (const pattern of AD_VOCAB_PATTERNS) {
+      const re = new RegExp(pattern.source, pattern.flags);
+      let m;
+      while ((m = re.exec(code)) !== null) {
+        push(AD_VOCAB_RULE, m.index, m[0]);
+        if (m[0].length === 0) re.lastIndex += 1;
       }
     }
   }
