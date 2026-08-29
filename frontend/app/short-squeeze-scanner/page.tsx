@@ -13,7 +13,7 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Short Squeeze Scanner — Live Squeeze Setups Across ~2,500 US Stocks | Tapeline",
+  title: "Short Squeeze Scanner — Live Setups, US Stocks | Tapeline",
   description:
     "Tapeline's short squeeze scanner surfaces compressed-range stocks setting up for a directional move, ranked by spike score with volume + OBV confirmation. Live universe, sub-60s refresh, public scorecard.",
   path: "/short-squeeze-scanner",

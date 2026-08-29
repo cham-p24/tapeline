@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs TrendSpider (2026): Composite Score vs Automated Charting",
+  title: "Tapeline vs TrendSpider (2026): Score vs Automated Charting",
   description:
     "Tapeline vs TrendSpider — one published 6-factor composite score per ticker with a public per-pick scorecard, vs TrendSpider's automated technical analysis, charting and strategy tester. Honest comparison at $8.25/mo Pro annual vs roughly $54-$108/mo (as of August 2026).",
   path: "/compare/trendspider",

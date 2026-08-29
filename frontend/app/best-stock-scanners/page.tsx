@@ -17,7 +17,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // ("actually worth paying for") and ends with the public-evidence hook
 // (scorecard + named factors) — the Tapeline-specific differentiators.
 export const metadata = pageMeta({
-  title: "Best Stock Scanners 2026 — 10 Tools Hand-Tested + Compared | Tapeline",
+  title: "Best Stock Scanners 2026 — 10 Tools Hand-Tested | Tapeline",
   description:
     "10 stock scanners actually worth paying for in 2026 — composite scoring, intraday signals, fundamentals, AI tools. Ranked by transparency, public evidence, and value at price.",
   path: "/best-stock-scanners",

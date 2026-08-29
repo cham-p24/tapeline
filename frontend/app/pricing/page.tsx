@@ -29,7 +29,15 @@ export const revalidate = 21600;
 // The "(billed annually)" parenthetical directly follows and scopes both
 // listed rates; the description carries the real totals.
 export const metadata = pageMeta({
-  title: `Tapeline Pricing: Pro from ${usd(PRICING.pro.annualPerMonth)}/mo · Premium from ${usd(PRICING.premium.annualPerMonth)}/mo (billed annually) · 14-Day Premium Trial`,
+  // Kept to a SERP-safe length: at 101 chars Google cut this mid-word and
+  // the trial clause never rendered anyway. Prices stay — they are the
+  // reason someone clicks a pricing result.
+  //
+  // "billed annually" is NOT optional padding. These are the annual
+  // per-month rates; quoting them as a bare $/mo is the misleading half of
+  // a real price. __tests__/pricingJsonLd.test.ts enforces the pairing, and
+  // it caught this exact omission when the title was first shortened.
+  title: `Tapeline Pricing: Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo billed annually`,
   description:
     `Tapeline pricing: Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial: card required at first sign-in, $0 charged today, cancel in one click before it ends. The public scorecard and daily picks stay free with no account.`,
   path: "/pricing",

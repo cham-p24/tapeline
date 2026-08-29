@@ -112,7 +112,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Moving average",
     aliases: ["MA", "simple moving average", "SMA"],
     category: "Trend & momentum",
-    title: "What Is a Moving Average? Plain-English Definition | Tapeline Glossary",
+    title: "What Is a Moving Average? Plain-English Definition | Tapeline",
     description:
       "A moving average is the average closing price over a rolling window of sessions. How it is calculated, what it smooths out, and where it lags.",
     h1: "Moving average",
@@ -133,7 +133,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "DMA stack",
     aliases: ["moving average stack", "MA stack", "stacked moving averages"],
     category: "Trend & momentum",
-    title: "What Is a DMA Stack? Moving-Average Alignment Explained | Tapeline Glossary",
+    title: "What Is a DMA Stack? Moving-Average Alignment | Tapeline",
     description:
       "A DMA stack describes several day-moving averages lined up in order, shortest to longest. How the alignment is read and why it is a description of the past.",
     h1: "DMA stack",
@@ -154,7 +154,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Golden cross",
     aliases: ["moving average crossover", "death cross"],
     category: "Trend & momentum",
-    title: "What Is a Golden Cross? Crossover Definition | Tapeline Glossary",
+    title: "What Is a Golden Cross? Crossover Definition | Tapeline",
     description:
       "A golden cross describes a shorter moving average crossing above a longer one. What the crossover is, how it is dated, and why it is always late.",
     h1: "Golden cross",
@@ -175,7 +175,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "MACD",
     aliases: ["moving average convergence divergence"],
     category: "Trend & momentum",
-    title: "What Is MACD? Moving Average Convergence Divergence | Tapeline Glossary",
+    title: "What Is MACD? Moving Average Convergence Divergence | Tapeline",
     description:
       "MACD is the difference between two exponential moving averages, plotted against a signal line. How the three components are built and what each one shows.",
     h1: "MACD (moving average convergence divergence)",
@@ -195,7 +195,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "RSI",
     aliases: ["relative strength index"],
     category: "Trend & momentum",
-    title: "What Is RSI? Relative Strength Index Explained | Tapeline Glossary",
+    title: "What Is RSI? Relative Strength Index Explained | Tapeline",
     description:
       "RSI compares the size of a security's recent gains to the size of its recent losses on a 0-100 scale. How it is calculated and what the scale actually says.",
     h1: "RSI (relative strength index)",
@@ -215,7 +215,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Rate of change",
     aliases: ["ROC", "price rate of change"],
     category: "Trend & momentum",
-    title: "What Is Rate of Change? ROC Definition for Traders | Tapeline Glossary",
+    title: "What Is Rate of Change? ROC Definition for Traders | Tapeline",
     description:
       "Rate of change is the percentage price change over a fixed lookback window. The simplest momentum measurement, and how window length changes what it sees.",
     h1: "Rate of change",
@@ -235,7 +235,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "momentum",
     term: "Momentum",
     category: "Trend & momentum",
-    title: "What Is Momentum in Stock Trading? Definition | Tapeline Glossary",
+    title: "What Is Momentum in Stock Trading? Definition | Tapeline",
     description:
       "Momentum describes how fast and how persistently price has been moving. What the measurement covers, and why it is the noisiest of the common factors.",
     h1: "Momentum",
@@ -255,7 +255,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "trend",
     term: "Trend",
     category: "Trend & momentum",
-    title: "What Is a Trend in Stock Trading? Definition | Tapeline Glossary",
+    title: "What Is a Trend in Stock Trading? Definition | Tapeline",
     description:
       "A trend describes the direction and persistence of price over a multi-month window. How trend differs from momentum, and why every trend reading is backward-looking.",
     h1: "Trend",
@@ -278,7 +278,7 @@ export const TERMS: GlossaryTerm[] = [
     // NOT "What Is a Breakout…" — the copy linter's Rule 2 fires on
     // "is a breakout" (the predictive form), and a <title> is exactly the
     // templated slot that rule exists to police.
-    title: "What Does Breakout Mean in Trading? Definition | Tapeline Glossary",
+    title: "What Does Breakout Mean in Trading? Definition | Tapeline",
     description:
       "A breakout describes price moving beyond a level that previously contained it. How the level is defined, and why breakouts are only identifiable after the fact.",
     h1: "Breakout",
@@ -298,7 +298,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Relative strength",
     aliases: ["RS", "relative performance"],
     category: "Relative performance",
-    title: "What Is Relative Strength? Definition for Traders | Tapeline Glossary",
+    title: "What Is Relative Strength? Definition for Traders | Tapeline",
     description:
       "Relative strength is a security's price change minus a benchmark's over the same period. How it is measured, and why it can read high while price falls.",
     h1: "Relative strength",
@@ -318,7 +318,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "alpha",
     term: "Alpha",
     category: "Relative performance",
-    title: "What Is Alpha in Investing? Plain-English Definition | Tapeline Glossary",
+    title: "What Is Alpha in Investing? Plain-English Definition | Tapeline",
     description:
       "Alpha is the part of a return not explained by the benchmark's move over the same period. How it is computed and why the window and benchmark choice decide it.",
     h1: "Alpha",
@@ -337,7 +337,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "beta",
     term: "Beta",
     category: "Relative performance",
-    title: "What Is Beta in Stocks? Plain-English Definition | Tapeline Glossary",
+    title: "What Is Beta in Stocks? Plain-English Definition | Tapeline",
     description:
       "Beta measures how much a security has moved for a given move in its benchmark. How it is estimated, and why it is a historical statistic, not a property.",
     h1: "Beta",
@@ -355,7 +355,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Relative volume",
     aliases: ["RVOL"],
     category: "Relative performance",
-    title: "What Is Relative Volume? RVOL Definition | Tapeline Glossary",
+    title: "What Is Relative Volume? RVOL Definition | Tapeline",
     description:
       "Relative volume compares today's traded volume to a security's own typical volume. How the baseline is built and what an elevated reading does and does not say.",
     h1: "Relative volume",
@@ -372,7 +372,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "sector-rotation",
     term: "Sector rotation",
     category: "Relative performance",
-    title: "What Is Sector Rotation? Definition for Traders | Tapeline Glossary",
+    title: "What Is Sector Rotation? Definition for Traders | Tapeline",
     description:
       "Sector rotation describes leadership shifting between sectors over weeks or months. How rotation is observed, and why it is identified only in hindsight.",
     h1: "Sector rotation",
@@ -394,7 +394,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Piotroski F-Score",
     aliases: ["F-Score"],
     category: "Fundamentals",
-    title: "What Is the Piotroski F-Score? Definition | Tapeline Glossary",
+    title: "What Is the Piotroski F-Score? Definition | Tapeline",
     description:
       "The Piotroski F-Score is a nine-point checklist of accounting tests scored one point each. What the nine tests cover and what the total does and does not mean.",
     h1: "Piotroski F-Score",
@@ -415,7 +415,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Price-to-earnings ratio",
     aliases: ["P/E ratio", "earnings multiple", "PE"],
     category: "Fundamentals",
-    title: "What Is the P/E Ratio? Earnings Multiple Explained | Tapeline Glossary",
+    title: "What Is the P/E Ratio? Earnings Multiple Explained | Tapeline",
     description:
       "The price-to-earnings ratio is share price divided by earnings per share. How trailing and forward versions differ and why the ratio is not comparable across sectors.",
     h1: "Price-to-earnings ratio (P/E)",
@@ -436,7 +436,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Return on equity",
     aliases: ["ROE"],
     category: "Fundamentals",
-    title: "What Is Return on Equity? ROE Definition | Tapeline Glossary",
+    title: "What Is Return on Equity? ROE Definition | Tapeline",
     description:
       "Return on equity is net income divided by shareholders' equity. How it is computed, why leverage inflates it, and what a negative equity base does to it.",
     h1: "Return on equity (ROE)",
@@ -457,7 +457,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Profit margin",
     aliases: ["net margin", "gross margin", "operating margin"],
     category: "Fundamentals",
-    title: "What Is Profit Margin? Gross, Operating and Net | Tapeline Glossary",
+    title: "What Is Profit Margin? Gross, Operating and Net | Tapeline",
     description:
       "Profit margin is profit as a share of revenue. How the gross, operating and net versions differ and why margins are only comparable within an industry.",
     h1: "Profit margin",
@@ -478,7 +478,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "EPS growth",
     aliases: ["earnings per share growth", "earnings growth"],
     category: "Fundamentals",
-    title: "What Is EPS Growth? Earnings Per Share Explained | Tapeline Glossary",
+    title: "What Is EPS Growth? Earnings Per Share Explained | Tapeline",
     description:
       "EPS growth is the change in earnings per share between reported periods. How share count affects it, and why one quarter's figure is a weak measurement.",
     h1: "EPS growth",
@@ -499,7 +499,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Revenue growth",
     aliases: ["sales growth", "top-line growth"],
     category: "Fundamentals",
-    title: "What Is Revenue Growth? Top-Line Definition | Tapeline Glossary",
+    title: "What Is Revenue Growth? Top-Line Definition | Tapeline",
     description:
       "Revenue growth is the change in reported sales between periods. Why it is harder to flatter than profit growth, and where acquisitions distort it.",
     h1: "Revenue growth",
@@ -520,7 +520,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Free cash flow",
     aliases: ["FCF"],
     category: "Fundamentals",
-    title: "What Is Free Cash Flow? FCF Definition | Tapeline Glossary",
+    title: "What Is Free Cash Flow? FCF Definition | Tapeline",
     description:
       "Free cash flow is operating cash flow minus capital expenditure. Why it differs from reported profit and what a persistent gap between the two indicates.",
     h1: "Free cash flow",
@@ -538,7 +538,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Earnings surprise",
     aliases: ["earnings beat", "earnings miss"],
     category: "Fundamentals",
-    title: "What Is an Earnings Surprise? Definition | Tapeline Glossary",
+    title: "What Is an Earnings Surprise? Definition | Tapeline",
     description:
       "An earnings surprise is the gap between reported results and the analyst consensus. How consensus is built and why the reaction often ignores the headline number.",
     h1: "Earnings surprise",
@@ -558,7 +558,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Float",
     aliases: ["free float", "public float", "shares outstanding"],
     category: "Market structure",
-    title: "What Is Float in Stocks? Free Float Explained | Tapeline Glossary",
+    title: "What Is Float in Stocks? Free Float Explained | Tapeline",
     description:
       "Float is the count of shares actually available to trade, excluding closely held blocks. How it differs from shares outstanding and why a small float moves prices.",
     h1: "Float",
@@ -577,7 +577,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "short-interest",
     term: "Short interest",
     category: "Market structure",
-    title: "What Is Short Interest? Definition and Reporting Lag | Tapeline Glossary",
+    title: "What Is Short Interest? Definition and Reporting Lag | Tapeline",
     description:
       "Short interest is the count of shares sold short and not yet closed. How it is reported, how often, and why the figure is always several days old.",
     h1: "Short interest",
@@ -597,7 +597,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Days to cover",
     aliases: ["short ratio", "short interest ratio"],
     category: "Market structure",
-    title: "What Is Days to Cover? Short Interest Ratio | Tapeline Glossary",
+    title: "What Is Days to Cover? Short Interest Ratio | Tapeline",
     description:
       "Days to cover is short interest divided by average daily volume. What the ratio estimates, and the assumption that makes it only an approximation.",
     h1: "Days to cover",
@@ -617,7 +617,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Short squeeze",
     aliases: ["squeeze"],
     category: "Market structure",
-    title: "What Is a Short Squeeze? Definition and Mechanics | Tapeline Glossary",
+    title: "What Is a Short Squeeze? Definition and Mechanics | Tapeline",
     description:
       "A short squeeze describes rising prices forcing short positions to be closed by buying, which adds further buying. The mechanics, conditions and limits.",
     h1: "Short squeeze",
@@ -636,7 +636,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "volume",
     term: "Volume",
     category: "Market structure",
-    title: "What Is Trading Volume? Definition for Traders | Tapeline Glossary",
+    title: "What Is Trading Volume? Definition for Traders | Tapeline",
     description:
       "Volume is the number of shares traded in a period. How it is counted, when it clusters, and why it measures participation rather than direction.",
     h1: "Volume",
@@ -654,7 +654,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Average dollar volume",
     aliases: ["ADV", "dollar volume", "liquidity"],
     category: "Market structure",
-    title: "What Is Average Dollar Volume? Liquidity Measure | Tapeline Glossary",
+    title: "What Is Average Dollar Volume? Liquidity Measure | Tapeline",
     description:
       "Average dollar volume is shares traded multiplied by price, averaged over recent sessions. Why it is the better liquidity screen than share volume alone.",
     h1: "Average dollar volume",
@@ -674,7 +674,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Bid-ask spread",
     aliases: ["spread"],
     category: "Market structure",
-    title: "What Is the Bid-Ask Spread? Definition | Tapeline Glossary",
+    title: "What Is the Bid-Ask Spread? Definition | Tapeline",
     description:
       "The bid-ask spread is the gap between the highest bid and the lowest offer. How it is quoted, what widens it, and why it is a real transaction cost.",
     h1: "Bid-ask spread",
@@ -692,7 +692,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Market capitalisation",
     aliases: ["market cap", "market capitalization"],
     category: "Market structure",
-    title: "What Is Market Capitalisation? Market Cap Explained | Tapeline Glossary",
+    title: "What Is Market Capitalisation? Market Cap Explained | Tapeline",
     description:
       "Market capitalisation is share price multiplied by shares outstanding. What it measures, why it is not the price of the company, and how the size bands work.",
     h1: "Market capitalisation",
@@ -710,7 +710,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Gap",
     aliases: ["gap up", "gap down", "overnight gap"],
     category: "Market structure",
-    title: "What Is a Gap in Stock Prices? Definition | Tapeline Glossary",
+    title: "What Is a Gap in Stock Prices? Definition | Tapeline",
     description:
       "A gap is a jump between one session's close and the next session's open with no trading in between. Why gaps form and what they mean for stop orders.",
     h1: "Gap",
@@ -730,7 +730,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "SEC Form 4",
     aliases: ["Form 4", "insider transaction", "insider buying"],
     category: "Disclosure & flow",
-    title: "What Is SEC Form 4? Insider Transaction Filing | Tapeline Glossary",
+    title: "What Is SEC Form 4? Insider Transaction Filing | Tapeline",
     description:
       "SEC Form 4 is the filing that reports a corporate insider's transaction in their own company's shares. Who files, the deadline, and what the filing omits.",
     h1: "SEC Form 4",
@@ -751,7 +751,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "13F filing",
     aliases: ["Form 13F", "institutional holdings"],
     category: "Disclosure & flow",
-    title: "What Is a 13F Filing? Institutional Holdings Report | Tapeline Glossary",
+    title: "What Is a 13F Filing? Institutional Holdings Report | Tapeline",
     description:
       "A 13F is the quarterly report large institutional managers file listing US equity holdings. What it covers, the 45-day lag, and what it leaves out entirely.",
     h1: "13F filing",
@@ -771,7 +771,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Congressional trade disclosure",
     aliases: ["STOCK Act", "congress trading", "congressional trades"],
     category: "Disclosure & flow",
-    title: "What Are Congressional Trade Disclosures? STOCK Act | Tapeline Glossary",
+    title: "What Are Congressional Trade Disclosures? STOCK Act | Tapeline",
     description:
       "US legislators must disclose securities transactions under the STOCK Act. The reporting deadline, what the filings contain, and their known limitations.",
     h1: "Congressional trade disclosure",
@@ -791,7 +791,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Accumulation / distribution",
     aliases: ["accumulation", "distribution", "A/D line"],
     category: "Disclosure & flow",
-    title: "What Is Accumulation / Distribution? Definition | Tapeline Glossary",
+    title: "What Is Accumulation / Distribution? Definition | Tapeline",
     description:
       "Accumulation and distribution describe buying or selling spread over time to limit price impact, and the volume studies built to infer it.",
     h1: "Accumulation / distribution",
@@ -811,7 +811,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Drawdown",
     aliases: ["maximum drawdown", "max DD"],
     category: "Risk",
-    title: "What Is Drawdown? Peak-to-Trough Definition | Tapeline Glossary",
+    title: "What Is Drawdown? Peak-to-Trough Definition | Tapeline",
     description:
       "Drawdown is the decline from a peak to the following trough, as a share of the peak. How maximum drawdown is measured and why recovery is asymmetric.",
     h1: "Drawdown",
@@ -829,7 +829,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Volatility",
     aliases: ["realised volatility", "implied volatility"],
     category: "Risk",
-    title: "What Is Volatility? Realised vs Implied | Tapeline Glossary",
+    title: "What Is Volatility? Realised vs Implied | Tapeline",
     description:
       "Volatility measures how much price varies around its own average. How realised and implied volatility are derived and why they answer different questions.",
     h1: "Volatility",
@@ -847,7 +847,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Average true range",
     aliases: ["ATR"],
     category: "Risk",
-    title: "What Is Average True Range? ATR Definition | Tapeline Glossary",
+    title: "What Is Average True Range? ATR Definition | Tapeline",
     description:
       "ATR is the average size of a security's daily range, including overnight gaps. How true range is defined and why ATR is quoted in dollars, not percent.",
     h1: "Average true range (ATR)",
@@ -864,7 +864,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "position-sizing",
     term: "Position sizing",
     category: "Risk",
-    title: "What Is Position Sizing? Definition | Tapeline Glossary",
+    title: "What Is Position Sizing? Definition | Tapeline",
     description:
       "Position sizing is the decision of how much to commit to a single holding. The common frameworks, and why Tapeline does not and cannot set sizes.",
     h1: "Position sizing",
@@ -882,7 +882,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Stop-loss order",
     aliases: ["stop order", "stop"],
     category: "Risk",
-    title: "What Is a Stop-Loss Order? Definition and Limits | Tapeline Glossary",
+    title: "What Is a Stop-Loss Order? Definition and Limits | Tapeline",
     description:
       "A stop-loss is a resting order that activates when price reaches a trigger. How stop-market and stop-limit differ, and why neither fixes an exit price.",
     h1: "Stop-loss order",
@@ -902,7 +902,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "VIX",
     aliases: ["volatility index", "fear index"],
     category: "Macro & regime",
-    title: "What Is the VIX? Volatility Index Explained | Tapeline Glossary",
+    title: "What Is the VIX? Volatility Index Explained | Tapeline",
     description:
       "The VIX is an index of expected 30-day volatility derived from S&P 500 options prices. What it measures, and the two things it is routinely misread as.",
     h1: "VIX",
@@ -920,7 +920,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Market breadth",
     aliases: ["breadth", "advance-decline"],
     category: "Macro & regime",
-    title: "What Is Market Breadth? Advance-Decline Explained | Tapeline Glossary",
+    title: "What Is Market Breadth? Advance-Decline Explained | Tapeline",
     description:
       "Market breadth measures how many securities are participating in a market move rather than how far an index has travelled. The common measures and their limits.",
     h1: "Market breadth",
@@ -937,7 +937,7 @@ export const TERMS: GlossaryTerm[] = [
     slug: "market-regime",
     term: "Market regime",
     category: "Macro & regime",
-    title: "What Is a Market Regime? Definition for Traders | Tapeline Glossary",
+    title: "What Is a Market Regime? Definition for Traders | Tapeline",
     description:
       "A market regime is a broad classification of prevailing conditions into named states. How regimes are identified and why they are always recognised in arrears.",
     h1: "Market regime",
@@ -958,7 +958,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Yield curve",
     aliases: ["inverted yield curve", "term structure"],
     category: "Macro & regime",
-    title: "What Is the Yield Curve? Inversion Explained | Tapeline Glossary",
+    title: "What Is the Yield Curve? Inversion Explained | Tapeline",
     description:
       "The yield curve plots government bond yields against maturity. What its shape describes, what inversion means, and the lag that makes it hard to trade.",
     h1: "Yield curve",
@@ -981,7 +981,7 @@ export const TERMS: GlossaryTerm[] = [
     term: "Composite score",
     aliases: ["Tapeline Score", "multi-factor score"],
     category: "Scoring & signals",
-    title: "What Is a Composite Score? Multi-Factor Scoring | Tapeline Glossary",
+    title: "What Is a Composite Score? Multi-Factor Scoring | Tapeline",
     description:
       "A composite score blends several separate measurements into one number on a common scale. How blending works, what it hides, and how Tapeline's is built.",
     h1: "Composite score",

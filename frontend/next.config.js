@@ -113,6 +113,24 @@ const nextConfig = {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.googletagmanager.com https://us-assets.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
       "connect-src 'self' https://www.facebook.com https://api.tapeline.io https://www.google-analytics.com https://*.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://us.i.posthog.com https://*.posthog.com https://challenges.cloudflare.com https://plausible.io",
       "frame-src https://challenges.cloudflare.com https://s.tradingview.com",
+      // Where violations actually go.
+      //
+      // Without this the phase-1 plan above could never complete: a
+      // report-only policy with no reporting destination logs to the console
+      // of whoever happens to have devtools open and nowhere else, so "after
+      // ~1 week of clean reports" was unobservable and the CSP stayed
+      // non-enforcing indefinitely (audited 2026-08-29 — it had been
+      // report-only with no collector the whole time).
+      //
+      // `report-uri` is deprecated in favour of `report-to`, but it is still
+      // what Chrome/Safari honour for CSP today and Firefox supports only it.
+      // Both are cheap; keep report-uri until report-to is universal.
+      //
+      // Collector: backend `POST /api/csp-report` — public by necessity (the
+      // browser sends these without credentials), size-capped, and it logs a
+      // fixed set of fields. It deliberately never logs `script-sample`,
+      // which can contain page content.
+      "report-uri https://api.tapeline.io/api/csp-report",
     ].join("; ");
     const securityHeaders = [
       // Phase-1 CSP: report-only, so it can only log — never block. See the

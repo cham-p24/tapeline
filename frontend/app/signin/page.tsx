@@ -18,11 +18,36 @@ import {
 } from "@/components/FormField";
 
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
+//
+// The fallback is NOT null. `useSearchParams()` makes Next bail out of
+// prerendering this whole subtree, so a null fallback meant the server sent an
+// empty shell: audited 2026-08-29, /signin and /signup both returned 570 bytes
+// of visible text and ZERO heading elements. Two consequences, one of them
+// affecting real users rather than crawlers:
+//
+//   * a visitor on a slow connection saw a blank page until the JS bundle
+//     landed, on the two pages where bouncing costs the most;
+//   * a screen reader got a document with no heading at all, so there was
+//     nothing to announce or navigate by.
+//
+// Rendering the static heading server-side costs nothing (it needs no search
+// params) and React swaps it for the real form on hydration.
 export default function SignInPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SignInSkeleton />}>
       <SignInForm />
     </Suspense>
+  );
+}
+
+/** Server-rendered shell: the parts of the page that don't depend on
+ *  `useSearchParams()`. Mirrors SignInForm's default (non-MFA) heading. */
+function SignInSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-md px-4">
+      <h1 className="mt-10 text-3xl font-bold tracking-tight">Welcome back</h1>
+      <p className="mt-2 text-sm text-muted">Sign in to your Tapeline account.</p>
+    </div>
   );
 }
 

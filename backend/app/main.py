@@ -1,6 +1,7 @@
 """FastAPI entry point."""
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from collections.abc import AsyncIterator
@@ -8,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.config import get_settings
 from app.routers import (
@@ -216,11 +217,57 @@ async def log_and_rate_limit(request: Request, call_next):
         except Exception as exc:
             status = getattr(exc, "status_code", 429)
             from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=status, content={"detail": str(exc)})
+            # This path returns BEFORE call_next, so it has to set the security
+            # headers itself — a rate-limited response is still a response, and
+            # a 429 with no HSTS is exactly as downgradeable as a 200 with none.
+            rejected = JSONResponse(status_code=status, content={"detail": str(exc)})
+            _apply_security_headers(rejected)
+            return rejected
 
     response = await call_next(request)
+    _apply_security_headers(response)
     logger.info("%s %s -> %s", request.method, path, response.status_code)
     return response
+
+
+#: Security headers for EVERY api.tapeline.io response.
+#:
+#: The frontend origin has had these for a long time (HSTS with preload,
+#: X-Frame-Options, nosniff, a CSP). The API origin had NONE of them — audited
+#: 2026-08-29, `curl -D- https://api.tapeline.io/api/health` returned no
+#: security headers at all. That is the origin the session cookie is scoped to
+#: and the one Stripe/billing calls traverse, so it is the wrong half to leave
+#: bare:
+#:
+#:   * Strict-Transport-Security — without it a first request to
+#:     `http://api.tapeline.io` can be intercepted and downgraded before any
+#:     redirect happens. `includeSubDomains; preload` matches what the
+#:     frontend already sends, so the whole apex is covered consistently.
+#:   * X-Content-Type-Options — the API serves JSON and CSV; nosniff stops a
+#:     browser deciding a CSV export is HTML and running it.
+#:   * X-Frame-Options — nothing here is meant to be framed. The embed/badge
+#:     feature is served by the FRONTEND (/api/embed only counts impressions),
+#:     so DENY costs nothing.
+#:
+#: Deliberately NOT a Content-Security-Policy: a CSP governs how a *document*
+#: loads subresources, and these responses are JSON, not documents. Adding one
+#: would be cargo cult.
+_SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+
+def _apply_security_headers(response) -> None:
+    """Set the headers above without clobbering anything already set.
+
+    `setdefault` rather than assignment so a route that deliberately chose a
+    different value for itself keeps it.
+    """
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
 
 
 @app.exception_handler(Exception)
@@ -264,6 +311,78 @@ async def log_client_error(request: Request) -> dict[str, bool]:
         except Exception:
             logger.exception("client_error.sentry_capture_failed")
     return {"ok": True}
+
+
+#: Directives whose violations are almost always third-party noise rather than
+#: a missing allow-list entry: browser extensions inject inline script and
+#: style into every page, and there is nothing to fix on our side.
+_CSP_NOISY_DIRECTIVES = {"style-src-attr", "style-src-elem"}
+
+
+@app.post("/api/csp-report", status_code=204)
+async def csp_report(request: Request) -> Response:
+    """Collector for Content-Security-Policy violation reports.
+
+    WHY THIS EXISTS
+    ---------------
+    `frontend/next.config.js` ships the CSP as **Report-Only** and documents a
+    "PHASE 1 → flip to enforce after ~1 week of clean reports" plan. That gate
+    could never be met: the policy declared no `report-uri` and no `report-to`,
+    so violations only ever reached the console of whoever happened to have
+    devtools open. Nothing aggregated them, so "a clean week" was unobservable
+    and the CSP stayed non-enforcing indefinitely — audited 2026-08-29.
+
+    This endpoint makes the documented plan completable. It does NOT enforce
+    anything by itself.
+
+    Accepts both report formats, because browsers disagree:
+      * legacy  `application/csp-report`   → {"csp-report": {...}}
+      * Reporting API `application/reports+json` → [{"type": "csp-violation",
+        "body": {...}}, ...]
+
+    Unauthenticated and public by necessity — the browser sends these, not the
+    app, and it will not attach credentials. That means anyone can POST here,
+    so every field is truncated and only a fixed set is logged. Never widen
+    this to log the raw body: `script-sample` can contain page content.
+    """
+    raw = await request.body()
+    # Reports are small; anything large is not a real report.
+    if len(raw) > 16_384:
+        logger.warning("csp_report.oversized bytes=%d", len(raw))
+        return Response(status_code=204)
+
+    try:
+        payload = json.loads(raw or b"{}")
+    except Exception:
+        return Response(status_code=204)
+
+    reports: list[dict] = []
+    if isinstance(payload, dict) and "csp-report" in payload:
+        body = payload.get("csp-report")
+        if isinstance(body, dict):
+            reports.append(body)
+    elif isinstance(payload, list):
+        for item in payload[:20]:
+            if isinstance(item, dict) and isinstance(item.get("body"), dict):
+                reports.append(item["body"])
+
+    for r in reports:
+        # Key names differ between the two formats; accept either spelling.
+        directive = str(
+            r.get("effective-directive") or r.get("effectiveDirective")
+            or r.get("violated-directive") or r.get("violatedDirective") or ""
+        )[:64]
+        if directive in _CSP_NOISY_DIRECTIVES:
+            continue
+        blocked = str(r.get("blocked-uri") or r.get("blockedURL") or "")[:300]
+        document = str(r.get("document-uri") or r.get("documentURL") or "")[:300]
+        # `script-sample` deliberately NOT logged — it can carry page content.
+        logger.warning(
+            "csp_violation directive=%s blocked=%s document=%s",
+            directive or "(unknown)", blocked or "(none)", document or "(none)",
+        )
+
+    return Response(status_code=204)
 
 
 @app.get("/api/public/top-tickers")

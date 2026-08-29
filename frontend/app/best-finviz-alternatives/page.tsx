@@ -34,7 +34,7 @@ export const metadata = pageMeta({
   // query showing 22 imp / 0 clicks in GSC. 2026 calendar modifier + the
   // "Free + Paid" qualifier give the snippet density. Brand suffix | Tapeline
   // at the end so the brand also shows in the result.
-  title: "Best Finviz Alternatives 2026 — 8 Stock Scanners Compared (Free + Paid) | Tapeline",
+  title: "Best Finviz Alternatives 2026 — 8 Scanners Compared | Tapeline",
   description:
     "Looking for a Finviz alternative? Hand-tested comparison of 8 stock scanners ranked by composite scoring, intraday speed, charting depth, fundamentals, AI signals, and price. Updated May 2026. Includes a migration checklist from Finviz Elite.",
   path: "/best-finviz-alternatives",

@@ -22,7 +22,7 @@ import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript, breadcrumbJsonLd } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "Tapeline Score Badge — Free Embeddable Stock-Score Widget for Blogs + READMEs",
+  title: "Tapeline Score Badge — Free Embeddable Stock Widget",
   description:
     "Embed a live Tapeline Score for any US ticker in your blog, Substack, or GitHub README. Free, no auth, iframe-able, updates live. Two-line iframe snippet. MIT-permissive — link back and you're good.",
   path: "/embed",

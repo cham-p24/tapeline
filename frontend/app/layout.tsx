@@ -128,6 +128,29 @@ export const metadata: Metadata = {
     siteName: "Tapeline",
     type: "website",
     locale: "en_US",
+    // Default social card for EVERY route that doesn't ship its own
+    // opengraph-image.tsx.
+    //
+    // Declaring `openGraph` here without `images` suppressed the file-based
+    // convention for descendant routes, so only the handful of pages with
+    // their own opengraph-image.tsx emitted an og:image at all. Audited
+    // 2026-08-29: 236 of 313 pages had none — /pricing, /how-it-works,
+    // /glossary/*, /limitations, /why, every blog post — while `twitter.card`
+    // below still claimed "summary_large_image". A large-image card with no
+    // image renders as a bare grey box on X, LinkedIn, Slack and iMessage,
+    // which is most of where this product gets shared.
+    //
+    // Routes with their own opengraph-image.tsx (/, /scorecard, /compare/*,
+    // /developers, …) still override this, because a more specific segment
+    // wins.
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Tapeline — Read the tape. Live.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
@@ -135,6 +158,10 @@ export const metadata: Metadata = {
     title: "Tapeline — Read the tape",
     description:
       "Read the tape. Public methodology, public scorecard. → tapeline.io/scorecard",
+    // `summary_large_image` is a promise that an image exists. Without this
+    // the card degraded to a bare grey box on every route that had no
+    // opengraph-image.tsx of its own — see the openGraph note above.
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,

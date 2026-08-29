@@ -5,7 +5,7 @@ import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline Security: Encryption, Password Storage, Payments, Disclosure",
+  title: "Tapeline Security: Encryption, Payments, Disclosure",
   description:
     "How Tapeline handles your data: TLS in transit, encryption at rest, Argon2 password hashing, Stripe-vaulted payment data, and our public vulnerability disclosure process. We'd rather over-explain than make you guess.",
   path: "/security",

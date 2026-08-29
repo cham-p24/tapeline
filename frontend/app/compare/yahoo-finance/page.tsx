@@ -2,7 +2,7 @@ import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Yahoo Finance (2026): Curated Score vs Free DIY Browsing",
+  title: "Tapeline vs Yahoo Finance (2026): Curated Score vs Free DIY",
   description:
     "Tapeline vs Yahoo Finance — synthesised 6-factor score per ticker, plain-English Why, and a public daily scorecard, vs Yahoo's free-tier DIY browsing + Premium screener. Honest tradeoffs.",
   path: "/compare/yahoo-finance",

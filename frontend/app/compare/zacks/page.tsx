@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Zacks (2026): Live Scoring vs Daily-Updated Proprietary Ranks",
+  title: "Tapeline vs Zacks (2026): Live Scoring vs Daily Ranks",
   description:
     "Tapeline vs Zacks Premium — sub-60s live scoring, public 6-factor formula, plain-English Why, and per-pick public scorecard, vs Zacks' once-daily proprietary ranks. Honest comparison.",
   path: "/compare/zacks",

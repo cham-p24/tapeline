@@ -22,7 +22,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     });
   }
   return pageMeta({
-    title: post.title,
+    // `metaTitle` when the headline is too long for a search result; the
+    // on-page <h1> keeps `title` either way. See the BlogPost type.
+    title: post.metaTitle ?? post.title,
     description: post.excerpt,
     path: `/blog/${post.slug}`,
     ogType: "article",

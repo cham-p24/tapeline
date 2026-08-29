@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Trade Ideas (2026): Public Formula at $25/mo vs Holly AI at $120+/mo",
+  title: "Tapeline vs Trade Ideas (2026): Public Formula vs Black-Box AI",
   description:
     "Tapeline vs Trade Ideas — transparent 6-factor scoring at $8.25/mo annual vs Trade Ideas' Holly AI scanner at $120+/mo. Public scorecard, plain-English Why, no proprietary AI black box.",
   path: "/compare/trade-ideas",

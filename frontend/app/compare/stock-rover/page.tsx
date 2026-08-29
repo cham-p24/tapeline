@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Stock Rover (2026): Composite Score vs 650-Metric Fundamental Screener",
+  title: "Tapeline vs Stock Rover (2026): Score vs 650 Metrics",
   description:
     "Tapeline vs Stock Rover — one published 6-factor composite score per ticker with sub-60s refresh, vs Stock Rover's 650+ raw fundamental metrics across 8,500 stocks. Honest comparison at $8.25/mo Pro annual vs $7.99-$27.99/mo annual.",
   path: "/compare/stock-rover",

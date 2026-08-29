@@ -2,7 +2,7 @@ import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Robinhood (2026): Research Workflow vs Gamified Discovery",
+  title: "Tapeline vs Robinhood (2026): Research vs Gamified Discovery",
   description:
     "Tapeline vs Robinhood — published 6-factor composite score, plain-English Why, and a public scorecard, vs Robinhood's minimal in-app discovery designed for the trade-now retail flow.",
   path: "/compare/robinhood",

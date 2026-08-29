@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs TradingView (2026): Score-First Scanning vs Chart-First Platform",
+  title: "Tapeline vs TradingView (2026): Score-First vs Chart-First",
   description:
     "Tapeline vs TradingView — composite stock score and plain-English Why per ticker, plus a public scorecard, vs TradingView's chart-first platform with manual screener. Honest comparison.",
   path: "/compare/tradingview",

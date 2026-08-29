@@ -11,7 +11,7 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Insider Buying Stocks — Live SEC Form 4 Tracker Across ~2,500 US Tickers | Tapeline",
+  title: "Insider Buying — Live SEC Form 4 Tracker | Tapeline",
   description:
     "Stocks insiders are buying right now — live SEC Form 4 filings across the US universe, ranked by transaction value, with each ticker linked to its full Tapeline score. Public data, public scorecard.",
   path: "/insider-buying",

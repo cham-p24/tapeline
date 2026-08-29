@@ -152,11 +152,36 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
 };
 
 // Outer page wraps the form in Suspense so useSearchParams() doesn't break prerender.
+//
+// The fallback is NOT null — see the matching note in app/signin/page.tsx.
+// `useSearchParams()` makes Next bail out of prerendering this subtree, so a
+// null fallback shipped an empty shell: audited 2026-08-29, this page returned
+// 570 bytes of visible text and ZERO headings. A visitor on a slow connection
+// saw a blank page on the primary conversion route, and a screen reader had no
+// heading to announce.
+//
+// The fallback uses the `_default` FROM_COPY entry deliberately. The variant
+// headlines are selected from `?from=`, which is exactly the search param this
+// boundary is waiting on — so the default is the only honest thing to render
+// before it resolves, and it is also what a crawler hitting the bare URL
+// should see. Hydration swaps in the variant when there is one.
 export default function SignUpPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SignUpSkeleton />}>
       <SignUpForm />
     </Suspense>
+  );
+}
+
+/** Server-rendered shell: heading + sub-copy that need no search params.
+ *  Kept in sync with FROM_COPY._default by construction — it reads it. */
+function SignUpSkeleton() {
+  const copy = FROM_COPY._default;
+  return (
+    <div className="mx-auto w-full max-w-md px-4">
+      <h1 className="mt-3 text-3xl font-bold tracking-tight">{copy.h1}</h1>
+      <p className="mt-2 text-sm text-muted">{copy.sub}</p>
+    </div>
   );
 }
 

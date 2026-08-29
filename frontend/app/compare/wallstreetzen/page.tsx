@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs WallStreetZen (2026): Public Weights, Live Data, Per-Pick Scorecard",
+  title: "Tapeline vs WallStreetZen (2026): Public Weights, Live Data",
   description:
     "Tapeline vs WallStreetZen Premium — 6-factor model with named factors + published methodology, sub-60s live data, per-pick public scorecard, vs WallStreetZen's 115-factor proprietary Zen Ratings. Honest comparison.",
   path: "/compare/wallstreetzen",

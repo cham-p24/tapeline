@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs StockCharts (2026): Composite Score vs Pure Technical Charting",
+  title: "Tapeline vs StockCharts (2026): Score vs Pure Charting",
   description:
     "Tapeline vs StockCharts — one published 6-factor composite score per ticker with a per-pick public scorecard, vs StockCharts' SharpCharts + ChartLists technical-analysis platform. Honest comparison at $8.25/mo Pro annual vs $14.95-$39.95/mo.",
   path: "/compare/stockcharts",
