@@ -174,14 +174,24 @@ export const metadata: Metadata = {
     // alone is supported in every modern browser + Googlebot.
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
-    // `apple` is deliberately NOT set here.
+    // iOS needs a RASTER home-screen icon — it cannot use favicon.svg, and
+    // without one the Home Screen tile falls back to a screenshot, which
+    // defeats the PWA install the billing page tells customers to do.
     //
-    // It used to be "/favicon.svg", which iOS cannot use: Safari requires a
-    // raster apple-touch-icon, so the Home Screen tile fell back to a
-    // screenshot. Worse, setting it here overrode the app/apple-icon.tsx file
-    // convention, so the PNG added for the PWA was never referenced — caught
-    // live after the first attempt shipped. Leaving it unset lets Next emit
-    // the generated 180x180 PNG.
+    // Points at /icon (app/icon.tsx) rather than an apple-icon.tsx file
+    // convention, for two measured reasons:
+    //   * defining `metadata.icons` at all suppresses the icon FILE
+    //     conventions, so a convention file would never be linked from here
+    //     anyway — verified live: with `apple` merely removed, no
+    //     apple-touch-icon tag was emitted at all;
+    //   * an app/apple-icon.tsx did not produce a route (GET /apple-icon
+    //     returned text/html) while the structurally identical app/icon.tsx
+    //     did (image/png). One working generated PNG, referenced explicitly,
+    //     is more predictable than two conventions interacting.
+    //
+    // 512x512 is larger than the 180 iOS asks for; iOS downscales, and one
+    // source image keeps this and the manifest icon identical.
+    apple: [{ url: "/icon", sizes: "512x512", type: "image/png" }],
   },
 };
 
