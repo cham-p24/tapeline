@@ -388,6 +388,10 @@ describe("signup funnel reaches GA4", () => {
     expect(email).toBeTruthy();
     fireEvent.change(email, { target: { value: "funnel@example.com" } });
     fireEvent.change(password, { target: { value: "correct-horse-battery-9" } });
+    // Required subscription acknowledgement (Meta Subscription Services
+    // standard) — submit is gated on it, so the funnel event cannot fire
+    // without it. See SignupForm.test.tsx for the gate's own coverage.
+    fireEvent.click(document.getElementById("signup-subscription-terms")!);
     fireEvent.submit(email.closest("form")!);
 
     await waitFor(() =>

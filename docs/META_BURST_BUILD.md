@@ -836,3 +836,32 @@ A$25/day anyway (§16), so that objection does not apply here.
 
 None of this collides with the AFSL constraints. Stating a price and an interval is factual: no
 performance claim, no buy/sell language, no weights, and it moves *further* from "no credit card".
+
+---
+
+## 18. The required subscription checkbox — 2026-08-30
+
+Founder decision made: **add it.** §17 left this as the one open item, because it adds required
+friction to the weakest step of a funnel with 25 users and 0 payers, and that trade-off was not
+mine to make.
+
+`/signup` now carries a **required, unticked** acknowledgement above the submit button, styled as a
+bordered panel so it reads as a gate rather than as a third optional email box. Submit is blocked
+until it is ticked, with a specific error and focus moved to the control.
+
+**The terms are in the label, not behind the Terms link**, because Meta's standard rejects
+price/interval that sit "behind a separate link" — and an acknowledgement has to be of the thing
+being acknowledged. The label states $0 today, `$19.99/month or $199/year`, the real first-charge
+date, that it recurs until cancelled, and the one-click exit. All from `PRICING.premium`.
+
+**Do not default it to true, and do not fold it into the Terms + Privacy line below it** — that is
+a different acknowledgement and its label names no price, interval or cancellation.
+
+**Every submit path in the test suite had to learn about the gate**, which is itself the evidence
+it works: 14 tests in `SignupForm.test.tsx`, one in `FunnelInstrumentation.test.tsx`, and the
+Playwright `funnel-events.spec.ts` all failed until they ticked it. Two new tests pin the gate —
+that the box renders unticked with `aria-required`, with price/interval/recurrence in its own
+label, and that an unticked submit produces the error and never calls `authApi.signup`.
+
+Verified by positive control rather than assumed: defaulting the box to `true` — the pre-ticked
+state the policy names as a violation — fails the suite.
