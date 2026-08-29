@@ -119,3 +119,45 @@ describe("auth pages server-render their heading", () => {
     expect(skeleton).toMatch(/FROM_COPY\._default/);
   });
 });
+
+describe("pageMeta carries the default card (the fix the layout alone did not make)", () => {
+  // Adding `images` to the root layout was NOT enough. pageMeta builds a
+  // COMPLETE openGraph object, and a page-level openGraph REPLACES the
+  // layout's rather than merging — which is the reason the helper exists at
+  // all. Every route calling pageMeta() therefore overwrote the layout's
+  // default and still emitted no og:image. Verified live: /limitations, /why
+  // and /glossary had og:title and og:description but no og:image.
+  it("emits an og:image for a page with no image of its own", async () => {
+    const { pageMeta } = await import("../lib/seo");
+    const m = pageMeta({ title: "T", description: "D", path: "/limitations" });
+    const images = m.openGraph?.images as Array<{ url: string }> | undefined;
+    expect(images?.[0]?.url).toBeTruthy();
+  });
+
+  it("emits a twitter image to back summary_large_image", async () => {
+    const { pageMeta } = await import("../lib/seo");
+    const m = pageMeta({ title: "T", description: "D", path: "/why" });
+    expect((m.twitter as { images?: unknown[] })?.images?.length).toBeGreaterThan(0);
+  });
+
+  it("still lets a route override with its own image", async () => {
+    const { pageMeta } = await import("../lib/seo");
+    const m = pageMeta({
+      title: "T", description: "D", path: "/x", ogImage: "/custom-image",
+    });
+    const images = m.openGraph?.images as Array<{ url: string }>;
+    expect(images[0].url).toBe("/custom-image");
+  });
+});
+
+describe("apple-touch-icon", () => {
+  it("the layout does not override the apple-icon.tsx convention", () => {
+    // Setting `apple` in layout metadata suppresses app/apple-icon.tsx, so
+    // the generated PNG was never referenced and iOS fell back to a
+    // screenshot for the Home Screen tile. iOS cannot use an SVG here.
+    const layout = readFileSync(join(APP, "layout.tsx"), "utf8");
+    const icons = layout.slice(layout.indexOf("icons:"), layout.indexOf("};", layout.indexOf("icons:")));
+    expect(icons).not.toMatch(/^\s*apple:/m);
+  });
+});
+
