@@ -2,7 +2,7 @@ import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs MarketSmith (2026): Six Named Factors vs Proprietary CAN SLIM Ranks",
+  title: "Tapeline vs MarketSmith (2026): Named Factors vs CAN SLIM",
   description:
     "Tapeline vs MarketSmith — published 6-factor composite score at $8.25/mo annual, vs IBD's proprietary CAN SLIM-based ranks at $74.95/mo. Honest comparison of methodology, price, and scorecard.",
   path: "/compare/marketsmith",

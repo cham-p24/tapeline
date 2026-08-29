@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Seeking Alpha (2026): Deterministic Score vs 31K-Contributor Editorial",
+  title: "Tapeline vs Seeking Alpha (2026): Score vs Editorial",
   description:
     "Tapeline vs Seeking Alpha — one published 6-factor score per ticker with a per-pick public scorecard, vs Seeking Alpha's 31,000-contributor editorial library with Quant Ratings. Honest comparison at $8.25/mo Pro annual vs ~$239/yr Premium.",
   path: "/compare/seeking-alpha",

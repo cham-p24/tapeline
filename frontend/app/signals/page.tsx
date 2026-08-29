@@ -32,7 +32,7 @@ import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 const PREVIEW_ROWS = 10;
 
 export const metadata = pageMeta({
-  title: "All Tapeline-Scored Tickers — Live Universe with Public 6-Factor Score",
+  title: "All Tapeline-Scored Tickers — Live 6-Factor Universe",
   description:
     "Every US stock Tapeline scores, ranked by the live 0-100 composite. " +
     "Same published methodology as our public scorecard. Sign up to see the full universe.",

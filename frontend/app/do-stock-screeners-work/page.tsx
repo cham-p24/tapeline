@@ -23,7 +23,7 @@ import {
  * descriptive, not-a-forecast framing as the live /scorecard, for compliance.
  */
 export const metadata = pageMeta({
-  title: "Do stock screeners actually work? What the evidence shows | Tapeline",
+  title: "Do stock screeners actually work? The evidence | Tapeline",
   description:
     "A stock screener reliably filters stocks to a rules-based shortlist — but whether its picks beat SPY is rarely proven, because almost none publish a dated, unedited, benchmarked record. Here's how to tell, and what one public record actually shows.",
   path: "/do-stock-screeners-work",

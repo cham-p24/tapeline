@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, compareJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Finviz Elite (2026): Synthesis, Published Methodology, Daily Scorecard",
+  title: "Tapeline vs Finviz Elite (2026): Score vs Raw Screener",
   description:
     "Tapeline vs Finviz Elite — one composite score per ticker, plain-English Why on every row, and a public next-day scorecard, none of which Finviz publishes. 9 categories Tapeline wins, 3 honest tradeoffs.",
   path: "/compare/finviz",

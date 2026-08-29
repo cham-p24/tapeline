@@ -18,7 +18,7 @@ import { pageMeta } from "@/lib/seo";
  * calls the server must come away with the same caveat attached.
  */
 export const metadata = pageMeta({
-  title: "Tapeline MCP server — connect the public record to Claude or ChatGPT",
+  title: "Tapeline MCP server — the public record in Claude",
   description:
     "Connect Tapeline to any MCP-compatible AI assistant. Ask for a stock's six-factor score, today's published picks, or the full never-edited track record — losing picks included. Free, no account, no API key.",
   path: "/mcp",

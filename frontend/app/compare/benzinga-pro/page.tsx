@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Benzinga Pro (2026): Composite Score vs Real-Time News Squawk",
+  title: "Tapeline vs Benzinga Pro (2026): Score vs News Squawk",
   description:
     "Tapeline vs Benzinga Pro — one published 6-factor score per ticker with a per-pick public scorecard, vs Benzinga's audio squawk + real-time news terminal for intraday traders. Honest comparison at $8.25/mo Pro annual vs ~$37-$99/mo.",
   path: "/compare/benzinga-pro",

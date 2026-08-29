@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Simply Wall St (2026): Live Six-Factor Score vs Snowflake Visual",
+  title: "Tapeline vs Simply Wall St (2026): Live Score vs Snowflake",
   description:
     "Tapeline vs Simply Wall St — live sub-60s six-factor composite with a per-pick public scorecard, vs Simply Wall St's static Snowflake analysis built for long-horizon investors. Honest head-to-head at the $20-50/mo tier.",
   path: "/compare/simply-wall-st",

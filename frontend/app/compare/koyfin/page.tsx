@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Koyfin (2026): Stock-Picking Scanner vs Bloomberg-Style Terminal",
+  title: "Tapeline vs Koyfin (2026): Stock Scanner vs Terminal",
   description:
     "Tapeline vs Koyfin — composite stock score with public methodology and back-checked picks, vs Koyfin's Bloomberg-style data terminal with deep fundamentals dashboards. Honest comparison.",
   path: "/compare/koyfin",

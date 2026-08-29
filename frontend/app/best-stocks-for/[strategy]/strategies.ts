@@ -28,7 +28,7 @@ export const STRATEGIES: StrategyConfig[] = [
     slug: "day-traders",
     display: "Day Traders",
     h1: "Best Stocks to Day Trade — Today's Top 30 by Move + Composite Score",
-    metaTitle: "Best Stocks to Day Trade Today — Live Top 30 Movers with Score Confluence | Tapeline",
+    metaTitle: "Best Stocks to Day Trade Today — Live Top 30 | Tapeline",
     metaDescription:
       "30 US stocks with the biggest moves today that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend and relative strength. Sub-60s refresh. Public scorecard, no edits.",
     lede:
@@ -174,7 +174,7 @@ export const STRATEGIES: StrategyConfig[] = [
     slug: "value",
     display: "Value Investors",
     h1: "Best Value Stocks — Quality Composite at Reasonable Multiples",
-    metaTitle: "Best Value Stocks 2026 — Tapeline Score Confluence on Quality Names",
+    metaTitle: "Best Value Stocks 2026 — Score Confluence | Tapeline",
     metaDescription:
       "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 14-day Premium trial takes a card, $0 today.",
     lede:

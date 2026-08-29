@@ -2,7 +2,7 @@ import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Webull (2026): Dedicated Scanner vs Broker-Bundled Tools",
+  title: "Tapeline vs Webull (2026): Scanner vs Broker-Bundled Tools",
   description:
     "Tapeline vs Webull's built-in scanner — published 6-factor composite score, sub-60s scoring, public scorecard, vs Webull's broker-bundled filter set that comes with the trading account.",
   path: "/compare/webull",

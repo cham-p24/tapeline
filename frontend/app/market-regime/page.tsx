@@ -11,7 +11,7 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Market Regime Indicator — Live VIX Thresholds + Advancers | Tapeline",
+  title: "Market Regime Indicator — Live VIX + Advancers | Tapeline",
   description:
     "Tapeline's market regime label is set by the VIX against four fixed thresholds. We publish it next to the advancer count, rate direction and SPY momentum, and show exactly which of those feed the label. Cached snapshot, refreshed hourly.",
   path: "/market-regime",

@@ -23,7 +23,7 @@ import {
  * the live /scorecard, for compliance.
  */
 export const metadata = pageMeta({
-  title: "Stock screeners with a public track record — what to demand | Tapeline",
+  title: "Stock screeners with a public track record | Tapeline",
   description:
     "Most stock screeners publish no per-pick track record at all. Here's what a real one must contain — dated, unedited, benchmarked, downloadable — and Tapeline's own public record of 628 picks checked against SPY, losses included.",
   path: "/stock-screener-track-record",

@@ -5,7 +5,7 @@ import { ScoreRadial } from "@/components/ScoreRadial";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "What's new in Tapeline — MCP server, rebuilt ticker pages, open access",
+  title: "What's new in Tapeline — MCP server, open access, more",
   description:
     "The latest Tapeline upgrades: a public MCP server for AI assistants, embeddable score badges, ticker pages rebuilt as a decision aid, a card-backed Premium trial, and the ranked scanner open on Free until 8 September.",
   path: "/whats-new",

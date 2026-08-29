@@ -2,7 +2,7 @@ import { CompareLayout } from "@/components/CompareLayout";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Bloomberg Terminal (2026): Retail Pricing vs $31K/yr Institutional",
+  title: "Tapeline vs Bloomberg Terminal (2026): Retail vs $31K/yr",
   description:
     "Tapeline vs Bloomberg Terminal — published 6-factor composite score at $8.25/mo annual, vs Bloomberg's institutional terminal at ~$2,665/mo ($31,980/yr). Honest comparison for retail traders.",
   path: "/compare/bloomberg-terminal",

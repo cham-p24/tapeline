@@ -18,7 +18,7 @@ import { breadcrumbJsonLd, jsonLdScript, pressContactPageJsonLd } from "@/lib/js
 import { PRICING, usd, usdCompact } from "@/lib/pricing";
 
 export const metadata = pageMeta({
-  title: "Tapeline Press Kit — Logos, Fact Sheet, Founder Bio, Media Contact",
+  title: "Tapeline Press Kit — Logos, Fact Sheet, Founder Bio",
   description:
     "Tapeline media resources: brand logos, factual one-paragraph and one-sentence descriptions, founder bio, screenshot kit, and direct press contact (press@tapeline.io).",
   path: "/press",

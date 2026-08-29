@@ -5,7 +5,7 @@ import { pageMeta } from "@/lib/seo";
 export const revalidate = 3600;
 
 export const metadata = pageMeta({
-  title: "Congressional Stock Trades — Live Tracker for House + Senate Disclosures | Tapeline",
+  title: "Congressional Stock Trades — House + Senate Tracker | Tapeline",
   description:
     "Track every disclosed stock trade by US House + Senate members. Live feed pulled from STOCK Act filings, ranked by recency and dollar size, linked to each ticker's full Tapeline score. Public scorecard.",
   path: "/congressional-trades",

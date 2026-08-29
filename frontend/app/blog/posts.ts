@@ -22,7 +22,22 @@ export type HowToStep = {
 
 export type BlogPost = {
   slug: string;
+  /** The article headline, as rendered on the page and in the blog index. */
   title: string;
+  /**
+   * Optional SERP-only title, used when `title` is too long for a search
+   * result.
+   *
+   * These are two different jobs. The on-page headline can afford a
+   * parenthetical aside — "(and why it's not what you think)" — because the
+   * reader is already there. A search result gets ~60 characters before
+   * Google cuts it, and seven posts were running 66-90 (audited 2026-08-29),
+   * so the aside was all the reader ever saw truncated.
+   *
+   * Set this ONLY to shorten; never to say something the headline doesn't.
+   * Falls back to `title` when absent, which is the case for most posts.
+   */
+  metaTitle?: string;
   excerpt: string;
   publishedAt: string; // ISO 8601 date
   author: string;
@@ -84,6 +99,7 @@ export const POSTS: BlogPost[] = [
   {
     slug: "how-to-use-macd",
     title: "How to Use MACD: The Indicator Explained (Line, Signal, Histogram)",
+    metaTitle: "How to Use MACD: Line, Signal, Histogram Explained",
     excerpt: "MACD is the most-screenshotted indicator in trading and the most misread. Here's how the MACD indicator is actually built — the line, signal, and histogram — what crossovers and divergence mean, and where it whipsaws in choppy markets. Then, honestly, how Tapeline reads the same trend and momentum ideas underneath it as two separate factors.",
     publishedAt: "2026-07-29",
     author: "Tapeline",
@@ -335,6 +351,7 @@ export const POSTS: BlogPost[] = [
   {
     slug: "what-smart-money-actually-means",
     title: "What 'Smart Money' actually means in the Tapeline Score (and why it's not what you think).",
+    metaTitle: "What 'Smart Money' actually means in the Tapeline Score",
     excerpt:
       "'Smart money' is the most misused phrase in retail finance. It's not influencer alpha, not the latest hedge-fund headline, not yesterday's CNBC clip. Here's what Tapeline's Smart Money factor — one of the six — actually measures, what the data sources are, and where the lags lie.",
     publishedAt: "2026-05-13",
@@ -997,6 +1014,7 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
   {
     slug: "what-is-rsi",
     title: "What is RSI in stocks? A retail trader's plain-English guide (with examples).",
+    metaTitle: "What is RSI in stocks? A plain-English guide",
     excerpt:
       "RSI stands for Relative Strength Index — a 0–100 momentum oscillator that signals overbought vs oversold conditions. Here's how it actually works, what the 70/30 thresholds mean, and the three mistakes retail traders make using it.",
     publishedAt: "2026-05-20",
@@ -1263,6 +1281,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
   {
     slug: "best-time-to-buy-stocks",
     title: "What's the best time to buy stocks? The data answer (it's not what you'd think).",
+    metaTitle: "What's the best time to buy stocks? The data answer",
     excerpt:
       "Retail trading folklore says 'buy at the open', 'wait until the last hour', or 'never on Mondays'. We pulled the data on intraday + day-of-week + month-of-year patterns. Here's what actually holds up — and what's just superstition.",
     publishedAt: "2026-05-20",
@@ -1398,6 +1417,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
   {
     slug: "best-stock-scanner-under-30",
     title: "Best stock scanner under $30/month in 2026 (honest cost-quality breakdown).",
+    metaTitle: "Best stock scanner under $30/month in 2026",
     excerpt:
       "We benchmarked the four sub-$30/mo stock scanners retail traders actually consider in 2026 — Finviz Elite, Stock Rover Essentials, Zacks Premium, and Tapeline Pro — across feature depth, data freshness, and (the part nobody else publishes) whether the picks beat SPY. Here's the honest matrix.",
     publishedAt: "2026-05-20",
@@ -1576,6 +1596,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
   {
     slug: "how-to-read-sec-form-4",
     title: "How to read SEC Form 4 insider buying (and what's actually a signal).",
+    metaTitle: "How to read SEC Form 4 insider buying",
     excerpt:
       "SEC Form 4 — the filing every corporate insider must submit within 2 business days of a trade — is the rawest 'smart money' signal retail traders can access. But 90% of Form 4 activity is noise. Here's how to filter for the 10% that matters, and how Tapeline's Smart Money sub-score does it automatically.",
     publishedAt: "2026-05-20",
@@ -1752,6 +1773,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
   {
     slug: "how-to-evaluate-a-stock-scanner-track-record",
     title: "How to evaluate a stock scanner you can actually trust (5 criteria most fail).",
+    metaTitle: "How to evaluate a stock scanner you can trust",
     excerpt:
       "Every stock scanner claims to beat the market. Almost none publish a daily, append-only, back-checked track record you can audit. Here are the five tests we'd put any scanner through before paying — and how to read between the lines when the answers get vague.",
     publishedAt: "2026-05-21",

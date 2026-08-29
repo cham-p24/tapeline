@@ -34,9 +34,48 @@ export type PageMetaArgs = {
   modifiedTime?: string;
 };
 
+/** Longest description Google will render before it cuts one off. */
+export const SERP_DESCRIPTION_MAX = 155;
+
+/**
+ * Trim a description to a SERP-safe length at a WORD boundary.
+ *
+ * `PageMetaArgs.description` has documented "150-160 chars" since this helper
+ * was written, and an audit on 2026-08-29 found 300 of 313 live pages over it
+ * — every /compare page (184), nearly every blog post (69, worst 413 chars),
+ * /pricing, /how-it-works and more. Google was cutting all of them, usually
+ * mid-word, and the tail was wasted.
+ *
+ * Clamping here rather than rewriting 300 strings is deliberate: the copy is
+ * good, it was simply longer than one of the two places it gets used. Google
+ * truncates it either way — this only decides whether the cut lands on a word
+ * boundary or in the middle of one.
+ *
+ * No ellipsis is appended. Google adds its own when it truncates further, and
+ * a "…" we wrote would be indistinguishable from lost content.
+ */
+export function clampDescription(text: string, max = SERP_DESCRIPTION_MAX): string {
+  const s = text.trim().replace(/\s+/g, " ");
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  // A single "word" longer than the limit can't be cut politely; take the
+  // hard slice rather than returning an empty string.
+  const out = lastSpace > 0 ? cut.slice(0, lastSpace) : s.slice(0, max);
+  // Don't end on dangling punctuation — reads like a truncation bug.
+  return out.replace(/[\s,;:—–-]+$/, "");
+}
+
 export function pageMeta(args: PageMetaArgs): Metadata {
   const url = `${SITE_URL}${args.path}`;
   const ogType = args.ogType ?? "website";
+  // The SERP snippet is clamped; the social card is NOT.
+  //
+  // These are different consumers with different limits: Google renders ~155
+  // chars, while Facebook/LinkedIn/Slack show appreciably more. Clamping both
+  // would throw away copy that the social card had room for, so the full text
+  // stays on openGraph/twitter below and only `description` is trimmed.
+  const serpDescription = clampDescription(args.description);
 
   const openGraph: NonNullable<Metadata["openGraph"]> = {
     title: args.title,
@@ -59,7 +98,7 @@ export function pageMeta(args: PageMetaArgs): Metadata {
 
   return {
     title: args.title,
-    description: args.description,
+    description: serpDescription,
     alternates: { canonical: url },
     openGraph,
     twitter: {

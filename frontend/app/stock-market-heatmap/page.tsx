@@ -11,7 +11,7 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Stock Market Heatmap — Live Sector + Ticker Performance, 1D / 1W / 1M | Tapeline",
+  title: "Stock Market Heatmap — Live Sector Performance | Tapeline",
   description:
     "Live US market heatmap grouped by GICS sector, tiles sized by dollar volume, coloured by performance. Hover any tile for the underlying Tapeline score. Sub-60s refresh during market hours.",
   path: "/stock-market-heatmap",

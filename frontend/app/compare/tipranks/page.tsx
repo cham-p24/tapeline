@@ -2,7 +2,7 @@ import { CompareLayout, type CompareRow, type CompareTradeoff, type CompareFaq }
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Tapeline vs Tipranks (2026): Named Factors vs Smart Score Black Box",
+  title: "Tapeline vs Tipranks (2026): Named Factors vs Black Box",
   description:
     "Tapeline vs Tipranks — six named factors and a published methodology with a per-pick public scorecard, vs Tipranks' Smart Score that aggregates eight factors at undisclosed weights. Honest comparison at $8.25/mo entry vs $30-76/mo.",
   path: "/compare/tipranks",

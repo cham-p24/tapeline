@@ -23,7 +23,7 @@ import {
  * not-a-forecast framing as the live /scorecard, for compliance.
  */
 export const metadata = pageMeta({
-  title: "The most transparent stock screener — publishes its losing picks | Tapeline",
+  title: "The stock screener that publishes its losing picks",
   description:
     "Tapeline is the stock screener that publishes every daily top-10 pick — 628 picks over 67 market days, frozen the day it printed, never edited, each checked against SPY the next session, losing days included and downloadable as raw data.",
   path: "/transparent-stock-screener",
