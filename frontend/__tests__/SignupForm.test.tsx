@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SignUpPage from "@/app/signup/page";
-import { PRICING, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
 
 vi.mock("@/lib/auth", () => ({
   authApi: {
@@ -180,7 +180,14 @@ describe("SignUpPage", () => {
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toMatch(/at first sign-in you add a card/i);
     expect(text).toMatch(/\$0 is charged today/i);
-    expect(text).toMatch(/first charge is 14 days later/i);
+    // A DATE, not a duration. The paid ad's headline is "$0 today. The charge
+    // date is on the page", and Meta reviews the landing page against the ad —
+    // "14 days later" left that literal promise unmet. Matched loosely on the
+    // month name so the assertion does not break every day as the date rolls.
+    expect(text).toMatch(
+      /first charge is on \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}/i,
+    );
+    expect(text).not.toMatch(/first charge is 14 days later/i);
     expect(text).toMatch(/one click ends it before then/i);
     // The advance warning is a promise the backend actually keeps (the
     // trial_will_end handler), so the page is allowed to make it.
@@ -541,11 +548,28 @@ describe("SignUpPage", () => {
   // Free-tier caps + refund window); all four now derive from the same
   // constants checkout and every other surface use.
 
-  it("derives the after-trial Pro price from PRICING (no hardcoded prose)", () => {
+  // Meta's Subscription Services standard requires the PRICE and BILLING
+  // INTERVAL of the subscription being advertised, shown clearly — not in fine
+  // print, not behind a link. The paid trial ad lands here, so this page is the
+  // enforcement surface.
+  //
+  // This previously asserted `Pro from $8.25/mo`, which pinned a real defect:
+  // the trial converts to PREMIUM (annual by default, so a $199 first charge),
+  // and the page advertised PRO's annually-billed monthly rate instead. Wrong
+  // plan, wrong interval. A misleading interval is a heavier failure than a
+  // missing one, so the assertion is inverted: Pro's per-month-of-annual rate
+  // must NOT be the headline price here.
+  it("shows Premium's real price and interval, derived from PRICING", () => {
     render(<SignUpPage />);
-    expect(
-      screen.getByText(`Pro from ${usd(PRICING.pro.annualPerMonth)}/mo`),
-    ).toBeInTheDocument();
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+
+    expect(text).toContain(`${usd(PRICING.premium.monthly)}/month`);
+    expect(text).toContain(`${usdCompact(PRICING.premium.annual)}/year`);
+    // "recurring until you cancel" is the recurrent-billing disclosure.
+    expect(text).toMatch(/recurring until you cancel/i);
+
+    // The old, wrong headline price must not come back.
+    expect(text).not.toContain(`Pro from ${usd(PRICING.pro.annualPerMonth)}/mo`);
   });
 
   it("names the card-free escape hatch in the transparency footer", () => {

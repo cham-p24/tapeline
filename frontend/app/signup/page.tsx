@@ -7,8 +7,9 @@ import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
 import { TRIAL_DAYS, TRIAL_LENGTH_LABEL } from "@/lib/trial";
+import { userLocale } from "@/lib/datetime";
 import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
-import { PRICING, REFUND, usd } from "@/lib/pricing";
+import { PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
 import { safeNext } from "@/lib/safeNext";
 import {
   getStoredFbclid,
@@ -30,6 +31,28 @@ import {
 } from "@/components/FormField";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+/**
+ * Long-form first-charge date, mirroring `/app/start`'s `longDate`.
+ *
+ * WHY THIS PAGE NEEDS IT TOO
+ * --------------------------
+ * `/app/start` was built to Meta's Subscription Services standard and clears it.
+ * But the paid ad that sells the trial points at `/signup?from=trial`, NOT at
+ * `/app/start` — so the page Meta's reviewer actually lands on is this one, and
+ * it was the page failing the standard. Meta's Advertising Standards say review
+ * covers "an ad's associated landing page or other destinations".
+ *
+ * The ad's own headline is "$0 today. The charge date is on the page." A
+ * duration ("14 days away") is not a date, so the literal promise was unmet.
+ */
+function longDate(d: Date): string {
+  return d.toLocaleDateString(userLocale(), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 declare global {
   interface Window {
@@ -192,6 +215,9 @@ function SignUpForm() {
   // the Daily Top 10 at all.
   const [weeklyDigestOptIn, setWeeklyDigestOptIn] = useState(false);
   const [dailyTop10OptIn, setDailyTop10OptIn] = useState(false);
+  // Computed once on mount, not per render, so the date cannot shift mid-session
+  // and cannot differ between server and client markup.
+  const [firstCharge] = useState(() => new Date(Date.now() + TRIAL_DAYS * 86_400_000));
   // Self-reported attribution — optional, free text, never required (gap G2).
   // Deliberately NOT a dropdown: a fixed list can only count channels we
   // already thought of, and this field exists to surface the ones we cannot
@@ -697,7 +723,7 @@ function SignUpForm() {
                 this button does not collect one, but the very next screen does,
                 so the true reassurance is the AMOUNT, not the absence. */}
             <p className="text-center text-xs text-muted">
-              $0 charged today &mdash; the first charge is {TRIAL_DAYS} days away
+              $0 charged today &mdash; the first charge is on {longDate(firstCharge)}
             </p>
 
             <p className="text-xs text-subtle">
@@ -713,7 +739,51 @@ function SignUpForm() {
               to state the whole rule BEFORE the account exists, not after.
               What the card does, when it charges, how to leave, and what you can
               still read without an account at all. */}
-          <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
+          {/* PRICE AND BILLING INTERVAL — DELIBERATELY `text-sm text-fg`.
+              Meta's Subscription Services standard requires price and billing
+              interval to be "clearly shown", and names fine print at the page
+              bottom, text buried in a privacy statement, and anything behind a
+              separate link as failures. This block previously rendered the whole
+              disclosure at `text-xs text-muted` with the refund line at
+              `text-[11px] text-subtle` — a near-literal instance of the
+              prohibited example.
+
+              It also quoted THE WRONG PLAN: "Pro from $8.25/mo", when the trial
+              converts to PREMIUM and `/app/start` defaults to ANNUAL, making the
+              real first charge $199. A misleading interval is a heavier failure
+              than a missing one, and it was simply untrue.
+
+              Always derive from `PRICING.premium` — never hardcode, and never
+              reach for `PRICING.pro.annualPerMonth` here again. */}
+          <div className="mt-8 rounded-md border border-border bg-panel/40 p-4 text-sm text-fg">
+            <div className="font-medium text-fg">What the card costs, and when</div>
+            <ul className="mt-2 space-y-1.5">
+              <li>
+                <strong className="font-semibold">$0 today.</strong> This form takes
+                an email and a password. The card comes at first sign-in.
+              </li>
+              <li>
+                <strong className="font-semibold">
+                  Then {usd(PRICING.premium.monthly)}/month, or{" "}
+                  {usdCompact(PRICING.premium.annual)}/year
+                </strong>{" "}
+                for Premium, recurring until you cancel. Annual is the default and
+                works out at {usd(PRICING.premium.annualPerMonth)}/month.
+              </li>
+              <li>
+                <strong className="font-semibold">
+                  Your first charge is on {longDate(firstCharge)}
+                </strong>{" "}
+                &mdash; {TRIAL_DAYS} days from today. We email you three days before it.
+              </li>
+              <li>
+                <strong className="font-semibold">Cancel in one click</strong> from
+                your billing page any time before then, and nothing is taken.
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-4 rounded-md border border-border bg-panel/40 p-4 text-xs text-muted">
             <div className="font-medium text-fg">Where the card comes in</div>
             {/* Numbers derive from lib/pricing (PRICING / REFUND)
                 — the single source of truth checkout + every other surface
@@ -723,10 +793,12 @@ function SignUpForm() {
             <p className="mt-1.5">
               This form takes an email and a password. At first sign-in you add a card, and
               that starts your <span className="text-fg">{TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
-              <span className="text-fg">$0 is charged today</span>, the first charge is {TRIAL_DAYS} days
-              later at the plan you pick, we email you three days before, and one click ends it
-              before then with nothing taken. Paid plans start at{" "}
-              <span className="text-fg">Pro from {usd(PRICING.pro.annualPerMonth)}/mo</span>.
+              <span className="text-fg">$0 is charged today</span>, the first charge is on{" "}
+              <span className="text-fg">{longDate(firstCharge)}</span> at the plan you pick, we
+              email you three days before, and one click ends it before then with nothing taken.
+              Cheaper plans exist if Premium is more than you need &mdash;{" "}
+              <span className="text-fg">Pro is {usd(PRICING.pro.monthly)}/mo</span> or{" "}
+              <span className="text-fg">{usdCompact(PRICING.pro.annual)}/yr</span>.
             </p>
             <p className="mt-2">
               You do not need an account &mdash; or a card &mdash; to read the record: the daily

@@ -759,3 +759,80 @@ descriptive-only rule already forbids that voice.
   now catches it too.
 - Uploading the 25 users as a customer-list audience — exceeds the current privacy disclosure.
 - Widening geo, UGC testimonials, or switching the optimisation event mid-flight.
+
+---
+
+## 17. The ad's landing page was the wrong page — 2026-08-29
+
+A second research pass (13 agents, primary-sourced against
+`transparency.meta.com/policies/ad-standards/content-specific-restrictions/subscription-services`)
+found that §15's reassurance about `/app/start` was aimed at the wrong URL.
+
+**Ad B routes to `/signup?from=trial`, not `/app/start`** (§1 of this file records the URL).
+Meta's Advertising Standards say review covers *"an ad's associated landing page or other
+destinations"*, so `/signup` is the enforcement surface. `/app/start` is a screen further on, is
+reached only after an account exists, and collects no PII at all — the card is entered on Stripe's
+own domain. It was built to a high standard and clears the bar. It simply is not the page under
+review.
+
+### What the standard actually requires
+
+The whole policy is one sentence — *"Ads for subscription services must disclose information on
+pricing and recurrent billing"* — plus three prohibited conditions **where PII is entered**:
+
+1. no unticked opt-in checkbox (*"no checkbox exists"* is named as a failure, equal to pre-ticked);
+2. no clear cancellation language;
+3. price / billing interval not clearly shown — *fine print at page bottom, buried in a privacy
+   statement, or behind a separate link* all fail.
+
+Three things widely asserted that are **not** in the text: a first-charge-date requirement, an
+above-the-fold rule, and any font-size threshold.
+
+### What `/signup?from=trial` was actually doing
+
+- **The only price on the page was `Pro from $8.25/mo`.** The trial converts to **Premium**, and
+  `/app/start` defaults to **annual** — so the real first charge is **$199**. Wrong plan, and an
+  annually-billed rate rendered as a monthly one. A misleading interval is a heavier failure than
+  a missing one, and it was simply untrue.
+- It sat in a `text-xs text-muted` panel at the page bottom, with the refund line at
+  `text-[11px] text-subtle` — a near-literal instance of the prohibited "fine print" example.
+- It said *"the first charge is 14 days later"* — a duration. Ad B's headline promises
+  *"$0 today. The charge date is on the page."* A duration is not a date, so the ad's literal
+  claim was unmet by its own landing page.
+
+### Fixed
+
+`frontend/app/signup/page.tsx` now carries a `text-sm text-fg` disclosure block above the footer:
+$0 today · **`$19.99/month, or $199/year` for Premium, recurring until you cancel** · **the real
+first-charge date**, rendered with the same `longDate` pattern `/app/start` uses · cancel in one
+click. All figures derive from `PRICING.premium` — never hardcoded, and never
+`PRICING.pro.annualPerMonth` again. The button-adjacent line and the transparency footer now state
+the date too, and the footer positions Pro honestly as the cheaper alternative
+(`$9.99/mo` or `$99/yr`) rather than as the trial's price.
+
+Two tests in `__tests__/SignupForm.test.tsx` had **pinned the defect** — one asserted
+`first charge is 14 days later`, the other asserted the `Pro from $8.25/mo` string. Both were
+inverted to pin the correct behaviour, including a negative assertion so the wrong price cannot
+come back.
+
+### Still open — one founder decision
+
+**No required, unticked subscription opt-in checkbox exists on `/signup`.** The two
+`ConsentCheckbox` controls there are optional *email marketing* opt-ins; terms are accepted by
+submission via a link, which the policy names as insufficient placement. There is no compliant
+alternative — *"no checkbox exists"* is a named violation.
+
+It is left undone deliberately, because it is a product trade-off rather than a pure compliance
+fix: it adds required friction to the weakest step of a funnel with 25 users and 0 payers. Scoped
+to `/signup` only, the cost halves. **Founder's call.**
+
+### Ad B's primary text still needs the price
+
+The top-line requirement is the disclosure *in the ad*. Append to ad B's primary text:
+*"Then $19.99/month, or $199/year, until you cancel."* **Sequence it after this page ships**, so a
+re-reviewed ad lands on a compliant destination. An in-flight edit re-enters review and can reset
+delivery — which normally argues against touching it, except the ad set cannot exit learning at
+A$25/day anyway (§16), so that objection does not apply here.
+
+None of this collides with the AFSL constraints. Stating a price and an interval is factual: no
+performance claim, no buy/sell language, no weights, and it moves *further* from "no credit card".
