@@ -174,7 +174,14 @@ export const metadata: Metadata = {
     // alone is supported in every modern browser + Googlebot.
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    // `apple` is deliberately NOT set here.
+    //
+    // It used to be "/favicon.svg", which iOS cannot use: Safari requires a
+    // raster apple-touch-icon, so the Home Screen tile fell back to a
+    // screenshot. Worse, setting it here overrode the app/apple-icon.tsx file
+    // convention, so the PNG added for the PWA was never referenced — caught
+    // live after the first attempt shipped. Leaving it unset lets Next emit
+    // the generated 180x180 PNG.
   },
 };
 
