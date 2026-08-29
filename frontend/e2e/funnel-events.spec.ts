@@ -144,6 +144,10 @@ test.describe.fixme("GA4 funnel events", () => {
     await page.fill('input[type="email"]', "test@example.com");
     await page.fill('input[type="password"]', "test1234password");
     await page.fill('input[autocomplete="name"]', "Test User");
+    // Required subscription acknowledgement — Meta's Subscription Services
+    // standard needs an unticked opt-in where PII is entered, and submit is
+    // gated on it, so the funnel events cannot fire without ticking it.
+    await page.check("#signup-subscription-terms");
     await page.click('button[type="submit"]');
     await page.waitForTimeout(800);
     const names = (await getEvents()).map((e) => e.name);

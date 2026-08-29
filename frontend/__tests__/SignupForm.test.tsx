@@ -85,7 +85,15 @@ beforeEach(() => {
   );
 });
 
-/** Fill the minimum valid form and submit it. */
+/**
+ * Fill the minimum valid form and submit it.
+ *
+ * The subscription-terms checkbox is REQUIRED (Meta's Subscription Services
+ * standard: an unticked opt-in must exist where PII is entered, and submit must
+ * not proceed without it). So "minimum valid" now includes ticking it — every
+ * submit-path test would otherwise be asserting against a blocked form.
+ * `signupTermsGate` below is the test that the gate actually gates.
+ */
 function fillAndSubmit(container: HTMLElement) {
   fireEvent.change(screen.getByLabelText(/^email$/i), {
     target: { value: "trader@example.com" },
@@ -93,6 +101,7 @@ function fillAndSubmit(container: HTMLElement) {
   fireEvent.change(screen.getByLabelText(/password/i), {
     target: { value: "longenough-pass" },
   });
+  fireEvent.click(document.getElementById("signup-subscription-terms")!);
   fireEvent.submit(container.querySelector("form")!);
 }
 
@@ -559,6 +568,56 @@ describe("SignUpPage", () => {
   // plan, wrong interval. A misleading interval is a heavier failure than a
   // missing one, so the assertion is inverted: Pro's per-month-of-annual rate
   // must NOT be the headline price here.
+  // ── The required subscription acknowledgement ─────────────────────────────
+  // Meta's Subscription Services standard prohibits, on a page where personal
+  // info is entered: "not including an unticked opt-in checkbox" — and names
+  // *no checkbox at all* as a failure equal to a pre-ticked one. This page is
+  // the destination of the paid trial ad, so it is the page under review.
+
+  it("renders the subscription checkbox UNTICKED, with the terms in its own label", () => {
+    render(<SignUpPage />);
+    const box = document.getElementById("signup-subscription-terms") as HTMLInputElement;
+    expect(box).not.toBeNull();
+    expect(box.type).toBe("checkbox");
+    // Unticked by default. A pre-ticked box is explicitly a violation.
+    expect(box.checked).toBe(false);
+    expect(box.getAttribute("aria-required")).toBe("true");
+
+    // The terms must be IN THE LABEL, not behind the Terms link — the policy
+    // rejects price/interval that sit "behind a separate link".
+    const label = box.closest("label");
+    const text = (label?.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain(`${usd(PRICING.premium.monthly)}/month`);
+    expect(text).toContain(`${usdCompact(PRICING.premium.annual)}/year`);
+    expect(text).toMatch(/recurring until I cancel/i);
+    expect(text).toMatch(/\$0 today/i);
+  });
+
+  it("blocks submit until the subscription checkbox is ticked", async () => {
+    const { authApi } = await import("@/lib/auth");
+    // The module-level mock accumulates across the file, so clear it here —
+    // otherwise this asserts against earlier tests' calls, not this one's.
+    vi.mocked(authApi.signup).mockClear();
+    const { container } = render(<SignUpPage />);
+
+    fireEvent.change(screen.getByLabelText(/^email$/i), {
+      target: { value: "trader@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "longenough-pass" },
+    });
+    // Deliberately NOT ticking the box.
+    fireEvent.submit(container.querySelector("form")!);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/confirm you understand the trial's price and billing/i),
+      ).toBeInTheDocument();
+    });
+    // The account must not have been created.
+    expect(authApi.signup).not.toHaveBeenCalled();
+  });
+
   it("shows Premium's real price and interval, derived from PRICING", () => {
     render(<SignUpPage />);
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
@@ -741,6 +800,8 @@ describe("SignUpPage", () => {
     fireEvent.blur(password);
     expect(screen.queryByRole("alert")).toBeNull();
 
+    // Required subscription acknowledgement — see the gate test above.
+    fireEvent.click(document.getElementById("signup-subscription-terms")!);
     fireEvent.submit(container.querySelector("form")!);
     await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
   });

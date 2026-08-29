@@ -218,6 +218,22 @@ function SignUpForm() {
   // Computed once on mount, not per render, so the date cannot shift mid-session
   // and cannot differ between server and client markup.
   const [firstCharge] = useState(() => new Date(Date.now() + TRIAL_DAYS * 86_400_000));
+  /**
+   * REQUIRED subscription-terms acknowledgement. Unchecked by default, and it
+   * blocks submit — both are the point.
+   *
+   * Meta's Subscription Services standard prohibits, on a page where personal
+   * info is entered, "not including an unticked opt-in checkbox" — and names
+   * *no checkbox at all* as a failure equal to a pre-ticked one. Accepting terms
+   * implicitly by submitting, via a link, is the placement the same policy
+   * rejects. This page is the destination of the paid trial ad, so it is the
+   * page under review.
+   *
+   * DO NOT default this to true, and do not "simplify" it into the Terms link
+   * below it — that link is a different acknowledgement (Terms + Privacy) and
+   * does not state price, interval or cancellation anywhere in its label.
+   */
+  const [subscriptionTermsAccepted, setSubscriptionTermsAccepted] = useState(false);
   // Self-reported attribution — optional, free text, never required (gap G2).
   // Deliberately NOT a dropdown: a fixed list can only count channels we
   // already thought of, and this field exists to surface the ones we cannot
@@ -325,6 +341,17 @@ function SignUpForm() {
         'input[name="cf-turnstile-response"]',
       );
       token = hidden?.value || "";
+    }
+    // The subscription-terms box is a hard gate, checked before the bot check
+    // so a user who missed it is told the real reason rather than being sent
+    // to solve a captcha first. Focus is moved to it, because it sits above the
+    // button and can be scrolled out of view on a short viewport.
+    if (!subscriptionTermsAccepted) {
+      setErr(
+        "Please confirm you understand the trial's price and billing before we create your account.",
+      );
+      document.getElementById("signup-subscription-terms")?.focus();
+      return;
     }
     if (TURNSTILE_SITE_KEY && !token) {
       // Instrument the friction: how often a real-looking submit is blocked
@@ -707,6 +734,42 @@ function SignUpForm() {
                 data-theme="dark"
               />
             )}
+
+            {/* REQUIRED subscription acknowledgement — deliberately styled as a
+                bordered panel so it reads as a gate, not as one more optional
+                email box. The two above it are opt-ins; this one is not.
+
+                The terms are IN THE LABEL, not behind the Terms link below.
+                Meta's standard rejects price/interval that sit "behind a
+                separate link", and the acknowledgement has to be of the thing
+                being acknowledged — so the amount, the interval, the date and
+                the way out are all in the sentence the user ticks. */}
+            <div className="rounded-md border border-border bg-panel/40 p-3">
+              <label
+                className="flex cursor-pointer items-start gap-2.5 text-sm"
+                htmlFor="signup-subscription-terms"
+              >
+                <input
+                  id="signup-subscription-terms"
+                  type="checkbox"
+                  checked={subscriptionTermsAccepted}
+                  onChange={(e) => setSubscriptionTermsAccepted(e.target.checked)}
+                  aria-required="true"
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent"
+                />
+                <span className="text-fg">
+                  I understand my {TRIAL_LENGTH_LABEL} Premium trial charges{" "}
+                  <strong className="font-semibold">$0 today</strong>, then{" "}
+                  <strong className="font-semibold">
+                    {usd(PRICING.premium.monthly)}/month or{" "}
+                    {usdCompact(PRICING.premium.annual)}/year
+                  </strong>{" "}
+                  from <strong className="font-semibold">{longDate(firstCharge)}</strong>,
+                  recurring until I cancel &mdash; and that I can cancel in one click
+                  before then and pay nothing.
+                </span>
+              </label>
+            </div>
 
             <FormAlert message={err} />
 
