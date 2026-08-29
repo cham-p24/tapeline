@@ -17,7 +17,7 @@
  *    iMessage.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import manifest from "../app/manifest";
@@ -65,13 +65,6 @@ describe("icon routes backing the manifest", () => {
     expect(src).toMatch(/ImageResponse/);
   });
 
-  it("app/apple-icon.tsx exists — iOS ignores manifest icons for the tile", () => {
-    const src = readFileSync(join(APP, "apple-icon.tsx"), "utf8");
-    expect(src).toMatch(/contentType\s*=\s*"image\/png"/);
-    // 180x180 is what current iPhones request.
-    expect(src).toMatch(/width:\s*180/);
-    expect(src).toMatch(/height:\s*180/);
-  });
 });
 
 describe("default social card", () => {
@@ -151,13 +144,31 @@ describe("pageMeta carries the default card (the fix the layout alone did not ma
 });
 
 describe("apple-touch-icon", () => {
-  it("the layout does not override the apple-icon.tsx convention", () => {
-    // Setting `apple` in layout metadata suppresses app/apple-icon.tsx, so
-    // the generated PNG was never referenced and iOS fell back to a
-    // screenshot for the Home Screen tile. iOS cannot use an SVG here.
+  // iOS cannot use an SVG for the Home Screen tile — it falls back to a
+  // screenshot, which defeats the PWA install the billing page tells
+  // customers to perform.
+  //
+  // This points at /icon rather than an apple-icon.tsx file convention for
+  // two measured reasons: defining `metadata.icons` at all suppresses the
+  // icon FILE conventions (verified live — with `apple` merely removed, no
+  // apple-touch-icon tag was emitted at all), and an app/apple-icon.tsx
+  // produced no route (GET /apple-icon returned text/html) while the
+  // structurally identical app/icon.tsx did.
+  function iconsBlock(): string {
     const layout = readFileSync(join(APP, "layout.tsx"), "utf8");
-    const icons = layout.slice(layout.indexOf("icons:"), layout.indexOf("};", layout.indexOf("icons:")));
-    expect(icons).not.toMatch(/^\s*apple:/m);
+    const start = layout.indexOf("icons:");
+    return layout.slice(start, layout.indexOf("};", start));
+  }
+
+  it("points at a raster icon, never the SVG", () => {
+    const apple = iconsBlock().slice(iconsBlock().indexOf("apple:"));
+    expect(apple).toMatch(/apple:/);
+    expect(apple).not.toMatch(/apple:.*favicon\.svg/);
+    expect(apple).toMatch(/image\/png/);
+  });
+
+  it("references a route that actually exists", () => {
+    expect(iconsBlock()).toMatch(/apple:[\s\S]*url:\s*"\/icon"/);
+    expect(existsSync(join(APP, "icon.tsx"))).toBe(true);
   });
 });
-
