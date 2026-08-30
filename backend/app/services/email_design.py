@@ -199,14 +199,47 @@ def _brand_header() -> str:
     """
 
 
-def _footer() -> str:
-    """Shared footer — manage links + the not-investment-advice disclaimer.
+#: Placeholder emitted into every rendered email body. `services/email.send_email`
+#: swaps it for a real one-click unsubscribe line when the send carries an
+#: `unsubscribe_user_id`, and strips it entirely for transactional mail (which
+#: must NOT offer an opt-out — a password reset is not marketing).
+#:
+#: Why a placeholder rather than a parameter: `shell()` is called by 47
+#: templates, none of which know the recipient. Threading a URL through all of
+#: them is 47 chances to miss one; resolving centrally at send time is one code
+#: path that every template inherits by construction.
+UNSUB_PLACEHOLDER = "<!--TL_UNSUBSCRIBE-->"
 
-    Order matters: the disclaimer comes first (legal) and the management
-    links second (utility). Mirrors Stripe / Mercury layout.
+
+def _footer() -> str:
+    """Shared footer — unsubscribe, manage links, and the disclaimer.
+
+    THE UNSUBSCRIBE LINE IS A LEGAL REQUIREMENT, NOT A COURTESY.
+
+    Until 2026-08-31 this footer offered exactly three links — Email
+    preferences, Account, Billing — and all three point at `/app/*`, which
+    `frontend/middleware.ts` puts behind auth. So no Tapeline email carried an
+    opt-out a recipient could actually use without logging in. The only
+    functioning opt-out was the `List-Unsubscribe` header, which many clients
+    never render.
+
+    That is the precise pattern the Australian Spam Act 2003 treats as a
+    non-functional unsubscribe facility, and ACMA has enforced it directly
+    (Telstra, A$626,000, October 2024, for opt-outs that were not reasonably
+    usable). Tapeline sends from Melbourne, so the Spam Act — not the laxer
+    US CAN-SPAM opt-out regime most email advice is written against — is the
+    governing law.
+
+    The machinery to fix it already existed: `services/unsubscribe.py` mints
+    stateless HMAC tokens that resolve on GET *and* POST with no auth
+    dependency. It was simply never surfaced in the visible body.
+
+    Order: unsubscribe first (the thing a recipient may be hunting for),
+    disclaimer, then management links.
     """
     return f"""
     <div class="tl-divider" style="height:1px;background:{LIGHT_BORDER};margin:36px 0 20px;"></div>
+    {UNSUB_PLACEHOLDER}
     <p class="tl-subtle" style="margin:0 0 10px;font-size:11px;line-height:1.6;color:{LIGHT_SUBTLE};font-family:{FONT_SANS};">
       <strong>Not investment advice.</strong> Tapeline is informational software — every score, signal, and headline is a data point, not a recommendation. Trade your own thesis.
     </p>

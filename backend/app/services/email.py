@@ -215,6 +215,47 @@ async def send_email(
                 unsubscribe_user_id,
             )
 
+    # Resolve the visible unsubscribe line. email_design._footer() emits a
+    # placeholder into EVERY rendered body; this is the one place that turns it
+    # into a real link, so all 47 templates inherit the behaviour and none can
+    # be forgotten.
+    #
+    # Marketing/lifecycle mail (has unsubscribe_user_id) gets a working
+    # one-click link that needs no login — the Spam Act requires the facility
+    # to be usable, and /app/settings/email is auth-gated. Transactional mail
+    # (no unsubscribe_user_id: password resets, sign-in codes, receipts) gets
+    # the placeholder stripped: it is not a commercial electronic message and
+    # must not invite an opt-out from mail the account depends on.
+    try:
+        from app.services.email_design import UNSUB_PLACEHOLDER
+
+        if UNSUB_PLACEHOLDER in (payload.get("html") or ""):
+            replacement = ""
+            if unsubscribe_user_id:
+                from app.services.unsubscribe import unsubscribe_url
+
+                url = unsubscribe_url(unsubscribe_user_id, unsubscribe_category)
+                if url:
+                    style = (
+                        "margin:0 0 10px;font-size:11px;line-height:1.6;"
+                        "color:#8a8f98;font-family:-apple-system,"
+                        "BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;"
+                    )
+                    link_style = "color:#8a8f98;text-decoration:underline;"
+                    replacement = (
+                        f'<p class="tl-subtle" style="{style}">'
+                        f'<a href="{url}" class="tl-link-subtle" '
+                        f'style="{link_style}">Unsubscribe</a>'
+                        " — one click, no sign-in needed.</p>"
+                    )
+            payload["html"] = payload["html"].replace(UNSUB_PLACEHOLDER, replacement)
+    except Exception:
+        # A footer-rendering failure must never block the send; the
+        # List-Unsubscribe header still carries a functioning opt-out.
+        logger.exception(
+            "email.unsubscribe_footer_failed user=%s", unsubscribe_user_id,
+        )
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"{RESEND_API}/emails",
