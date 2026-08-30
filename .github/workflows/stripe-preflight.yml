@@ -1,0 +1,50 @@
+name: Stripe preflight (shadow test)
+
+# Shadow-tests the paid path against LIVE Stripe without taking any money.
+#
+# NO MONEY MOVES. Creating a Checkout Session mints a URL and nothing else —
+# no charge, no PaymentIntent, no Customer, no subscription. Those exist only
+# once a human completes the hosted page. The script then EXPIRES each session
+# it created, so the URLs it minted cannot be completed by anyone.
+#
+# WHY IT EXISTS: two bugs made the paid path dead for over a month each and
+# neither was visible to the test suite — #635 (every Checkout Session 400'd
+# → 502, for 37 days) and #639 (the tier-granting webhook 500'd on every real
+# delivery). Both are fixed and unit-tested, but no account has ever completed
+# a checkout, so "fixed" rests on tests rather than on Stripe having accepted
+# anything. This closes as much of that gap as can be closed without a card.
+#
+# WHAT IT STILL CANNOT PROVE: that a real card is accepted, that Stripe fires
+# the webhook, or that the tier is granted end to end. Those need a human with
+# a card.
+#
+# Takes no inputs, so it cannot become an arbitrary-command runner. It prints
+# a masked key prefix (7 chars) to identify LIVE vs TEST mode — never a usable
+# secret.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: stripe-preflight
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Shadow-test checkout, prices, webhook parsing and the card wall
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.stripe_preflight"
