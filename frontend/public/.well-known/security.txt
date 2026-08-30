@@ -1,0 +1,22 @@
+# Tapeline — security contact (RFC 9116)
+#
+# The /security page already published security@tapeline.io as the disclosure
+# address, but nothing served this file, so /.well-known/security.txt 404'd
+# (audited 2026-08-29). Researchers and automated scanners look here first;
+# without it, a finder either guesses an address or gives up.
+
+Contact: mailto:security@tapeline.io
+Contact: https://tapeline.io/security
+
+# RFC 9116 requires this field, and a stale one is treated as expired — a
+# researcher is entitled to read an expired file as "nobody is listening".
+# Re-date it when it lapses; the whole file is three lines of upkeep a year.
+Expires: 2027-08-29T00:00:00.000Z
+
+Preferred-Languages: en
+Canonical: https://tapeline.io/.well-known/security.txt
+Policy: https://tapeline.io/security
+
+# Tapeline is a solo-founder product. There is no bug-bounty budget, so no
+# payment is offered or implied — saying so plainly is fairer than leaving a
+# finder to assume one exists. Reports are read and answered by a human.

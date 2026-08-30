@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from starlette.requests import ClientDisconnect
 
 from app.config import get_settings
 from app.routers import (
@@ -345,7 +346,30 @@ async def csp_report(request: Request) -> Response:
     so every field is truncated and only a fixed set is logged. Never widen
     this to log the raw body: `script-sample` can contain page content.
     """
-    raw = await request.body()
+    # Reading the body can raise, and a raise here is NOT an error worth
+    # recording.
+    #
+    # Browsers send CSP reports fire-and-forget — beacon semantics, no interest
+    # in the response — so the connection is routinely gone before the body is
+    # read, and Starlette then raises ClientDisconnect out of request.body().
+    # Unhandled, it propagates through the middleware and Sentry files it as a
+    # production `error`. Within hours of this endpoint shipping it was doing
+    # exactly that (Sentry TAPELINE-BACKEND-2C), which is worse than the
+    # problem it was added to solve: a telemetry collector that pages you about
+    # its own reporters hanging up trains you to ignore the alerts that matter.
+    #
+    # A disconnected reporter is a non-event. Swallow it and answer 204 — there
+    # is nobody left to answer to anyway.
+    try:
+        raw = await request.body()
+    except ClientDisconnect:
+        return Response(status_code=204)
+    except Exception:
+        # Any other read failure is equally not actionable: we have no report
+        # to parse and no client to tell.
+        logger.info("csp_report.body_unreadable")
+        return Response(status_code=204)
+
     # Reports are small; anything large is not a real report.
     if len(raw) > 16_384:
         logger.warning("csp_report.oversized bytes=%d", len(raw))
