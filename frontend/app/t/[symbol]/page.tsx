@@ -616,7 +616,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes — Pro tier gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected). Premium adds Congressional-trade alerts. The free tier shows live scores for the top ${FREE_LIMITS.scannerRows} scanner rows plus ${FREE_LIMITS.dailyLookups} look-ups a day, with ${FREE_LIMITS.webPushAlerts} browser push alerts; ${sym} email alerts specifically require Pro or Premium.`,
+      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected), and Premium adds Congressional-trade alerts. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 14-day Premium trial or a paid plan.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,
@@ -944,20 +944,20 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         <div className="mt-10 sm:mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-5 sm:p-8">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            {/* CARD HONESTY. This said "Free signup gives you … free forever,
-                no card", which #548 made false: from 2026-08-22 a NEW account
-                adds a card at first sign-in. The card-free claim is kept only
-                where it is still literally true — reading the published record
-                — and the Free-tier caps are now framed as what grandfathered
-                accounts keep. Same split as the /compare and /best-* pages. */}
+            {/* CARD HONESTY, restated 2026-08-30. The wall at first sign-in is
+                gone: signing up takes an email and a password and lands on a
+                real free plan, so the paragraph splits three ways — what needs
+                no account, what a free account gets, and what the card buys.
+                The Free-tier caps below are the live FREE_LIMITS every account
+                gets today, not a grandfather clause for old accounts. */}
             This page, the daily Top 10, the whole scorecard and the raw CSV/JSON record are free to
-            read with no account at all. The signed-in scanner is where the card comes in: a new
-            account adds one at first sign-in and starts a 14-day Premium trial — $0 that day, the
-            first charge on day 14 at the plan you pick, one click to cancel before then. That opens
-            the full ~2,500-ticker real-time scanner with unlimited look-ups and smart alerts;
-            Premium adds congressional trades and recent insider buys (SEC Form 4). Accounts created
-            before 22 August 2026 keep the Free access they signed up for: live scores on the
-            top {FREE_LIMITS.scannerRows}{" "}scanner rows{freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} and {FREE_LIMITS.dailyLookups}{" "}look-ups a day.
+            read with no account at all. Signing up takes an email and a password: a free account
+            runs the live scanner on the top {FREE_LIMITS.scannerRows}{" "}scored rows of any scan,
+            keeps one saved screen{freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} and opens {FREE_LIMITS.dailyLookups}{" "}ticker deep-pages a day.
+            The card is what starts a 14-day Premium trial — $0 that day, the first charge on day 14
+            at the plan you pick, one click to cancel before then — and that is what turns on every
+            matching row instead of the first {FREE_LIMITS.scannerRows}, alerts, CSV export, the
+            200-ticker watchlist, congressional trades and recent insider buys (SEC Form 4).
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {/* rel=nofollow: every public /t/{SYMBOL} page emits this CTA with a
@@ -971,7 +971,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               className="btn-accent"
               rel="nofollow"
             >
-              Start the 14-day Premium trial →
+              Create your account →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

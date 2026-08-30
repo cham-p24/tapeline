@@ -157,33 +157,38 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
         <div className="min-w-0">
           {/* The saved watchlist is Pro-and-up whenever freeHasWatchlist() is
               false, so that branch sells it as a Pro perk instead.
-              CARD HONESTY: this nudge only ever renders for an anonymous
-              visitor, so the account being offered is a POST-2026-08-22 one —
-              it adds a card at first sign-in. "Sign up free" was true before
-              #548 and is not now, so the headline and CTA drop "free" and the
-              body states the mechanism, the way LookupWall does. */}
+              CARD HONESTY (#683, 2026-08-30): the card ask moved off the front
+              door. Signing up is an email and a password, and the account lands
+              on the free plan with the live scanner already open, so this body
+              says that plainly. Two things it must NOT do: imply the TRIAL is
+              card-free (it is not), or promise alerts — free is now zero on
+              every channel, email and web push alike. The card buys the
+              STANDING work: Tapeline re-running the screen after the close and
+              saying what moved. That is the sentence, and it is a better one
+              than the wall gave us. */}
           <h2 className="text-base sm:text-lg font-semibold tracking-tight text-fg">
             {freeHasWatchlist()
               ? "You’re exploring — save your tickers"
-              : "You’re exploring — an account tracks these for you"}
+              : "You’re exploring — an account opens the live scanner"}
           </h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
             {freeHasWatchlist() ? (
               <>
                 You&rsquo;ve looked at a few tickers. An account saves them to a
-                watchlist and alerts you when their scores move. Creating one adds
-                a card at first sign-in and starts a 14-day Premium trial &mdash; $0
-                today, one click to cancel before day 14. Or keep reading the
+                watchlist and opens the live scanner &mdash; an email and a
+                password, no card. Being told when their scores move is the part
+                that takes one: a card starts the 14-day Premium trial, $0 that
+                day, one click to cancel before day 14. Or keep reading the
                 published record with no account at all.
               </>
             ) : (
               <>
-                You&rsquo;ve looked at a few tickers. An account gives you live
-                scores and browser alerts when their scores move &mdash; save them to
-                a watchlist on Pro. Creating one adds a card at first sign-in and
-                starts a 14-day Premium trial &mdash; $0 today, one click to cancel
-                before day 14. Or keep reading the published record with no account
-                at all.
+                You&rsquo;ve looked at a few tickers. An account opens the live
+                scanner and raises how many you can look up in a day &mdash; an
+                email and a password, no card. A saved watchlist and score alerts
+                come with a card, which starts a 14-day Premium trial &mdash; $0
+                that day, one click to cancel before day 14. Or keep reading the
+                published record with no account at all.
               </>
             )}
           </p>

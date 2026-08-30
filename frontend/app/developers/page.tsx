@@ -3,6 +3,10 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+// Free-tier caps are quoted from the single source of truth rather than typed
+// out here — the free plan is a real self-serve tier again (2026-08-30), so
+// this page has to describe it accurately while saying the API isn't in it.
+import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 
 // Developer/API landing page. The public API (/api/v1/*) shipped 2026-06-01
 // (PR #247) but had no public marketing/docs surface — only the in-app key
@@ -110,7 +114,7 @@ const FAQ = [
   },
   {
     q: "Is there a free tier for the API?",
-    a: "The API itself is a Premium feature. A new account adds a card at first sign-in and starts a 14-day Premium trial — $0 that day, first charge on day 14, one click to cancel before then — so you can build and test against the API before deciding. The Free tier covers the in-app product (live scores for the top 10 scanner rows, 12 look-ups/day), not programmatic API access.",
+    a: `The API itself is a Premium feature. Signing up costs nothing and takes an email and a password, but a free account issues no key: the free plan covers the in-app product (live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""}), not programmatic access. Adding a card starts a 14-day Premium trial — $0 that day, first charge on day 14, one click to cancel before then — and the trial issues a working key at 100 requests/day, so you can build and test against the real endpoints before deciding.`,
   },
 ];
 
@@ -145,12 +149,17 @@ export default function DevelopersPage() {
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/signup" className="btn-primary">
-            Start the 14-day trial &rarr;
+            Create your account &rarr;
           </Link>
           <Link href="/app/api-keys" className="btn-ghost">
             Manage API keys
           </Link>
         </div>
+        <p className="mt-3 text-xs text-subtle">
+          Sign-up takes an email and a password. Keys are issued on Premium, so
+          the 14-day trial (started by adding a card, $0 that day) is the way to
+          build against the API before you commit.
+        </p>
 
         {/* Quickstart */}
         <section className="mt-12">
@@ -243,13 +252,14 @@ export default function DevelopersPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">Build on the tape.</h2>
           <p className="mt-3 text-sm text-muted">
-            Premium includes the API, 1,000 requests/day, and everything else. 14-day Premium trial
-            &mdash; a card at first sign-in, $0 charged that day, first charge on day 14, one click
-            to cancel.
+            Premium includes the API, 1,000 requests/day, and everything else. An
+            account takes an email and a password; adding a card starts the 14-day
+            Premium trial and issues a key &mdash; $0 charged that day, first charge
+            on day 14, one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Start the 14-day trial &rarr;
+              Create your account &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost">
               See pricing

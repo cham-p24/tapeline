@@ -6,20 +6,23 @@ import { authApi, type SessionUser } from "@/lib/auth";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 /**
- * The session user, plus the card-gate verdict if the session endpoint happens
- * to carry it.
+ * The session user, plus the `must_add_card` verdict if the session endpoint
+ * happens to carry it.
  *
- * `must_add_card` is computed ENTIRELY server-side (backend
- * services/tier.must_add_card, keyed on the single CARD_GATE_START constant)
- * and simply reported here. The browser deliberately does NOT re-derive it
- * from `created_at`: the grandfather rule — accounts created before the
- * cutover keep their access forever and must never meet the wall — is the one
- * rule that cannot be allowed to differ between two implementations, so it has
- * exactly one implementation, and it is not this one.
+ * NOT A GATE ANY MORE. #683 (2026-08-30) removed the route wall this flag used
+ * to drive; it now means "this account has never put a card down" and is read
+ * for COPY — the /app/start trial offer, upgrade prompts, funnel cohorts. An
+ * account it is true for can use the whole free product.
+ *
+ * It is computed ENTIRELY server-side (backend services/tier.must_add_card,
+ * keyed on the single CARD_GATE_START constant) and simply reported here. The
+ * browser deliberately does NOT re-derive it from `created_at`: a billing
+ * predicate with two implementations is how the two drift apart, so it has
+ * exactly one, and it is not this one.
  *
  * Optional on purpose. `/api/auth/session` does not return the field today
- * (see `resolveCardGate` below), and absent means NOT gated: a payload that
- * predates the field can never wall anybody.
+ * (see `resolveCardGate` below), and absent means false — a payload that
+ * predates the field can never make the app act as though a card is owed.
  */
 export type SessionUserWithGate = SessionUser & {
   must_add_card?: boolean;

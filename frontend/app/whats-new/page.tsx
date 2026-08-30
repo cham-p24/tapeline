@@ -7,7 +7,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "What's new in Tapeline — MCP server, open access, more",
   description:
-    "The latest Tapeline upgrades: a public MCP server for AI assistants, embeddable score badges, ticker pages rebuilt as a decision aid, a card-backed Premium trial, and the ranked scanner open on Free until 8 September.",
+    "The latest Tapeline upgrades: a public MCP server for AI assistants, embeddable score badges, ticker pages rebuilt as a decision aid, sign-up down to an email and a password, and the ranked scanner open on Free until 8 September.",
   path: "/whats-new",
 });
 
@@ -364,10 +364,10 @@ export default function WhatsNewPage() {
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-muted">
             The latest round: a public MCP server so AI assistants can read the record directly,
-            embeddable score badges, ticker pages rebuilt as a decision aid, a clearer card-backed
-            trial, and the ranked scanner open on the Free plan until 8 September. Same transparent
-            six-factor scores and the same public record behind everything; here&rsquo;s what changed
-            and where to find it.
+            embeddable score badges, ticker pages rebuilt as a decision aid, sign-up down to an
+            email and a password with the card moved onto the trial, and the ranked scanner open on
+            the Free plan until 8 September. Same transparent six-factor scores and the same public
+            record behind everything; here&rsquo;s what changed and where to find it.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button href="/signup" variant="primary" shape="rounded">
@@ -432,16 +432,20 @@ export default function WhatsNewPage() {
 
         <FeatureRow
           flip
-          where="first sign-in, for accounts created from 22 August"
-          title="The 14-day Premium trial now takes card details up front"
+          where="sign-up, and the billing page"
+          title="Sign up with an email and a password; the card starts the trial"
           body={
             <>
-              A new account adds a card at first sign-in and starts the 14-day Premium trial:{" "}
+              A new account takes an <strong className="text-fg">email and a password</strong> and
+              lands on the Free plan, which opens the live scanner at the{" "}
+              <strong className="text-fg">top ten scored rows</strong> — live data, no delay — plus
+              one saved screen, a 5-symbol watchlist and 12 ticker pages a day. A card is the
+              separate step that starts the 14-day Premium trial, and it is what turns on every
+              matching row, a second saved screen, alerts, CSV export and the filings feeds:{" "}
               <strong className="text-fg">$0 charged today</strong>, first charge on day 14 at the
               plan you pick. We email you <strong className="text-fg">three days before</strong> that
               charge, and cancelling is one click on the first screen — cancel before day 14 and you
-              are never charged. Existing accounts are unchanged, and the published record stays free
-              to read with no account.
+              are never charged. The published record stays free to read with no account.
             </>
           }
           mock={<TrialMock />}
@@ -540,8 +544,9 @@ export default function WhatsNewPage() {
         <div className="mt-20 rounded-2xl border border-border bg-panel p-8 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">See it for yourself</h2>
           <p className="mx-auto mt-2 max-w-md text-muted">
-            The record is free to read with no account. The live scanner takes a card at
-            first sign-in and starts a 14-day Premium trial &mdash; $0 today.
+            The record is free to read with no account. A free account takes an email and a
+            password and opens the live scanner at the top ten scored rows; a card is what starts
+            the 14-day Premium trial &mdash; $0 today.
           </p>
           <Button href="/signup" variant="primary" shape="rounded" className="mt-6">
             Open Tapeline &rarr;

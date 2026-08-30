@@ -18,10 +18,12 @@ import { freeOpenAccess, FREE_LIMITS, PRO_SCANNER_ROWS } from "@/lib/pricing";
  *     AUTHENTICATED Free users; anonymous callers keep the standard top 10 —
  *     so the copy must say the full list needs an account, and must NOT
  *     promise lifted look-ups, watchlist slots or any Pro feature;
- *   - since the 2026-08-22 card gate a NEW account adds a card at first
- *     sign-in (14-day Premium trial), so no "free account, no card" claim may
- *     appear here — "Sign in" is the honest CTA for the accounts the promo
- *     actually reaches;
+ *   - since #683 (2026-08-30) a new account is an email and a password and
+ *     lands on Free, so the promo is no longer only reachable by people who
+ *     already had an account. "Sign in" was the honest CTA while it was; now
+ *     the honest strip offers both doors, and may say the sign-up one takes no
+ *     card, because that is true of SIGN-UP. It stays false of the trial, so
+ *     the trial is not mentioned here at all;
  *   - "until 8 September" is a factual end date (permitted); no countdown, no
  *     urgency framing (compliance Rule 6).
  *
@@ -52,8 +54,16 @@ export function OpenAccessBanner({
         href="/signin"
         className="whitespace-nowrap text-accent underline-offset-2 hover:underline"
       >
-        Sign in &rarr;
-      </Link>
+        Sign in
+      </Link>{" "}
+      or{" "}
+      <Link
+        href="/signup"
+        className="whitespace-nowrap text-accent underline-offset-2 hover:underline"
+      >
+        create an account
+      </Link>{" "}
+      &mdash; an email and a password, no card.
     </aside>
   );
 }

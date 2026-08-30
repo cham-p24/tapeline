@@ -190,10 +190,11 @@ export default async function SignalsPage() {
             "Read the page or tap any ticker for the score breakdown."
           ) : (
             <>
-              Anonymous visitors see the top {PREVIEW_ROWS} —{" "}
-              <Link href="/signup" className="link">create an account</Link> &mdash; a card at first
-              sign-in starts the 14-day Premium trial of the full universe, $0 charged that day,
-              one click to cancel.
+              Anonymous visitors see the top {PREVIEW_ROWS}.{" "}
+              <Link href="/signup" className="link">Create an account</Link> &mdash; an email and a
+              password, no card &mdash; and the whole list opens here. In the app itself the free
+              plan scores the top ten rows of any scan; a card starts the 14-day Premium trial for
+              every matching row, $0 charged that day, one click to cancel.
             </>
           )}
         </p>
@@ -309,19 +310,20 @@ export default async function SignalsPage() {
         {!isSignedIn && hiddenCount > 0 ? (
           <div className="mt-6 overflow-hidden rounded-xl border border-accent/30 bg-gradient-to-br from-accent/10 via-panel to-panel">
             <div className="p-6 sm:p-8 text-center">
-              <p className="eyebrow text-accent">{hiddenCount.toLocaleString()} more tickers behind the wall</p>
+              <p className="eyebrow text-accent">{hiddenCount.toLocaleString()} more tickers, an account away</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-                Unlock the full universe — 14-day Premium trial.
+                Open the full universe.
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-sm text-muted">
                 You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
-                A card at first sign-in starts the 14-day Premium trial — the full live universe,
-                the same six named factors on every row. $0 charged that day, first charge on
-                day 14, one click to cancel.
+                An account takes an email and a password and opens the rest of this list — the same
+                six named factors on every row. Inside the app the free plan scores the top ten rows
+                of any scan; a card starts the 14-day Premium trial for every matching row, $0
+                charged that day, first charge on day 14, one click to cancel.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">
-                  Start the 14-day trial &rarr;
+                  Create your account &rarr;
                 </Link>
                 <Link href="/pricing" className="btn-ghost">
                   See pricing

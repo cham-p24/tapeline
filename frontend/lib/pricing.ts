@@ -77,8 +77,17 @@ export const FREE_LIMITS = {
   scannerRows: 10,
   /** Read-only Squeeze Watch preview rows (GET /api/squeeze/preview). */
   squeezePreviewRows: 3,
-  /** Web-push alert rules a free user may create. */
-  webPushAlerts: 2,
+  /**
+   * Web-push alert rules a free user may create. ZERO since #683
+   * (2026-08-30): Free now carries no alerts on ANY channel (email was
+   * already 0), and alerts are one of the things a card turns on. Kept as a
+   * constant rather than deleted so callers keep mirroring tier.py's
+   * FREE_WEB_PUSH_ALERTS if the allowance ever returns — but every caller
+   * must handle 0 by naming the absence, never by rendering "0 alerts".
+   */
+  webPushAlerts: 0,
+  /** Saved screens a free user may keep (tier.py FREE tier `saved_scans`). */
+  savedScans: 1,
 } as const;
 
 /**

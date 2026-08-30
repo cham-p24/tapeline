@@ -14,7 +14,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Best Free Stock Screener 2026 — 5 Tools Compared | Tapeline",
   description:
-    "Compare 2026's best free stock screeners — Finviz, TradingView, StockAnalysis and Tapeline's free published record. Only Tapeline names its scoring factors and keeps a public scorecard.",
+    "Compare 2026's best free stock screeners — Finviz, TradingView, StockAnalysis and Tapeline's free plan and public record. Only Tapeline names its scoring factors and keeps a public scorecard.",
   path: "/best-free-stock-screener",
 });
 
@@ -34,19 +34,22 @@ type FreeScreener = {
 
 const SCREENERS: FreeScreener[] = [
   {
-    // 2026-08-22 card gate: this entry used to sell a "free forever" logged-in
-    // tier with "no card, no trial clock". A new Tapeline account now takes a
-    // card at first sign-in, so the free thing on offer is the PUBLISHED
-    // RECORD — which is genuinely free, genuinely card-free and genuinely
-    // account-free, and is what this row now describes.
-    name: "Tapeline (public record)",
+    // 2026-08-30: the card moved off the front door (PR #683). Between
+    // 2026-08-22 and that date a new account really did have to add a card to
+    // get in, and this row honestly described the published RECORD as the
+    // only free thing on offer. It is no longer the only one: signing up is
+    // an email and a password onto a free plan that runs the live scanner, so
+    // this row now covers both free paths — reading (no account) and running
+    // (an account, still no card) — and names the row cap that bounds the
+    // second one.
+    name: "Tapeline (free plan)",
     freePlan:
-      "The daily Top 10, the full scorecard, a page per scored ticker and the raw CSV/JSON — free, with no account at all",
+      "A free account runs the live scanner at the top ten scored rows of any scan, live — and the daily Top 10, full scorecard and raw CSV/JSON need no account at all",
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     noCard: "Yes",
     summary:
-      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. All of the published output is readable without an account or a card: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record. What is NOT card-free is the signed-in scanner — a new account adds a card at first sign-in and starts a 14-day Premium trial ($0 that day, first charge on day 14, one click to cancel). Accounts created before 22 August 2026 keep the free access they signed up for.",
+      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. There are two free paths here, and they are worth separating. Reading asks for nothing at all: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record are open to anyone. Running the scanner asks for an email and a password and nothing else — the free plan is live, not delayed, and shows you the top ten scored rows of whatever scan you build, with one saved screen and a five-symbol watchlist. A card is what turns on the rest of the matching rows, alerts, CSV export and the filings feeds, and adding one starts the 14-day Premium trial ($0 that day, first charge on day 14, one click to cancel).",
   },
   {
     name: "Finviz (free)",
@@ -85,11 +88,11 @@ const SCREENERS: FreeScreener[] = [
 const FAQ = [
   {
     q: "What's the best free stock screener in 2026?",
-    a: "It depends on the job. To READ a synthesised composite score per ticker with a published methodology, Tapeline's public record — the only one here that also keeps a public scorecard, and none of it needs an account. To RUN your own filters for free, the free Finviz screener for raw filter density, TradingView for charting plus a screener, StockAnalysis.io for clean fundamental tables with no login wall. Each is honest about what its free path includes and what it doesn't.",
+    a: "It depends on the job. To READ a synthesised composite score per ticker with a published methodology, Tapeline's public record — the only one here that also keeps a public scorecard, and none of it needs an account. To RUN screens for free: Tapeline's free plan (an email and a password, live data, the top ten scored rows of any scan you build), the free Finviz screener for raw filter density, TradingView for charting plus a screener, StockAnalysis.io for clean fundamental tables with no login wall. Each is honest about what its free path includes and what it doesn't.",
   },
   {
     q: "Are free stock screeners actually any good, or just trials?",
-    a: "Several are genuinely free, not disguised trials. StockAnalysis.io, the free Finviz screener, and TradingView's free tier all give you real, ongoing screening with no card required. Tapeline is the odd one out here and it should be said plainly: its published record is free forever with no account, but the signed-in scanner takes a card at first sign-in — so it is not a free screener you can run yourself. Paid tiers elsewhere add depth (real-time data, more filters, unlimited look-ups), but the free versions do real work.",
+    a: "Several are genuinely free, not disguised trials. StockAnalysis.io, the free Finviz screener, and TradingView's free tier all give you real, ongoing screening with no card required. Tapeline belongs in that list too since 30 August 2026 — an email and a password, nothing else, and the live scanner runs — with the limit stated plainly: it shows the top ten scored rows of a scan rather than every match, and its published record stays readable with no account. Paid tiers everywhere add depth (real-time data, more filters, every matching row, alerts, exports), but the free versions do real work.",
   },
   {
     q: "Which free screener publishes how it actually scores stocks?",
@@ -101,7 +104,7 @@ const FAQ = [
   },
   {
     q: "How did you compare these free screeners?",
-    a: "On features only, never on returns: what you can reach with no credit card, whether it publishes the methodology behind any score, whether it keeps a public track record, and whether it works with no account. We don't rank tools by claimed performance — that's not something an honest scanner should advertise. Note the split on Tapeline: reading its record is free and account-free, but from 22 August 2026 a new account takes a card at first sign-in, so if you want a free screener to run yourself the other four are the honest answer.",
+    a: "On features only, never on returns: what you can reach with no credit card, whether it publishes the methodology behind any score, whether it keeps a public track record, and whether it works with no account. We don't rank tools by claimed performance — that's not something an honest scanner should advertise. Note the two free paths on Tapeline, because they answer different columns: reading the record needs no account at all, and running the scanner needs an account but not a card. The honest limit on the second one is breadth — ten scored rows a scan, where the other four show you every row that matches your filters.",
   },
 ];
 
@@ -154,8 +157,11 @@ export default function BestFreeStockScreenerPage() {
 
         {/* Above-the-fold conversion block — offer, live scanner preview, and the
             founding price up top where the visitor already is. from="screener"
-            message-matches the signup H1 for screener-intent traffic. */}
-        <LandingCta from="screener" primaryLabel="Start the 14-day Premium trial" />
+            message-matches the signup H1 for screener-intent traffic. The
+            label names what the button actually does since 2026-08-30: signup
+            is an email and a password onto the free plan, and the trial is a
+            later, separate choice. */}
+        <LandingCta from="screener" primaryLabel="Open the live scanner — free account" />
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance — the free paths compared</h2>
@@ -240,10 +246,11 @@ export default function BestFreeStockScreenerPage() {
             Tapeline is the only tool here that answers &quot;yes&quot; to both the public-methodology
             and public-scorecard columns. The scorecard trailing SPY is stated plainly on the{" "}
             <Link href="/scorecard" className="text-accent hover:underline">public scorecard</Link>{" "}
-            itself — it&apos;s the trust hook, not a footnote. It is also the one entry here whose
-            free path is reading rather than screening: from 22 August 2026 a new Tapeline account
-            takes a card at first sign-in, so if what you want is a free screener to run yourself,
-            the other four are the honest answer. The raw filter screeners
+            itself — it&apos;s the trust hook, not a footnote. It is also the one entry here with
+            two free paths rather than one: the record reads with no account, and the scanner
+            runs on a free plan that asks for an email and a password and nothing else. That
+            second path has a real ceiling and we&apos;d rather you hear it here — ten scored rows
+            a scan, where the other four hand you every row your filters match. The raw filter screeners
             (Finviz, TradingView, StockAnalysis.io) don&apos;t produce a composite score at all, so
             those columns simply don&apos;t apply to them — a fair difference in design, not a knock.
           </p>
@@ -306,12 +313,12 @@ export default function BestFreeStockScreenerPage() {
             The scanner that shows its receipts.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 14-day Premium trial, $0 today, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">
-              Start the 14-day Premium trial →
+              Create a free account →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

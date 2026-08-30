@@ -6,10 +6,12 @@
  *
  * It must also offer TWO first-class entry points, not one button plus a
  * ghost link. The fold previously demoted everything except /signup to
- * `btn-ghost` (borderless, muted text), so the no-card trial's terms and the
+ * `btn-ghost` (borderless, muted text), so the trial's terms and the
  * no-account browse path both read as footnotes. Both doors now carry equal
- * visual weight, and the trial is described plainly — no card, nothing
- * charged, and no deadline framing (compliance Rule 6).
+ * visual weight, and the terms are described plainly: signing up takes an
+ * email and a password and no card, a card is what starts the trial, nothing
+ * is charged the day it does, and there is no deadline framing anywhere
+ * (compliance Rule 6).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -111,10 +113,16 @@ describe("LandingPage hero fold", () => {
 
   it("adds a subtle tertiary /signup link without demoting the two pills (GAP #6)", async () => {
     render(await LandingPage());
-    // The tertiary link is present and points at /signup...
-    expect(
-      screen.getByRole("link", { name: /start the 14-day trial/i }),
-    ).toHaveAttribute("href", "/signup");
+    // The tertiary link is present and points at /signup. Matched on the HREF,
+    // not on the label: this used to assert the words "Start the 14-day
+    // trial", and since #683 signing up does not start a trial — it creates a
+    // free account that can scan straight away. What GAP #6 is actually about
+    // is the DOOR being there, so that is what is pinned; the wording of the
+    // link belongs to app/page.tsx.
+    const signup = screen
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("href") === "/signup");
+    expect(signup.length).toBeGreaterThan(0);
     // ...and the two proof-first pills are still first-class (unchanged).
     expect(
       screen.getByRole("link", { name: /see the track record/i }),
@@ -124,19 +132,25 @@ describe("LandingPage hero fold", () => {
     ).toHaveAttribute("href", "/daily-picks");
   });
 
-  it("states the trial terms plainly: card at sign-in, \$0 today, day-14 charge, one-click exit", async () => {
-    render(await LandingPage());
-    // CHANGED by the #548 card gate. The old copy promised "no credit card, no
-    // payment details, nothing charged" — false for any account created from
-    // 2026-08-22. The terms must now name the card, the amount and the date.
-    const terms = screen.getByText(/your card goes on at first sign-in/i);
-    expect(terms).toBeInTheDocument();
-    expect(terms.textContent).toMatch(/14 days of Premium/i);
-    expect(terms.textContent).toMatch(/nothing is charged that day/i);
-    expect(terms.textContent).toMatch(/first charge is on day 14/i);
-    expect(terms.textContent).toMatch(/one click cancels/i);
-    // The genuinely card-free path is still offered.
-    expect(terms.textContent).toMatch(/free to read with no\s+account/i);
+  it("states the terms plainly: what a card buys, \$0 that day, day-14 charge, one-click exit", async () => {
+    const { container } = render(await LandingPage());
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    // CHANGED TWICE. #548 replaced "no credit card, no payment details" with
+    // "your card goes on at first sign-in"; #683 (2026-08-30) took the wall
+    // that sentence described back out. Signing up is an email and a password
+    // and the new account can scan immediately — the card is what buys the
+    // trial, and the TRIAL's terms below are exactly as they were.
+    expect(text).toMatch(/no card/i);
+    expect(text).toMatch(/14 days of Premium/i);
+    expect(text).toMatch(/nothing is charged/i);
+    expect(text).toMatch(/first charge is on day 14/i);
+    expect(text).toMatch(/one click cancels/i);
+    // The path that needs no account at all is still offered alongside it.
+    expect(text).toMatch(/free to read with no account/i);
+    // The retired wall must not survive anywhere in the fold copy. Asserted on
+    // the whole render because the sentence could reappear in any block.
+    expect(text).not.toMatch(/card (?:goes on|is added|comes) at first sign-in/i);
+    expect(text).not.toMatch(/at first sign-in,? you add a card/i);
   });
 
   it("keeps the trial CTA free of urgency and scarcity framing (Rule 6)", async () => {

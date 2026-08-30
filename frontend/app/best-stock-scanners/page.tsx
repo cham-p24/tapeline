@@ -39,7 +39,7 @@ const TOOLS: Tool[] = [
     rank: 1,
     name: "Tapeline",
     bestFor: "Multi-factor composite scoring + public scorecard",
-    price: "$8.25/mo Pro · $16.58/mo Premium (annual) · 14-day trial",
+    price: "Free · $8.25/mo Pro · $16.58/mo Premium (annual) · 14-day Premium trial",
     scoring: "Named factors",
     scorecard: "Per-pick public",
     tagline:
@@ -151,7 +151,7 @@ const FAQ = [
   },
   {
     q: "What's the best free stock scanner?",
-    a: "Stockanalysis.com offers the most usable free tier — full screener access, clean fundamental tables, ETF coverage, no paywall on basics. TradingView's free tier covers charting and a basic screener well. Tapeline is a different shape and worth being plain about: its published output is free to read with no account — the daily Top 10, the full scorecard, a page per scored ticker and the raw CSV/JSON — but the signed-in scanner takes a card at first sign-in, so it is not a free screener you can run yourself. Each is honest about what's included.",
+    a: "Stockanalysis.com offers the most usable free tier — full screener access, clean fundamental tables, ETF coverage, no paywall on basics. TradingView's free tier covers charting and a basic screener well. Tapeline is a different shape and worth being plain about: its published output is free to read with no account — the daily Top 10, the full scorecard, a page per scored ticker and the raw CSV/JSON — and a free plan (an email and a password) runs the live scanner, showing the top ten scored rows of any scan rather than every match. Each is honest about what's included.",
   },
   {
     q: "What's the best stock scanner with a public track record?",
@@ -219,8 +219,11 @@ export default function BestStockScannersPage() {
             the bottom of a long article. LandingCta puts the offer, the live
             scanner preview (the product proof), and the founding price up top
             where the visitor already is. from="screener" message-matches the
-            signup H1 ("the scanner that shows its receipts"). */}
-        <LandingCta from="screener" primaryLabel="Start the 14-day Premium trial" />
+            signup H1 ("the scanner that shows its receipts"). The label names
+            what the button actually does since 2026-08-30: signup is an email
+            and a password onto the free plan, and the trial is a later,
+            separate choice. */}
+        <LandingCta from="screener" primaryLabel="Open the live scanner — free account" />
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">At a glance</h2>
@@ -328,12 +331,12 @@ export default function BestStockScannersPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner.</h2>
           <p className="mt-3 text-sm text-muted">
-            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 14-day Premium trial, $0 today, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup?from=screener" className="btn-primary">
-              Start the 14-day Premium trial →
+              Create a free account →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

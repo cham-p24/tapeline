@@ -119,6 +119,18 @@ type Entry = {
 // and bug-admission language belong in commit messages, not here.
 const ENTRIES: Entry[] = [
   {
+    date: "2026-08-30",
+    version: "0.1.21",
+    tag: "improvement",
+    title: "The card moved off the front door — sign up with an email and a password",
+    body: [
+      "Signing up takes an email and a password. The account it makes lands on the Free plan and opens the live scanner straight away: the top ten scored rows of any scan, on live data, no delay. Free also carries one saved screen, a 5-symbol watchlist, and 12 ticker deep-pages a day.",
+      "A card is what starts the 14-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included.",
+      "The trial terms are unchanged: $0 charged that day, the exact first-charge date shown before you confirm, an email three days before the charge, and one click to cancel.",
+      "This supersedes the arrangement in the 22 August 2026 entry below, where a new account added a card at first sign-in before the logged-in product opened. That entry stands as a record of what shipped then. The published record — daily top 10, scorecard, per-ticker pages, CSV/JSON — is unchanged and still needs no account.",
+    ],
+  },
+  {
     date: "2026-08-22",
     version: "0.1.20",
     tag: "improvement",
@@ -302,7 +314,7 @@ const ENTRIES: Entry[] = [
     title: "Elite 13F holdings, harder Free tier, three competitor comparisons",
     body: [
       "Elite-fund 13F holdings live for Premium: latest positions from Buffett, Burry, Tepper, Ackman, Druckenmiller, Laffont, Coleman, Singer.",
-      "Free tier reworked at the time so the trial-end transition was meaningful. (Since superseded: Free is live scores on the top-10 scanner with 12 look-ups/day, and from 22 August 2026 a new account adds a card at first sign-in — see /pricing.)",
+      "Free tier reworked at the time so the trial-end transition was meaningful. (Since superseded: Free is live scores on the top-10 scanner with 12 look-ups/day, and where the card is asked for changed on 22 August 2026 and again on 30 August 2026 — see those entries, and /pricing.)",
       "Plain-English Why on every scanner row rewritten with sector-aware language across ~100 phrase variants.",
       "Side-by-side comparison pages live for Finviz, Zacks, and WallStreetZen.",
     ],
@@ -337,7 +349,7 @@ const ENTRIES: Entry[] = [
       "Six-factor scoring methodology live with all six factors published on /how-it-works.",
       "Scanner with one composite score and one plain-English Why on every US-listed ticker.",
       "Watchlist with smart score-change alerts.",
-      "14-day Premium trial available with no credit card. (Since superseded: the trial is card-required, and from 22 August 2026 a new account adds a card at first sign-in — see /pricing.)",
+      "14-day Premium trial available with no credit card. (Since superseded: the trial is card-required. Where the card is asked for changed on 22 August 2026 and again on 30 August 2026 — see those entries, and /pricing.)",
     ],
   },
 ];

@@ -274,11 +274,13 @@ export default function HowItWorksPage() {
       <section className="section py-8 sm:py-10 text-center">
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
         <p className="mt-3 text-muted">
-          14-day Premium trial &mdash; a card at first sign-in, $0 charged that day, first
+          An email and a password puts you on the free plan, where every scan
+          returns its top ten scored rows, live. A card starts the 14-day
+          Premium trial &mdash; every matching row, $0 charged that day, first
           charge on day 14, one click to cancel.
         </p>
         <Link href="/signup" className="btn-primary mt-6 inline-flex h-11 px-6 text-base">
-          Start the 14-day trial &rarr;
+          Create your account &rarr;
         </Link>
       </section>
 

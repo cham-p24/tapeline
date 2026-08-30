@@ -595,7 +595,6 @@ export default function BillingPage() {
           firstCharge={trialFirstCharge}
           busy={busy === "premium"}
           onStartTrial={() => startCheckout("premium", { startTrial: true })}
-          cardRequired={mustAddCard === true}
         />
       )}
 
@@ -933,7 +932,12 @@ export default function BillingPage() {
               items={[
                 `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
                 "Public scorecard + basic regime",
-                `${freeHasWatchlist() ? `Watchlist of ${FREE_LIMITS.watchlistTickers} · ` : ""}${FREE_LIMITS.webPushAlerts} browser push alerts`,
+                `${freeHasWatchlist() ? `Watchlist of ${FREE_LIMITS.watchlistTickers} · ` : ""}${FREE_LIMITS.savedScans} saved screen`,
+                // #683 took Free to zero alerts on EVERY channel, push
+                // included. Name the absence; never render "0 alerts".
+                FREE_LIMITS.webPushAlerts > 0
+                  ? `${FREE_LIMITS.webPushAlerts} browser push alerts`
+                  : "No alerts — email or push",
               ]}
               highlight={tier === "free"}
             />
@@ -1131,27 +1135,29 @@ export default function BillingPage() {
  *      same typographic weight as the trial button, sits beside it, is not a
  *      greyed-out afterthought, and is not preceded by a guilt line.
  *
- *      It must also DESCRIBE WHAT ACTUALLY HAPPENS, which depends on the
- *      account — hence `cardRequired` (the server's `must_add_card`). This
- *      panel shipped with one unconditional decline reading "Continue on the
- *      Free plan → /app/scanner", promising "live scores, top-N scanner, N
- *      look-ups a day". For an account created on or after CARD_GATE_START
- *      (2026-08-22) every word of that was false: /app/scanner is not in
+ *      It must also DESCRIBE WHAT ACTUALLY HAPPENS. This has been wrong in
+ *      both directions, so the history is worth keeping:
+ *
+ *      The panel shipped with one unconditional decline reading "Continue on
+ *      the Free plan → /app/scanner", promising "live scores, top-N scanner, N
+ *      look-ups a day". From CARD_GATE_START (2026-08-22) every word of that
+ *      was false for a new account: /app/scanner was not in
  *      CARD_GATE_PASSTHROUGH, so app/app/layout.tsx replaced it with the card
- *      wall the instant they clicked. The panel had no idea the gate existed.
+ *      wall the instant they clicked. So the decline was FORKED on
+ *      `cardRequired` (the server's `must_add_card`): a gated account was told
+ *      the signed-in app stays locked without a card and was pointed at the
+ *      public record instead.
  *
- *      That is exactly the bait-and-switch the gate's own grandfather clause
- *      was written to avoid, reproduced one click into the funnel — and it was
- *      the FIRST screen after signup, so it was the first thing a new customer
- *      was told. It also made this rule self-contradicting: "Free is a real
- *      outcome, not a punishment" was true only for the grandfathered half.
+ *      #683 (2026-08-30) removed the wall, which made the FORK the lie — it
+ *      was telling every card-free account the app was locked when the free
+ *      scanner was one click away, and routing them off the product to say so.
+ *      The fork is gone and the decline is unconditional again: everyone
+ *      continues on the Free plan, to /app/scanner, which is now true for
+ *      every account that can see this panel.
  *
- *      So: grandfathered/paying accounts keep the Free-plan wording, which is
- *      true for them. A gated account is told the signed-in app stays locked
- *      without a card, and is pointed at the PUBLIC RECORD (/scorecard,
- *      /daily-picks, the exports) — which genuinely needs no account and no
- *      card, and is the same escape hatch the wall itself offers. Never
- *      promise a gated account a Free tier it cannot reach.
+ *      THE RULE, which outlived both mistakes: the decline must describe the
+ *      destination it actually leads to. Never promise a Free tier the reader
+ *      cannot reach, and never withhold one they can.
  *   3. NO DARK PATTERNS. No auto-redirect into Stripe (the button is the only
  *      thing that navigates), nothing pre-ticked, no countdown, no scarcity,
  *      no "N spots left", no fake discount. Compliance rule 6 — and the copy
@@ -1171,15 +1177,12 @@ function TrialOfferPanel({
   firstCharge,
   busy,
   onStartTrial,
-  cardRequired,
 }: {
   billingPeriod: "monthly" | "annual";
   onBillingPeriod: (p: "monthly" | "annual") => void;
   firstCharge: Date;
   busy: boolean;
   onStartTrial: () => void;
-  /** `must_add_card` for THIS account — see the DECLINE note above. */
-  cardRequired: boolean;
 }) {
   const chargeDate = longDate(firstCharge);
   const amount =
@@ -1279,30 +1282,21 @@ function TrialOfferPanel({
           {busy ? "Opening Stripe…" : `Start the ${TRIAL_DAYS}-day trial`}
         </button>
         <Link
-          href={cardRequired ? "/scorecard" : "/app/scanner"}
+          href="/app/scanner"
           className={`flex h-11 flex-1 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-fg transition-colors hover:bg-panel2 ${FOCUS}`}
         >
-          {cardRequired ? "Continue without a card" : "Continue on the Free plan"}
+          Continue on the Free plan
         </Link>
       </div>
 
-      {cardRequired ? (
-        <p className="mt-4 text-xs text-muted leading-relaxed">
-          Declining costs you nothing and you are never charged. Without a card the
-          signed-in app stays locked for this account &mdash; but the public record is
-          open to everyone, with no account and no card: every daily pick, the full
-          scorecard measured against SPY, and the CSV and JSON exports. You can start
-          the trial from this page whenever you want.
-        </p>
-      ) : (
-        <p className="mt-4 text-xs text-muted leading-relaxed">
-          Declining costs you nothing: you stay on the Free plan &mdash; live scores,
-          top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups a day
-          {freeHasWatchlist() ? `, and a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}{" "}
-          &mdash; and no further charge is made. You can start the trial later from this
-          page &mdash; it is here whenever you want it.
-        </p>
-      )}
+      <p className="mt-4 text-xs text-muted leading-relaxed">
+        Declining costs you nothing: you stay on the Free plan &mdash; live scores,
+        top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups a day
+        {freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}, and
+        {" "}{FREE_LIMITS.savedScans}{" "}saved screen &mdash; and no further charge is made. The
+        public record stays open too, with no account at all. You can start the trial later from
+        this page &mdash; it is here whenever you want it.
+      </p>
     </section>
   );
 }

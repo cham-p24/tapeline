@@ -15,10 +15,12 @@ import { freeHasWatchlist } from "@/lib/pricing";
  *     notes the count resets tomorrow so the free tier still feels useful.
  *   - "signup_required"   → anonymous visitor over their (smaller) daily
  *     cap. Invites an account — inviting, not punitive — and states the
- *     mechanism plainly: since the 2026-08-22 cutover a new account adds a
- *     card at first sign-in and that starts the 14-day Premium trial. The
- *     genuinely card-free path, the published record, is offered in the
- *     footnote.
+ *     mechanism plainly: since #683 (2026-08-30) an account is an email and a
+ *     password, it lands on the free plan, and the card is what starts the
+ *     14-day Premium trial later. What this variant must NOT promise is the
+ *     FULL scanner: free sees the top ten scored rows, and a card is what
+ *     shows every matching one. The no-account path, the published record, is
+ *     still offered in the footnote.
  *
  * Copy follows the ASIC rule: descriptive, never prescriptive — no
  * buy/sell/recommend/should/guaranteed/beats-the-market language. We
@@ -97,15 +99,20 @@ export function LookupWall({
             Keep looking up tickers
           </h2>
           {/* CARD HONESTY. This wall is only ever shown to an anonymous guest,
-              so the account they would create is a POST-cutover one: it adds a
-              card at first sign-in. "No card required" was true before #548 and
-              is not now. The genuinely card-free path is the published record,
-              so that is what the footnote offers instead. */}
+              and since #683 the account they would create takes an email and a
+              password and nothing else. So the ask can finally be small — but
+              the copy has to stay exact in the other direction: an account
+              opens the scanner at the TOP TEN rows, not the whole list, and the
+              14-day Premium trial still takes a card. Naming both is what keeps
+              the small ask credible. The no-account path is the published
+              record, which the footnote offers. */}
           <p className="mt-3 text-sm leading-relaxed text-muted">
-            You&rsquo;ve reached {countPhrase} as a guest. An account opens live scores,
-            more look-ups each day{freeHasWatchlist() ? ", a watchlist," : ","} and the full
-            scanner. Creating one adds a card at first sign-in and starts a 14-day Premium
-            trial &mdash; $0 today, one click to cancel before day 14.
+            You&rsquo;ve reached {countPhrase} as a guest. An account is an email and a
+            password, no card &mdash; it opens live scores, more look-ups each day
+            {freeHasWatchlist() ? ", a watchlist," : ","} and the top ten scored rows of
+            any scan. Adding a card starts a 14-day Premium trial and shows every matching
+            row instead of the first ten &mdash; $0 that day, one click to cancel before
+            day 14.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link

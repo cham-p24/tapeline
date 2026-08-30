@@ -45,9 +45,9 @@ const WINS: CompareRow[] = [
     competitor: "Price/indicator alerts only — no composite",
   },
   {
-    label: "Trial terms",
+    label: "Free tier and trial terms",
     tapeline:
-      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
+      "Free plan on an email and a password — live scanner, top ten scored rows. A card starts the 14-day full Premium trial: $0 charged that day, first charge on day 14, cancel in one click before then",
     competitor: "Free tier exists; paid tiers prompt for card",
   },
 ];
@@ -98,7 +98,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Should I use both?",
-    a: "Many active traders do — TradingView for chart analysis and community ideas, Tapeline for the multi-factor scoring and the public scorecard back-checking every call. Run Tapeline alongside your existing TradingView setup: the 14-day Premium trial takes a card at first sign-in but charges $0 until day 14 and cancels in one click, and if you'd rather not put a card down the daily Top 10 and the full scorecard are readable with no account.",
+    a: "Many active traders do — TradingView for chart analysis and community ideas, Tapeline for the multi-factor scoring and the public scorecard back-checking every call. Running Tapeline alongside your existing TradingView setup costs nothing to start: an email and a password puts you on the free plan, where the scanner is live and shows the top ten scored rows of any scan. A card is what starts the 14-day Premium trial and opens the rest of the list — $0 charged that day, one click cancels before day 14. And with no account at all, the daily Top 10 and the full scorecard stay readable.",
   },
 ];
 

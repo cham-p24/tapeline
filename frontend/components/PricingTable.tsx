@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { Button } from "@/components/Button";
-// FREE_LIMITS / freeHasWatchlist are no longer read here: the $0 column
-// describes the public record (which has no per-account limits), not a
-// logged-in free tier. The constants still exist for the surfaces that
-// legitimately describe grandfathered Free accounts.
+// FREE_LIMITS is read again (#683): the $0 column describes a real logged-in
+// Free plan once more, so its numbers must come from the shared constants
+// rather than be retyped here — that retyping is exactly how the Free column
+// drifted from the backend last time.
 import {
   PRICING,
   REFUND,
@@ -21,46 +21,50 @@ import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosur
 
 const PLANS = [
   {
-    // ── The card-free column, restated (2026-08-22, card gate) ────────────
-    // This card used to be "Free — free forever, live scores" with a "Start
-    // free" button into /signup. A new account now requires a card at first
-    // sign-in, so a self-serve free TIER is no longer something a visitor can
-    // sign up for, and selling one here would be the single most expensive
-    // false claim on the site.
+    // ── The $0 column, restated again (#683, 2026-08-30) ───────────────────
+    // History, because this column has now been rewritten twice and the next
+    // person deserves to know why. Before 22 August it was "Free — free
+    // forever" with a "Start free" button. The card gate then made a self-serve
+    // free tier untrue, so the column was narrowed to the PUBLIC RECORD: the
+    // one $0 thing that survived, and an honest column rather than a false one.
     //
-    // What is still completely true — and is what this column now shows — is
-    // the PUBLIC record: the daily Top 10, the whole scorecard, a page per
-    // scored ticker and the raw CSV/JSON export are open to anyone with no
-    // account, no card and no email. That is a real $0 offer, so it keeps the
-    // $0 column; it just stops pretending to be a logged-in plan.
-    name: "Public record",
-    tagline: "Open to everyone — no account",
+    // #683 moved the card ask off the front door, and the honest column is now
+    // wider than it was in either previous state. A visitor signs up with an
+    // email and a password, lands on Free, and runs live scans. So the column
+    // goes back to being a PLAN — but it keeps the public-record bullets,
+    // because those remain reachable with no account at all and are the only
+    // lines here a reader can verify before trusting us with an address.
+    //
+    // The bullets are ordered logged-in-first, then the no-account record, and
+    // the footnote draws the line between them. Every number comes from
+    // FREE_LIMITS so this column cannot drift from tier.py by hand again.
+    name: "Free",
+    tagline: "An email and a password. No card.",
     prices: { monthly: 0, annual: 0, annualPerMonth: 0 },
     highlights: [
-      "The daily Top 10, live",
+      `The live scanner — the top ${FREE_LIMITS.scannerRows} scored rows of any scan`,
+      "One saved screen, re-run whenever you open it",
+      `A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`,
+      `${FREE_LIMITS.dailyLookups} ticker look-ups a day`,
       "The full scorecard — every pick, back-checked vs SPY",
-      "A page per scored ticker, all six factors",
-      "The raw record as CSV and JSON",
       // Not "the scoring formula, named and weighted" — PR #342 deliberately
       // stripped the numbers. What /how-it-works publishes is the factor set
       // plus the weight ORDERING, and this bullet may promise no more.
       "The six scoring factors, named and ranked by weight",
-      "No account, no card, no email",
     ],
-    cta: "Read the record",
-    ctaHref: "/scorecard",
+    cta: "Create an account",
+    ctaHref: "/signup",
     skipBillingParam: true,
     highlight: false,
-    // The grandfather clause, stated where a returning free user will look
-    // first. Accounts created before the cutover keep what they signed up
-    // for; nobody is asked for a card to get back into an account they
-    // already have.
+    // Two facts a reader wants in this order: what the sign-up costs them
+    // (nothing, and no card), and what is readable before they sign up at all.
+    // The second is the more persuasive one, so it is not buried.
     footnote:
-      "Nothing here asks for anything. Signing in to the app is separate and does take a card — see the trial terms below. Accounts created before 22 August 2026 keep the free access they signed up for and are never asked for a card.",
+      "Signing up takes an email and a password, no card. The public record — the daily Top 10, the whole scorecard, a page per scored ticker and the raw CSV/JSON — stays open with no account at all.",
     // Marks the card that carries the date-gated open-access note below. The
-    // note describes a SIGNED-IN entitlement, so it lives with the footnote
-    // (which already covers signed-in matters), never in the highlights list —
-    // every highlight above must stay reachable with no account.
+    // note describes a SIGNED-IN entitlement, so it stays out of the highlights
+    // list, which mixes signed-in lines with no-account ones and would blur the
+    // two if the promo were folded in.
     openAccessNote: true,
   },
   {
@@ -185,9 +189,9 @@ export function PricingTable({ now }: { now?: Date } = {}) {
           // Monthly stays as-is.
           const perMonth = billing === "annual" ? p.prices.annualPerMonth : price;
           const isPower = (p as { proPlus?: boolean }).proPlus === true;
-          // The public-record column links to a shared, indexable public URL;
-          // it carries no plan and no billing period, so it does not get a
-          // ?billing= param bolted on.
+          // The Free column has no billing period to carry — there is nothing
+          // to bill — so its CTA goes to a bare /signup rather than picking up
+          // a ?billing= param that would be meaningless on arrival.
           const ctaHref = (p as { skipBillingParam?: boolean }).skipBillingParam
             ? p.ctaHref
             : p.ctaHref.includes("?")
@@ -255,12 +259,14 @@ export function PricingTable({ now }: { now?: Date } = {}) {
                   {(p as { footnote?: string }).footnote}
                 </p>
               )}
-              {/* Open-access month — one factual line, stated where the $0
-                  column meets the signed-in world. The lift is rows-only and
-                  signed-in-only (tier.py limit()): no lifted look-ups, no
-                  Pro features, nothing for anonymous callers — so the copy
-                  says exactly that and nothing more. Factual end date only;
-                  no urgency (Rule 6). */}
+              {/* Open-access month — one factual line under the Free column,
+                  qualifying the row cap the bullet above states. The lift is
+                  rows-only and signed-in-only (tier.py limit()): no lifted
+                  look-ups, no Pro features, nothing for anonymous callers — so
+                  the copy says exactly that and nothing more. It is deliberately
+                  NOT folded into the bullet: the bullet describes the plan,
+                  which outlives the promo. Factual end date only; no urgency
+                  (Rule 6). */}
               {(p as { openAccessNote?: boolean }).openAccessNote && openAccess && (
                 <p className="mt-3 text-xs leading-relaxed text-accent/90">
                   Open-access month: until 8 September, signing in to a free
@@ -290,25 +296,31 @@ export function PricingTable({ now }: { now?: Date } = {}) {
           14, and the one button that stops it. Cancellation is genuinely one
           click (POST /api/billing/cancel, no survey gate).
 
-          2026-08-22: the last sentence used to read "Skip the trial and you
-          stay on Free, which never asks for a card." A new account now adds a
-          card at first sign-in, so there is no skip — and the honest
-          replacement is the way out that actually exists: read the public
-          record, which costs nothing and asks for nothing.
+          2026-08-30 (#683): the skip exists again. This paragraph's last
+          sentence once read "Skip the trial and you stay on Free, which never
+          asks for a card", was cut when the card moved to first sign-in, and is
+          true once more — so it is restored, but as a mechanism rather than a
+          reassurance, and naming BOTH ways of not paying: the free plan (an
+          account, no card) and the public record (no account either). They suit
+          different readers and neither substitutes for the other.
+          What must never soften is the first sentence: the trial itself takes a
+          card. Sign-up being card-free does not make the trial card-free, and
+          the two sit one line apart here.
           No urgency, no deadline, no scarcity. */}
       <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-panel/60 px-4 py-3">
           <div className="text-xs font-medium text-fg">14-day Premium trial — $0 today</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
-            A new account adds a card at first sign-in, and that starts the trial.
+            Adding a card is what starts the trial &mdash; nothing before it does.
             Stripe charges $0 that day and shows you the exact first-charge date
             before you confirm: day 14, at the plan and billing period you picked.
-            One click stops it before that date and you are charged nothing. If
-            you would rather not put a card down at all, the{" "}
+            One click stops it before that date and you are charged nothing. If you
+            would rather not put a card down, you don&rsquo;t have to: the free plan
+            runs without one, and the{" "}
             <Link href="/scorecard" className="text-accent hover:underline">
               public record
             </Link>{" "}
-            stays open with no account.
+            is open with no account at all.
           </p>
         </div>
         <div className="rounded-lg bg-panel/60 px-4 py-3">

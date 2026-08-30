@@ -74,9 +74,11 @@ export default function SupportPage() {
                 {/* CARD HONESTY. This answer used to say the trial starts
                     "automatically (no card)" and that trial end drops you back
                     to Free — both were true before #536/#548 and are false now.
-                    A reader sitting on Free inside the app is a pre-2026-08-22
-                    account, so the honest answer is: nothing changes unless you
-                    choose the trial, and the trial takes a card. */}
+                    Since #683 (2026-08-30) a reader sitting on Free inside the
+                    app is simply a normal new account: signing up takes an
+                    email and a password and lands here. The honest answer is
+                    unchanged — nothing changes unless you choose the trial,
+                    and the trial takes a card. */}
                 Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
                 by design — it's the same product, just narrower, and it stays that way at no cost:
                 top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.

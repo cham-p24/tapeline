@@ -260,28 +260,40 @@ export const RULES = [
   },
   {
     id: "card-free-trial",
-    brief: "Rule 10 — never advertise the trial or a new account as card-free",
+    brief: "Rule 10 — never advertise the TRIAL as card-free",
     message:
-      "Card-free TRIAL/ACCOUNT claim. Since the 2026-08-22 card gate the 14-day " +
-      "Premium trial is card-required ($0 today, first charge on day 14) and a NEW " +
-      "account adds a card at first sign-in, so 'no credit card' next to 'trial' or " +
-      "'account' is false advertising on a financial product. Saying the PUBLIC " +
-      "RECORD needs no card is still true and does not match this rule — only " +
-      "card-free wording within ~40 characters of trial/account/sign-up does. " +
-      "For a dated historical entry (e.g. /changelog), use an inline " +
+      "Card-free TRIAL claim. The 14-day Premium trial is card-required ($0 that " +
+      "day, first charge on day 14), so 'no credit card' next to 'trial' is false " +
+      "advertising on a financial product. NARROWED 2026-08-30 (#683): the card " +
+      "wall at first sign-in is gone, so a card-free claim about SIGNING UP or " +
+      "about the FREE PLAN is now TRUE and no longer matches this rule — signing " +
+      "up takes an email and a password. Saying the PUBLIC RECORD needs no card " +
+      "is likewise still true. Two things stay banned everywhere: card-free " +
+      "wording within ~40 characters of 'trial', and the marketing phrase 'no " +
+      "credit card required', which is true of sign-up but false of the trial " +
+      "and never says which — prefer plain wording like 'email and password, no " +
+      "card'. For a dated historical entry (e.g. /changelog), use an inline " +
       "copy-compliance-allow with a reason.",
     patterns: [
       // "14-day trial ... no credit card" / "trial is no-card".
       // Two temperings, both for honest copy that names the constraint:
       //   (?<!\bno\s) / (?!\bno\b) — "no card, no trial" on the newsletter
       //     capture rules the trial OUT; it does not offer a card-free one.
-      //   (?![-\s]free) — "there is no card-free tier to sign up for" is the
+      //   (?![-\s]free) -- "there is no card-free tier to sign up for" is the
       //     honest negation on /best-finviz-alternatives, not a claim.
       /(?<!\bno\s)\btrial\b(?:(?!\bno\b)[^.!?]){0,40}\bno[-\s]?(?:credit[-\s]?)?card\b(?![-\s]free)/i,
-      // "no-credit-card trial" / "no card required to sign up"
-      /\bno[-\s]?(?:credit[-\s]?)?card\b(?![-\s]free)(?:(?!\bno\b)[^.!?]){0,40}\b(?:trial|account|sign[-\s]?up)\b/i,
-      // "card-free trial/account"
-      /(?<!\bno\s)\bcard[-\s]free\b[^.!?]{0,20}\b(?:trial|account|signup|sign[-\s]?up)\b/i,
+      // "no-credit-card trial". Since #683 this window is TRIAL-only:
+      // "no card to sign up" and "free plan, no card" are true statements
+      // about the ACCOUNT, and banning them would have the linter enforce
+      // the opposite of what the product does. A sentence break still ends
+      // the window, so "... no card. A card starts the trial." stays clean
+      // and is the phrasing to reach for when both facts must sit together.
+      /\bno[-\s]?(?:credit[-\s]?)?card\b(?![-\s]free)(?:(?!\bno\b)[^.!?]){0,40}\btrial\b/i,
+      // "card-free trial" ("card-free account" is now true, so it is out).
+      /(?<!\bno\s)\bcard[-\s]free\b[^.!?]{0,20}\btrial\b/i,
+      // The marketing phrase itself, wherever it lands. Kept because it is
+      // ambiguous between the account (true) and the trial (false).
+      /\bno\s+credit\s+card\s+(?:required|needed|necessary)\b/i,
     ],
   },
   {

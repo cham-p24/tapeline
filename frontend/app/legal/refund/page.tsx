@@ -72,18 +72,23 @@ export default function RefundPolicyPage() {
             for committed-term subscriptions.
           </p>
 
-          <h2 className="mt-6 text-lg font-semibold text-fg">4. Premium trial &mdash; card required, $0 today</h2>
+          <h2 className="mt-6 text-lg font-semibold text-fg">4. Premium trial &mdash; starts when you add a card, $0 that day</h2>
           <p>
-            From 22 August 2026 a new account adds a card at first sign-in, and that starts the
-            14-day Premium trial. Nothing is charged on the day you add it. The first charge lands
-            on day 14 at the plan price you picked, and we email you three days before that
-            happens. Cancel any time before day 14 and you are never billed &mdash; there is
-            nothing to refund, because no money moved.
+            Creating an account takes an email and a password. It does not take a card, and it
+            does not start a trial &mdash; a new account sits on the free plan until you choose
+            otherwise. The 14-day Premium trial begins when you add a card. Nothing is charged on
+            the day you add it. The first charge lands on day 14 at the plan price you picked, and
+            we email you three days before that happens. Cancel any time before day 14 and you are
+            never billed &mdash; there is nothing to refund, because no money moved.
           </p>
           <p>
-            Accounts created before 22 August 2026 were never asked for a card and are not affected
-            by this: they keep the free access they signed up for. Older trials that ran without a
-            payment method simply ended and moved the account to Free, with nothing charged.
+            A note on history, because it changes what people were told at sign-up: between
+            22 August and 30 August 2026 a new account added a card at first sign-in. That
+            requirement was removed on 30 August 2026. The trial terms themselves never changed
+            &mdash; $0 on the day the card goes on, first charge on day 14, one click to cancel
+            before then &mdash; so nobody was billed for signing up under either arrangement.
+            Trials that ran without a payment method simply ended and moved the account to the
+            free plan, with nothing charged.
           </p>
 
           <h2 className="mt-6 text-lg font-semibold text-fg">5. Refund method</h2>
@@ -133,6 +138,7 @@ export default function RefundPolicyPage() {
             <li>Cancel any time from your billing page; access continues until the end of the period.</li>
             <li>Monthly: 100% refund within 30 days, no questions.</li>
             <li>Annual: prorated refund within 30 days (we retain one month).</li>
+            <li>Signing up takes an email and a password; the trial starts only when you add a card.</li>
             <li>Trial: cancel before day 14 and you are never charged &mdash; nothing to refund.</li>
             <li>Refunds go back to the original card/wallet, usually within a week.</li>
             <li>Email <a href="mailto:support@tapeline.io" className="text-accent">support@tapeline.io</a> rather than chargeback &mdash; we&rsquo;ll just refund you.</li>

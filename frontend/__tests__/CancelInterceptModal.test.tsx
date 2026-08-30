@@ -77,10 +77,13 @@ describe("CancelInterceptModal", () => {
     } else {
       expect(text).not.toContain("-ticker watchlist");
     }
-    expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);
-    // Free keeps browser push — only email alerts are paid. Never claim a
-    // blanket "no alerts".
-    expect(text).not.toContain("no alerts");
+    // INVERTED for #683 (2026-08-30). Free used to keep a small browser-push
+    // allowance, so this asserted the count AND banned a blanket "no alerts".
+    // Free is now zero on every channel, so the honest copy is the blanket
+    // statement and the count must NOT appear.
+    expect(text).toContain(`${FREE_LIMITS.savedScans} saved screen`);
+    expect(text).not.toMatch(/\d+ browser push alerts/);
+    expect(text).toMatch(/no alerts, on email or push/i);
     expect(text).not.toContain("5 look-ups");
   });
 

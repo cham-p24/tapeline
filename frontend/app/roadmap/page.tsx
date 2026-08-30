@@ -22,7 +22,7 @@ const ITEMS: RoadmapItem[] = [
   { slug: "public-share-pages",     title: "Per-ticker share pages",    detail: "Every ticker gets a public /t/[symbol] page with the live score and 6-factor breakdown — shareable on X with a live preview card.", status: "shipped" },
   { slug: "public-scorecard",       title: "Public scorecard from day one", detail: "Every top-10 we publish back-checked against the next-day price move vs SPY.",     status: "shipped" },
   { slug: "watchlist-starter",      title: "Watchlist starter pack",    detail: "Empty watchlist? One click adds 8 mega-caps + SPY so smart alerts can fire from day one.", status: "shipped" },
-  { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Card at first sign-in via Stripe Checkout, then one-click upgrade from trial to paid.",   status: "shipped" },
+  { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Card details taken on Stripe's own checkout page to start the trial, then one-click upgrade from trial to paid.",   status: "shipped" },
   { slug: "universe-expansion",     title: "2,500-ticker active scoring",  detail: "Score the top 2,500 names by daily $-volume — covers everything liquid down to small-caps.", status: "shipped" },
   { slug: "api-v1",                 title: "Public API v1",              detail: "Read-only REST endpoints at /api/v1 for Premium subscribers, key-authenticated, 1,000 requests/day. Documented at /developers.", status: "shipped" },
 

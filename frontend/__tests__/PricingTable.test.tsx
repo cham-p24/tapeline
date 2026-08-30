@@ -9,36 +9,50 @@
  * cards + ComparisonTable header share one toggle state so they can never
  * show different billing periods on the same screen.
  *
- * CARD GATE (2026-08-22). The $0 column used to be a "Free" plan card with a
- * "Start free" button into /signup and a footnote promising a card-free
- * signup. A new account now adds a card at first sign-in
- * (`services/tier.must_add_card`), so a self-serve free tier is no longer on
- * offer and selling one here would be the most expensive false claim on the
- * site. The $0 column is now the PUBLIC RECORD — genuinely free, genuinely
- * account-free — and the suite below pins that contract in both directions:
- * the public-record column must be there, and no card-free ACCOUNT may be
- * advertised anywhere on this component.
+ * THE $0 COLUMN, AND WHY IT SAYS WHAT IT SAYS. It began as a "Free" plan card
+ * with a "Start free" button into /signup. The 2026-08-22 card gate made that
+ * false — a new account met a card wall at first sign-in — so the column was
+ * rewritten as the PUBLIC RECORD: the daily Top 10, the whole scorecard, a
+ * page per scored ticker and the raw CSV/JSON, open with no account, no card
+ * and no email.
+ *
+ * #683 (2026-08-30) removed the wall. Signing up is an email and a password,
+ * and the free account it creates reaches the live scanner immediately — the
+ * top ten scored rows of any scan, one saved screen, a five-symbol watchlist,
+ * twelve ticker pages a day. So a card-free ACCOUNT is now an honest thing to
+ * advertise, and this suite no longer forbids it. Two claims are still
+ * policed, because both are still false: that the 14-day Premium trial is
+ * card-free (it is not — a card is exactly what starts it), and any promise
+ * of permanence the product cannot keep.
+ *
+ * What the public-record assertions below pin is unchanged and independent of
+ * all that: every line in the $0 column has to be reachable with no account
+ * at all. A free PLAN column would be an honest addition beside it — it just
+ * would not belong in the account-free list.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
-import { PRICING, REFUND, usd, billedAnnuallyNote } from "@/lib/pricing";
+import { PRICING, REFUND, FREE_LIMITS, usd, billedAnnuallyNote } from "@/lib/pricing";
 
 /** Escape a literal string for use inside a RegExp ("$8.25 (…)" etc.). */
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 describe("PricingTable", () => {
-  it("renders the public-record, Pro, and Premium columns", () => {
+  it("renders the Free, Pro, and Premium columns", () => {
     render(<PricingTable />);
-    expect(screen.getByRole("heading", { name: /public record/i })).toBeInTheDocument();
+    // FOLLOWS THE COMPONENT, #683 (2026-08-30). The $0 column was narrowed to
+    // "Public record" while the card gate stood, because there was no free
+    // logged-in tier to sell and a /signup CTA would have been a lie. The wall
+    // is gone: signing up takes an email and a password and lands on a Free
+    // PLAN, so the column is a plan again and its CTA is a signup door.
+    expect(screen.getByRole("heading", { name: "Free" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Premium" })).toBeInTheDocument();
-    // The $0 column is no longer a signup destination: its CTA goes to the
-    // public record, not to /signup.
-    const free = screen.getByRole("link", { name: /read the record/i });
-    expect(free).toHaveAttribute("href", "/scorecard");
+    const free = screen.getByRole("link", { name: /create an account/i });
+    expect(free).toHaveAttribute("href", "/signup");
   });
 
   it("defaults to ANNUAL with the billed-annually qualifier and real totals", () => {
@@ -96,10 +110,17 @@ describe("PricingTable", () => {
     // and WHEN — $0 today, first charge on day 14 — plus a real, unpunished
     // way out. A vague "free trial" label here would be the exact failure
     // this test exists to catch.
-    render(<PricingTable />);
+    const { container } = render(<PricingTable />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
     expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
-    expect(screen.getByText(/card at first sign-in/i)).toBeInTheDocument();
-    expect(screen.getByText(/day 14, at the plan and billing period you picked/i)).toBeInTheDocument();
+    // CHANGED by #683. This block used to open "A new account adds a card at
+    // first sign-in, and that starts the trial" — the first half described a
+    // wall that no longer exists, and stating it here would tell a reader the
+    // scanner is unreachable without paying. The second half is the part that
+    // was always the point: a card is what starts the trial.
+    expect(text).toMatch(/card[^.]{0,30}starts the trial/i);
+    expect(text).not.toMatch(/(?:adds|adding) a card at first sign-in/i);
+    expect(text).toMatch(/day 14, at the plan and billing period you picked/i);
     // The way out is a link to the free public record, not a dead sentence.
     expect(screen.getByRole("link", { name: /public record/i })).toHaveAttribute(
       "href",
@@ -113,37 +134,65 @@ describe("PricingTable", () => {
     expect(screen.getByText(/No survey to complete/i)).toBeInTheDocument();
   });
 
-  it("sells the public record — the surface that is genuinely free and account-free", () => {
-    // Everything listed in the $0 column has to be reachable with no account:
-    // the daily Top 10, the scorecard, the per-ticker pages, the raw exports
-    // and the published formula. If a line here ever needs a login, it does
-    // not belong in this column.
-    render(<PricingTable />);
-    expect(screen.getByText(/open to everyone — no account/i)).toBeInTheDocument();
-    expect(screen.getByText(/the daily top 10, live/i)).toBeInTheDocument();
-    expect(screen.getByText(/full scorecard/i)).toBeInTheDocument();
-    expect(screen.getByText(/raw record as CSV and JSON/i)).toBeInTheDocument();
-    expect(screen.getByText(/no account, no card, no email/i)).toBeInTheDocument();
+  it("sells the Free PLAN at $0, and keeps the account-free record visible beside it", () => {
+    // REWRITTEN for #683. The old invariant was "every line in the $0 column
+    // must be reachable with NO ACCOUNT", which was right while the column
+    // described only the published record. The column is now a plan, so the
+    // invariant moves with it: every line must be reachable on a FREE ACCOUNT,
+    // which costs an email and a password and no card. The account-free record
+    // did not stop existing — it moved to the footnote, and this test pins it
+    // there so it can never be quietly dropped in favour of the plan.
+    const { container } = render(<PricingTable />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+
+    // The plan: what the account actually gets.
+    expect(screen.getByText(/an email and a password\. no card\./i)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`the top ${FREE_LIMITS.scannerRows} scored rows`, "i")),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/one saved screen/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${FREE_LIMITS.watchlistTickers}-ticker watchlist`, "i")),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${FREE_LIMITS.dailyLookups} ticker look-ups a day`, "i")),
+    ).toBeInTheDocument();
+
+    // The record, still stated as needing no account at all.
+    expect(text).toMatch(/signing up takes an email and a password, no card/i);
+    expect(text).toMatch(/stays open with no account at all/i);
+    expect(text).toMatch(/the daily top 10/i);
+    expect(text).toMatch(/raw csv\/json/i);
   });
 
-  it("never advertises a card-free ACCOUNT, and keeps the grandfather clause visible", () => {
-    // The regression this file exists to prevent from here on. Every one of
-    // these phrases was live on this component before the card gate and each
-    // is now false for a new user. The public record staying free is the
-    // claim that survives — it is asserted in the test above, not banned here.
+  it("never advertises a card-free TRIAL, and never promises permanence", () => {
+    // REWRITTEN by #683. This list used to ban every card-free claim about an
+    // ACCOUNT, because a new account met a card wall — "start free" and
+    // "signing up asks for an email and a password" were on it, and both are
+    // now literally what happens. Banning them would be policing the truth.
+    //
+    // What is still worth catching is a growth edit that moves card-free
+    // wording ONE noun across, from the account to the trial. The trial takes
+    // a card; that is the whole reason the disclosure block above exists.
     const { container } = render(<PricingTable />);
-    const text = (container.textContent || "").toLowerCase();
-    for (const banned of [
-      "free forever",
-      "never asks for a card",
-      "start free",
-      "signing up asks for an email and a password",
-    ]) {
-      expect(text).not.toContain(banned);
-    }
-    // Grandfathered accounts must be told, on the pricing page, that the wall
-    // is not for them.
-    expect(text).toContain("before 22 august 2026");
+    const text = (container.textContent || "").replace(/\s+/g, " ");
+    // Windows stop at a sentence break or a `·` separator, so honest copy that
+    // states both facts in one breath ("no card to sign up; a card starts the
+    // trial") reads clean, while "no card needed to start your trial" does not.
+    expect(text).not.toMatch(/\btrial\b[^.;·]{0,30}(?:no|without a) (?:credit )?card/i);
+    expect(text).not.toMatch(/(?:no|without a) (?:credit )?card[^.;·]{0,28}\btrial\b/i);
+    expect(text).not.toMatch(/card[-\s]free trial/i);
+    expect(text).not.toMatch(/no credit card required/i);
+    // And no promise the product cannot keep. A free tier is a decision that
+    // can be revisited, and the app does ask for a card at a cap — so neither
+    // "forever" nor "never" belongs on a plan card.
+    expect(text.toLowerCase()).not.toContain("free forever");
+    expect(text.toLowerCase()).not.toContain("never asks for a card");
+    // The grandfather clause ("accounts created before 22 August 2026 keep the
+    // free access they signed up for") is deliberately NOT asserted any more.
+    // It was a promise to one cohort while the wall split the userbase in two;
+    // with the wall gone every account has that access, and requiring the
+    // sentence here would keep implying a distinction that no longer exists.
   });
 
   // ── Open-access month note (backend tier.py free_open_access, #523) ──────
@@ -171,13 +220,18 @@ describe("PricingTable", () => {
       expect(screen.queryByText(/open-access month/i)).toBeNull();
     });
 
-    it("keeps the promo line free of urgency and card-free-account claims", () => {
+    it("keeps the promo line free of urgency and of promises it can't keep", () => {
       render(<PricingTable now={DURING} />);
       const text = (screen.getByText(/open-access month/i).textContent || "").toLowerCase();
       expect(text).not.toMatch(
         /hurry|act now|last chance|limited time|countdown|only \d+ (left|remaining)/i,
       );
-      for (const banned of ["no card", "no credit card", "free forever", "start free"]) {
+      // "no card" and "start free" left this list with #683 — a free account
+      // really is an email and a password now, so the promo line is allowed to
+      // say so. The permanence promise and the banned marketing phrase stay
+      // out, and a temporary row-cap lift must never be sold as a free tier
+      // that outlives it.
+      for (const banned of ["free forever", "no credit card required"]) {
         expect(text).not.toContain(banned);
       }
     });

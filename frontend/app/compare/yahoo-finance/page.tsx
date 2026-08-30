@@ -23,7 +23,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Is Yahoo Finance's free tier good enough for stock picking?",
-    a: "For headlines, news, and basic charting — absolutely. For 'which of these 30 watchlist names should I look at first today', the answer is: not really. Tapeline's free surface is a different shape: the daily Top 10, the full scorecard and a page per scored ticker are readable with no account, but they are a published record rather than a screener you drive. The signed-in scanner takes a card at first sign-in.",
+    a: "For headlines, news, and basic charting — absolutely. For 'which of these 30 watchlist names should I look at first today', the answer is: not really. Tapeline's free surface is a different shape, and it has two layers. With no account: the daily Top 10, the full scorecard and a page per scored ticker — a published record rather than a screener you drive. With an email and a password: the live scanner itself, handing back the top ten scored rows of whatever you scan, plus one saved screen. Every matching row, alerts and export are what a card turns on.",
   },
   {
     q: "Should I use both?",
@@ -72,9 +72,9 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Free price tier",
-    tapeline: "Free to read with no account (daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON)",
+    tapeline: "No account: daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON. Free plan: the live scanner, top ten scored rows, one saved screen",
     competitor: "Free (full quote / news access, 15-min delay)",
-    note: "Yahoo's free tier gives you far more raw data to browse than Tapeline's free surface does, and it needs no card either way. Tapeline's free surface is a published, downloadable record of what the scoring engine said and how it did; Yahoo's free is a full browsing tool without the synthesis layer. Different value proposition: 'read the record' vs 'see everything but compute it yourself'. Tapeline's signed-in scanner takes a card at first sign-in.",
+    note: "Yahoo's free tier gives you far more raw data to browse than Tapeline's does, and neither asks for a card. The difference is shape, not price: Yahoo's free is a full browsing tool without the synthesis layer; Tapeline's is a published, downloadable record of what the scoring engine said and how it did, plus — once you sign up — the live scanner itself, handing back the top ten scored rows of any scan. 'See everything and compute it yourself' vs 'read the record, then run the engine on ten names at a time'.",
   },
   {
     label: "News + earnings calendar coverage",

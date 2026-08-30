@@ -75,10 +75,13 @@ type Props = {
   /** FAQ — visible accordion + JSON-LD FAQPage schema. 5-6 items ideal. */
   faq: FeatureFAQ[];
   /** Premium feature? Drives the CTA copy.
-      No "free" member: this template's CTA sends every reader to /signup, and
-      since the 2026-08-22 card gate a new account is card-gated into the
-      14-day Premium trial — so there is no honest "free tier" line to render
-      under that button. Removed rather than reworded; no caller used it. */
+      No "free" member, for a reason that has now changed twice. The 2026-08-22
+      card gate walled new accounts, so a "free tier" line under this button
+      would have been false and the member was removed. #683 (2026-08-30) took
+      the wall away: signing up takes an email and a password and lands on the
+      free plan. A free line would be honest again — the member stays absent
+      only because no caller uses it. What this template must NOT do is imply
+      the trial is card-free; the trial still takes a card. */
   tier: "pro" | "premium";
   /** Message-match slug appended to the /signup CTA as ?from=<slug>. The
       signup page restates the matching promise in its H1 (see signup

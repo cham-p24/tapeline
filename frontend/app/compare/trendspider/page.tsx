@@ -40,9 +40,9 @@ const WINS: CompareRow[] = [
     competitor: "Individual indicators are standard TA and transparent per chart, but there is no composite ranking methodology to audit",
   },
   {
-    label: "Trial terms",
+    label: "Getting to a first look",
     tapeline:
-      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
+      "✓ Email and password puts you on the free plan — live scanner, top ten scored rows. A card starts the 14-day full Premium trial: $0 charged that day, first charge on day 14, cancel in one click before then",
     competitor: "Trial has historically required a card on file — check their site for current terms",
   },
 ];
@@ -93,7 +93,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Can I try both before deciding?",
-    a: "Easily. The 14-day full-Premium trial is how you run Tapeline beside TrendSpider: a new account adds a card at first sign-in, $0 is charged that day, the first charge is on day 14, and one click cancels before then. TrendSpider's trial has historically required a card on file too — check their current terms. If you'd rather not put a card down at all, Tapeline's daily Top 10 and full scorecard are readable with no account. Running both for a week against your own watchlist is the fastest way to see which output you actually reach for.",
+    a: "Easily, and Tapeline's side of it starts with an email and a password. A new account lands on the free plan and the scanner runs immediately — live data, the top ten scored rows of any scan, one saved screen — which is enough to put Tapeline's read beside TrendSpider's charts on the same names. The 14-day full-Premium trial is what a card starts: every matching row rather than the first ten, plus alerts and export. $0 is charged that day, the first charge is on day 14, and one click cancels before then. TrendSpider's trial has historically required a card on file — check their current terms. With no account at all, Tapeline's daily Top 10 and full scorecard are still readable. Running both for a week against your own watchlist is the fastest way to see which output you actually reach for.",
   },
 ];
 
