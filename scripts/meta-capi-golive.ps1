@@ -4,14 +4,14 @@
 
 .DESCRIPTION
   The browser pixel (id 28351455154543230) is already live and verified. This
-  script switches on the SERVER-SIDE half — the one that matters most here,
+  script switches on the SERVER-SIDE half - the one that matters most here,
   because the money event lands via a Stripe webhook 14 days after the click
   with no browser involved, and because this audience blocks trackers heavily.
   (Measured: fbevents.js came back with transferSize 0 in the founder's own
   Chrome, and 107,766 bytes in a clean browser. Same page, same deploy.)
 
   The token never leaves this machine. It is read with -AsSecureString so it
-  is not echoed to the terminal, never written to a file, and never printed —
+  is not echoed to the terminal, never written to a file, and never printed -
   including in the verification step, which sends it as a query parameter to
   Meta directly.
 
@@ -19,7 +19,7 @@
   Optional. From Events Manager -> Test Events. When supplied, the
   verification event is flagged as a test so it appears in the Test Events tab
   and is EXCLUDED from ad optimisation. Recommended for the first run.
-  Do NOT set META_CAPI_TEST_EVENT_CODE as a Fly secret — that would quietly
+  Do NOT set META_CAPI_TEST_EVENT_CODE as a Fly secret - that would quietly
   stop every real event counting. This is a one-off check only.
 
 .PARAMETER SkipVerify
@@ -47,22 +47,38 @@ $App     = "tapeline-backend"
 $GraphV  = "v21.0"
 
 Write-Host ""
-Write-Host "Meta Conversions API — go live" -ForegroundColor Cyan
+Write-Host "Meta Conversions API - go live" -ForegroundColor Cyan
 Write-Host "  pixel   $PixelId"
 Write-Host "  fly app $App"
 Write-Host ""
 
-# ── preflight ────────────────────────────────────────────────────────────────
-if (-not (Get-Command flyctl -ErrorAction SilentlyContinue) -and
-    -not (Get-Command fly    -ErrorAction SilentlyContinue)) {
-  throw "flyctl not found on PATH. Install it, then run 'fly auth login'."
+# -- preflight ----------------------------------------------------------------
+# Resolve flyctl. It is NOT enough to check PATH: the official Windows installer
+# drops it in ~\.fly\bin and does not always add that to PATH, which is exactly
+# how this failed the first time it was run for real ("fly : The term 'fly' is
+# not recognized"). Check PATH first, then the known install location.
+#
+# Written as an if/elseif chain on purpose. This previously used `??`, which is
+# PowerShell 7+ only and is a parse error under Windows PowerShell 5.1 - the
+# shell this script is actually launched in.
+$fly = $null
+foreach ($name in @("flyctl", "fly")) {
+  $cmd = Get-Command $name -ErrorAction SilentlyContinue
+  if ($cmd) { $fly = $cmd.Source; break }
 }
-$fly = (Get-Command flyctl -ErrorAction SilentlyContinue) ?? (Get-Command fly)
+if (-not $fly) {
+  $fallback = Join-Path $env:USERPROFILE ".fly\bin\flyctl.exe"
+  if (Test-Path $fallback) { $fly = $fallback }
+}
+if (-not $fly) {
+  throw "flyctl not found on PATH or in $env:USERPROFILE\.fly\bin. Install it, then run 'fly auth login'."
+}
+Write-Host "  flyctl  $fly"
 
 try { & $fly auth whoami 2>&1 | Out-Null }
 catch { throw "flyctl is not logged in. Run 'fly auth login' first." }
 
-# ── token ────────────────────────────────────────────────────────────────────
+# -- token --------------------------------------------------------------------
 Write-Host "Events Manager -> Datasets -> Tapeline -> Settings -> Conversions API"
 Write-Host "-> Generate access token. Paste it below (input is hidden)." -ForegroundColor Yellow
 Write-Host ""
@@ -71,13 +87,13 @@ $secure = Read-Host "CAPI access token" -AsSecureString
 $token  = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
             [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
 
-if ([string]::IsNullOrWhiteSpace($token)) { throw "No token entered — nothing changed." }
+if ([string]::IsNullOrWhiteSpace($token)) { throw "No token entered - nothing changed." }
 # Meta CAPI tokens are long. A short paste is almost always a truncated copy.
 if ($token.Length -lt 50) {
-  throw "That token is only $($token.Length) characters, which is too short to be a Meta CAPI token. Re-copy it — the field truncates easily."
+  throw "That token is only $($token.Length) characters, which is too short to be a Meta CAPI token. Re-copy it - the field truncates easily."
 }
 
-# ── set the secrets ──────────────────────────────────────────────────────────
+# -- set the secrets ----------------------------------------------------------
 Write-Host ""
 Write-Host "Setting Fly secrets (this restarts the backend)..." -ForegroundColor Cyan
 
@@ -92,7 +108,7 @@ if ($SkipVerify) {
   return
 }
 
-# ── verify ───────────────────────────────────────────────────────────────────
+# -- verify -------------------------------------------------------------------
 # Sends one CompleteRegistration straight to Meta with a synthetic hashed
 # identifier, exactly the shape services/meta_capi builds. This proves the
 # TOKEN and PIXEL are a valid pair before real traffic depends on them.
@@ -129,7 +145,7 @@ try {
   Write-Host "Meta accepted the event. events_received = $($resp.events_received)" -ForegroundColor Green
 }
 catch {
-  # Deliberately does NOT echo $uri — it carries the token.
+  # Deliberately does NOT echo $uri - it carries the token.
   $detail = $_.ErrorDetails.Message
   Write-Host ""
   Write-Host "Meta REJECTED the verification event." -ForegroundColor Red
@@ -153,7 +169,7 @@ Write-Host ""
 Write-Host "Live from now on: CompleteRegistration on signup, StartTrial when the" -ForegroundColor Green
 Write-Host "card-required trial begins, Purchase on first charge." -ForegroundColor Green
 Write-Host ""
-Write-Host "Still required before any spend — neither is a code step:" -ForegroundColor Yellow
+Write-Host "Still required before any spend - neither is a code step:" -ForegroundColor Yellow
 Write-Host "  1. Declare the Financial Products & Services Special Ad Category"
 Write-Host "  2. Exclude Australia from geo targeting (see docs/META_GO_LIVE.md section 4)"
 Write-Host ""

@@ -1,4 +1,4 @@
-# Tapeline — local dev runner
+# Tapeline - local dev runner
 # Starts Postgres + Redis in docker, migrates DB, runs API + worker, runs frontend.
 # Prerequisites: Docker Desktop, Python 3.12, Node 20+.
 

@@ -5,7 +5,7 @@
 # Open button.
 #
 # Runs as the user (not via MCP), so it bypasses Claude Code's tier
-# restriction on Chrome — PowerShell calls into user32.dll directly.
+# restriction on Chrome - PowerShell calls into user32.dll directly.
 #
 # Usage:
 #   pwsh -File attach-file-to-picker.ps1 -Path "C:\Project 1\sales\images\linkedin_banner.png"
@@ -118,7 +118,7 @@ $enumProc = [Win32+EnumWindowsProc]{
             }
             # Remember any Edit as a fallback if we don't find the well-known ID
             if ($script:fileEditHwnd -eq [IntPtr]::Zero -and $id -ne 0) {
-                # don't immediately accept — keep looking for the well-known ID
+                # don't immediately accept - keep looking for the well-known ID
             }
         }
     }

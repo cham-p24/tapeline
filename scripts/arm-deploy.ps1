@@ -2,7 +2,7 @@
 #requires -Version 7
 <#
 .SYNOPSIS
-  One-time operator setup — arm hands-off backend auto-deploy.
+  One-time operator setup - arm hands-off backend auto-deploy.
 
 .DESCRIPTION
   Mints a Fly.io *deploy* token (scoped to deploying tapeline-backend and
@@ -14,7 +14,7 @@
     2. auto-deploys to Fly (remote build + `alembic upgrade head`), then
     3. runs a post-deploy smoke check against prod.
   No manual `fly deploy` ever again, and a dirty local checkout can no longer
-  reach prod — which is what caused the v128/v129 clobber of the public API.
+  reach prod - which is what caused the v128/v129 clobber of the public API.
 
   This lives in the repo (not run by the AI assistant) on purpose: minting and
   planting a production deploy credential is an operator action by design.
