@@ -187,7 +187,22 @@ Write-Host ""
 Write-Host "Live from now on: CompleteRegistration on signup, StartTrial when the" -ForegroundColor Green
 Write-Host "card-required trial begins, Purchase on first charge." -ForegroundColor Green
 Write-Host ""
-Write-Host "Still required before any spend - neither is a code step:" -ForegroundColor Yellow
-Write-Host "  1. Declare the Financial Products & Services Special Ad Category"
-Write-Host "  2. Exclude Australia from geo targeting (see docs/META_GO_LIVE.md section 4)"
+# Both items that used to print here were done on 2026-08-26, and one of them was
+# never possible in the first place. Leaving them up told the operator to go and
+# repeat work already live, which is worse than saying nothing.
+#
+#   "Declare the Financial Products & Services Special Ad Category" - declared on
+#   the live ad set (US - FPS - 3 concept message test).
+#
+#   "Exclude Australia from geo targeting" - Special Ad Categories do NOT permit
+#   location EXCLUSIONS at all. The only mechanism protecting the Australia
+#   constraint is US-only INCLUSION, which is set. See META_BURST_BUILD.md 16.
+Write-Host "Ad-account prerequisites are already in place:" -ForegroundColor Green
+Write-Host "  - Financial Products & Services Special Ad Category: declared"
+Write-Host "  - Geo: United States only (SAC forbids location exclusions, so"
+Write-Host "        US-only inclusion is what protects the Australia constraint)"
+Write-Host ""
+Write-Host "Next: confirm real events land once someone signs up. The browser and"
+Write-Host "server copies of CompleteRegistration share a deterministic event_id,"
+Write-Host "so Meta collapses them into ONE conversion rather than double-counting."
 Write-Host ""
