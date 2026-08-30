@@ -90,6 +90,56 @@ async def _subscriptions_for(customer_id: str) -> list[Any]:  # type: ignore[val
     return list(_f(subs, "data", []) or [])
 
 
+async def _revenue() -> None:
+    """Has any money ACTUALLY been collected?
+
+    A subscription status of `active` is strong evidence but not proof — it is
+    a status string, and this session has twice drawn a wrong conclusion from
+    partial evidence. A PAID INVOICE with `amount_paid > 0` is the fact itself:
+    Stripe issues one only when a charge succeeded.
+
+    Trials invoice at $0, so amount_paid is what separates "someone entered a
+    card" from "someone was charged".
+    """
+    import stripe
+
+    logger.info("")
+    logger.info("revenue (paid invoices, amount_paid > 0)")
+    try:
+        invoices = await asyncio.to_thread(stripe.Invoice.list, status="paid", limit=100)
+    except Exception as exc:
+        logger.error("  could not list invoices — %s", exc)
+        return
+
+    data = _f(invoices, "data", []) or []
+    rows = [i for i in data if int(_f(i, "amount_paid", 0) or 0) > 0]
+    if not rows:
+        logger.info(
+            "  none. %d paid invoice(s) exist but every one is $0 — cards are "
+            "on file and trials are running, but nobody has been charged yet.",
+            len(data),
+        )
+        return
+
+    total = 0
+    for inv in rows:
+        amt = int(_f(inv, "amount_paid", 0) or 0)
+        total += amt
+        created = _f(inv, "created", 0)
+        when = (
+            datetime.fromtimestamp(int(created), UTC).strftime("%Y-%m-%d")
+            if created else "?"
+        )
+        logger.warning(
+            "  %s  %s %s  %s",
+            when,
+            f"{amt / 100:.2f}",
+            str(_f(inv, "currency", "?")).upper(),
+            _mask_email(str(_f(inv, "customer_email", "") or "") or None),
+        )
+    logger.warning("  TOTAL COLLECTED: %.2f across %d invoice(s)", total / 100, len(rows))
+
+
 async def _audit() -> None:
     import stripe
 
@@ -224,5 +274,10 @@ async def _audit() -> None:
         )
 
 
+async def _main() -> None:
+    await _audit()
+    await _revenue()
+
+
 if __name__ == "__main__":
-    asyncio.run(_audit())
+    asyncio.run(_main())
