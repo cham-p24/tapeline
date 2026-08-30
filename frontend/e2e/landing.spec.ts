@@ -14,8 +14,14 @@ test.describe("Landing page", () => {
     ).toBeVisible();
     await expect(page.getByText(/six named factors/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /see the track record/i })).toBeVisible();
-    // GAP #6 — the subtle tertiary trial link is above the fold alongside the pills.
-    await expect(page.getByRole("link", { name: /start the 14-day trial/i })).toBeVisible();
+    // GAP #6 — a tertiary text link into /signup sits above the fold alongside
+    // the pills. Asserted by DESTINATION, not by label: the label was "Start
+    // the 14-day trial" until #683 removed the card wall, at which point
+    // /signup stopped starting a trial and the copy had to change. A spec that
+    // pins the wording fails on the correction rather than on the regression.
+    await expect(
+      page.locator('a[href^="/signup"]').first(),
+    ).toBeVisible();
 
     // Openness line vs the paid rivals (GAP #22) — static, server-rendered.
     await expect(page.getByText(/most scanners keep their picks behind a paywall/i)).toBeVisible();
