@@ -1,0 +1,54 @@
+name: Billing audit (local tier vs live Stripe)
+
+# Cross-references every account's LOCAL billing state against LIVE Stripe and
+# reports the disagreements. READ-ONLY: it creates nothing, writes nothing,
+# cancels nothing. `backend/tests/test_billing_audit.py` enforces that at the
+# AST level, on the method name rather than on a receiver-qualified string —
+# the first version of that guard banned "session.commit" while the audit's
+# session variable is named `s`, so a write slipped straight through it.
+#
+# WHY IT EXISTS: `User.tier` and Stripe's subscription state are two records of
+# the same fact, kept in step by exactly one mechanism — the webhook. That
+# webhook 500'd on every real delivery (#639), and the Checkout Session before
+# it 502'd for 37 days (#635). Both are fixed, but nothing had ever checked
+# whether the two records actually AGREE for accounts that existed while they
+# were broken.
+#
+# The finding that matters most is PAID_NOT_GRANTED — an active subscription in
+# Stripe against a local free tier, i.e. someone paying and receiving nothing.
+# It is printed first and loudest.
+#
+# Takes no inputs, so it cannot become an arbitrary-command runner. Customer
+# emails are masked in the output because these logs are world-readable on this
+# public repo.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Monday 02:00 UTC. Drift between the two records is silent by
+    # nature — nobody files a ticket saying "I am being charged correctly".
+    - cron: "0 2 * * 1"
+
+concurrency:
+  group: billing-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Reconcile every account against Stripe
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.billing_audit"
