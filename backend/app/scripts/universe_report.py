@@ -52,6 +52,19 @@ async def _main() -> None:
     print("probe present      :", present)
     print("probe missing      :", sorted(set(probe) - set(syms)))
 
+    # Symbols that could never be ingested today. `symbols.VALID_SYMBOL_RE`
+    # rejects these at both the ingest and serving boundaries, so anything
+    # listed here predates that guard: sheet annotations like "🏆 IVV"
+    # that were once read as standalone tickers. They are filtered off every
+    # ranked surface, so this is residue rather than an active fault — but it
+    # is residue a human should be able to see before anyone deletes it.
+    from app.services.symbols import VALID_SYMBOL_RE
+
+    invalid = sorted(s for s in syms if s and not VALID_SYMBOL_RE.match(s))
+    print(f"invalid symbols    : {len(invalid)}")
+    for sym in invalid:
+        print(f"    {sym!r}")
+
 
 if __name__ == "__main__":
     asyncio.run(_main())

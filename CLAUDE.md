@@ -45,7 +45,7 @@ The lift is deliberately narrow, and `backend/tests/test_open_access_month.py` a
 
 **Copy rule while it runs:** "Upgrade to unlock the full scanner" is **false** for a signed-in Free user today, and true again on 2026-09-08 — sell only what Pro/Premium genuinely add on top. `services/email.py` already branches on `free_open_access()` for exactly this reason.
 
-**Two stale sources here — trust the `limit()` body and the test file over both:** (a) `tier.py` says to keep a matching `PROMO_OPEN_ACCESS_UNTIL` in `frontend/lib/pricing.ts`, but **there isn't one** — `FREE_LIMITS.scannerRows` is hard-coded to 10, so frontend Free-tier copy currently understates the live cap; (b) the `free_open_access()` docstring still describes the original "caps + every Pro feature" plan, which the implementation never did.
+**Both halves of the old "two stale sources" warning here are now FIXED — verified 2026-08-30, do not go chasing them:** (a) `frontend/lib/pricing.ts` DOES carry `PROMO_OPEN_ACCESS_UNTIL`, `freeOpenAccess()`, `PRO_SCANNER_ROWS` and an audience-aware `scannerRowsFor()` accessor that mirrors the backend's `authenticated` gate — it defaults to the conservative number so a new call site can't accidentally over-promise on a forward-looking surface; (b) the `free_open_access()` docstring now describes what was actually implemented and says so explicitly. `backend/tests/test_open_access_month.py` remains the authority if either drifts again.
 
 **Retired customer alert channels:** Discord webhook + Twilio SMS (2026-05-04), and **Telegram (2026-08-11)**. Discord/SMS: service files at `services/{discord,sms}.py` and DB columns left in place; re-enable by re-adding `alerts.discord` / `alerts.sms` to `tier.py:FEATURES`. **Telegram went further** — `AlertRuleCreate.channel` in `routers/alerts.py` is now `Field("email", pattern="^(email|web_push)$")`, so a `channel="telegram"` POST 422s, and `services/alerts.py:_fire` has no Telegram dispatch arm at all (regression guard: `backend/tests/test_free_alert_taste.py::test_free_user_blocked_from_email_and_telegram_channel_retired`). `tier.py` still carries a vestigial `telegram_alerts_per_day` cap with **no consumer** — do not read it as evidence the channel is live. **Never write customer-facing Telegram copy** (no "Telegram alerts", no "unlimited Telegram", no "paste your chat ID"). Telegram remains live for FOUNDER-facing notifications only — see Notification channels.
 
@@ -176,9 +176,9 @@ feature only ever served mock data):
 ## Known issues / partially-built
 - **`rate_direction` is now live from FRED** — `polygon_feed.fetch_regime` reads the 10Y yield's last 30 obs from FRED and classifies RISING / FALLING / SIDEWAYS via `fred_feed._direction()` (0.5 % threshold). Falls back to SIDEWAYS without a FRED key. Breadth_pct still placeholder; sector_leaders computed live each tick.
 - **Finnhub fundamentals not yet wired into per-tick `sub_fundamentals`** — `services/finnhub_feed.py` has `fetch_basic_financials()` + `compute_fundamentals_score()` working live (verified AAPL scored 79.1/100). Calendars (IPO + earnings) already use Finnhub when configured. To wire fundamentals into the score: pre-fetch all 870 tickers weekly, cache results, have `polygon_feed.fetch_snapshots` read from cache instead of generating random.
-- **Sector backfill is wired** — `signal_publisher._backfill_sectors` runs daily via `_serial_finnhub_refreshes`, queries `Ticker.sector IN (NULL, "Unknown")`, hits Finnhub `/stock/profile2` per symbol at 1.1s/call, caps at 200/day to stay under the free-tier budget. Auto-discovered tickers get their real sector within 24h.
+- **Sector backfill is wired** — `signal_publisher._backfill_sectors` runs daily via `_serial_finnhub_refreshes`, hits Finnhub `/stock/profile2` per symbol at 1.1s/call, **cap 2,500/day** (not 200 — that figure was stale). Its selection is `sector IN (NULL, Unknown, N/A, Uncategorized)` **OR the name is still a placeholder**, and it repairs both off the one profile call.
 - **`pywebpush` is now in `pyproject.toml`** (>=2.0.1). Web push send works as soon as VAPID env vars are set.
-- **Frontend tests cover ~6 surfaces** — Paywall, PricingTable, SignupForm honeypot, ScannerPreview labels, BillingToggle, HoldingsPage. Grow with billing flow + alerts CRUD + scanner page next.
+- **Frontend tests cover ~96 files / ~890 tests** — the "~6 surfaces" figure here was stale by a wide margin. See the Tests section.
 - **Playwright E2E scaffold lives at `frontend/e2e/`** — 3 spec files covering landing, pricing, and auth-form rendering. To run locally:
   ```powershell
   cd frontend
@@ -241,7 +241,11 @@ Each Ticker row carries a `confidence_pct` (0-100) that varies with which underl
 `stripe_webhook_events` table logs every processed event id. Replay attacks and Stripe redeliveries return `{ok: true, replay: true}` instead of double-processing. Migration 0010.
 
 ## Tests
-Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backend/pytest.ini`. Run: `pytest` from `backend/`. Frontend: no tests.
+**Backend: ~1,815 tests across 183 files** (`backend/tests/`), pytest config at `backend/pytest.ini`. Run `pytest` from `backend/`. The old "8 smoke tests / frontend: no tests" line here was years stale and would have sent you re-scaffolding a suite that already exists.
+
+**Frontend: ~890 tests across 96 files** (`frontend/__tests__/`, Vitest + RTL). Run `npm test` from `frontend/`.
+
+**House rule, learned the hard way and worth keeping:** a test is only real if you have watched it FAIL. Revert the fix, confirm red, restore. This repo has repeatedly shipped assertions that passed against their own explanatory comment, against prose in a docstring, or against a fixture that never exercised the branch (a 35KB CSP fixture that the size guard rejected before the count cap ran; a source-grep that matched the layout file while the bug lived in `pageMeta`'s output). Source-level assertions must strip comments AND docstrings before matching.
 
 ## Things NOT to change without thinking
 - 6-factor scoring formula and weights
@@ -289,7 +293,7 @@ Backend: 8 smoke tests at `backend/tests/test_smoke.py`, pytest config at `backe
 - `frontend/__tests__/` — Vitest + RTL scaffold (run `npm test` after `npm install`)
 - `backend/app/workers/signal_publisher.py` — scoring tick worker
 - `backend/app/scripts/seed_owner.py` — creates/updates the owner account
-- `backend/alembic/versions/` — 7 migrations, run via `alembic upgrade head`
+- `backend/alembic/versions/` — **61 migrations** (head `0059_ticker_day_close`), run via `alembic upgrade head`. CI asserts a single head.
 - `frontend/components/PricingTable.tsx` — **canonical** pricing UI
 - `frontend/components/TrialBanner.tsx` — trial countdown UI
 - `frontend/middleware.ts` — gates `/app/*` routes

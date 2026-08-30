@@ -20,6 +20,7 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import ClientDisconnect
 
 from app.main import app
 
@@ -159,7 +160,6 @@ def test_extension_noise_is_filtered(client, caplog):
 def test_the_policy_actually_points_at_this_endpoint():
     """A collector nothing reports to is the bug this fixes, one level up."""
     import pathlib
-    import re
 
     cfg = (
         pathlib.Path(__file__).resolve().parents[2]
@@ -179,3 +179,59 @@ def test_the_policy_actually_points_at_this_endpoint():
         "invisible and 'a week of clean reports' remains unobservable"
     )
     assert "/api/csp-report" in code
+
+
+def test_a_disconnected_reporter_is_not_an_error():
+    """The exact production failure, reproduced.
+
+    Browsers send CSP reports fire-and-forget — beacon semantics, no interest
+    in the response — so the connection is routinely gone before the body is
+    read, and Starlette raises ClientDisconnect out of `request.body()`.
+    Unhandled, it propagated through the middleware and Sentry filed it as a
+    production `error` (TAPELINE-BACKEND-2C, /api/csp-report, within hours of
+    this endpoint shipping).
+
+    That is worse than the problem the endpoint was added to solve: a
+    telemetry collector that pages you about its own reporters hanging up
+    trains you to ignore the alerts that matter.
+
+    Driven at the ASGI layer because TestClient cannot hang up mid-request —
+    the disconnect has to come from the receive channel, which is exactly
+    where the real one comes from.
+    """
+    import anyio
+
+    from app.main import csp_report
+
+    class _Req:
+        """Minimal stand-in whose body() raises the way Starlette's does."""
+
+        async def body(self):
+            raise ClientDisconnect()
+
+    async def _run():
+        return await csp_report(_Req())  # type: ignore[arg-type]
+
+    resp = anyio.run(_run)
+    assert resp.status_code == 204, (
+        "a disconnected CSP reporter still raises — Sentry will keep filing "
+        "it as a production error"
+    )
+
+
+def test_an_unreadable_body_is_also_swallowed():
+    """Any other read failure is equally unactionable: no report to parse and
+    no client left to tell."""
+    import anyio
+
+    from app.main import csp_report
+
+    class _Req:
+        async def body(self):
+            raise RuntimeError("stream broke")
+
+    async def _run():
+        return await csp_report(_Req())  # type: ignore[arg-type]
+
+    assert anyio.run(_run).status_code == 204
+
