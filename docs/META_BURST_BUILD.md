@@ -865,3 +865,61 @@ label, and that an unticked submit produces the error and never calls `authApi.s
 
 Verified by positive control rather than assumed: defaulting the box to `true` — the pre-ticked
 state the policy names as a violation — fails the suite.
+
+---
+
+## 19. The message test is readable — on our side, not Meta's — 2026-08-30
+
+§16 concluded the three-way ranking "will not be produced" and should read as *"the instrument did
+not run"*. That is correct **about Meta's instrument** and too pessimistic about ours.
+
+`users.signup_utm_content` is persisted (`backend/app/models/user.py:270`), and every ad carries
+`utm_content={{ad.id}}` in its URL parameters (§9). So **each ad's signups are distinguishable in
+Tapeline's own database, per ad and per placement**, with no dependency on Meta's conversion column,
+the Conversions API, or the core-setup restriction that strips URL paths on Meta's side.
+
+`signup_utm_term={{placement}}` gives the placement for free in the same row.
+
+### What the data says as at 2026-08-30
+
+Two facebook-attributed signups exist, not one:
+
+| Created (UTC) | utm_campaign | utm_content (ad) | utm_term (placement) |
+|---|---|---|---|
+| 2026-08-29 03:06 | `120246296540020292` | `120246337809030292` | `Facebook_Mobile_Feed` |
+| 2026-08-27 22:17 | `120246296540020292` | `120246337809030292` | `Facebook_Mobile_Feed` |
+
+`120246337809030292` is **ad B — "$0 today. The charge date is on the page."** Both conversions came
+from B, both from Facebook Mobile Feed. Meta's own Results column still reads `—` for all three ads,
+so this is signal Meta cannot currently see.
+
+### Read it honestly
+
+**n = 2. This ranks nothing.** B has had ~449 impressions against A's 50 — roughly 9× the exposure —
+so "B converted and A did not" is very nearly a statement about delivery share, which §16 already
+established is not a performance metric.
+
+What it *does* establish, and this is the useful part:
+
+- **The funnel works end to end.** Ad → click → landing page → account, with attribution intact,
+  twice. That is the one-cell question the burst can actually answer (*can Meta deliver a US swing
+  trader to the site at all?*) and the answer so far is yes.
+- **The per-ad readout exists and is ours.** Whatever the burst produces, it can be read from the
+  users table at any time, and it does not degrade if the CAPI token is never set.
+- **Placement is captured**, so a placement effect can be separated from a message effect later.
+
+### The query
+
+```sql
+select signup_utm_content as ad, signup_utm_term as placement,
+       count(*) as signups, min(created_at), max(created_at)
+from users
+where signup_utm_source = 'facebook'
+group by 1, 2 order by signups desc;
+```
+
+Ad ids: A `120246296540000292` · B `120246337809030292` · C `120246337921240292` (paused).
+
+**Do not read a winner off this before burst-end + 7**, and when reading it, divide by impressions
+per ad rather than comparing raw counts — otherwise you are re-reading Meta's allocation and calling
+it a message result.
