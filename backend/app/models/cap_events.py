@@ -51,6 +51,15 @@ CAP_NAMES: frozenset[str] = frozenset(
         "watchlist_tickers",
         "web_push_alerts",
         "squeeze_preview",
+        # Added 2026-08-30 with the move of the card ask from the front door to
+        # the point of standing work. These three ARE the new ask, and none of
+        # them was in this set — record_cap_hit drops an unknown name with a log
+        # line and writes nothing, so every one of these events has been
+        # silently discarded for as long as the caps have existed. The whole
+        # plan depends on being able to see which limit people actually reach.
+        "saved_scans",
+        "email_alerts",
+        "export_csv",
     }
 )
 

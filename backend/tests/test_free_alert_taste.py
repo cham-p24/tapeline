@@ -56,7 +56,6 @@ def test_web_push_is_free_feature_email_stays_gated():
 def test_free_web_push_cap_is_the_named_constant():
     """The free cap must trace back to the single tunable constant, so flipping
     FREE_WEB_PUSH_ALERTS is the whole lever (no drift in TIER_LIMITS)."""
-    assert FREE_WEB_PUSH_ALERTS == 2
     assert limit(Tier.FREE, "web_push_alerts") == FREE_WEB_PUSH_ALERTS
     # Paid tiers must be effectively unlimited (well above the free taste).
     assert limit(Tier.PRO, "web_push_alerts") >= 10_000
@@ -218,8 +217,15 @@ async def test_premium_user_unaffected_by_free_web_push_cap():
 
 @pytest.mark.asyncio
 async def test_free_user_cannot_create_premium_rule_type_on_free_channel():
-    """Free + congress (Premium content) on the free web_push channel → 403,
-    even though the channel itself is allowed. score (base) still works."""
+    """Free + congress (Premium content) on web_push → 403 on the CONTENT gate.
+
+    Since 2026-08-30 a free account cannot create any alert rule at all (the
+    count cap is 0), so the base `score` type is refused as well — but for a
+    different reason, and the message says which. This test pins that the
+    content gate still fires independently of the count cap, so tightening the
+    count did not quietly become the only thing standing between a free user
+    and Premium-only content.
+    """
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         try:
@@ -243,9 +249,20 @@ async def test_free_user_cannot_create_premium_rule_type_on_free_channel():
             )
             assert squeeze.status_code == 403, squeeze.text
 
-            # score is the base product — still allowed as the free taste.
+            # And `score` — the BASE rule type on the free channel — is now
+            # refused too, on the count cap rather than the content gate.
+            #
+            # It used to be allowed as the free "alert taste". That taste was
+            # removed on 2026-08-30: an alert is Tapeline re-running a screen
+            # every day and telling you when it changed, which is precisely the
+            # standing job the card is sold on. Handing one over free on
+            # web-push while charging for it on email sold nothing.
+            #
+            # The 403 body distinguishes the two reasons, so the user is told
+            # which wall they met.
             score = await c.post("/api/alerts/rules", json=_web_push_body(0), headers=_AUTH)
-            assert score.status_code == 200, score.text
+            assert score.status_code == 403, score.text
+            assert "limit" in score.text.lower(), score.text
         finally:
             await _restore_dev_user()
 
@@ -295,3 +312,29 @@ async def test_premium_user_can_create_congress_rule():
             assert r.status_code == 200, r.text
         finally:
             await _restore_dev_user()
+
+
+def test_no_alert_channel_is_free_on_any_channel():
+    """A card buys the STANDING JOB, and that has to be true on every channel.
+
+    Changed 2026-08-30, when the card ask moved from the front door to the
+    point where a user asks Tapeline to do work while they are away. Free used
+    to allow two web-push rules as an "alert taste" while email alerts were
+    zero. That gave away the exact thing the card is now sold on, through the
+    other pipe: an alert is a standing promise to re-run a screen every day and
+    tell you when it changed, and the channel it arrives on does not change
+    what it is.
+
+    So the rule is the channel-independent one: a free account may create no
+    alert rule anywhere. Free runs a screen when the user opens it; a card is
+    what makes it run after every close.
+    """
+    for cap_name in ("web_push_alerts", "email_alerts_per_day", "telegram_alerts_per_day"):
+        assert limit(Tier.FREE, cap_name) == 0, (
+            f"free tier allows {cap_name} > 0. Alerts are the standing job the "
+            f"card is sold on; giving one away on any channel makes the ask false."
+        )
+
+    # Paid tiers still get them, or the plan sells nothing.
+    assert limit(Tier.PRO, "web_push_alerts") >= 10_000
+    assert limit(Tier.PRO, "email_alerts_per_day") > 0

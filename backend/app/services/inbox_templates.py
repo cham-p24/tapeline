@@ -95,12 +95,11 @@ async def render_ticker_score(body: str) -> str | None:
 async def render_pricing(_body: str) -> str:
     """Canonical pricing answer. Mirrors what /pricing shows.
 
-    CHANGED 2026-08-22 (card gate — services/tier.CARD_GATE_START). This used to
-    end "Signup is email + password and lands on the free tier — no card". These
-    replies go to strangers who have not signed up yet, i.e. exactly the people
-    the card gate now applies to, so that sentence would have been false to
-    every single recipient. The free thing that is still true for them is the
-    published record, and that is what the reply now points at.
+    CHANGED 2026-08-22 for the card gate, then CHANGED BACK 2026-08-30 when the
+    route wall was removed. Signing up does land on a free tier again — the top
+    ten scored rows, live, no card — so the sentence is true once more. The card
+    now buys the standing work (a second saved screen, alerts, export, every
+    matching row) rather than the front door.
     """
     return (
         "The published record is free with no account at all: the daily top 10, "
@@ -109,9 +108,10 @@ async def render_pricing(_body: str) -> str:
         "($9.99 monthly) for the full live scan + smart "
         "watchlist alerts. Premium is $16.58/mo annual ($19.99 monthly) "
         "for everything in Pro + congressional trades + insider Form 4 "
-        "buys. A new account puts a card on file at first sign-in, which "
-        "starts the 14-day Premium trial: $0 charged that day, first charge "
-        "on day 14, one click to cancel before then. Full comparison at "
+        "buys. Signing up is email and password and lands on the free tier: "
+        "the top ten scored rows of any scan, live, no card. A card adds the "
+        "14-day Premium trial — $0 charged that day, first charge on day 14, "
+        "one click to cancel before then. Full comparison at "
         "tapeline.io/pricing."
     )
 
@@ -119,9 +119,10 @@ async def render_pricing(_body: str) -> str:
 async def render_trial(_body: str) -> str:
     """Canonical trial answer."""
     return (
-        "There's a 14-day Premium trial — a new account adds a card at first "
-        "sign-in, but nothing is charged that day. The first charge is on day "
-        "14 and one click cancels before then. tapeline.io/signup. The full "
+        "There's a 14-day Premium trial. Signing up needs no card — you land "
+        "on the free tier and can run scans straight away; adding a card "
+        "starts the trial and nothing is charged that day. The first charge is "
+        "on day 14 and one click cancels before then. tapeline.io/signup. The full "
         "scored universe, scorecard, watchlist alerts, "
         "congressional/insider feeds — all included for the trial window. If "
         "you'd rather not put a card down, the daily top 10 and the published "

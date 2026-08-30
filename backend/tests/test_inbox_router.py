@@ -176,11 +176,17 @@ async def test_pricing_template_returns_string():
 
 @pytest.mark.asyncio
 async def test_trial_template_discloses_the_card_and_the_first_charge():
-    """A new account now adds a card at FIRST SIGN-IN, so the canonical inbox
-    answer — which replies to strangers, i.e. exactly the people the gate
-    applies to — must say so AND say what happens: nothing charged that day, a
-    dated first charge, one-click cancel, and the genuinely card-free way to
-    look. A bare "free trial" reply here would be the misstatement.
+    """The trial takes a card, so the canonical inbox answer must say what that
+    means: nothing charged that day, a dated first charge, one-click cancel,
+    and the card-free way to look.
+
+    UPDATED 2026-08-30. This used to also require the words "sign-in", because
+    the card was taken at first sign-in and a reply that omitted WHEN would
+    have been misleading. The route wall is gone — signing up now lands on the
+    free tier and the card starts the trial whenever the user chooses it — so
+    that assertion was pinning a flow that no longer exists and failed on copy
+    that had become MORE accurate, not less. What replaces it is the claim that
+    actually has to be true now: signing up itself needs no card.
 
     Asserted by SUBSTANCE, not by one phrasing: the wording will keep moving as
     the offer is tuned, and a test that pins a sentence fails on an improvement
@@ -189,7 +195,10 @@ async def test_trial_template_discloses_the_card_and_the_first_charge():
     assert isinstance(result, str)
     lowered = result.lower()
     assert "card" in lowered                      # the card is disclosed at all
-    assert "sign-in" in lowered or "sign in" in lowered  # ...and WHEN
+    # Signing up is card-free and the reply must say so — that is the fact that
+    # changed, and the one a stranger asking "free trial?" most needs.
+    assert "no card" in lowered or "needs no card" in lowered
+    assert "free tier" in lowered or "free plan" in lowered
     assert "nothing is charged" in lowered        # what happens that day
     assert "day 14" in lowered or "14 days" in lowered   # when it does charge
     assert "cancel" in lowered                    # how to stop it
