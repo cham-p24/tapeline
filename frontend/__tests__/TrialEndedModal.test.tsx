@@ -61,7 +61,10 @@ describe("TrialEndedModal", () => {
     // same idiom as backend tests/test_upgrade_nudge.py.
     expect(text).toContain(`top ${freeScannerRows({ authenticated: true })} scanner rows`);
     expect(text).toContain(`top-${FREE_LIMITS.squeezePreviewRows} preview`);
-    expect(text).toContain(`${FREE_LIMITS.webPushAlerts} browser push alerts`);
+    // #683: Free keeps no alerts on any channel, so the "what you keep" list
+    // names the saved screen instead of a push-alert count.
+    expect(text).not.toMatch(/\d+ browser push alerts/);
+    expect(text).toContain(`${FREE_LIMITS.savedScans} saved screen`);
     expect(text).toMatch(/full public scorecard/i);
     // Never the stale pre-#343 numbers.
     expect(text).not.toContain("5 look-ups");

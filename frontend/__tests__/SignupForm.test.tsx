@@ -2,10 +2,13 @@
  * Signup page tests:
  *   - the offscreen honeypot field (bot-protection layer depends on it)
  *   - core fields, and the CARD RULE stated honestly. Since 2026-08 this form
- *     creates a FREE account and nothing else: no card, no trial. The 14-day
- *     Premium trial is a separate opt-in on the next screen and it DOES take a
- *     card, so every "no credit card" line here must qualify the account, not
- *     the trial. The page must also contain NO card input of any kind.
+ *     creates a FREE account and nothing else: no card, no trial. Since #683
+ *     (2026-08-30) that account is also immediately usable — the live scanner's
+ *     top ten rows, one saved screen, a five-symbol watchlist — where it
+ *     previously met a card wall at first sign-in. The 14-day Premium trial is
+ *     a separate opt-in on the next screen and it DOES take a card, so a
+ *     card-free claim here must qualify the ACCOUNT, never the trial. The page
+ *     must also contain NO card input of any kind.
  *   - source-aware (message-match) headlines driven by ?from=, the funnel
  *     fix that carries an ad/landing-page promise through to the signup H1
  *     instead of showing cold traffic a generic form.
@@ -153,14 +156,17 @@ describe("SignUpPage", () => {
 
   it("renders the coherent value strip, with the card rule attached to the right thing", () => {
     render(<SignUpPage />);
-    // CHANGED TWICE. #536 moved "no credit card" off the trial and onto the
-    // account. #548 then put a card wall at first sign-in, so the account is
-    // not card-free either — the strip must lead with the card and the amount.
-    expect(
-      screen.getByText(
-        /14-day Premium trial.*Card added at first sign-in, \$0 charged today.*Cancel in one click.*30-day money-back/i,
-      ),
-    ).toBeInTheDocument();
+    // CHANGED THREE TIMES, and the shape of the sentence is the whole point.
+    // #536 moved "no credit card" off the trial and onto the account. #548 put
+    // a card wall at first sign-in, so the strip had to lead with the card.
+    // #683 removed the wall: the account is card-free again, and the card is
+    // what buys the trial. The strip must therefore say both things in that
+    // order — free plan first, then what a card adds and what it costs.
+    const strip = screen.getByText(
+      /no card.*Premium trial.*\$0.*Cancel in one click.*money-back/i,
+    );
+    expect(strip).toBeInTheDocument();
+    expect(strip.textContent).toMatch(/free plan/i);
   });
 
   // ── The card rule, stated before an account exists ────────────────────────
@@ -179,15 +185,33 @@ describe("SignUpPage", () => {
   it("never promises a card-free TRIAL (the free account is what takes no card)", () => {
     const { container } = render(<SignUpPage />);
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    // The exact claim that stopped being true.
-    expect(text).not.toMatch(/(?:14[- ]day|Premium) trial[^.]{0,40}no (?:credit )?card/i);
-    expect(text).not.toMatch(/no (?:credit )?card[^.]{0,25}(?:14[- ]day|Premium) trial/i);
+    // NARROWED by #683. These patterns used to treat "no card" anywhere near
+    // "trial" as the tell, which was right while the account took a card too.
+    // Now the page says both things a sentence apart — "Sign up with no card;
+    // a card starts the 14-day Premium trial" — and the old windows read that
+    // honest pairing as a violation. So the windows now stop at a sentence
+    // break or a `·` separator: the two facts stated side by side pass, and a
+    // card-free claim carried INTO the trial clause does not.
+    expect(text).not.toMatch(/\btrial\b[^.;·]{0,30}(?:no|without a) (?:credit )?card/i);
+    expect(text).not.toMatch(/(?:no|without a) (?:credit )?card[^.;·]{0,28}\btrial\b/i);
+    expect(text).not.toMatch(/card[-\s]free trial/i);
+    // Still banned outright: it is the marketing phrase, and it is false of
+    // the only thing on this page that takes a card.
+    expect(text).not.toMatch(/no credit card required/i);
   });
 
-  it("states the trial's charge terms up front: card at sign-in, $0 today, first charge at day 14, one-click exit", () => {
+  it("states the trial's charge terms up front: what a card buys, $0 today, first charge at day 14, one-click exit", () => {
     const { container } = render(<SignUpPage />);
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(/at first sign-in you add a card/i);
+    // CHANGED by #683. The page used to open this block with "At first sign-in
+    // you add a card" — a wall that no longer exists, and the single sentence
+    // most likely to make a reader think the scanner is unreachable without
+    // paying. What replaces it has to say the same amount, not less: the form
+    // takes no card, and adding one later is what starts the trial.
+    expect(text).toMatch(/no card/i);
+    expect(text).toMatch(/adding a card[^.]{0,30}starts/i);
+    expect(text).not.toMatch(/at first sign-in,? you add a card/i);
+    expect(text).not.toMatch(/card (?:added|comes|goes on) at first sign-in/i);
     expect(text).toMatch(/\$0 is charged today/i);
     // A DATE, not a duration. The paid ad's headline is "$0 today. The charge
     // date is on the page", and Meta reviews the landing page against the ad —
@@ -203,19 +227,27 @@ describe("SignUpPage", () => {
     expect(text).toMatch(/three days before/i);
   });
 
-  it("attaches the card-free claim ONLY to the published record", () => {
+  it("keeps the strongest card-free claim: the record needs no account at all", () => {
     const { container } = render(<SignUpPage />);
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    // The one card-free path that survived #548: reading the record needs no
-    // account at all. If this line goes, the page has no honest "free" left
-    // and every remaining "free" is selling something that takes a card.
+    // Under the card gate this was the ONLY card-free path left, and the test
+    // was named for that scarcity. #683 gave the page a second one — signing
+    // up takes no card — but this line is still the stronger claim, because it
+    // needs no account either, and it is the one a sceptical reader can check
+    // before typing anything. If it goes, the page loses its only offer that
+    // costs the reader nothing at all.
     expect(text).toMatch(/do not need an account — or a card — to read the record/i);
-    // And the grandfather clause is stated, because it is a promise to real
-    // users rather than a marketing line.
-    expect(text).toMatch(/before 22 August 2026 keep the free access/i);
-    // The dead claim must not come back in any form.
+    // Still banned: the permanence promise. "Free" is a product decision, and
+    // the app does ask for a card when a cap is reached.
     expect(text).not.toMatch(/free forever and never needing a card/i);
-    expect(text).not.toMatch(/no card to sign up/i);
+    // DELIBERATELY NOT ASSERTED ANY MORE:
+    //   - "no card to sign up" was banned here as a false claim. #683 made it
+    //     the literal truth, and it is now on the page on purpose.
+    //   - the grandfather clause ("accounts created before 22 August 2026 keep
+    //     the free access they signed up for") was a promise to one cohort
+    //     while the wall split the userbase in two. Every account now has that
+    //     access, so pinning the sentence would keep a distinction alive in
+    //     copy that no longer exists in the product.
   });
 
   it("labels the submit button as account creation, not a trial start", () => {
@@ -245,10 +277,11 @@ describe("SignUpPage", () => {
     // CHANGED: the default destination is now the trial OFFER rather than the
     // scanner. Signup no longer starts a trial, so if nothing presented the
     // choice the trial would never be offered to anyone. The offer is a
-    // two-button fork. The decline branches on must_add_card: a
-    // grandfathered account gets "Continue on the Free plan" → /app/scanner,
-    // a gated one gets "Continue without a card" → /scorecard, because
-    // /app/scanner would bounce it to the card wall.
+    // two-button fork, and since #683 the decline is unconditional again:
+    // every account continues on the Free plan into /app/scanner, because
+    // /app/scanner no longer bounces anyone to a card wall. (#684 had split
+    // that button on must_add_card — a gated account was sent to /scorecard
+    // instead — which was the honest branch while the wall stood.)
     expect(routerSpies.push).toHaveBeenCalledWith(
       `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );
@@ -265,8 +298,10 @@ describe("SignUpPage", () => {
   it("shows the card-transparency block", () => {
     render(<SignUpPage />);
     // CHANGED TWICE: it headlined "After your 14 days" (assumed a trial had
-    // started), then "Free account, and where a card does come in" (assumed the
-    // account was free). Post-#548 it is simply about the card.
+    // started), then "Free account, and where a card does come in" — dropped
+    // under #548 because the account was not free. #683 made it free again,
+    // but the heading stays as it is: "Where the card comes in" is the more
+    // useful question now that the answer is "not here, and not to scan".
     expect(
       screen.getByText(/^Where the card comes in$/i),
     ).toBeInTheDocument();
@@ -276,7 +311,9 @@ describe("SignUpPage", () => {
     render(<SignUpPage />);
     // CHANGED: "Try Premium free for 14 days" over an email+password form was
     // a mis-promise, and so was "free account" once #548 put a card wall at
-    // first sign-in. The H1 now claims neither.
+    // first sign-in. The H1 claims neither. #683 makes "free account" true
+    // again, so the H1 could say it — but "Create your Tapeline account" is
+    // what the button below actually does, and the subhead carries the terms.
     expect(
       screen.getByRole("heading", { name: /^Create your Tapeline account$/i }),
     ).toBeInTheDocument();
@@ -312,11 +349,23 @@ describe("SignUpPage", () => {
       const { container, unmount } = render(<SignUpPage />);
       const head = (container.querySelector("h1")?.textContent ?? "") +
         " " + (container.querySelector("h1")?.nextElementSibling?.textContent ?? "");
-      expect(head).not.toMatch(/(?:14[- ]days? )?free[^.]{0,20}no credit card/i);
       expect(head).not.toMatch(/Premium free/i);
-      // #548: no source may sell a card-free ACCOUNT either.
-      expect(head).not.toMatch(/free account/i);
-      expect(head).not.toMatch(/no card/i);
+      expect(head).not.toMatch(/no credit card required/i);
+      // "14 days free — no credit card" is the trial sold as a free period
+      // without naming it a trial; it survives the rewrite below because it
+      // never says the word. A free PLAN needing no card is a different
+      // sentence and is now true, so the pattern is pinned to "N days free".
+      expect(head).not.toMatch(
+        /\b\d+[- ]days? free\b[^.;·]{0,25}(?:no|without a) (?:credit )?card/i,
+      );
+      // #548 added blanket bans on "free account" and "no card" here, because
+      // the wall made both false whatever the source. #683 removed the wall,
+      // so a subhead may now say a source-matched visitor gets a free account
+      // with no card — every one of them does. The line that stays banned is
+      // the one that carries card-freeness into the TRIAL clause, which is the
+      // easiest mistake to make in exactly these one-sentence variants.
+      expect(head).not.toMatch(/\btrial\b[^.;·]{0,30}(?:no|without a) (?:credit )?card/i);
+      expect(head).not.toMatch(/(?:no|without a) (?:credit )?card[^.;·]{0,28}\btrial\b/i);
       unmount();
     }
   });
@@ -350,9 +399,12 @@ describe("SignUpPage", () => {
     expect(sub).toMatch(/one click ends the trial/i);
     // The escape hatch that keeps "read the record first" true.
     expect(sub).toMatch(/public record needs no account/i);
-    // And the claim that has been false since #548 must not reappear here of
-    // all places — this is the variant about the card.
-    expect(sub).not.toMatch(/no (?:credit )?card/i);
+    // NARROWED by #683. This used to ban "no card" outright in this subhead —
+    // correct while the account took one too. Now that signing up genuinely
+    // takes none, this variant may say so; what it may never say is that the
+    // TRIAL takes none, which is the exact thing the ad it answers is about.
+    expect(sub).not.toMatch(/\btrial\b[^.;·]{0,30}(?:no|without a) (?:credit )?card/i);
+    expect(sub).not.toMatch(/(?:no|without a) (?:credit )?card[^.;·]{0,28}\btrial\b/i);
   });
 
   // ── HDYHAU: optional free-text self-reported attribution (gap G2) ─────────
@@ -634,11 +686,13 @@ describe("SignUpPage", () => {
     expect(text).not.toContain(`Pro from ${usd(PRICING.pro.annualPerMonth)}/mo`);
   });
 
-  it("names the card-free escape hatch in the transparency footer", () => {
+  it("names the account-free escape hatch in the transparency footer", () => {
     // This replaced a FREE_LIMITS-derivation check: the footer used to sell a
-    // card-free Free tier with its caps, which #548 made false, so there are no
-    // caps left to derive. What the footer must still carry is the honest
-    // alternative — the record a visitor can read without an account.
+    // card-free Free tier with its caps, and #548 made that false. #683 makes
+    // the caps real again (ten scanner rows, one saved screen, five watchlist
+    // symbols, twelve ticker pages a day), so a FREE_LIMITS-derived line would
+    // be honest here once more — this test does not ask for one. What it does
+    // require is the claim that needs no account at all: the published record.
     render(<SignUpPage />);
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toMatch(/the daily Top 10, the whole back-checked scorecard/i);

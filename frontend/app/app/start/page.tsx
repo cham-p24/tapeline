@@ -1,25 +1,25 @@
 "use client";
 
 /**
- * /app/start — the card gate.
+ * /app/start — the trial-start screen.
  *
- * This is the one screen standing between a brand-new account and the
- * logged-in product. An account created on or after the cutover has to put a
- * card on file before /app/* opens; the layout sends every other /app route
- * here while that is true (see app/app/layout.tsx), and sends the user back
- * out the moment it stops being true.
+ * NOT A WALL, since #683 (2026-08-30). Between 2026-08-22 and that date this
+ * was the one screen standing between a brand-new account and the logged-in
+ * product: /app/* did not open until a card was on file, and app/app/layout
+ * redirected every other /app route here. That is gone. A new account lands on
+ * the FREE plan with the live scanner already working, and this page is now an
+ * OFFER it can walk past — nothing behind it is closed.
  *
- * WHO NEVER SEES THIS PAGE, and it is not a short list: every account created
- * before the cutover, every admin, every lifetime account, and anyone with a
- * card already on file. The verdict is `must_add_card` on the session payload
- * and it is computed server-side from one dated constant. This page re-derives
- * nothing — it renders the wall only when told to, and redirects out
- * otherwise.
+ * WHO SEES IT: an account the session payload marks `must_add_card`, i.e. one
+ * that has never put a card down. Admins, lifetime accounts, anyone with a
+ * card and anyone who already trialled are redirected out. The verdict is
+ * computed server-side from one dated constant; this page re-derives nothing.
  *
- * THE RULES THIS SCREEN HAS TO OBEY. It is asking for a card before the person
- * has seen a single screen of the product, which is the least earned ask in
- * the whole funnel, so the disclosure has to be better than the one on the
- * billing page, not worse:
+ * THE RULES THIS SCREEN HAS TO OBEY. The ask is better earned than it was —
+ * the visitor can have used the free scanner first — but it is still a card
+ * ask, so the disclosure stays stricter than the billing page's, not looser.
+ * It must also never imply the product is shut until the card goes on; it
+ * isn't, and the exits below say so:
  *
  *  1. THE FULL TERMS, AS REAL BODY TEXT, ABOVE THE BUTTON. $0 today, the exact
  *     calendar date of the first charge, the exact amount, that one click
@@ -300,10 +300,13 @@ export default function CardGateStartPage() {
         Start your {TRIAL_DAYS}-day Premium trial
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        It takes a card and charges <strong className="text-fg">$0 today</strong>
-        {" "}&mdash; the card is what opens the app, and the trial becomes a paid
-        subscription if you keep it. Here is exactly what that means, before you
-        enter anything.
+        It takes a card and charges <strong className="text-fg">$0 today</strong>.
+        {" "}Your account already works without one &mdash; the free plan runs the
+        live scanner on the top ten scored rows. What the card adds is every
+        matching row instead of the first ten, a second saved screen, alerts,
+        CSV export and the filings feeds; the trial becomes a paid subscription
+        if you keep it. Here is exactly what that means, before you enter
+        anything.
       </p>
 
       {/* Billing period. Nothing is pre-ticked beyond the site-wide default,
@@ -399,8 +402,10 @@ export default function CardGateStartPage() {
       </button>
 
       {/* THE WAY OUT. Not a footnote and not a dark-pattern "no thanks, I hate
-          value" line — two real, free destinations that need no account at
-          all, plus the door. */}
+          value" line. Since #683 the strongest exit is the honest one: the
+          account already works. So this leads with the free plan's own live
+          scanner, then the two destinations that need no account at all, then
+          the door. */}
       <section
         data-testid="card-gate-exits"
         aria-labelledby="gate-exits-heading"
@@ -410,9 +415,17 @@ export default function CardGateStartPage() {
           Not ready to hand over a card?
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          That is a fine answer, and it does not cost you the thing most people
-          came for. Two pages stay open to everyone, free, with no account and
-          no card:
+          That is a fine answer, and it costs you nothing you already have. Your
+          account stays on the free plan and the{" "}
+          <Link
+            href="/app/scanner"
+            className={`rounded font-medium text-accent underline underline-offset-2 hover:text-fg ${FOCUS}`}
+          >
+            live scanner
+          </Link>{" "}
+          keeps working &mdash; the top ten scored rows of any scan, live data,
+          no delay. Two more pages stay open to everyone, free, with no account
+          and no card at all:
         </p>
         <ul className="mt-3 space-y-2 text-sm">
           <li>

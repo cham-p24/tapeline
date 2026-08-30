@@ -60,9 +60,10 @@ export function OnboardingTip() {
   if (!show) return null;
 
   // The tip fires on account age alone, and signup grants no trial (#536), so
-  // a new account that has not been through the /app/start card wall has no
-  // trial to announce. Read the same field TrialBanner does rather than
-  // assuming one exists — the three things to try below stand on their own.
+  // a new account that has not started one at /app/start has no trial to
+  // announce. Read the same field TrialBanner does rather than assuming one
+  // exists — the three things to try below stand on their own, and since #683
+  // they are all reachable on the free plan without a card.
   const trialEndsAt = user?.trial_ends_at ? new Date(user.trial_ends_at).getTime() : NaN;
   const onTrial = Number.isFinite(trialEndsAt) && trialEndsAt > Date.now();
 

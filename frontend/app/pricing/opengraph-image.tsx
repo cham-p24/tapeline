@@ -69,22 +69,27 @@ export default async function OG() {
             Live scanner. Public scorecard.
           </div>
           <div style={{ fontSize: "30px", color: "#a1a1aa", lineHeight: 1.4, display: "flex" }}>
-            Public record free, no account. 14-day Premium trial, card required. Prices in USD.
+            Free plan, no card. Public record needs no account. Premium trial takes a card. Prices in USD.
           </div>
         </div>
 
         {/* Pricing tiles */}
         <div style={{ marginTop: "auto", display: "flex", gap: "20px" }}>
-          {/* 2026-08-22 card gate: this tile used to advertise a signed-in
-              "Free forever" tier (and with stale limits — 5 look-ups/day, when
-              the enforced number was 12). A new account takes a card, so the
-              $0 tile now shows the thing that is genuinely $0 and account-free:
-              the published record. */}
+          {/* History, because this tile has been wrong in both directions.
+              It once advertised a signed-in "Free forever" tier with stale
+              limits (5 look-ups/day against an enforced 12); the 2026-08-22
+              card gate then made any signed-in free claim false and the tile
+              was narrowed to the published record. #683 (2026-08-30) removed
+              the wall, so the $0 column on /pricing is a Free PLAN again and
+              this tile mirrors it: an account is an email and a password, and
+              the published record still needs no account at all. Permanence
+              ("free forever") remains unsayable, and so does a card-free
+              trial — the trial takes a card. */}
           <Tile
-            tier="Public record"
+            tier="Free"
             price="$0"
-            sub="no account"
-            note="Daily Top 10 · full scorecard · CSV + JSON"
+            sub="email + password"
+            note="Top 10 scanner rows · 1 saved screen · full scorecard, no account"
           />
           <Tile
             tier="Pro"

@@ -8,9 +8,11 @@ because none had ever been asked for one. Now:
 
   • POST /api/auth/signup creates a FREE account. No card, no trial, no
     trial_ends_at — nothing about account creation is gated behind payment
-    details. (Separately, from tier.CARD_GATE_START a new account meets the
-    /app/start card wall the first time it signs in; accounts created before
-    that date are grandfathered card-free forever.)
+    details. Since #683 (2026-08-30) nothing about USING the free product is
+    either: the account lands on the live scanner's top ten rows, one saved
+    screen, a five-symbol watchlist and a daily ticker-page budget without a
+    card. (The /app/start card wall that stood between 2026-08-22 and that
+    date is gone; there is no longer a gated cohort and a grandfathered one.)
   • Starting the trial is a separate, deliberate act:
     POST /api/billing/checkout {"start_trial": true} opens the SAME Stripe
     Checkout the paid flow uses, in mode=subscription with
@@ -36,7 +38,7 @@ webhook (parse_webhook + subscription_payload patched, real handler logic).
 from __future__ import annotations
 
 import uuid as _uuid
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -47,15 +49,16 @@ from app.main import app
 from app.models import StripeWebhookEvent, Subscription, User
 from app.routers import billing as billing_router
 from app.routers import webhooks as webhooks_router
-from app.services.tier import CARD_GATE_START
 
 _AUTH = {"Authorization": "Bearer dev-bypass"}
 
-# Anchored on the constant, never on a literal, so moving the cutover moves
-# this with it. Used to pin the shared dev_user row on the POST-cutover side
-# of the card gate instead of inheriting whatever `created_at` a long-lived
-# local tapeline_dev.sqlite happens to carry.
-_AFTER_GATE = datetime.combine(CARD_GATE_START, time.min, tzinfo=UTC) + timedelta(days=1)
+# A recent, fixed creation date for the shared dev_user row. The DB is
+# session-scoped and reused between runs, so without this the row inherits
+# whatever `created_at` a long-lived local tapeline_dev.sqlite happens to
+# carry. Deliberately AFTER the retired 2026-08-22 card cutover: a brand-new
+# account is the case this file describes, and since #683 it reaches the free
+# product with no card like every other account.
+_CREATED_AT = datetime(2026, 8, 23, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -87,19 +90,19 @@ async def _prep_dev_user(c: httpx.AsyncClient, **fields) -> None:
     """Reset the shared dev_user row to a known baseline plus `fields`.
 
     Defaults describe a brand-new account under the new contract: FREE, no
-    card, never trialled, created after tier.CARD_GATE_START. Each test states
-    only the deviation it cares about.
+    card, never trialled. Each test states only the deviation it cares about.
 
     `created_at` is pinned deliberately: the DB is session-scoped and reused
-    between runs, so without this the card-gate assertions would depend on when
-    the developer's local tapeline_dev.sqlite first created the dev row.
+    between runs, so without this every assertion that reads the creation date
+    would depend on when the developer's local tapeline_dev.sqlite first
+    created the dev row.
     """
     # GET /api/me ensures the dev_user row exists before we mutate it.
     await c.get("/api/me", headers=_AUTH)
     async with session_scope() as s:
         u = (await s.execute(select(User).where(User.id == "dev_user"))).scalar_one()
         u.tier = fields.get("tier", "free")
-        u.created_at = fields.get("created_at", _AFTER_GATE)
+        u.created_at = fields.get("created_at", _CREATED_AT)
         u.stripe_customer_id = fields.get("stripe_customer_id")
         u.canceled_at = fields.get("canceled_at")
         u.trial_ends_at = fields.get("trial_ends_at")
@@ -420,9 +423,9 @@ async def test_trial_offer_states_the_charge(monkeypatch):
     """GET /trial-offer carries every fact the pre-card screen has to state.
 
     $0 today, the exact first-charge instant, one-click cancellation, and —
-    explicitly — whether THIS account still needs a card to use the free
-    product at all. Served from the same TRIAL_DAYS the checkout sends, which
-    is the whole point: the disclosure and the subscription cannot disagree.
+    explicitly — that a card is what buys the trial, not what buys entry.
+    Served from the same TRIAL_DAYS the checkout sends, which is the whole
+    point: the disclosure and the subscription cannot disagree.
     """
     before = datetime.now(UTC)
     async with _dev_client() as c:
@@ -436,13 +439,19 @@ async def test_trial_offer_states_the_charge(monkeypatch):
     assert body["trial_days"] == 14
     assert body["amount_charged_today"] == 0
     assert body["cancel_in_one_click"] is True
+    # The card is required for THE TRIAL. That has not changed and is the
+    # single most important thing this screen says.
     assert body["card_required"] is True
-    # Per-account, not a blanket statement about the tier: _prep_dev_user pins
-    # created_at to _AFTER_GATE, so this row sits on the far side of
-    # tier.CARD_GATE_START and must add a card at first sign-in. A
-    # grandfathered row (created before the cutover) reads False — see
-    # tests/test_card_gate.py for both sides of that boundary.
-    assert body["free_tier_requires_card"] is True
+    # INVERTED by #683 (2026-08-30). This flag used to report the /app/start
+    # wall, and for a row created after the 2026-08-22 cutover it read True:
+    # "you need a card to use the free product at all". The wall is gone, so
+    # the honest answer is now no for every account, whenever it was created —
+    # _prep_dev_user deliberately pins `created_at` past the retired cutover,
+    # so this is the case that used to say yes. `.get` because the field may
+    # legitimately be dropped from the payload now that it has one answer.
+    assert not body.get("free_tier_requires_card"), (
+        "a card buys the trial, not entry — the free product needs none"
+    )
     assert body["current_trial_ends_at"] is None
 
     first_charge = datetime.fromisoformat(body["first_charge_at"])

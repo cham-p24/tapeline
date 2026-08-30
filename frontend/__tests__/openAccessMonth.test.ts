@@ -67,6 +67,8 @@ describe("open-access month", () => {
     // web_push_alerts are NOT part of the promo, and no Pro feature unlocks.
     expect(FREE_LIMITS.dailyLookups).toBe(12);
     expect(FREE_LIMITS.watchlistTickers).toBe(5);
-    expect(FREE_LIMITS.webPushAlerts).toBe(2);
+    // 0 since #683 (2026-08-30): Free carries no alerts on any channel. The
+    // promo is still a row-cap lift only, so it must not move this either.
+    expect(FREE_LIMITS.webPushAlerts).toBe(0);
   });
 });

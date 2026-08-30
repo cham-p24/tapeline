@@ -335,25 +335,30 @@ def render_watchlist_alert_email(
 # The one paragraph that has to be exactly right, because the welcome mail is
 # the first place a reader forms a belief about whether we can charge them.
 #
-# CHANGED 2026-08-22 (card gate — see services/tier.CARD_GATE_START). This used
-# to open "The Free plan needs no card and there is nothing to cancel", which
-# was true while signup landed on a card-free Free tier. From the cutover a NEW
-# account adds a card at first sign-in before it can use /app, so that sentence
-# would now be a false statement made to the exact person it is false about.
+# CHANGED 2026-08-22 (the card gate), then again 2026-08-30 (#683, the gate
+# moved off the front door). Between those dates a new account genuinely had
+# to put a card up before /app opened, and this footnote said so. It no longer
+# does: signing up is an email and a password, the account that results is a
+# working one, and the card is what STARTS THE TRIAL. Both facts have to be in
+# here, and neither may stand in for the other — "we took nothing from you" is
+# not a promise that the trial is free, and "the trial takes a card" is not a
+# reason for a reader to think their account is already billable.
 #
-# Only render_welcome_email uses this, and welcome is day-0 — grandfathered
-# accounts (created before the cutover) never receive it again, so it is written
-# for the new-account case without a date branch.
+# Only render_welcome_email uses this, and welcome is day-0, so it is written
+# for a brand-new account without a date branch.
 #
 # Three things it must state before any card is asked for: $0 today, when the
-# first charge lands, and that one click stops it — plus a real way out that is
-# not punished (the public record, which needs no account at all).
+# first charge lands, and that one click stops it — plus the fact that nobody
+# has to reach that ask at all, because the free plan and the public record
+# both work without it.
 _FREE_VS_TRIAL_FOOTNOTE = (
-    "A new account adds a card at first sign-in, on Stripe's own checkout page. "
-    "That starts the 14-day Premium trial: $0 is charged that day, the first "
+    "Your account took an email and a password, and there is nothing on file "
+    "to cancel. A card is the separate step that starts the 14-day Premium "
+    "trial, on Stripe's own checkout page: $0 is charged that day, the first "
     "charge is at the end of day 14, and one click cancels before then with "
-    "nothing taken. If you would rather not, the daily picks and the whole "
-    "public scorecard stay readable at tapeline.io/scorecard with no account."
+    "nothing taken. If you would rather not, the free plan keeps working, and "
+    "the daily picks and the whole public scorecard stay readable at "
+    "tapeline.io/scorecard without an account at all."
 )
 
 
@@ -408,7 +413,7 @@ def render_welcome_email(
                 <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
                   <li><strong>Scanner</strong> — every ticker scored; hover any score for the 6-factor breakdown</li>
                   <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
-                  <li><strong>Watchlist</strong> — add 5-10 tickers, get smart alerts when scores shift past your threshold</li>
+                  <li><strong>Watchlist</strong> — save up to {FREE_WATCHLIST_TICKERS} tickers and watch their scores move in one place</li>
                 </ol>
                 """
             )
@@ -1917,8 +1922,19 @@ def _free_tier_changelog_lines() -> list[str]:
         f"{FREE_DAILY_LOOKUPS} full ticker look-ups a day.",
         f"{FREE_SCANNER_ROWS} live scanner rows (live data, not delayed).",
         f"The squeeze radar's top {_free_squeeze_preview_limit()} setups.",
-        f"{FREE_WEB_PUSH_ALERTS} browser alerts you can set on your own tickers.",
+        "A saved screen, which re-runs each time you open it.",
     ]
+    # The browser-alert line that used to close this list is gone rather than
+    # re-worded. FREE_WEB_PUSH_ALERTS went to 0 on 2026-08-30 (#683) — an
+    # alert is Tapeline re-running a screen while you are not here, which is
+    # the standing work a card buys, and it was being given away on one
+    # channel while being charged for on the other. A line reading "0 browser
+    # alerts" is not a feature; it is an apology, and this email is a list of
+    # what the plan HAS.
+    if FREE_WEB_PUSH_ALERTS:  # pragma: no cover - re-armed only if the cap returns
+        lines.append(
+            f"{FREE_WEB_PUSH_ALERTS} browser alerts you can set on your own tickers."
+        )
     if free_has_watchlist():
         lines.insert(
             0,
@@ -1981,7 +1997,7 @@ def render_free_tier_changelog_email(user_name: str) -> str:
                 else "The free plan now includes "
             )
             + f"{FREE_DAILY_LOOKUPS} look-ups a day and "
-            f"{FREE_WEB_PUSH_ALERTS} browser alerts."
+            f"{FREE_SCANNER_ROWS} live scanner rows."
         ),
     )
 
@@ -2614,7 +2630,6 @@ def render_annual_renewal_reminder_email(
 
 def render_free_trial_invite_email(
     user_name: str, *, open_access: bool = False, open_access_until: str = "",
-    must_add_card: bool = False,
 ) -> str:
     """Day ~3: the first (and usually only) invitation to start a trial.
 
@@ -2630,41 +2645,33 @@ def render_free_trial_invite_email(
        rows Pro does. "Upgrade to unlock the full scanner" is *false* for them
        today and true again on Sept 9 — so the promo case says so plainly and
        sells only what Premium genuinely adds on top.
-    2. **State the trial terms here, not at the checkout wall.** The trial takes
-       a card. Someone should learn that from us, in the email doing the asking,
+    2. **State the trial terms here, not at the checkout.** The trial takes a
+       card. Someone should learn that from us, in the email doing the asking,
        not discover it after clicking.
-    3. **A walled account has not reached the scanner yet.** From
-       tier.CARD_GATE_START an account created on or after that date meets the
-       /app/start card wall at first sign-in, so `must_add_card=True` means the
-       in-app rows are not open to them yet — the daily picks and the public
-       record still are, with no account and no card. Never tell that recipient
-       the scanner is already on, and do not tell them their Free account
-       "stays exactly as it is" if they say no — it has never been open to
-       them. Accounts created before the cutover are grandfathered and read
-       `must_add_card=False`.
+    3. **Never tell the recipient the product is shut to them.** It is not,
+       and has not been since the route wall came down on 2026-08-30 (#683).
+       Everyone who receives this already has the free plan running — the top
+       ten scored rows on live data, one saved screen, a watchlist — plus the
+       daily picks and the public record. So the ask here is about what a card
+       ADDS, never about getting in, and the sentence covering a "no" may say
+       their account stays exactly as it is, because it does. The
+       `must_add_card` argument this function used to branch on is gone: it
+       distinguished nothing the copy is entitled to claim.
     """
-    if open_access and not must_add_card:
+    # ONE open-access branch, not two. A second one used to sit here for an
+    # account that had not yet put a card up, telling it the full scanner
+    # arrived "once your card is on file at first sign-in". Two things make
+    # that wrong: the route wall came down on 2026-08-30 (#683), and the promo
+    # lifts the row cap on the FREE tier itself, so a card was never what
+    # switched it on. Whether this recipient has been through Stripe changes
+    # nothing about the sentence, so the sentence no longer asks.
+    if open_access:
         access_line = muted_paragraph(
             f"Right now your Free account has the <strong>full scanner</strong> — "
             f"every scored row, not the top ten — because open access is running "
             f"until {open_access_until}. Nothing to do to get it; it is already on."
         )
         adds_intro = "What a trial adds on top of that:"
-    elif open_access:
-        access_line = muted_paragraph(
-            f"Open access is running until {open_access_until}: once your card is "
-            f"on file at first sign-in, your Free account gets every scored row, "
-            f"not the top ten. The daily picks and the whole public record are "
-            f"open to you right now, with no account and no card."
-        )
-        adds_intro = "What a trial adds on top of that:"
-    # The `must_add_card` branch that used to sit here said the scanner "opens
-    # once you add a card at first sign-in". That was true only while the route
-    # wall existed. The wall was removed on 2026-08-30 — a new account now gets
-    # the top ten scored rows immediately, and the card buys the standing work
-    # (a second saved screen, alerts, export, every matching row). Sending a
-    # false instruction about money is worse than the wall was, so the branch
-    # is gone and an uncarded account falls through to the accurate copy below.
     else:
         access_line = muted_paragraph(
             "Free gives you the top ten scored rows, the daily picks and the "
@@ -2695,7 +2702,7 @@ def render_free_trial_invite_email(
               <li><strong>Congressional trades</strong> — disclosed House and Senate buys and sells, by ticker</li>
               <li><strong>Insider filings</strong> — SEC Form 4 transactions: date, insider, shares, value</li>
               <li><strong>Analyst consensus</strong> per ticker</li>
-              <li><strong>Email alerts and the daily briefing</strong> — Free carries browser push only</li>
+              <li><strong>Alerts on every channel, and the daily briefing</strong> — the screen re-runs after each close and tells you what changed; Free runs a screen when you open it</li>
               <li><strong>Your watchlist's own record</strong> — how each name you saved has scored since you added it</li>
               <li><strong>CSV export and API access</strong></li>
             </ul>
@@ -4667,11 +4674,7 @@ async def run_free_trial_invite_drip(
 
     from app.models import User
     from app.services.email_prefs import EmailPref, wants
-    from app.services.tier import (
-        PROMO_OPEN_ACCESS_UNTIL,
-        free_open_access,
-        must_add_card,
-    )
+    from app.services.tier import PROMO_OPEN_ACCESS_UNTIL, free_open_access
 
     now = now or datetime.now(UTC)
     counts = {"free_invite1": 0, "free_invite2": 0}
@@ -4693,11 +4696,14 @@ async def run_free_trial_invite_drip(
         (
             "free_invite1",
             now - timedelta(days=6), now - timedelta(days=3),
-            # The card wall decides whether this recipient can reach the in-app
-            # rows at all, so the access claim has to be per-account.
+            # The access claim is the same for every recipient now: they all
+            # have the free plan, and the promo lifts the row cap for all of
+            # them. It used to be forked on tier.must_add_card, which stopped
+            # meaning "cannot reach the rows" when the route wall came down on
+            # 2026-08-30 (#683). `u` is still handed to the renderer factory
+            # by the loop below; this stage simply has nothing to ask it.
             lambda name, u: render_free_trial_invite_email(
                 name, open_access=open_access, open_access_until=open_until,
-                must_add_card=must_add_card(u),
             ),
             "What else your Tapeline account can do",
         ),

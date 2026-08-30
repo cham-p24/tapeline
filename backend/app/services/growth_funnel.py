@@ -40,14 +40,20 @@ DEFINITIONS (deliberately spelled out — every one of these is arguable)
 
 THE CARD-WALL ROW (`card_wall`)
 -------------------------------
-Since `tier.CARD_GATE_START` (2026-08-22) a NEW account has to put a card on
-file before it can use the logged-in product. That wall's completion rate is
-the first quality read on any acquisition channel — a channel that fills the
-wall and stops is buying signups the product never sees — and nothing anywhere
-computed it: `begin_checkout(surface:"card_gate")` fires on entry and nothing
-fires on exit. This block is the server-side, DB-truth answer.
+HISTORY FIRST: between `tier.CARD_GATE_START` (2026-08-22) and 2026-08-30 a NEW
+account had to put a card on file before it could use the logged-in product.
+#683 removed that wall — an account with no card now uses the free product
+immediately — so this row no longer measures a barrier. It measures CARD
+ADOPTION: of the accounts that were asked, how many put a card down. Read the
+pre-2026-08-30 window as wall completion and everything after it as voluntary
+trial starts; the two are not comparable and should not be trended as one line.
 
-  * **gated_total** — accounts in the window that actually faced the wall.
+Either way it is the first quality read on an acquisition channel, and nothing
+anywhere else computes it: `begin_checkout(surface:"card_gate")` fires on entry
+and nothing fires on exit. This block is the server-side, DB-truth answer.
+
+  * **gated_total** — accounts in the window the predicate applies to (before
+    2026-08-30, the ones that actually faced the wall).
   * **cards_added** — of those, the ones carrying a `trial_started_at` stamp,
     which is written only by the `trialing` subscription webhook, i.e. only
     after a card cleared Stripe Checkout.

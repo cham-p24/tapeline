@@ -64,7 +64,11 @@ const SECTIONS: Section[] = [
       { label: "Squeeze Watch", free: `Top-${FREE_LIMITS.squeezePreviewRows} preview`, pro: "✓", premium: "✓" },
       { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },
       { label: "IPO + Earnings calendars", free: "—", pro: "✓", premium: "✓" },
-      { label: "Saved scans", free: "—", pro: "10", premium: "100" },
+      // One saved screen on Free, not zero (#683, tier.py saved_scans). Free
+      // re-runs it when the user opens it; the second one is where the card is
+      // asked for, which is a conversation about a thing they have already
+      // built rather than an abstraction.
+      { label: "Saved scans", free: String(FREE_LIMITS.savedScans), pro: "10", premium: "100" },
     ],
   },
   {
@@ -73,7 +77,13 @@ const SECTIONS: Section[] = [
       { label: "Watchlist", free: freeHasWatchlist() ? `${FREE_LIMITS.watchlistTickers} tickers` : "—", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
       { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
-      { label: "Browser push", free: `${FREE_LIMITS.webPushAlerts} alert rules`, pro: "✓", premium: "✓" },
+      // #683 took the free allowance to ZERO in backend tier.py
+      // (FREE_WEB_PUSH_ALERTS = 0) on the reasoning that an alert IS the
+      // standing work the card is sold on, and handing it over on one channel
+      // while charging for it on the other sold nothing. lib/pricing.ts has
+      // been brought back in line with tier.py, so this reads from the
+      // constant again rather than hardcoding the dash.
+      { label: "Browser push", free: FREE_LIMITS.webPushAlerts > 0 ? `${FREE_LIMITS.webPushAlerts} alert rules` : "—", pro: "✓", premium: "✓" },
     ],
   },
   {
@@ -126,7 +136,7 @@ export function ComparisonTable() {
               <th className="px-3 py-5 text-center align-bottom">
                 <span className="block text-xs font-semibold uppercase tracking-wider text-muted">Free</span>
                 <span className="mt-2 block text-lg font-bold text-fg nums">$0</span>
-                <span className="block text-[10px] text-subtle">existing &amp; lapsed accounts</span>
+                <span className="block text-[10px] text-subtle">email &amp; password &middot; no card</span>
               </th>
               <th className="relative px-3 py-5 text-center align-bottom">
                 <BestValueBadge className="absolute left-1/2 top-2 -translate-x-1/2" />
@@ -160,19 +170,21 @@ export function ComparisonTable() {
           </tbody>
         </table>
       </div>
-      {/* The Free column is not something a new visitor can sign up into.
-          Since the 2026-08-22 card gate it describes grandfathered accounts AND
-          the tier a lapsed subscription lands on — this table also renders
-          inside /app/billing, where a post-cutover reader whose trial or
-          subscription ended is standing in that very column, so the rendered
-          text has to name both, not just the grandfathered half. */}
+      {/* The Free column is a plan a visitor can sign up into again (#683,
+          2026-08-30). It is where a new account starts AND where a lapsed
+          subscription lands — this table also renders inside /app/billing,
+          where a reader whose trial or subscription just ended is standing in
+          that very column, so the rendered text names both doors into it.
+          The grandfather clause the card gate needed has been dropped from the
+          copy: it existed to mark pre-cutover accounts as the only ones with
+          free access, and that distinction no longer exists. Those accounts
+          lost nothing — everyone now has what they had. */}
       <p className="border-t border-border/60 px-5 py-3 text-[11px] text-subtle">
-        Free is not a plan a new visitor can sign up into. It covers accounts created before
-        22 August 2026 &mdash; which keep the free access they signed up for and are never asked
-        for a card &mdash; and it is where an account lands when a trial or subscription ends. A
-        new account adds a card at first sign-in, and that starts the 14-day Premium trial. The
-        public record &mdash; scorecard, daily picks, ticker pages and exports &mdash; stays open
-        with no account and no card.
+        Free is where a new account starts: an email and a password, no card. It is also
+        where an account lands when a trial or subscription ends. Adding a card starts the
+        14-day Premium trial, which turns on the Premium column &mdash; $0 that day, one
+        click to cancel before day 14. The public record &mdash; scorecard, daily picks,
+        ticker pages and exports &mdash; stays open with no account at all.
       </p>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">
         {annual

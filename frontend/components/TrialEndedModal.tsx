@@ -48,7 +48,11 @@ function freeTierKeeps(): string[] {
     // the product they are looking at.
     `The top ${freeScannerRows({ authenticated: true })} scanner rows, live — no delay`,
     `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
-    `${FREE_LIMITS.webPushAlerts} browser push alerts`,
+    // #683: Free carries no alerts on any channel, so this "what you keep"
+    // list must not name one. Guarded on the constant in case it returns.
+    ...(FREE_LIMITS.webPushAlerts > 0
+      ? [`${FREE_LIMITS.webPushAlerts} browser push alerts`]
+      : [`${FREE_LIMITS.savedScans} saved screen, re-run whenever you open it`]),
     "The full public scorecard",
   ];
 }

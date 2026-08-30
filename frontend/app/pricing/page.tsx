@@ -10,10 +10,19 @@ import { OpenAccessBanner } from "@/components/OpenAccessBanner";
 import { PricingProof } from "./PricingProof";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
-// FREE_LIMITS / freeHasWatchlist are no longer read on this page: the $0
-// column now describes the public record (no account, no per-account limits)
-// rather than a self-serve logged-in free tier.
-import { PRICING, REFUND, usd, annualRateLabel } from "@/lib/pricing";
+// FREE_LIMITS / freeHasWatchlist are read here again. The 2026-08-30 change
+// removed the card wall at /app/start, so a self-serve logged-in free tier is
+// once more something a visitor can actually sign up for — which means the FAQ
+// below should quote the caps a new account really gets, not just describe the
+// no-account public record.
+import {
+  PRICING,
+  REFUND,
+  usd,
+  annualRateLabel,
+  FREE_LIMITS,
+  freeHasWatchlist,
+} from "@/lib/pricing";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 
 // ISR: regenerate periodically so date-gated copy flips here without waiting
@@ -39,33 +48,31 @@ export const metadata = pageMeta({
   // it caught this exact omission when the title was first shortened.
   title: `Tapeline Pricing: Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo billed annually`,
   description:
-    `Tapeline pricing: Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. 14-day Premium trial: card required at first sign-in, $0 charged today, cancel in one click before it ends. The public scorecard and daily picks stay free with no account.`,
+    `Tapeline pricing: Pro from ${annualRateLabel(PRICING.pro)}, Premium from ${annualRateLabel(PRICING.premium)}. Monthly billing available. Signing up takes an email and a password and lands you on the free plan; adding a card starts the 14-day Premium trial, $0 charged that day, cancel in one click before it ends. The public scorecard and daily picks stay free with no account.`,
   path: "/pricing",
 });
 
 // FAQs — the visible accordion AND the FAQPage JSON-LD both render from this
 // one array, so what Google shows can never drift from what the page says.
 // The refund guarantee derives from REFUND in lib/pricing.ts (single-sourced
-// from /legal/refund). These answers deliberately no longer enumerate
-// FREE_LIMITS: a new visitor cannot sign up for that tier, so quoting its
-// caps here would sell a plan that is not on offer.
+// from /legal/refund). The Free-tier caps are quoted from FREE_LIMITS rather
+// than typed out, so the plan described here is the plan the backend enforces.
 const FAQ_ITEMS = [
   {
     q: "Do I need a card to use Tapeline?",
-    // 2026-08-22 card gate. This answer used to open "Not for Free" and
-    // describe a card-free self-serve tier. A new account now adds a card at
-    // first sign-in, so the honest answer splits by surface: reading costs
-    // nothing and asks for nothing; the signed-in app takes a card.
-    a: "To read Tapeline, no. The daily Top 10, the whole public scorecard, a page per scored ticker and the raw CSV/JSON export are open to anyone with no account and no card. To use the signed-in app, yes: a new account adds a card at first sign-in through Stripe Checkout, which starts the 14-day Premium trial. $0 is charged that day, the first charge is on day 14 at the plan you picked, and one click cancels before then. Accounts created before 22 August 2026 keep the free access they signed up for and are never asked for a card.",
+    // 2026-08-30: the card wall at first sign-in is gone. The answer still
+    // splits by surface, but there are now three of them, not two — reading
+    // asks for nothing, signing up asks for an email and a password, and the
+    // card is what buys the Premium surface for fourteen days.
+    a: `To read Tapeline, no. The daily Top 10, the whole public scorecard, a page per scored ticker and the raw CSV/JSON export are open to anyone with no account and no card. To sign up, still no: the form takes an email and a password. A new account lands on the free plan and can run the live scanner the same minute — the top ${FREE_LIMITS.scannerRows} scored rows of any scan, live and undelayed, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""} and ${FREE_LIMITS.dailyLookups} ticker deep-pages a day. A card is what starts the 14-day Premium trial, and that is what turns on every matching row instead of the first ${FREE_LIMITS.scannerRows}, a second saved screen, alerts by email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. $0 is charged the day you add it, the first charge is on day 14 at the plan you picked, and one click cancels before then.`,
   },
   {
     q: "What happens when my trial ends?",
-    // The "you are not re-walled" sentence is checked against the code, not
-    // assumed: backend/app/services/tier.py::must_add_card returns False as
-    // soon as `stripe_customer_id` is set (and again once `trial_started_at`
-    // is set), so an account that has been through Stripe once is never asked
-    // again — cancelling drops it to Free rather than back behind the wall.
-    a: "On day 14 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to Free, and because you have already been through the card step once you are never asked for a card again. Your settings and anything you saved are kept, and the public record — the daily Top 10, the full scorecard, the raw CSV and JSON — stays open either way.",
+    // Cancelling has never re-walled anyone, and since the wall itself was
+    // removed there is nothing to be sent back behind: a cancelled account
+    // lands on the same free plan a brand-new account gets, which is why the
+    // caps below are the same FREE_LIMITS quoted in the answer above.
+    a: `On day 14 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to the free plan, which keeps the live top-${FREE_LIMITS.scannerRows} scanner, a saved screen${freeHasWatchlist() ? `, the ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day. Your settings and anything you saved are kept, and the public record — the daily Top 10, the full scorecard, the raw CSV and JSON — stays open either way.`,
   },
   {
     q: "Can I switch plans later?",
@@ -113,11 +120,11 @@ export default function PricingPage() {
           </h1>
           <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
             The published record is free to read and always will be &mdash; no
-            account, no card. The app itself asks for a card at first sign-in,
-            which starts the 14-day Premium trial: $0 is charged that day, the
-            first charge is on day 14, and one click cancels before then.
-            Subscribers keep their price for as long as the subscription stays
-            active.
+            account, no card. Signing up takes an email and a password, and puts
+            you on the free plan with the live scanner running. A card is what
+            starts the 14-day Premium trial: $0 is charged that day, the first
+            charge is on day 14, and one click cancels before then. Subscribers
+            keep their price for as long as the subscription stays active.
           </p>
         </div>
 
@@ -207,10 +214,11 @@ export default function PricingPage() {
 
           <div className="mt-10 text-center">
             <Link href="/signup" className="btn-accent inline-flex h-11 px-6 text-base">
-              Start the 14-day Premium trial &rarr;
+              Create your account &rarr;
             </Link>
             <p className="mt-3 text-xs text-subtle">
-              Card required · $0 today · cancel in one click ·{" "}
+              Email and password · free plan, live scanner · a card starts the
+              14-day Premium trial, $0 that day, cancel in one click ·{" "}
               <Link href="/support" className="hover:text-muted underline-offset-2 hover:underline">
                 more questions
               </Link>

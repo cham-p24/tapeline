@@ -335,7 +335,7 @@ export function CancelInterceptModal({
                 ? "You'll keep full access until the end of your billing period. Changed your mind? Here's a reason to stay."
                 : // Downgrade description derives from FREE_LIMITS (mirrors
                   // backend tier.py) — never overstate what cancelling costs.
-                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, ${freeHasWatchlist() ? `a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ` : ""}${FREE_LIMITS.webPushAlerts} browser push alerts — no email alerts. Cancel below, or take one of these instead.`}
+                  `Cancelling means moving to Free: live scores for the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups a day, ${freeHasWatchlist() ? `a ${FREE_LIMITS.watchlistTickers}-ticker watchlist, ` : ""}${FREE_LIMITS.savedScans} saved screen${FREE_LIMITS.webPushAlerts > 0 ? `, ${FREE_LIMITS.webPushAlerts} browser push alerts` : ""} — and no alerts, on email or push. Cancel below, or take one of these instead.`}
             </p>
 
             {error && <ErrorNote text={error} />}

@@ -236,13 +236,14 @@ export default function AboutPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">See the public scorecard.</h2>
           <p className="mt-3 text-sm text-muted">
-            The receipts are at /scorecard. The methodology is at /how-it-works. The 14-day Premium
-            trial starts at first sign-in with a card — $0 charged that day, first charge on day 14,
-            one click to cancel.
+            The receipts are at /scorecard. The methodology is at /how-it-works. Signing up takes an
+            email and a password and lands on the free plan, which runs the live scanner on the top
+            ten scored rows of any scan. Adding a card is what starts the 14-day Premium trial — $0
+            charged that day, first charge on day 14, one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
-              Start the 14-day trial →
+              Create your account →
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the scorecard

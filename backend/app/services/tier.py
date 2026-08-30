@@ -466,20 +466,31 @@ def effective_limit(user: User, key: str) -> int | None:
     return _TRIAL_PREMIUM_REDUCTIONS[key]
 
 
-# ---- Card gate (new accounts add a card before using the /app product) ------
+# ---- Card gate (RETIRED as a wall; the predicate survives as copy) ---------
 #
-# From CARD_GATE_START a NEW account has to put a card on file before it can
-# use the logged-in product: Stripe Checkout, $0 charged today, 14-day trial,
-# first charge at trial end, one click to cancel before then. `must_add_card`
-# below is the ONE predicate every surface reads (it is exposed on /api/me and
-# the frontend routes off that flag), so the wall can never be computed two
-# different ways in two places.
+# HISTORY, because the name of everything below still says "gate". Between
+# CARD_GATE_START (2026-08-22) and 2026-08-30 a NEW account had to put a card
+# on file before it could use the logged-in product. #683 REMOVED THAT WALL.
 #
-# GRANDFATHERING IS THE LOAD-BEARING PART OF THIS RULE. Every account created
-# BEFORE this date signed up under "free account, no card" and keeps that deal
-# forever — those users must NEVER see the wall. That is a promise made to real
-# people, not a tunable knob: do not "simplify" the created_at comparison away,
-# and do not move the date backwards over accounts that already exist.
+# WHAT IS TRUE NOW: signing up takes an email and a password and lands on a
+# working FREE plan — the live scanner at FREE_SCANNER_ROWS, one saved screen,
+# a watchlist, a daily ticker-page budget. A card starts the 14-day Premium
+# trial (Stripe Checkout, $0 that day, first charge at trial end, one click to
+# cancel before then) and is what turns on every matching row, a second saved
+# screen, alerts, export and the filings feeds.
+#
+# `must_add_card` below therefore no longer gates ACCESS. It is still the ONE
+# predicate every surface reads, but what it now answers is "has this account
+# ever put a card down?" — it drives /app/start, the upgrade prompts, the drip
+# emails and the funnel cohorts. Anything it returns True for is still fully
+# able to use the free product. Do not reintroduce a route wall on it.
+#
+# THE GRANDFATHER CLAUSE IS NOW MOOT BUT STAYS. Every account created before
+# CARD_GATE_START signed up under "free account, no card" and keeps that deal;
+# since #683 everyone has it, so the created_at comparison no longer separates
+# two cohorts. It is kept because the predicate is still read as "was this
+# account ever asked for a card", and because ripping a dated cutover out of a
+# billing predicate is how you accidentally re-wall real people.
 #
 # What this gate does NOT touch, deliberately: the public surface. /scorecard,
 # /daily-picks, the record CSV/JSON export, the marketing pages and the public

@@ -41,10 +41,14 @@ describe("ComparisonTable", () => {
     expect(
       screen.getByText(`Top-${FREE_LIMITS.squeezePreviewRows} preview`),
     ).toBeInTheDocument();
-    // Browser push: 2 free alert rules, not "—".
+    // Browser push: INVERTED for #683 (2026-08-30). This used to assert the
+    // Free column showed a real alert-rule count rather than "—". Free is now
+    // zero on every channel, so the dash is the correct cell and a count
+    // would advertise something the API refuses.
+    expect(FREE_LIMITS.webPushAlerts).toBe(0);
     expect(
-      screen.getByText(`${FREE_LIMITS.webPushAlerts} alert rules`),
-    ).toBeInTheDocument();
+      screen.queryByText(/\d+ alert rules/),
+    ).not.toBeInTheDocument();
   });
 
   it("does not sell the stale pre-#343 free tier", () => {

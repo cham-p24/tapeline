@@ -36,7 +36,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Can I try Tapeline before paying?",
-    a: "Two ways. Read it for free with no account at all — the daily Top 10, the whole scorecard, a page per scored ticker and the raw CSV/JSON export. Or run it yourself: a new account adds a card at first sign-in, which starts the 14-day Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then. Accounts created before 22 August 2026 keep the free access they signed up for.",
+    a: "Three ways, and two of them never ask for a card. Read it with no account at all — the daily Top 10, the whole scorecard, a page per scored ticker and the raw CSV/JSON export. Or sign up with an email and a password and run the scanner yourself on the free plan: live data, no delay, the top ten scored rows of any scan, one saved screen. A card is what starts the 14-day Premium trial, which turns on every matching row rather than the first ten, plus alerts, CSV export and the Congressional and insider feeds — $0 charged that day, first charge on day 14, cancel in one click before then.",
   },
 ];
 
@@ -91,7 +91,7 @@ const WINS = [
   {
     label: "Trial terms",
     tapeline:
-      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
+      "Signing up takes an email and a password; a card is what starts the 14-day full Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then",
     competitor: "Direct paid signup, no trial",
   },
 ];
@@ -227,7 +227,7 @@ export default function VsFinvizPage() {
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner.</h2>
         <p className="mt-3 text-muted">
-          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. Signing up takes an email and a password, and the scanner opens on the free plan: live data, the top ten scored rows of any scan. A card starts the 14-day Premium trial and opens every matching row — $0 today, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a {REFUND.windowDays}-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">

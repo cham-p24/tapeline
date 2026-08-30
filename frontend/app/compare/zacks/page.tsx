@@ -99,7 +99,7 @@ const WINS = [
   {
     label: "Trial terms",
     tapeline:
-      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
+      "Signing up takes an email and a password; a card is what starts the 14-day full Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then",
     competitor: "Direct paid signup",
   },
 ];
@@ -223,7 +223,7 @@ export default function VsZacksPage() {
       <section className="mx-auto max-w-3xl px-4 sm:px-6 py-8 text-center">
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner free.</h2>
         <p className="mt-3 text-muted">
-          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+          The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. Signing up takes an email and a password, and the scanner opens on the free plan: live data, the top ten scored rows of any scan. A card starts the 14-day Premium trial and opens every matching row — $0 today, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
           ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">

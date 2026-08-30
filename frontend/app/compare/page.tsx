@@ -97,12 +97,14 @@ export default function CompareIndexPage() {
         <div className="mt-14 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
           <h2 className="text-xl font-semibold">See any ticker scored yourself</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            The same six-factor score on the full live scanner. The published record is free
-            to read with no account; the app takes a card at first sign-in — $0 today, a
-            14-day Premium trial, one click to cancel.
+            The same six-factor score on the live scanner. The published record is free
+            to read with no account; an account is an email and a password, and opens the
+            scanner on the top ten scored rows of any scan. A card starts the 14-day
+            Premium trial — every matching row instead of the first ten, $0 today, one
+            click to cancel.
           </p>
           <Button href="/signup" variant="primary" shape="rounded" className="mt-5">
-            Start the 14-day Premium trial &rarr;
+            Create your free account &rarr;
           </Button>
         </div>
       </div>

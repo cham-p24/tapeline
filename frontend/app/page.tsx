@@ -157,13 +157,15 @@ export default async function LandingPage() {
                 the fold alongside the two proof-first pills. It does not remove
                 or demote either existing CTA (both stay full pills, test-locked
                 in LandingPage.test.tsx) — it just gives an already-convinced
-                visitor a low-friction door into the trial. */}
+                visitor a low-friction door into the product. #683 removed the
+                card wall, so that door now opens on the free plan rather than
+                on a trial; the label says so. */}
             <p className="mt-3 text-sm">
               <Link
                 href="/signup"
                 className="text-accent underline-offset-2 hover:underline"
               >
-                Start the 14-day trial
+                Create a free account
               </Link>
             </p>
           </div>
@@ -208,11 +210,12 @@ export default async function LandingPage() {
               left column on desktop (lg:gap-y-0 keeps its mt-3 the only gap, so
               the desktop layout is unchanged). */}
           <p className="order-3 mt-3 text-xs leading-relaxed text-muted lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-2">
-            The trial is 14 days of Premium. Your card goes on at first sign-in
-            and nothing is charged that day &mdash; the first charge is on day 14 at
-            the plan you pick, we email you three days before, and one click cancels
-            before then. The scorecard and daily Top 10 stay free to read with no
-            account either way.
+            Signing up takes an email and a password, and lands on the free plan
+            &mdash; the live scanner, top ten scored rows a scan. Adding a card is
+            what starts the trial: 14 days of Premium, and nothing is charged that day
+            &mdash; the first charge is on day 14 at the plan you pick, we email you
+            three days before, and one click cancels before then. The scorecard and
+            daily Top 10 stay free to read with no account either way.
           </p>
         </div>
       </section>

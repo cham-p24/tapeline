@@ -34,7 +34,7 @@ const COMPARE_FAQ = [
   },
   {
     q: "Should I use both?",
-    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare it directly against your existing WallStreetZen workflow.",
+    a: "WallStreetZen has stronger investor-education content and broader analyst commentary; Tapeline has the live multi-factor synthesis and the public scorecard. Tapeline's public record — the daily Top 10 and the whole scorecard — needs no account and no card, so you can compare it directly against your existing WallStreetZen workflow. A free account goes one step further: the live scanner itself, capped to the top ten scored rows of a scan.",
   },
 ];
 
@@ -87,7 +87,7 @@ const WINS = [
   {
     label: "Trial terms",
     tapeline:
-      "14-day full Premium trial — card required, $0 charged today, first charge on day 14, cancel in one click before then",
+      "Signing up takes an email and a password; a card is what starts the 14-day full Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then",
     competitor: "Annual subscription only on Premium",
   },
   {
@@ -105,9 +105,9 @@ const WINS = [
 const TRADEOFFS = [
   {
     label: "Free access",
-    tapeline: "Daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON — no account; the app itself takes a card",
+    tapeline: "No account: daily Top 10, full scorecard, per-ticker pages, raw CSV/JSON. Free plan: the live scanner, top ten scored rows, one saved screen",
     competitor: "4,600+ stocks with free Zen Ratings — genuinely strong",
-    note: "This one goes to WallStreetZen and it isn't close: their free tier is the strongest in the category and you can screen with it. Tapeline's free surface is a published record you can read and download, not a screener you can run — from 22 August 2026 a new Tapeline account takes a card at first sign-in.",
+    note: "This one still goes to WallStreetZen on breadth: their free tier rates 4,600+ names and you can screen the whole list with it. Tapeline's free access comes in two layers — a published record anyone can read and download without an account, and a free logged-in plan (email and password, no card) that runs the live scanner but shows you the top ten scored rows of any scan, with one saved screen and a five-symbol watchlist. Their free gives you more names; ours gives you the live engine and the record behind it. Every matching row, alerts, export and the Congressional and insider feeds are what a card turns on.",
   },
   {
     label: "Brand history",
@@ -161,9 +161,10 @@ export default function VsWallStreetZenPage() {
           Zen Ratings — daily-rebuilt letter grades, no live tick. Tapeline names all six
           factors and how they're weighted, recomputes the score sub-60s, and pairs every top-10
           with a per-pick public scorecard. If you trade on a sub-week timescale,
-          Tapeline is built for you. If you buy-and-hold for 5+ years, or you want a free
-          screener you can run yourself, WallStreetZen is the right choice — Tapeline&apos;s
-          app takes a card at first sign-in.
+          Tapeline is built for you. If you buy-and-hold for 5+ years, WallStreetZen is the
+          right choice — and on free access theirs is still the more generous tier: 4,600+
+          names rated, where Tapeline&apos;s free plan runs the live scanner but hands back
+          the top ten scored rows of a scan.
         </p>
         {/* Hype pill removed 2026-06-16 — counting categories Tapeline "wins
             outright" reads as marketing, not honesty (matches the finviz
@@ -232,8 +233,10 @@ export default function VsWallStreetZenPage() {
         <h2 className="text-3xl font-bold tracking-tight">Try the live scanner.</h2>
         <p className="mt-3 text-muted">
           The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with
-          no account. The app takes a card at first sign-in: $0 today, a 14-day Premium trial,
-          first charge on day 14, one click to cancel.
+          no account. Signing up takes an email and a password, and the scanner opens on the
+          free plan: live data, the top ten scored rows of any scan. A card starts the 14-day
+          Premium trial and opens every matching row — $0 today, first charge on day 14, one
+          click to cancel.
           Pro from {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr), with a
           {" "}{REFUND.windowDays}-day money-back guarantee.
         </p>

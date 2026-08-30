@@ -58,10 +58,15 @@ export default function ConnectClient() {
     return (
       <div className="mt-8 rounded-xl border border-border bg-panel p-6">
         <h2 className="text-lg font-semibold">You need an account first</h2>
+        {/* The extension needs an account but not a paid one — /api/extension/token
+            mints for any signed-in user, free included. Since #683 that account is
+            an email and a password, so this screen no longer has to introduce a
+            payment step to hand someone a connect code. It does not mention the
+            trial at all: the trial takes a card, and naming it here would put a
+            price next to a thing that has none. */}
         <p className="mt-2 text-sm leading-relaxed text-muted">
           The extension works with a Tapeline account. Creating one takes a few seconds
-          and adds a card at first sign-in, which starts a 14-day Premium trial &mdash; $0
-          today, one click to cancel before day 14.
+          &mdash; an email and a password, no card.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button href="/signup?next=/extension/connect" variant="primary" shape="rounded">

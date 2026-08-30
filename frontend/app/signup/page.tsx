@@ -87,44 +87,50 @@ if (typeof window !== "undefined") {
 // single highest-confidence funnel lever (Unbounce / NN-group information-
 // scent research). Unknown/absent `from` falls back to `_default`.
 //
-// CARD HONESTY (2026-08, revised for the #548 card gate). This copy has been
-// wrong twice, in opposite directions, so read both steps before editing it.
+// CARD HONESTY (2026-08-30, revised for #683). This copy has been wrong three
+// times, in alternating directions, so read the whole history before editing.
 //
 //   #536 removed the auto-granted trial: signup stopped granting Premium, and
 //   the lines here were rewritten to promise a card-free FREE ACCOUNT instead.
 //
-//   #548 then made THAT false. From CARD_GATE_START (2026-08-22) a new account
-//   meets a card wall at /app/start before it can use the logged-in product.
-//   So "free account, no card to sign up" is now misleading even though this
-//   form still collects no card: the visitor cannot reach the product without
-//   one. Promising a free account here and producing a card wall one click
-//   later is precisely the bait-and-switch the gate's own grandfather clause
-//   exists to avoid.
+//   #548 made THAT false. From CARD_GATE_START (2026-08-22) a new account met
+//   a card wall at /app/start before it could use the logged-in product, so
+//   "free account, no card to sign up" became misleading even though this form
+//   collected no card: the visitor could not reach the product without one.
 //
-// What is still literally true, and the ONLY place "no card" may appear: the
-// PUBLISHED RECORD — /scorecard, /daily-picks, per-ticker pages, the CSV/JSON
-// export — needs no account at all. Everything about the account and the trial
-// must state the card and the dates. Do not re-couple "free" to either one.
+//   #683 (2026-08-30) removed the wall. Signing up is an email and a password
+//   and lands on a FREE PLAN that runs the live scanner — top ten scored rows
+//   of any scan, live, one saved screen, a five-symbol watchlist, twelve
+//   ticker pages a day. So the #536 wording is true again and the #548 wording
+//   is now the false one. There is no bait-and-switch left to warn about here.
+//
+// THE RULE THAT SURVIVES ALL THREE: the card belongs to the TRIAL and nothing
+// else. "No card" may be said of this form, of the free plan, and of the
+// PUBLISHED RECORD (/scorecard, /daily-picks, per-ticker pages, CSV/JSON,
+// which need no account at all). It may NOT be said of, or next to, the trial
+// — the trial takes a card, $0 that day, first charge on day 14. Keep the two
+// facts in separate sentences; a reader who merges them has been misled, and
+// the copy linter's Rule 10 fails the build on the merged phrasing.
 const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   _default: {
     h1: "Create your Tapeline account",
-    sub: `Email and password to start. At first sign-in you add a card and your ${TRIAL_LENGTH_LABEL} Premium trial begins — $0 today, cancel in one click.`,
+    sub: `Email and password to start — no card. You land on the free plan and can run scans straight away. Adding a card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 that day, cancel in one click.`,
   },
   finviz: {
     h1: "The Finviz alternative.",
-    sub: `One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day.`,
+    sub: `One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day.`,
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: `One score, one sentence, and every pick logged public vs SPY. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day.`,
+    sub: `One score, one sentence, and every pick logged public vs SPY. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day.`,
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: `The full live universe, every name scored. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day, cancel in one click.`,
+    sub: `The full live universe, every name scored. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day, cancel in one click.`,
   },
   compare: {
     h1: "Switching to Tapeline?",
-    sub: `One transparent score per ticker plus a public track record. ${TRIAL_LENGTH_LABEL} Premium trial — a card at first sign-in, $0 charged that day.`,
+    sub: `One transparent score per ticker plus a public track record. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day.`,
   },
   // Destination for the ad variant that sells the SAFETY of the card trial
   // rather than trying to talk around it (Metrics Bible §7.3, variant 9 —
@@ -516,16 +522,17 @@ function SignUpForm() {
             <span className="text-lg font-semibold tracking-tight">Tapeline</span>
           </Link>
 
-          {/* TWO-STEP SIGNPOST. The card gate at /app/start was arriving as a
-              surprise: a visitor filled in email + password believing they
-              were done, then met an unannounced ask for a card. Naming both
-              steps here costs nothing and means the wall is the step they were
-              told about rather than a bait-and-switch — which is also the only
-              framing consistent with a product whose pitch is that it does not
-              misstate things.
+          {/* TWO-STEP SIGNPOST. This existed because the card gate at
+              /app/start arrived as a surprise: a visitor filled in email +
+              password believing they were done, then met an unannounced ask
+              for a card. #683 (2026-08-30) removed that wall, so step 2 is now
+              the product itself — the form is the whole of sign-up and the
+              free plan is running on the other side of it. The signpost stays
+              because it sets the same expectation in the honest direction: no
+              card is coming.
 
               Factual, not a progress bar with a countdown: no urgency, no
-              scarcity, and it does not imply step 2 is optional. */}
+              scarcity. */}
           <ol
             aria-label="Sign-up steps"
             className="mt-10 flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted"
@@ -534,19 +541,19 @@ function SignUpForm() {
               1. Your details
             </li>
             <li aria-hidden="true">&rarr;</li>
-            <li>2. Card &mdash; starts the {TRIAL_LENGTH_LABEL} trial, $0 today</li>
+            <li>2. Start scanning &mdash; free, no card</li>
           </ol>
 
           <h1 className="mt-3 text-3xl font-bold tracking-tight">{headline.h1}</h1>
           <p className="mt-2 text-sm text-muted">{headline.sub}</p>
 
-          {/* Value strip at the decision point. Post-#548 the honest headline
-              fact is the card itself: it goes on at first sign-in, $0 moves
-              today, and the first charge is 14 days out. The visitor should
-              learn that from us here, before they are anywhere near a card
-              field — not discover it at the wall on the next screen. */}
+          {/* Value strip at the decision point. Two facts, and they must not
+              share a clause: this form takes no card, and the trial does. Kept
+              as separate sentences so neither can be read as covering the
+              other — the same reason Rule 10 in the copy linter still bans
+              card-free wording inside ~40 characters of "trial". */}
           <p className="mt-4 text-xs text-muted">
-            {TRIAL_LENGTH_LABEL} Premium trial &middot; Card added at first sign-in, $0 charged today &middot; Cancel in one click &middot; {REFUND.windowDays}-day money-back on paid plans
+            Free plan &mdash; an email and a password, no card. A card is what starts the {TRIAL_LENGTH_LABEL} Premium trial: $0 that day, cancel in one click, {REFUND.windowDays}-day money-back on paid plans.
           </p>
 
           {/* PRIMARY signup path: Google-first, above the fold, first thing the
@@ -848,7 +855,7 @@ function SignUpForm() {
             <ul className="mt-2 space-y-1.5">
               <li>
                 <strong className="font-semibold">$0 today.</strong> This form takes
-                an email and a password. The card comes at first sign-in.
+                an email and a password. No card to sign up.
               </li>
               <li>
                 <strong className="font-semibold">
@@ -879,8 +886,8 @@ function SignUpForm() {
                 the real Free-tier caps again (it previously hardcoded all
                 three and had already drifted once). */}
             <p className="mt-1.5">
-              This form takes an email and a password. At first sign-in you add a card, and
-              that starts your <span className="text-fg">{TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
+              This form takes an email and a password, and no card. Adding a card later
+              starts your <span className="text-fg">{TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
               <span className="text-fg">$0 is charged today</span>, the first charge is on{" "}
               <span className="text-fg">{longDate(firstCharge)}</span> at the plan you pick, we
               email you three days before, and one click ends it before then with nothing taken.

@@ -219,18 +219,21 @@ describe("trial offer — the decline is a real, equal choice", () => {
       name: /continue (on the free plan|without a card)/i,
     });
 
-  it("points a GATED account at the public record, not at a walled route", async () => {
-    // The bug this pins shut. /app/scanner is not in CARD_GATE_PASSTHROUGH, so
-    // for a post-cutover account app/app/layout.tsx replaces it with the card
-    // wall on arrival. Offering it as the decline made the button a trapdoor.
+  it("points a card-free account at the scanner it can actually use", async () => {
+    // INVERTED by #683 (2026-08-30). This test's whole subject was the wall:
+    // /app/scanner was not in CARD_GATE_PASSTHROUGH, so for a post-cutover
+    // account app/app/layout.tsx replaced it with the card wall on arrival,
+    // and offering it as the decline made the button a trapdoor. The wall is
+    // gone. Sending that same account to /scorecard instead is now the
+    // trapdoor — it routes someone off the product to tell them they cannot
+    // use it, which is false. The decline goes to the free scanner.
     freshFreeUser();
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
     const decline = declineIn(panel);
 
-    expect(decline).toHaveAttribute("href", "/scorecard");
-    expect(decline).not.toHaveAttribute("href", "/app/scanner");
-    expect(decline.textContent).toMatch(/without a card/i);
+    expect(decline).toHaveAttribute("href", "/app/scanner");
+    expect(decline.textContent).toMatch(/continue on the free plan/i);
   });
 
   it("keeps the Free-plan decline for a GRANDFATHERED account", async () => {
@@ -269,25 +272,30 @@ describe("trial offer — the decline is a real, equal choice", () => {
   // removed (true before the 2026-08-22 gate, false after), but the Free-plan
   // promise underneath it survived unconditionally — so this test went on
   // pinning copy that was false for every new signup.
-  it("tells a GATED account what it actually gets, and never promises Free", async () => {
+  it("tells a card-free account what it actually keeps, and promises Free because Free is real", async () => {
+    // INVERTED by #683. While the wall stood, "you stay on the Free plan" was
+    // a promise this cohort could not cash, so it was BANNED here. Free is now
+    // a plan a declining account genuinely lands on, so withholding it is the
+    // dishonest option and the ban is inverted into a requirement.
     freshFreeUser();
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
     const text = (panel.textContent ?? "").replace(/\s+/g, " ");
 
     expect(text).toMatch(/declining costs you nothing/i);
-    expect(text).toMatch(/never charged/i);
-    // The honest escape hatch: the published record needs no account, no card.
+    expect(text).toMatch(/stay on the free plan/i);
+    expect(text).toMatch(new RegExp(`top-${FREE_LIMITS.scannerRows}`, "i"));
+    expect(text).toMatch(/look-ups a day/i);
+    // The public record is still named, as the surface needing no account.
     expect(text).toMatch(/public record/i);
-    expect(text).toMatch(/no account and no card/i);
     // …and the trial stays available later.
-    expect(text).toMatch(/start the trial from this page whenever you want/i);
+    expect(text).toMatch(/start the trial later from this page/i);
 
-    // The promises it must NOT make to this cohort.
-    expect(text).not.toMatch(/stay on the Free plan/i);
-    expect(text).not.toMatch(new RegExp(`top-${FREE_LIMITS.scannerRows}`, "i"));
-    expect(text).not.toMatch(/look-ups a day/i);
+    // Still banned: telling this account the product is shut without a card,
+    // and any permanence promise the product cannot keep.
+    expect(text).not.toMatch(/stays locked/i);
     expect(text).not.toMatch(/never asks for a card/i);
+    expect(text).not.toMatch(/free forever/i);
   });
 
   it("restates the real Free outcome for a GRANDFATHERED account", async () => {

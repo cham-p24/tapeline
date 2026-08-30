@@ -274,11 +274,12 @@ export default async function DailyPicksPage() {
             </div>
             <div>
               <div className="text-3xl font-bold text-accent">$0</div>
-              <h3 className="mt-2 font-semibold text-fg">No card, ever</h3>
+              <h3 className="mt-2 font-semibold text-fg">Free to read, free to run</h3>
               <p className="mt-1 text-sm text-muted leading-relaxed">
-                The daily email is free. If you ever want live scoring, watchlist
-                alerts, or the full universe, the trial is one click away — no
-                pressure.
+                The daily email needs no account at all. An account takes an
+                email and a password, and the free plan runs the live scanner on
+                the top ten scored rows. Alerts and the full universe are what
+                the trial adds — no pressure.
               </p>
             </div>
           </div>
@@ -312,13 +313,16 @@ export default async function DailyPicksPage() {
             Want the same composite, live and on your own watchlist?
           </h2>
           <p className="mt-3 text-muted">
-            14-day Premium trial — a card at first sign-in, $0 charged that day, first
-            charge on day 14, one click to cancel. The daily email is free with no account
-            and keeps coming either way.
+            An account takes an email and a password: the free plan runs the
+            scanner on the top ten scored rows and holds a five-symbol
+            watchlist. A card starts the 14-day Premium trial — every matching
+            row, alerts and the 200-symbol watchlist, $0 charged that day, first
+            charge on day 14, one click to cancel. The daily email is free with
+            no account and keeps coming either way.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
-              Start the 14-day trial &rarr;
+              Create your account &rarr;
             </Link>
             <Link href="/pricing" className="btn-ghost text-base">
               See pricing

@@ -40,26 +40,36 @@ function openSearch() {
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
 }
 
-/* ─── Card gate ──────────────────────────────────────────────────────────────
+/* ─── Card gate (REMOVED — read this before restoring anything below) ────────
  *
- * An account created on or after the cutover has to put a card on file before
- * it can use the logged-in product. The verdict itself is the server's —
- * `must_add_card`, derived from the backend's single CARD_GATE_START constant
- * and surfaced by UserContext — and this layout is only the doorman.
+ * There is no route wall. #683 (2026-08-30) removed it: an account created
+ * with an email and a password lands on the FREE plan and every /app route is
+ * open to it immediately. `gated` below is hardcoded false and the machinery
+ * is kept only so the route list and its tests stay meaningful if a gate is
+ * ever needed again.
  *
- * Three things it must never do, in order of how much damage they'd cause:
+ * HISTORY: between 2026-08-22 (CARD_GATE_START) and 2026-08-30 an account
+ * created on or after the cutover had to put a card on file before it could
+ * use the logged-in product. The verdict was the server's — `must_add_card`,
+ * derived from the backend's single CARD_GATE_START constant and surfaced by
+ * UserContext — and this layout was only the doorman. `must_add_card` is still
+ * computed and still drives copy (see the note further down), but it no longer
+ * decides whether anything renders.
  *
- *  1. Wall a grandfathered account. Accounts that predate the cutover signed
- *     up under "free, no card"; making them pay to log back in would be a
- *     bait-and-switch on real people. The server never sets the flag for them
+ * If a wall is ever reinstated, these were its rules, in order of how much
+ * damage breaking them would cause:
+ *
+ *  1. Never wall a grandfathered account. Accounts predating the cutover
+ *     signed up under "free, no card"; making them pay to log back in would be
+ *     a bait-and-switch on real people. The server never set the flag for them
  *     (nor for admins or lifetime accounts), and everything here fails OPEN —
  *     no flag, no session, no field at all ⇒ the normal app renders.
- *  2. Flash the wall at somebody who isn't gated. While the session fetch is
- *     in flight we know nothing, so we render a neutral frame rather than
- *     guessing in either direction.
- *  3. Flash the PRODUCT at somebody who is. A gated route renders the same
- *     neutral frame while the redirect to the wall lands, so the scanner never
- *     mounts and never fires its authed fetches.
+ *  2. Never flash the wall at somebody who isn't gated. While the session
+ *     fetch is in flight we know nothing, so we render a neutral frame rather
+ *     than guessing in either direction.
+ *  3. Never flash the PRODUCT at somebody who is. A gated route renders the
+ *     same neutral frame while the redirect lands, so the scanner never mounts
+ *     and never fires its authed fetches.
  */
 export const CARD_GATE_ROUTE = "/app/start";
 

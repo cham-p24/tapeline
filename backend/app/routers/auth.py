@@ -367,12 +367,13 @@ async def signup(
     referred_by_id = referrer.id if referrer else None
 
     # NO trial is granted here. Creating an account is email + password only,
-    # and it lands on FREE. From tier.CARD_GATE_START a NEW free account still
-    # hits the card wall at first sign-in (services/tier.must_add_card); only
-    # accounts created before that date are card-free forever. The
-    # /free-stock-scanner-no-credit-card page was rewritten for exactly this —
-    # it now tells a true story about the PUBLIC record (scorecard, daily
-    # picks, exports, ticker pages), which needs no account and no card.
+    # and it lands on FREE — a working plan, not a holding pen: the live
+    # scanner at the free row cap, one saved screen, a watchlist and a daily
+    # ticker-page budget, all reachable immediately. The card wall that stood
+    # at /app/start from tier.CARD_GATE_START was removed in #683 (2026-08-30);
+    # `services/tier.must_add_card` survives it but now drives copy and funnel
+    # cohorts, not access. The PUBLIC record (scorecard, daily picks, exports,
+    # ticker pages) still needs no account and no card at all.
     #
     # The 14-day Premium trial is now card-required: the user starts it
     # deliberately from POST /api/billing/checkout {"start_trial": true}, which
@@ -397,10 +398,10 @@ async def signup(
         id=f"u_{uuid.uuid4().hex}",
         email=email,
         name=(body.name or "").strip() or None,
-        # FREE, no card on file, and no trial. See the block above: from
-        # tier.CARD_GATE_START this row still meets the card wall at first
-        # sign-in, and the Premium trial is opt-in and card-required, stamped
-        # by the subscription webhook — never here.
+        # FREE, no card on file, and no trial. See the block above: since #683
+        # this row can use the free product straight away, and the Premium
+        # trial is opt-in and card-required, stamped by the subscription
+        # webhook — never here.
         tier="free",
         password_hash=pw,
         trial_ends_at=None,

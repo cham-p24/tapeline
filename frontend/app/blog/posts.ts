@@ -786,9 +786,10 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       If you want them all in one view ranked by score, the live
       <a href="/app/scanner">scanner</a> is the home for that — Free
       gets live scores for the top 10 rows plus 12 look-ups a day
-      (unmetered for the first 24 hours); the
-      <a href="/signup">14-day Premium trial</a> — a card at first sign-in,
-      $0 charged that day — opens the full real-time universe with unlimited look-ups.</p>
+      (unmetered for the first 24 hours), and an account is an email and a
+      password; the <a href="/signup">14-day Premium trial</a> — that step
+      takes a card, $0 charged that day — opens the full real-time universe
+      with unlimited look-ups.</p>
     `,
   },
   {
@@ -837,10 +838,12 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       upgrade-trap rather than retain. Tapeline's answer is to put the whole
       published record outside the paywall entirely: the daily Top 10, every
       pick ever made with its next-session result vs SPY, a page per scored
-      ticker, and the raw CSV/JSON — no account, no card. The signed-in app
-      itself takes a card at first sign-in and starts a 14-day Premium trial
-      ($0 that day, first charge on day 14, one click to cancel). Judge the
-      product on the record before you decide whether to open an account.</p>
+      ticker, and the raw CSV/JSON — no account, no card. A free account is
+      an email and a password, and it opens the live scanner at the top ten
+      scored rows. The card belongs to the 14-day Premium trial, which is a
+      step you take on purpose ($0 that day, first charge on day 14, one
+      click to cancel). Judge the product on the record before you decide
+      whether to open an account.</p>
 
       <h2>5. Can you cancel in one click?</h2>
       <p>If you have to email support to cancel, that's a tell about how
@@ -1113,11 +1116,12 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>Want to see RSI in context for every US ticker? The Tapeline
       composite blends RSI into a single 0–100 score along with five other
-      factors. <a href="/signup">Try the 14-day Premium trial</a> — a new
-      account adds a card at first sign-in, $0 is charged that day, and one
-      click cancels before the day-14 charge. If you'd rather not put a card
-      down, the <a href="/scorecard">public record</a> and the daily Top 10
-      stay open with no account.</p>
+      factors. <a href="/signup">Try the 14-day Premium trial</a> — starting
+      it takes a card, $0 is charged that day, and one click cancels before
+      the day-14 charge. If you'd rather not put a card down, a free account
+      still gets the top ten scored rows live, and the
+      <a href="/scorecard">public record</a> and the daily Top 10 stay open
+      with no account at all.</p>
     `,
     howToTime: "PT8M",
     howToSteps: [
@@ -1381,9 +1385,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       is built to answer the first question. The second question
       mostly takes care of itself once the first one is settled.</p>
 
-      <p><a href="/signup">Try the 14-day Premium trial</a> — a new account
-      adds a card at first sign-in, $0 charged today, first charge on day 14,
-      cancel in one click before then. Read
+      <p><a href="/signup">Try the 14-day Premium trial</a> — starting it
+      takes a card, $0 charged today, first charge on day 14, cancel in one
+      click before then. The account itself is an email and a password. Read
       every score the same way our public scorecard does.</p>
     `,
     howToTime: "PT7M",
@@ -1891,12 +1895,13 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li>What's the refund window?</li>
       </ul>
 
-      <p>Tapeline's policy: the trial takes a card at first sign-in and
-      charges $0 until day 14, cancel from /app/billing in one click,
-      30-day refund window on monthly subscriptions. The published
-      record — daily Top 10, scorecard, per-ticker pages, raw CSV/JSON —
-      needs no account or card at all. We'd rather lose subscribers
-      cleanly than retain them via friction.</p>
+      <p>Tapeline's policy: signing up is an email and a password, and the
+      account it makes is a working one — the top ten scored rows, live. The
+      trial is the part that takes a card, and it charges $0 until day 14;
+      cancel from /app/billing in one click, 30-day refund window on monthly
+      subscriptions. The published record — daily Top 10, scorecard,
+      per-ticker pages, raw CSV/JSON — needs no account or card at all. We'd
+      rather lose subscribers cleanly than retain them via friction.</p>
 
       <h2>How Tapeline scores against the checklist</h2>
 
@@ -1913,7 +1918,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Data freshness</td>
               <td>60s composite refresh; the public ticker pages show the same live score with no account</td></tr>
           <tr><td>Cancel friction</td>
-              <td>One-click cancel, 30-day refund. The trial takes a card at first sign-in and charges $0 until day 14; the published record needs no account at all</td></tr>
+              <td>One-click cancel, 30-day refund. Signing up takes an email and a password; the trial is the part that takes a card, and charges $0 until day 14; the published record needs no account at all</td></tr>
         </tbody>
       </table>
 
@@ -1942,9 +1947,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       product that fits you better than win it via misleading
       claims. If the scorecard convinces you, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">14-day
-      Premium trial</a> is the way to see the rest — a new account adds a card
-      at first sign-in, $0 is charged today, and one click cancels before the
-      day-14 charge. If it doesn't, that's useful
+      Premium trial</a> is the way to see the rest — starting it takes a card,
+      $0 is charged today, and one click cancels before the day-14 charge. If
+      it doesn't, that's useful
       information too.</p>
     `,
   },

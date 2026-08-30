@@ -44,7 +44,7 @@ export type TapelineEvent =
   | "sign_up_started"      // Signup form opened
   | "sign_up"              // Account created — primary lead conversion
   // Trial → paid funnel
-  | "start_trial"          // 14-day Premium trial started via Stripe Checkout — the /app/start card wall or the /app/billing trial offer (card required, $0 today, first charge day 14)
+  | "start_trial"          // 14-day Premium trial started via Stripe Checkout — the /app/start trial screen or the /app/billing trial offer (card required, $0 today, first charge day 14). Neither is a wall since #683; signup itself does not fire this.
   | "begin_checkout"       // Upgrade clicked — Stripe Checkout about to open
   | "subscribe"            // First paid charge — primary revenue conversion
   // Engagement signals
