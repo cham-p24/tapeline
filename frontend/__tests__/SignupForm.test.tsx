@@ -245,7 +245,10 @@ describe("SignUpPage", () => {
     // CHANGED: the default destination is now the trial OFFER rather than the
     // scanner. Signup no longer starts a trial, so if nothing presented the
     // choice the trial would never be offered to anyone. The offer is a
-    // two-button fork, one of which is "Continue on the Free plan" → scanner.
+    // two-button fork. The decline branches on must_add_card: a
+    // grandfathered account gets "Continue on the Free plan" → /app/scanner,
+    // a gated one gets "Continue without a card" → /scorecard, because
+    // /app/scanner would bounce it to the card wall.
     expect(routerSpies.push).toHaveBeenCalledWith(
       `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
     );

@@ -8,8 +8,14 @@
  *   1. HONEST DISCLOSURE, as real body text, BEFORE the card. $0 today, the
  *      exact date of the first charge, the amount, and one-click cancellation
  *      before that date. Not a tooltip, not an image, not behind a <details>.
- *   2. THE FREE TIER STAYS CARD-FREE, and declining is an equal, unpunished
- *      choice sitting right beside the trial button.
+ *   2. DECLINING IS AN EQUAL, UNPUNISHED, HONESTLY-DESCRIBED choice sitting
+ *      right beside the trial button. What declining actually GETS you differs
+ *      by cohort, so the panel branches on `must_add_card` and both branches
+ *      are tested. It used to promise every visitor "you stay on the Free plan
+ *      — top-N scanner, N look-ups a day" and link to /app/scanner; for any
+ *      account created on or after CARD_GATE_START that route bounces straight
+ *      to the card wall, so the decline was a trapdoor and this file's own
+ *      fixture (created_at = now) was the exact cohort being lied to.
  *   3. NO DARK PATTERNS. Nothing redirects into Stripe on its own, nothing is
  *      pre-ticked beyond the site-wide billing-period default, and no
  *      urgency/scarcity language appears anywhere on the panel.
@@ -41,6 +47,9 @@ vi.mock("@/lib/gtag", async (importOriginal) => {
 const session = vi.hoisted(() => ({
   user: {} as Record<string, unknown> | null,
   refresh: vi.fn(),
+  // The server's `must_add_card` for this account. The panel reads it to decide
+  // what the DECLINE can honestly promise — see freshFreeUser/grandfatheredUser.
+  mustAddCard: false as boolean,
 }));
 vi.mock("@/components/UserContext", () => ({
   useUser: () => session,
@@ -102,7 +111,15 @@ async function renderBilling(search: string) {
   return render(<BillingPage />);
 }
 
-/** A brand-new account: free tier, never trialled, no card. */
+/** A brand-new account: free tier, never trialled, no card.
+ *
+ * `created_at` is NOW, so this account is on the far side of CARD_GATE_START
+ * (2026-08-22) and the server returns must_add_card = true for it. That pairing
+ * is the point: the fixture said "created today" while the mock left the gate
+ * flag unset, so every assertion in this file ran against a cohort that does
+ * not exist — a new account that is somehow not gated. That is how the decline
+ * came to promise a Free plan this account cannot reach.
+ */
 function freshFreeUser() {
   session.user = {
     id: "u_new",
@@ -112,6 +129,25 @@ function freshFreeUser() {
     trial_ends_at: null,
     created_at: new Date().toISOString(),
   };
+  session.mustAddCard = true;
+}
+
+/** An account from before the card gate: free, no card, and never walled.
+ *
+ * Grandfathering is permanent — these people signed up under "free, no card"
+ * and keep that deal — so for them the original Free-plan decline copy is
+ * still exactly true, and must not be "simplified" away with the gated one.
+ */
+function grandfatheredFreeUser() {
+  session.user = {
+    id: "u_old",
+    email: "old@example.com",
+    name: null,
+    tier: "free",
+    trial_ends_at: null,
+    created_at: "2026-07-01T00:00:00.000Z",
+  };
+  session.mustAddCard = false;
 }
 
 beforeEach(() => {
@@ -177,18 +213,48 @@ describe("trial offer — disclosure", () => {
 });
 
 describe("trial offer — the decline is a real, equal choice", () => {
-  it("offers 'Continue on the Free plan' beside the trial button", async () => {
+  /** The decline link, under either cohort's label. */
+  const declineIn = (panel: HTMLElement) =>
+    within(panel).getByRole("link", {
+      name: /continue (on the free plan|without a card)/i,
+    });
+
+  it("points a GATED account at the public record, not at a walled route", async () => {
+    // The bug this pins shut. /app/scanner is not in CARD_GATE_PASSTHROUGH, so
+    // for a post-cutover account app/app/layout.tsx replaces it with the card
+    // wall on arrival. Offering it as the decline made the button a trapdoor.
+    freshFreeUser();
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
-    const decline = within(panel).getByRole("link", { name: /continue on the free plan/i });
-    expect(decline).toHaveAttribute("href", "/app/scanner");
+    const decline = declineIn(panel);
+
+    expect(decline).toHaveAttribute("href", "/scorecard");
+    expect(decline).not.toHaveAttribute("href", "/app/scanner");
+    expect(decline.textContent).toMatch(/without a card/i);
   });
 
-  it("gives both options the same size and weight (no greyed-out afterthought)", async () => {
+  it("keeps the Free-plan decline for a GRANDFATHERED account", async () => {
+    // For a pre-cutover account /app/scanner is genuinely reachable and Free is
+    // genuinely theirs. Collapsing both cohorts onto the gated copy would take
+    // away something these people actually have.
+    grandfatheredFreeUser();
+    await renderBilling("/app/billing?trial=start");
+    const panel = await screen.findByTestId("trial-offer");
+    const decline = declineIn(panel);
+
+    expect(decline).toHaveAttribute("href", "/app/scanner");
+    expect(decline.textContent).toMatch(/continue on the free plan/i);
+  });
+
+  it.each([
+    ["gated", freshFreeUser],
+    ["grandfathered", grandfatheredFreeUser],
+  ])("gives both options the same size and weight for a %s account", async (_label, seed) => {
+    seed();
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
     const trial = within(panel).getByRole("button", { name: /start the 14-day trial/i });
-    const decline = within(panel).getByRole("link", { name: /continue on the free plan/i });
+    const decline = declineIn(panel);
 
     for (const cls of ["h-11", "flex-1", "text-sm", "font-medium", "rounded-md"]) {
       expect(trial.className).toContain(cls);
@@ -198,22 +264,45 @@ describe("trial offer — the decline is a real, equal choice", () => {
     expect(decline.className).not.toMatch(/opacity-\d|text-xs|text-subtle|underline/);
   });
 
-  // The decline must state the Free OUTCOME without claiming the account is
-  // card-free. "never asks for a card" was true before the 2026-08-22 card
-  // gate and is false for any account created since — PricingTable.test.tsx
-  // bans that exact phrase, so asserting it here put the two guards in direct
-  // conflict. What is still true, and what this now checks, is that declining
-  // costs nothing and lands the user on Free with its real caps.
-  it("restates the Free outcome without claiming a card-free account", async () => {
+  // The decline must state the real OUTCOME for the account reading it. Two
+  // earlier fixes narrowed this and stopped short: "never asks for a card" was
+  // removed (true before the 2026-08-22 gate, false after), but the Free-plan
+  // promise underneath it survived unconditionally — so this test went on
+  // pinning copy that was false for every new signup.
+  it("tells a GATED account what it actually gets, and never promises Free", async () => {
+    freshFreeUser();
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
     const text = (panel.textContent ?? "").replace(/\s+/g, " ");
+
+    expect(text).toMatch(/declining costs you nothing/i);
+    expect(text).toMatch(/never charged/i);
+    // The honest escape hatch: the published record needs no account, no card.
+    expect(text).toMatch(/public record/i);
+    expect(text).toMatch(/no account and no card/i);
+    // …and the trial stays available later.
+    expect(text).toMatch(/start the trial from this page whenever you want/i);
+
+    // The promises it must NOT make to this cohort.
+    expect(text).not.toMatch(/stay on the Free plan/i);
+    expect(text).not.toMatch(new RegExp(`top-${FREE_LIMITS.scannerRows}`, "i"));
+    expect(text).not.toMatch(/look-ups a day/i);
+    expect(text).not.toMatch(/never asks for a card/i);
+  });
+
+  it("restates the real Free outcome for a GRANDFATHERED account", async () => {
+    grandfatheredFreeUser();
+    await renderBilling("/app/billing?trial=start");
+    const panel = await screen.findByTestId("trial-offer");
+    const text = (panel.textContent ?? "").replace(/\s+/g, " ");
+
     expect(text).toMatch(/declining costs you nothing/i);
     expect(text).toMatch(/stay on the Free plan/i);
-    expect(text).not.toMatch(/never asks for a card/i);
     expect(text).toMatch(new RegExp(`top-${FREE_LIMITS.scannerRows}`, "i"));
-    // …and the trial stays available later, so declining costs nothing either.
     expect(text).toMatch(/start the trial later/i);
+    // Still never claims the ACCOUNT is card-free — PricingTable.test.tsx bans
+    // that phrase site-wide and the two guards must not conflict.
+    expect(text).not.toMatch(/never asks for a card/i);
   });
 
   it("uses only real, keyboard-operable controls", async () => {
@@ -224,7 +313,11 @@ describe("trial offer — the decline is a real, equal choice", () => {
       expect(el.tagName).not.toBe("DIV");
     }
     const trial = within(panel).getByRole("button", { name: /start the 14-day trial/i });
-    const decline = within(panel).getByRole("link", { name: /continue on the free plan/i });
+    // Label-agnostic: the decline reads differently per cohort (see the
+    // decline describe block), but it is an <a> in both.
+    const decline = within(panel).getByRole("link", {
+      name: /continue (on the free plan|without a card)/i,
+    });
     expect(trial.tagName).toBe("BUTTON");
     expect(decline.tagName).toBe("A");
     // Visible focus is explicit on the panel's own controls (the tinted panel
