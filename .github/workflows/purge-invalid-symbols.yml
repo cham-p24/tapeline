@@ -1,0 +1,83 @@
+name: Purge invalid ticker symbols
+
+# One-off repair of production data. Deletes Ticker rows whose symbol could
+# never be ingested today — see app/scripts/purge_invalid_symbols.py.
+#
+# What these are: residue from before services/symbols.VALID_SYMBOL_RE guarded
+# the ingest boundary. Audited 2026-08-30, production held exactly 25 —
+# 24 trophy-prefixed sheet annotations ("🏆 SPY", each a ghost duplicate of a
+# real ETF that also exists correctly) and one "币安人生". They are already
+# filtered off every public surface, so this is hygiene, not a fix.
+#
+# ORDER OF OPERATIONS
+#   1. mode=dry-run  — lists every candidate and whether anything references
+#                      it. Writes nothing. Run this and READ IT.
+#   2. mode=apply    — deletes. Gated on typing the confirm phrase.
+#
+# The script refuses to delete any symbol referenced by DailyScorecardEntry
+# (the permanent public record) or WatchlistItem (user data), and says which.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run = list only | apply = DELETE"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - apply
+      confirm:
+        description: "For mode=apply ONLY, type exactly: delete-invalid-symbols"
+        required: false
+        default: ""
+
+concurrency:
+  group: purge-invalid-symbols
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Gate the destructive mode behind an explicit phrase
+        if: ${{ inputs.mode == 'apply' && inputs.confirm != 'delete-invalid-symbols' }}
+        run: |
+          echo "::error title=Not confirmed::mode=apply DELETES production rows."
+          echo "Type 'delete-invalid-symbols' in the confirm box, and run"
+          echo "mode=dry-run first so you have seen the list."
+          exit 1
+
+      # Pinned to the same immutable SHA as every other workflow holding the
+      # production Fly token.
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Run the purge on the Fly machine
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          args=""
+          [ "$MODE" = "apply" ] && args="--apply"
+          echo "mode=$MODE  args='$args'"
+          echo "--------------------------------------------------------------"
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.purge_invalid_symbols ${args}"
+
+      - name: Confirm the universe still serves
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/u.json -w "%{http_code}" --max-time 30 \
+            "https://api.tapeline.io/api/public/signals?limit=5&cb=${GITHUB_RUN_ID}")
+          echo "GET /api/public/signals -> $code"
+          [ "$code" = "200" ] || { echo "::error::the universe is not serving"; exit 1; }
+          python3 -c "import json;d=json.load(open('/tmp/u.json'));print('rows returned:',len(d.get('items',[])))"
