@@ -1,4 +1,4 @@
-# Tapeline — first-time dev bootstrap
+# Tapeline - first-time dev bootstrap
 # Run from C:\Project 1\ in PowerShell
 
 Write-Host "=== Tapeline dev bootstrap ===" -ForegroundColor Cyan

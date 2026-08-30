@@ -10,7 +10,7 @@ $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 $g.Clear([System.Drawing.ColorTranslator]::FromHtml("#0B1220"))
 
-# centred block — Facebook crops the sides hard on mobile, so keep everything mid-frame
+# centred block - Facebook crops the sides hard on mobile, so keep everything mid-frame
 $cx = $W / 2
 
 $sf = New-Object System.Drawing.StringFormat

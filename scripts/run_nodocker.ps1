@@ -1,4 +1,4 @@
-# Tapeline — zero-dependency local runner
+# Tapeline - zero-dependency local runner
 # Uses SQLite instead of Postgres, skips Redis (in-process pub/sub), no Docker required.
 # Python 3.12+ and Node 20+ are the only prerequisites.
 
@@ -76,7 +76,7 @@ Start-Process -FilePath "npm" -ArgumentList "run", "dev" `
     -WorkingDirectory "$root\frontend" -WindowStyle Normal
 
 Write-Host ""
-Write-Host "✔ Services launched. Waiting for frontend to build..." -ForegroundColor Green
+Write-Host "OK Services launched. Waiting for frontend to build..." -ForegroundColor Green
 Start-Sleep -Seconds 8
 Start-Process "http://localhost:3000"
 
