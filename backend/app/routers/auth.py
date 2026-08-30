@@ -440,7 +440,15 @@ async def signup(
         # Weekly-digest consent from the signup form's unchecked-by-default
         # checkbox. False (no tick) writes the column default — nothing is
         # inferred from silence.
-        marketing_opt_in=bool(body.marketing_opt_in),
+    )
+    # Consent is written through services/consent so the timestamp and source
+    # land with it — under the Australian Spam Act the sender carries the onus
+    # of PROVING consent, and a bare boolean proves nothing. Applied after
+    # construction because set_marketing_consent writes three columns.
+    from app.services.consent import set_marketing_consent
+
+    set_marketing_consent(
+        user, granted=bool(body.marketing_opt_in), source="signup_form"
     )
     session.add(user)
     # NOTE: the referrer is deliberately NOT credited here. Granting a free

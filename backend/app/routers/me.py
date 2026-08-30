@@ -391,7 +391,11 @@ async def submit_onboarding(
     # but keeping them aligned at the consent moment means /app/settings/email
     # shows the toggle in the state the user just chose.
     if body.marketing_opt_in is not None:
-        user.marketing_opt_in = bool(body.marketing_opt_in)
+        from app.services.consent import set_marketing_consent
+
+        set_marketing_consent(
+            user, granted=bool(body.marketing_opt_in), source="onboarding"
+        )
         from app.services.email_prefs import EmailPref
         bit = int(EmailPref.WEEKLY_NEWSLETTER)
         current = int(user.email_prefs or 0)
@@ -608,7 +612,9 @@ async def set_email_prefs(
     # have consent on file". A user can pause delivery without revoking
     # consent, but a user can't START delivery without granting it.
     if incoming.get("weekly_newsletter") is True:
-        user.marketing_opt_in = True
+        from app.services.consent import set_marketing_consent
+
+        set_marketing_consent(user, granted=True, source="settings")
     await session.commit()
     logger.info("me.email_prefs_updated user=%s prefs=%d", user.id, current)
     return {"prefs": prefs_to_dict(current)}
