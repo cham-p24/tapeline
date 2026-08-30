@@ -14,10 +14,15 @@ were invisible to the test suite:
     All nine webhook tests monkeypatched `parse_webhook` to return a plain
     dict, so the shape that broke was the one shape never exercised.
 
-Both are fixed and covered by tests that drive real vendor objects. But no
-account has ever completed a checkout, so "fixed" rests on tests rather than
-on Stripe having accepted anything. This closes that gap as far as it can be
-closed without a card.
+Both are fixed and covered by tests that drive real vendor objects. When this
+script was written, no account had ever completed a checkout, so "fixed" rested
+on tests rather than on Stripe having accepted anything.
+
+That is no longer true: the first real payment landed 2026-08-29 ($9.99, one
+Pro subscription), which proves the checkout AND the tier-granting webhook both
+work in production. This script keeps its value as a PREFLIGHT — it re-proves
+the path on demand without waiting for a customer, and without taking money.
+See `billing_audit.py` for the after-the-fact reconciliation.
 
 WHAT "SHADOW" MEANS HERE — read before running
 ----------------------------------------------
