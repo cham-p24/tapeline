@@ -75,8 +75,26 @@ if (-not $fly) {
 }
 Write-Host "  flyctl  $fly"
 
-try { & $fly auth whoami 2>&1 | Out-Null }
-catch { throw "flyctl is not logged in. Run 'fly auth login' first." }
+# `auth whoami` writes its failure to stderr and returns non-zero rather than
+# throwing, so a bare try/catch misses it and the script would sail on to ask for
+# a token it cannot use. Check the exit code.
+# $ErrorActionPreference = "Stop" (set at the top) turns a native command's
+# STDERR into a terminating NativeCommandError, so flyctl's own "no access token"
+# text would print as a stack-trace-looking block ahead of the useful message.
+# Drop to Continue just for this call, and swallow both streams.
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $fly auth whoami *> $null
+$loggedIn = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prevEAP
+
+if (-not $loggedIn) {
+  # Quote the RESOLVED path, not "fly auth login". The whole reason this script
+  # had to go looking for the binary is that flyctl is often not on PATH -- so
+  # telling the operator to run `fly auth login` reproduces the exact error they
+  # just hit. This happened for real on 2026-08-30.
+  throw "flyctl is not logged in. Run this first, then re-run this script:`n`n    & `"$fly`" auth login`n"
+}
 
 # -- token --------------------------------------------------------------------
 Write-Host "Events Manager -> Datasets -> Tapeline -> Settings -> Conversions API"
