@@ -150,6 +150,26 @@ function nearSecurityNoun(adjective) {
  * `brief` cites the numbered rule in docs/COMPLIANCE_COPY_RULES.md so a
  * failing build tells the author WHICH constraint they hit and why.
  * ------------------------------------------------------------------ */
+/**
+ * Substitute the interpolated constants that appear inside user-facing copy,
+ * so proximity rules measure rendered length.
+ *
+ * Deliberately a small, explicit table rather than a TS evaluator: the only
+ * placeholders that appear inside compliance-relevant sentences are the trial
+ * length and the price labels, and a real evaluator would be a much larger
+ * surface for a much smaller gain. An unlisted placeholder is left alone,
+ * which is the safe direction — it can only make a window LOOK longer than it
+ * renders, never shorter.
+ */
+export function expandKnownConstants(text) {
+  return text
+    .replace(/\$\{TRIAL_LENGTH_LABEL\}/g, "14-day")
+    .replace(/\{TRIAL_LENGTH_LABEL\}/g, "14-day")
+    .replace(/\$\{TRIAL_DAYS\}/g, "14")
+    .replace(/\{TRIAL_DAYS\}/g, "14");
+}
+
+
 export const RULES = [
   {
     id: "performance-claim",
@@ -935,6 +955,20 @@ function main(argv) {
     } catch {
       continue;
     }
+    // Scan what the page RENDERS, not what the source spells.
+    //
+    // Several rules work on proximity — Rule 10 bans card-free wording within
+    // ~40 characters of "trial" — and every one of them measures the SOURCE
+    // string. A template placeholder is longer than the value it renders to,
+    // so interpolated copy can sit inside the banned window on screen while
+    // testing clean on disk.
+    //
+    // That was not hypothetical: four /signup sublines reading "Sign up with
+    // no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial" were
+    // passing purely because the 18-character placeholder pushed "trial" past
+    // the 40-character window that the 6-character "14-day" would have sat
+    // inside. The copy happened to be honest. The linter had no way to know.
+    text = expandKnownConstants(text);
     findings.push(
       ...scanSource(text, file, {
         allow: config.allow,

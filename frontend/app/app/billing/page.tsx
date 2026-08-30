@@ -823,7 +823,7 @@ export default function BillingPage() {
                     before then and never be billed.
                   </>
                 )}{" "}
-                Skip it and your account moves to Free forever — live scores,
+                Skip it and your account stays on the Free plan, with no expiry — live scores,
                 top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">

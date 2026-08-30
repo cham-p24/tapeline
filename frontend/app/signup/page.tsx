@@ -118,19 +118,19 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   },
   finviz: {
     h1: "The Finviz alternative.",
-    sub: `One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day.`,
+    sub: `One composite score per ticker and a public, back-checked track record — the synthesis Finviz doesn't do. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day.`,
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: `One score, one sentence, and every pick logged public vs SPY. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day.`,
+    sub: `One score, one sentence, and every pick logged public vs SPY. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day.`,
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: `The full live universe, every name scored. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day, cancel in one click.`,
+    sub: `The full live universe, every name scored. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day, cancel in one click.`,
   },
   compare: {
     h1: "Switching to Tapeline?",
-    sub: `One transparent score per ticker plus a public track record. Sign up with no card; a card starts the ${TRIAL_LENGTH_LABEL} Premium trial, $0 charged that day.`,
+    sub: `One transparent score per ticker plus a public track record. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day.`,
   },
   // Destination for the ad variant that sells the SAFETY of the card trial
   // rather than trying to talk around it (Metrics Bible §7.3, variant 9 —
