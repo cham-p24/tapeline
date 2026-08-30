@@ -2,8 +2,18 @@
 
 A real US symbol is an uppercase letter followed by up to 11 more uppercase
 letters/digits or the structural separators . = / ^ - (class shares like
-BRK.B / BRK-B, futures continuous contracts like CL=F / ZC=F, index notation
-like ^GSPC). Anything else is NOT a ticker and must never be ingested as one
+BRK.B / BRK-B, futures continuous contracts like CL=F / ZC=F).
+
+NOT index notation. This docstring used to cite "^GSPC" as a supported
+example, which contradicted the leading-letter rule stated two paragraphs
+below — `VALID_SYMBOL_RE.match("^GSPC")` has always been None. The regex is
+the correct half: nothing in the app ingests an index (the discovered
+universe is CS/ADRC/ETF/ETV/ETS/ETN — see
+`polygon_feed.VENDOR_TYPE_TO_ASSET_CLASS`), and relaxing the leading-letter
+rule to admit them would also admit the separator-and-digit junk it exists to
+reject. The caret stays legal in non-leading positions, where it is harmless.
+
+Anything else is NOT a ticker and must never be ingested as one
 (see sheet_feed) nor served as a /t/{symbol} page (see routers.ticker):
 
   • blank cells / the literal "TICKER" header
