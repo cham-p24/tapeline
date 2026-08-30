@@ -93,10 +93,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) =>
     !!pathname && (pathname === href || pathname.startsWith(`${href}/`));
 
-  const gated = !sessionLoading && mustAddCard === true;
-  const gatePassthrough = !!pathname && CARD_GATE_PASSTHROUGH.has(pathname);
-  // A gated account on a walled route. Everything below reads this one flag.
-  const redirectingToWall = gated && !gatePassthrough;
+  // THE ROUTE WALL IS GONE. `must_add_card` is still computed and still drives
+  // /app/start, the upgrade prompts and the drip emails — an account without a
+  // card still cannot save a second screen, set an email alert, export, or see
+  // past the free row cap. Those limits live in backend services/tier.py and
+  // are enforced server-side, which the wall never was: `must_add_card`
+  // appears only in session payloads and copy, so any caller hitting the API
+  // (or the public MCP server) always had the product without a card. The wall
+  // stopped ordinary visitors and nobody else.
+  //
+  // What it cost: of the three accounts created under it, none added a card,
+  // none reached a second screen, and none ran a single scan. Two never even
+  // opened the payment page. A person who bounces off a wall is gone and you
+  // asked once; a person inside the product can be asked on every visit.
+  //
+  // The card ask now happens where the user asks Tapeline to do standing work
+  // — save another screen, email me when this changes, export, show every
+  // match. Same card, later, after they have something to lose.
+  const gated = false;
+  const redirectingToWall = false;
 
   // Escape closes the mobile drawer (WAI-ARIA: a menu/dialog dismisses on Esc).
   useEffect(() => {
@@ -106,12 +121,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
-  // Send a gated account to the wall. `replace`, not `push`: the route they
-  // aimed at is not somewhere Back should return them to.
-  useEffect(() => {
-    if (!redirectingToWall) return;
-    router.replace(CARD_GATE_ROUTE);
-  }, [redirectingToWall, router]);
 
   // ── Gate render decisions. All hooks above have already run, so these early
   //    returns can't change hook order between renders. ────────────────────

@@ -2658,13 +2658,13 @@ def render_free_trial_invite_email(
             f"open to you right now, with no account and no card."
         )
         adds_intro = "What a trial adds on top of that:"
-    elif must_add_card:
-        access_line = muted_paragraph(
-            "The daily picks and the whole public record are open to you right "
-            "now, with no account and no card. The in-app scanner — the top ten "
-            "scored rows on Free — opens once you add a card at first sign-in."
-        )
-        adds_intro = "What a trial adds:"
+    # The `must_add_card` branch that used to sit here said the scanner "opens
+    # once you add a card at first sign-in". That was true only while the route
+    # wall existed. The wall was removed on 2026-08-30 — a new account now gets
+    # the top ten scored rows immediately, and the card buys the standing work
+    # (a second saved screen, alerts, export, every matching row). Sending a
+    # false instruction about money is worse than the wall was, so the branch
+    # is gone and an uncarded account falls through to the accurate copy below.
     else:
         access_line = muted_paragraph(
             "Free gives you the top ten scored rows, the daily picks and the "
@@ -2672,18 +2672,14 @@ def render_free_trial_invite_email(
         )
         adds_intro = "What a trial adds:"
 
-    # A walled account has no Free product to "stay exactly as it is" — the
-    # thing that survives a no is the public record, which needs neither an
-    # account nor a card.
-    if must_add_card:
-        decline_line = (
-            "Say no and nothing changes — the daily picks and the whole public "
-            "record stay open to you, with no account and no card."
-        )
-    else:
-        decline_line = (
-            "Say no and nothing changes — your Free account stays exactly as it is."
-        )
+    # Every account now has a Free product that survives a no — the wall that
+    # made this branch necessary was removed on 2026-08-30. Saying "your Free
+    # account stays exactly as it is" is true for everyone again, and it is the
+    # more reassuring of the two, which matters in the sentence whose whole job
+    # is to make declining safe.
+    decline_line = (
+        "Say no and nothing changes — your Free account stays exactly as it is."
+    )
 
     return shell(
         h1(f"{user_name}, here's what else your account can do.")

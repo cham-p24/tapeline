@@ -199,7 +199,12 @@ FREE_FIRST_SESSION_GRACE_HOURS = 24
 #      re-gate the browser-subscription + rule-creation binary check.
 # Pro/Premium web-push caps below are effectively unlimited and must NOT change
 # when tuning this lever — only the FREE number is the experiment.
-FREE_WEB_PUSH_ALERTS = 2         # free users may create up to 2 web-push alert rules (the taste)
+# ZERO, not 2. Email alerts are already 0 on free, so shipping two free
+# web-push rules gave away the same standing job through the other channel —
+# and it is the exact job the card is meant to buy. "A card turns on alerts"
+# cannot be true while a free account can create an alert that fires without
+# one. The channel is not the product; the standing work is.
+FREE_WEB_PUSH_ALERTS = 0         # free users may create no alert rules on any channel
 
 # ANONYMOUS (no account at all): a small taste before sign-up is required.
 ANON_DAILY_LOOKUPS = 2           # 2 ticker-detail views per UTC day, per IP
@@ -232,7 +237,19 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         # routers/alerts.py. Free=2, paid tiers effectively unlimited.
         "web_push_alerts": FREE_WEB_PUSH_ALERTS,
         "api_requests_per_day": 0,
-        "saved_scans": 0,
+        # ONE saved screen on free, deliberately, not zero.
+        #
+        # The card ask needs something to be about. A user with zero saved
+        # screens who is asked for a card is being asked to buy an abstraction;
+        # a user who has built and named one screen and is saving a second is
+        # being asked to pay for a thing they already made. The second save is
+        # the trigger, and it cannot exist while the first one is impossible.
+        #
+        # Free runs the screen WHEN THE USER OPENS IT. A card is what makes it
+        # run after every close and email them — see email_alerts_per_day and
+        # web_push_alerts below. That is the line the whole plan sits on: free
+        # is the tool, paid is the tool doing standing work while you sleep.
+        "saved_scans": 1,
         # Single-ticker detailed-score views per UTC day (GET /api/ticker/{sym}).
         # Enforced via app/services/usage.consume_ticker_lookup.
         "daily_lookups": FREE_DAILY_LOOKUPS,

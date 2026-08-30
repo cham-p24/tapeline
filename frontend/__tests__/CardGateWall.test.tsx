@@ -212,54 +212,78 @@ describe("card gate — the loading state", () => {
     expect(routerSpies.replace).not.toHaveBeenCalled();
   });
 
-  it("does not flash the product at a gated account mid-redirect", async () => {
+  it("shows the product once the session resolves, with no redirect", async () => {
+    // Was "does not flash the product at a gated account mid-redirect". There
+    // is no mid-redirect any more — nothing to flash past. The property that
+    // still matters is the other half of the original: while the session
+    // verdict is unknown the layout renders a neutral frame rather than
+    // guessing, and once it resolves the account gets the product.
     await renderLayout("/app/scanner", <div>scanner content</div>);
-    expect(screen.queryByText("scanner content")).toBeNull();
-    expect(screen.getByTestId("app-frame")).toBeInTheDocument();
-    await waitFor(() => expect(routerSpies.replace).toHaveBeenCalledWith("/app/start"));
+    await waitFor(() =>
+      expect(screen.getByText("scanner content")).toBeInTheDocument(),
+    );
+    expect(routerSpies.replace).not.toHaveBeenCalled();
   });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
  * 3. The routing itself.
  * ───────────────────────────────────────────────────────────────────────── */
-describe("card gate — routing", () => {
+describe("no route wall — an account without a card reaches the product", () => {
+  // REPLACED 2026-08-30. These cases used to assert the opposite: that an
+  // account without a card was redirected from every /app route to
+  // /app/start. That wall was removed.
+  //
+  // Why, in one line: it was never a wall. `must_add_card` appears only in
+  // session payloads and copy — no backend route reads it — so any caller
+  // hitting the API directly, or the public MCP server, always had the whole
+  // product without a card. It stopped ordinary visitors and nobody else.
+  //
+  // What it cost: of the three accounts created under it, none added a card,
+  // none ran a single scan, and two never opened the payment page at all.
+  // Someone who bounces off a wall is gone and you asked once. Someone inside
+  // the product can be asked every visit, at the moment they reach for
+  // something a card turns on.
+  //
+  // The card did not become optional. It moved. The limits that sell it live
+  // in backend services/tier.py and are enforced server-side, which is the
+  // part that was always real.
   it.each(["/app/scanner", "/app/watchlist", "/app/alerts", "/app/account"])(
-    "sends a gated account from %s to the wall",
+    "renders %s for an account with no card, and does not redirect",
     async (path) => {
       await renderLayout(path, <div>product</div>);
-      await waitFor(() => expect(routerSpies.replace).toHaveBeenCalledWith("/app/start"));
-      expect(screen.queryByText("product")).toBeNull();
+      await waitFor(() => expect(screen.getByText("product")).toBeInTheDocument());
+      expect(routerSpies.replace).not.toHaveBeenCalled();
     },
   );
 
-  it("lets a gated account reach /app/billing — Stripe returns there", async () => {
-    // Load-bearing exception, not a convenience. Stripe's success_url is
-    // /app/billing?checkout=success, but the tier flip is webhook-driven, so for
-    // the seconds before that webhook lands the account still reads
-    // must_add_card. Bouncing them back to the wall there would be telling
-    // someone who just handed over a card that they still need to hand over a
-    // card — the surest way to make a person pay twice.
+  it("still renders /app/billing — Stripe returns there after checkout", async () => {
     await renderLayout("/app/billing", <div>billing</div>);
     await waitFor(() => expect(screen.getByText("billing")).toBeInTheDocument());
     expect(routerSpies.replace).not.toHaveBeenCalled();
   });
 
-  it("renders the wall in a bare shell — no nav into pages they can't open", async () => {
-    await renderLayout("/app/start", <div>the wall</div>);
-    expect(screen.getByTestId("card-gate-shell")).toBeInTheDocument();
-    expect(screen.getByText("the wall")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^scanner$/i })).toBeNull();
-    expect(screen.queryByRole("navigation", { name: /primary/i })).toBeNull();
+  it("gives an uncarded account the real app frame, not a bare shell", async () => {
+    // The bare GateShell existed to deny a walled account any navigation into
+    // pages it could not open. There are no such pages now — every /app route
+    // renders, with the free-tier limits applied inside it — so withholding
+    // the nav would only hide the product from someone we want using it.
+    await renderLayout("/app/scanner", <div>product</div>);
+    await waitFor(() => expect(screen.getByText("product")).toBeInTheDocument());
+    expect(screen.queryByTestId("card-gate-shell")).toBeNull();
+  });
+
+  it("still renders /app/start when the user goes there deliberately", async () => {
+    // The page is no longer a wall, but it is still where the trial is
+    // started, and the post-signup hand-off and upgrade prompts point at it.
+    await renderLayout("/app/start", <div>the trial offer</div>);
+    expect(screen.getByText("the trial offer")).toBeInTheDocument();
     expect(routerSpies.replace).not.toHaveBeenCalled();
   });
 
-  it("lets the one-time provisioning hop through, still without app nav", async () => {
-    // /app/onboarding renders no product, asks nothing, and forwards itself.
-    // Walling it would silently strand the once-per-account server-side setup.
+  it("lets the one-time provisioning hop through", async () => {
     await renderLayout("/app/onboarding", <div>provisioning</div>);
     expect(screen.getByText("provisioning")).toBeInTheDocument();
-    expect(screen.getByTestId("card-gate-shell")).toBeInTheDocument();
     expect(routerSpies.replace).not.toHaveBeenCalled();
   });
 });

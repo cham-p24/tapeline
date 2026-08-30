@@ -66,6 +66,24 @@ async def record_cap_hit(
 
         session.add(CapEvent(user_id=user_id, cap=cap, tier=tier_value))
         await session.commit()
+
+        # Tell the founder NOW, not in a weekly digest.
+        #
+        # At two or three signups a month, a free user hitting a limit is the
+        # highest-intent event this product produces: they are inside the app,
+        # they have built something, and they have just been told no. A reply
+        # while they are still on the site beats any upgrade modal that could
+        # be built, and there are few enough of them that a human can answer
+        # every one.
+        #
+        # Wrapped separately so a mail failure cannot roll back the row that
+        # was just committed, and awaited rather than spawned so it cannot
+        # outlive the request's session. Send failures are logged, never
+        # raised — the caller is mid-403.
+        try:
+            await _notify_founder_of_cap_hit(session, user_id, cap)
+        except Exception:
+            logger.exception("cap_hit.notify_failed cap=%s user=%s", cap, user_id)
     except Exception:
         # A logging failure must never break the request. Roll back so the
         # caller's session is left clean for the 402/403 it's about to raise.
@@ -74,3 +92,70 @@ async def record_cap_hit(
             await session.rollback()
         except Exception:
             logger.exception("cap_hit.rollback_failed cap=%s user=%s", cap, user_id)
+
+
+async def _notify_founder_of_cap_hit(
+    session: AsyncSession, user_id: str, cap: str
+) -> None:
+    """Email the founder that a free user just hit `cap`.
+
+    Operational mail to one internal address — not a customer send — so it does
+    not go through the marketing preference or unsubscribe machinery. It
+    carries who, which limit, and what they had built, because the useful reply
+    is specific ("I saw you were building a screen for X").
+    """
+    from sqlalchemy import select
+
+    from app.config import get_settings
+    from app.models import ScannerPreset, User
+
+    settings = get_settings()
+    to = getattr(settings, "owner_email", None) or "owner@tapeline.io"
+
+    user = (
+        await session.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if user is None:
+        return
+
+    preset_names: list[str] = []
+    try:
+        rows = (
+            await session.execute(
+                select(ScannerPreset.name)
+                .where(ScannerPreset.user_id == user_id)
+                .limit(5)
+            )
+        ).scalars().all()
+        preset_names = [str(r) for r in rows]
+    except Exception:
+        logger.exception("cap_hit.preset_lookup_failed user=%s", user_id)
+
+    signed_up = user.created_at.date().isoformat() if user.created_at else "unknown"
+    built = ", ".join(preset_names) if preset_names else "nothing saved yet"
+
+    lines = [
+        f"{user.email} just hit the {cap} limit.",
+        "",
+        f"Name:        {user.name or '(none)'}",
+        f"Signed up:   {signed_up}",
+        f"Tier:        {user.tier}",
+        f"Saved screens: {built}",
+        f"Source:      {user.signup_utm_source or 'direct'}",
+        "",
+        "They are in the product and were just told no. A reply now lands",
+        "while they still have the screen open.",
+    ]
+
+    from app.services.email import send_email
+
+    body = "\n".join(lines)
+    await send_email(
+        to,
+        f"[cap] {user.email} hit {cap}",
+        '<pre style="font-family:ui-monospace,monospace;font-size:13px">'
+        + body
+        + "</pre>",
+        text=body,
+        skip_if_undeliverable=False,
+    )

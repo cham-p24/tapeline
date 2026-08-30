@@ -341,7 +341,9 @@ export default function CardGateStartPage() {
           <span aria-hidden="true" className="text-muted">·</span>
           <span>
             <strong className="font-semibold">$0 today.</strong> Adding the card
-            charges you nothing now.
+            charges you nothing now. Your bank may briefly show a $0 or $1
+            authorisation while it checks the card &mdash; that is a hold, not a
+            charge, and it clears on its own.
           </span>
         </li>
         <li className="flex gap-2">

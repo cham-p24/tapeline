@@ -884,6 +884,8 @@ function SignUpForm() {
               <span className="text-fg">$0 is charged today</span>, the first charge is on{" "}
               <span className="text-fg">{longDate(firstCharge)}</span> at the plan you pick, we
               email you three days before, and one click ends it before then with nothing taken.
+              Your bank may briefly show a $0 or $1 authorisation while it checks the card &mdash;
+              a hold, not a charge, and it clears on its own.
               Cheaper plans exist if Premium is more than you need &mdash;{" "}
               <span className="text-fg">Pro is {usd(PRICING.pro.monthly)}/mo</span> or{" "}
               <span className="text-fg">{usdCompact(PRICING.pro.annual)}/yr</span>.

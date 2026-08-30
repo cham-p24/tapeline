@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import ScannerPreset, User
 from app.services.auth import current_user_required
+from app.services.cap_events import record_cap_hit
 from app.services.tier import Tier, effective_limit
 
 router = APIRouter()
@@ -83,6 +84,13 @@ async def create_preset(
     current = count_q.scalar() or 0
     if current >= cap:
         tier = Tier(user.tier).value
+        # Record it. Saving a SECOND screen is the clearest buying signal this
+        # product has: the user built something, named it, and came back to
+        # build another. Until 2026-08-30 "saved_scans" was not in CAP_NAMES,
+        # so record_cap_hit dropped it and every one of these was lost.
+        # record_cap_hit no-ops for paid tiers, so this only ever fires for the
+        # people the ask is aimed at.
+        await record_cap_hit(session, user.id, "saved_scans", user.tier)
         raise HTTPException(
             403,
             f"Saved-scans limit reached ({cap} on {tier}). "
