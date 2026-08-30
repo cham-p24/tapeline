@@ -252,6 +252,23 @@ class User(Base):
     # user implicitly opts into by signing up). Newsletter sends MUST check
     # this column, not email_prefs.
     marketing_opt_in: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # Consent PROVENANCE — when and from which surface. Under the Australian
+    # Spam Act 2003 (the governing regime for a Melbourne sender, not the
+    # laxer US CAN-SPAM opt-out model) the onus of proving consent sits with
+    # the sender, and a bare boolean proves nothing.
+    #
+    # Never set `marketing_opt_in` directly — use
+    # `services.consent.set_marketing_consent()`, which writes all three
+    # columns together so a True can never exist without its evidence.
+    # `backfill_unverified` marks rows whose timestamp was reconstructed by
+    # migration 0060 and whose original surface is genuinely unknown.
+    marketing_opt_in_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    marketing_opt_in_source: Mapped[str | None] = mapped_column(
+        String(40), nullable=True,
+    )
     sectors_of_interest: Mapped[str | None] = mapped_column(String(400), nullable=True)
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
