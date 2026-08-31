@@ -17,7 +17,7 @@ import pytest
 from app.scripts.catchup_send import (
     CATCHUP_TOKEN,
     FORWARD_FLOW_GRACE_DAYS,
-    _drip_state,
+    _tokens,
     _render,
 )
 
@@ -118,17 +118,16 @@ def test_neither_audience_gets_banned_marketing_language():
 # ── idempotency ──────────────────────────────────────────────────────────────
 
 
-def test_drip_state_parses_dict_and_json_and_garbage():
-    assert _drip_state(_U(drip_state={"a": 1})) == {"a": 1}
-    assert _drip_state(_U(drip_state='{"b": 2}')) == {"b": 2}
-    assert _drip_state(_U(drip_state="not json")) == {}
-    assert _drip_state(_U(drip_state=None)) == {}
+def test_tokens_parses_the_real_comma_separated_format():
+    """drip_state is a token STRING. Assigning a dict raises at COMMIT."""
+    assert _tokens(_U(drip_state="expired,post3,re14")) == {"expired", "post3", "re14"}
+    assert _tokens(_U(drip_state="")) == set()
+    assert _tokens(_U(drip_state=None)) == set()
 
 
 def test_an_already_caught_up_user_is_recognised():
     """The stamp is what makes a second run a no-op."""
-    u = _U(drip_state={CATCHUP_TOKEN: "2026-08-31T00:00:00+00:00"})
-    assert CATCHUP_TOKEN in _drip_state(u)
+    assert CATCHUP_TOKEN in _tokens(_U(drip_state=f"expired,{CATCHUP_TOKEN}"))
 
 
 def test_grace_window_is_long_enough_to_clear_the_drip_stages():

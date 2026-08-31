@@ -5369,3 +5369,68 @@ async def run_checkout_abandonment_recovery(
     if any_sent:
         await session.commit()
     return counts
+
+
+def render_free_month_offer_email(
+    user_name: str, *, checkout_url: str, monthly_price: str = "$19.99",
+) -> str:
+    """A founder-authorised one-month-free Premium offer for card-less accounts.
+
+    Authorised by the founder on 2026-08-31: "everyone that's not a card they
+    going one month free premium once they enter their card details."
+
+    HOW THE OFFER IS ACTUALLY HONOURED — this copy is only true because the
+    mechanism already exists. `users.referral_credit_months` is read by
+    `routers/billing.py` at checkout, which mints a one-shot 100%-off Stripe
+    coupon for that many months (`services/billing.create_checkout_session`),
+    and `routers/webhooks.py` consumes the credit on
+    `customer.subscription.created` so an abandoned checkout cannot burn it.
+    Granting 1 credit is therefore what makes "a month on us" redeemable
+    through the same path that has already taken a real payment. Do not send
+    this email to an account that has not been granted the credit.
+
+    WHY THE RENEWAL PRICE IS STATED IN THE BODY, NOT THE FOOTER
+    An offer that leads with "free" and hides the renewal is the dark pattern
+    this product does not do. The exact price, the exact moment it starts, and
+    the one-click cancel are all above the button. That is also what keeps the
+    copy inside the descriptive-only posture: it describes terms, it does not
+    pressure.
+
+    NO DEADLINE IS STATED. There is no countdown, no "expires Friday", no
+    scarcity — those are banned by the house copy rules and by
+    `scripts/lint-copy-compliance.mjs`, and a manufactured deadline on a
+    financial product is exactly the wrong instinct.
+    """
+    return shell(
+        h1("A month of Premium, on us.")
+        + lead(
+            f"Hi {user_name} — you have a Tapeline account without a card on "
+            f"file. Here is a straightforward offer: add one, and your first "
+            f"month of Premium is free."
+        )
+        + paragraph("What Premium opens up, beyond the free plan:")
+        + card(
+            '<ul style="margin:0;padding:0 0 0 20px;">'
+            '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
+            "Congressional trades — disclosed House and Senate buys and sells, by ticker</li>"
+            '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
+            "Recent insider buys — SEC Form 4 filings: date, insider, shares, value</li>"
+            '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
+            "The full scored universe, plus squeeze, regime and the sector heatmap</li>"
+            '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
+            "Email alerts, CSV export, a 200-ticker watchlist, and the public API</li>"
+            "</ul>"
+        )
+        + paragraph(
+            f"The terms, in full: the first month costs nothing. After it ends "
+            f"Premium renews at {monthly_price} a month unless you cancel, and "
+            f"cancelling is one click in your billing settings at any time "
+            f"during the free month. Adding a card is what activates it."
+        )
+        + button("Claim the free month", checkout_url)
+        + paragraph(
+            "If you would rather not, nothing changes — your free account stays "
+            "exactly as it is, and the public scorecard stays readable without "
+            "any account at all."
+        )
+    )

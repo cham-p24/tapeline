@@ -56,7 +56,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
 import sys
 from datetime import UTC, datetime, timedelta
@@ -77,14 +76,30 @@ CATCHUP_TOKEN = "catchup_2026_08"
 FORWARD_FLOW_GRACE_DAYS = 20
 
 
-def _drip_state(user) -> dict:
-    raw = user.drip_state
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw)
-        except Exception:
-            return {}
-    return raw if isinstance(raw, dict) else {}
+def _tokens(user) -> set[str]:
+    """Parse `User.drip_state`, which is a COMMA-SEPARATED TOKEN STRING.
+
+    Not JSON. `models/user.py` declares it `String(255)` and every existing
+    drip writes it as `",".join(sorted(tokens))` — e.g.
+    `"11,13,3,7,act_alert,expired,post3,weekly_2026W36"`.
+
+    This mattered twice, both times badly:
+
+      * An audit that json.loads()'d this column got {} for every row and
+        concluded no email had ever been sent. In fact 25 of 31 accounts carry
+        tokens; the drips have been running for weeks.
+      * Assigning a dict here raises `cannot adapt type 'dict'` at COMMIT —
+        after the email has already gone out. That happened on the first live
+        self-test: the mail was delivered and the credit grant rolled back,
+        leaving a promise with nothing behind it.
+    """
+    raw = (user.drip_state or "").strip()
+    return {t for t in raw.split(",") if t} if raw else set()
+
+
+def _add_token(user, token: str) -> None:
+    """Append a token, preserving the sorted comma-joined format."""
+    user.drip_state = ",".join(sorted(_tokens(user) | {token}))
 
 
 async def collect(session, *, limit: int | None = None) -> dict[str, list]:
@@ -108,8 +123,8 @@ async def collect(session, *, limit: int | None = None) -> dict[str, list]:
     buckets: dict[str, list] = {"never_trialled": [], "legacy_trial": [], "skipped": []}
 
     for u in rows:
-        state = _drip_state(u)
-        if CATCHUP_TOKEN in state:
+        toks = _tokens(u)
+        if CATCHUP_TOKEN in toks:
             buckets["skipped"].append((u, "already_caught_up"))
             continue
         if getattr(u, "email_undeliverable_at", None) is not None:
@@ -229,9 +244,7 @@ async def run(*, send: bool, limit: int | None) -> dict:
                     continue
 
                 # Stamp only after a real send, so a skipped attempt retries.
-                state = _drip_state(u)
-                state[CATCHUP_TOKEN] = datetime.now(UTC).isoformat()
-                u.drip_state = state
+                _add_token(u, CATCHUP_TOKEN)
                 governor.record(u)
                 counts["sent"] += 1
                 print(f"  SENT        {u.email:<38} age={age}d")
