@@ -78,6 +78,12 @@
       "rule": "card-free-trial",
       "phrase": "trial available with no credit card",
       "reason": "Same dated-history exemption as the entry above — this is the 2026-04-22 launch note, not a live offer."
+    },
+    {
+      "file": "docs/META_BURST_BUILD.md",
+      "rule": "financial-state-targeting",
+      "phrase": "Tired of losing money",
+      "reason": "The Banned forever in future variants list. This build doc names Meta Personal-Attributes phrasings in order to PROHIBIT them, on the line directly above the note that the descriptive-only rule already forbids that voice. Same principle as the legal-pages exemption: ruling a claim out requires naming it. Scoped to this one phrase deliberately, so a NEW banned example added to that list fires and gets exempted on purpose rather than inheriting silence. Only reachable via a hand-lint: docs is not in the include globs."
     }
   ],
   "_knownViolations_readme": [
