@@ -180,7 +180,7 @@ async def gather() -> dict:
                 ),
                 {"since": since},
             )
-            wr = w.mappings().first() or {}
+            wr: dict = dict(w.mappings().first() or {})
             shadow["walled_actions"] = int(wr.get("actions") or 0)
             shadow["walled_users"] = int(wr.get("users") or 0)
         except Exception:
