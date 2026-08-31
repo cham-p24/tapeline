@@ -20,28 +20,39 @@
 > in for early subscribers"** — truthful (subscribers keep their price); never
 > a fake countdown or a fabricated "N left" counter.
 
-## Card gate (2026-08-22)
+## Card gate (2026-08-22 → 2026-08-30) — REMOVED
 
-**A new account must put a card on file at first sign-in before it can use the
-logged-in product.** Single source of truth: `CARD_GATE_START = date(2026, 8, 22)`
-and `must_add_card()` in `backend/app/services/tier.py`; `/api/me` exposes the
-flag and the `/app` layout routes off it. The wall is Stripe Checkout — $0 today,
-14-day Premium trial, first charge at trial end, one click to cancel before then.
+**There is no card wall.** It was added by #548 on 2026-08-22 and removed by
+#683 on 2026-08-30, an eight-day life. During that window a new account met
+Stripe Checkout at `/app/start` before it could use the logged-in product.
+**It no longer does:** every `/app` route renders for an uncarded account with
+free-tier limits applied inside it, enforced server-side in
+`backend/app/services/tier.py`.
 
-Two things this does **not** touch, deliberately:
+Why it went, from #683: three accounts were created under the wall — **none
+added a card, none ran a single scan, two never opened the payment page.** And
+it was never really a wall: `must_add_card` appeared only in session payloads
+and copy, and **no backend route ever read it**, so the API and the public MCP
+server always served the full product uncarded.
 
-- **Grandfathered accounts.** Every account created BEFORE 2026-08-22 signed up
-  under "free account, no card" and keeps that deal forever. They never see the
-  wall. Admins, lifetime accounts, and hand-comped pro/premium accounts are
-  exempt too, as is anyone who already has a card on file or has already
-  trialled — the ask is made once per account.
-- **The public surface.** `/scorecard`, `/daily-picks`, the record CSV/JSON
-  export (`/api/scorecard.csv`, `/api/scorecard.json`), the per-ticker pages,
-  the marketing pages and the public API stay open with no account and no card.
+`CARD_GATE_START` and `must_add_card()` still exist and are still the single
+predicate every surface reads — but what they answer now is *"has this account
+ever put a card down?"*, driving `/app/start`, upgrade prompts, drip emails and
+funnel cohorts. **Do not reintroduce a route wall on it.**
 
-Copy rule that falls out of this: **do not describe an account as free or
-card-free anywhere.** Descriptions of the PUBLIC record as free and
-account-free stay true and should stay.
+- **Grandfathering is now moot but stays.** Since #683 every account has the
+  "free, no card" deal, so the `created_at` comparison no longer separates two
+  cohorts. It is kept because ripping a dated cutover out of a billing
+  predicate is how you accidentally re-wall real people.
+- **The public surface** was never gated and still isn't: `/scorecard`,
+  `/daily-picks`, the record CSV/JSON export (`/api/scorecard.csv`,
+  `/api/scorecard.json`), the per-ticker pages, the marketing pages and the
+  public API — no account, no card.
+
+Copy rule, and note it has **inverted** since #548: describing a new ACCOUNT as
+free and card-free is **true again** (#686 corrected 79 such claims across 42
+files back). What stays permanently false is describing the **trial** as
+card-free — the 14-day Premium trial genuinely requires a card.
 
 ## Tiers
 
@@ -170,11 +181,11 @@ high tier.
 
 ## Trial / conversion
 
-- **14-day Premium trial, card required at first sign-in** — signup is email +
-  password; the first sign-in lands on the card wall (`/app/start`). Adding a
-  card runs Stripe Checkout (`mode=subscription` +
-  `subscription_data.trial_end`) and starts the trial. Grandfathered accounts
-  skip the wall entirely.
+- **14-day Premium trial, card required — but chosen, not forced.** Signup is
+  email + password and lands on a working Free plan. Starting the trial is a
+  deliberate step that runs Stripe Checkout (`mode=subscription` +
+  `subscription_data.trial_end`). Since #683 nothing routes a new account into
+  that checkout before it can use the product.
 - Disclosed before the card is entered: $0 charged today, the exact
   first-charge date (day 14), the amount, and one-click cancel before then.
 - Declining is a normal outcome and must not be punished: the wall carries a
