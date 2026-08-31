@@ -12,6 +12,7 @@ from app.db import get_session, is_sqlite
 from app.models import Ticker, User
 from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
+from app.services.funnel_events import record_funnel_event
 from app.services.ticker_freshness import live_clauses
 from app.services.ticker_ordering import (
     ORDER_PATTERN,
@@ -262,6 +263,18 @@ async def list_scanner(
     # full capped page with more behind it. Anonymous callers have no user to
     # attribute and paid tiers aren't capped, so both are skipped (record_cap_hit
     # also refuses non-free tiers). Fire-and-forget: never breaks the response.
+    # THE ACTIVATION EVENT. Recorded for every signed-in scan, paid tiers
+    # included — until this existed, a user who ran scans and never hit a limit
+    # left no trace anywhere: lookups_today counts ticker pages and cap_events
+    # only fires on a REFUSAL. Running a scan is the thing the product is for,
+    # and it was the one thing nothing measured.
+    #
+    # Each row also carries whether the removed card wall would have blocked
+    # this scan, which is how the wall's cost gets counted without splitting
+    # traffic — see models/funnel_events.py.
+    if user is not None:
+        await record_funnel_event(user, "scan_run")
+
     if user is not None and tier is Tier.FREE and row_cap > 0 and len(rows) >= row_cap:
         await record_cap_hit(session, user.id, "scanner_rows", tier)
 
