@@ -121,28 +121,35 @@ describe("AlertsPage locked delivery channels (show don't hide)", () => {
 });
 
 describe("AlertsPage tier-gate errors", () => {
-  it("humanizes the web-push cap 403 and renders a real billing link", async () => {
-    mockedUseUser.mockReturnValue(asUser(freeUser));
+  // Driven as PRO, not Free. Since #683 the free allowance is 0 on every
+  // channel, so a Free account cannot submit this form at all — the Create
+  // button is disabled and the 403 is never reached from the UI. The behaviour
+  // under test (humanising a TierGateError and rendering a real billing link)
+  // still matters for a paid account hitting its own daily cap, so the test
+  // moves to the tier that can actually get there.
+  it("humanizes an alert-cap 403 and renders a real billing link", async () => {
+    mockedUseUser.mockReturnValue(asUser(proUser));
     createMock.mockRejectedValue(
       new TierGateError(
-        "Free web-push alert limit reached (2 on free). "
-        + "Upgrade for 10 alerts/day at /app/billing.",
+        "Email alert limit reached (10/day on pro). "
+        + "Upgrade for unlimited alerts at /app/billing.",
       ),
     );
     render(<AlertsPage />);
     await userEvent.type(screen.getByPlaceholderText("AAPL"), "AAPL");
     await userEvent.click(screen.getByRole("button", { name: /Create rule/i }));
 
-    const gateMsg = await screen.findByText(/Free web-push alert limit reached \(2 on free\)/);
+    const gateMsg = await screen.findByText(/Email alert limit reached \(10\/day on pro\)/);
     // The billing path must be a REAL link, not inline text. Scope to the
-    // error paragraph — the free-taste hint has its own "See plans" link.
+    // error paragraph — other hints on the page carry their own "See plans".
     expect(screen.queryByText(/\/app\/billing/)).not.toBeInTheDocument();
     const link = within(gateMsg.closest("p")!).getByRole("link", { name: /See plans/i });
     expect(link).toHaveAttribute("href", "/app/billing");
   });
 
   it("translates raw feature slugs (alerts.email) into human channel names", async () => {
-    mockedUseUser.mockReturnValue(asUser(freeUser));
+    // Pro for the same reason as above: Free cannot submit the form.
+    mockedUseUser.mockReturnValue(asUser(proUser));
     createMock.mockRejectedValue(
       new TierGateError("alerts.email requires a higher tier. Upgrade at /app/billing"),
     );
@@ -160,11 +167,15 @@ describe("AlertsPage tier-gate errors", () => {
 
 describe("AlertsPage web-push enable prompt", () => {
   it("prompts to enable browser notifications after creating a web_push rule without permission", async () => {
-    mockedUseUser.mockReturnValue(asUser(freeUser));
+    // Pro: web_push is a paid channel since #683 took the free allowance to 0.
+    mockedUseUser.mockReturnValue(asUser(proUser));
     createMock.mockResolvedValue({ id: 1 });
     statusMock.mockResolvedValue("default"); // permission not yet granted
     subscribeMock.mockResolvedValue({ ok: true });
     render(<AlertsPage />);
+    // A paid account defaults to the email channel, so web_push has to be
+    // chosen explicitly for the browser-notification prompt to be relevant.
+    await userEvent.selectOptions(channelSelect(), "web_push");
     await userEvent.type(screen.getByPlaceholderText("AAPL"), "AAPL");
     await userEvent.click(screen.getByRole("button", { name: /Create rule/i }));
 
@@ -177,7 +188,7 @@ describe("AlertsPage web-push enable prompt", () => {
   });
 
   it("does not prompt when the browser has already granted permission", async () => {
-    mockedUseUser.mockReturnValue(asUser(freeUser));
+    mockedUseUser.mockReturnValue(asUser(proUser));
     createMock.mockResolvedValue({ id: 1 });
     statusMock.mockResolvedValue("granted");
     render(<AlertsPage />);
