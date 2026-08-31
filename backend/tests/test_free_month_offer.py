@@ -15,7 +15,7 @@ import re
 
 import pytest
 
-from app.scripts.free_month_offer import CREDIT_MONTHS, OFFER_TOKEN, _drip_state
+from app.scripts.free_month_offer import CREDIT_MONTHS, OFFER_TOKEN, _tokens
 from app.services.email import render_free_month_offer_email
 
 URL = "https://tapeline.io/app/billing?offer=freemonth"
@@ -110,21 +110,47 @@ def test_webhook_consumes_the_credit():
 # ── 3. idempotency ───────────────────────────────────────────────────────────
 
 
+class _Row:
+    def __init__(self, v):
+        self.drip_state = v
+
+
 def test_offer_token_makes_a_second_run_a_noop():
-    class _U:
-        drip_state = {OFFER_TOKEN: "2026-08-31T00:00:00+00:00"}
+    """drip_state is a COMMA-SEPARATED TOKEN STRING, not JSON.
 
-    assert OFFER_TOKEN in _drip_state(_U())
+    This test previously built a dict, which is the format the first version
+    of the script wrongly assumed. That bug raised "cannot adapt type 'dict'"
+    at COMMIT — after the email had already been sent — leaving a promise with
+    no credit behind it. Pin the real format.
+    """
+    assert OFFER_TOKEN in _tokens(
+        _Row(f"11,3,act_alert,{OFFER_TOKEN},weekly_2026W36")
+    )
 
 
-def test_drip_state_survives_json_and_garbage():
-    class _U:
-        def __init__(self, v):
-            self.drip_state = v
+def test_tokens_parses_the_real_production_format():
+    # An actual value read from production.
+    real = "11,13,3,7,act_alert,act_wl,expired,lapse30,post3,re14,weekly_2026W36"
+    toks = _tokens(_Row(real))
+    assert "act_alert" in toks and "weekly_2026W36" in toks
+    assert len(toks) == 11
 
-    assert _drip_state(_U('{"x":1}')) == {"x": 1}
-    assert _drip_state(_U("garbage")) == {}
-    assert _drip_state(_U(None)) == {}
+
+def test_tokens_handles_empty_and_null():
+    assert _tokens(_Row("")) == set()
+    assert _tokens(_Row(None)) == set()
+
+
+def test_add_token_preserves_the_joined_format():
+    from app.scripts.free_month_offer import _add_token
+
+    u = _Row("expired,post3")
+    _add_token(u, OFFER_TOKEN)
+    assert isinstance(u.drip_state, str), "must stay a string or COMMIT fails"
+    assert set(u.drip_state.split(",")) == {"expired", "post3", OFFER_TOKEN}
+    # idempotent
+    _add_token(u, OFFER_TOKEN)
+    assert u.drip_state.count(OFFER_TOKEN) == 1
 
 
 # ── 4. the link guard ────────────────────────────────────────────────────────

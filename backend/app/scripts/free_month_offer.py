@@ -48,10 +48,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import logging
 import sys
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -61,14 +59,30 @@ OFFER_TOKEN = "free_month_2026_08"
 CREDIT_MONTHS = 1
 
 
-def _drip_state(user) -> dict:
-    raw = user.drip_state
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw)
-        except Exception:
-            return {}
-    return raw if isinstance(raw, dict) else {}
+def _tokens(user) -> set[str]:
+    """Parse `User.drip_state`, which is a COMMA-SEPARATED TOKEN STRING.
+
+    Not JSON. `models/user.py` declares it `String(255)` and every existing
+    drip writes it as `",".join(sorted(tokens))` — e.g.
+    `"11,13,3,7,act_alert,expired,post3,weekly_2026W36"`.
+
+    This mattered twice, both times badly:
+
+      * An audit that json.loads()'d this column got {} for every row and
+        concluded no email had ever been sent. In fact 25 of 31 accounts carry
+        tokens; the drips have been running for weeks.
+      * Assigning a dict here raises `cannot adapt type 'dict'` at COMMIT —
+        after the email has already gone out. That happened on the first live
+        self-test: the mail was delivered and the credit grant rolled back,
+        leaving a promise with nothing behind it.
+    """
+    raw = (user.drip_state or "").strip()
+    return {t for t in raw.split(",") if t} if raw else set()
+
+
+def _add_token(user, token: str) -> None:
+    """Append a token, preserving the sorted comma-joined format."""
+    user.drip_state = ",".join(sorted(_tokens(user) | {token}))
 
 
 async def collect(
@@ -96,7 +110,7 @@ async def collect(
             skipped.append((u, "admin"))
         elif getattr(u, "email_undeliverable_at", None) is not None:
             skipped.append((u, "undeliverable"))
-        elif OFFER_TOKEN in _drip_state(u):
+        elif OFFER_TOKEN in _tokens(u):
             skipped.append((u, "already_offered"))
         elif not wants(u.email_prefs, EmailPref.TRIAL_DRIP):
             skipped.append((u, "opted_out"))
@@ -197,9 +211,7 @@ async def run(*, send: bool, limit: int | None, only: str | None = None) -> dict
                 print(f"  SKIPPED           {u.email} ({res.get('reason')})")
                 continue
 
-            state = _drip_state(u)
-            state[OFFER_TOKEN] = datetime.now(UTC).isoformat()
-            u.drip_state = state
+            _add_token(u, OFFER_TOKEN)
             governor.record(u)
             counts["sent"] += 1
             print(f"  GRANTED+SENT      {u.email:<38} tier={u.tier}")
