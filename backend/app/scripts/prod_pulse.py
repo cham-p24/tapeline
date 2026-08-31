@@ -23,7 +23,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.db import SessionLocal
 from app.models import User
@@ -146,6 +146,48 @@ async def gather() -> dict:
                     wl = -1
             leads.append((r[1], r[2] or "-", str(r[3])[:10], wl))
 
+        # THE SHADOW RESULT. Not an A/B test — at 2-3 signups a month a split
+        # would take decades to resolve and would halve the only signal there is.
+        # Instead every recorded action carries whether the removed card wall
+        # WOULD have blocked it, so the wall's cost is counted without ever
+        # splitting traffic. See models/funnel_events.py.
+        shadow: dict = {"rows": [], "walled_actions": 0, "walled_users": 0, "days": 30}
+        try:
+            since = datetime.now(UTC).date() - timedelta(days=30)
+            q = await s.execute(
+                text(
+                    """
+                    SELECT event,
+                           count(*) AS actions,
+                           count(DISTINCT user_id) AS users,
+                           count(*) FILTER (WHERE would_have_been_walled) AS walled
+                    FROM funnel_events
+                    WHERE day >= :since
+                    GROUP BY event
+                    ORDER BY actions DESC
+                    """
+                ),
+                {"since": since},
+            )
+            shadow["rows"] = [dict(r) for r in q.mappings()]
+            w = await s.execute(
+                text(
+                    """
+                    SELECT count(*) AS actions, count(DISTINCT user_id) AS users
+                    FROM funnel_events
+                    WHERE day >= :since AND would_have_been_walled
+                    """
+                ),
+                {"since": since},
+            )
+            wr = w.mappings().first() or {}
+            shadow["walled_actions"] = int(wr.get("actions") or 0)
+            shadow["walled_users"] = int(wr.get("users") or 0)
+        except Exception:
+            # The table may not exist yet on an old deploy. Report-only script:
+            # never let a missing relation cost the founder the whole email.
+            print("prod_pulse.shadow_failed", flush=True)
+
     return {
         "total": total,
         "by_tier": by_tier,
@@ -157,6 +199,7 @@ async def gather() -> dict:
         "checkout_emails": checkout_emails,
         "card_emails": card_emails,
         "leads": leads,
+        "shadow": shadow,
     }
 
 
@@ -227,6 +270,23 @@ def render(d: dict) -> str:
         or '<tr><td colspan="4" style="padding:4px 0;">none</td></tr>'
     )
 
+    # The shadow section. `.get` throughout so an older gather() payload — or a
+    # deploy where the funnel_events table does not exist yet — renders an
+    # empty row rather than costing the founder the whole email.
+    sh = d.get("shadow") or {}
+    shadow_rows = (
+        "".join(
+            f'<tr><td style="padding:4px 12px 4px 0;"><code>{_esc(r["event"])}</code></td>'
+            f'<td style="padding:4px 12px;text-align:right;">{r["actions"]} action(s)</td>'
+            f'<td style="padding:4px 12px;text-align:right;">{r["users"]} user(s)</td>'
+            f'<td style="padding:4px 0;text-align:right;">{r["walled"]} walled</td></tr>'
+            for r in sh.get("rows", [])
+        )
+        or '<tr><td colspan="4" style="padding:4px 0;">no activity recorded yet</td></tr>'
+    )
+    shadow_walled_actions = sh.get("walled_actions", 0)
+    shadow_walled_users = sh.get("walled_users", 0)
+
     return f"""\
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;
 margin:0 auto;color:#111;line-height:1.5;">
@@ -260,6 +320,20 @@ margin:0 auto;color:#111;line-height:1.5;">
   <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;
   margin:22px 0 6px;">New signups (last 7 days)</h2>
   <ul style="font-size:14px;margin:0;padding-left:18px;">{new_rows}</ul>
+
+  <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;
+  margin:22px 0 6px;">Shadow result — what the old card wall would have blocked</h2>
+  <p style="font-size:13px;color:#4b5563;margin:0 0 6px;">
+    Last 30 days. Every action below happened; the walled column is how many of
+    them the pre-30-Aug card wall would have prevented. This is not an A/B test
+    — no traffic is split — it is a count of product use that sat behind the
+    wall.
+  </p>
+  <table style="font-size:14px;border-collapse:collapse;">{shadow_rows}</table>
+  <p style="font-size:13px;color:#111;margin:6px 0 0;">
+    <strong>{shadow_walled_actions}</strong> action(s) by
+    <strong>{shadow_walled_users}</strong> user(s) would have been blocked.
+  </p>
 
   <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;
   margin:22px 0 6px;">Hot leads — engaged, never paid</h2>

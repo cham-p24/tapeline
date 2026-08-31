@@ -5,6 +5,7 @@ from app.models.cap_events import CapEvent
 from app.models.congress import CongressTrade
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.embed_impression import EmbedImpression
+from app.models.funnel_events import FUNNEL_EVENTS, FunnelEvent
 from app.models.inbox import InboundMessage
 from app.models.inbox_classification_log import InboxClassificationLog
 from app.models.insider_transaction import InsiderTransaction
@@ -28,6 +29,7 @@ from app.models.web_push import WebPushSubscription
 from app.models.webhook_event import StripeWebhookEvent
 
 __all__ = [
+    "FUNNEL_EVENTS",
     "AlertEvent",
     "AlertRule",
     "ApiKey",
@@ -37,6 +39,7 @@ __all__ = [
     "EarningsEvent",
     "EmailVerificationToken",
     "EmbedImpression",
+    "FunnelEvent",
     "IPOEvent",
     "InboundMessage",
     "InboxClassificationLog",
