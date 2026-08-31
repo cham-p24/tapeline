@@ -8,6 +8,7 @@ import { useUser } from "@/components/UserContext";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/Skeleton";
 import { getWebPushStatus, subscribeToWebPush } from "@/lib/webPush";
+import { FREE_LIMITS } from "@/lib/pricing";
 import { trackEvent } from "@/lib/gtag";
 
 type RuleType = AlertRule["rule_type"];
@@ -275,12 +276,23 @@ function AlertsPageInner() {
   const isPro = user?.tier === "pro" || isPremium;
   const isFree = !!user && !isPro;
 
-  // Free "alert taste": free users get a SMALL web-push allowance so they can
-  // actually feel an alert fire (activation lever). Kept in sync with the
-  // backend single source of truth, tier.FREE_WEB_PUSH_ALERTS — if you tune
-  // that constant, mirror it here. web_push is the ONLY channel free users can
-  // create; email stays paid, so its (Pro) tag remains.
-  const FREE_WEB_PUSH_ALERTS = 2;
+  // Free web-push allowance, DERIVED — never hand-mirrored.
+  //
+  // This was `const FREE_WEB_PUSH_ALERTS = 2` sitting directly under a comment
+  // promising it was kept in sync with the backend. #683 took the free
+  // allowance to zero on every channel (tier.py FREE_WEB_PUSH_ALERTS = 0,
+  // email_alerts_per_day = 0) because an alert IS the standing work the card is
+  // sold on. #683 updated lib/pricing.ts and the surfaces that read it, but not
+  // this page, which read its own copy — so every Free user was told "2 of 2
+  // free web-push alerts left", built one, and got a 403 reading
+  // "limit reached (0 on free)".
+  //
+  // `freeAlertTaste` keeps the old activation UI alive behind the number: if
+  // the allowance is ever restored, this page starts working again with no
+  // further edit. At zero, alerts are simply a paid feature and the page says
+  // so rather than offering something the API refuses.
+  const FREE_WEB_PUSH_ALERTS = FREE_LIMITS.webPushAlerts;
+  const freeAlertTaste = FREE_WEB_PUSH_ALERTS > 0;
   const webPushRulesUsed = rules.filter((r) => r.channel === "web_push").length;
   const freeWebPushRemaining = Math.max(0, FREE_WEB_PUSH_ALERTS - webPushRulesUsed);
 
@@ -297,7 +309,9 @@ function AlertsPageInner() {
           <>
             Get notified when scores, setups, or regimes change.{" "}
             {isFree
-              ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro.`
+              ? freeAlertTaste
+                ? `${FREE_WEB_PUSH_ALERTS} free web-push alerts included. Email + more push on Pro.`
+                : "Alerts run on Pro. Free runs a screen when you open it; a card is what runs it after every close."
               : "Email + Web push on Pro."}
           </>
         }
@@ -309,12 +323,16 @@ function AlertsPageInner() {
       {isFree && (
         <div className="mt-4 rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 text-sm">
           <span className="font-medium text-fg">
-            {freeWebPushRemaining > 0
-              ? `${freeWebPushRemaining} of ${FREE_WEB_PUSH_ALERTS} free web-push alerts left`
-              : `You've used all ${FREE_WEB_PUSH_ALERTS} free web-push alerts`}
+            {!freeAlertTaste
+              ? "Alerts are a Pro feature"
+              : freeWebPushRemaining > 0
+                ? `${freeWebPushRemaining} of ${FREE_WEB_PUSH_ALERTS} free web-push alerts left`
+                : `You've used all ${FREE_WEB_PUSH_ALERTS} free web-push alerts`}
           </span>{" "}
           <span className="text-muted">
-            — upgrade for 10 alerts/day.{" "}
+            {!freeAlertTaste
+              ? "— an alert is Tapeline re-running your screen after every close and telling you what moved. "
+              : "— upgrade for 10 alerts/day. "}
             <Link href="/app/billing" className="link">See plans →</Link>
           </span>
         </div>
@@ -341,8 +359,10 @@ function AlertsPageInner() {
           </div>
           <ul className="mt-3 flex flex-wrap gap-2">
             <li className="inline-flex items-center gap-1.5 rounded-md border border-up/30 bg-up/5 px-2.5 py-1 text-xs">
-              <span aria-hidden>✓</span> Web push{" "}
-              <span className="text-muted">· included</span>
+              <span aria-hidden>{freeAlertTaste ? "✓" : "○"}</span> Web push{" "}
+              <span className="text-muted">
+                {freeAlertTaste ? "· included" : "· Pro"}
+              </span>
             </li>
             <li
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-panel px-2.5 py-1 text-xs text-muted"
@@ -393,10 +413,13 @@ function AlertsPageInner() {
                   a Free user can't select it and only discover the 403 after
                   hitting Create — the gate is now visible at the point of choice. */}
               <option value="email">Email {isPro ? "" : "(Pro)"}</option>
-              {/* web_push is now the free "taste" channel — free users can
-                  create up to FREE_WEB_PUSH_ALERTS of these, so it carries a
-                  "(free)" tag for them rather than "(Pro)". */}
-              <option value="web_push">Web push {isFree ? "(free)" : ""}</option>
+              {/* web_push carries a "(free)" tag only while the free allowance
+                  is actually non-zero. At zero it is Pro like email, and is
+                  disabled for Free so the gate is visible at the point of
+                  choice rather than as a 403 after Create. */}
+              <option value="web_push" disabled={isFree && !freeAlertTaste}>
+                Web push {isFree ? (freeAlertTaste ? "(free)" : "(Pro)") : ""}
+              </option>
             </select>
           </div>
 
@@ -508,13 +531,28 @@ function AlertsPageInner() {
         </div>
 
         <div className="mt-5 flex items-center gap-3">
+          {/* A Free account with no allowance on any channel cannot create a
+              rule — the API returns 403 "limit reached (0 on free)". Disabling
+              here shows the gate at the point of action instead of after a
+              submitted form, which is how it read before: a filled-in form, a
+              confident button, and a refusal. */}
           <button
             onClick={create}
-            disabled={creating || (def.needsSymbol && !symbol.trim())}
+            disabled={
+              creating ||
+              (def.needsSymbol && !symbol.trim()) ||
+              (isFree && !freeAlertTaste)
+            }
             className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             {creating ? "Creating…" : "Create rule"}
           </button>
+          {isFree && !freeAlertTaste && (
+            <p className="text-xs text-muted">
+              Alert rules run on Pro.{" "}
+              <Link href="/app/billing?intent=pro" className="link">See plans →</Link>
+            </p>
+          )}
           {error && <p className="text-xs text-down">{error}</p>}
           {gateError && (
             <p className="text-xs text-down">

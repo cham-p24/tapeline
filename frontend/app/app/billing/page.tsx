@@ -877,7 +877,9 @@ export default function BillingPage() {
           />
           <UsageTile
             label="Saved scans"
-            limit={tier === "free" ? 0 : tier === "pro" ? 10 : 100}
+            // Free is FREE_LIMITS.savedScans (1), not 0 — this tile contradicted
+            // the Free plan card 55 lines below on this same page.
+            limit={tier === "free" ? FREE_LIMITS.savedScans : tier === "pro" ? 10 : 100}
             unit="scans"
           />
           <UsageTile

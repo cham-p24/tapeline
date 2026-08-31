@@ -11,6 +11,7 @@ import {
   trackUpgradePromptShown,
   trackUpgradePromptClicked,
 } from "@/lib/gtag";
+import { FREE_LIMITS } from "@/lib/pricing";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -95,16 +96,26 @@ const SECTOR_OPTIONS = [
   ].map((s) => ({ value: s, label: s })),
 ];
 
-// Mirror of `saved_scans` caps from backend/app/services/tier.py. The
-// server-side cap is the authoritative gate; this just disables the UI
-// button for Free users (cap=0) so they don't waste a click before the
-// 403 lands.
+// Saved-screen caps, DERIVED from the shared source of truth so they cannot
+// drift from backend/app/services/tier.py again.
+//
+// This table used to hardcode `free: 0` under a comment claiming it mirrored
+// the backend. tier.py has said `"saved_scans": 1` since #683, and says why in
+// the same breath: "The second save is the trigger, and it cannot exist while
+// the first one is impossible." PresetMenu disables Save at `cap <= 0`, so the
+// stale 0 disabled the button for every Free account, made the promised one
+// saved screen unreachable, and meant routers/presets.py's
+// record_cap_hit("saved_scans") — the event the post-#683 pricing model is
+// built to read — could never fire. Production bore that out: cap_events held
+// scanner_rows and squeeze_preview hits and zero saved_scans, ever.
+//
+// Free comes from FREE_LIMITS. Paid caps are display-only (the server is the
+// real gate) and are not worth a second shared constant.
 const SAVED_SCANS_CAP_BY_TIER: Record<string, number> = {
-  free: 0,
+  free: FREE_LIMITS.savedScans,
   pro: 10,
   premium: 100,
 };
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Once the user dismisses (or manually overrides) the onboarding-driven
