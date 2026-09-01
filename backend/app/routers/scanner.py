@@ -34,13 +34,32 @@ SCANNER_QUERY_TIMEOUT_MS = 8000
 # Default liquidity floor for the ranked scanner view. A high Tapeline Score on
 # a near-untradeable instrument (e.g. a bond/strategy ETF trading a few hundred
 # dollars a day — BBBL at ~$800/day, AETH at ~$21k) was floating to the TOP of
-# the list, a first-impression killer on the core product surface. We drop rows
-# whose dollar-volume (price*volume) is KNOWN and below this floor; rows missing
-# price or volume are KEPT, so the filter can only ever remove obvious junk,
-# never hide a name we simply lack a volume read for. Conservative on purpose so
-# the price-anchored listicle pages (penny stocks / under-$5) keep their long
-# tail. Pass min_dollar_volume=0 to disable.
-SCANNER_MIN_DOLLAR_VOLUME = 50_000.0
+# the list, a first-impression killer on the core product surface.
+#
+# RAISED 2026-08-30 from $50k to $1M, and the basis changed. Two reasons:
+#
+#   1. $50k was far below anything a swing trader can actually get in and out
+#      of. It removed the absurd and kept the merely untradeable: the live
+#      ranked view was topped by names at $0.46M-$0.90M a day.
+#   2. `volume` is the SESSION's running total, not a full day. Measuring
+#      liquidity against it means the same ticker fails this floor at 10am and
+#      passes at 4pm — the floor was strictest exactly when the fewest people
+#      had looked. `avg_volume_30d` is derived from daily bars by
+#      compute_bar_stats, so it is stable across the session and is the honest
+#      basis for "can this be traded". We fall back to the intraday figure only
+#      when the 30-day average is missing.
+#
+# Rows missing BOTH liquidity reads are still KEPT, deliberately: the filter
+# removes names we know are illiquid, never names we simply lack a read for.
+# That carve-out is load-bearing while feed coverage is still filling in — see
+# docs/FEED_COVERAGE_AUDIT_2026-08-30.md; on 2026-08-30, 3,662 of 6,753 scored
+# tickers had no volume read at all, and failing them closed would have emptied
+# most of the scanner.
+#
+# The price-anchored SEO pages (/best-stocks-for/*, /sector/*, /signal/*) each
+# pass min_dollar_volume=50000 explicitly, so they keep their long tail and are
+# unaffected by this default. Pass min_dollar_volume=0 to disable entirely.
+SCANNER_MIN_DOLLAR_VOLUME = 1_000_000.0
 
 # Module-level cache for /popular — recomputed every hour. The query is cheap
 # but we'd rather not run it on every empty-state render in /app/watchlist.
@@ -185,15 +204,20 @@ async def list_scanner(
     for clause in await live_clauses(session):
         stmt = stmt.where(clause)
 
-    # Liquidity floor — keep rows with an unknown (null) price/volume, but drop
+    # Liquidity floor — keep rows with an unknown (null) liquidity read, but drop
     # any whose KNOWN dollar-volume is below the floor so a high score on a
     # near-untradeable ETF can't top the ranked list. See SCANNER_MIN_DOLLAR_VOLUME.
+    #
+    # Basis is the 30-day average volume, NOT the session's running `volume` —
+    # the latter makes the same ticker fail at 10am and pass at 4pm. Fall back
+    # to the intraday figure only when the average is missing.
     if min_dollar_volume > 0:
+        liquidity = func.coalesce(Ticker.avg_volume_30d, Ticker.volume)
         stmt = stmt.where(
             or_(
                 Ticker.price.is_(None),
-                Ticker.volume.is_(None),
-                Ticker.price * Ticker.volume >= min_dollar_volume,
+                liquidity.is_(None),
+                Ticker.price * liquidity >= min_dollar_volume,
             )
         )
 
