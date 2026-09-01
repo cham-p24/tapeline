@@ -993,9 +993,48 @@ async def stripe_webhook(
                 )
 
                 lines = (obj.get("lines") or {}).get("data") or []
-                price = (lines[0].get("price") or {}) if lines else {}
-                interval = (price.get("recurring") or {}).get("interval")
-                interval_count = (price.get("recurring") or {}).get("interval_count") or 1
+
+                # THE INTERVAL COMES FROM THE BILLED PERIOD, not from a price
+                # object. On the API version this account actually sends
+                # (2026-08-26.dahlia) an invoice line has NO `price` key at
+                # all: it carries `pricing.price_details.price`, a bare price
+                # ID with no `recurring` block to read an interval out of.
+                # Reading `line["price"]["recurring"]["interval"]` yields None
+                # on every real delivery, which silently skips every email —
+                # a handler that passes its tests and never sends anything.
+                # `period` is on the line in every API version, is the thing
+                # the customer is actually being billed for, and needs no
+                # second API call to interpret. Prorations ride along as short
+                # extra lines, so take the LONGEST period on the invoice.
+                period_days = 0.0
+                for line in lines:
+                    per = line.get("period") or {}
+                    start_ts, end_ts = per.get("start"), per.get("end")
+                    if (
+                        isinstance(start_ts, int)
+                        and isinstance(end_ts, int)
+                        and end_ts > start_ts
+                    ):
+                        period_days = max(period_days, (end_ts - start_ts) / 86400)
+
+                ts = obj.get("next_payment_attempt") or obj.get("period_end")
+
+                # Does trial_will_end already own this charge? That branch
+                # fires ~3 days before a trial converts and states the same
+                # date and amount, so warning again here is two emails for one
+                # payment. Decided from OUR record of the trial end rather
+                # than the invoice's billing_reason: an upcoming invoice for a
+                # converting trial does not reliably carry
+                # `subscription_create`, and trial_ends_at is written from the
+                # subscription's own trial_end, so the two refer to the same
+                # instant. A year later, at the real renewal, this is long past
+                # and the notice goes out normally.
+                trial_end = user.trial_ends_at
+                covered_by_trial_notice = bool(
+                    trial_end
+                    and ts
+                    and abs(trial_end.timestamp() - ts) <= 2 * 86400
+                )
 
                 # MONTHLY IS DELIBERATELY SKIPPED. A monthly subscriber is
                 # charged a small amount they saw twelve times a year and gets
@@ -1003,16 +1042,15 @@ async def stripe_webhook(
                 # that trains people to ignore billing mail — the opposite of
                 # the goal. The surprise risk lives in the long intervals, and
                 # so does the regulatory expectation. To include monthly,
-                # delete this guard: everything below already works for it.
-                months = interval_count * (12 if interval == "year" else 1)
-                if interval not in ("year", "month") or months < 6:
+                # lower this threshold: everything below already works for it.
+                if period_days < 180:
                     logger.info(
-                        "stripe.upcoming_skipped_short_interval user=%s interval=%s x%s",
-                        user.id, interval, interval_count,
+                        "stripe.upcoming_skipped_short_period user=%s days=%.1f",
+                        user.id, period_days,
                     )
-                elif (obj.get("billing_reason") or "") == "subscription_create":
-                    # The trial's own first invoice. trial_will_end owns that
-                    # moment; sending both would be two warnings for one charge.
+                elif covered_by_trial_notice or (
+                    (obj.get("billing_reason") or "") == "subscription_create"
+                ):
                     logger.info("stripe.upcoming_skipped_trial_first user=%s", user.id)
                 else:
                     amount_due = obj.get("amount_due")
@@ -1022,7 +1060,6 @@ async def stripe_webhook(
                         if isinstance(amount_due, (int, float)) and amount_due
                         else None
                     )
-                    ts = obj.get("next_payment_attempt") or obj.get("period_end")
                     renew_label = (
                         datetime.fromtimestamp(ts, tz=UTC).strftime("%d %B %Y")
                         if ts else "your next renewal date"
