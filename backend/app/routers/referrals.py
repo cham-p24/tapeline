@@ -1,6 +1,8 @@
 """Referral tracking — "Refer a friend, both get a free month" growth engine."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,39 @@ from app.services.auth import current_user_required
 
 router = APIRouter()
 settings = get_settings()
+
+PAID_TIERS = ("pro", "premium")
+
+
+def _has_converted(u: User, now: datetime) -> bool:
+    """Has this referred friend actually become a paying subscriber?
+
+    NOT `tier in PAID_TIERS and not u.trial_ends_at`, which is what this used
+    to be. `trial_ends_at` is written once when the trial starts and is never
+    cleared, so a friend who took the 14-day trial and then converted keeps a
+    non-null value forever — and showed on the referrer's page as "pending"
+    for the rest of time, which is the one number the referral page exists to
+    move.
+
+    The question is whether they are STILL INSIDE a trial, not whether they
+    ever had one. A future `trial_ends_at` means mid-trial: Stripe has a card
+    but has charged $0, so counting it as converted would be the opposite
+    error. A past one means the trial ended and they are still on a paid tier,
+    which is exactly conversion. A lapsed trial is not a false positive here
+    because `_downgrade_expired_trials` drops those accounts to `free`, so the
+    tier check has already excluded them.
+
+    Deliberately not `is_on_trial()`: that only recognises the legacy
+    card-free trial, so it would mark a mid-trial friend as converted.
+    """
+    if u.tier not in PAID_TIERS:
+        return False
+    ends = u.trial_ends_at
+    if ends is None:
+        return True  # paid without ever trialling
+    if ends.tzinfo is None:
+        ends = ends.replace(tzinfo=UTC)
+    return ends <= now
 
 
 @router.get("/me")
@@ -26,7 +61,8 @@ async def my_referral_stats(
     )
     referred = referred_q.scalars().all()
     signed_up = len(referred)
-    converted = sum(1 for u in referred if u.tier in ("pro", "premium") and not u.trial_ends_at)
+    now = datetime.now(UTC)
+    converted = sum(1 for u in referred if _has_converted(u, now))
 
     # Build share URL — works even before domain is registered
     share_url = f"{settings.app_url}/signup?ref={user.referral_code}" if user.referral_code else None
@@ -45,7 +81,7 @@ async def my_referral_stats(
             {
                 "email": u.email[:3] + "***" + u.email[u.email.index("@"):],  # privacy-preserving
                 "tier": u.tier,
-                "converted": u.tier in ("pro", "premium") and not u.trial_ends_at,
+                "converted": _has_converted(u, now),
                 "joined": u.created_at.isoformat() if u.created_at else None,
             }
             for u in referred[:20]
