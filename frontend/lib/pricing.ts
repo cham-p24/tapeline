@@ -108,6 +108,35 @@ export function freeOpenAccess(now: Date = new Date()): boolean {
 export const PRO_SCANNER_ROWS = 1000;
 
 /**
+ * The end of the promo, spelled the way the copy says it. One constant so the
+ * banner, the scanner note and any email cannot drift onto different dates.
+ */
+export const PROMO_OPEN_ACCESS_END_LABEL = "8 September";
+
+/** How long after the revert we keep explaining what changed. */
+const OPEN_ACCESS_AFTERMATH_DAYS = 10;
+
+/**
+ * True for a short window AFTER open access ends.
+ *
+ * The revert needs no deploy, which is its best property and its worst: on
+ * 2026-09-08 a signed-in Free user's scanner silently drops from
+ * PRO_SCANNER_ROWS to FREE_LIMITS.scannerRows — a 99% cut — with nothing on
+ * screen to say why. Losing that much overnight reads as a broken product,
+ * not as a promo ending, and the people it hits are the ones who did nothing
+ * wrong. The public OpenAccessBanner does not cover this: it renders on the
+ * homepage and /pricing, i.e. only to LOGGED-OUT visitors, and it disappears
+ * at exactly the moment the explanation starts being needed.
+ *
+ * So the in-app note keeps talking for a few days after the date, then stops.
+ */
+export function openAccessJustEnded(now: Date = new Date()): boolean {
+  if (freeOpenAccess(now)) return false;
+  const since = now.getTime() - PROMO_OPEN_ACCESS_UNTIL.getTime();
+  return since < OPEN_ACCESS_AFTERMATH_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/**
  * Scanner rows a Free user ACTUALLY gets right now — the audience-aware
  * accessor for `FREE_LIMITS.scannerRows`.
  *

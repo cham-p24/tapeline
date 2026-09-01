@@ -11,7 +11,12 @@ import {
   trackUpgradePromptShown,
   trackUpgradePromptClicked,
 } from "@/lib/gtag";
-import { FREE_LIMITS } from "@/lib/pricing";
+import {
+  FREE_LIMITS,
+  PROMO_OPEN_ACCESS_END_LABEL,
+  freeOpenAccess,
+  openAccessJustEnded,
+} from "@/lib/pricing";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -754,6 +759,29 @@ export default function ScannerPage() {
             Free plan — showing live scores for the top{" "}
             <strong className="text-fg">{meta.rowCap}</strong> rows.
             Pro unlocks the full ~2,500-ticker universe, real-time.
+            {/* The row cap this line quotes CHANGES ON ITS OWN. Open-access
+                month lifts a signed-in Free account to the Pro cap and reverts
+                with no deploy, so on the revert date this same sentence goes
+                from 1,000 to 10 — a 99% cut, unannounced, to people who did
+                nothing. Unexplained, that reads as a broken product.
+                OpenAccessBanner does not cover it: it renders on the homepage
+                and /pricing, so only LOGGED-OUT visitors see it, and it
+                vanishes exactly when the explanation is needed. Hence both
+                halves here, next to the number itself.
+                A factual end date is permitted; a countdown is not
+                (compliance Rule 6), so this states the date and stops. */}
+            {freeOpenAccess() && (
+              <>
+                {" "}Open access ends {PROMO_OPEN_ACCESS_END_LABEL} — after
+                that, the top {FREE_LIMITS.scannerRows}.
+              </>
+            )}
+            {openAccessJustEnded() && (
+              <>
+                {" "}Open-access month ended {PROMO_OPEN_ACCESS_END_LABEL}, so
+                this is back to the top {FREE_LIMITS.scannerRows}.
+              </>
+            )}
           </span>
           <Link
             href="/app/billing"
