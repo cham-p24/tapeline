@@ -964,6 +964,93 @@ async def stripe_webhook(
                 "stripe.trial_will_end_without_user customer=%s", customer_id,
             )
 
+    elif evt_type == "invoice.upcoming":
+        # PRE-RENEWAL NOTICE. Stripe fires this before it creates a renewal
+        # invoice, and it carries the amount it is actually about to charge.
+        #
+        # `customer.subscription.trial_will_end` above covers only the FIRST
+        # charge. Nothing covered the ones after it — including the annual
+        # renewal a year later, which is the charge most likely to be a
+        # surprise and the one that produces "I forgot I ever signed up"
+        # disputes. render_annual_renewal_reminder_email has existed since the
+        # retention work but was reachable only from the admin preview: the
+        # template was written and never given a trigger. This is the trigger.
+        #
+        # AMOUNT FROM THE INVOICE, never the sticker price. A grandfathered,
+        # discounted or proration-adjusted subscription renews at a different
+        # figure, and quoting the wrong one is worse than quoting none — the
+        # renderer takes None and points at billing instead.
+        customer_id = obj.get("customer")
+        result = await session.execute(
+            select(User).where(User.stripe_customer_id == customer_id)
+        )
+        user = result.scalar_one_or_none()
+        if user and user.email:
+            try:
+                from app.services.email import (
+                    render_annual_renewal_reminder_email,
+                    send_email,
+                )
+
+                lines = (obj.get("lines") or {}).get("data") or []
+                price = (lines[0].get("price") or {}) if lines else {}
+                interval = (price.get("recurring") or {}).get("interval")
+                interval_count = (price.get("recurring") or {}).get("interval_count") or 1
+
+                # MONTHLY IS DELIBERATELY SKIPPED. A monthly subscriber is
+                # charged a small amount they saw twelve times a year and gets
+                # a receipt every time; a reminder before each one is noise
+                # that trains people to ignore billing mail — the opposite of
+                # the goal. The surprise risk lives in the long intervals, and
+                # so does the regulatory expectation. To include monthly,
+                # delete this guard: everything below already works for it.
+                months = interval_count * (12 if interval == "year" else 1)
+                if interval not in ("year", "month") or months < 6:
+                    logger.info(
+                        "stripe.upcoming_skipped_short_interval user=%s interval=%s x%s",
+                        user.id, interval, interval_count,
+                    )
+                elif (obj.get("billing_reason") or "") == "subscription_create":
+                    # The trial's own first invoice. trial_will_end owns that
+                    # moment; sending both would be two warnings for one charge.
+                    logger.info("stripe.upcoming_skipped_trial_first user=%s", user.id)
+                else:
+                    amount_due = obj.get("amount_due")
+                    currency = (obj.get("currency") or "usd").upper()
+                    amount_label = (
+                        f"${amount_due / 100:.2f} {currency}"
+                        if isinstance(amount_due, (int, float)) and amount_due
+                        else None
+                    )
+                    ts = obj.get("next_payment_attempt") or obj.get("period_end")
+                    renew_label = (
+                        datetime.fromtimestamp(ts, tz=UTC).strftime("%d %B %Y")
+                        if ts else "your next renewal date"
+                    )
+                    html = render_annual_renewal_reminder_email(
+                        user.name or "there",
+                        tier=str(user.tier),
+                        amount_label=amount_label,
+                        renew_date_label=renew_label,
+                    )
+                    await send_email(
+                        user.email,
+                        f"Your Tapeline plan renews on {renew_label}",
+                        html,
+                        persona="billing",
+                        skip_if_undeliverable=False,
+                    )
+                    logger.info(
+                        "stripe.renewal_reminder_sent user=%s amount=%s on=%s",
+                        user.id, amount_label, renew_label,
+                    )
+            except Exception:
+                logger.exception("stripe.renewal_reminder_error user=%s", user.id)
+        else:
+            logger.warning(
+                "stripe.upcoming_invoice_without_user customer=%s", customer_id
+            )
+
     elif evt_type == "customer.source.expiring":
         # The card on file expires at month-end. Proactively nudge an update
         # BEFORE the next renewal declines into dunning — cheaper to keep a
