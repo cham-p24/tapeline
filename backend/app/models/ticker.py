@@ -108,6 +108,26 @@ class Ticker(Base):
     # alert payloads that quote them are built from that row plus this
     # ticker-level data. (The Discord channel that also read them was retired
     # 2026-05-04.)
+    # When the daily aggregates pass last fetched OHLC bars for this symbol.
+    # NULL = never. This exists so `_refresh_aggregates` can round-robin fairly
+    # instead of ranking on the very column it populates.
+    #
+    # The bug it fixes: that pass ordered by `coalesce(volume * price, -1)` and
+    # took the top 2,500. `volume` is NULL until the pass has run for a symbol,
+    # so NULLs sorted last, the first run tie-broke on physical (alphabetical)
+    # order, and those winners then sorted FIRST on every later run — for good.
+    # The covered set could never grow. Production ended up with volume for 94%
+    # of A-symbols, 65% of D, 26% of E, 1% of S and T, and 0% of Y and Z, while
+    # the published Top 10 was drawn entirely from A-D and several of its names
+    # traded a few hundred shares a day. See
+    # docs/FEED_COVERAGE_AUDIT_2026-08-30.md.
+    #
+    # `updated_at` cannot serve this purpose: the 60s scoring tick writes every
+    # scored row, so it says when the row was last touched, not when its bars
+    # were last fetched.
+    last_aggregates_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
