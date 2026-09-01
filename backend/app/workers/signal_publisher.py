@@ -1178,15 +1178,29 @@ governs which picks make the public scorecard, where a hostile-macro
 pick almost certainly fights the next-day tape regardless of how strong
 its other factors look."""
 
-_MIN_DOLLAR_VOLUME_FOR_SCORECARD = 250_000.0
+_MIN_DOLLAR_VOLUME_FOR_SCORECARD = 1_000_000.0
 """Liquidity floor for the public scorecard freeze. A high Tapeline Score on a
 near-untradeable instrument (a bond/strategy ETF trading a few hundred dollars a
 day) is not a pick anyone could act on, and its noisy next-day move drags the
 back-check's alpha around for no real reason. Skip a candidate when its
-dollar-volume (price*volume) is KNOWN and below this floor; a null volume is
-kept (no read = no penalty), so the gate only ever removes genuinely
-untradeable names. Forward-only — historical scorecard rows are never touched.
-Mirrors routers/scanner.SCANNER_MIN_DOLLAR_VOLUME. Set 0 to disable."""
+dollar-volume is KNOWN and below this floor; a null read is kept (no read = no
+penalty), so the gate only ever removes genuinely untradeable names.
+Forward-only — historical scorecard rows are never touched.
+
+RAISED 2026-08-30 from $250k to $1M, matching routers/scanner.
+SCANNER_MIN_DOLLAR_VOLUME. If a name is too thin to sit at the top of the
+ranked view, it is too thin to enter a permanent public track record — and the
+scorecard is the one surface where an unactionable pick costs credibility
+rather than just attention.
+
+The basis also changed, and that matters more than the number: it was
+`price * volume`, where `volume` is the SESSION's running total. The same
+ticker therefore failed this gate in the morning and passed it by the close,
+and the freeze runs after the US close — so the gate was being applied to a
+full-day figure while the scanner was applying it to a partial one, and the two
+surfaces silently disagreed all day. Now both use `avg_volume_30d` (derived
+from daily bars in compute_bar_stats, stable across the session) and fall back
+to the intraday figure only when that is missing."""
 
 
 def _macro_gate_active() -> bool:
@@ -1332,13 +1346,16 @@ async def _ensure_daily_scorecard(today: date) -> None:
             # trading a few hundred dollars a day isn't a pick anyone could act
             # on, and its noisy next-day move drags the back-check's alpha for
             # no real reason. Skip when dollar-volume is KNOWN and below the
-            # floor; a null volume is kept (no read = no penalty). Same pick is
-            # still on /scanner — this only governs the public scorecard.
+            # floor; a null read is kept (no read = no penalty). Basis is the
+            # 30-day average, not the session's running volume — see the
+            # constant's docstring. Same pick is still on /scanner — this only
+            # governs the public scorecard.
+            _liquidity = t.avg_volume_30d if t.avg_volume_30d is not None else t.volume
             if (
                 _MIN_DOLLAR_VOLUME_FOR_SCORECARD > 0
-                and t.volume is not None
+                and _liquidity is not None
                 and t.price is not None
-                and t.price * t.volume < _MIN_DOLLAR_VOLUME_FOR_SCORECARD
+                and t.price * _liquidity < _MIN_DOLLAR_VOLUME_FOR_SCORECARD
             ):
                 skipped_illiquid += 1
                 continue
