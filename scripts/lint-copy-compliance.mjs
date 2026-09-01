@@ -632,6 +632,18 @@ export function stripComments(text, lang) {
       .join("\n");
   }
 
+  if (lang === "md") {
+    // Markdown has no `//` or block comments - only HTML comments. Running
+    // the JS state machine here is what let a `docs/**` glob in prose act as
+    // an unterminated `/*` and blind every rule for the rest of the file.
+    //
+    // Fenced code blocks are deliberately still scanned. An unclosed fence
+    // would reintroduce exactly the runaway-to-EOF failure being fixed, and
+    // a false positive inside a fence is an allowlist entry with a written
+    // reason - which is the documented process. Silence is not.
+    return text.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "));
+  }
+
   // JS/TS/JSX: single pass state machine.
   let out = "";
   let i = 0;
@@ -809,7 +821,15 @@ function excerpt(text, index, matchLength) {
 export function scanSource(text, filePath = "<input>", options = {}) {
   const allow = options.allow || [];
   const known = options.knownViolations || [];
-  const lang = filePath.endsWith(".py") ? "py" : "js";
+  // Markdown is NOT JavaScript. `docs/**` contains the two characters `/*`,
+  // which the JS state machine reads as an unterminated block comment and
+  // uses to blank the entire rest of the file - silently reporting success
+  // on copy it never scanned. See stripComments' `md` branch.
+  const lang = filePath.endsWith(".py")
+    ? "py"
+    : /\.mdx?$/i.test(filePath)
+      ? "md"
+      : "js";
   const code = maskProductLexicon(stripComments(text, lang));
   const inlineAllowed = inlineAllowedLines(text);
   const findings = [];

@@ -21,6 +21,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import { scoredTickersLabel } from "@/lib/universe";
 
 export type FeatureFAQ = { q: string; a: string };
 
@@ -109,10 +110,14 @@ export function SeoFeaturePage({
     { name: h1, url },
   ]);
   const tierLabel = tier === "premium" ? "Premium" : "Pro";
+  // Says what the reader gets, not what the tier is called. The previous
+  // Pro line ("14-day Premium trial that includes everything in Pro") was
+  // circular — it described the trial in terms of the tier and the tier in
+  // terms of the trial, and made no argument at all.
   const tierCopy =
     tier === "premium"
-      ? "Premium · 14-day trial, $0 today."
-      : "Pro · 14-day Premium trial that includes everything in Pro.";
+      ? "Included in Premium, and in the 14-day trial from day one."
+      : "Included in Pro, and in the 14-day Premium trial from day one.";
 
   return (
     <main id="main" className="min-h-screen">
@@ -215,21 +220,57 @@ export function SeoFeaturePage({
           <NewsletterCapture source="feature" heading="" sub="" />
         </section>
 
-        {/* CTA — tier-aware copy + same gradient as the homepage final CTA. */}
+        {/* CTA — tier-aware copy + same gradient as the homepage final CTA.
+         *
+         * REBUILT 2026-09-01 against what actually produces a card.
+         *
+         * Every account that has ever put a card on Tapeline did it within
+         * 2m08s of signing up, without touching the product first. Nobody was
+         * converted by usage: the longest-tenured account in the base (21 days)
+         * never carded, and the free-tier cap meter has fired six times in its
+         * life and converted no one. The decision is made BEFORE the account
+         * exists, which makes this block — not the app — the selling surface.
+         *
+         * Two changes follow from that:
+         *
+         * 1. The record is a primary path, not a footnote. The fastest card on
+         *    record (29 seconds, direct traffic) came from someone who arrived
+         *    already convinced; /scorecard is the only asset that can do that,
+         *    and it needs no account and no card. Sending an unconvinced
+         *    visitor there beats sending them to a signup form they abandon —
+         *    these pages currently convert signups to cards at 0%.
+         *
+         * 2. The card terms are stated here rather than discovered at checkout.
+         *    That is the mechanism behind the only ad concept in the 2026-08
+         *    burst that produced cards: name the money question and answer it
+         *    completely, up front. See docs/ads/meta-burst-2026-08/.
+         *
+         * Ticker count comes from lib/universe — it was hardcoded "~2,500"
+         * here and understated the real figure by 2.7x.
+         */}
         <section className="mt-12 rounded-2xl bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <p className="eyebrow text-accent">{tierLabel} feature</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
-            See this live across the full ~2,500-ticker universe.
+            See this live across {scoredTickersLabel} scored tickers.
           </h2>
           <p className="mt-3 text-sm text-muted">{tierCopy}</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href={`/signup?from=${signupFrom}`} className="btn-primary">
               Start the 14-day Premium trial &rarr;
             </Link>
-            <Link href="/pricing" className="btn-ghost">
-              See pricing
+            <Link href="/scorecard" className="btn-ghost">
+              Read the record first &rarr;
             </Link>
           </div>
+          <p className="mt-4 text-xs text-subtle">
+            The record needs no account and no card. The trial takes a card,
+            charges $0 today, and shows the date of the first charge before you
+            confirm.{" "}
+            <Link href="/pricing" className="text-accent hover:underline">
+              See pricing
+            </Link>
+            .
+          </p>
         </section>
 
         <p className="mt-10 text-xs text-subtle text-center">

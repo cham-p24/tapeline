@@ -561,3 +561,52 @@ test("does NOT flag the accurate card-required trial description", () => {
   const src = `<p>14-day full Premium trial — card required, $0 charged today, first charge on day 14.</p>`;
   assert.ok(!fires(src, "card-free-trial"), `false positive on: ${src}`);
 });
+
+/* ------------------------------------------------------------------ *
+ * Markdown is not JavaScript.
+ *
+ * `stripComments` ran its JS/TS state machine over EVERY non-Python file,
+ * Markdown included. Markdown has no block comments, but it is full of
+ * glob paths — and `docs/**` contains the two characters `/*`. That opened
+ * a block comment that nothing ever closed, so the linter silently blanked
+ * the entire rest of the file and reported "0 blocking findings".
+ *
+ * This was not theoretical. It was found in `docs/ads/`, which is where ad
+ * copy is hand-linted before money is spent on it, and the suppressing line
+ * was the very sentence telling the reader to hand-lint the file.
+ *
+ * Production copy was never affected — all 188 CI-scanned frontend files
+ * close every `/*` they open — but a compliance linter that switches itself
+ * off on a glob is worse than no linter, because it reports success.
+ * ------------------------------------------------------------------ */
+
+test("markdown: a `/**` glob in prose does not blind the rest of the file", () => {
+  const md = [
+    "**Lint before shipping any edit — CI's globs do not cover `docs/**`:**",
+    "",
+    "> Guaranteed returns, every month.",
+  ].join("\n");
+  const findings = scanSource(md, "docs/ads/example.md");
+  assert.ok(
+    findings.length > 0,
+    "a violation AFTER a `/**` glob must still be reported in Markdown",
+  );
+});
+
+test("markdown: HTML comments are still stripped", () => {
+  const md = "<!-- Guaranteed returns, every month. -->\n\nDescriptive scores only.";
+  assert.equal(
+    scanSource(md, "docs/ads/example.md").length,
+    0,
+    "an HTML comment is not user-facing copy",
+  );
+});
+
+test("js/ts: block comments are still stripped (the md fix must not over-correct)", () => {
+  const src = "/* Guaranteed returns, every month. */\nexport const x = 1;";
+  assert.equal(
+    scanSource(src, "frontend/components/Example.tsx").length,
+    0,
+    "a real JS block comment must still be ignored",
+  );
+});
