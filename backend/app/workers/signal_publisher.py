@@ -1960,19 +1960,63 @@ async def _refresh_aggregates_cache() -> bool:
     # micro-caps no scanner user filters into. Cap matches the active
     # scoring universe (2,500) — ~12 min refresh, every scored ticker
     # has real OHLC-derived trend/RS/momentum sub-scores.
+    #
+    # ── The budget is SPLIT, and that split is the whole fix ────────────────
+    #
+    # This used to be one query: ORDER BY coalesce(volume * price, -1) DESC,
+    # LIMIT 2500. It ranks on the very column this pass populates. `volume` is
+    # NULL until the pass has run for a symbol, so NULLs sorted last, the first
+    # run tie-broke on physical (alphabetical) order, and those winners then
+    # sorted FIRST on every later run. The covered set could never grow.
+    #
+    # Production, measured 2026-08-30: volume present for 94% of A-symbols,
+    # 95% B, 92% C, 65% D, 26% E, 4-12% F-R, 1% S, 1% T, 0% Y and Z — 72.2% of
+    # 11,808 tickers with no volume at all, and a published Top 10 drawn
+    # entirely from A-D, several names trading a few hundred shares a day.
+    # docs/FEED_COVERAGE_AUDIT_2026-08-30.md has the full read.
+    #
+    # EXPLOIT keeps the liquid names fresh, which is what the cap was always
+    # for. EXPLORE spends the rest on least-recently-fetched symbols, NULLs
+    # (never fetched) first — so the ranking gets real numbers to rank. It is
+    # self-limiting: once the universe is covered, `last_aggregates_at` is
+    # populated everywhere and the explore slice degrades into a plain
+    # oldest-first rotation, which is what you want anyway for staleness.
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
     AGGREGATES_CAP = ACTIVE_UNIVERSE_SIZE
+    EXPLORE_SHARE = 0.4
+    EXPLORE_CAP = int(AGGREGATES_CAP * EXPLORE_SHARE)
+    EXPLOIT_CAP = AGGREGATES_CAP - EXPLORE_CAP
 
     from sqlalchemy import desc as _desc
 
     async with session_scope() as session:
-        result = await session.execute(
+        exploit = (await session.execute(
             select(Ticker.symbol)
             # NULLS LAST across dialects — see _refresh_fundamentals_cache.
             .order_by(_desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
-            .limit(AGGREGATES_CAP)
-        )
-        symbols = [row[0] for row in result.all() if row[0] != "SPY"]
+            .limit(EXPLOIT_CAP)
+        )).scalars().all()
+
+        # NULLS FIRST across dialects: a never-fetched symbol is infinitely
+        # stale, so it must outrank every fetched one. coalesce onto a sentinel
+        # far in the past rather than relying on dialect NULL ordering.
+        _never = datetime(1970, 1, 1, tzinfo=UTC)
+        explore = (await session.execute(
+            select(Ticker.symbol)
+            .where(Ticker.symbol.notin_(exploit))
+            .order_by(func.coalesce(Ticker.last_aggregates_at, _never).asc())
+            .limit(EXPLORE_CAP)
+        )).scalars().all()
+
+    seen: set[str] = set()
+    symbols = [
+        s for s in [*exploit, *explore]
+        if s != "SPY" and not (s in seen or seen.add(s))
+    ]
+    logger.info(
+        "aggregates.selection exploit=%d explore=%d total=%d",
+        len(exploit), len(explore), len(symbols),
+    )
 
     # SPY is excluded from the loop below because its bars were already
     # fetched above as the RS benchmark — re-fetching would be a wasted call.
@@ -1985,6 +2029,7 @@ async def _refresh_aggregates_cache() -> bool:
 
     logger.info("aggregates.refresh_started count=%d", len(symbols))
     refreshed = 0
+    attempted: list[str] = []
     for sym in symbols:
         try:
             bars = await fetch_aggregates(sym, from_date=start, to_date=today)
@@ -2005,7 +2050,24 @@ async def _refresh_aggregates_cache() -> bool:
                     refreshed += 1
         except Exception:
             logger.exception("aggregates.fetch_failed symbol=%s", sym)
+        attempted.append(sym)
         await asyncio.sleep(0.3)  # gentle pacing — Starter is unlimited but still
+
+    # Stamp on ATTEMPT, not on success. A symbol the vendor has no bars for
+    # would otherwise stay NULL forever and monopolise the explore slice on
+    # every run, starving the rest exactly the way the old ordering did. What
+    # this column records is "we have tried this one", which is what a fair
+    # rotation needs.
+    if attempted:
+        now = datetime.now(UTC)
+        async with session_scope() as session:
+            for chunk_start in range(0, len(attempted), 500):
+                chunk = attempted[chunk_start:chunk_start + 500]
+                await session.execute(
+                    update(Ticker)
+                    .where(Ticker.symbol.in_(chunk))
+                    .values(last_aggregates_at=now)
+                )
 
     sizes = aggregate_cache_sizes()
     logger.info(
