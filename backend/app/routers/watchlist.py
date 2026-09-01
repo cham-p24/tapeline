@@ -12,6 +12,7 @@ from app.db import get_session
 from app.models import Ticker, User, Watchlist, WatchlistItem, WatchlistTrackRecordEntry
 from app.services.auth import current_user_required
 from app.services.cap_events import record_cap_hit
+from app.services.funnel_events import record_funnel_event
 from app.services.tier import Tier, effective_limit, has_feature
 from app.services.watchlist_trackrecord import summary_for_rows
 
@@ -281,6 +282,11 @@ async def add_to_watchlist(
         user.activated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(item)
+
+    # Same activation moment activated_at marks, but recorded per-day and with
+    # the wall counterfactual attached — activated_at is a single first-ever
+    # timestamp and cannot say whether the person came back.
+    await record_funnel_event(user, "watchlist_add")
     return {
         "id": item.id,
         "symbol": item.symbol,
