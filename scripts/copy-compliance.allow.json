@@ -13,6 +13,15 @@
     "of the matched text). Narrower is better — prefer file+rule+phrase over a",
     "blanket file exemption.",
     "",
+    "The four docs/ entries are PASTE-READY COPY BANKS, not documentation:",
+    "text written to be copied verbatim into press, outreach, a Chrome Web",
+    "Store listing and launch collateral. docs/** as a whole is deliberately",
+    "NOT globbed — most of it is engineering prose and dated analysis, and a",
+    "noisy linter gets disabled. Being outside the linter is how 'a new account",
+    "adds a card at first sign-in' survived #686's 79-place sweep in all four",
+    "of them, three weeks after #683 made it false. Listed by name to keep the",
+    "scope narrow.",
+    "",
     "See docs/COMPLIANCE_COPY_RULES.md."
   ],
   "include": [
@@ -22,7 +31,11 @@
     "frontend/lib/**/*.ts",
     "backend/app/services/email*.py",
     "backend/app/services/inbox_templates.py",
-    "backend/app/services/**/*template*.py"
+    "backend/app/services/**/*template*.py",
+    "docs/BRAND_SERP_KIT.md",
+    "docs/extension/CHROME_STORE_LISTING.md",
+    "docs/growth/newsletter_outreach.md",
+    "docs/launch/LAUNCH_PLAYBOOK.md"
   ],
   "exclude": [
     "**/*.test.ts",

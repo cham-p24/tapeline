@@ -1,18 +1,31 @@
 # Tapeline — Newsletter Sponsorship Research
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-08-30. Check every claim below against `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the live scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 14-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and the Congressional and insider
+> feeds.
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> The **published record is free with no account at all**: the daily Top 10, the
+> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History, because this block said the opposite for eight days: #548
+> (2026-08-22) put a card wall in front of the logged-in product, and #683
+> (2026-08-30) removed
+> it. #686 corrected 79 claims across 42 files — but not this file, because
+> `docs/**` was outside the copy linter's include globs, so the four paste-ready
+> copy banks kept regenerating the false claim from this very instruction. They
+> are named in `scripts/copy-compliance.allow.json` now, and rule
+> `card-required-signup` fails the build on it._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -68,7 +81,7 @@ Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stoc
 Why your audience fits:
 — The published record is complete and needs no account; a free account adds top-10 live rows and 12 look-ups a day. Genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
 — Pro tier is $8.25/mo (annual) — accessible price point for retail traders considering a paid tool.
-— The published record requires no account and no card. An account takes a card at first sign-in and starts the 14-day Premium trial — $0 today, cancels in one click.
+— The published record requires no account and no card. An account takes an email and a password and opens the free plan; a card is what starts the 14-day Premium trial — $0 today, cancels in one click.
 
 I'm specifically asking about a *secondary* placement (footer slot, sponsored link, etc.) rather than primary because we're testing the channel at $300-1.2K budget. Happy to take whichever slot/date makes sense for your inventory.
 

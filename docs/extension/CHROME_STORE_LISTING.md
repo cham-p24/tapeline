@@ -97,7 +97,7 @@ WHAT YOU NEED
 
 A Tapeline account. After installing, the welcome page takes you to tapeline.io to sign in or create one.
 
-New accounts add a card at first sign-in, which starts a 14-day Premium trial — $0 that day, the first charge lands at the end of the trial, and one click cancels before then.
+Signing up takes an email and a password and opens the free plan. A card is what starts the 14-day Premium trial — $0 that day, the first charge lands at the end of the trial, and one click cancels before then.
 
 HONEST ABOUT THE RECORD
 

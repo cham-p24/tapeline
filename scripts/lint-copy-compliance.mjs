@@ -317,6 +317,39 @@ export const RULES = [
     ],
   },
   {
+    id: "card-required-signup",
+    brief: "Rule 10b — never claim a card is needed to SIGN UP",
+    message:
+      "Card-required SIGN-UP claim. This is the inverse of card-free-trial and " +
+      "became false on 2026-08-30 (#683), which removed the card wall: signing " +
+      "up takes an email and a password, and the scanner opens on the free " +
+      "plan. #548 had made the opposite claim true for eight days and #686 " +
+      "corrected 79 places when it stopped being — but only the card-FREE " +
+      "direction was ever linted, so the card-REQUIRED direction kept " +
+      "regenerating from paste-ready templates (the brand SERP kit, the Chrome " +
+      "Web Store listing, newsletter outreach, the launch playbook) and from a " +
+      "/compare FAQ answer that also ships as FAQPage JSON-LD to Google. " +
+      "The trial IS card-required and saying so is correct — the banned shape " +
+      "is attaching the card to the ACCOUNT or to SIGNING IN. Prefer the " +
+      "three-layer wording used on /compare/finviz: the record needs no " +
+      "account; signing up takes an email and a password; a card starts the " +
+      "trial. For a DATED historical entry (/changelog, /legal/refund, " +
+      "llms.txt), use an inline copy-compliance-allow with a reason.",
+    patterns: [
+      // "a new account adds a card at first sign-in" and its variants.
+      /\bcard\b[^.!?]{0,30}\bat\s+first\s+sign[-\s]?in\b/i,
+      /\b(?:new\s+)?accounts?\b[^.!?]{0,40}\badds?\s+(?:a\s+)?card\b/i,
+      // "signing up takes a card" / "an account requires a card"
+      // `(?<![\/\w])` keeps a URL PATH out of it: an href="/signup" sitting
+      // near true trial copy ("starting it takes a card") is not a claim
+      // about signing up. Caught on a blog draft before this shipped.
+      /(?<![\/\w])sign(?:ing)?[-\s]?up\b[^.!?]{0,30}\b(?:takes|needs|requires)\s+(?:a\s+)?card\b/i,
+      /\baccount\b[^.!?]{0,30}\b(?:takes|needs|requires)\s+(?:a\s+)?(?:credit\s+)?card\b/i,
+      // The comparison-table row #548 introduced.
+      /\bcard\s+to\s+sign\s+in\b/i,
+    ],
+  },
+  {
     id: "urgency-scarcity",
     brief: "Rule 6 — no manufactured urgency or scarcity",
     message:

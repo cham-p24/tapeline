@@ -127,6 +127,7 @@ const ENTRIES: Entry[] = [
       "Signing up takes an email and a password. The account it makes lands on the Free plan and opens the live scanner straight away: the top ten scored rows of any scan, on live data, no delay. Free also carries one saved screen, a 5-symbol watchlist, and 12 ticker deep-pages a day.",
       "A card is what starts the 14-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included.",
       "The trial terms are unchanged: $0 charged that day, the exact first-charge date shown before you confirm, an email three days before the charge, and one click to cancel.",
+      // copy-compliance-allow card-required-signup -- dated changelog entry; it states the superseded arrangement, and says so
       "This supersedes the arrangement in the 22 August 2026 entry below, where a new account added a card at first sign-in before the logged-in product opened. That entry stands as a record of what shipped then. The published record — daily top 10, scorecard, per-ticker pages, CSV/JSON — is unchanged and still needs no account.",
     ],
   },
@@ -136,6 +137,7 @@ const ENTRIES: Entry[] = [
     tag: "improvement",
     title: "Premium trial takes card details up front — $0 today, reminder email, one-click cancel",
     body: [
+      // copy-compliance-allow card-required-signup -- the 2026-08-22 entry itself; a changelog records what WAS true on its date
       "From 22 August 2026, a new account adds a card at first sign-in and starts the 14-day Premium trial. $0 is charged on day 0; the first charge lands on day 14 at the plan picked at sign-up.",
       "A reminder email goes out three days before the first charge, and cancelling is one click on the first screen of the cancel flow — cancel before day 14 and no charge is ever made.",
       "Existing accounts are unaffected, and the published record — daily top 10, scorecard, CSV/JSON — stays free to read with no account.",
