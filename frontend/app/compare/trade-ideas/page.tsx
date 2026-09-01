@@ -88,7 +88,7 @@ const FAQ: CompareFaq[] = [
   },
   {
     q: "Can I trial Tapeline before paying?",
-    a: "Reading it, yes — the daily Top 10, the full scorecard and the raw CSV/JSON record are free with no account. Running the signed-in scanner takes a card: a new account adds one at first sign-in, which starts the 14-day Premium trial — $0 charged that day, first charge on day 14, cancel in one click before then. Trade Ideas offers a free 7-day trial that also requires a card on file.",
+    a: "Reading it, yes — the daily Top 10, the full scorecard and the raw CSV/JSON record are free with no account. Signing up takes an email and a password, and the scanner opens on the free plan: live data, the top ten scored rows of any scan, one saved screen. A card is what starts the 14-day Premium trial — every matching row rather than the first ten, plus alerts, CSV export and the Congressional and insider feeds — $0 charged that day, first charge on day 14, cancel in one click before then. Trade Ideas offers a free 7-day trial that also requires a card on file.",
   },
   {
     q: "Should I use both?",

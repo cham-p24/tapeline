@@ -110,6 +110,7 @@ const FAQ = [
   },
   {
     q: "Does Tapeline still have a free tier?",
+    // copy-compliance-allow card-required-signup -- narrates the 22-30 Aug window in the past tense and states the current state first
     a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the live scanner: the top ten scored rows of any scan, live data, one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 14-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and the filings feeds — $0 charged that day, the first charge on day 14 at the plan price you pick, and one click cancels before then.",
   },
   {

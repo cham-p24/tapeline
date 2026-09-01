@@ -1,18 +1,31 @@
 # Brand SERP Kit — paste-ready off-site copy + launch pitch
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-08-30. Check every claim below against `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the live scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 14-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and the Congressional and insider
+> feeds.
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> The **published record is free with no account at all**: the daily Top 10, the
+> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History, because this block said the opposite for eight days: #548
+> (2026-08-22) put a card wall in front of the logged-in product, and #683
+> (2026-08-30) removed
+> it. #686 corrected 79 claims across 42 files — but not this file, because
+> `docs/**` was outside the copy linter's include globs, so the four paste-ready
+> copy banks kept regenerating the false claim from this very instruction. They
+> are named in `scripts/copy-compliance.allow.json` now, and rule
+> `card-required-signup` fails the build on it._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -97,7 +110,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   | Headquarters | Melbourne, Victoria, Australia |
   | Funding | Bootstrapped — no external investment |
   | Pricing | Public record free, no account required · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
-  | Free trial | 14-day Premium — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, one-click cancel. The published record (daily Top 10, full scorecard, raw CSV/JSON) needs no account at all |
+  | Free trial | 14-day Premium — a card starts it, $0 charged that day, first charge on day 14, one-click cancel. Signing up itself takes only an email and a password and opens the free plan. The published record (daily Top 10, full scorecard, raw CSV/JSON) needs no account at all |
   | Universe | ~2,500 active US tickers (top by daily $-volume) · 5,757 tracked |
   | Update cadence | Sub-60 seconds during US market hours |
   | Press contact | press@tapeline.io |
@@ -187,7 +200,7 @@ bottom of Part A.
 
   It's descriptive, not advice — six labels, no buy/sell language. The public
   record is the real product and is readable with no account and no card; the
-  signed-in product takes a card at first sign-in and starts the 14-day Premium
+  signed-in product opens on the free plan with an email and a password; a card starts the 14-day Premium
   trial — $0 today, first charge at day 14, one click to cancel.
   Would genuinely
   love feedback on the scoring methodology: https://tapeline.io/how-it-works
@@ -390,6 +403,7 @@ time.
 ## Voice guardrails (legal-critical — applies to every word above)
 
 - **Descriptive, never prescriptive.** Never "buy", "sell", "you should",
+<!-- copy-compliance-allow performance-claim -- this line IS the prohibition list; it quotes the banned phrases in order to ban them -->
   "recommend", "best pick". Use the score, the label, the data.
 - **No performance promises or return guarantees.** The scorecard shows realized
   results, framed as a record, never a forecast.

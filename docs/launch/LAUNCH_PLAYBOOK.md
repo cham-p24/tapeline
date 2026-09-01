@@ -1,18 +1,31 @@
 # Tapeline Launch Playbook
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-08-30. Check every claim below against `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the live scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 14-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and the Congressional and insider
+> feeds.
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> The **published record is free with no account at all**: the daily Top 10, the
+> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History, because this block said the opposite for eight days: #548
+> (2026-08-22) put a card wall in front of the logged-in product, and #683
+> (2026-08-30) removed
+> it. #686 corrected 79 claims across 42 files — but not this file, because
+> `docs/**` was outside the copy linter's include globs, so the four paste-ready
+> copy banks kept regenerating the false claim from this very instruction. They
+> are named in `scripts/copy-compliance.allow.json` now, and rule
+> `card-required-signup` fails the build on it._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -65,7 +78,7 @@ The thing I care most about: a public scorecard. Every day I log the top 10 name
 Free tier: top-10 rows, live, 12 ticker look-ups a day, 5-name watchlist.
 Pro $9.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
 Premium $19.99/mo: + Congress trades, insider Form 4 activity.
-14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+14-day Premium trial — a card starts it, $0 charged that day, first charge on day 14, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED. Deployed on Fly.io.
 
@@ -144,7 +157,7 @@ What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
 - + Recent insider buys (SEC Form 4) across the active universe
 
-14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+14-day Premium trial — a card starts it, $0 charged that day, first charge on day 14, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
 
 Try it on any ticker you like — `tapeline.io/t/AAPL`, `tapeline.io/t/NVDA`, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 
@@ -234,7 +247,7 @@ Pro $9.99/mo: full ~2,500-ticker live scan + smart watchlist alerts + IPO/earnin
 
 Premium $19.99/mo: + Congress trades + SEC Form 4 insider buys.
 
-14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+14-day Premium trial — a card starts it, $0 charged that day, first charge on day 14, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
 
 5/ Three things I care about most:
 
