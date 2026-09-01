@@ -193,6 +193,40 @@ def test_every_event_name_used_in_the_app_is_declared():
     )
 
 
+def test_every_declared_event_is_actually_wired_up():
+    """The direction the first version of this file MISSED.
+
+    Its sibling above checks used ⊆ declared, which catches a typo at a call
+    site. It does not catch the opposite and equally silent failure: an event
+    declared in FUNNEL_EVENTS that nothing ever emits. That shipped — three of
+    the four declared events had no call site at all, so the shadow log could
+    only ever contain `scan_run` and the other three columns would have read
+    zero forever while looking like real measurements.
+
+    A zero that means "nobody did this" and a zero that means "nothing records
+    this" are indistinguishable in a report, which is the whole reason this
+    table exists. So both directions are pinned.
+    """
+    import re
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parents[1] / "app"
+    used: set[str] = set()
+    for path in app_dir.rglob("*.py"):
+        for m in re.finditer(
+            r'record_funnel_event\(\s*[^,]+,\s*"([a-z_]+)"',
+            path.read_text(encoding="utf-8"),
+        ):
+            used.add(m.group(1))
+
+    unwired = set(FUNNEL_EVENTS) - used
+    assert not unwired, (
+        f"these events are declared but nothing emits them, so their counts "
+        f"will read zero forever and look like a real measurement: "
+        f"{sorted(unwired)}. Either wire them up or remove them."
+    )
+
+
 @pytest.mark.asyncio
 async def test_a_logging_failure_never_breaks_the_caller():
     """It runs on the hot path of ordinary successful requests."""

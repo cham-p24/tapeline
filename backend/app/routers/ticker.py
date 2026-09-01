@@ -593,6 +593,13 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                     },
                 )
             lookups_payload = _lookup_meter_payload(meter)
+
+            # An allowed lookup, i.e. a real ticker view by a signed-in user.
+            # Placed AFTER the 402 branch above so a refusal is recorded as a
+            # cap hit and not also as a view — the two mean opposite things.
+            from app.services.funnel_events import record_funnel_event
+
+            await record_funnel_event(user, "ticker_view")
             # Activation (Growth Playbook §4.2): viewing a ticker's full six-factor
             # breakdown IS the core "aha" — seeing WHY a stock scores what it does —
             # so it counts as activation, not only a watchlist add. Anonymous SSR

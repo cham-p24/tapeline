@@ -27,6 +27,7 @@ from app.db import get_session
 from app.models import ScannerPreset, User
 from app.services.auth import current_user_required
 from app.services.cap_events import record_cap_hit
+from app.services.funnel_events import record_funnel_event
 from app.services.tier import Tier, effective_limit
 
 router = APIRouter()
@@ -110,6 +111,11 @@ async def create_preset(
     session.add(p)
     await session.commit()
     await session.refresh(p)
+
+    # A saved screen is the object the card ask is about: someone who built and
+    # named one is a different conversation from someone asked to buy an
+    # abstraction. Recorded after the commit so it only fires on a real save.
+    await record_funnel_event(user, "screen_saved")
     return {
         "id": p.id,
         "name": p.name,
