@@ -2104,7 +2104,10 @@ def _winback_scorecard_line(scorecard: dict | None) -> str:
     if hit is not None:
         bits.append(f"{round(hit)}% of calls beat SPY")
     if alpha is not None:
-        bits.append(f"{'+' if alpha >= 0 else ''}{alpha:.2f}% avg next-day alpha")
+        # "median", not "avg": the value handed in is the median either way (the
+        # fallback key list already preferred median_alpha_vs_spy), so the old
+        # label printed the median UNDER the word average.
+        bits.append(f"{'+' if alpha >= 0 else ''}{alpha:.2f}% median next-day alpha")
     if best and best.get("symbol") and isinstance(best.get("alpha"), (int, float)):
         a = float(best["alpha"])
         bits.append(f"best call {best['symbol']} {'+' if a >= 0 else ''}{a:.2f}% vs SPY")
@@ -3237,10 +3240,21 @@ async def trial_summary_for_user(session, user) -> dict | None:
             100.0 * sum(1 for p in scored if (p.alpha_vs_spy or 0) > 0) / len(scored)
             if scored else None
         )
-        avg_alpha = (
-            sum(p.alpha_vs_spy or 0 for p in scored) / len(scored)
-            if scored else None
-        )
+        # MEDIAN, via the same helper /api/scorecard uses — not a mean.
+        #
+        # This was `sum(alpha) / len(scored)`: an arithmetic mean with no outlier
+        # filter. On the live record that reads +3.58% while the MEDIAN pick is
+        # -0.272% — a handful of big winners drag the average positive while the
+        # typical pick trails SPY. Emailing the mean told subscribers the picks
+        # beat the market when the honest reading is that they do not, from the one
+        # company whose whole pitch is that it does not misstate things.
+        #
+        # The public API already filters outliers (±50%) and reports the median.
+        # Two methodologies for one record is the same defect as two composite
+        # definitions: the website and the email disagreed about the same picks.
+        from app.routers.scorecard import _summary_stats
+
+        avg_alpha = _summary_stats(scored).get("median_alpha_vs_spy") if scored else None
         best_pick = None
         if scored:
             b = max(scored, key=lambda p: p.alpha_vs_spy or 0)
@@ -3731,7 +3745,7 @@ def render_weekly_market_digest(
             sign = "+" if aa >= 0 else ""
             col = SIG_BULL if aa >= 0 else SIG_BEAR
             bits.append(
-                f'<li>Average alpha vs SPY: <span style="color:{col};font-weight:600;">{sign}{aa:.2f}%</span>.</li>'
+                f'<li>Median alpha vs SPY: <span style="color:{col};font-weight:600;">{sign}{aa:.2f}%</span>.</li>'
             )
         best = scorecard.get("best")
         if best and best.get("alpha") is not None:
@@ -3871,10 +3885,21 @@ async def _build_newsletter_payload(session) -> dict:
                 100.0 * sum(1 for p in scored if (p.alpha_vs_spy or 0) > 0) / len(scored)
                 if scored else None
             )
-            avg_alpha = (
-                sum(p.alpha_vs_spy or 0 for p in scored) / len(scored)
-                if scored else None
-            )
+            # MEDIAN, via the same helper /api/scorecard uses — not a mean.
+            #
+            # This was `sum(alpha) / len(scored)`: an arithmetic mean with no outlier
+            # filter. On the live record that reads +3.58% while the MEDIAN pick is
+            # -0.272% — a handful of big winners drag the average positive while the
+            # typical pick trails SPY. Emailing the mean told subscribers the picks
+            # beat the market when the honest reading is that they do not, from the one
+            # company whose whole pitch is that it does not misstate things.
+            #
+            # The public API already filters outliers (±50%) and reports the median.
+            # Two methodologies for one record is the same defect as two composite
+            # definitions: the website and the email disagreed about the same picks.
+            from app.routers.scorecard import _summary_stats
+
+            avg_alpha = _summary_stats(scored).get("median_alpha_vs_spy") if scored else None
             best = None
             if scored:
                 b = max(scored, key=lambda p: p.alpha_vs_spy or 0)
