@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
-import { SCORED_TICKERS } from "@/lib/universe";
+import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
 
 function renderPage() {
   return render(
@@ -68,11 +68,15 @@ describe("SeoFeaturePage CTA", () => {
     expect(cta).toMatch(/first charge/i);
   });
 
-  it("takes the ticker count from lib/universe and never hardcodes ~2,500", () => {
-    renderPage();
-    const body = document.body.textContent ?? "";
-    expect(body).toContain(SCORED_TICKERS.toLocaleString("en-US"));
-    expect(body).not.toMatch(/2,500/);
+  it("takes the ticker count from lib/universe, and states the ACTIVE set", () => {
+    const { container } = renderPage();
+    const cta = ctaSection(container).textContent ?? "";
+    // 2,500 is correct: it mirrors backend ACTIVE_UNIVERSE_SIZE. This test
+    // previously asserted the ABSENCE of "2,500" and pinned a false claim
+    // into place - a COUNT(*) of score-bearing rows counts ~3,600 sheet-fed
+    // rows that carry no volume and are not actively scored.
+    expect(cta).toContain(ACTIVE_SCORED_TICKERS.toLocaleString("en-US"));
+    expect(cta).toMatch(/actively scored/i);
   });
 
   it("still links signup with the message-match ?from= slug", () => {
