@@ -113,7 +113,7 @@ Seven exposures found independently across four sessions. The Massive vendor key
 
 # 9 — Engineering (capped ≤1 day/week, gated on 6 interviews)
 
-- [ ] **Feed-coverage audit** — one query: which top-500 US names by dollar volume have no price/volume read on prod, grouped by cause. **This is the one item allowed to jump the interview gate** if the cause is a mapping bug
+- [x] **Feed-coverage audit DONE, and the bug it found is FIXED** (#696 audit, #698 fix, 2026-08-30). Not a licence or mapping problem: `_refresh_aggregates` ranked on the column it populates, so coverage froze alphabetically — A 94% down to Y/Z 0%, 72.2% of the universe with no volume. Fixed with a 60/40 exploit/explore split and `tickers.last_aggregates_at` (migration 0062). Full coverage lands ~9 days from 2026-08-30
 - [ ] **[gate]** Positioning + hero rewrite, using the customers' own words
 - [ ] **[gate]** Remaining activation code — pre-armed alert on the seeded name, 3-item checklist, T+0 founder welcome
 - [ ] **[gate]** Ruler-lite — `core_action_at`, `churn_events` + reason taxonomy + reactivation stamp, the saved weekly SQL
@@ -124,10 +124,12 @@ Seven exposures found independently across four sessions. The Massive vendor key
 
 # 10 — Housekeeping
 
+- [x] **Liquidity floor added** (#704, 2026-08-30) — scanner $50k and scorecard $250k both raised to **$1M**, and both moved off `Ticker.volume` (the session's RUNNING total, which made the same ticker fail at 10am and pass at 4pm) onto `avg_volume_30d`. Live: `total_matched` 2,390 to 1,849; CRWD in, CHCI/CIX out. Null reads still kept — load-bearing until coverage fills in
+- [x] **Random-returns regression guard ported** (#696, 2026-08-30) — `change_pct_5d`/`change_pct_1m` were `random.gauss` draws in production. The forward fix was on main; its test was orphaned on a branch whose migration id is now taken. Verified failing against the reintroduced bug before landing
 - [x] **CLAUDE.md corrected** (2026-08-30) — it still described the card wall as live and Free as having 2 web-push alerts. Both false since #683/#686
-- [ ] Stale docs still to fix: `PRICING_ANALYSIS_2026-08.md` ("Free — no card, forever"), `finance/spend-policy.md` ("Paid ads: PAUSED" — Meta is live), `operator-role-and-session-map.md` (Premium $39.99 + FOUNDERFRIENDS 50%), `docs/PRICING.md`
+- [x] **Stale docs fixed** (2026-08-30) — `PRICING_ANALYSIS_2026-08.md` ("Free — no card, forever"), `finance/spend-policy.md` ("Paid ads: PAUSED" — Meta is live), `operator-role-and-session-map.md` (Premium $39.99 + FOUNDERFRIENDS 50%), `docs/PRICING.md`
 - [ ] **`C:\Tapeline` is not a git repository.** `CHROME_STORE_LISTING.md` — which is needed for the extension submission — plus the audit dumps live there untracked and unbacked-up
-- [ ] 368 remote branches, ~204 with unmerged commits. Most of the agent fleet's output never landed
+- [x] **Branches pruned** (2026-08-30) — 369 to 9. Every one deleted was the head ref of a merged PR, so the content is in `main` and GitHub still serves them from their PR pages. The 9 survivors carry genuinely unmerged commits
 - [ ] **Audit/Bugs session** — resume or close. It ends mid-sentence on *"I need to correct something I told you"* with a defect sweep that never reported
 - [ ] Recovery email to the 3 users who hit the trial-decline trapdoor on 27–28 Aug — drafted, held for founder sign-off (see `docs/drafts/`)
 
