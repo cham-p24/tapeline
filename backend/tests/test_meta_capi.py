@@ -44,8 +44,8 @@ class _Capture:
     async def __aexit__(self, *a):
         return False
 
-    async def post(self, url, params=None, json=None):
-        _Capture.calls.append({"url": url, "params": params, "json": json})
+    async def post(self, url, params=None, json=None, headers=None):  # headers: token moved out of the query string
+        _Capture.calls.append({"url": url, "params": params, "json": json, "headers": headers})
 
         class _R:
             status_code = 200
@@ -218,13 +218,28 @@ async def test_start_trial_is_its_own_event(configured, capture):
 
 # ── request shape ────────────────────────────────────────────────────────────
 
-async def test_posts_to_pinned_version_with_token_as_param(configured, capture):
+async def test_posts_to_pinned_version_with_token_in_the_auth_header(configured, capture):
+    """The token travels in a header, never in the URL or the body.
+
+    This test previously asserted the OPPOSITE - that the token was a query
+    param - and so actively pinned the leak in place. httpx logs full request
+    URLs at INFO and app/main.py sets INFO globally, so the query-string form
+    wrote a 208-character Meta access token into the application log on every
+    conversion. Same mechanism that published the Massive key 1,086 times in
+    public CI logs on 2026-08-27.
+
+    Meta accepts Authorization: Bearer - verified against the live endpoint from
+    the production machine on 2026-09-01, which returned an identical response
+    for header auth and query-string auth.
+    """
     await meta_capi.track_start_trial(user_id="u_1")
     call = capture.calls[0]
     assert meta_capi.GRAPH_API_VERSION in call["url"]
     assert call["url"].endswith("/123456789/events")
-    # Token as a query param, never in the JSON body.
-    assert call["params"] == {"access_token": "tok_test"}
+    assert call["headers"] == {"Authorization": "Bearer tok_test"}
+    # And nowhere it could be logged or serialised.
+    assert "tok_test" not in call["url"]
+    assert "tok_test" not in str(call["params"])
     assert "tok_test" not in str(call["json"])
 
 
