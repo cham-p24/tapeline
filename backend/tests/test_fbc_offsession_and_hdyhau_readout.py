@@ -39,8 +39,16 @@ class _Capture:
     async def __aexit__(self, *a):
         return False
 
-    async def post(self, url, params=None, json=None):
-        _Capture.calls.append({"url": url, "params": params, "json": json})
+    async def post(self, url, params=None, json=None, headers=None):
+        # `headers` is not optional decoration. The Meta access token moved out
+        # of the query string and into an Authorization header, and a stub whose
+        # signature only accepted `params` raised TypeError on the real call -
+        # the same "mock accepts a shape the vendor does not" trap that hid the
+        # #635 checkout outage for 37 days. Record both so a regression back to
+        # a query-string token is visible to any assertion here.
+        _Capture.calls.append(
+            {"url": url, "params": params, "json": json, "headers": headers}
+        )
 
         class _R:
             status_code = 200

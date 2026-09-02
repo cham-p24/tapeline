@@ -133,3 +133,61 @@ def test_every_vendor_request_actually_passes_headers():
         assert "auth_headers" in code, (
             f"{module} dropped the query-param key but never added the header"
         )
+
+
+# ---------------------------------------------------------------------------
+# Meta Conversions API — the same leak, a different vendor.
+#
+# The rule above was written for Massive/Polygon and scoped to VENDOR_MODULES,
+# so `services/meta_capi.py` sat outside it and shipped the identical mistake:
+# `params={"access_token": token}`. Every conversion sent from production wrote
+# a 208-character Meta access token into the Fly logs, by the same mechanism
+# documented at the top of this file.
+#
+# Meta accepts `Authorization: Bearer <token>` — verified against the live
+# endpoint from the production machine on 2026-09-01, which returned the same
+# response for header auth as for the query-string form.
+#
+# Kept in THIS file rather than a new one because the failure is not
+# "polygon_feed regressed", it is "a new outbound integration copies the
+# query-string pattern". The next vendor belongs here too.
+# ---------------------------------------------------------------------------
+
+META_MODULE = "meta_capi.py"
+
+
+def test_meta_capi_does_not_put_the_access_token_in_a_query_param():
+    code = _code_only(SERVICES / META_MODULE)
+    assert "access_token" not in code, (
+        "meta_capi.py passes the Meta access token as a query parameter. httpx "
+        "logs full URLs at INFO and app/main.py sets INFO globally, so every "
+        "conversion event writes the token into the application log. Send it as "
+        'headers={"Authorization": f"Bearer {token}"} instead — Meta accepts it '
+        "and httpx does not log headers."
+    )
+
+
+def test_meta_capi_sends_the_token_as_a_bearer_header():
+    code = _code_only(SERVICES / META_MODULE)
+    assert "Authorization" in code and "Bearer" in code, (
+        "meta_capi.py must authenticate with an Authorization: Bearer header."
+    )
+
+
+def test_an_unconfigured_production_process_says_so_out_loud():
+    """A missing key must never be a silent no-op in production.
+
+    On 2026-08-31 a signup from a paid Meta ad reported no conversion because
+    the process serving it had no META_* in its environment. The code logged
+    that at DEBUG, Meta reported no error, and the only symptom was an ad
+    account optimising toward a conversion it had never observed. The event was
+    unrecoverable; the silence is what made it unfindable for two days.
+    """
+    code = _code_only(SERVICES / META_MODULE)
+    assert "APP_ENV" in code, (
+        "meta_capi must branch on APP_ENV so an unconfigured PRODUCTION process "
+        "warns instead of no-oping at debug level."
+    )
+    assert "logger.warning" in code, (
+        "the unconfigured branch must be able to log at warning, not only debug."
+    )

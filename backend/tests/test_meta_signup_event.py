@@ -71,7 +71,7 @@ class _Capture:
     async def __aexit__(self, *a):
         return False
 
-    async def post(self, url, params=None, json=None):
+    async def post(self, url, params=None, json=None, headers=None):  # headers: token moved out of the query string
         _Capture.calls.append({"url": url, "params": params, "json": json})
 
         class _R:

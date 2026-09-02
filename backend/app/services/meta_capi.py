@@ -225,8 +225,26 @@ async def send_event(
     """
     creds = _credentials()
     if creds is None:
-        # Silent no-op: the common case until the operator sets the secrets.
-        logger.debug("meta_capi.unconfigured event=%s", event_name)
+        # Silent in dev (the common case until the operator sets the secrets),
+        # LOUD in production.
+        #
+        # This line cost real money. On 2026-08-31 a signup that arrived from a
+        # paid Meta ad produced no CompleteRegistration, because the process
+        # serving it had no META_* in its environment. At debug level the app
+        # said nothing, Meta reported no error, and the only visible symptom was
+        # an ad account optimising toward a conversion it had never once
+        # observed - which is what a ~5x CPM buys you. The event is gone; the
+        # silence is what made it unfindable.
+        if (os.getenv("APP_ENV") or "").lower() == "production":
+            logger.warning(
+                "meta_capi.unconfigured event=%s - META_PIXEL_ID/"
+                "META_CAPI_ACCESS_TOKEN missing in THIS process. Ad conversion "
+                "not reported. Check every machine, not just one: "
+                "fly ssh console --machine <id> -C 'printenv META_PIXEL_ID'",
+                event_name,
+            )
+        else:
+            logger.debug("meta_capi.unconfigured event=%s", event_name)
         return False
     pixel_id, token = creds
 
@@ -276,7 +294,7 @@ async def send_event(
         async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
             resp = await client.post(
                 f"https://graph.facebook.com/{GRAPH_API_VERSION}/{pixel_id}/events",
-                params={"access_token": token},
+                headers={"Authorization": f"Bearer {token}"},
                 json=payload,
             )
         if resp.status_code >= 300:
