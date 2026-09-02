@@ -44,9 +44,38 @@ def test_trial_start_is_not_wired_to_the_paid_receipt():
 
 
 def test_conversion_from_trial_sends_the_paid_receipt():
-    """trialing -> active is the first real charge; it must be captured."""
-    assert "prior_status" in WEBHOOKS
-    assert 'prior_status == "trialing" and p["status"] == "active"' in WEBHOOKS
+    """A trial's first real charge must be captured — INCLUDING when the first
+    card attempt is declined.
+
+    This used to assert the literal source string
+        prior_status == "trialing" and p["status"] == "active"
+    which pinned the implementation rather than the behaviour, and pinned a
+    BUGGY one: Stripe retries a declined first charge for days, so a converting
+    trial commonly goes trialing -> past_due -> active. By the time it reached
+    active the prior status was past_due, so the receipt and the founder's
+    revenue alert both stayed silent on a sale that had completed.
+
+    `is_paid_start` now latches "has this subscription EVER been active",
+    reusing the stripe_webhook_events idempotency table. The behavioural cases
+    live in test_billing_edge_cases.py; this keeps the wiring assertion that
+    belongs with the rest of the lifecycle.
+    """
+    assert "is_paid_start" in WEBHOOKS
+    assert "paid_start:" in WEBHOOKS, "the first-charge latch is gone"
+
+    # The bug, pinned shut. Checked against EXECUTABLE source only: WEBHOOKS is
+    # the raw file, and the comment explaining why prior_status was removed
+    # necessarily contains the words "prior_status". Asserting on raw text
+    # failed against that comment — the same class of mistake as a test passing
+    # against its own prose, just pointing the other way.
+    import ast
+    import textwrap
+
+    executable = ast.unparse(ast.parse(textwrap.dedent(WEBHOOKS)))
+    assert "prior_status" not in executable, (
+        "prior_status is back — a trial converting through a declined first "
+        "attempt arrives at active with prior_status == 'past_due'"
+    )
 
 
 def test_cancel_during_trial_is_confirmed_as_no_charge():

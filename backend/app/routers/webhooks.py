@@ -392,12 +392,11 @@ async def stripe_webhook(
         # Upsert subscription
         sub_result = await session.execute(select(Subscription).where(Subscription.id == p["id"]))
         existing = sub_result.scalar_one_or_none()
-        # Snapshot the status BEFORE the upsert overwrites it. A card-required
-        # trial converting to paid is a trialing -> active transition, and that
-        # moment is the customer's first real charge — the only honest place to
-        # send the paid receipt. Without this we cannot tell it apart from any
-        # other .updated event.
-        prior_status = existing.status if existing else None
+        # No prior-status snapshot here any more. It used to exist so the paid
+        # receipt could fire on a trialing -> active transition, but that misses
+        # a trial whose first charge is declined (trialing -> past_due ->
+        # active) and misfires on ordinary dunning recovery. `is_paid_start`
+        # below latches "has this subscription ever been active" instead.
         if existing:
             existing.status = p["status"]
             # Skip the tier write on an unknown price — keep what we last knew.
@@ -628,11 +627,44 @@ async def stripe_webhook(
         # precisely the "first time we ever saw this subscription" condition
         # these emails want.
         is_trial_start = (existing is None and p["status"] == "trialing")
-        # The first REAL charge: either a straight purchase, or a trial that
-        # just converted (trialing -> active on an .updated event).
-        is_paid_start = (
-            existing is None and p["status"] == "active"
-        ) or (prior_status == "trialing" and p["status"] == "active")
+        # The first REAL charge on this subscription.
+        #
+        # NOT `prior_status == "trialing"`. That reads the IMMEDIATELY PRIOR
+        # status, and a trial whose first charge is declined converts as
+        #     trialing -> past_due -> active
+        # so by the time it reaches active the prior status is past_due and the
+        # customer got no receipt while the founder got no revenue alert — for
+        # a sale that did complete, just not on the first card attempt. Stripe
+        # retries for days, so this is an ordinary outcome, not an edge case.
+        #
+        # The honest question is "has this subscription EVER been active
+        # before", which the row cannot answer: it stores only the last status.
+        # So latch it, reusing the stripe_webhook_events idempotency table the
+        # ga4_purchase claim already uses — same mechanism, no migration.
+        #
+        # This also fixes the reverse error. `past_due -> active` on an
+        # established subscription is ordinary dunning RECOVERY, not a new
+        # sale; it already has its own email (render_payment_recovered_email).
+        # A naive "prior_status in (trialing, past_due)" would have sent a
+        # fresh receipt and pinged the founder about new revenue every time a
+        # long-standing subscriber's card recovered.
+        is_paid_start = False
+        if p["status"] == "active":
+            paid_latch = f"paid_start:{p['id']}"[:80]
+            already = await session.execute(
+                select(StripeWebhookEvent).where(StripeWebhookEvent.id == paid_latch)
+            )
+            if already.scalar_one_or_none() is None:
+                try:
+                    session.add(
+                        StripeWebhookEvent(id=paid_latch, event_type="paid_start")
+                    )
+                    await session.flush()
+                    is_paid_start = True
+                except Exception:
+                    # A concurrent delivery claimed it; that one sends.
+                    await session.rollback()
+                    logger.info("stripe.paid_start_claim_lost sub=%s", p["id"])
 
         if is_trial_start and user.email:
             try:
@@ -871,11 +903,35 @@ async def stripe_webhook(
             else:
                 try:
                     from app.services.email import render_payment_failed_email, send_email
+
+                    # Is this the charge at the END OF A TRIAL rather than a
+                    # renewal? Stripe cannot tell us directly — the invoice for
+                    # a trial converting carries billing_reason
+                    # "subscription_cycle", exactly like an ordinary renewal.
+                    # But the first charge lands ON trial_ends_at by
+                    # construction, so a trial that ended within the retry
+                    # window is a reliable local signal.
+                    #
+                    # The window is generous because Stripe retries over
+                    # several days and this email is sent per attempt; the cost
+                    # of being slightly wide is calling a genuine renewal a
+                    # first charge for one account that started paying days
+                    # ago, which is far cheaper than telling someone who has
+                    # never paid that their "renewal" failed.
+                    first_charge = False
+                    ends = getattr(user, "trial_ends_at", None)
+                    if ends is not None:
+                        if ends.tzinfo is None:
+                            ends = ends.replace(tzinfo=UTC)
+                        age = datetime.now(UTC) - ends
+                        first_charge = timedelta(0) <= age <= timedelta(days=14)
+
                     html = render_payment_failed_email(
                         user.name or "trader",
                         tier=user.tier or "Pro",
                         attempt_count=attempt_count,
                         final_attempt=final_attempt,
+                        first_charge=first_charge,
                     )
                     subject = (
                         "Action needed: your Tapeline access is about to lapse"
