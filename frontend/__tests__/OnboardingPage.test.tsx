@@ -57,6 +57,17 @@ const gtag = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/gtag", () => gtag);
 
+// Meta pixel's browser-side conversion. Resolves to an event id to mimic a
+// CONFIRMED dispatch; a null return means "pixel off or blocked", which the
+// page must treat as not-yet-sent rather than done.
+const metaConv = vi.hoisted(() => ({
+  trackMetaCompleteRegistration: vi.fn(
+    (..._args: unknown[]): Promise<string | null> =>
+      Promise.resolve("signup.deadbeef"),
+  ),
+}));
+vi.mock("@/lib/metaConversions", () => metaConv);
+
 /** Captures every POSTed onboarding body; `fail` makes the POST reject. */
 function stubFetch(opts: { fail?: boolean; status?: number } = {}) {
   const posts: Array<Record<string, unknown>> = [];
@@ -92,6 +103,12 @@ beforeEach(() => {
   routerSpies.refresh.mockClear();
   gtag.trackEvent.mockClear();
   gtag.trackEventOnce.mockClear();
+  metaConv.trackMetaCompleteRegistration.mockClear();
+  try {
+    window.localStorage.clear();
+  } catch {
+    /* jsdom always has it; guard matches the page */
+  }
 });
 
 afterEach(() => {
@@ -292,5 +309,82 @@ describe("OnboardingPage OAuth conversion", () => {
       "start_trial",
       expect.anything(),
     );
+  });
+});
+
+
+/* ------------------------------------------------------------------ *
+ * Meta CompleteRegistration on the OAuth path.
+ *
+ * The browser copy of this event lived ONLY on the /signup form submit, which
+ * an OAuth signup never touches — it leaves for the provider and returns via
+ * the callback. As of 2026-09-02 every account that has ever put a card on
+ * Tapeline signed up with Google, so the browser copy had never fired for a
+ * single real customer and the server copy was carrying it with no fallback.
+ * When that copy silently dropped, the conversion was gone and the ad account
+ * kept optimising toward an event it had never seen.
+ * ------------------------------------------------------------------ */
+describe("OnboardingPage Meta conversion", () => {
+  it("fires CompleteRegistration for a new OAuth signup, keyed on the user id", async () => {
+    nav.search = new URLSearchParams("oauth=1");
+    session.user = { id: "u_abc123", onboarding_completed_at: null };
+    stubFetch();
+    render(<OnboardingPage />);
+    await waitFor(() =>
+      expect(metaConv.trackMetaCompleteRegistration).toHaveBeenCalled(),
+    );
+    expect(metaConv.trackMetaCompleteRegistration).toHaveBeenCalledWith({
+      userId: "u_abc123",
+      method: "oauth",
+    });
+  });
+
+  it("does NOT fire on the email path — /signup already sent it there", async () => {
+    nav.search = new URLSearchParams();
+    session.user = { id: "u_abc123", onboarding_completed_at: null };
+    stubFetch();
+    render(<OnboardingPage />);
+    await waitFor(() => expect(routerSpies.replace).toHaveBeenCalled());
+    expect(metaConv.trackMetaCompleteRegistration).not.toHaveBeenCalled();
+  });
+
+  it("waits for the session — never fires without a user id to key the event on", async () => {
+    // A shared event_id is the whole deduplication mechanism. Firing before the
+    // id resolves would send an unmatchable event AND double-count against the
+    // server copy.
+    nav.search = new URLSearchParams("oauth=1");
+    session.user = null;
+    session.loading = true;
+    stubFetch();
+    render(<OnboardingPage />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(metaConv.trackMetaCompleteRegistration).not.toHaveBeenCalled();
+  });
+
+  it("does not re-fire for a browser that already converted", async () => {
+    window.localStorage.setItem("tapeline_oauth_meta_conversion_fired", "1");
+    nav.search = new URLSearchParams("oauth=1");
+    session.user = { id: "u_abc123", onboarding_completed_at: null };
+    stubFetch();
+    render(<OnboardingPage />);
+    await waitFor(() => expect(routerSpies.replace).toHaveBeenCalled());
+    expect(metaConv.trackMetaCompleteRegistration).not.toHaveBeenCalled();
+  });
+
+  it("does not stamp the dedupe flag when the pixel is blocked", async () => {
+    // A null return means nothing was sent. Stamping the flag there would
+    // permanently lose the conversion on this browser — the same race that
+    // already cost the GA4 sign_up event once.
+    metaConv.trackMetaCompleteRegistration.mockResolvedValueOnce(null);
+    nav.search = new URLSearchParams("oauth=1");
+    session.user = { id: "u_abc123", onboarding_completed_at: null };
+    stubFetch();
+    render(<OnboardingPage />);
+    await waitFor(() =>
+      expect(metaConv.trackMetaCompleteRegistration).toHaveBeenCalled(),
+    );
+    expect(
+      window.localStorage.getItem("tapeline_oauth_meta_conversion_fired"),
+    ).toBeNull();
   });
 });
