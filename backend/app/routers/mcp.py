@@ -285,7 +285,14 @@ async def _tool_track_record(_args: dict, session: AsyncSession) -> dict:
     hit = summary.get("hit_rate_beat_spy")
     median = summary.get("median_alpha_vs_spy")
     return {
-        "entries_logged": summary.get("entries_scored"),
+        # These are two different numbers and the field names now mean what
+        # they say. `entries_logged` used to be fed `entries_scored` — the
+        # back-checked subset — so an AI assistant quoting this tool
+        # understated the record by every pick published since the last close.
+        # Every rate below is computed over `entries_back_checked`, which is
+        # why both are returned rather than one.
+        "entries_logged": summary.get("entries_logged"),
+        "entries_back_checked": summary.get("entries_scored"),
         "sessions_tracked": summary.get("days_tracked"),
         "tracking_since": summary.get("first_tracked_date"),
         "share_beat_spy_next_session_pct": (

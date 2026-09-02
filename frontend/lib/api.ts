@@ -309,6 +309,9 @@ export type WatchlistTrackRecordItem = {
   sector: string | null;
   summary: {
     days_tracked: number;
+    /** Picks published, back-checked or not. Optional: absent on
+     *  responses cached from before the field existed. */
+    entries_logged?: number | null;
     entries_scored: number;
     entries_excluded_outliers: number;
     avg_1d_return: number | null;
@@ -805,7 +808,7 @@ export const api = {
       };
     }>(`/api/heatmap${suffix}`);
   },
-  scorecard: (days = 30) => get<{ summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number }; days: Record<string, ScorecardEntry[]> }>(`/api/scorecard?days=${days}`),
+  scorecard: (days = 30) => get<{ summary: { days_tracked: number; entries_logged?: number | null; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number }; days: Record<string, ScorecardEntry[]> }>(`/api/scorecard?days=${days}`),
   popularTickers: (n = 8) => get<{ items: Array<{ symbol: string; name: string | null; sector: string | null; score: number | null }>; cached: boolean }>(`/api/scanner/popular?n=${n}`),
   scorecardSymbol: (symbol: string) => get<{
     summary: {

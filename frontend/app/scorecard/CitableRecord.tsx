@@ -1,4 +1,4 @@
-import { citableSentence, type CitableSummary } from "@/lib/scorecardCitation";
+import { citableSentence, loggedCount, type CitableSummary } from "@/lib/scorecardCitation";
 
 /**
  * The headline stats of the archive as STATIC server-rendered HTML.
@@ -25,6 +25,7 @@ export function CitableRecord({ summary }: { summary: CitableSummary }) {
   // The denominator the aggregates were computed over — scored rows minus
   // data-quality exclusions. Disclosed inline, same as the summary table.
   const n = Math.max(summary.entries_scored - summary.entries_excluded_outliers, 0);
+  const logged = loggedCount(summary);
   const median =
     summary.median_alpha_vs_spy == null
       ? "—"
@@ -53,8 +54,17 @@ export function CitableRecord({ summary }: { summary: CitableSummary }) {
           <dt className="text-muted">Market days tracked</dt>
           <dd className="nums font-medium text-fg">{summary.days_tracked}</dd>
         </div>
+        {/* Two rows, not one. The old single "Entries logged" row printed
+            entries_scored — the back-checked subset — so the count shown was
+            smaller than the number of picks actually published. */}
+        {logged != null && logged > summary.entries_scored && (
+          <div className="flex justify-between gap-4 sm:justify-start">
+            <dt className="text-muted">Entries logged</dt>
+            <dd className="nums font-medium text-fg">{logged}</dd>
+          </div>
+        )}
         <div className="flex justify-between gap-4 sm:justify-start">
-          <dt className="text-muted">Entries logged</dt>
+          <dt className="text-muted">Entries back-checked</dt>
           <dd className="nums font-medium text-fg">{summary.entries_scored}</dd>
         </div>
         <div className="flex justify-between gap-4 sm:justify-start">

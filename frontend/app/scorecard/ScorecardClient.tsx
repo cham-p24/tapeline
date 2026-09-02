@@ -53,7 +53,7 @@ export function ScorecardClient() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [data, setData] = useState<{
-    summary: { days_tracked: number; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number };
+    summary: { days_tracked: number; entries_logged?: number | null; entries_scored: number; entries_excluded_outliers: number; avg_1d_return: number | null; median_1d_return: number | null; avg_alpha_vs_spy: number | null; median_alpha_vs_spy: number | null; hit_rate_beat_spy: number | null; is_delayed: boolean; delay_days: number };
     days: Record<string, ScorecardEntry[]>;
   } | null>(null);
 
@@ -387,6 +387,9 @@ function SummaryTable({
 }: {
   summary: {
     days_tracked: number;
+    /** Picks published, back-checked or not. Optional: absent on
+     *  responses cached from before the field existed. */
+    entries_logged?: number | null;
     entries_scored: number;
     entries_excluded_outliers: number;
     avg_1d_return: number | null;
@@ -408,7 +411,13 @@ function SummaryTable({
     {
       measure: "Sessions recorded",
       value: String(summary.days_tracked),
-      basis: `${summary.entries_scored} entries logged`,
+      // entries_scored is the BACK-CHECKED subset, which is the correct
+      // basis for every rate below it — but it was labelled "logged", a
+      // different and larger number. Both are named now.
+      basis:
+        summary.entries_logged != null && summary.entries_logged > summary.entries_scored
+          ? `${summary.entries_logged} logged, ${summary.entries_scored} back-checked`
+          : `${summary.entries_scored} entries back-checked`,
     },
     {
       measure: "Median 1-day change of ranked entries",
