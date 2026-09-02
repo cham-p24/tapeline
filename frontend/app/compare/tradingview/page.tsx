@@ -67,9 +67,17 @@ const TRADEOFFS: CompareTradeoff[] = [
   },
   {
     label: "Asset class breadth",
-    tapeline: "US equities + ETFs + select crypto/FX",
+    // Corrected 2026-09-03. This row claimed "select crypto/FX" and that "we
+    // add crypto and FX selectively". Neither has ever been true: there is no
+    // crypto or FX anywhere in the codebase, the vendor plan does not include
+    // either, and the six-factor model cannot score a token at all (no Form 4
+    // filings, no company fundamentals — ~45% of the composite weight would be
+    // a constant). The only crypto that ever reached production was 54 sheet
+    // rows that collided with real listings and published Solana's price under
+    // Emeren Group Ltd; they were deleted in #715.
+    tapeline: "US equities + ETFs",
     competitor: "Equities + crypto + FX + futures + bonds + economic data globally",
-    note: "TradingView covers everything tradeable on a chart globally. Tapeline scoring is US-equity-first; we add crypto and FX selectively where the multi-factor model translates.",
+    note: "TradingView covers everything tradeable on a chart globally. Tapeline is US-equity-and-ETF only, and scores every name in that universe on the same six factors.",
   },
   {
     label: "Cheapest paid tier",
