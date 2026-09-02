@@ -1,6 +1,12 @@
 # Lawyer consult — ready-to-send email
 
-Save this whole document. When you're ready to send, copy the email-body section into Gmail / Outlook / whatever you use, set the To: address, click send.
+*Rewritten 2026-09-02. The previous version was drafted pre-launch ("preparing
+to publicly launch in the next 1-2 weeks") and covered three questions. Tapeline
+is now live and has taken money, and four more compliance surfaces have shipped
+since. `SAAS_OPTIMISATION_PLAYBOOK.md` §5.1 item 5 lists six; all six are below.*
+
+**This is the oldest open critical item in the repo.** The original was never
+confirmed sent. Copy the email-body block, set the To: address, send.
 
 ---
 
@@ -8,108 +14,157 @@ Save this whole document. When you're ready to send, copy the email-body section
 
 **Firm**: Holley Nethercote Lawyers (Melbourne) — financial services compliance specialists
 **Site**: https://hnlaw.com.au/
-**General contact**: https://hnlaw.com.au/contact-us/ (use their contact form), or direct partner email if you know one
+**Contact**: https://hnlaw.com.au/contact-us/ (contact form), or a direct partner email if you have one
 
-**Why them**: Specialists in Australian financial services law (AFSL, ASIC, anti-hawking, financial product advice regulations). Cheaper than the big-firm equivalents and substantially more relevant than a generalist tech lawyer for a stock-scoring SaaS. Typical Tapeline-style descriptive-analytics review runs **AU$400–800**.
+**Why them**: specialists in Australian financial services law (AFSL, ASIC,
+anti-hawking, financial product advice). Cheaper than big-firm equivalents and
+far more relevant than a generalist tech lawyer for a stock-scoring SaaS.
+Expect **AU$400–800** for a review of this scope; more if the data-licensing
+question (item 1) turns out to need real work.
 
 ---
 
 ## Subject line
 
 ```
-Pre-launch compliance review — Tapeline (stock scoring SaaS, Melbourne-based)
+Compliance review — Tapeline (live stock-scoring SaaS, Melbourne sole trader)
 ```
 
 ---
 
-## Email body — paste this into the form / email client
+## Email body — paste this in
 
 ```
 Hi,
 
 I'm the founder of Tapeline (https://tapeline.io), a Melbourne-based
-stock-scoring SaaS that I'm preparing to publicly launch in the next
-1-2 weeks. Before that I'd like a compliance review from someone who
-specifically does financial services work in Australia, and Holley
-Nethercote was recommended.
+stock-scoring SaaS. It is live, has paying subscribers, and I'd like a
+compliance review from someone who does Australian financial services
+work specifically. Holley Nethercote was recommended.
 
 What Tapeline does, in one paragraph:
-We score every US-listed ticker with a single 0-100 composite from a
-6-factor model whose factor set and weight ordering are published
-(trend, relative strength, fundamentals, insider Form 4 transactions,
-macro regime, momentum); the exact weights and the parameter recipe are
-deliberately not published. Every top-10 daily pick is back-checked
-against SPY the next day on a public scorecard with no survivor-bias
-filtering. We deliberately use descriptive labels ("STRONG SETUP",
-"WEAK") instead of prescriptive ones ("BUY", "SELL"), and we don't take
-custody of money or hold an AFSL.
+We score US-listed tickers with a single 0-100 composite from a
+six-factor model whose factor set and weight ORDERING are published
+(trend, relative strength, fundamentals, insider Form 4 activity, macro
+regime, momentum); the exact weights and the parameter recipe are
+deliberately not published. Every daily top-10 is back-checked against
+SPY the following day on a public scorecard, with no survivor-bias
+filtering and restatements disclosed. We use descriptive labels
+("STRONG SETUP", "WEAK") rather than prescriptive ones ("BUY", "SELL"),
+we publish the same scores to every user, we do not personalise, we
+take no custody of money, and we hold no AFSL. The position I have
+taken is a publisher-style general-information posture. I want that
+posture tested, and six specific surfaces reviewed.
 
-What I'd like sign-off on before launch:
+1. DATA LICENSING — the one I am most worried about.
+   Our market data comes from Massive (formerly Polygon.io) on their
+   Starter plan and Finnhub on their free tier. Reading their terms, I
+   believe both are licensed for personal / non-business use, while I
+   am redistributing derived values (scores, and price/volume on public
+   pages) in a commercial subscription product and a public API. I want
+   to know: (a) how exposed I actually am, (b) whether derived scores
+   are distinguishable from redistributing the underlying data, and
+   (c) roughly what a commercial market-data licence costs so I can
+   decide whether the product is viable at my price point ($9.99-$19.99
+   a month). If the answer is "you must relicense", I would rather know
+   now at 30 customers than at 3,000.
 
-1. The "not investment advice" positioning. Our /legal/risk page
-   (https://tapeline.io/legal/risk) frames Tapeline as a "quantitative
-   data analysis tool" rather than a financial adviser. We rely on
-   descriptive labels + the public scorecard transparency + a
-   publisher-exemption framing (we're not personalising advice; we're
-   publishing the same scores to every user). I want a lawyer to
-   confirm this holds under ASIC RG 36 and the Corporations Act
-   s911A general advice exemptions.
+2. THE GENERAL-ADVICE POSITION.
+   Our /legal/risk page frames Tapeline as a quantitative data analysis
+   tool, not a financial adviser. We rely on descriptive-only labels,
+   full public accountability for the scores, and the fact that every
+   user sees identical output. Does this hold under ASIC RG 36 and the
+   Corporations Act s911A general-advice exemptions? I would like the
+   line drawn explicitly, because I turn features off when I am unsure
+   and I would rather turn fewer off.
 
-2. The current /legal/terms (https://tapeline.io/legal/terms) and
-   /legal/privacy (https://tapeline.io/legal/privacy) pages. They were
-   drafted by me using market-standard templates and need someone
-   qualified to red-line them. Privacy in particular: we're an
-   Australian operator with users worldwide, so GDPR + CCPA language
-   is wedged in and I want it tightened.
+3. A PER-USER PERFORMANCE RECORD.
+   One planned Premium feature freezes each ticker on a USER'S OWN
+   watchlist daily and back-checks it against SPY — so the output is a
+   performance record specific to the securities that user chose. The
+   sitewide scorecard is identical for everyone; this is not. My
+   instinct is that personalising the record moves it materially closer
+   to personal advice, so I have kept the feature dark pending your
+   answer. Is that instinct right?
 
-3. Customer terms around the scorecard. We publish a public daily
-   back-check of our top-10 picks vs SPY. I want to confirm the way
-   we frame this ("our scoring methodology's accountability layer",
-   not "guaranteed returns") doesn't create implied warranty exposure
-   under ACL.
+4. THE BROWSER EXTENSION.
+   We publish a Chrome/Edge extension that reads only the ticker symbol
+   from the browser's address bar (never the page contents) and shows
+   that ticker's Tapeline score in a small overlay. It can be enabled
+   on broker sites, which means our score can appear on the same screen
+   as a live order-entry form. Does proximity to the point of trade
+   change the character of what we are publishing?
 
-Business setup: Sole Trader (Chamara Piyatilaka, ABN to be confirmed),
-operating from Melbourne, Victoria. No staff, no investor money,
-bootstrap-funded.
+5. THE PUBLIC SCORECARD'S SUMMARY STATISTICS.
+   The scorecard page shows aggregate figures — hit rate, median
+   next-day alpha versus SPY, days tracked. These are historical and
+   we make no forward claim, but they are performance figures on a
+   public marketing surface. What framing keeps them safe, and is
+   there anything we must display alongside them?
 
-Budget for this scope: AU$400-1500 depending on what you find. I'm
-happy to do a fixed-fee engagement if that's easier than billable
-hours.
+6. TWO SMALLER ONES.
+   (a) We are considering a short post-signup survey asking how people
+       trade. We deliberately do NOT record any individual's capital,
+       holdings, experience level or risk tolerance, because collecting
+       suitability information sits badly with a no-advice posture. Is
+       any behavioural question safe, or is the safest answer none?
+   (b) Trademark: we trade as "Tapeline" at tapeline.io. There is an
+       unrelated tapelinehq.com. Worth a clearance search and a class
+       35/42 application, or not worth the spend at this size?
 
-Available for a 30-minute scoping call this week or next. Please let
-me know your availability and what background materials you'd want
-me to send through first (I can share full /legal docs, the technical
-how-it-works page, and our terms straight away).
+Also, and separately, our /legal/terms and /legal/privacy pages were
+drafted by me from market-standard templates and need a red-line. We
+are an Australian operator with users worldwide, so there is GDPR and
+CCPA language wedged in that I am not confident about.
+
+Business setup: sole trader, Melbourne. No staff, no investor money,
+bootstrapped. Revenue is currently a few subscriptions a month, so
+please scope accordingly — I would rather have a tight answer on items
+1, 2 and 3 than a broad review of everything.
+
+Budget: AU$400-1500, happy with a fixed fee. Available for a 30-minute
+scoping call any time. Tell me what you would like to see first and I
+will send it straight through.
 
 Thanks,
 Chamara Piyatilaka
 Founder, Tapeline
-chamara@tapeline.io
-+61 410 866 374
 https://tapeline.io
 ```
 
 ---
 
-## What to send alongside (if they ask for materials)
+## Send this from the real legal name
 
-Bundle and send as a follow-up after they reply:
+The public-facing identity for Tapeline outreach is "Christian Piyatilaka".
+**This email is the exception** — a lawyer engaging a sole trader needs the name
+on the ABN. Sign as Chamara, and use whichever address you actually read.
 
-- Links: `/legal/terms`, `/legal/privacy`, `/legal/risk`, `/legal/refund`, `/how-it-works`, `/scorecard`
-- Brief on the six factors (point them at /how-it-works, which is the public methodology; flag that the exact weights are deliberately unpublished)
-- Business address: 4 Aubergine Road, Mickleham VIC 3064
-- ABN status: confirm in your reply (if you have one, share it; if not, mention you're registering shortly)
+## What to send if they ask for materials
 
-## When to send
+- Links: `/legal/terms`, `/legal/privacy`, `/legal/risk`, `/legal/refund`,
+  `/how-it-works`, `/scorecard`, `/developers`
+- `docs/LICENSE_AUDIT.md` — the vendor-terms analysis behind item 1. This is the
+  single most useful attachment; it is the reason item 1 exists.
+- `docs/COMPLIANCE_COPY_RULES.md` — the nine copy rules already CI-enforced. It
+  shows the posture is operational, not aspirational, which shortens the review.
+- Business address and ABN status.
 
-Send it **now** if you can (Sunday/Monday is fine for solicitors' inboxes — they triage Monday morning). Worst case the response lands 24-48h later. Don't wait until you're ready to launch and then need overnight turnaround.
+## Why item 1 leads
 
-## What you should expect
+The other five are posture questions where the current answer is probably
+"you're fine, tighten this wording". Item 1 is the only one whose answer could
+be "the product as priced does not work" — the licence cost lands directly on a
+$9.99-$19.99 price point. It also has the longest lead time, because the vendor
+letters (`docs/drafts/vendor-data-rights-letters.md`) take 2-6 weeks to come
+back and that clock only starts when they are sent.
 
-1. Reply within 1-2 business days asking for materials + scope clarification
-2. 30-min discovery call (often free)
-3. Fixed-fee quote (AU$400-1500) for the scope above
-4. 5-10 business days for the actual review + redlines
-5. You re-deploy the lawyered-up `/legal/*` pages
+## Expected shape
 
-That timeline puts you 2-3 weeks out from green-light. Send the email today.
+1. Reply in 1-2 business days asking for scope + materials
+2. Free 30-minute discovery call
+3. Fixed-fee quote
+4. 5-10 business days for the review and red-lines
+
+Send it and the vendor letters on the same day. They run in parallel and both
+feed the same decision.
