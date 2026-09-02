@@ -20,6 +20,7 @@ import pytest
 from sqlalchemy import delete, func, select
 
 from app.db import SessionLocal, session_scope
+from app.services.tier import DISABLED_FEATURES as _DISABLED
 from app.main import app
 from app.models import (
     Ticker,
@@ -122,10 +123,16 @@ async def test_track_record_requires_premium(client, monkeypatch):
             r = await client.get("/api/watchlist/track-record", cookies=cookies)
             assert r.status_code == 403, f"{tier}: {r.text}"
 
+        # Premium too, since 2026-09-02: the feature is in
+        # tier.DISABLED_FEATURES, held dark at EVERY tier pending item 3 of
+        # docs/launch/LAWYER_CONSULT_EMAIL.md. A per-user next-day-vs-SPY
+        # record is specific to the securities that user chose, which moves it
+        # closer to a personalised performance record — and Tapeline holds no
+        # AFSL. This assertion used to be 200; flipping it back is a legal
+        # decision, not a test fix.
         _uid, cookies = await _signup(client, "premium")
         r = await client.get("/api/watchlist/track-record", cookies=cookies)
-        assert r.status_code == 200, r.text
-        assert r.json()["items"] == []  # premium, nothing watched yet
+        assert r.status_code == 403, r.text
 
 
 # ── Snapshot ─────────────────────────────────────────────────────────────────
@@ -267,6 +274,14 @@ def test_summary_for_rows_empty_is_zeroed():
 
 # ── Endpoint shape ───────────────────────────────────────────────────────────
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    "watchlist.track_record" in _DISABLED,
+    reason=(
+        "Held dark at every tier pending legal review (tier.DISABLED_FEATURES). "
+        "This payload-shape coverage is deliberately kept rather than deleted: "
+        "it is what proves the endpoint still works the day the flag is lifted."
+    ),
+)
 async def test_endpoint_returns_symbol_rows_and_summary(client, monkeypatch):
     _patch_signup_gates(monkeypatch)
     sym = f"TRE{uuid.uuid4().hex[:4].upper()}"

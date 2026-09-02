@@ -26,7 +26,14 @@ vi.mock("@/components/FilterBar", () => ({
   useDebounced: (v: string) => v,
 }));
 vi.mock("@/lib/filters", () => ({ matchesQuery: () => true }));
-vi.mock("@/lib/auth", () => ({ canUse: () => false }));
+// Partial factories leak across vitest workers — the very lesson this file
+// states two lines down, so honour it here too. `canUse` is overridden to
+// false (these tests are about the watchlist LOCK); everything else, including
+// isFeatureDisabled, comes from the real module.
+vi.mock("@/lib/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth")>();
+  return { ...actual, canUse: () => false };
+});
 // Mock the FULL @/lib/gtag surface, not just the two fns this file asserts on.
 // A partial factory (missing trackEvent) can leak across vitest workers and
 // leave an unrelated file — e.g. SignupForm, which uses the real trackEvent —

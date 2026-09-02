@@ -84,7 +84,32 @@ FEATURES: dict[str, Tier] = {
 _ORDER = {Tier.FREE: 0, Tier.PRO: 1, Tier.PREMIUM: 2}
 
 
+# ── Features held dark, regardless of tier ──────────────────────────────────
+#
+# Checked BEFORE the FEATURES lookup, because has_feature FAILS OPEN on an
+# unknown key (`if feature not in FEATURES: return True`). Deleting an entry
+# from FEATURES to disable it would therefore grant it to EVERY tier including
+# free — the exact opposite of the intent. This set is the safe way to turn a
+# feature off.
+#
+# watchlist.track_record — freezes each ticker on a USER'S OWN watchlist daily
+# and back-checks it next-day versus SPY. The sitewide scorecard is identical
+# for every user; this one is specific to the securities that user chose, which
+# moves it materially closer to a personalised performance record and therefore
+# closer to personal advice. Tapeline holds no AFSL and relies on a
+# publisher-style general-information posture (see docs/COMPLIANCE_COPY_RULES.md).
+#
+# Held dark pending item 3 of docs/launch/LAWYER_CONSULT_EMAIL.md, per
+# SAAS_OPTIMISATION_PLAYBOOK.md §5.1 item 6. Re-enable by removing the entry
+# below — but only once that answer is in writing, and record the date.
+DISABLED_FEATURES: Final[frozenset[str]] = frozenset({
+    "watchlist.track_record",
+})
+
+
 def has_feature(user_tier: Tier | str, feature: str) -> bool:
+    if feature in DISABLED_FEATURES:
+        return False
     if feature not in FEATURES:
         return True
     required = FEATURES[feature]
