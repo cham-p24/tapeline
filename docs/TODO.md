@@ -66,13 +66,13 @@ Item `eainjcenlknbojblklapgjilafgebiii`, version 1.2.3, all four `CWS_*` secrets
 - [ ] Payout bank verification; business/personal money split; Radar check; sole-trader KYC upload
 - [ ] **Plan-change gap** — an active subscriber switching plans today gets "contact support". Zero-code fix: enable plan switching in Stripe portal settings
 - [ ] Cancel the Quiver $30/mo subscription
-- [ ] Validate the 3 never-exercised Stripe price IDs (`PRO_ANNUAL`, `PREMIUM_MONTHLY`, `PREMIUM_ANNUAL`) — blocked on the Fly token
+- [x] **All four Stripe price IDs validated against LIVE Stripe** (2026-09-02, `stripe-preflight` workflow). pro monthly $9.99/mo, pro annual $99/yr, premium monthly $19.99/mo, premium annual — all `ok`; all four shadow checkouts created and expired; `webhook parse: OK (signature verified, .get() works)`; account `charges_enabled=True payouts_enabled=True`. **Never needed the founder** — the workflow uses the repo's `FLY_API_TOKEN` secret, not the expired local one
 
 # 5 — Credentials
 
 Seven exposures found independently across four sessions. The Massive vendor key is a separate, already-decided accepted risk and is deliberately not re-opened here.
 
-- [ ] **Open GitHub secret-scanning alert #1** — Stripe webhook signing secret, **public repo**, unresolved. Appears as a `TEST_SECRET` fixture so it is probably fabricated; if it is not, anyone can forge Stripe webhooks and grant themselves Premium. Two minutes to confirm and dismiss
+- [x] **Secret-scanning alert #1 resolved** (2026-09-02, `used_in_tests`). False positive: the file is `test_inbox_webhook.py` — the **Resend/Svix** inbound test, and Svix shares the `whsec_` prefix that GitHub's Stripe classifier matched. Fabricated `TEST_SECRET` fixture, GitHub validity `unknown`, and `RESEND_INBOUND_SECRET` was never provisioned in production, so there is no live secret it could correspond to. The file never reached `main`; its branch (`claude/cool-shockley-ac08f3`, inbox-bot phases A–F) was fully superseded by the shipped inbox bot and has been deleted
 - [ ] Rotate **Anthropic + OpenAI API keys** — pasted into chat 2026-05-12, no rotation recorded
 - [ ] Rotate **Alpaca key + secret** — pasted into chat 2026-06-15
 - [ ] Rotate **Fly deploy token** — pasted into chat 2026-06-04, **and it is now expired**, which is actively blocking work
@@ -95,8 +95,8 @@ Seven exposures found independently across four sessions. The Massive vendor key
 
 # 7 — Legal
 
-- [ ] **Lawyer consult** (Holley Nethercote, $400–800). Flagged as the *"oldest open critical item"*; the original June email may never have been sent. Brief covers: Massive/Finnhub personal-use terms vs commercial use; the per-user next-day-vs-SPY track record; the extension rendering a score beside broker order flow; post-aha microsurveys vs rule 8; scorecard summary stats vs rule 4
-- [ ] **Vendor data-rights letters** to Massive/Polygon + Finnhub — 2–6 week lead time that starts only when sent. Not sent
+- [ ] **Lawyer consult** (Holley Nethercote, $400–800) — **brief REWRITTEN and ready to send**: `docs/launch/LAWYER_CONSULT_EMAIL.md`. The old one was drafted pre-launch and covered 3 questions; it now covers all six surfaces, leads with data licensing (the only one whose answer could be "the product as priced does not work"), and is scoped so a sole trader gets a tight answer rather than a broad review. **Sending is founder-only**
+- [ ] **Vendor data-rights letters** — **DRAFTED**: `docs/drafts/vendor-data-rights-letters.md`. Two short emails, both asking directly what the commercial tier costs rather than whether current use is permitted (deliberate, and the trade-off is written down). 2–6 week lead starts only when sent. **Sending is founder-only**
 - [ ] Trademark search: "Tapeline" vs tapelinehq.com
 
 # 8 — Distribution
@@ -118,7 +118,7 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] **[gate]** Remaining activation code — pre-armed alert on the seeded name, 3-item checklist, T+0 founder welcome
 - [ ] **[gate]** Ruler-lite — `core_action_at`, `churn_events` + reason taxonomy + reactivation stamp, the saved weekly SQL
 - [ ] Flip `watchlist.track_record` off pending the lawyer's answer
-- [ ] One-time catch-up so the ~23 users who aged out of every drip window can ever receive a lifecycle email
+- [x] **Catch-up mechanism BUILT** — `backend/app/scripts/catchup_send.py` + `tests/test_catchup_send.py` (shipped by a parallel session). Correctly a deliberate script, not an auto-firing task, and it splits the audience so nobody legacy-trialled is promised a trial they cannot take. **Running it is a send, so it is founder-only**
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
 
