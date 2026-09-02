@@ -6,8 +6,13 @@ Two levers that head off INVOLUNTARY churn:
      plan auto-renews. DB drip on the real billing_period column (0031), gated
      to a tight (now+6d, now+8d) window, dedup'd per renewal cycle via a
      date-stamped "renA{YYMMDD}" token so it fires once a YEAR not once ever.
-  2. customer.source.expiring webhook — nudge a card refresh before the card
-     expires and the next renewal declines into dunning.
+  2. the card-expiry guard inside the invoice.upcoming webhook — nudge a card
+     refresh when the card on file will already be dead on the renewal date.
+     This used to hang off customer.source.expiring, which is defined for
+     legacy Card Sources; this account has none (all four live customers
+     report sources.total_count = 0 and pay with a Checkout-minted
+     PaymentMethod), the endpoint never subscribed to it, and the branch never
+     ran. invoice.upcoming is subscribed and fires before every renewal.
 
 send_email is mocked to a capture in the send paths (without it, the no-RESEND
 short-circuit returns {"skipped": True} and the drip wouldn't stamp/count).
@@ -167,17 +172,84 @@ async def test_renewal_reminder_skips_outside_window(monkeypatch):
     assert "renA" not in await _drip_state(uid)
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# customer.source.expiring webhook
-# ════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
+# Card-expiry guard (rides on invoice.upcoming)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# These two used to fire `customer.source.expiring` at the endpoint. That
+# proved nothing: the event is emitted for legacy Card Sources attached to a
+# Customer, Checkout in mode="subscription" mints PaymentMethods instead, and
+# on 2026-09-02 every live customer on this account returned
+# `sources.total_count = 0` with `default_source = None`. The endpoint was
+# never subscribed to it either. A green test over a branch Stripe cannot
+# reach is a fifth false reading, so the trigger moved to invoice.upcoming and
+# the tests moved with it. Full coverage of the new guard — the resolution
+# hops, the month-end boundary, Link, the dedup — lives in
+# test_card_expiry_guard.py; these two keep the end-to-end send in the file
+# that documents the lever.
+
+
+def _upcoming_invoice(customer: str, *, due_in_days: int = 3) -> dict:
+    """An invoice.upcoming payload with a one-year line, dahlia-shaped.
+
+    No `price` key, and `subscription` only under
+    `parent.subscription_details` — both true of the real payload captured off
+    the live account. See test_card_expiry_guard.py for the full note.
+    """
+    due = int((datetime.now(UTC) + timedelta(days=due_in_days)).timestamp())
+    return {
+        "id": f"upcoming_in_{_uuid.uuid4().hex[:16]}",
+        "object": "invoice",
+        "customer": customer,
+        "amount_due": 19900,
+        "currency": "usd",
+        "billing_reason": "subscription_cycle",
+        "next_payment_attempt": due,
+        "period_end": due,
+        "default_payment_method": None,
+        "parent": {
+            "type": "subscription_details",
+            "quote_details": None,
+            "subscription_details": {
+                "subscription": f"sub_{_uuid.uuid4().hex[:16]}",
+                "metadata": {},
+            },
+        },
+        "lines": {
+            "object": "list",
+            "data": [
+                {
+                    "id": f"il_tmp_{_uuid.uuid4().hex[:16]}",
+                    "object": "line_item",
+                    "amount": 19900,
+                    "currency": "usd",
+                    "period": {"start": due, "end": due + 365 * 86400},
+                    "pricing": {
+                        "type": "price_details",
+                        "price_details": {"price": f"price_{_uuid.uuid4().hex[:16]}"},
+                    },
+                    "quantity": 1,
+                }
+            ],
+        },
+    }
+
+
+def _dead_card(monkeypatch):
+    """Force the resolver to report a card that expired in 06/2026."""
+    async def _resolve(_invoice):
+        return {"brand": "visa", "last4": "4242", "exp_month": 6, "exp_year": 2026}
+
+    monkeypatch.setattr(webhooks_router, "card_on_file_for_invoice", _resolve)
+
 
 @pytest.mark.asyncio
 async def test_card_expiring_webhook_emails_owner(monkeypatch):
     uid, email, cust = await _seed(billing_period="annual", days_out=200)
     cap = _Capture()
     monkeypatch.setattr(email_module, "send_email", cap)
-    obj = {"customer": cust, "brand": "Visa", "last4": "4242", "exp_month": 6, "exp_year": 2026}
-    r = await _fire(monkeypatch, _evt("customer.source.expiring", obj))
+    _dead_card(monkeypatch)
+    r = await _fire(monkeypatch, _evt("invoice.upcoming", _upcoming_invoice(cust)))
     assert r.status_code == 200
     assert cap.to(email)
     sent = next(c for c in cap.calls if c["to"] == email)
@@ -189,8 +261,8 @@ async def test_card_expiring_webhook_emails_owner(monkeypatch):
 async def test_card_expiring_webhook_no_user_is_noop(monkeypatch):
     cap = _Capture()
     monkeypatch.setattr(email_module, "send_email", cap)
-    obj = {"customer": f"cus_{_uuid.uuid4().hex[:18]}", "brand": "Visa",
-           "last4": "0000", "exp_month": 1, "exp_year": 2027}
-    r = await _fire(monkeypatch, _evt("customer.source.expiring", obj))
+    _dead_card(monkeypatch)
+    unknown = f"cus_{_uuid.uuid4().hex[:18]}"
+    r = await _fire(monkeypatch, _evt("invoice.upcoming", _upcoming_invoice(unknown)))
     assert r.status_code == 200       # handled gracefully
     assert cap.calls == []            # nobody emailed

@@ -822,3 +822,138 @@ def subscription_payload(sub: Any) -> dict[str, Any]:
         "cancel_at_period_end": bool(_sub_field(sub, "cancel_at_period_end") or False),
         "billing_period": "annual" if interval == "year" else "monthly",
     }
+
+
+# ── Card-expiry guard ───────────────────────────────────────────────────────
+#
+# WHY THIS IS NOT `customer.source.expiring`. That event was handled in
+# webhooks.py from the retention work onward and could never once have fired.
+# It is defined for legacy Card *Sources* attached to a Customer, and this
+# account has none: on 2026-09-02 all four live customers returned
+# `sources.total_count = 0` with `default_source = None`, one PaymentMethod
+# each, and the single charge on the account carries `source=None`. Checkout in
+# mode="subscription" mints PaymentMethods, and nothing in this codebase ever
+# creates a Source. Subscribing the endpoint to the event would therefore have
+# bought exactly nothing — a dead branch stays dead.
+#
+# `invoice.upcoming` is already subscribed, already fires before every renewal,
+# and carries the renewal timestamp. That makes it the place to ask the
+# question that actually matters: will the card on file still be valid on the
+# day Stripe tries to charge it? The answer is knowable, and the failure it
+# prevents — a silent decline twelve months after anyone last thought about
+# billing — is the one that costs a paying customer.
+
+
+def card_is_dead_by(card: Any, ts: int | float) -> bool:
+    """True when `card` has expired by unix time `ts`.
+
+    A card is valid through the LAST INSTANT of its expiry month — a card
+    marked 09/2026 still works on 2026-09-30 — so the comparison is against
+    the first instant of the following month, not against the expiry date.
+    Off-by-one here means warning a customer whose card is fine, which trains
+    them to ignore billing mail.
+
+    Returns False on any card with no usable expiry rather than guessing;
+    see card_on_file_for_invoice for why a payment method may have none.
+    """
+    month = _nested(card, "exp_month")
+    year = _nested(card, "exp_year")
+    if not month or not year:
+        return False
+    try:
+        month, year = int(month), int(year)
+    except (TypeError, ValueError):
+        return False
+    if not 1 <= month <= 12:
+        return False
+    dead_year, dead_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    dead_from = datetime(dead_year, dead_month, 1, tzinfo=UTC).timestamp()
+    return ts >= dead_from
+
+
+async def card_on_file_for_invoice(invoice: Any) -> dict[str, Any] | None:
+    """The `card` block Stripe will actually charge for `invoice`, or None.
+
+    Resolved in Stripe's own precedence order — the invoice's own default, then
+    the subscription's, then the customer's. On a REAL upcoming invoice
+    captured off this account, the first two of those are worth spelling out:
+
+      * `invoice["default_payment_method"]` is null. It is populated only when
+        someone has pinned a method to the invoice, which nothing here does.
+      * `invoice["subscription"]` is ALSO null on API 2026-08-26.dahlia. The
+        subscription id moved to `parent.subscription_details.subscription`,
+        so reading the top-level key finds nothing and the resolution gives up
+        one hop early — landing on the customer default, which is likewise
+        null on all four live customers. The method that actually gets charged
+        is the one on the SUBSCRIPTION, so missing this hop resolves every
+        real invoice to None and the guard never fires.
+
+    Returns None — never raises — when the method is not a card. That is not a
+    hypothetical: one of the four live subscribers pays through Link, whose
+    PaymentMethod has `card: null` and no expiry anywhere on it. Bank debits
+    and wallets are the same. A payment method with no expiry cannot expire,
+    so there is nothing to warn about and None is the correct answer.
+
+    Any Stripe failure also yields None. This runs inside the renewal-notice
+    path, and a card lookup that 500s must not take the renewal email with it.
+    """
+    if not settings.stripe_secret_key:
+        return None
+
+    pm_id = _nested(invoice, "default_payment_method")
+
+    if not pm_id:
+        parent = _nested(invoice, "parent") or {}
+        sub_id = _nested(_nested(parent, "subscription_details"), "subscription")
+        # Pre-dahlia payloads put it at the top level; read both so this keeps
+        # working if the endpoint is ever pinned to an older version.
+        sub_id = sub_id or _nested(invoice, "subscription")
+        if sub_id:
+            try:
+                sub = await asyncio.to_thread(stripe.Subscription.retrieve, sub_id)
+                pm_id = _sub_field(sub, "default_payment_method")
+            except stripe.error.StripeError:
+                logger.exception("stripe.card_lookup_subscription_failed sub=%s", sub_id)
+                return None
+
+    if not pm_id:
+        customer_id = _nested(invoice, "customer")
+        if customer_id:
+            try:
+                cust = await asyncio.to_thread(stripe.Customer.retrieve, customer_id)
+                pm_id = _nested(
+                    _sub_field(cust, "invoice_settings"), "default_payment_method"
+                )
+            except stripe.error.StripeError:
+                logger.exception(
+                    "stripe.card_lookup_customer_failed customer=%s", customer_id
+                )
+                return None
+
+    # `default_source` is deliberately NOT consulted. It only ever holds a
+    # legacy Source id, which PaymentMethod.retrieve cannot load, and this
+    # account has never had one — chasing it would re-create the dead branch
+    # this function exists to replace.
+    if not isinstance(pm_id, str) or not pm_id.startswith("pm_"):
+        if pm_id:
+            logger.info("stripe.card_lookup_not_a_payment_method id=%s", pm_id)
+        return None
+
+    try:
+        pm = await asyncio.to_thread(stripe.PaymentMethod.retrieve, pm_id)
+    except stripe.error.StripeError:
+        logger.exception("stripe.card_lookup_pm_failed pm=%s", pm_id)
+        return None
+
+    card = _sub_field(pm, "card")
+    if card is None:
+        logger.info(
+            "stripe.card_lookup_no_card pm=%s type=%s", pm_id, _sub_field(pm, "type")
+        )
+        return None
+    return {
+        "brand": _nested(card, "display_brand") or _nested(card, "brand") or "Card",
+        "last4": _nested(card, "last4") or "",
+        "exp_month": _nested(card, "exp_month"),
+        "exp_year": _nested(card, "exp_year"),
+    }

@@ -12,7 +12,12 @@ from svix.webhooks import Webhook, WebhookVerificationError
 from app.config import get_settings
 from app.db import get_session
 from app.models import NewsletterSubscriber, StripeWebhookEvent, Subscription, User
-from app.services.billing import parse_webhook, subscription_payload
+from app.services.billing import (
+    card_is_dead_by,
+    card_on_file_for_invoice,
+    parse_webhook,
+    subscription_payload,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1019,6 +1024,90 @@ async def stripe_webhook(
 
                 ts = obj.get("next_payment_attempt") or obj.get("period_end")
 
+                amount_due = obj.get("amount_due")
+                currency = (obj.get("currency") or "usd").upper()
+                amount_label = (
+                    f"${amount_due / 100:.2f} {currency}"
+                    if isinstance(amount_due, (int, float)) and amount_due
+                    else None
+                )
+                renew_label = (
+                    datetime.fromtimestamp(ts, tz=UTC).strftime("%d %B %Y")
+                    if ts else "your next renewal date"
+                )
+
+                # ── WILL THE CARD STILL BE ALIVE ON THE DAY? ────────────────
+                #
+                # This replaces the `customer.source.expiring` branch that used
+                # to sit further down. That event is defined for legacy Card
+                # Sources; every customer on this account pays with a
+                # PaymentMethod minted by Checkout, so it could never fire and
+                # the branch had never once executed. The risk it was meant to
+                # cover is real all the same, and worst for annual plans: one
+                # charge every twelve months, a card that quietly expired in
+                # between, and a decline nobody saw coming.
+                #
+                # Asked here because `invoice.upcoming` is already subscribed,
+                # already fires ahead of every renewal, and carries the date of
+                # the charge. The lead time is Stripe's, set in Billing
+                # settings and measured in days rather than months, so this is
+                # a last clear chance rather than an early warning — the
+                # dunning ladder in invoice.payment_failed still backs it up.
+                # It could not be measured from the event log: invoice.upcoming
+                # was only subscribed on 2026-08-30 (#705) and had fired zero
+                # times as of 2026-09-02, the first renewals being 09-12.
+                #
+                # Deliberately OUTSIDE the annual-only gate below. A monthly
+                # subscriber's renewal reminder is suppressed as noise because
+                # it says nothing they did not expect; "your card is about to
+                # be declined" is not noise at any interval.
+                card_warned = False
+                card = await card_on_file_for_invoice(obj)
+                if card and ts and card_is_dead_by(card, ts):
+                    exp_label = f"{int(card['exp_month']):02d}/{card['exp_year']}"
+                    # One warning per CARD, not per renewal: re-sending every
+                    # cycle to someone who has chosen not to act is nagging,
+                    # and the token changes the moment they put a new card on
+                    # file. Guards distinct events; exact redeliveries are
+                    # already stopped by the StripeWebhookEvent id-dedup above.
+                    token = f"cardexp{card['exp_month']}{card['exp_year']}{card['last4']}"
+                    tokens = [t for t in (user.drip_state or "").split(",") if t]
+                    card_warned = True
+                    if token in tokens:
+                        logger.info(
+                            "stripe.card_expiring_deduped user=%s exp=%s",
+                            user.id, exp_label,
+                        )
+                    else:
+                        from app.services.email import render_card_expiring_email
+
+                        html = render_card_expiring_email(
+                            user.name or "trader",
+                            brand=str(card["brand"]).title(),
+                            last4=str(card["last4"]),
+                            exp_label=exp_label,
+                            renew_date_label=renew_label,
+                            amount_label=amount_label,
+                        )
+                        res = await send_email(
+                            user.email,
+                            "Your card expires before your next Tapeline renewal",
+                            html,
+                            persona="billing",
+                            skip_if_undeliverable=False,
+                        )
+                        # Stamp only on a real send, mirroring the dunning
+                        # branch: a skipped send must leave the token unset so
+                        # a later genuine event can still try.
+                        if not res.get("skipped", False):
+                            user.drip_state = ",".join([*tokens, token])
+                            await session.commit()
+                        logger.info(
+                            "stripe.card_expiring_sent user=%s exp=%s on=%s skipped=%s",
+                            user.id, exp_label, renew_label,
+                            res.get("skipped", False),
+                        )
+
                 # Does trial_will_end already own this charge? That branch
                 # fires ~3 days before a trial converts and states the same
                 # date and amount, so warning again here is two emails for one
@@ -1043,7 +1132,14 @@ async def stripe_webhook(
                 # the goal. The surprise risk lives in the long intervals, and
                 # so does the regulatory expectation. To include monthly,
                 # lower this threshold: everything below already works for it.
-                if period_days < 180:
+                if card_warned:
+                    # The card email carries this renewal's date and amount
+                    # already, so the routine reminder would be a second email
+                    # about one charge — and the weaker of the two.
+                    logger.info(
+                        "stripe.upcoming_superseded_by_card_warning user=%s", user.id
+                    )
+                elif period_days < 180:
                     logger.info(
                         "stripe.upcoming_skipped_short_period user=%s days=%.1f",
                         user.id, period_days,
@@ -1053,17 +1149,6 @@ async def stripe_webhook(
                 ):
                     logger.info("stripe.upcoming_skipped_trial_first user=%s", user.id)
                 else:
-                    amount_due = obj.get("amount_due")
-                    currency = (obj.get("currency") or "usd").upper()
-                    amount_label = (
-                        f"${amount_due / 100:.2f} {currency}"
-                        if isinstance(amount_due, (int, float)) and amount_due
-                        else None
-                    )
-                    renew_label = (
-                        datetime.fromtimestamp(ts, tz=UTC).strftime("%d %B %Y")
-                        if ts else "your next renewal date"
-                    )
                     html = render_annual_renewal_reminder_email(
                         user.name or "there",
                         tier=str(user.tier),
@@ -1087,42 +1172,6 @@ async def stripe_webhook(
             logger.warning(
                 "stripe.upcoming_invoice_without_user customer=%s", customer_id
             )
-
-    elif evt_type == "customer.source.expiring":
-        # The card on file expires at month-end. Proactively nudge an update
-        # BEFORE the next renewal declines into dunning — cheaper to keep a
-        # customer than to recover one. Replays are blocked by the
-        # StripeWebhookEvent id-dedup at the top of this handler. The event's
-        # data.object IS the card (top-level brand/last4/exp_*, with a nested
-        # "card" fallback for source-shaped payloads).
-        customer_id = obj.get("customer")
-        result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
-        user = result.scalar_one_or_none()
-        if user and user.email:
-            try:
-                from app.services.email import render_card_expiring_email, send_email
-                nested = obj.get("card") or {}
-                brand = str(obj.get("brand") or nested.get("brand") or "Card")
-                last4 = str(obj.get("last4") or nested.get("last4") or "")
-                exp_month = obj.get("exp_month") or nested.get("exp_month")
-                exp_year = obj.get("exp_year") or nested.get("exp_year")
-                exp_label = (
-                    f"{int(exp_month):02d}/{exp_year}" if exp_month and exp_year else "soon"
-                )
-                html = render_card_expiring_email(
-                    user.name or "trader", brand=brand, last4=last4, exp_label=exp_label,
-                )
-                await send_email(
-                    user.email,
-                    "Your card on file is about to expire",
-                    html,
-                    persona="billing",
-                )
-                logger.info("stripe.card_expiring_email user=%s exp=%s", user.id, exp_label)
-            except Exception:
-                logger.exception("stripe.card_expiring_email_error user=%s", user.id)
-        else:
-            logger.warning("stripe.card_expiring_without_user customer=%s", customer_id)
 
     elif evt_type == "invoice.payment_succeeded":
         # A renewal charge cleared. Most of these are routine — every monthly

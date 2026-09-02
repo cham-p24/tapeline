@@ -2966,18 +2966,56 @@ def render_trial_precharge_reminder_email(
 
 
 def render_card_expiring_email(
-    user_name: str, *, brand: str, last4: str, exp_label: str,
+    user_name: str,
+    *,
+    brand: str,
+    last4: str,
+    exp_label: str,
+    renew_date_label: str | None = None,
+    amount_label: str | None = None,
 ) -> str:
-    """The card on file expires at month-end (Stripe customer.source.expiring).
-    Nudge an update BEFORE the next renewal declines into dunning."""
+    """The card on file will not be valid on the day of the next renewal.
+
+    Triggered from the `invoice.upcoming` branch in routers/webhooks.py, which
+    fires before every renewal and carries the date Stripe will actually try
+    the charge. It is NOT triggered by `customer.source.expiring`: that event
+    only exists for legacy Card Sources, this account has none, and the branch
+    that once handled it could never have run. See card_on_file_for_invoice.
+
+    `renew_date_label` and `amount_label` are what let this email REPLACE the
+    routine renewal reminder rather than arrive alongside it. When the card is
+    dead the renewal notice and the card notice are about the same charge, and
+    sending both is two emails for one payment; this one carries the reminder's
+    disclosure (what, when, how much) plus the thing the customer has to act
+    on. They stay optional so the admin preview harness can render the template
+    without inventing a renewal.
+    """
     card_label = f"{brand} ending {last4}" if last4 else "the card on file"
-    return shell(
-        h1(f"Your card expires soon, {user_name}.")
-        + lead(
+    if renew_date_label:
+        charge = f"on {renew_date_label}"
+        amount_clause = f" for {amount_label}" if amount_label else ""
+        lead_text = (
+            f"Your Tapeline plan renews {charge}{amount_clause}, and the card we "
+            f"have on file — {card_label} — expires {exp_label}. As it stands "
+            "that charge will be declined."
+        )
+        preheader = (
+            f"{card_label} expires {exp_label} and your plan renews "
+            f"{charge} — update the card so the charge goes through."
+        )
+    else:
+        lead_text = (
             f"The card we have on file — {card_label} — expires {exp_label}. "
             "Update it before your next renewal so your Tapeline access never "
             "skips a beat."
         )
+        preheader = (
+            f"The card on file ({card_label}) expires {exp_label} — update it "
+            "to avoid an interruption."
+        )
+    return shell(
+        h1(f"Your card expires soon, {user_name}.")
+        + lead(lead_text)
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Update your card</div>'
             f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
@@ -2990,10 +3028,10 @@ def render_card_expiring_email(
             accent=True,
         )
         + muted_paragraph(
-            "Already updated it? Then you're all set — you can ignore this."
+            "Already updated it? Then you’re all set — you can ignore this."
         )
         + footnote("Anything weird? Reply to this email — billing@tapeline.io reads every reply."),
-        preheader=f"The card on file ({card_label}) expires {exp_label} — update it to avoid an interruption.",
+        preheader=preheader,
     )
 
 
