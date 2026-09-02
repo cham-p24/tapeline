@@ -41,6 +41,8 @@ import LandingPage from "@/app/page";
 // figures precisely so we can prove they DON'T leak onto the hero (Rule 3).
 const SUMMARY = {
   days_tracked: 62,
+  // Larger than entries_scored on purpose — see scorecardCitation.test.tsx.
+  entries_logged: 620,
   entries_scored: 610,
   entries_excluded_outliers: 0,
   median_alpha_vs_spy: 0.42,
@@ -215,15 +217,33 @@ describe("LandingPage usage-as-proof line", () => {
     // Sourced from the mocked scorecard summary: entries_scored across
     // days_tracked, with the tracked-since clause from first_tracked_date.
     const proof = screen.getByText(
-      /610 picks logged across 62 market days/i,
+      /620 picks logged across 62 market days/i,
     );
     expect(proof).toBeInTheDocument();
     expect(proof.textContent).toMatch(/tracked since 12 May 2026/i);
+    // The hero used to print entries_scored (610) here under "logged".
+    expect(proof.textContent).not.toMatch(/610 picks logged/i);
     // The summary fetch actually fired at /api/scorecard.
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining("/api/scorecard"),
       expect.anything(),
     );
+  });
+
+  it("says 'back-checked', not 'logged', when the API omits entries_logged", async () => {
+    // A response cached from before entries_logged shipped carries only the
+    // back-checked count. The hero must change the NOUN rather than print
+    // that smaller number after the word "logged" — which is precisely the
+    // understatement this field was added to remove. Without this case the
+    // whole guard is vacuous: a hero hardcoded to "logged" passes every other
+    // test in this file.
+    const legacy = { ...SUMMARY } as Record<string, unknown>;
+    delete legacy.entries_logged;
+    mockSummaryFetch(legacy);
+    render(await LandingPage());
+    const proof = screen.getByText(/610 picks back-checked across 62 market days/i);
+    expect(proof).toBeInTheDocument();
+    expect(proof.textContent).not.toMatch(/logged/i);
   });
 
   it("surfaces NO vs-SPY figure on the landing surface (Rule 3)", async () => {

@@ -181,9 +181,21 @@ async def get_scorecard(
     first_tracked = (await session.execute(
         select(func.min(DailyScorecardEntry.as_of))
     )).scalar()
+    # EVERY pick ever published, back-checked or not. `entries_scored` counts
+    # only rows carrying an alpha, because every rate in the summary is
+    # computed over those — but four surfaces and the MCP `entries_logged`
+    # field printed that number under the word "logged", which understates the
+    # record: the most recent session's picks are logged the moment they
+    # publish and cannot be back-checked until the next close, so the
+    # back-checked count permanently trails the logged one. Reporting both is
+    # the only way for copy to use either word correctly.
+    total_logged = (await session.execute(
+        select(func.count()).select_from(DailyScorecardEntry)
+    )).scalar() or 0
     summary = {
         "days_tracked": int(total_days),
         "first_tracked_date": first_tracked.isoformat() if first_tracked else None,
+        "entries_logged": int(total_logged),
         **_summary_stats(all_scored),
     }
 

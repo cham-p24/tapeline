@@ -22,8 +22,14 @@ import {
   type CitableSummary,
 } from "@/lib/scorecardCitation";
 
+// entries_logged is deliberately LARGER than entries_scored, which is the
+// real relationship: the latest session's picks are logged the moment they
+// publish and only get a back-check after the next close. A fixture where the
+// two are equal cannot tell the two numbers apart and is how the original
+// mislabel survived.
 const SUMMARY: CitableSummary = {
   days_tracked: 62,
+  entries_logged: 620,
   entries_scored: 610,
   entries_excluded_outliers: 3,
   median_alpha_vs_spy: -0.12,
@@ -32,16 +38,41 @@ const SUMMARY: CitableSummary = {
 };
 
 describe("citableSentence", () => {
-  it("produces the exact citable form", () => {
+  it("produces the exact citable form, naming both counts", () => {
     expect(citableSentence(SUMMARY)).toBe(
-      "Across 610 logged top-10 picks over 62 market days since 12 May 2026, " +
-        "51.3% beat SPY the next session.",
+      "Across 620 logged top-10 picks over 62 market days since 12 May 2026, " +
+        "610 have a next-session back-check and 51.3% of those beat SPY.",
     );
   });
 
   it("omits the since-clause when the first-tracked date is unavailable", () => {
     expect(citableSentence({ ...SUMMARY, first_tracked_date: null })).toBe(
-      "Across 610 logged top-10 picks over 62 market days, 51.3% beat SPY the next session.",
+      "Across 620 logged top-10 picks over 62 market days, " +
+        "610 have a next-session back-check and 51.3% of those beat SPY.",
+    );
+  });
+
+  it("never prints the back-checked count after the word 'logged'", () => {
+    // THE REGRESSION THIS FILE EXISTS TO CATCH. The sentence used to read
+    // "Across 610 logged top-10 picks", where 610 was entries_scored — the
+    // back-checked subset. When the API response carries no entries_logged
+    // (a cached body from before the field shipped) the fix must reword, NOT
+    // fall back to entries_scored under the same noun.
+    const noLogged = { ...SUMMARY };
+    delete (noLogged as { entries_logged?: number | null }).entries_logged;
+    const sentence = citableSentence(noLogged);
+    expect(sentence).toBe(
+      "Across 610 back-checked top-10 picks over 62 market days since 12 May 2026, " +
+        "51.3% beat SPY the next session.",
+    );
+    expect(sentence).not.toMatch(/610 logged/);
+  });
+
+  it("does not claim two counts when they are the same number", () => {
+    const allChecked = { ...SUMMARY, entries_logged: 610 };
+    expect(citableSentence(allChecked)).toBe(
+      "Across 610 back-checked top-10 picks over 62 market days since 12 May 2026, " +
+        "51.3% beat SPY the next session.",
     );
   });
 
@@ -70,14 +101,19 @@ describe("<CitableRecord>", () => {
     render(<CitableRecord summary={SUMMARY} />);
     expect(
       screen.getByText(
-        "Across 610 logged top-10 picks over 62 market days since 12 May 2026, " +
-          "51.3% beat SPY the next session.",
+        "Across 620 logged top-10 picks over 62 market days since 12 May 2026, " +
+          "610 have a next-session back-check and 51.3% of those beat SPY.",
       ),
     ).toBeTruthy();
-    // Headline stats: days tracked, entries logged, hit rate, median alpha.
+    // Headline stats: days tracked, both counts, hit rate, median alpha.
     expect(screen.getByText("Market days tracked")).toBeTruthy();
     expect(screen.getByText("62")).toBeTruthy();
+    // Two separate rows carrying two different numbers. A single "Entries
+    // logged" row showing 610 is the defect: it printed the back-checked
+    // subset under the label for the larger population.
     expect(screen.getByText("Entries logged")).toBeTruthy();
+    expect(screen.getByText("620")).toBeTruthy();
+    expect(screen.getByText("Entries back-checked")).toBeTruthy();
     expect(screen.getByText("610")).toBeTruthy();
     expect(screen.getByText("51.3%")).toBeTruthy();
     // A losing median renders at the same weight — and n is disclosed on the

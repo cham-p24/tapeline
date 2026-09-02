@@ -235,7 +235,13 @@ export default async function LandingPage() {
               sample size disclosed. */}
           {summary && (
             <p className="mt-4 text-center text-sm text-muted">
-              {summary.entries_scored} picks logged across{" "}
+              {/* `entries_logged` counts every pick published;
+                  `entries_scored` counts only those already back-checked, and
+                  printing the latter after "logged" understated the record by
+                  a whole session's picks. No `??` fallback on purpose — when
+                  the field is missing the noun changes instead. */}
+              {summary.entries_logged ?? summary.entries_scored} picks{" "}
+              {summary.entries_logged == null ? "back-checked" : "logged"} across{" "}
               {summary.days_tracked} market days
               {trackedSince ? `, tracked since ${trackedSince}` : ""}.
             </p>
