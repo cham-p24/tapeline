@@ -142,3 +142,99 @@ describe("trackEvent → Google Ads conversion forwarding", () => {
     expect(() => trackEvent("sign_up")).not.toThrow();
   });
 });
+
+
+/**
+ * The once-per-browser flag must follow a REAL dispatch.
+ *
+ * `trackEventOnce` writes a localStorage flag so an activation event is
+ * counted once per browser. It took `trackEvent`'s return value as proof the
+ * event had been sent — but `trackEvent` returns true when it merely QUEUES
+ * the event because gtag has not loaded yet, which is the normal case for an
+ * event fired from a mount effect (both scripts in app/layout.tsx are
+ * `afterInteractive`).
+ *
+ * If gtag then never arrives, `scheduleFlush` drops the backlog while the
+ * flag is already written, and the event can never fire on that browser
+ * again. Caught in a real browser: `/app/scanner` left
+ * `tapeline_scanner_first_use = "1"` in localStorage with no
+ * `scanner_first_use` anywhere in `dataLayer`.
+ */
+describe("trackEventOnce — the flag must not outrun the dispatch", () => {
+  const KEY = "tapeline_test_once_key";
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.useFakeTimers();
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+    delete (window as unknown as { gtag?: GtagSpy }).gtag;
+  });
+
+  it("sets the flag immediately when gtag is already present", async () => {
+    const gtag = installGtag();
+    const { trackEventOnce } = await import("@/lib/gtag");
+
+    expect(trackEventOnce(KEY, "scanner_first_use")).toBe(true);
+
+    expect(gtag).toHaveBeenCalledWith("event", "scanner_first_use", {});
+    expect(window.localStorage.getItem(KEY)).toBe("1");
+  });
+
+  it("does NOT set the flag while the event is only queued", async () => {
+    delete (window as unknown as { gtag?: GtagSpy }).gtag;
+    const { trackEventOnce } = await import("@/lib/gtag");
+
+    trackEventOnce(KEY, "scanner_first_use");
+
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("sets the flag once the queued event actually reaches gtag", async () => {
+    delete (window as unknown as { gtag?: GtagSpy }).gtag;
+    const { trackEventOnce } = await import("@/lib/gtag");
+
+    trackEventOnce(KEY, "scanner_first_use");
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+
+    const gtag = installGtag();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(gtag).toHaveBeenCalledWith("event", "scanner_first_use", {});
+    expect(window.localStorage.getItem(KEY)).toBe("1");
+  });
+
+  it("leaves the flag UNSET when gtag never arrives, so the next visit retries", async () => {
+    delete (window as unknown as { gtag?: GtagSpy }).gtag;
+    const { trackEventOnce } = await import("@/lib/gtag");
+
+    trackEventOnce(KEY, "scanner_first_use");
+    // Past the whole flush window (40 x 250ms), after which the backlog is
+    // dropped. This is the permanent-suppression case.
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+
+    // ...and a later visit, with gtag present, still counts the activation.
+    const gtag = installGtag();
+    expect(trackEventOnce(KEY, "scanner_first_use")).toBe(true);
+    expect(gtag).toHaveBeenCalledWith("event", "scanner_first_use", {});
+    expect(window.localStorage.getItem(KEY)).toBe("1");
+  });
+
+  it("still refuses a second fire once the flag is genuinely set", async () => {
+    const gtag = installGtag();
+    const { trackEventOnce } = await import("@/lib/gtag");
+
+    trackEventOnce(KEY, "scanner_first_use");
+    gtag.mockClear();
+
+    expect(trackEventOnce(KEY, "scanner_first_use")).toBe(false);
+    expect(gtag).not.toHaveBeenCalled();
+  });
+});

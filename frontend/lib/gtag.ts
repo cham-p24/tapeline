@@ -188,7 +188,19 @@ type EventParams = Record<string, string | number | boolean>;
  * permanently losing the conversion. We now park them here and flush once
  * gtag appears.
  */
-const pending: Array<[TapelineEvent, EventParams]> = [];
+type PendingEvent = {
+  event: TapelineEvent;
+  params: EventParams;
+  /**
+   * Run ONLY after the event has really reached gtag. `trackEventOnce` uses
+   * this to write its once-per-browser flag, which must never be set for an
+   * event that is merely sitting in this queue — see the note on
+   * `trackEventOnce`.
+   */
+  onDispatched?: () => void;
+};
+
+const pending: PendingEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushAttempts = 0;
 // ~10s of polling (40 × 250ms). Longer than any realistic gtag.js load, short
@@ -211,7 +223,10 @@ function scheduleFlush(): void {
     if (typeof window !== "undefined" && typeof window.gtag === "function") {
       flushAttempts = 0;
       const queued = pending.splice(0, pending.length);
-      for (const [event, params] of queued) dispatch(event, params);
+      for (const q of queued) {
+        dispatch(q.event, q.params);
+        q.onDispatched?.();
+      }
       return;
     }
     if (pending.length > 0) scheduleFlush();
@@ -265,27 +280,50 @@ function dispatch(event: TapelineEvent, params: EventParams): void {
 export function trackEvent(
   event: TapelineEvent,
   params?: EventParams,
+  /**
+   * Called once the event has actually been handed to gtag — immediately on
+   * the fast path, or later from the flush. NOT called if the backlog is
+   * dropped because gtag never arrived.
+   */
+  onDispatched?: () => void,
 ): boolean {
   if (typeof window === "undefined") return false;
   if (typeof window.gtag !== "function") {
-    pending.push([event, params ?? {}]);
+    pending.push({ event, params: params ?? {}, onDispatched });
     scheduleFlush();
     return true;
   }
   dispatch(event, params ?? {});
+  onDispatched?.();
   return true;
 }
 
 /**
  * Fire an event at most once per browser, keyed on `storageKey`.
  *
- * Order matters and is the whole point of this helper: the event is
- * dispatched FIRST, and the localStorage flag is written only after a
- * confirmed dispatch. Writing the flag first (the old pattern) meant a failed
- * or dropped dispatch permanently suppressed the event on that browser.
+ * THE FLAG FOLLOWS A REAL DISPATCH, NOT AN ACCEPTED CALL. This helper was
+ * already written to set the flag "only after a confirmed dispatch" — but it
+ * treated `trackEvent`'s return value as that confirmation, and `trackEvent`
+ * returns true when it merely QUEUES the event because gtag has not loaded
+ * yet. Both scripts in app/layout.tsx are `afterInteractive`, so an event
+ * fired from a mount effect nearly always takes the queued path.
  *
- * Returns true if the event fired on this call, false if it was already
- * marked as fired (or the dispatch was refused, i.e. SSR).
+ * If gtag then never arrives (ad blocker, blocked network, or the 10s flush
+ * window expiring), `scheduleFlush` drops the backlog — and the flag was
+ * already written, so the event is suppressed on that browser FOREVER. That
+ * is the exact failure the ordering was changed to prevent; it survived the
+ * fix. Observed directly: `/app/scanner` left
+ * `tapeline_scanner_first_use = "1"` in localStorage with no
+ * `scanner_first_use` anywhere in `dataLayer`, meaning activation for that
+ * browser could never be counted again.
+ *
+ * Now the flag is written from `onDispatched`, which runs only after the
+ * event actually reaches gtag. A dropped backlog leaves the flag unset, so
+ * the next visit retries — an occasional duplicate over a silent permanent
+ * loss, the same trade-off the storage guard below already makes.
+ *
+ * Returns true if the event was accepted on this call (dispatched or queued),
+ * false if it was already marked as fired or refused (SSR).
  */
 export function trackEventOnce(
   storageKey: string,
@@ -299,14 +337,13 @@ export function trackEventOnce(
     // Storage unavailable (private mode / quota). Fall through and fire — an
     // occasional duplicate beats never counting the conversion at all.
   }
-  const fired = trackEvent(event, params);
-  if (!fired) return false;
-  try {
-    window.localStorage.setItem(storageKey, "1");
-  } catch {
-    // Storage unavailable — the event already fired, which is what matters.
-  }
-  return true;
+  return trackEvent(event, params, () => {
+    try {
+      window.localStorage.setItem(storageKey, "1");
+    } catch {
+      // Storage unavailable — the event already fired, which is what matters.
+    }
+  });
 }
 
 /**
