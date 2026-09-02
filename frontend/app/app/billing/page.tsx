@@ -541,6 +541,36 @@ export default function BillingPage() {
     }
   }
 
+  /**
+   * Where a plan-change CTA should actually go.
+   *
+   * The Pro and Premium cards render "Switch to Pro" / "Switch to Premium" for
+   * an existing subscriber, but both used to call startCheckout() — and
+   * Checkout always mints a NEW Stripe customer and subscription, so the
+   * backend refuses it. routers/billing.py's double-billing guard 409s on
+   * exactly this shape (`stripe_customer_id AND tier in (pro, premium)`) with
+   * "Manage or switch your plan from the billing portal". That guard is doing
+   * its job — it is why nobody has been double-billed — but the button was
+   * still advertising an action it could only fail at, and then showing the
+   * error as if the user had done something wrong.
+   *
+   * The condition here MIRRORS THE GUARD, not "is this a paid tier": a legacy
+   * card-free trial holds a paid tier with NO stripe_customer_id, passes the
+   * guard, and genuinely needs Checkout. Sending them to the portal instead
+   * would 400 ("No billing account yet") — the same class of mistake in the
+   * other direction.
+   *
+   * `hasBilling` is null while its fetch is in flight; null is not true, so
+   * the fall-through is Checkout, and the server-side guard still catches a
+   * subscriber who beats the fetch. The UI is the convenience here; the 409
+   * remains the correctness boundary.
+   */
+  function changePlan(target: "pro" | "premium") {
+    const subscriber = hasBilling === true && (tier === "pro" || tier === "premium");
+    if (subscriber) return openPortal();
+    return startCheckout(target, target === "premium" ? { startTrial: trialEligible } : undefined);
+  }
+
   async function openPortal() {
     try {
       const res = await fetch(`${API_BASE}/api/billing/portal`, {
@@ -961,7 +991,7 @@ export default function BillingPage() {
               intent={intentPlan === "pro" && tier !== "pro"}
               disabled={tier === "pro"}
               busy={busy === "pro"}
-              onUpgrade={() => startCheckout("pro")}
+              onUpgrade={() => changePlan("pro")}
             />
             <Plan
               name="Premium"
@@ -1007,7 +1037,7 @@ export default function BillingPage() {
               intent={intentPlan === "premium" && (tier !== "premium" || isCardlessTrial)}
               disabled={tier === "premium" && !isCardlessTrial}
               busy={busy === "premium"}
-              onUpgrade={() => startCheckout("premium", { startTrial: trialEligible })}
+              onUpgrade={() => changePlan("premium")}
             />
           </div>
 
@@ -1094,12 +1124,21 @@ export default function BillingPage() {
           <div>
             <h2 className="text-xl font-semibold">Alert delivery channels</h2>
             <p className="mt-1 text-sm text-muted">
-              Email is the default. Add any channel below for richer or faster delivery.
+              {tier === "free" && FREE_LIMITS.webPushAlerts === 0
+                ? "Alert delivery is a paid feature — Free runs a screen when you open it."
+                : "Email is the default. Add any channel below for richer or faster delivery."}
             </p>
           </div>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <Paywall feature="alerts.web_push" title="Browser push">
+          {/* `exhausted` because alerts.web_push is flag-FREE but cap-0 on
+              free since #683 — without it this card renders for an account
+              that cannot attach a single rule to the channel it enables. */}
+          <Paywall
+            feature="alerts.web_push"
+            title="Browser push"
+            exhausted={tier === "free" && FREE_LIMITS.webPushAlerts === 0}
+          >
             <WebPushCard />
           </Paywall>
         </div>

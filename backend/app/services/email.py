@@ -1480,7 +1480,12 @@ def render_subscription_started_email(
 
 
 def render_payment_failed_email(
-    user_name: str, tier: str, attempt_count: int = 1, *, final_attempt: bool = False,
+    user_name: str,
+    tier: str,
+    attempt_count: int = 1,
+    *,
+    final_attempt: bool = False,
+    first_charge: bool = False,
 ) -> str:
     """Stripe `invoice.payment_failed`. Tone is calm + practical, not
     alarmist. First-attempt failures are usually transient (bank fraud
@@ -1489,7 +1494,20 @@ def render_payment_failed_email(
     `final_attempt` flips the copy to the last-chance variant: Stripe has
     no further automatic retries scheduled (`next_payment_attempt` is None),
     so the next failure ends the grace window and the account drops to Free.
-    This is the most urgent touch in the dunning sequence."""
+    This is the most urgent touch in the dunning sequence.
+
+    `first_charge` says this is the charge at the END OF A TRIAL, not a
+    renewal. It matters because this email used to open "your last payment
+    didn't go through" and call it "the renewal charge" unconditionally — to
+    someone who had never paid Tapeline anything and had never renewed
+    anything. Since the card-required trial is the normal route to paid, that
+    was the MOST LIKELY reader of this email, and it reads as though they have
+    been billed for months. Wrong on a billing email is expensive: it invites
+    a chargeback for a payment that never happened.
+
+    Default is False and the wording it selects is true either way ("your
+    payment didn't go through" / "The charge for..."), so a caller that does
+    not know cannot produce a false claim — only a less specific one."""
     tier_label = tier.capitalize()
     if final_attempt:
         urgency_line = (
@@ -1503,13 +1521,25 @@ def render_payment_failed_email(
             f"This is the {_ordinal(attempt_count)} attempt — if it fails "
             f"again, your account drops to Free."
         )
-    return shell(
-        h1(f"{user_name}, your last payment didn't go through.")
-        + lead(
-            f"The renewal charge for your Tapeline {tier_label} subscription "
-            f"was declined. Usually it's a card on file that expired, or a "
-            f"bank fraud-system flag — not an actual problem with your account."
+    if first_charge:
+        headline = f"{user_name}, the first charge didn't go through."
+        opening = (
+            f"Your Tapeline {tier_label} trial ended and the first charge was "
+            f"declined. Usually it's a card that expired since you added it, "
+            f"or a bank fraud-system flag — not an actual problem with your "
+            f"account."
         )
+    else:
+        # Deliberately neither "renewal" nor "first": true for both.
+        headline = f"{user_name}, your payment didn't go through."
+        opening = (
+            f"The charge for your Tapeline {tier_label} subscription was "
+            f"declined. Usually it's a card on file that expired, or a bank "
+            f"fraud-system flag — not an actual problem with your account."
+        )
+    return shell(
+        h1(headline)
+        + lead(opening)
         + muted_paragraph(
             f"{urgency_line} Nothing is paused on your end yet — you still "
             f"have full {tier_label} access."
@@ -1521,7 +1551,11 @@ def render_payment_failed_email(
             accent=True,
         )
         + footnote("Anything weird? Reply to this email — billing@tapeline.io reads every reply."),
-        preheader=f"Your {tier_label} renewal charge was declined — fix it in two clicks.",
+        preheader=(
+            f"Your {tier_label} first charge was declined — fix it in two clicks."
+            if first_charge
+            else f"Your {tier_label} charge was declined — fix it in two clicks."
+        ),
     )
 
 

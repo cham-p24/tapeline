@@ -18,17 +18,38 @@ export function Paywall({
   feature,
   title,
   children,
+  exhausted = false,
 }: {
   feature: keyof typeof FEATURE_TIERS;
   title?: string;
   children: React.ReactNode;
+  /**
+   * Lock even though the FEATURE FLAG allows this tier, because the tier's
+   * ALLOWANCE for it is zero.
+   *
+   * Some features are gated by a binary flag and others by a count cap, and
+   * `alerts.web_push` is both: the flag is Tier.FREE (an activation bet from
+   * 2026-07-04) while `FREE_WEB_PUSH_ALERTS` went to 0 in #683. A cap of zero
+   * behind a permissive flag renders as ACCESS here — so /app/billing showed
+   * free accounts the browser-push card, invited them to enable browser
+   * notifications, and then refused every rule they attached.
+   *
+   * Deliberately NOT fixed by reverting the flag to Tier.PRO, which tier.py
+   * offers as an option: that refuses the request at the feature gate, before
+   * the count check, so `record_cap_hit` never fires and the funnel loses the
+   * clearest intent signal there is — someone actively trying to make an
+   * alert. The server still answers "limit reached (0 on free)" and still
+   * records it; this only stops the UI offering the door.
+   */
+  exhausted?: boolean;
 }) {
   const { user, loading } = useUser();
   // Free→paid funnel: this component IS the tier feature gate. When it renders
   // locked, the user has met a gate and is being shown an upgrade prompt — fire
   // both signals once (deps settle to locked=true exactly once). Effect must run
   // before the early returns (rules-of-hooks).
-  const locked = !loading && !canUse(user, feature);
+  const allowed = canUse(user, feature) && !exhausted;
+  const locked = !loading && !allowed;
   useEffect(() => {
     if (locked) {
       trackGateEncountered(feature, "paywall");
@@ -37,7 +58,7 @@ export function Paywall({
   }, [locked, feature]);
   if (loading) return null;
 
-  if (canUse(user, feature)) return <>{children}</>;
+  if (allowed) return <>{children}</>;
 
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$19.99/mo (Premium)" : "$9.99/mo (Pro)";
