@@ -43,6 +43,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 import { handle401 } from "@/lib/api";
 import { trackEvent, trackEventOnce } from "@/lib/gtag";
+import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
 import { useUser } from "@/components/UserContext";
 import { safeNext } from "@/lib/safeNext";
 
@@ -53,6 +54,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 // as-is on purpose — renaming it would re-fire `sign_up` for every browser
 // that already converted under the old (signup + start_trial) pair.
 const OAUTH_CONVERSION_FIRED_KEY = "tapeline_oauth_conversion_fired";
+
+// Same, for the Meta pixel's browser-side CompleteRegistration. Separate key
+// from the GA4 one because the two dispatch independently: the Meta copy needs
+// `user.id` and so fires a beat later, and one being blocked must not mark the
+// other as done.
+const OAUTH_META_CONVERSION_FIRED_KEY = "tapeline_oauth_meta_conversion_fired";
 
 export default function OnboardingPage() {
   return (
@@ -97,6 +104,62 @@ function OnboardingHandoff() {
     // fires from the billing page when a trial is actually started.
     trackEventOnce(OAUTH_CONVERSION_FIRED_KEY, "sign_up", { method: "oauth" });
   }, [qp]);
+
+  // Meta CompleteRegistration, browser half — the OAuth path had none.
+  //
+  // WHY THIS WAS MISSING AND WHY IT MATTERS
+  // ---------------------------------------
+  // `trackMetaCompleteRegistration` lived only on the /signup form submit. But
+  // OAuth leaves the site for the provider and comes back through the callback,
+  // so that form handler never runs — and as of 2026-09-02 EVERY account that
+  // has ever put a card on Tapeline signed up with Google (`password_hash` is
+  // NULL for all of them). So the browser copy of the money event had never
+  // fired for a single real customer, and the server copy in routers/oauth.py
+  // was carrying it alone with no fallback. When that copy silently dropped
+  // (a process without META_* — see services/meta_capi), the conversion was
+  // simply gone, and the ad account spent days optimising toward an event it
+  // had never observed.
+  //
+  // The two copies share a deterministic event_id derived from the user id, so
+  // Meta collapses them into ONE conversion rather than double-counting. The
+  // browser copy also carries the `_fbp` cookie, which the server copy cannot
+  // see on the callback leg — so this is a match-quality gain, not just a
+  // redundant send.
+  //
+  // Deliberately a separate effect from the GA4 one above: this needs `user.id`
+  // for the shared event_id, which is not available until the session fetch
+  // resolves. Folding it into that effect would fire it before the id existed.
+  const metaFiredRef = useRef(false);
+  useEffect(() => {
+    if (qp.get("oauth") == null) return;
+    if (metaFiredRef.current) return;
+    if (loading || !user?.id) return;
+    metaFiredRef.current = true;
+
+    // localStorage throws in some privacy modes; a lost dedupe flag is
+    // harmless (the event_id makes a re-send idempotent at Meta's end) but an
+    // exception here would break the handoff, so it is swallowed both ways.
+    try {
+      if (window.localStorage.getItem(OAUTH_META_CONVERSION_FIRED_KEY)) return;
+    } catch {
+      /* private mode — fall through and let the shared event_id dedupe */
+    }
+
+    void trackMetaCompleteRegistration({
+      userId: user.id,
+      method: "oauth",
+    }).then((eventId) => {
+      // Only stamp the flag on a CONFIRMED dispatch. The same race the GA4
+      // comment above describes applies here: fbevents.js loads
+      // afterInteractive, so an early return means "not sent yet", not "sent".
+      if (!eventId) return;
+      try {
+        window.localStorage.setItem(OAUTH_META_CONVERSION_FIRED_KEY, "1");
+      } catch {
+        /* nothing to do */
+      }
+    });
+  }, [qp, user, loading]);
 
   // Provision the account, then forward. Runs once per mount (ref guard for
   // React strict-mode double-mount) and never blocks on anything optional.
