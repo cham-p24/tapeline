@@ -48,17 +48,52 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKIP_DIRS = {"node_modules", ".venv", "worktrees", ".git"}
 
 
+def _is_skipped(path: Path, root: Path) -> bool:
+    """Is `path` inside a skipped directory *of this checkout*?
+
+    Matched against the path RELATIVE to the repo root, never the absolute
+    one. When the suite runs from a worktree the checkout itself lives at
+    `.../.claude/worktrees/<name>/`, so every absolute path contains
+    "worktrees" — matching on absolute parts skipped every file in the repo,
+    `_powershell_scripts()` returned nothing, and the guard below failed on
+    every branch while the real ASCII check passed vacuously. The failure was
+    dismissed as a worktree quirk for days, which is exactly what a permanently
+    red test buys you.
+    """
+    try:
+        rel = path.relative_to(root)
+    except ValueError:  # pragma: no cover - path outside the repo
+        return True
+    return not _SKIP_DIRS.isdisjoint(rel.parts)
+
+
 def _powershell_scripts() -> list[Path]:
     return sorted(
         p
         for p in REPO_ROOT.rglob("*.ps1")
-        if _SKIP_DIRS.isdisjoint(p.parts)
+        if not _is_skipped(p, REPO_ROOT)
     )
 
 
 def test_there_are_powershell_scripts_to_check() -> None:
     """Guard the guard: if the glob silently matches nothing, the rest passes vacuously."""
     assert _powershell_scripts(), "no .ps1 files found - the glob is wrong"
+
+
+def test_the_skip_list_is_relative_to_the_repo_root() -> None:
+    """A repo checked out UNDER a skipped-looking directory still gets scanned.
+
+    This is the worktree case, stated directly: the root itself sits inside
+    `.claude/worktrees/`, and nothing in it may be skipped for that reason.
+    """
+    root = Path("C:/repo/.claude/worktrees/wt-x")
+    assert not _is_skipped(root / "scripts" / "go.ps1", root), (
+        "a script was skipped because the REPO ROOT's own path contains a "
+        "skip-list word; the match is not relative to the root"
+    )
+    # ...while a skipped directory genuinely inside the checkout is still cut.
+    assert _is_skipped(root / ".claude" / "worktrees" / "inner" / "a.ps1", root)
+    assert _is_skipped(root / "frontend" / "node_modules" / "x" / "b.ps1", root)
 
 
 def test_powershell_scripts_contain_no_non_ascii() -> None:
