@@ -1,40 +1,51 @@
 /**
- * How big the scored universe actually is.
+ * How big the scored universe actually is — and why the big number is wrong.
  *
- * WHY THIS FILE EXISTS
- * --------------------
- * "~2,500 tickers" was hardcoded as a string literal in ten places, including
- * JSON-LD served to search engines and AI assistants. It was correct when
- * written and then quietly stopped being true: the discovery/reconciliation
- * fixes of 2026-08-28 (PRs #654, #658) grew the live universe from 2,463 to
- * ~11,800 rows, and no marketing copy moved with it.
+ * READ THIS BEFORE "CORRECTING" ANY TICKER COUNT IN COPY.
  *
- * Understating the product is not a safe error. `/best-finviz-alternatives`
- * was conceding "~2,500 actively scored ... not the full 9,000+ Finviz
- * indexes" — surrendering a comparison Tapeline no longer loses.
+ * `SELECT count(*) FROM tickers` returns ~11,800 and `WHERE score IS NOT NULL`
+ * returns ~6,700. Neither is the marketing number, and reaching for one of them
+ * is an easy, confident mistake — it was made on 2026-09-01, shipped to five
+ * live SEO pages as "6,600+ scored tickers", and reverted the same day.
  *
- * So: one constant, one place, and the query that verifies it.
+ * There are TWO write paths into `tickers.score`:
  *
- * HOW TO RE-CHECK (read-only):
- *   SELECT count(*) FROM tickers;                          -- UNIVERSE_TICKERS
- *   SELECT count(*) FROM tickers WHERE score IS NOT NULL;  -- SCORED_TICKERS
+ *   1. The scoring worker, which scores exactly `ACTIVE_UNIVERSE_SIZE`
+ *      (backend/app/services/universe.py — 2,500, not overridden in prod) by
+ *      daily dollar-volume, and writes real price AND volume for those.
+ *   2. `services/sheet_feed.py`, which upserts a price and a score from the
+ *      Google Sheet for names OUTSIDE that top-N and has no volume column.
  *
- * Last verified 2026-09-01: 11,808 rows, 6,643 scored
- * (4,132 equities + 2,418 ETFs), 3,376 refreshed in the previous 24h.
+ * So ~3,600 rows carry a score with `volume IS NULL`. They are tracked for
+ * watchlists, news and per-ticker pages — they are not what "actively scored"
+ * means, and counting them inflates the claim. See
+ * docs/FEED_COVERAGE_AUDIT_2026-08-19.md, which reaches the same conclusion
+ * and argues 2,500 is the right cut for the ICP.
  *
- * WHICH NUMBER TO PUT IN COPY
- * ---------------------------
- * `SCORED_TICKERS` — always. It is the smaller, defensible one, and it is the
- * one that matches the claim being made: a scanner is judged on what it
- * scores, not on what it lists. Both are rounded DOWN to a round number so
- * copy is never ahead of the database between refreshes.
+ * The honest split, verified 2026-09-01:
+ *   11,815  rows in `tickers`            -> TRACKED_TICKERS
+ *    6,713  score IS NOT NULL            -> NOT a marketing number
+ *    3,051  score AND volume (worker)    -> the real active set
+ *    2,500  ACTIVE_UNIVERSE_SIZE         -> ACTIVE_SCORED_TICKERS
+ *
+ * Copy says ~2,500 because that is the configured, defensible floor of what the
+ * worker scores every tick. Every mega-cap (AAPL, MSFT, NVDA, TSLA, SPY, QQQ)
+ * is in it with live volume — spot-checked the same day.
+ *
+ * RE-CHECK (read-only):
+ *   SELECT count(*) FROM tickers;
+ *   SELECT count(*) FROM tickers WHERE score IS NOT NULL AND volume > 0;
+ * and confirm ACTIVE_UNIVERSE_SIZE in backend/app/services/universe.py.
  */
 
-/** Rows in `tickers` carrying a composite score. Rounded down from 6,643. */
-export const SCORED_TICKERS = 6600;
+/**
+ * Mirrors backend `ACTIVE_UNIVERSE_SIZE`. The number that belongs in copy.
+ * If the backend constant moves, move this with it.
+ */
+export const ACTIVE_SCORED_TICKERS = 2500;
 
-/** Total rows in `tickers`, scored or not. Rounded down from 11,808. */
-export const UNIVERSE_TICKERS = 11800;
+/** Rows in `tickers`, scored or merely tracked. Rounded down from 11,815. */
+export const TRACKED_TICKERS = 11800;
 
-/** Display form for the number that belongs in copy, e.g. "6,600+". */
-export const scoredTickersLabel = `${SCORED_TICKERS.toLocaleString("en-US")}+`;
+/** Display form for the number that belongs in copy, e.g. "~2,500". */
+export const activeScoredLabel = `~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}`;

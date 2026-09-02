@@ -21,7 +21,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
-import { scoredTickersLabel } from "@/lib/universe";
+import { activeScoredLabel } from "@/lib/universe";
 
 export type FeatureFAQ = { q: string; a: string };
 
@@ -245,13 +245,16 @@ export function SeoFeaturePage({
          *    burst that produced cards: name the money question and answer it
          *    completely, up front. See docs/ads/meta-burst-2026-08/.
          *
-         * Ticker count comes from lib/universe — it was hardcoded "~2,500"
-         * here and understated the real figure by 2.7x.
+         * Ticker count comes from lib/universe, which is the ONLY place that
+         * knows why the number is 2,500 and not the 11,800 rows or the 6,700
+         * score-bearing rows in the table. Do not "correct" it from a COUNT(*)
+         * — read that file first. This CTA briefly shipped "6,600+" on
+         * 2026-09-01 by doing exactly that.
          */}
         <section className="mt-12 rounded-2xl bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <p className="eyebrow text-accent">{tierLabel} feature</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
-            See this live across {scoredTickersLabel} scored tickers.
+            See this live across {activeScoredLabel} actively scored tickers.
           </h2>
           <p className="mt-3 text-sm text-muted">{tierCopy}</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
