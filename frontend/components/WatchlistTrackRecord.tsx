@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type WatchlistTrackRecordItem, type WatchlistTrackRecordRow } from "@/lib/api";
 import { useUser } from "@/components/UserContext";
-import { canUse } from "@/lib/auth";
+import { canUse, isFeatureDisabled } from "@/lib/auth";
 import { PaywallModal } from "@/components/Paywall";
 
 /**
@@ -137,6 +137,10 @@ function TickerCard({ item }: { item: WatchlistTrackRecordItem }) {
 
 export function WatchlistTrackRecord() {
   const { user } = useUser();
+  // Held dark pending legal review (see lib/auth DISABLED_FEATURES). Render
+  // NOTHING rather than the upsell below: advertising a feature that cannot
+  // be bought at any price is worse than not mentioning it.
+  const disabled = isFeatureDisabled("watchlist.track_record");
   const gated = canUse(user, "watchlist.track_record");
   const [items, setItems] = useState<WatchlistTrackRecordItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +164,8 @@ export function WatchlistTrackRecord() {
   useEffect(() => {
     load();
   }, [load]);
+
+  if (disabled) return null;
 
   // Free / Pro — a real explanatory teaser, not a blurred empty table.
   if (!gated) {

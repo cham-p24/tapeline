@@ -134,7 +134,11 @@ const PLANS = [
     // Pro"); the first highlight states "Everything in Premium" instead.
     highlights: [
       "Everything in Premium",
-      "Your full track record + per-factor attribution",
+      // "Your full track record + per-factor attribution" removed 2026-09-02:
+      // that is the PER-USER watchlist record, held dark pending item 3 of
+      // docs/launch/LAWYER_CONSULT_EMAIL.md. Selling a feature that is switched
+      // off at every tier is the kind of claim the copy linter exists to stop.
+      "Per-factor attribution on every score",
       "Get your data out — API, bulk export & webhooks",
       "Desk-grade watchlists, scans & alerts",
       "A hand in what we build next",

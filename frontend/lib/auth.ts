@@ -192,6 +192,27 @@ export const FEATURE_TIERS = {
   "watchlist.track_record": "premium" as const,
 };
 
+/**
+ * Features held dark regardless of tier. MIRRORS backend
+ * services/tier.py DISABLED_FEATURES — if the two drift, the UI offers
+ * something the API refuses, which is worse than either state alone.
+ *
+ * watchlist.track_record freezes each ticker on a USER'S OWN watchlist and
+ * back-checks it against SPY. The public scorecard is identical for everyone;
+ * this one is specific to the securities that user picked, which moves it
+ * closer to a personalised performance record and so closer to personal
+ * advice. Tapeline holds no AFSL. Held dark pending item 3 of
+ * docs/launch/LAWYER_CONSULT_EMAIL.md.
+ */
+export const DISABLED_FEATURES: ReadonlySet<string> = new Set([
+  "watchlist.track_record",
+]);
+
+export function isFeatureDisabled(feature: string): boolean {
+  return DISABLED_FEATURES.has(feature);
+}
+
 export function canUse(user: SessionUser | null, feature: keyof typeof FEATURE_TIERS): boolean {
+  if (DISABLED_FEATURES.has(feature)) return false;
   return hasMinTier(user, FEATURE_TIERS[feature]);
 }
