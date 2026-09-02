@@ -134,8 +134,22 @@ def normalize_asset_class(raw: Any) -> str | None:
     """
     if raw is None:
         return None
-    # Drop leading non-ascii (emoji/icons) + whitespace, collapse inner spacing.
-    s = re.sub(r"^[^\x00-\x7f\s]+", "", str(raw)).strip().lower()
+    # Strip surrounding whitespace FIRST, then the leading emoji, then collapse
+    # inner spacing.
+    #
+    # Order matters and used to be wrong. The emoji pattern is anchored at `^`
+    # and its character class excludes whitespace, so a cell that began with a
+    # space left the icon un-stripped and fell through to None. Measured:
+    # "  <chart-emoji> stock" normalised to None instead of "equity", and
+    # " <bitcoin-sign>  CRYPTO " to None instead of "crypto".
+    #
+    # That silently defeats the self-heal this function exists for.
+    # `upsert_tickers` only overwrites `asset_class` when the normalised value
+    # is truthy, so None means the dirty stored value survives — precisely the
+    # failure the docstring above describes. Google Sheets emits leading
+    # spaces routinely, and the crypto drop in parse_all_signals_csv keys off
+    # this return value, so a miss here also re-opens that door.
+    s = re.sub(r"^[^\x00-\x7f\s]+", "", str(raw).strip()).strip().lower()
     s = re.sub(r"\s+", " ", s)
     if not s:
         return None
@@ -307,6 +321,7 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     rows at the bottom of the sheet don't break the upsert.
     """
     rows: list[dict[str, Any]] = []
+    skipped_crypto = 0
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
         symbol = _clean_symbol(raw.get("Ticker"))
@@ -355,6 +370,34 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # missing data degrades to NEUTRAL (50) per factor, never None.
         composite, subs = compute_tapeline_composite(row_for_composite)
 
+        # ── Crypto rows are DROPPED, not ingested ──────────────────────────
+        #
+        # Tapeline is a US-equity/ETF scanner and the crypto symbol namespace
+        # COLLIDES with real listings. Measured in production 2026-09-03, four
+        # real securities were being published with a token's price because the
+        # sheet wrote its crypto row over the vendor's equity row of the same
+        # symbol:
+        #
+        #   SOL  Emeren Group Ltd (NYSE solar, ~$1.94)  published at $64.45  (Solana)
+        #   EOS  Eaton Vance Enhanced Equity Income II  published at $0.0625 (EOS token)
+        #   BGB  Blackstone Strategic Credit 2027 Term  published at $1.8568
+        #   LEO  BNY Mellon Strategic Municipals Inc    published at $6.15   (UNUS SED LEO)
+        #
+        # Each carried a six-factor score and a CAUTION/NEUTRAL label on a
+        # public per-ticker page with JSON-LD, under a no-AFSL publisher
+        # posture. That is a false statement of fact about a named, real,
+        # listed security — the most serious class of defect this product can
+        # produce, and worse than serving nothing.
+        #
+        # Separately, the six-factor model cannot score a token: there are no
+        # Form 4 filings and no company fundamentals, so ~45% of the composite
+        # weight is a constant and no token can exceed 77.5/100. Crypto is a
+        # different product with a different factor set, not a universe
+        # extension. Do not "just let them through" — namespace them first.
+        if normalize_asset_class(raw.get("Asset Class")) == "crypto":
+            skipped_crypto += 1
+            continue
+
         rows.append({
             "symbol":          symbol,
             "asset_class":     normalize_asset_class(raw.get("Asset Class")),
@@ -381,6 +424,10 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
             "sub_macro":        subs["macro"],
             "sub_momentum":     subs["momentum"],
         })
+    if skipped_crypto:
+        # Logged rather than silent: a drop nobody can see is how the
+        # collision survived in the first place.
+        logger.info("sheet.crypto_rows_skipped count=%d", skipped_crypto)
     return rows
 
 
