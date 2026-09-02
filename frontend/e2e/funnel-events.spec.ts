@@ -16,17 +16,31 @@
  *   inject — so the assertions were validating a no-op. The package is gone and
  *   the events now go to GA4 via lib/gtag.ts.
  *
- * Capture strategy:
- *   lib/gtag.ts dispatches through `window.gtag`, and queues events until it
- *   appears. We install a stub `window.gtag` before any page JS runs, so the
- *   helper takes the fast path and every event lands in a window-level array
- *   we read at assertion time. No network interception needed.
+ * Capture strategy — READ THE dataLayer, NOT A gtag STUB:
+ *   These specs were quarantined on 2026-08-28 because every assertion came
+ *   back an empty array, and the stated cause was a consent gate. That was
+ *   wrong: there is no consent gate anywhere in lib/gtag.ts, and the events
+ *   were firing correctly the whole time.
+ *
+ *   The real cause is that app/layout.tsx injects Google's standard snippet,
+ *   `function gtag(){dataLayer.push(arguments);}`, whenever NEXT_PUBLIC_GA_ID
+ *   or NEXT_PUBLIC_GOOGLE_ADS_ID is set — and both ARE set in .env. A classic
+ *   function DECLARATION assigns window.gtag, silently replacing the stub
+ *   installed by addInitScript. From that moment every event went into
+ *   `dataLayer` and none into the stub's array. A dump of dataLayer on
+ *   /signup shows `["event","sign_up_started",{...}]` sitting there.
+ *
+ *   So capture from `dataLayer`, which is where the events actually are. The
+ *   stub below pushes there too, with the same semantics as Google's, so this
+ *   works identically whether or not the GA snippet loads — a suite that only
+ *   passes when GA happens to be configured would just be the same trap in
+ *   the other direction.
  *
  * Run:
  *   npm run e2e -- funnel-events       # full suite
  *   npm run e2e:ui                      # debugging UI
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 type CapturedEvent = { name: string; properties: Record<string, unknown> };
 
@@ -38,35 +52,136 @@ type CapturedEvent = { name: string; properties: Record<string, unknown> };
 async function installGtagCapture(page: Page): Promise<() => Promise<CapturedEvent[]>> {
   await page.addInitScript(() => {
     const w = window as unknown as {
-      __capturedEvents: CapturedEvent[];
-      gtag: (command: string, ...args: unknown[]) => void;
-      dataLayer: unknown[];
+      gtag?: (command: string, ...args: unknown[]) => void;
+      dataLayer?: unknown[];
     };
-    w.__capturedEvents = [];
+    // Pre-create the array Google's snippet preserves via `|| []`, so both
+    // our stub and the real gtag append to the SAME buffer.
     w.dataLayer = w.dataLayer ?? [];
-    w.gtag = (command: string, ...args: unknown[]) => {
-      if (command === "event" && typeof args[0] === "string") {
-        w.__capturedEvents.push({
-          name: args[0],
-          properties: (args[1] as Record<string, unknown>) ?? {},
-        });
-      }
-    };
+    // Stand-in for the real snippet, for environments where it never loads
+    // (no GA/Ads id configured). lib/gtag.ts only dispatches when
+    // `typeof window.gtag === "function"`, so without this the events would
+    // queue forever and the specs would pass vacuously with nothing fired.
+    if (typeof w.gtag !== "function") {
+      w.gtag = function (...args: unknown[]) {
+        w.dataLayer!.push(args);
+      };
+    }
   });
 
-  return async () =>
-    page.evaluate(
-      () =>
-        (window as unknown as { __capturedEvents: CapturedEvent[] }).__capturedEvents ?? [],
-    );
+  const read = () =>
+    page.evaluate(() => {
+      const dl = (window as unknown as { dataLayer?: unknown[] }).dataLayer ?? [];
+      const out: { name: string; properties: Record<string, unknown> }[] = [];
+      for (const raw of dl) {
+        // Google pushes the live `arguments` object, ours pushes a real
+        // array; both are array-like, so normalise before reading.
+        const a = Array.from(raw as ArrayLike<unknown>);
+        if (a[0] === "event" && typeof a[1] === "string") {
+          out.push({
+            name: a[1],
+            properties: (a[2] as Record<string, unknown>) ?? {},
+          });
+        }
+      }
+      return out;
+    });
+
+  // ACCUMULATE ACROSS NAVIGATIONS. Reading dataLayer once at assertion time
+  // is not safe here: /app/billing strips `?checkout=success` with a full
+  // document navigation after firing trial_converted, and the init script
+  // re-creates an EMPTY dataLayer on the new document. A single late read
+  // therefore misses events that fired correctly, and racing the hop itself
+  // throws "Execution context was destroyed" — which is what made these
+  // specs intermittent rather than merely broken.
+  //
+  // So poll in the background and keep everything seen. A shrinking length
+  // means a new document, so the buffer is re-read from the start rather
+  // than diffed against a stale high-water mark.
+  const seen: CapturedEvent[] = [];
+  let lastLen = 0;
+  let polling = true;
+
+  const pump = async () => {
+    while (polling) {
+      try {
+        const cur = await read();
+        if (cur.length < lastLen) lastLen = 0; // navigated: dataLayer reset
+        for (let i = lastLen; i < cur.length; i += 1) seen.push(cur[i]);
+        lastLen = cur.length;
+      } catch {
+        // Mid-navigation read. The next tick picks it up.
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+  void pump();
+  page.once("close", () => {
+    polling = false;
+  });
+
+  return async () => {
+    // One last synchronous-ish sweep so events fired just before the call are
+    // included without depending on the poll interval landing kindly.
+    try {
+      const cur = await read();
+      if (cur.length < lastLen) lastLen = 0;
+      for (let i = lastLen; i < cur.length; i += 1) seen.push(cur[i]);
+      lastLen = cur.length;
+    } catch {
+      // Navigating right now; the accumulated buffer already has the events.
+    }
+    return [...seen];
+  };
 }
 
+
 /**
- * Stub every /api/* call the marketing pages need with minimal valid
- * responses. The signup endpoint sets a session cookie the auth context
- * reads; for this test we route around UserContext by directly hitting
- * /app routes after stubbing /api/me.
+ * Make the browser look signed in, so /app/* renders instead of redirecting.
+ *
+ * middleware.ts gates /app/* on the mere PRESENCE of a `tapeline_session`
+ * cookie ("cookie-level only, no DB hit; the backend enforces tier gates
+ * independently"), so a dummy value is enough to get past the redirect — this
+ * bypasses nothing the backend relies on.
+ *
+ * Past the redirect, UserContext calls `/api/auth/session` and then
+ * `/api/me`; without the first, the app shell sits in its loading state and
+ * never mounts the components that fire the funnel events. No e2e spec had
+ * ever reached an authed page before, which is the real reason four of these
+ * were quarantined.
  */
+async function installSignedIn(
+  page: Page,
+  context: BrowserContext,
+  overrides: Record<string, unknown> = {},
+) {
+  const user = {
+    id: "test-user",
+    email: "test@example.com",
+    name: "Test User",
+    tier: "premium",
+    must_add_card: false,
+    trial_ends_at: new Date(Date.now() + 14 * 86400_000).toISOString(),
+    ...overrides,
+  };
+  await context.addCookies([
+    {
+      name: "tapeline_session",
+      value: "e2e-fake-session",
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  await page.route("**/api/auth/session", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ user }),
+    });
+  });
+}
+
+
 async function installApiStubs(page: Page) {
   await page.route("**/api/auth/signup", async (route) => {
     await route.fulfill({
@@ -109,22 +224,14 @@ async function installApiStubs(page: Page) {
   });
 }
 
-// QUARANTINED 2026-08-28 — `.fixme` marks these known-broken rather than
-// deleting them, so the coverage stays visible in the report instead of
-// silently disappearing.
-//
-// Every assertion here comes back an EMPTY event array against a working app:
-// the gtag stub installs correctly, but no event reaches it. lib/gtag.ts
-// queues until `window.gtag` appears and the analytics bootstrap is gated on
-// consent, which nothing grants in a fresh headless context — so this measures
-// the consent gate, not the funnel.
-//
-// Kept out of the CI gate deliberately. A required check that cannot pass gets
-// marked non-required within a week, and then the specs that DO work stop
-// being enforced too. Un-fixme these once the suite can grant consent (or the
-// bootstrap exposes a test hook); the server-side CAPI events have their own
-// backend tests in the meantime.
-test.describe.fixme("GA4 funnel events", () => {
+
+// UN-QUARANTINED 2026-09-02. These were disabled as a block on 2026-08-28 on
+// the theory that a consent gate stopped the events firing. There is no
+// consent gate anywhere in lib/gtag.ts, and the events fire correctly — the
+// suite was reading the wrong place (see "Capture strategy" above). Four of
+// the six now pass and are enforced; the two that remain are marked
+// individually, so the passing ones cannot silently rot behind them.
+test.describe("GA4 funnel events", () => {
   test("sign_up_started fires on /signup mount", async ({ page }) => {
     const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
@@ -137,7 +244,7 @@ test.describe.fixme("GA4 funnel events", () => {
     expect(events.map((e) => e.name)).not.toContain("signup_started");
   });
 
-  test("sign_up + start_trial fire after form submit", async ({ page }) => {
+  test("sign_up fires after form submit — and start_trial does NOT", async ({ page }) => {
     const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
     await page.goto("/signup");
@@ -152,40 +259,85 @@ test.describe.fixme("GA4 funnel events", () => {
     await page.waitForTimeout(800);
     const names = (await getEvents()).map((e) => e.name);
     expect(names).toContain("sign_up");
-    expect(names).toContain("start_trial");
+    // start_trial MUST NOT fire here. This assertion used to be `toContain`,
+    // written when signup required a card and started a 14-day trial in the
+    // same step. #683 removed that: signup is now email + password on the free
+    // plan, and a trial begins only from /app/start or the /app/billing offer.
+    // lib/gtag.ts says so directly — "signup itself does not fire this". The
+    // old assertion would have kept passing only if signup silently started
+    // trials again, so it is inverted rather than deleted.
+    expect(names).not.toContain("start_trial");
     expect(names).not.toContain("signup_completed");
     expect(names).not.toContain("trial_started");
   });
 
-  test("scanner_first_use fires once on /app/scanner first visit, not on second", async ({
+  // STILL FAILING, and NOT for the reason the block quarantine claimed.
+  // Observed directly in the browser: /app/scanner fires `open_scanner` twice
+  // from the same component and lands both in dataLayer, while
+  // `scanner_first_use` — one useEffect earlier, via trackEventOnce — never
+  // appears there at all, even after the full 10s flush window, yet
+  // localStorage ends up holding `tapeline_scanner_first_use = "1"`.
+  //
+  // The flag-before-dispatch ordering bug that produces exactly that shape is
+  // fixed in lib/gtag.ts in this same change and covered by unit tests in
+  // __tests__/gtag.test.tsx (including a mutation back to the original
+  // ordering). This spec still does not pass afterwards, so something further
+  // is going on in the page. Left visible rather than deleted: whether
+  // activation is actually being counted is a real open question.
+  test.fixme("scanner_first_use fires once on /app/scanner first visit, not on second", async ({
     page,
     context,
   }) => {
     const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
-    // Wipe localStorage so the dedupe flag isn't set from a previous run.
+    // clearCookies BEFORE signing in — the other order deletes the session
+    // cookie and the page redirects to /signin.
     await context.clearCookies();
-    await page.addInitScript(() => window.localStorage.clear());
+    // NO addInitScript(localStorage.clear) here. Init scripts re-run on EVERY
+    // navigation, so wiping storage that way also wiped the dedupe flag
+    // between the two visits below — making the second assertion unfalsifiable
+    // in one direction and impossible in the other. Each test gets a fresh
+    // browser context, so localStorage already starts empty.
+    await installSignedIn(page, context);
     await page.goto("/app/scanner");
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1200);
     let events = await getEvents();
     expect(events.filter((e) => e.name === "scanner_first_use")).toHaveLength(1);
+    // The flag is written only after the event really reaches gtag, so its
+    // presence here is also proof the dispatch happened (lib/gtag.ts).
+    expect(await page.evaluate(() => localStorage.getItem("tapeline_scanner_first_use"))).toBe("1");
 
-    // Reload — flag should now be set, no second event.
-    await page.reload();
-    await page.waitForTimeout(500);
+    // Visit again — the flag is set, so no second activation event.
+    await page.goto("/app/scanner");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1200);
     events = await getEvents();
-    expect(events.filter((e) => e.name === "scanner_first_use")).toHaveLength(1);
+    expect(events.filter((e) => e.name === "scanner_first_use")).toHaveLength(0);
   });
 
-  test("begin_checkout fires exactly once when an Upgrade button is clicked", async ({
+  // STILL FAILING. The page is reached and a button matching
+  // `button:has-text("Upgrade")` is found and clicked, but no begin_checkout
+  // arrives — and `startCheckout` in app/app/billing/page.tsx fires it as its
+  // third statement with no guard above. So the clicked control is most
+  // likely a different "Upgrade" button that does not call that handler, and
+  // the locator needs pinning to the real one. Not shown to be a product bug,
+  // but not ruled out either.
+  test.fixme("begin_checkout fires exactly once when an Upgrade button is clicked", async ({
     page,
+    context,
   }) => {
     const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
+    // FREE, deliberately. The shared stub signs in as premium, and a premium
+    // account has nothing to upgrade to — the button never renders and the
+    // click timed out against a page that was working correctly.
+    await installSignedIn(page, context, { tier: "free", trial_ends_at: null });
     await page.goto("/app/billing");
-    await page.waitForTimeout(800);
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1200);
     const upgrade = page.locator('button:has-text("Upgrade")').first();
+    await upgrade.waitFor({ state: "visible", timeout: 15_000 });
     await upgrade.click();
     await page.waitForTimeout(800);
     const events = await getEvents();
@@ -193,9 +345,13 @@ test.describe.fixme("GA4 funnel events", () => {
     expect(events.map((e) => e.name)).not.toContain("checkout_started");
   });
 
-  test("trial_converted fires when ?checkout=success is on the URL", async ({ page }) => {
+  test("trial_converted fires when ?checkout=success is on the URL", async ({
+    page,
+    context,
+  }) => {
     const getEvents = await installGtagCapture(page);
     await installApiStubs(page);
+    await installSignedIn(page, context);
     await page.goto("/app/billing?checkout=success&tier=premium&billing_period=annual");
     await page.waitForTimeout(800);
     const events = await getEvents();
@@ -227,6 +383,14 @@ test.describe.fixme("GA4 funnel events", () => {
     );
     await context.clearCookies();
     await page.addInitScript(() => window.localStorage.clear());
+    // Signed in, but as the downgraded user the /api/me stub above describes.
+    await installSignedIn(page, context, {
+      id: "downgraded-user",
+      email: "downgraded@example.com",
+      name: "Downgraded User",
+      tier: "free",
+      trial_ends_at: new Date(Date.now() - 86400_000).toISOString(),
+    });
     await page.goto("/app/billing");
     await page.waitForTimeout(800);
     const events = await getEvents();
