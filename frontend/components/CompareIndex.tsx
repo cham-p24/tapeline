@@ -83,7 +83,11 @@ export function CompareIndex({ currentSlug }: { currentSlug: string }) {
         <a href="mailto:support@tapeline.io" className="text-accent hover:underline">
           Tell us
         </a>{" "}
-        — we publish a new comparison every two weeks based on requests.
+        {/* Cadence promise retired 2026-09-03: it committed to "a new
+            comparison every two weeks" and no comparison has been added in
+            months. A published cadence nobody is holding is a small, checkable
+            lie on a page whose entire job is to be checkable. */}
+        — and we&rsquo;ll take a look.
       </p>
     </section>
   );
