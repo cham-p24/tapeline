@@ -117,10 +117,24 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] **[gate]** Positioning + hero rewrite, using the customers' own words
 - [ ] **[gate]** Remaining activation code — pre-armed alert on the seeded name, 3-item checklist, T+0 founder welcome
 - [ ] **[gate]** Ruler-lite — `core_action_at`, `churn_events` + reason taxonomy + reactivation stamp, the saved weekly SQL
-- [ ] Flip `watchlist.track_record` off pending the lawyer's answer
+- [x] **`watchlist.track_record` held dark** (#712, 2026-09-02). NOT by deleting the FEATURES entry — `has_feature` fails OPEN on an unknown key, so that would have granted it to every tier including free. New `DISABLED_FEATURES` frozenset checked first, mirrored in `frontend/lib/auth.ts`, with a test asserting the two sets are identical. The component now renders nothing rather than an upsell for something unbuyable, and `PricingTable` stopped selling it
 - [x] **Catch-up mechanism BUILT** — `backend/app/scripts/catchup_send.py` + `tests/test_catchup_send.py` (shipped by a parallel session). Correctly a deliberate script, not an auto-firing task, and it splits the audience so nobody legacy-trialled is promised a trial they cannot take. **Running it is a send, so it is founder-only**
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
+
+# 9b — Shipped 2026-09-02/03 (was not on the original list)
+
+Found while working the list. All merged, deployed and verified in production.
+
+- [x] **Four real listed securities were published at a crypto's price** (#715). `/t/SOL` served a six-factor score and a CAUTION label for **Emeren Group Ltd** — a real NYSE solar company — computed from **Solana's $64.45**, with JSON-LD aimed at answer engines, under a no-AFSL posture. Same for EOS (Eaton Vance fund), BGB and LEO. The sheet upserts by symbol and the crypto namespace collides with real listings. Crypto now dropped at ingest; migration 0063 deleted all 54 rows; verified 0 remain
+- [x] **`normalize_asset_class` failed on a leading space** (#715). `"  <emoji> stock"` returned `None` instead of `"equity"`, silently defeating the self-heal its own docstring describes — and it would have re-opened the crypto door, since the drop keys off that return value
+- [x] **The site claimed crypto and FX coverage** (#716). It never had either. Also retired `/compare`'s promise to "publish a new comparison every two weeks" — none had been added in months
+- [x] **The scorecard download and the page gave different answers** (#721). The summary excluded moves over 50% and reported only a count; the export flagged nothing. ADAC on 2026-05-13 shows **+2,832.23%** — 126x the next largest move in the record, an unadjusted reverse split. New `excluded_from_summary` column and ONE shared threshold constant, with a test asserting both sides use the same object
+- [x] **The aggregates pass could never reach 80% of the universe** (#698). It ranked on the column it populates, so coverage froze alphabetically: A 94%, D 65%, E 26%, **Y and Z 0%**. 60/40 exploit/explore split + `tickers.last_aggregates_at` (migration 0062)
+- [x] **Liquidity floor raised and re-based** (#704). Scanner $50k and scorecard $250k both to **$1M**, and both moved off the session's RUNNING volume onto `avg_volume_30d`. Live: `total_matched` 2,390 to 1,849
+- [x] **The 18 competitor comparison pages removed** (#718). 410 Gone, not silent 404s. The ~165 stock-vs-stock matchups kept. 44 inbound references fixed first
+- [x] **Random-returns regression guard ported** (#696)
+- [x] **I broke `main` and fixed it** (#719). My `pytest.mark.anyio` marker was the only one in ~180 test files; both async plugins claimed the tests and raced at teardown. Green locally, red in CI
 
 # 10 — Housekeeping
 
@@ -128,7 +142,7 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [x] **Random-returns regression guard ported** (#696, 2026-08-30) — `change_pct_5d`/`change_pct_1m` were `random.gauss` draws in production. The forward fix was on main; its test was orphaned on a branch whose migration id is now taken. Verified failing against the reintroduced bug before landing
 - [x] **CLAUDE.md corrected** (2026-08-30) — it still described the card wall as live and Free as having 2 web-push alerts. Both false since #683/#686
 - [x] **Stale docs fixed** (2026-08-30) — `PRICING_ANALYSIS_2026-08.md` ("Free — no card, forever"), `finance/spend-policy.md` ("Paid ads: PAUSED" — Meta is live), `operator-role-and-session-map.md` (Premium $39.99 + FOUNDERFRIENDS 50%), `docs/PRICING.md`
-- [ ] **`C:\Tapeline` is not a git repository.** `CHROME_STORE_LISTING.md` — which is needed for the extension submission — plus the audit dumps live there untracked and unbacked-up
+- [x] **Store listing backed up into the repo** (#692) at `docs/extension/CHROME_STORE_LISTING.md` with a provenance note. `C:\Tapeline` is still not a git repository and the audit dumps there are still unbacked-up — but the one file needed to submit the extension is now versioned
 - [x] **Branches pruned** (2026-08-30) — 369 to 9. Every one deleted was the head ref of a merged PR, so the content is in `main` and GitHub still serves them from their PR pages. The 9 survivors carry genuinely unmerged commits
 - [ ] **Audit/Bugs session** — resume or close. It ends mid-sentence on *"I need to correct something I told you"* with a defect sweep that never reported
 - [ ] Recovery email to the 3 users who hit the trial-decline trapdoor on 27–28 Aug — drafted, held for founder sign-off (see `docs/drafts/`)
