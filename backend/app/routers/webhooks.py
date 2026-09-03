@@ -195,6 +195,7 @@ async def _send_purchase_conversion(
                 email=email,
                 value=value,
                 currency=currency,
+                event_source_url=meta_capi.source_url("/app/billing"),
                 tier=tier,
                 billing_period=billing_period,
                 fbc=purchase_fbc,
@@ -540,6 +541,10 @@ async def stripe_webhook(
                             fbc=meta_capi.fbc_value(
                                 user.signup_fbclid, user.created_at,
                             ),
+                            # No browser on a Stripe webhook. The checkout was
+                            # started from the billing page, which is the
+                            # closest true source URL available.
+                            event_source_url=meta_capi.source_url("/app/billing"),
                         )
                     except Exception:
                         logger.exception("stripe.meta_start_trial_failed user=%s", user.id)

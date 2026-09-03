@@ -35,7 +35,8 @@
     "docs/BRAND_SERP_KIT.md",
     "docs/extension/CHROME_STORE_LISTING.md",
     "docs/growth/newsletter_outreach.md",
-    "docs/launch/LAUNCH_PLAYBOOK.md"
+    "docs/launch/LAUNCH_PLAYBOOK.md",
+    "frontend/public/llms.txt"
   ],
   "exclude": [
     "**/*.test.ts",
@@ -103,6 +104,18 @@
       "rule": "card-free-trial",
       "phrase": "no card",
       "reason": "This document QUOTES a live AI-search summary that wrongly described the 14-day Premium trial as card-free, in order to report it as a compliance defect and specify the fix. The quotation is the evidence; paraphrasing it would remove the reader's ability to recognise the claim in the wild. Same principle as the /legal/** exemption and the META_BURST_BUILD banned-phrases list: ruling a claim out requires naming it. Scoped to this file and this rule so any NEW card-free wording elsewhere in the doc still fails. The doc is internal research and is not a public surface."
+    },
+    {
+      "file": "frontend/public/llms.txt",
+      "rule": "card-required-signup",
+      "phrase": "new account did have to add a card",
+      "reason": "The dated historical note about the 22-30 August 2026 card wall. Rule 10b's own message names llms.txt as a place where a DATED historical entry is legitimate, and this paragraph exists precisely so a summariser reading an archived page does not report the removed gate as current pricing - it is anti-misinformation copy, not a pricing claim. Pre-existing and never previously caught because frontend/public/ is outside the include globs. Scoped to these two exact phrases so any NEW card-required-signup wording in this file still fails."
+    },
+    {
+      "file": "frontend/public/llms.txt",
+      "rule": "card-required-signup",
+      "phrase": "card at first sign-in",
+      "reason": "The dated historical note about the 22-30 August 2026 card wall. Rule 10b's own message names llms.txt as a place where a DATED historical entry is legitimate, and this paragraph exists precisely so a summariser reading an archived page does not report the removed gate as current pricing - it is anti-misinformation copy, not a pricing claim. Pre-existing and never previously caught because frontend/public/ is outside the include globs. Scoped to these two exact phrases so any NEW card-required-signup wording in this file still fails."
     }
   ],
   "_knownViolations_readme": [
