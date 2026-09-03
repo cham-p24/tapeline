@@ -28,13 +28,18 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from sqlalchemy import func, select
 
 from app.db import session_scope
 from app.models import Ticker
 
-pytestmark = pytest.mark.anyio
+# NO `pytestmark = pytest.mark.anyio`. pytest.ini sets `asyncio_mode = auto`,
+# so pytest-asyncio already collects bare `async def` tests — which is how all
+# ~180 other test files here are written. Adding the anyio marker made BOTH
+# plugins claim these tests; they ran under anyio (visible as an `[asyncio]`
+# suffix in the test id) and then raced at teardown, so the test PASSED and
+# immediately ERRORed with asyncio.exceptions.CancelledError. It went green
+# locally and red in CI, which is the worst version of this mistake.
 
 
 async def _seed(rows: list[tuple[str, float | None, float | None, datetime | None]]) -> None:
