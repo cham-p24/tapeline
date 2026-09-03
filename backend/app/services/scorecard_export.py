@@ -99,6 +99,19 @@ RESTATEMENTS: list[dict[str, str]] = [
     },
 ]
 
+# The corporate-action threshold. A single-session move larger than this is a
+# split or similar action that the frozen prices do not adjust for — not a
+# realised return. routers/scorecard imports this so the page's summary and the
+# `excluded_from_summary` column in this file can never disagree.
+#
+# The row that forced this: ADAC on 2026-05-13 shows +2,832.23%. The next
+# largest move in the entire published record is +22.45%, so it is 126x
+# anything else. The web summary already skipped it; this file did not say so,
+# which meant anyone recomputing the hit rate from the download got a different
+# answer than the page — on the one artefact whose whole purpose is being
+# checkable.
+OUTLIER_PCT_THRESHOLD: float = 50.0
+
 # Column order is part of the published contract — consumers will index by
 # position. Append new columns at the end; never reorder or remove.
 COLUMNS: list[str] = [
@@ -111,6 +124,7 @@ COLUMNS: list[str] = [
     "change_pct_1d_after",
     "spy_change_pct_1d",
     "alpha_vs_spy",
+    "excluded_from_summary",
 ]
 
 COLUMN_DEFINITIONS: dict[str, str] = {
@@ -128,6 +142,16 @@ COLUMN_DEFINITIONS: dict[str, str] = {
     "spy_change_pct_1d": "SPY's close-to-close percentage change over the same two sessions.",
     "alpha_vs_spy": "change_pct_1d_after - spy_change_pct_1d. Negative values are "
                     "retained; no row is removed for being negative.",
+    "excluded_from_summary": "true when |change_pct_1d_after| exceeds 50, the "
+                             "corporate-action threshold. The row is STILL IN "
+                             "THIS FILE and is still what was published — the "
+                             "flag only marks that the summary statistics on "
+                             "the web page skip it, so a reader recomputing "
+                             "from this file can reproduce the page's numbers "
+                             "instead of getting different ones. A move of that "
+                             "size over one session is a split or similar "
+                             "corporate action that the frozen prices do not "
+                             "adjust for, not a realised return.",
 }
 
 # Any key or column whose name contains one of these is a derived performance
@@ -238,6 +262,13 @@ def serialise_entry(e: DailyScorecardEntry) -> dict:
         "change_pct_1d_after": e.change_pct_1d_after,
         "spy_change_pct_1d": e.spy_change_pct_1d,
         "alpha_vs_spy": e.alpha_vs_spy,
+        # Mirrors routers/scorecard._is_outlier. Kept as a flag rather than a
+        # deletion: the row WAS published and removing it would break the
+        # append-only guarantee this artefact makes two paragraphs up.
+        "excluded_from_summary": (
+            e.change_pct_1d_after is not None
+            and abs(e.change_pct_1d_after) > OUTLIER_PCT_THRESHOLD
+        ),
     }
 
 
