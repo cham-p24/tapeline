@@ -438,20 +438,12 @@ export default async function LandingPage() {
           </Faq>
           <Faq q="How is this different from Finviz / Zacks / TradingView?">
             Other scanners give you 500 filters and a blank stare. Tapeline
-            gives you one number, one sentence, and a public track record.
-            Side-by-side comparisons:{" "}
-            <Link href="/compare/finviz" className="link">
-              vs Finviz
-            </Link>
-            ,{" "}
-            <Link href="/compare/tradingview" className="link">
-              vs TradingView
-            </Link>
-            ,{" "}
-            <Link href="/compare/zacks" className="link">
-              vs Zacks
-            </Link>
-            .
+            gives you one number, one sentence, and a public track record. You
+            do not have to take our word for the last part —{" "}
+            <Link href="/scorecard" className="link">
+              read the record
+            </Link>{" "}
+            before you decide anything.
           </Faq>
           <Faq q="Is the scorecard really real?">
             Yes. Top-10 picks log automatically at market close every day; the

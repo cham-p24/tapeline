@@ -110,7 +110,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "If your reason for using Finviz is 'I want a synthesised picture of which names are worth looking at this week', Tapeline is the upgrade — the score does the synthesis Finviz makes you do manually. Honest about what it doesn't do: if your job-to-be-done is raw filter density across 9,000+ tickers, stay on Finviz.",
-    comparePath: "/compare/finviz",
     externalUrl: "/",
   },
   {
@@ -142,7 +141,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "If you live in charts and crowdsourced setups, TradingView replaces Finviz entirely. Pair with Tapeline for the scoring layer it doesn't try to provide.",
-    comparePath: "/compare/tradingview",
   },
   {
     rank: 3,
@@ -173,7 +171,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "Right tool if you're an active intraday trader and AI auto-execution is on the table. Overkill (and overpriced) for swing/positional traders looking for daily ranking.",
-    comparePath: "/compare/trade-ideas",
   },
   {
     rank: 4,
@@ -204,7 +201,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "Closest retail-priced alternative to a Bloomberg Terminal. Pair with a scanner like Tapeline, not a replacement for one.",
-    comparePath: "/compare/koyfin",
   },
   {
     rank: 5,
@@ -235,7 +231,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "Best Finviz alternative for buy-and-hold fundamental investors who want a portfolio analytics layer. Less suitable for active swing traders.",
-    comparePath: "/compare/stock-rover",
   },
   {
     rank: 6,
@@ -296,7 +291,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "Pick Simply Wall St if you're a long-term investor doing fundamental due diligence. Pick Tapeline if you want a daily multi-factor synthesis with a public scorecard.",
-    comparePath: "/compare/simply-wall-st",
   },
   {
     rank: 8,
@@ -326,7 +320,6 @@ const TOOLS: Tool[] = [
     ],
     verdict:
       "Pick Zacks if 37 years of brand history outweighs everything else and you want the curated equity research library. Pick Tapeline if transparency, speed, and per-pick accountability matter more.",
-    comparePath: "/compare/zacks",
   },
 ];
 
@@ -342,22 +335,18 @@ const QUICK_PICKS = [
   {
     intent: "Best-in-class charting + a massive community ideas feed",
     pick: "TradingView",
-    href: "/compare/tradingview",
   },
   {
     intent: "Intraday day-trading with AI auto-execution (and you're willing to pay $120+/mo)",
     pick: "Trade Ideas",
-    href: "/compare/trade-ideas",
   },
   {
     intent: "Institutional-grade fundamentals dashboards at retail pricing",
     pick: "Koyfin",
-    href: "/compare/koyfin",
   },
   {
     intent: "Portfolio analytics for long-term buy-and-hold investors",
     pick: "Stock Rover",
-    href: "/compare/stock-rover",
   },
   {
     intent: "A free screener that's not artificially crippled",
@@ -367,12 +356,10 @@ const QUICK_PICKS = [
   {
     intent: "Long-term DCF-led fundamental analysis with a distinctive visual",
     pick: "Simply Wall St",
-    href: "/compare/simply-wall-st",
   },
   {
     intent: "Traditional sell-side equity research + the Zacks Rank brand",
     pick: "Zacks Premium",
-    href: "/compare/zacks",
   },
 ];
 
@@ -685,7 +672,13 @@ export default function BestFinvizAlternativesPage() {
                 </p>
                 <p className="mt-2 text-sm">
                   <span className="text-muted">Pick:</span>{" "}
-                  {q.href.startsWith("http") ? (
+                  {/* href is optional since the /compare/* competitor pages
+                      were removed 2026-09-03. An entry without one still says
+                      something useful — "if you want X, pick Y" — so render
+                      the name as plain text rather than dropping the row. */}
+                  {!q.href ? (
+                    <span className="font-medium text-fg">{q.pick}</span>
+                  ) : q.href.startsWith("http") ? (
                     <a
                       href={q.href}
                       target="_blank"

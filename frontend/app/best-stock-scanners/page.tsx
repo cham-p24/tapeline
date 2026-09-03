@@ -44,7 +44,6 @@ const TOOLS: Tool[] = [
     scorecard: "Per-pick public",
     tagline:
       "The only scanner that names all six scoring factors AND back-checks every top-10 pick next-day vs SPY.",
-    comparePath: "/compare/finviz",
   },
   {
     rank: 2,
@@ -55,7 +54,6 @@ const TOOLS: Tool[] = [
     scorecard: "None",
     tagline:
       "60+ raw screener filters across 9,000+ stocks including OTC. The right tool if you want to build your own thesis from data.",
-    comparePath: "/compare/finviz",
   },
   {
     rank: 3,
@@ -66,7 +64,6 @@ const TOOLS: Tool[] = [
     scorecard: "None",
     tagline:
       "Best charting on the internet, 60M+ user community, integrated screener. Pair with a scoring layer like Tapeline.",
-    comparePath: "/compare/tradingview",
   },
   {
     rank: 4,
@@ -77,7 +74,6 @@ const TOOLS: Tool[] = [
     scorecard: "Aggregate",
     tagline:
       "37-year track record on the proprietary Zacks Rank #1-#5 system. Strong analyst report library.",
-    comparePath: "/compare/zacks",
   },
   {
     rank: 5,
@@ -98,7 +94,6 @@ const TOOLS: Tool[] = [
     scorecard: "Aggregate",
     tagline:
       "Sub-second intraday signals from Holly AI, integrated auto-execution. Built for active multi-monitor day traders.",
-    comparePath: "/compare/trade-ideas",
   },
   {
     rank: 7,
@@ -109,7 +104,6 @@ const TOOLS: Tool[] = [
     scorecard: "None",
     tagline:
       "Institutional-quality fundamentals, macro modules, charting. Not a scanner — pair with one.",
-    comparePath: "/compare/koyfin",
   },
   {
     rank: 8,
@@ -120,7 +114,6 @@ const TOOLS: Tool[] = [
     scorecard: "Aggregate",
     tagline:
       "115-factor Zen Ratings model with proprietary weights. Strong investor-education layer.",
-    comparePath: "/compare/wallstreetzen",
   },
   {
     rank: 9,

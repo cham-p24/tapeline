@@ -54,15 +54,12 @@ export function MarketingFooter() {
             <FooterLink href="/changelog">Changelog</FooterLink>
           </FooterCol>
 
-          <FooterCol title="Compare">
-            <FooterLink href="/compare/finviz">vs Finviz</FooterLink>
-            <FooterLink href="/compare/tradingview">vs TradingView</FooterLink>
-            <FooterLink href="/compare/trade-ideas">vs Trade Ideas</FooterLink>
-            <FooterLink href="/compare/zacks">vs Zacks</FooterLink>
-            <FooterLink href="/compare/tipranks">vs Tipranks</FooterLink>
-            <FooterLink href="/compare">All comparisons</FooterLink>
-          </FooterCol>
-
+          {/* The "Compare" column listed five competitor pages
+              (/compare/finviz, /compare/tradingview, …). Those pages were
+              removed 2026-09-03 and their URLs now serve 410. The
+              stock-vs-stock cluster survives and is reachable from /compare,
+              which is linked from the nav — a whole footer column for one link
+              was not worth keeping. */}
           <FooterCol title="Company">
             <FooterLink href="/about">About</FooterLink>
             <FooterLink href="/contact">Contact</FooterLink>

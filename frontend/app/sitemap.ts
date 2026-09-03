@@ -206,30 +206,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Comparison pages — high commercial-investigation intent.
     { url: `${base}/whats-new`,                 lastModified: new Date("2026-08-23"), priority: 0.7 },
     { url: `${base}/compare`,                   lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
-    { url: `${base}/compare/finviz`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/zacks`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/wallstreetzen`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/tradingview`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/trade-ideas`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/koyfin`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/tipranks`,          lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/simply-wall-st`,    lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/seeking-alpha`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/stock-rover`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/benzinga-pro`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/stockcharts`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // New competitor pages — 2026-05-20 expansion to cover the remaining
     // high-intent comparison clusters (free incumbent, broker-built scanners,
     // institutional pedigree, enterprise pricing anchor).
-    { url: `${base}/compare/yahoo-finance`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/webull`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/robinhood`,         lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/marketsmith`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
-    { url: `${base}/compare/bloomberg-terminal`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // 2026-08 expansion — paid scanners the engaged ICP actually cross-shops
     // (pay-inclination deep dive: beginner-intermediate swing traders compare
     // paid tools, not free Finviz).
-    { url: `${base}/compare/trendspider`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Listicle / best-of pages — top of the commercial-investigation funnel.
     { url: `${base}/best-finviz-alternatives`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/best-stock-scanners`,       lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },

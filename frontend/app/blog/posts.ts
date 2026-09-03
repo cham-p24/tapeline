@@ -301,7 +301,7 @@ export const POSTS: BlogPost[] = [
 
 <h2>What to actually look for</h2>
 
-<p>None of this requires taking a side on any particular competitor. It's a lens for reading all of them. When you evaluate any "AI" scanner — Trade Ideas, Tapeline, or the next one — the questions are the same: Can I see what it measures, or just the output? Can I see the losses, or just the highlight reel? Is there a denominator anywhere? Our own side-by-side on <a href="/compare/trade-ideas">Tapeline vs Trade Ideas</a> is written to make those exact differences legible rather than to declare a winner. If a tool makes it hard to answer those three questions, that difficulty is itself the answer.</p>
+<p>None of this requires taking a side on any particular competitor. It's a lens for reading all of them. When you evaluate any "AI" scanner — Trade Ideas, Tapeline, or the next one — the questions are the same: Can I see what it measures, or just the output? Can I see the losses, or just the highlight reel? Is there a denominator anywhere? Those three questions are the lens; apply them to us as readily as to anyone else. If a tool makes it hard to answer those three questions, that difficulty is itself the answer.</p>
 
 <h2>The honest caveat</h2>
 
@@ -637,7 +637,7 @@ export const POSTS: BlogPost[] = [
       Don't subscribe to either if you can't tell which kind you have.</p>
 
       <p>If you're not sure where to start, the
-      <a href="/compare/finviz">Tapeline vs Finviz comparison</a> goes
+      published methodology goes
       into the screener-vs-scanner question head-to-head with a real
       $8.25/mo entry tier. Both products do useful work; they don't do
       the same work.</p>

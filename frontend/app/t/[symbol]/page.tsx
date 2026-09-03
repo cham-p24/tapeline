@@ -1164,12 +1164,6 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           <Link href="/scorecard" className="hover:text-fg underline-offset-4 hover:underline">
             Public scorecard
           </Link>
-          <Link href="/compare/finviz" className="hover:text-fg underline-offset-4 hover:underline">
-            Tapeline vs Finviz
-          </Link>
-          <Link href="/compare/zacks" className="hover:text-fg underline-offset-4 hover:underline">
-            Tapeline vs Zacks
-          </Link>
           <Link href="/blog" className="hover:text-fg underline-offset-4 hover:underline">
             Methodology blog
           </Link>

@@ -50,12 +50,6 @@ Historical note, for anyone summarising older pages: between 22 August and 30 Au
 - System status: https://tapeline.io/status
 
 ### Comparisons (head-to-head with incumbents)
-- vs Finviz: https://tapeline.io/compare/finviz
-- vs Zacks: https://tapeline.io/compare/zacks
-- vs WallStreetZen: https://tapeline.io/compare/wallstreetzen
-- vs TradingView: https://tapeline.io/compare/tradingview
-- vs Trade Ideas: https://tapeline.io/compare/trade-ideas
-- vs Koyfin: https://tapeline.io/compare/koyfin
 - Best Finviz alternatives: https://tapeline.io/best-finviz-alternatives
 - Best stock scanners: https://tapeline.io/best-stock-scanners
 
