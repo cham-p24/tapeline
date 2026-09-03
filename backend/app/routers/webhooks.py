@@ -968,12 +968,40 @@ async def stripe_webhook(
         # The date and amount are read off Stripe's own subscription object, so
         # what we quote is exactly what will be charged. Replays are already
         # blocked by the StripeWebhookEvent id-dedup at the top of the handler.
+        #
+        # A CANCELLED TRIAL IS NOT ABOUT TO BE CHARGED. Stripe schedules this
+        # event off `trial_end` and sends it regardless of
+        # `cancel_at_period_end`, because a subscription set to cancel is
+        # still `trialing` right up to the date. The copy below states, as
+        # fact, that "the card you added is charged <amount> and Premium
+        # continues" — so without this guard we tell someone who already
+        # cancelled that we are about to take $199 off them. That is false, it
+        # is alarming, and it is the single most likely way to convert a
+        # polite non-customer into a chargeback or a complaint.
+        #
+        # Not hypothetical: an account created 2026-09-03 13:04 added a card
+        # for the $199/year trial and cancelled at 13:07, three minutes later.
+        # Its trial runs to 09-17, so this event fires on 09-14.
+        #
+        # Nothing is sent instead. They asked to stop, they already have the
+        # cancellation confirmation, and the one thing this email exists to
+        # prevent — an unexpected charge — cannot happen to them.
+        # Skipped by falling through, NOT by returning early: the event-id
+        # idempotency row is written at the very END of this handler, and a
+        # `return` here would leave the delivery unrecorded.
+        cancelled = bool(obj.get("cancel_at_period_end") or obj.get("canceled_at"))
+        if cancelled:
+            logger.info(
+                "stripe.trial_will_end_skipped_cancelled sub=%s customer=%s",
+                obj.get("id"), obj.get("customer"),
+            )
+
         customer_id = obj.get("customer")
         result = await session.execute(
             select(User).where(User.stripe_customer_id == customer_id)
         )
         user = result.scalar_one_or_none()
-        if user and user.email:
+        if user and user.email and not cancelled:
             try:
                 from datetime import datetime as _dt
 
