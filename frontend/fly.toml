@@ -11,10 +11,25 @@ primary_region = "syd"
   # These two keys are public by design (every browser receives them); the paired
   # server-side secrets (CLOUDFLARE_TURNSTILE_SECRET_KEY) stay in Fly secrets.
   [build.args]
-    # Cloudflare Turnstile site key. Empty = the signup widget never renders and
-    # bot protection is off. Paste the site key from the Cloudflare dashboard
-    # (Turnstile > your widget) to switch it on.
-    NEXT_PUBLIC_TURNSTILE_SITE_KEY = ""
+    # Cloudflare Turnstile site key for the `tapeline-signup` widget.
+    #
+    # DO NOT BLANK THIS. Empty does NOT mean "bot protection off" — it means
+    # EMAIL/PASSWORD SIGNUP IS DEAD. The two halves are enforced independently:
+    # the backend turns Turnstile ON the moment CLOUDFLARE_TURNSTILE_SECRET_KEY
+    # exists in Fly secrets (services/bot_protection.verify_turnstile skips its
+    # dev pass-through), while app/signup/page.tsx only renders the widget under
+    # `{TURNSTILE_SITE_KEY && ...}`. Blank here + secret set there = the browser
+    # can never mint a token, so routers/auth.py:316 raises
+    # 400 "Bot challenge failed" on EVERY signup attempt.
+    #
+    # That is not hypothetical: it was live in production for months. 32 accounts
+    # and only the seeded owner ever had a password — every real user came in via
+    # Google OAuth, which bypasses /api/auth/signup entirely and was the only
+    # working door. Guard: frontend/__tests__/turnstileSiteKey.test.ts
+    #
+    # To genuinely disable Turnstile you must ALSO unset the Fly secret:
+    #   fly secrets unset CLOUDFLARE_TURNSTILE_SECRET_KEY -a tapeline-backend
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAADHsH033vb1D4kLI"
     # PostHog project key (starts `phc_`) + region host. Empty = PostHog no-ops.
     # Host is https://us.i.posthog.com or https://eu.i.posthog.com — must match
     # the region chosen at project creation; it cannot be changed afterwards.
