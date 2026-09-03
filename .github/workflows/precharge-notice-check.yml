@@ -1,0 +1,62 @@
+name: Pre-charge notice check
+
+# Verifies that nobody is charged without being told first.
+#
+# Two events carry every pre-charge notice: `customer.subscription.trial_will_end`
+# for the first charge and `invoice.upcoming` for every renewal after it — the
+# latter also carrying the card-expiry guard (#711). Both fail silently: if
+# they stop arriving, no email goes out, no error is raised, and the first
+# anyone hears of it is a chargeback.
+#
+# WHY IT EXISTS: `invoice.upcoming` was subscribed on 2026-08-30 (#705) and had
+# fired ZERO times as of 2026-09-02 — no renewal had come due yet — so the whole
+# pre-charge path was live but unexercised while the first real renewals were
+# days away. That is a bad combination to leave unwatched.
+#
+# The check grades each finding against BOTH Stripe's event log and our own
+# webhook dedup table, because "Stripe never sent it" and "Stripe sent it and we
+# dropped it" have opposite fixes. It alerts the founder (Telegram, email
+# fallback) only on a real finding, and exits non-zero so a red run is visible
+# in the Actions tab even if the alert channel is misconfigured.
+#
+# READ-ONLY and input-free: it cannot become an arbitrary-command runner, and
+# `backend/tests/test_precharge_notice_check.py` enforces the read-only property
+# at the AST level. No customer email is read or printed — these logs are
+# world-readable on this public repo.
+
+on:
+  schedule:
+    # Daily at 06:40 UTC. Renewals land at whatever hour the subscription was
+    # created, and Stripe's notice lead time is measured in days, so a daily
+    # cadence is enough to catch a gap while the charge is still recent — and
+    # cheap enough that it can just keep running. Off the :00 mark because
+    # Actions cron is best-effort and bunches at the hour.
+    - cron: "40 6 * * *"
+  workflow_dispatch:        # Manual "check it now" from the Actions tab
+
+concurrency:
+  group: precharge-notice-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Verify every imminent charge was announced
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          # Runs against the deployed backend, so it uses the live DB and the
+          # configured Resend/Telegram credentials without needing any of them
+          # on the runner. `-m` avoids flyctl's -C space-splitting entirely.
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.check_precharge_notices"
