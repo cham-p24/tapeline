@@ -72,7 +72,12 @@ _SYMBOL_RE = re.compile(r"^[A-Z]{1,6}(\.[A-Z])?$")
 #   - We also expose median 1D return + median alpha alongside the mean,
 #     because median is robust to the outliers the filter catches and
 #     reads less like a performance claim.
-_OUTLIER_PCT_THRESHOLD = 50.0
+# Single source of truth lives in services/scorecard_export so the page's
+# summary and the export's `excluded_from_summary` column cannot drift. They
+# used to be able to: the summary excluded these rows and the downloadable file
+# did not say which, so recomputing the hit rate from the artefact gave a
+# different answer than the page.
+from app.services.scorecard_export import OUTLIER_PCT_THRESHOLD as _OUTLIER_PCT_THRESHOLD
 
 
 def _is_outlier(entry: DailyScorecardEntry) -> bool:

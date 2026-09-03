@@ -112,6 +112,30 @@ posture tested, and six specific surfaces reviewed.
        unrelated tapelinehq.com. Worth a clearance search and a class
        35/42 application, or not worth the spend at this size?
 
+7. TRADING — WHAT WOULD IT ACTUALLY TAKE?
+   I would like users to be able to act on a score without leaving
+   Tapeline. I understand this is a licensing question rather than a
+   feature, and I am not asking you to bless a plan — I am asking you
+   to price the options so I can decide whether to start.
+   (a) Where exactly is the line? My reading is that s766C(2) makes
+       "arranging" for someone to acquire a product a dealing in its
+       own right, so even a smart link might cross it while a plain
+       list of brokers does not. Is that right, and where would you
+       draw it?
+   (b) Is becoming an authorised representative of an existing AFSL
+       holder realistic for a sole trader with one paying customer?
+       Roughly what does appointment cost to set up and to run, and
+       who would take on someone this small?
+   (c) If instead I applied for my own AFSL: rough cost, rough
+       timeline, and what the responsible-manager experience
+       requirement would mean for a solo founder.
+   (d) My users are almost entirely American. Does routing a US
+       person's US-equity order pull in US law regardless of what I
+       do here, and if so is that a separate engagement I should
+       budget for now rather than discover later?
+   I would rather hear "not at your size" from you than spend a year
+   finding that out.
+
 Also, and separately, our /legal/terms and /legal/privacy pages were
 drafted by me from market-standard templates and need a red-line. We
 are an Australian operator with users worldwide, so there is GDPR and
@@ -120,7 +144,7 @@ CCPA language wedged in that I am not confident about.
 Business setup: sole trader, Melbourne. No staff, no investor money,
 bootstrapped. Revenue is currently a few subscriptions a month, so
 please scope accordingly — I would rather have a tight answer on items
-1, 2 and 3 than a broad review of everything.
+1, 2 and 7 than a broad review of everything.
 
 Budget: AU$400-1500, happy with a fixed fee. Available for a 30-minute
 scoping call any time. Tell me what you would like to see first and I
