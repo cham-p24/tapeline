@@ -97,6 +97,12 @@
       "rule": "financial-state-targeting",
       "phrase": "Tired of losing money",
       "reason": "The Banned forever in future variants list. This build doc names Meta Personal-Attributes phrasings in order to PROHIBIT them, on the line directly above the note that the descriptive-only rule already forbids that voice. Same principle as the legal-pages exemption: ruling a claim out requires naming it. Scoped to this one phrase deliberately, so a NEW banned example added to that list fires and gets exempted on purpose rather than inheriting silence. Only reachable via a hand-lint: docs is not in the include globs."
+    },
+    {
+      "file": "docs/PAID_ACQUISITION_DEEP_DIVE_2026-09.md",
+      "rule": "card-free-trial",
+      "phrase": "no card",
+      "reason": "This document QUOTES a live AI-search summary that wrongly described the 14-day Premium trial as card-free, in order to report it as a compliance defect and specify the fix. The quotation is the evidence; paraphrasing it would remove the reader's ability to recognise the claim in the wild. Same principle as the /legal/** exemption and the META_BURST_BUILD banned-phrases list: ruling a claim out requires naming it. Scoped to this file and this rule so any NEW card-free wording elsewhere in the doc still fails. The doc is internal research and is not a public surface."
     }
   ],
   "_knownViolations_readme": [
