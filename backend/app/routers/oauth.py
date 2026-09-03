@@ -780,6 +780,7 @@ async def oauth_callback(
             await meta_capi.track_complete_registration(
                 user_id=user.id, email=user.email, method=provider,
                 fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
+                event_source_url=meta_capi.source_url(user.signup_landing_path),
             )
         except Exception:
             logger.exception("oauth.meta_complete_registration_failed user=%s", user.id)

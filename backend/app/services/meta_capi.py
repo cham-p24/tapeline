@@ -127,6 +127,32 @@ def _credentials() -> tuple[str, str] | None:
     return pixel_id, token
 
 
+def source_url(path: str | None) -> str | None:
+    """Absolute page URL for `event_source_url`, or None if one cannot be built.
+
+    Meta wants the URL of the page an event happened on whenever
+    `action_source` is `website`, and it is one of the inputs to Event Match
+    Quality. Every call site omitted it until 2026-09-04, so the field was
+    defined and consumed here but never actually populated in production.
+
+    `path` is a site-relative path (e.g. the `signup_landing_path` recorded on
+    the user row). A protocol-relative value is flattened to `/` rather than
+    joined, so a stored path can never redirect the reported source to another
+    origin.
+    """
+    from app.config import get_settings
+
+    base = (get_settings().app_url or "").rstrip("/")
+    if not base:
+        return None
+    candidate = (path or "/").strip() or "/"
+    if not candidate.startswith("/"):
+        candidate = "/" + candidate
+    if candidate.startswith("//"):
+        candidate = "/"
+    return f"{base}{candidate}"
+
+
 def is_configured() -> bool:
     """True when Meta CAPI credentials are present."""
     return _credentials() is not None
@@ -320,6 +346,7 @@ async def track_start_trial(
     currency: str = "USD",
     fbc: str | None = None,
     fbp: str | None = None,
+    event_source_url: str | None = None,
 ) -> bool:
     """`StartTrial` — the card-required trial began.
 
@@ -338,6 +365,7 @@ async def track_start_trial(
         custom_data=custom,
         fbc=fbc,
         fbp=fbp,
+        event_source_url=event_source_url,
     )
 
 
@@ -352,6 +380,7 @@ async def track_purchase(
     billing_period: str | None = None,
     fbc: str | None = None,
     fbp: str | None = None,
+    event_source_url: str | None = None,
 ) -> bool:
     """`Purchase` — the first real charge succeeded.
 
@@ -374,13 +403,15 @@ async def track_purchase(
         custom_data=custom,
         fbc=fbc,
         fbp=fbp,
+        event_source_url=event_source_url,
     )
 
 
 async def track_complete_registration(*, user_id: str, email: str | None = None,
                                       method: str = "email",
                                       fbc: str | None = None,
-                                      fbp: str | None = None) -> bool:
+                                      fbp: str | None = None,
+                                      event_source_url: str | None = None) -> bool:
     """`CompleteRegistration` — an account was created (no card yet).
 
     Lower intent than StartTrial now that the trial is card-required (#536).
@@ -404,4 +435,5 @@ async def track_complete_registration(*, user_id: str, email: str | None = None,
         fbc=fbc,
         fbp=fbp,
         custom_data={"content_name": method},
+        event_source_url=event_source_url,
     )

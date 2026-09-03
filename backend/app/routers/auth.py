@@ -538,6 +538,10 @@ async def signup(
             user_id=user.id, email=user.email, method="email",
             fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
             fbp=(body.fbp or None),
+            # The page this signup actually started on, straight off the user
+            # row. Meta wants it for website events and derives part of Event
+            # Match Quality from it; every call site omitted it until now.
+            event_source_url=meta_capi.source_url(user.signup_landing_path),
         )
     except Exception:
         logger.exception("auth.meta_complete_registration_failed user=%s", user.id)
