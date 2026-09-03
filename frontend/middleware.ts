@@ -51,6 +51,69 @@ function localeForCountry(country: string | undefined): string {
   return COUNTRY_LOCALE[country.toUpperCase()] || "en-GB";
 }
 
+/**
+ * The 18 competitor comparison pages, removed 2026-09-03 on the founder's
+ * decision. Their URLs serve **410 Gone**, not 404.
+ *
+ * Why 410 and not a silent 404: these were in the sitemap and indexed. A 404
+ * tells a crawler "maybe this is temporary, come back"; a 410 tells it "this is
+ * intentionally gone, delist it". Google treats 410 as a slightly stronger
+ * removal signal and stops retrying sooner. Neither leaks link equity anywhere,
+ * which is correct — there is no successor page to send these to, and 301'ing
+ * competitor-comparison traffic to /pricing or /compare would be a bait and
+ * switch on the query intent.
+ *
+ * Why middleware rather than next.config: Next's `redirects()` cannot return a
+ * status body, and these paths would otherwise fall through to the surviving
+ * `/compare/[matchup]` dynamic route, which calls notFound() for a slug that
+ * is not a ticker pair — a 404. This intercepts them first.
+ *
+ * Why they went: 0 of 10 instrumented signups came from the cluster while 4 of
+ * 10 came from other programmatic content, and keeping claims about
+ * competitors' pricing and terms accurate had already cost five separate
+ * copy-correction sweeps across four months (#548, #686 and three others).
+ * The stock-vs-stock cluster at /compare/[a]-vs-[b] is unaffected: it compares
+ * two tickers on Tapeline's own score and makes no claim about a third party.
+ */
+const REMOVED_COMPARE_SLUGS = new Set([
+  "benzinga-pro",
+  "bloomberg-terminal",
+  "finviz",
+  "koyfin",
+  "marketsmith",
+  "robinhood",
+  "seeking-alpha",
+  "simply-wall-st",
+  "stock-rover",
+  "stockcharts",
+  "tipranks",
+  "trade-ideas",
+  "tradingview",
+  "trendspider",
+  "wallstreetzen",
+  "webull",
+  "yahoo-finance",
+  "zacks",
+]);
+
+export function handleRemovedComparePage(request: NextRequest) {
+  const m = /^\/compare\/([^/]+)\/?$/.exec(request.nextUrl.pathname);
+  if (!m) return null;
+  if (!REMOVED_COMPARE_SLUGS.has(m[1].toLowerCase())) return null;
+  return new NextResponse(
+    "This comparison page has been removed. The public track record is at " +
+      "https://tapeline.io/scorecard",
+    {
+      status: 410,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        // Belt and braces: a crawler that ignores the 410 still must not index.
+        "X-Robots-Tag": "noindex",
+      },
+    },
+  );
+}
+
 export function middleware(request: NextRequest) {
   // Domain consolidation — legacy tapeline.app → canonical tapeline.io. Runs
   // first so nothing else fires on the redirect hop.
@@ -66,6 +129,11 @@ export function middleware(request: NextRequest) {
   // Any of these returns early so auth+locale don't run on the redirect.
   const tickerHandled = handleTickerRoute(request);
   if (tickerHandled) return tickerHandled;
+
+  // Removed competitor comparison pages → 410 Gone. Must run BEFORE the page
+  // router, or these fall into /compare/[matchup] and 404 instead.
+  const goneHandled = handleRemovedComparePage(request);
+  if (goneHandled) return goneHandled;
 
   // Sector slug redirect — old Yahoo Finance slugs (technology,
   // healthcare, financial-services, consumer-cyclical, etc.) 308 to the

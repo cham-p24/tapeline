@@ -117,40 +117,12 @@ describe("content CTA instrumentation on real surfaces", () => {
     delete (window as unknown as { gtag?: GtagSpy }).gtag;
   });
 
-  it("compare pages fire {surface: compare, destination: signup, slug}", async () => {
-    const gtag = installGtag();
-    const { CompareLayout } = await import("@/components/CompareLayout");
-
-    render(
-      <CompareLayout
-        competitor="TestRival"
-        competitorUrl="https://example.com"
-        competitorPriceMonthly={20}
-        slug="testrival"
-        heading="Tapeline vs TestRival"
-        lede="A one-line lede for the comparison."
-        wins={[{ label: "Composite score", tapeline: "✓ Yes", competitor: "Not available" }]}
-        tradeoffs={[
-          { label: "Universe size", tapeline: "~2,500", competitor: "9,000+", note: "note text" },
-        ]}
-        faq={[{ q: "Is this a test?", a: "Yes." }]}
-        verifiedOn="2026-07-04"
-      />,
-    );
-
-    // The bottom-of-page CTA is the instrumented one; the above-the-fold
-    // LandingCta block renders the same label, so take the last match.
-    const ctas = screen.getAllByRole("link", {
-      name: /try the live scanner — 14-day trial/i,
-    });
-    await userEvent.click(ctas[ctas.length - 1]);
-
-    expect(gtag).toHaveBeenCalledWith("event", "content_cta_click", {
-      surface: "compare",
-      destination: "signup",
-      slug: "testrival",
-    });
-  });
+  // The "compare pages fire ..." case was REMOVED 2026-09-03 along with the
+  // CompareLayout component it rendered. The 18 competitor comparison pages
+  // were deleted (their URLs now 410), so there is no compare surface left to
+  // instrument. The ContentCtaLink coverage that mattered here is not lost —
+  // the other cases in this file exercise the same component on the surfaces
+  // that still exist.
 
   it("the glossary hub fires {surface: glossary, destination: scanner}", async () => {
     const gtag = installGtag();

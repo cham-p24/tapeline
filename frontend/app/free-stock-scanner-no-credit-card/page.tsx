@@ -75,7 +75,6 @@ const SCANNERS: Scanner[] = [
     trackRecord: "None",
     summary:
       "The free Finviz screener is usable without any signup — deep on raw filter fields so you build your own thesis from the data. No composite score, no published methodology, no track record. The paid Elite tier (which does take a card) removes ads and adds real-time data. For hand-built filtering, the free tier is genuinely useful.",
-    comparePath: "/compare/finviz",
   },
   {
     name: "TradingView (free)",
@@ -85,7 +84,6 @@ const SCANNERS: Scanner[] = [
     trackRecord: "None",
     summary:
       "A free account (no card) unlocks a genuinely usable screener plus the best charting on the internet and a large community ideas feed. The screener is filter-based rather than a scoring engine, with no first-party record of how its screens have done. Best if charts are your primary workspace.",
-    comparePath: "/compare/tradingview",
   },
   {
     name: "Trade Ideas",
@@ -95,7 +93,6 @@ const SCANNERS: Scanner[] = [
     trackRecord: "None",
     summary:
       "Included here for honesty because people search for it: Trade Ideas has no genuinely free tier, and its trials ask for a card. It's a powerful intraday tool with AI-driven signals at premium pricing — but if a no-credit-card path is your requirement, it isn't one. Listed so the comparison is complete, not to knock the product.",
-    comparePath: "/compare/trade-ideas",
   },
 ];
 
@@ -409,12 +406,6 @@ export default function FreeStockScannerNoCreditCardPage() {
                 Best swing trade stocks right now →
               </Link>{" "}
               <span className="text-muted">— today&apos;s top 30 by composite score.</span>
-            </li>
-            <li>
-              <Link href="/compare/finviz" className="text-accent hover:underline">
-                Tapeline vs Finviz →
-              </Link>{" "}
-              <span className="text-muted">— the full free-screener head-to-head.</span>
             </li>
             <li>
               <Link href="/scorecard" className="text-accent hover:underline">

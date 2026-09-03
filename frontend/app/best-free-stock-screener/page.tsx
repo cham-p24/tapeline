@@ -60,7 +60,6 @@ const SCREENERS: FreeScreener[] = [
     noCard: "Yes",
     summary:
       "The free Finviz screener is deep on raw filter fields — you build your own thesis from the data. There's no composite score, no published methodology, and no track record; it's a filter box, not a scoring engine. The paid Elite tier removes ads and adds real-time data. If you like filtering the universe by hand, the free tier is genuinely useful.",
-    comparePath: "/compare/finviz",
   },
   {
     name: "TradingView (free screener)",
@@ -71,7 +70,6 @@ const SCREENERS: FreeScreener[] = [
     noCard: "Yes",
     summary:
       "TradingView pairs a genuinely usable free screener with the best charting on the internet and a huge community ideas feed. The screener is filter-based rather than a scoring engine, and there's no first-party record of how its screens have done. Best if you live in charts and want a free screener alongside them.",
-    comparePath: "/compare/tradingview",
   },
   {
     name: "StockAnalysis.io",
@@ -292,12 +290,6 @@ export default function BestFreeStockScreenerPage() {
                 Best swing trade stocks right now →
               </Link>{" "}
               <span className="text-muted">— today&apos;s top 30 by composite score.</span>
-            </li>
-            <li>
-              <Link href="/compare/finviz" className="text-accent hover:underline">
-                Tapeline vs Finviz →
-              </Link>{" "}
-              <span className="text-muted">— the full free-screener head-to-head.</span>
             </li>
             <li>
               <Link href="/scorecard" className="text-accent hover:underline">

@@ -137,12 +137,6 @@
       "reason": "Names Zacks' own published rating label ('Strong Buy') in a comparison. Naming a competitor's product feature is not Tapeline rating a security."
     },
     {
-      "file": "frontend/app/compare/tradingview/page.tsx",
-      "rule": "performance-claim",
-      "phrase": "strong buy",
-      "reason": "Names TradingView's technical-rating output ('Buy/Sell/Strong Buy from technicals only') in a feature-comparison row. Describes a competitor's UI, not a Tapeline recommendation."
-    },
-    {
       "file": "frontend/app/congressional-trades/page.tsx",
       "rule": "performance-claim",
       "phrase": "beaten the market",
