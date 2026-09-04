@@ -108,5 +108,15 @@ async def verify_turnstile(token: str | None, remote_ip: str | None) -> bool:
             data = r.json()
             return bool(data.get("success"))
     except Exception:
+        # FAILS CLOSED, so while Cloudflare is unreachable NOBODY can sign up
+        # with email and password. That is a total outage of the paid funnel's
+        # front door, from a cause entirely outside this codebase, and it would
+        # otherwise be visible only as a log line nobody reads.
         logger.exception("turnstile.verify_failed")
+        try:
+            from app.services.signup_alerts import alert_signup_blocked
+
+            await alert_signup_blocked("cloudflare_unreachable", client_ip=remote_ip)
+        except Exception:
+            logger.exception("turnstile.unreachable_alert_failed")
         return False
