@@ -90,16 +90,33 @@ _CONVICTION_TO_CONFIDENCE: dict[str, float] = {
 # e.g. "📈 stock", "₿ crypto", "🥇 commodity etf", "🏢 holding co". Passed
 # through raw those dirty strings fragment the asset_class column (and the
 # heatmap bucketing in services/sector.canonical_sector). Normalize to a small
-# clean enum at ingest. Unknown/blank inputs default to "equity" — the column's
-# pre-existing default — so a new sheet label never produces a junk value.
+# clean enum at ingest.
+#
+# Blank and unrecognised both return None, and they are NOT the same fact —
+# see `normalize_asset_class` and `is_unrecognised_asset_class` below. The
+# older comment here said unknown inputs "default to equity"; they have not
+# since the blank-vs-equity fix, and a reader acting on that line would
+# reintroduce the overwrite bug the docstring describes.
 _ASSET_CLASS_MAP: dict[str, str] = {
     "stock":            "equity",
     "equity":           "equity",
     "equities":         "equity",
     "holding co":       "equity",
     "holding company":  "equity",
+    # Crypto spellings. Deliberately generous: every one of these is a label a
+    # human might type into the sheet's Asset Class column for a token, and a
+    # spelling that is NOT here does not merely mislabel the row — before the
+    # unrecognised-drop below existed it published the token's price under a
+    # real listed company's symbol. Adding a synonym here is free; missing one
+    # used to be a false statement of fact about a named security.
     "crypto":           "crypto",
     "cryptocurrency":   "crypto",
+    "cryptocurrencies": "crypto",
+    "crypto currency":  "crypto",
+    "digital asset":    "crypto",
+    "digital currency": "crypto",
+    "token":            "crypto",
+    "coin":             "crypto",
     "etf":              "etf",
     "future_commodity": "commodity",
     "commodity":        "commodity",
@@ -160,6 +177,43 @@ def normalize_asset_class(raw: Any) -> str | None:
         return "etf"
     # Unrecognised is a no-read, not a vote for "equity".
     return None
+
+
+def is_unrecognised_asset_class(raw: Any) -> bool:
+    """True when the cell says SOMETHING this module cannot classify.
+
+    `normalize_asset_class` collapses two different facts into None:
+
+        blank cell        → "the sheet did not say"     → None
+        "digital asset"   → "the sheet said, and we do
+                             not understand it"          → None
+
+    Callers that only need a value can treat both as absent. The ingest guard
+    in `parse_all_signals_csv` cannot, and that distinction is the whole
+    reason this function exists.
+
+    Why it matters, concretely. The crypto drop used to read
+    `normalize_asset_class(...) == "crypto"`, which is true only for the
+    spellings in `_ASSET_CLASS_MAP`. A sheet cell reading "token", "digital
+    asset", or a new icon the strip does not catch normalised to None, sailed
+    past the guard, and was written into `Ticker.asset_class` as NULL — i.e.
+    published as an ordinary listing. That is exactly how SOL, EOS, BGB and
+    LEO came to carry a cryptocurrency's price under four real companies'
+    symbols (migration 0063). Closing the door on one spelling while leaving
+    it open on every other spelling is not a fix.
+
+    Blank must NOT be unrecognised. Sheet-governed ETFs (SPY, QQQ, IWM, GLD …)
+    have an empty Asset Class cell by design; treating blank as suspicious
+    would drop the benchmarks the scanner is measured against.
+    """
+    if raw is None:
+        return False
+    if normalize_asset_class(raw) is not None:
+        return False
+    # Reached only when normalisation failed. Re-run the same cleaning the
+    # normaliser does — if anything survives it, the cell had content.
+    s = re.sub(r"^[^\x00-\x7f\s]+", "", str(raw).strip()).strip()
+    return bool(s)
 
 
 def score_to_signal(score: float | None) -> str | None:
@@ -394,7 +448,20 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # weight is a constant and no token can exceed 77.5/100. Crypto is a
         # different product with a different factor set, not a universe
         # extension. Do not "just let them through" — namespace them first.
-        if normalize_asset_class(raw.get("Asset Class")) == "crypto":
+        #
+        # FAIL CLOSED on a class we cannot read. `== "crypto"` alone only
+        # catches the spellings already in `_ASSET_CLASS_MAP`; anything else
+        # the sheet invents ("token", "digital asset", a new icon) normalises
+        # to None and would be published as an ordinary listing at the
+        # token's price — the original defect, one spreadsheet edit away.
+        # A blank cell still passes: sheet-governed ETFs legitimately leave
+        # this column empty. "Said nothing" and "said something we do not
+        # understand" are different facts; only the first is safe to ingest.
+        asset_class_raw = raw.get("Asset Class")
+        if (
+            normalize_asset_class(asset_class_raw) == "crypto"
+            or is_unrecognised_asset_class(asset_class_raw)
+        ):
             skipped_crypto += 1
             continue
 
@@ -426,7 +493,10 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         })
     if skipped_crypto:
         # Logged rather than silent: a drop nobody can see is how the
-        # collision survived in the first place.
+        # collision survived in the first place. Counts crypto rows AND rows
+        # whose Asset Class did not classify — both are refusals to publish,
+        # and a sudden jump here means the sheet grew a label this module has
+        # never seen, which is worth a look rather than a silent shrug.
         logger.info("sheet.crypto_rows_skipped count=%d", skipped_crypto)
     return rows
 
