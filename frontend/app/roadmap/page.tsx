@@ -34,7 +34,15 @@ const ITEMS: RoadmapItem[] = [
   // LATER
   { slug: "backtesting",            title: "Backtesting",                detail: "Replay any ticker and see how its score evolved before today's call.",                  status: "later" },
   { slug: "custom-weights",         title: "Custom scoring weights",     detail: "Pro users override the default 6-factor weights per saved scan.",                      status: "later" },
-  { slug: "crypto",                 title: "Crypto coverage",            detail: "BTC + top-50 by liquidity, scored on the same framework.",                              status: "later" },
+  // NOT "scored on the same framework" — that was the old wording and it
+  // promises something the model cannot do. Two of the six factors have no
+  // crypto analogue at all (insider Form 4 filings, company fundamentals),
+  // so ~45% of the composite weight would be a constant and no token could
+  // exceed 77.5/100 — "HIGH CONVICTION" unreachable by construction. See
+  // backend/alembic/versions/20260903_0063_drop_crypto_rows.py, which deleted
+  // 54 crypto rows for exactly this reason. Crypto needs a different factor
+  // set and a different benchmark; it is a second product, not a wider net.
+  { slug: "crypto",                 title: "Crypto coverage",            detail: "Would need its own factor set — two of our six have no crypto equivalent. Not a widening of the current model.", status: "later" },
   { slug: "options-flow",           title: "Options flow integration",   detail: "Unusual-options activity overlay on ticker pages.",                                     status: "later" },
   { slug: "ios-app",                title: "Mobile app",                 detail: "Native iOS + Android with push notifications and watchlist widget.",                    status: "later" },
 ];

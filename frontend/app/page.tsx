@@ -518,15 +518,25 @@ export default async function LandingPage() {
       <section className="bg-panel/30">
         <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
           <div className="text-center mb-6">
+            {/* Says "no account", NOT "no card".
+                Both are true of a newsletter signup, but this chip sits
+                directly above the word "trial" and ~300 lines away from the
+                binding sentence in Block A ("Adding a card is what starts the
+                trial"). A summariser lifting this block alone reads
+                "Free · no card / Not ready for a trial?" and emits "free
+                trial, no card" — the one claim that is never allowed, because
+                the 14-day Premium trial genuinely requires a card.
+                "No account" is the friction claim that actually means
+                something here, and it cannot be misread onto the trial. */}
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">
-              Free · no card
+              Free · no account
             </div>
             <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
               Not ready for a trial?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted text-sm sm:text-base leading-relaxed">
               Get the daily Top 10 picks in your inbox each market morning.
-              One email, one minute, no card. Unsubscribe in one click.
+              One email, one minute, no account. Unsubscribe in one click.
             </p>
           </div>
           <div className="mx-auto max-w-md">
