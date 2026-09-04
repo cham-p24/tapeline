@@ -107,7 +107,31 @@ logger = logging.getLogger(__name__)
 
 # Pinned Graph API version. Meta deprecates versions on a schedule; pinning
 # means an upstream default change can never silently alter payload handling.
-GRAPH_API_VERSION = "v21.0"
+#
+# The pin is only safe if someone notices when it goes stale, and nobody did:
+# v21.0 sat here from #542 until 2026-09-04, by which point Meta was returning
+# `x-ad-api-version-warning: You are calling a deprecated version of the Ads
+# API` on EVERY live call. The warning was in the response headers the whole
+# time and nothing read them.
+#
+# Verified against the live endpoint on 2026-09-04 (empty `data` array, so no
+# event is recorded), from the production machine:
+#
+#   for v in v21.0 v22.0 v23.0 v24.0 v25.0; do
+#     curl -s -D- -o/dev/null -X POST #       "https://graph.facebook.com/$v/<PIXEL_ID>/events" #       -H "Authorization: Bearer $META_CAPI_ACCESS_TOKEN" #       -H 'Content-Type: application/json' -d '{"data":[]}' #       | grep -i 'x-ad-api-version-warning\|facebook-api-version'
+#   done
+#
+#   v21.0 v22.0 v23.0 -> deprecated warning
+#   v24.0 v25.0       -> no warning
+#
+# A bogus version (v99.0) is served as v20.0 and errors with "Unknown path
+# components", so an echoed `facebook-api-version` really does confirm the
+# version exists — that control is what makes the result above meaningful.
+#
+# v24.0 rather than v25.0: one step back from newest is the conservative pin for
+# a money path, and both are current. `test_graph_api_version_is_not_deprecated`
+# fails if this is ever set back into the known-deprecated range.
+GRAPH_API_VERSION = "v24.0"
 
 # Best-effort, inline on the Stripe webhook. Two seconds mirrors the GA4
 # service and stays far under Stripe's webhook timeout.
