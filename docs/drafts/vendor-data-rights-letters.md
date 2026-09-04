@@ -1,6 +1,11 @@
 # Vendor data-rights letters — Massive and Finnhub
 
-**Status: DRAFTED, NOT SENT.** Two emails, both short. Send them the same day as
+**Status: BOTH SENT 2026-09-05.** Massive → support@massive.com (Gmail thread `1a06d446b4f5baac`).
+Finnhub → support@finnhub.io (thread `1a06d4485e9f7d06`). Sent from cpiyatilaka@gmail.com,
+which is a mailbox that is actually read — check 1 above. The lawyer brief went the
+same day. **The 2-6 week clock started 2026-09-05; chase once at 2026-09-26.**
+
+*Historical framing below, kept as written. Two emails, both short. Send them the same day as*
 the lawyer brief (`docs/launch/LAWYER_CONSULT_EMAIL.md`) — they answer the same
 question from the other side, and they carry a **2-6 week lead time that only
 starts when they are sent.**
