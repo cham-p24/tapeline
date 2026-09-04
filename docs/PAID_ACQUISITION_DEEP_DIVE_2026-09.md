@@ -86,9 +86,22 @@ A$511 end.
 
 ## 1. The answer
 
-**Stop the Meta campaign on 7 September — one day early, not on the 15th. Do not restart Google non-brand. Do not spend another dollar on paid until four free checks are done.**
+**Let the Meta campaign run to 15 September as planned. Do not restart Google non-brand. Do not spend another dollar of NEW paid budget until four free checks are done.**
 
-The remaining A$96 of Meta budget buys no information: the ad set is 11–17× below the volume at which Meta's optimiser functions, and it has never received a single conversion event. Stopping on the 7th also avoids a live compliance problem — the open-access promo silently reverts on 8 September, which makes free-tier claims in the running ads false mid-flight.
+> **This paragraph was rewritten on 2026-09-05.** It used to read "stop the Meta
+> campaign on 7 September — one day early", and correction **C2** above rules that
+> wrong: every open-access surface is date-gated through `freeOpenAccess()` and
+> removes itself with no deploy, so the 8 September revert *heals* a copy problem
+> instead of creating one. The two sections contradicted each other for three days,
+> and §1 is the half a reader acts on first — a founder who read the answer without
+> reading the corrections block would have killed the campaign on a retracted
+> recommendation. Corrections are only worth writing if they reach the summary.
+
+Running to the 15th is the whole point of the extension: it puts the **12–14 September
+trial decisions inside a live campaign**, which is the only way those decisions are
+attributable to it at all. The remaining A$96 buys little on its own — the ad set is
+11–17× below the volume at which Meta's optimiser functions, and it has never received
+a single conversion event — but stopping early costs the attribution and saves A$96.
 
 **Do these instead, this week, for A$0:** read Events Manager → Data Restrictions; pull "unique link clicks" and "landing page views" from Ads Manager; open Bing Webmaster Tools' AI Performance report; and put a physical street address on the site, which Google's financial-services policy requires and Tapeline does not have.
 
@@ -311,7 +324,21 @@ The Meta campaign currently runs to **15 September**. Any ad or landing-page cla
 
 Ad-to-landing-page mismatch sits under Google's **Circumventing systems** policy (*"Showing Google a landing page or an ad's destination that complies with Google Ads' policies while showing people different content"*), which is one of ten "egregious" policies carrying suspension on detection, without prior warning, and permanent loss of advertising access unless an appeal succeeds. Meta's Unacceptable business practices standard is analogous.
 
-**This is a self-inflicted misrepresentation trigger on a known calendar date, four days out.** It is the strongest single reason to stop the campaign on 7 September rather than let it run to the 15th.
+**~~This is a self-inflicted misrepresentation trigger on a known calendar date, four days out. It is the strongest single reason to stop the campaign on 7 September rather than let it run to the 15th.~~**
+
+**RETRACTED 2026-09-05 — see correction C2.** The premise is wrong. Every surface
+that mentions open access is gated behind `freeOpenAccess()` and removes itself
+with no deploy, so nothing goes stale on the morning of the 8th: `OpenAccessBanner`
+returns null, the homepage block renders nothing, `app/scanner` and `app/billing`
+both re-read the live cap. There is no ad-to-landing-page mismatch to trigger.
+
+The residual is a single 6-hour page cache on `/pricing` — measured in hours, on one
+page, and not an ad. The section's own analysis of the *policy* stands and is worth
+keeping; what does not stand is the claim that Tapeline is exposed to it here.
+
+The revert actually **heals** a copy problem rather than creating one: per `CLAUDE.md`,
+"upgrade to unlock the full scanner" is the claim that is false *during* the promo and
+true again after it.
 
 ---
 
@@ -496,11 +523,31 @@ It is a separate free property from Search Console (which Zanek has, and which d
 | 8 | **Fix `docs/PAID_ADS_METRICS_BIBLE.md` line 50** — Meta finance-feed CTR 0.98% is the **third**-lowest vertical (Automotive Repair 0.80%, Physicians & Surgeons 0.83% are lower), not the lowest. | 5 min | A false claim sitting in the house's own canonical reference. |
 | 9 | **Write the 12–14 Sep decision rule down, before the result.** | 30 min | See §8.4. |
 | 10 | **Five-screen Google audit** (§3.3), as forensics. | 60 min | Learn what A$951 bought. Not a restart plan. |
-| 11 | **Stop the Meta campaign end of day 7 September.** | 5 min | See below. |
+| 11 | **Let the Meta campaign run to 15 September, as planned.** | 0 min | Corrected 2026-09-05 — see below. |
 
-**Why stop on the 7th, not the 15th.** Spend was 146.86 on 2 September at ~A$13.73/day actual delivery — roughly A$215 by the 7th, ~A$310 by the 15th, against a A$350 kill line. Running to the 15th spends **~A$96 more for zero additional information**, crosses the 8 September promo revert (making live ad copy false, §4.6), and contaminates the clean pre/post read.
+**~~Why stop on the 7th, not the 15th.~~ RETRACTED — the campaign runs to the 15th.**
+The original row said stop end of day 7 September, on three grounds. Two survive as
+arithmetic and one was simply wrong:
 
-**Before it stops — freeze the pre/post baseline** in `docs/WEEKLY_LEDGER.md`: signups/day, card-adds/day, Facebook-referred sessions/day for 27 Aug → 7 Sep (ads on), to be compared against 8 → 19 Sep (ads off) on identical definitions. Underpowered at 31 accounts, but a pre-registered comparison beats an argument in three weeks about what the baseline felt like. **Write the comparison rule before the ads stop, or hindsight will write it.**
+- *Spend.* Correct as stated — A$215 by the 7th, ~A$310 by the 15th, against a A$350
+  kill line. Running on costs **~A$96**, and the line is not crossed either way.
+- *"Crosses the 8 September promo revert, making live ad copy false."* **False.** Every
+  open-access surface is date-gated through `freeOpenAccess()` and removes itself with
+  no deploy. See correction C2 and the retraction in §4.6.
+- *"Contaminates the clean pre/post read."* Backwards. The **12–14 September trial
+  decisions** are the only conversion events this campaign is likely to produce, and
+  they are attributable to it only while it is live. Stopping on the 7th does not
+  protect the read — it throws away the read.
+
+A$96 for the one window in which this campaign can produce an attributable outcome is
+the cheapest information on the list.
+
+**Freeze the pre/post baseline anyway** in `docs/WEEKLY_LEDGER.md`: signups/day,
+card-adds/day, Facebook-referred sessions/day for 27 Aug → 15 Sep (ads on), to be
+compared against 16 → 27 Sep (ads off) on identical definitions. Underpowered at 31
+accounts, but a pre-registered comparison beats an argument in three weeks about what
+the baseline felt like. **Write the comparison rule before the ads stop, or hindsight
+will write it.**
 
 **Also this week, if a payer reply is authorised:** email `llegrandconsulting` and `avasmom8723` one question — *"what were you doing when you first came across Tapeline?"* n=2 with a direct answer beats n=2 with a dashboard guess. **These are live paying customers; get the founder's explicit authorisation before sending.**
 
