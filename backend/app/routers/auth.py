@@ -314,6 +314,27 @@ async def signup(
     # services/rate_limit already does for limit_auth.
     client_ip = resolve_client_ip(request)
     if not await verify_turnstile(body.turnstile_token, client_ip):
+        # TELL SOMEONE. This 400 was returned to every single caller from
+        # 2026-08-10 to 2026-09-03 (#725) because the frontend shipped a blank
+        # Turnstile site key, so no widget rendered and no token was ever sent.
+        # It survived nearly a month because the only signal was an error the
+        # visitor saw and the founder did not — Google sign-in uses a different
+        # route and kept working, so the account count kept rising.
+        #
+        # The reason is classified HERE, from what we already know, rather than
+        # by asking Cloudflare a second time: an absent token is the outage
+        # signature (blank key / blocked script / broken widget), while a token
+        # that was submitted and refused is ordinarily just a bot.
+        reason = "no_token" if not body.turnstile_token else "token_rejected"
+        try:
+            from app.services.signup_alerts import alert_signup_blocked
+
+            await alert_signup_blocked(
+                reason, email=body.email, client_ip=client_ip
+            )
+        except Exception:
+            # Alerting must never be what breaks signup.
+            logger.exception("signup.blocked_alert_failed reason=%s", reason)
         raise HTTPException(400, "Bot challenge failed. Please refresh and try again.")
 
     # IP-based 24h signup cap. Stops drive-by trial farming where one host
