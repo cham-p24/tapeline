@@ -122,6 +122,51 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
 
+# 9c — Shipped 2026-09-05
+
+Found by a ten-agent audit of the founder's five strategic items, every verdict
+independently challenged. The challenge phase corrected two of the five, and one
+of its own corrections was wrong — recorded here because the near-miss is the
+useful part.
+
+- [x] **The crypto guard only knew two spellings** (#729) — #715 dropped rows whose
+  Asset Class normalises to `crypto`, which covers only the spellings already in
+  the map. `token`, `digital asset` or any new icon normalised to None, passed the
+  guard, and published at the token's price. Now fails closed on any class it
+  cannot read, while blank still passes (sheet-governed ETFs leave it empty by
+  design). Watched failing first: 7 red, 15 green.
+- [x] **Migration 0063 claimed something false** (#729) — it said deleting the four
+  collision rows would let `_refresh_universe` re-create them. Verified live: all
+  four still 404. They are **correctly** absent — EOS/BGB/LEO are closed-end funds
+  that `VENDOR_TYPE_TO_ASSET_CLASS` excludes on purpose, and SOL (Emeren) was
+  delisted from the NYSE on 2025-12-15 when it went private. An audit read this as
+  a P0 regression I had caused. **It is not one — do not go looking for it.**
+- [x] **Seven paste-ready growth files still carried the retired card block** (#730)
+  — `docs/**` sits outside the copy linter's include globs, so #686 could not reach
+  them and they kept instructing their own reader to write the claim #686 removed
+  from 42 files. Two body lines had already been generated from it.
+- [x] **Homepage newsletter chip** (#730) — `Free · no card` sat directly above "Not
+  ready for a trial?" and ~300 lines from the binding sentence. Now
+  `Free · no account`. The homepage fine-print and PricingTable were also flagged
+  as live exposures and are **not** — both already bind the two facts adjacently.
+- [x] **Roadmap promised crypto "scored on the same framework"** (#730) — two of the
+  six factors have no crypto analogue, so ~45% of the weight would be constant and
+  no token could exceed 77.5/100. Reworded.
+- [x] **The deep dive contradicted its own correction** (#731) — §1, §4.6 and action
+  row 11 all said stop Meta on 7 September, on a promo-revert premise that the
+  doc's own correction C2 refutes. §1 is the half a reader acts on first. All three
+  now say run to the 15th, with the retractions left visible.
+- [x] **Lawyer brief + both vendor letters SENT** (#727) — see §7. The lawyer address
+  was the real blocker: Holley Nethercote publish no email address anywhere and
+  their contact form renders no fields at all.
+
+**Where the five strategic items actually stand.** Comparison pages DONE (18 gone,
+410 + noindex, 165 stock-vs-stock survived). Ads PARTIAL — A$1,074.53 lifetime spend,
+zero payers, tracking now genuinely fixed. Scale strategy ANSWERED but not actioned,
+and gated on the 0/6 interview count. Trading ANSWERED, brief now sent. Crypto and
+world markets ANSWERED — neither is reachable without a commercial data licence,
+which is exactly what the vendor letters are now asking the price of.
+
 # 9b — Shipped 2026-09-02/03 (was not on the original list)
 
 Found while working the list. All merged, deployed and verified in production.
