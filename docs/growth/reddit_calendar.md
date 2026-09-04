@@ -1,18 +1,31 @@
 # Tapeline — 8-Week Reddit Posting Calendar
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the live scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 14-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and the Congressional and insider
+> feeds.
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> The **published record is free with no account at all**: the daily Top 10, the
+> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History, because this block said the OPPOSITE until today, and that is the
+> whole reason it is being rewritten: #548 (2026-08-22) put a card wall in front
+> of the logged-in product, and #683 (2026-08-30) removed it. #686 corrected 79
+> claims across 42 files — but not this one, because `docs/**` sits outside the
+> copy linter's include globs. So this file kept instructing its own reader to
+> write the false claim, and every line of paste-ready copy below it was
+> generated from that instruction. Audited 2026-09-05: seven of the thirteen
+> files in this directory still carried the retired block._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -95,7 +108,7 @@ What surprised me from two weeks of running this:
 
 3. Smart Money reads disclosed Form 4 transactions netted over a recent window — not 13F, and not Congressional disclosures, which are ingested and published as their own feed rather than folded into the sub-score. Whether that netting is the right construction is the thing I'd most like torn apart.
 
-The full record is readable with no account and no card. A free-tier account gets top-10 rows live and 12 look-ups a day. Pro is $9.99/mo for the full ~2,500-ticker universe. Creating an account puts a card on file at first sign-in and starts the 14-day Premium trial — $0 charged today, one click to cancel before day 14.
+The full record is readable with no account and no card. A free account is an email and a password — no card — and gets top-10 rows live plus 12 look-ups a day. Pro is $9.99/mo for the full ~2,500-ticker universe. A card is only for the 14-day Premium trial — $0 charged today, first charge on day 14, one click to cancel before then.
 
 What signals or factors would you want me to add weight to? The weighting is versioned in the changelog so factor changes ship with a written rationale.
 ```
