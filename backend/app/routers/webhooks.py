@@ -209,7 +209,7 @@ async def _send_purchase_conversion(
             # raw address never leaves this process.
             #
             # The stored Meta click id comes along in the same read. A purchase
-            # lands ~14 days after the click with no browser present, so `fbc`
+            # lands ~30 days after the click with no browser present, so `fbc`
             # can only be rebuilt server-side from the persisted fbclid — and
             # without it the fbclid → User → Stripe join that is the only
             # honest Meta payer count has nothing to key on.

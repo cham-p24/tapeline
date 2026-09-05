@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "FEATURE",
     title: "Congressional Stock Trades.",
     subtitle:
-      "Live STOCK Act disclosures from House + Senate, joined to each ticker's Tapeline score. Premium feature, 14-day trial.",
+      "Live STOCK Act disclosures from House + Senate, joined to each ticker's Tapeline score. Premium feature, 30-day trial.",
   });
 }

@@ -143,7 +143,7 @@ export default function VerifyPage() {
           <LandingCta
             from="scorecard"
             showPreview={false}
-            primaryLabel="Try the live scanner — 14-day trial"
+            primaryLabel="Try the live scanner — 30-day trial"
             secondaryHref="/scorecard"
             secondaryLabel="Open the public scorecard"
           />

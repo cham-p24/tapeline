@@ -218,7 +218,7 @@ export default function SqueezePage() {
           <p className="mt-2 text-sm text-muted">
             The full Squeeze Watch feed — every current setup, plus the volume,
             OBV and timing-window columns — is part of the $9.99/mo (Pro) plan
-            (USD). 14-day Premium trial &mdash; $0 today, cancel in one click.
+            (USD). 30-day Premium trial &mdash; $0 today, cancel in one click.
           </p>
           <div className="mt-5 flex justify-center gap-3">
             <Link href="/app/billing?intent=pro" className="btn-primary">Upgrade to Pro &rarr;</Link>

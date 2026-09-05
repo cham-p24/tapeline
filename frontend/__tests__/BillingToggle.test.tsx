@@ -19,6 +19,9 @@
  *     (watchlist 5, top-10 scanner rows)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// Trial length read from lib/trial.ts. These assertions used to hardcode
+// 14 and so kept asserting a promise the product had stopped making.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import BillingPage from "@/app/app/billing/page";
 import type { SessionUser } from "@/lib/auth";
@@ -171,7 +174,9 @@ describe("BillingPage — trial checkout dead-end fix", () => {
     // in-page button, never a dead /signup link) is unchanged.
     render(<BillingPage />); // default ctx.user = free, never trialled
     expect(
-      screen.getByRole("button", { name: /see plans and the 14-day trial/i }),
+      screen.getByRole("button", {
+        name: new RegExp(`see plans and the ${TRIAL_DAYS}-day trial`, "i"),
+      }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /try premium free/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /sign ?up/i })).not.toBeInTheDocument();

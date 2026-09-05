@@ -79,7 +79,7 @@ export function OnboardingTip() {
           </h3>
           {onTrial && (
             <p className="mt-1 text-sm text-muted">
-              Your 14-day Premium trial is live.
+              Your 30-day Premium trial is live.
             </p>
           )}
           <ul className="mt-3 space-y-1.5 text-sm">

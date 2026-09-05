@@ -193,7 +193,7 @@ export default async function SignalsPage() {
               Anonymous visitors see the top {PREVIEW_ROWS}.{" "}
               <Link href="/signup" className="link">Create an account</Link> &mdash; an email and a
               password, no card &mdash; and the whole list opens here. In the app itself the free
-              plan scores the top ten rows of any scan; a card starts the 14-day Premium trial for
+              plan scores the top ten rows of any scan; a card starts the 30-day Premium trial for
               every matching row, $0 charged that day, one click to cancel.
             </>
           )}
@@ -318,8 +318,8 @@ export default async function SignalsPage() {
                 You&rsquo;re seeing the top {PREVIEW_ROWS} of {items.length.toLocaleString()} scored tickers.
                 An account takes an email and a password and opens the rest of this list — the same
                 six named factors on every row. Inside the app the free plan scores the top ten rows
-                of any scan; a card starts the 14-day Premium trial for every matching row, $0
-                charged that day, first charge on day 14, one click to cancel.
+                of any scan; a card starts the 30-day Premium trial for every matching row, $0
+                charged that day, first charge on day 30, one click to cancel.
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <Link href="/signup?next=/signals" className="btn-primary">

@@ -14,6 +14,9 @@
  * (compliance Rule 6).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+// Trial length read from lib/trial.ts. These assertions used to hardcode
+// 14 and so kept asserting a promise the product had stopped making.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { render, screen } from "@testing-library/react";
 
 // ScannerPreview is an async server component (server-fetches the real
@@ -143,9 +146,9 @@ describe("LandingPage hero fold", () => {
     // and the new account can scan immediately — the card is what buys the
     // trial, and the TRIAL's terms below are exactly as they were.
     expect(text).toMatch(/no card/i);
-    expect(text).toMatch(/14 days of Premium/i);
+    expect(text).toMatch(new RegExp(`${TRIAL_DAYS} days of Premium`, "i"));
     expect(text).toMatch(/nothing is charged/i);
-    expect(text).toMatch(/first charge is on day 14/i);
+    expect(text).toMatch(new RegExp(`first charge is on day ${TRIAL_DAYS}`, "i"));
     expect(text).toMatch(/one click cancels/i);
     // The path that needs no account at all is still offered alongside it.
     expect(text).toMatch(/free to read with no account/i);

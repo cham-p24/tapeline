@@ -1,7 +1,7 @@
 """POST /api/newsletter/subscribe  ·  GET /api/newsletter/unsubscribe
 
 The lead-magnet capture endpoint. Visitors who aren't ready to start a
-14-day trial can drop their email here to get the daily Top 10 digest.
+30-day trial can drop their email here to get the daily Top 10 digest.
 Lower-commitment funnel step than /signup; once we have their email
 we can re-engage via the daily send and the trial CTA inside it.
 

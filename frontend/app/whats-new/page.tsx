@@ -440,9 +440,9 @@ export default function WhatsNewPage() {
               lands on the Free plan, which opens the live scanner at the{" "}
               <strong className="text-fg">top ten scored rows</strong> — live data, no delay — plus
               one saved screen, a 5-symbol watchlist and 12 ticker pages a day. A card is the
-              separate step that starts the 14-day Premium trial, and it is what turns on every
+              separate step that starts the 30-day Premium trial, and it is what turns on every
               matching row, a second saved screen, alerts, CSV export and the filings feeds:{" "}
-              <strong className="text-fg">$0 charged today</strong>, first charge on day 14 at the
+              <strong className="text-fg">$0 charged today</strong>, first charge on day 30 at the
               plan you pick. We email you <strong className="text-fg">three days before</strong> that
               charge, and cancelling is one click on the first screen — cancel before day 14 and you
               are never charged. The published record stays free to read with no account.
@@ -546,7 +546,7 @@ export default function WhatsNewPage() {
           <p className="mx-auto mt-2 max-w-md text-muted">
             The record is free to read with no account. A free account takes an email and a
             password and opens the live scanner at the top ten scored rows; a card is what starts
-            the 14-day Premium trial &mdash; $0 today.
+            the 30-day Premium trial &mdash; $0 today.
           </p>
           <Button href="/signup" variant="primary" shape="rounded" className="mt-6">
             Open Tapeline &rarr;

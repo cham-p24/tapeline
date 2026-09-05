@@ -10,7 +10,7 @@
 >
 > From 2026-08-22 a **new account must put a card on file at first sign-in**
 > before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> 30-day Premium trial, first charge on day 30, one click to cancel before then).
 > Accounts created **before** that date are grandfathered: they keep the free
 > access they signed up for and are never asked for a card.
 >
@@ -41,7 +41,7 @@
 > copy as a draft to re-check, not as approved copy.
 
 `LAUNCH_PLAYBOOK.md` §1 has the primary draft (focus: public methodology +
-public scorecard, 14-day trial mention). This file holds two alternate angles in
+public scorecard, 30-day trial mention). This file holds two alternate angles in
 case the primary doesn't feel right on Tuesday morning. All three are
 **post-as-Text-with-`https://tapeline.io`-in-URL-field** format.
 
@@ -70,7 +70,7 @@ The scorecard is the part I want HN to tear apart. It's the only thing I've ever
 Free tier: top-10 rows, live, 12 ticker look-ups a day, 5-name watchlist.
 Pro $8.25/mo billed annually: full live universe + smart alerts.
 Premium $19.99/mo: + Congress trades + SEC Form 4.
-14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 30, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
 Built solo over the last few months from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and what factors I'm under-weighting.
 ```
@@ -109,7 +109,7 @@ The scoring is version-controlled, so a change is a change on the record. /score
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED, deployed on Fly.io. The methodology — the six factors, what each measures, and their weight ordering — is published on /how-it-works; the exact weights and the parameter recipe are not.
 
-Free tier: top-10 rows, live, 12 ticker look-ups a day. Pro $8.25/mo annual. Premium $16.58/mo annual. 14-day Premium trial takes a card — $0 today, first charge on day 14, one click to cancel.
+Free tier: top-10 rows, live, 12 ticker look-ups a day. Pro $8.25/mo annual. Premium $16.58/mo annual. 30-day Premium trial takes a card — $0 today, first charge on day 30, one click to cancel.
 
 What I want HN to break: the methodology. The Smart Money sub-score in particular — it reads SEC Form 4 insider transactions and doesn't score 13F at all, because the 45-day filing lag means the position is usually already priced by the time you see it. I'd love to be argued out of that.
 ```

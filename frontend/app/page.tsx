@@ -212,8 +212,8 @@ export default async function LandingPage() {
           <p className="order-3 mt-3 text-xs leading-relaxed text-muted lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-2">
             Signing up takes an email and a password, and lands on the free plan
             &mdash; the live scanner, top ten scored rows a scan. Adding a card is
-            what starts the trial: 14 days of Premium, and nothing is charged that day
-            &mdash; the first charge is on day 14 at the plan you pick, we email you
+            what starts the trial: 30 days of Premium, and nothing is charged that day
+            &mdash; the first charge is on day 30 at the plan you pick, we email you
             three days before, and one click cancels before then. The scorecard and
             daily Top 10 stay free to read with no account either way.
           </p>
@@ -490,7 +490,7 @@ export default async function LandingPage() {
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-muted">
             See your watchlist scored the same way we score the public
-            scorecard. 14 days of Premium, $0 today.
+            scorecard. 30 days of Premium, $0 today.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary text-base">
@@ -523,7 +523,7 @@ export default async function LandingPage() {
                 trial"). A summariser lifting this block alone reads
                 "Free · no card / Not ready for a trial?" and emits "free
                 trial, no card" — the one claim that is never allowed, because
-                the 14-day Premium trial genuinely requires a card.
+                the 30-day Premium trial genuinely requires a card.
                 "No account" is the friction claim that actually means
                 something here, and it cannot be misread onto the trial. */}
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">

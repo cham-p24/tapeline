@@ -4,8 +4,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -81,7 +81,7 @@ Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stoc
 Why your audience fits:
 — The published record is complete and needs no account; a free account adds top-10 live rows and 12 look-ups a day. Genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
 — Pro tier is $8.25/mo (annual) — accessible price point for retail traders considering a paid tool.
-— The published record requires no account and no card. An account takes an email and a password and opens the free plan; a card is what starts the 14-day Premium trial — $0 today, cancels in one click.
+— The published record requires no account and no card. An account takes an email and a password and opens the free plan; a card is what starts the 30-day Premium trial — $0 today, cancels in one click.
 
 I'm specifically asking about a *secondary* placement (footer slot, sponsored link, etc.) rather than primary because we're testing the channel at $300-1.2K budget. Happy to take whichever slot/date makes sense for your inventory.
 
@@ -107,7 +107,7 @@ Christian
 ```
 Hi Finimize team,
 
-Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published methodology and a public scorecard. A free public record (no account, no card), $9.99/mo Pro, and a 14-day Premium trial that takes a card but charges $0 until day 14.
+Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published methodology and a public scorecard. A free public record (no account, no card), $9.99/mo Pro, and a 30-day Premium trial that takes a card but charges $0 until day 14.
 
 The reason it's a fit for Finimize: your audience is in the "I want to learn how investing works" cohort. Tapeline's positioning lands there — the entire product is built around showing you HOW each score is computed, not just giving you a verdict. The /how-it-works page is half the product.
 
@@ -136,7 +136,7 @@ Pitching Tapeline (tapeline.io) for a single-issue sponsorship. The angle: Tapel
 Why your audience fits specifically:
 — Net Interest readers are professionals who read 10-Ks and quarterly filings. The Smart Money factor reads disclosed SEC Form 4 insider transactions and nets them over a recent window — not 13F, and not Congressional disclosure, which Tapeline publishes as its own feed rather than folding into the sub-score. Every other retail scoring tool either hides the smart-money methodology or skips it.
 — The methodology transparency matches Net Interest's editorial standard. The product positioning is the inverse of "trust us, our AI works."
-— Pricing is retail-friendly ($9.99/mo Pro, a free public record with no account, 14-day Premium trial at $0 today), so the placement converts on direct-response, not just brand-awareness.
+— Pricing is retail-friendly ($9.99/mo Pro, a free public record with no account, 30-day Premium trial at $0 today), so the placement converts on direct-response, not just brand-awareness.
 
 Asking about a single-issue sponsored block. Happy to take any format that fits your usual inventory. Budget on our side starts at $300 and we can flex upward if a primary-placement slot makes sense for both of us.
 
@@ -164,7 +164,7 @@ Your audience is the cohort that most cares about this. Most retail scoring tool
 
 Specific angles for the placement:
 — The published record is real product and needs no account; free accounts get top-10 live rows and 12 look-ups a day.
-— Pro is $9.99/mo. The published record needs no account or card; creating an account takes a card and starts the 14-day Premium trial at $0 today.
+— Pro is $9.99/mo. The published record needs no account or card; creating an account takes a card and starts the 30-day Premium trial at $0 today.
 — Smart Money factor reads disclosed SEC Form 4 insider transactions, netted over a recent window — named on the methodology page, which is the sort of thing Bear Cave readers appreciate.
 
 Budget on our side starts at $300 and can flex upward if the placement timing/format matches. Open to whatever inventory works best for you.
@@ -189,7 +189,7 @@ Hi Andrew,
 
 Pitching Tapeline (tapeline.io) for a sponsorship slot. Quick overview: stock-scanning tool for retail traders with a published 6-factor methodology and a public scorecard that back-checks every daily pick against SPY the next session. The record is free with no account; free-tier accounts get top-10 live rows. Pro at $8.25/mo annual.
 
-Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The published record is a low-friction way for them to try it — no account, no card, ever. The 14-day Premium trial does take a card, charges $0 today, and cancels in one click.
+Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The published record is a low-friction way for them to try it — no account, no card, ever. The 30-day Premium trial does take a card, charges $0 today, and cancels in one click.
 
 Asking what your sponsorship inventory looks like. Budget on our side starts at $300; happy to flex up to $1,200 if a primary slot is the right fit. Lower-tier / footer inventory is also fine for a first test.
 

@@ -448,7 +448,7 @@ export default async function BestStocksForStrategyPage({
           <p className="mt-3 text-sm text-muted">
             The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no
             account. An account takes an email and a password, and runs this scan live ten scored
-            rows at a time. A card starts the 14-day Premium trial: $0 today, first charge on day
+            rows at a time. A card starts the 30-day Premium trial: $0 today, first charge on day
             14, one click to cancel — every matching row across the ~2,500-ticker universe, every
             sort/filter combination, watchlist + alerts. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.

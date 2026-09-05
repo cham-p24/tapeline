@@ -64,14 +64,14 @@ export function Paywall({
   const priceLine = requiredTier === "premium" ? "$19.99/mo (Premium)" : "$9.99/mo (Pro)";
   const signedIn = !!user;
   // Risk-reversal line must be TRUE for the viewer. Signup grants no trial at
-  // all (routers/auth.py writes tier="free", trial_ends_at=None). The 14-day
+  // all (routers/auth.py writes tier="free", trial_ends_at=None). The 30-day
   // Premium trial is card-required and opt-in — POST /api/billing/checkout
   // {"start_trial": true} — so a signed-out reader can still be offered it,
   // while a signed-in user's checkout charges immediately (their trial is
   // consumed or unavailable). They get the real guarantee instead.
   const riskLine = signedIn
     ? "30-day money-back guarantee · cancel anytime."
-    : "14-day Premium trial — $0 today, cancel in one click.";
+    : "30-day Premium trial — $0 today, cancel in one click.";
 
   return (
     <div className="card relative overflow-hidden p-0">
@@ -102,7 +102,7 @@ export function Paywall({
                 className="btn-primary"
                 onClick={() => trackUpgradePromptClicked("paywall", feature)}
               >
-                Start the 14-day trial &rarr;
+                Start the 30-day trial &rarr;
               </Link>
             )}
             <Link href="/pricing" className="btn-ghost">See all plans</Link>
@@ -137,13 +137,13 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
             screen here to qualify the CTA, so the label has to carry the
             mechanism itself — "Try Premium free" would be the only thing this
             reader sees about the trial, and the trial takes a card. */}
-        {!user && <>The 14-day Premium trial is $0 today, cancel in one click.{" "}</>}
+        {!user && <>The 30-day Premium trial is $0 today, cancel in one click.{" "}</>}
         <Link
           href={user ? "/app/billing" : "/signup"}
           className="text-accent underline"
           onClick={() => trackUpgradePromptClicked("paywall", feature)}
         >
-          {user ? "Upgrade" : "Start the 14-day trial"} &rarr;
+          {user ? "Upgrade" : "Start the 30-day trial"} &rarr;
         </Link>
       </span>
     </div>
@@ -214,7 +214,7 @@ export function PaywallModal({
           Upgrade to {priceLine} to unlock.{" "}
           {user
             ? "30-day money-back guarantee · cancel anytime."
-            : "14-day Premium trial — $0 today, first charge on day 14, cancel in one click."}
+            : "30-day Premium trial — $0 today, first charge on day 30, cancel in one click."}
         </p>
         <div className="mt-6 flex gap-3">
           <Link

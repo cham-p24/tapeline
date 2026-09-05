@@ -133,7 +133,7 @@ const ENTRIES: Entry[] = [
     title: "The card moved off the front door — sign up with an email and a password",
     body: [
       "Signing up takes an email and a password. The account it makes lands on the Free plan and opens the live scanner straight away: the top ten scored rows of any scan, on live data, no delay. Free also carries one saved screen, a 5-symbol watchlist, and 12 ticker deep-pages a day.",
-      "A card is what starts the 14-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included.",
+      "A card is what starts the 30-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included.",
       "The trial terms are unchanged: $0 charged that day, the exact first-charge date shown before you confirm, an email three days before the charge, and one click to cancel.",
       // copy-compliance-allow card-required-signup -- dated changelog entry; it states the superseded arrangement, and says so
       "This supersedes the arrangement in the 22 August 2026 entry below, where a new account added a card at first sign-in before the logged-in product opened. That entry stands as a record of what shipped then. The published record — daily top 10, scorecard, per-ticker pages, CSV/JSON — is unchanged and still needs no account.",
@@ -146,7 +146,7 @@ const ENTRIES: Entry[] = [
     title: "Premium trial takes card details up front — $0 today, reminder email, one-click cancel",
     body: [
       // copy-compliance-allow card-required-signup -- the 2026-08-22 entry itself; a changelog records what WAS true on its date
-      "From 22 August 2026, a new account adds a card at first sign-in and starts the 14-day Premium trial. $0 is charged on day 0; the first charge lands on day 14 at the plan picked at sign-up.",
+      "From 22 August 2026, a new account adds a card at first sign-in and starts the 30-day Premium trial. $0 is charged on day 0; the first charge lands on day 14 at the plan picked at sign-up.",
       "A reminder email goes out three days before the first charge, and cancelling is one click on the first screen of the cancel flow — cancel before day 14 and no charge is ever made.",
       "Existing accounts are unaffected, and the published record — daily top 10, scorecard, CSV/JSON — stays free to read with no account.",
     ],
@@ -212,6 +212,11 @@ const ENTRIES: Entry[] = [
     body: [
       "New founding pricing across every plan: Pro is $9.99/mo or $99/yr ($8.25/mo effective), Premium is $19.99/mo or $199/yr ($16.58/mo effective). Tapeline is new and the price now says so — subscribers keep their rate for as long as the subscription stays active. No countdowns, no fake scarcity.",
       "Money-back guarantee extended from 7 days to 30 days on every paid plan — email support@tapeline.io within your first 30 days for a full refund, no forms.",
+      // A dated entry records what was true on its date. The trial was 14 days
+      // and card-free then; it is 30 days and card-required now. Editing this
+      // line would rewrite history to match the present, which is the one thing
+      // a changelog must never do — supersede with a new dated entry instead.
+      // copy-compliance-allow stale-trial-length -- dated 2026 entry; the trial was 14 days and card-free on that date
       "Feature gating unchanged: same tiers, same limits, same 14-day no-card Premium trial.",
     ],
   },
@@ -372,7 +377,7 @@ const ENTRIES: Entry[] = [
       "Six-factor scoring methodology live with all six factors published on /how-it-works.",
       "Scanner with one composite score and one plain-English Why on every US-listed ticker.",
       "Watchlist with smart score-change alerts.",
-      "14-day Premium trial available with no credit card. (Since superseded: the trial is card-required. Where the card is asked for changed on 22 August 2026 and again on 30 August 2026 — see those entries, and /pricing.)",
+      "30-day Premium trial available with no credit card. (Since superseded: the trial is card-required. Where the card is asked for changed on 22 August 2026 and again on 30 August 2026 — see those entries, and /pricing.)",
     ],
   },
 ];

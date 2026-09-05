@@ -49,7 +49,7 @@ const SCREENERS: FreeScreener[] = [
     trackRecord: "Public scorecard",
     noCard: "Yes",
     summary:
-      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. There are two free paths here, and they are worth separating. Reading asks for nothing at all: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record are open to anyone. Running the scanner asks for an email and a password and nothing else — the free plan is live, not delayed, and shows you the top ten scored rows of whatever scan you build, with one saved screen and a five-symbol watchlist. A card is what turns on the rest of the matching rows, alerts, CSV export and the filings feeds, and adding one starts the 14-day Premium trial ($0 that day, first charge on day 14, one click to cancel).",
+      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. There are two free paths here, and they are worth separating. Reading asks for nothing at all: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record are open to anyone. Running the scanner asks for an email and a password and nothing else — the free plan is live, not delayed, and shows you the top ten scored rows of whatever scan you build, with one saved screen and a five-symbol watchlist. A card is what turns on the rest of the matching rows, alerts, CSV export and the filings feeds, and adding one starts the 30-day Premium trial ($0 that day, first charge on day 30, one click to cancel).",
   },
   {
     name: "Finviz (free)",
@@ -305,7 +305,7 @@ export default function BestFreeStockScreenerPage() {
             The scanner that shows its receipts.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 14-day Premium trial, $0 today, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 30-day Premium trial, $0 today, first charge on day 30, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">

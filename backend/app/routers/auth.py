@@ -105,7 +105,7 @@ class SignupBody(BaseModel):
     # other paid-click platform. Written once to users.signup_fbclid. The RAW
     # param, not the `fb.1.<ts>.<fbclid>` wire format; meta_capi.fbc_value()
     # builds that. Without it Meta's match quality is capped and there is no
-    # honest way to count Meta payers (the 14-day trial puts every first
+    # honest way to count Meta payers (the 30-day trial puts every first
     # charge outside Meta's 7-day click window) — see migration 0053.
     fbclid: str | None = Field(None, max_length=200)
     # The `_fbp` first-party cookie the Meta pixel writes on the landing
@@ -396,7 +396,7 @@ async def signup(
     # cohorts, not access. The PUBLIC record (scorecard, daily picks, exports,
     # ticker pages) still needs no account and no card at all.
     #
-    # The 14-day Premium trial is now card-required: the user starts it
+    # The 30-day Premium trial is now card-required: the user starts it
     # deliberately from POST /api/billing/checkout {"start_trial": true}, which
     # opens a Stripe Checkout that charges $0 today and states the exact
     # first-charge date. tier/trial_ends_at/trial_started_at are then written by
@@ -404,7 +404,7 @@ async def signup(
     # SUBSCRIPTION's own trial_end, so the date we show is the date Stripe will
     # actually bill. Declining leaves the account exactly as created here.
     #
-    # Why the old auto-grant went: every account got Premium for 14 days with
+    # Why the old auto-grant went: every account got Premium for 30 days with
     # no card, so no account has ever produced a payment signal.
 
     # Generate a unique referral code for the new user
@@ -538,7 +538,7 @@ async def signup(
     # so a browser-only signup event under-counts real conversions — which is
     # precisely the signal an ad account would be optimising against.
     #
-    # Why this event and not just StartTrial: since #536 the 14-day trial is a
+    # Why this event and not just StartTrial: since #536 the 30-day trial is a
     # SEPARATE, card-required step, so StartTrial is now genuinely scarce.
     # Meta's smart bidding wants ~50 events per ad set per week; at Tapeline's
     # volume only the free-account signup has any chance of approaching that.

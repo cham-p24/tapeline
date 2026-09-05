@@ -45,7 +45,7 @@ _CANCEL_REASONS = frozenset(
 )
 
 
-# ── Card-required 14-day trial ──────────────────────────────────────────────
+# ── Card-required 30-day trial ──────────────────────────────────────────────
 #
 # Creating an account is email + password only and lands on FREE, and FREE is
 # a working product: the top ten scored rows of any scan on live data, one
@@ -110,7 +110,7 @@ if TRIAL_DAYS < MIN_TRIAL_DAYS:  # pragma: no cover - import-time invariant
 # substitute for a purchase someone has already made.
 _TRIAL_INELIGIBLE_MESSAGES: dict[str, str] = {
     "lifetime": "Your account already has lifetime access — there's nothing to trial.",
-    "already_trialed": "This account has already used its 14-day trial.",
+    "already_trialed": "This account has already used its 30-day trial.",
     "has_billing_account": (
         "This account already has a billing history with us, so the trial "
         "doesn't apply. You can subscribe directly at any time."
@@ -130,7 +130,7 @@ def _trial_ineligible_reason(user: User) -> str | None:
       • trial_ends_at    — also set by every LEGACY no-card auto-trial from
         before this change. Those rows have a null trial_started_at, so without
         this second check every pre-existing user would be handed a fresh
-        14-day trial on top of the one they already had.
+        30-day trial on top of the one they already had.
 
     A user who has ever had a Stripe customer record has been through billing
     (subscriber or churned) and buys directly rather than re-trialling; the
@@ -151,7 +151,7 @@ def _trial_ineligible_reason(user: User) -> str | None:
 class CheckoutRequest(BaseModel):
     tier: str = "pro"                     # "pro" or "premium"
     billing_period: str = "monthly"        # "monthly" or "annual"
-    # Opt-in: open this checkout as a 14-day trial instead of an immediate
+    # Opt-in: open this checkout as a 30-day trial instead of an immediate
     # purchase. Defaults False so every pre-existing caller (paid upgrade,
     # mid-trial card-add, win-back re-subscribe) behaves exactly as before.
     start_trial: bool = False
@@ -195,7 +195,7 @@ async def create_checkout(
     # branches can apply, and both end up as subscription_data.trial_end on the
     # SAME Stripe mechanism:
     #
-    #   start_trial=True  → a NEW 14-day trial. Gated on never-trialled; a
+    #   start_trial=True  → a NEW 30-day trial. Gated on never-trialled; a
     #     second attempt is refused here rather than quietly minting a second
     #     free window. The instant is computed once and returned to the caller
     #     so the confirmation UI states the same date Stripe was given.
@@ -273,7 +273,7 @@ async def create_checkout(
         # in services/billing.trial_save_offer_eligible; redeemed-at is set by
         # the subscription webhook so an abandoned checkout doesn't burn it.
         trial_save_offer=trial_save_offer_eligible(user),
-        # Either a brand-new 14-day trial or the remainder of an in-flight one
+        # Either a brand-new 30-day trial or the remainder of an in-flight one
         # — see the branch above. Forwarded as subscription_data.trial_end, so
         # Stripe collects the card, charges nothing today, and bills the first
         # real amount on that date. The service drops it when under Stripe's

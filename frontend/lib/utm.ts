@@ -285,7 +285,7 @@ export function clearStoredGclid(): void {
  *      requires NO new personal data. (Do not chase EMQ by collecting phone
  *      or date of birth: a scanner signup has no legitimate reason to hold
  *      them.)
- *   2. **Counting Meta payers at all.** The trial is 14 days, so the first
+ *   2. **Counting Meta payers at all.** The trial is 30 days, so the first
  *      charge always lands outside Meta's 7-day click window and the
  *      in-platform Purchase column reads ~0 no matter what really happened.
  *      Joining this click ID to our own Stripe rows is the only honest count.

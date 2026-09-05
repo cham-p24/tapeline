@@ -4,8 +4,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -303,7 +303,7 @@ Every other stock scanner gives you 47 filters and a blank stare.
 
 Tapeline gives you one number, one plain-English why, and a public track record you can audit before you pay.
 
-The full record is free to read with no account. Pro is $9.99/mo for the live full universe. An account takes a card and starts the 14-day Premium trial — $0 today, one click cancels.
+The full record is free to read with no account. Pro is $9.99/mo for the live full universe. An account takes a card and starts the 30-day Premium trial — $0 today, one click cancels.
 
 https://tapeline.io
 ```

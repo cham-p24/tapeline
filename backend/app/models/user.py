@@ -84,7 +84,7 @@ class User(Base):
 
     # ── Trial state (card-required trial) ──────────────────────────────────
     #
-    # Signup no longer grants a trial. The 14-day Premium trial now starts only
+    # Signup no longer grants a trial. The 30-day Premium trial now starts only
     # when the user completes a Stripe Checkout that carries a card
     # (subscription_data.trial_end — see routers/billing.py), and it is the
     # `trialing` subscription webhook that writes both columns below
@@ -307,7 +307,7 @@ class User(Base):
     #      hashed email + hashed user id, which caps EMQ around 5-6. `fbc`,
     #      derived from this value, is the cheapest upgrade available and
     #      needs no new PII.
-    #   2. The ONLY honest Meta payer count. Tapeline's trial is 14 days, so
+    #   2. The ONLY honest Meta payer count. Tapeline's trial is 30 days, so
     #      the first charge always falls outside Meta's 7-day click window and
     #      the in-platform Purchase column reads ~0 whatever the truth is.
     #      Counting payers means joining this column to Stripe ourselves.

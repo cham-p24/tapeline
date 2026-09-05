@@ -82,8 +82,8 @@ export default function SupportPage() {
                 Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
                 by design — it's the same product, just narrower, and it stays that way at no cost:
                 top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
-                The 14-day Premium trial is a separate step you choose, and it does take a card:
-                $0 is charged that day, the first charge is on day 14 at the plan you pick, and one
+                The 30-day Premium trial is a separate step you choose, and it does take a card:
+                $0 is charged that day, the first charge is on day 30 at the plan you pick, and one
                 click cancels before then. It is never started automatically.{" "}
                 <Link href="/app/billing" className="text-accent hover:underline">See plans →</Link>
               </>

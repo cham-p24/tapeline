@@ -10,7 +10,7 @@
 >
 > From 2026-08-22 a **new account must put a card on file at first sign-in**
 > before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> 30-day Premium trial, first charge on day 30, one click to cancel before then).
 > Accounts created **before** that date are grandfathered: they keep the free
 > access they signed up for and are never asked for a card.
 >
@@ -78,7 +78,7 @@ What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
 - + Recent insider buys (SEC Form 4) across the active universe
 
-14-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 14, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 30, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
 
 Try it on any ticker you like — tapeline.io/t/AAPL, tapeline.io/t/NVDA, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 

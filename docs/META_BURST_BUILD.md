@@ -40,7 +40,7 @@ All three landing keys verified live on tapeline.io 2026-08-23.
 
 ### Concept B — "$0 today. The charge date is on the page."
 **Primary text:**
-> The 14-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm. Cancelling takes one click, any time before that date. And the public scorecard needs no account at all.
+> The 30-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm. Cancelling takes one click, any time before that date. And the public scorecard needs no account at all.
 
 **Headline:** $0 today. The charge date is on the page.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -750,7 +750,7 @@ descriptive-only rule already forbids that voice.
 
 ### Rejected on compliance grounds — do not revive
 
-- A compressed *"$0 today. Start your 14-day trial."* headline — implies card-free by omission.
+- A compressed *"$0 today. Start your 30-day trial."* headline — implies card-free by omission.
 - Adding *"Past results do not indicate future results"* to the statics — a past-performance
   disclaimer presupposes a performance representation and imports the exact frame the rules exist
   to keep out. Most tempting on C, most dangerous there.

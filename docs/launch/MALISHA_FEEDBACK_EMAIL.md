@@ -29,8 +29,8 @@ suggests US- or UK-ish; aim for ~14:00 UTC to be safe across both.
 >
 > — Christian
 >
-> P.S. If you want a clean restart, the 14-day Premium trial starts when
-> you add a card — $0 charged that day, first charge on day 14, one click
+> P.S. If you want a clean restart, the 30-day Premium trial starts when
+> you add a card — $0 charged that day, first charge on day 30, one click
 > cancels before then. Or just say the word and I'll switch your account
 > on from my end instead.
 >

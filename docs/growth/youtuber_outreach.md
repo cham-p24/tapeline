@@ -31,7 +31,7 @@ Tapeline to them = handing your differentiator to a competitor.
 | 1 | Joseph Carlson (@joecarlsonshow) | **DISQUALIFIED** | Runs **Qualtrim** (qualtrim.com) — competing stock-research SaaS |
 | 2 | The Plain Bagel (@The_Plain_Bagel) | **VIABLE** | Verified active 2026-05-17. No competing product. Underscore handle is the real one; `@theplainbagel` (no underscore) is an impersonation squat — the May 5 pinned post is Richard warning about AI-impersonator accounts |
 | 3 | Money & Macro (@JoeriSchasfoort) | **VIABLE** | No competing product. Macro academic. |
-| 4 | Tom Nash (@iamtomnash) | **DISQUALIFIED** | Co-founder of **STOCK MVP** (@stock_mvp, stock-mvp.com) — competing stock-assessment software with 7-day free trial |
+| 4 | Tom Nash (@iamtomnash) | **DISQUALIFIED** | Co-founder of **STOCK MVP** (@stock_mvp, stock-mvp.com) — competing stock-assessment software with 30-day free trial |
 | 5 | Ziet Money | **DEFERRED** | Unchanged from original doc — Week 6+ only |
 
 Handle-confusion notes worth keeping for future audits:

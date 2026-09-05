@@ -6,7 +6,7 @@
 
 > ⚠️ **Superseded snapshot — read as a dated record, not as current fact.** Two
 > statements below were overtaken by later changes and must not be reused in
-> any copy: the "free 14-day trial (no credit card needed)" line under *Where
+> any copy: the "free 30-day trial (no credit card needed)" line under *Where
 > the business really stands*, and the "publishes its formula" quote under *The
 > one big decision we need to make*. Both are annotated inline. Everything else
 > stands as written on 26 June 2026.
@@ -29,7 +29,7 @@ So the first goal isn't "grow 10x." From zero, 10x is still zero. The first goal
 - The full website and app are live at tapeline.io.
 - The scoring engine is real and running — it scores about 2,500 stocks and updates every minute.
 - Payments are fully set up (Stripe). We can take money the moment someone subscribes. There's even built-in machinery to win back people who try to cancel.
-- ~~We have a free 14-day trial (no credit card needed).~~ **No longer true — never reuse this sentence.** Signup grants no trial at all (#536), and since 2026-08-22 a new account must put a card on file at `/app/start` before it can use the logged-in product: 14-day Premium trial, $0 charged that day, first charge on day 14, one click to cancel (#548). Accounts created before 2026-08-22 are grandfathered. What is still card-free: the public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API need no account and no card.
+- ~~We have a free 30-day trial (no credit card needed).~~ **No longer true — never reuse this sentence.** Signup grants no trial at all (#536), and since 2026-08-22 a new account must put a card on file at `/app/start` before it can use the logged-in product: 30-day Premium trial, $0 charged that day, first charge on day 30, one click to cancel (#548). Accounts created before 2026-08-22 are grandfathered. What is still card-free: the public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API need no account and no card.
 - There are roughly 4,750 web pages built for Google to find us, plus finished launch posts for ten different channels.
 
 **What's missing — and it's all the same root cause: nobody's coming through the door:**

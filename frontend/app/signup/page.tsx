@@ -44,7 +44,7 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
  * covers "an ad's associated landing page or other destinations".
  *
  * The ad's own headline is "$0 today. The charge date is on the page." A
- * duration ("14 days away") is not a date, so the literal promise was unmet.
+ * duration ("30 days away") is not a date, so the literal promise was unmet.
  */
 function longDate(d: Date): string {
   return d.toLocaleDateString(userLocale(), {
@@ -108,7 +108,7 @@ if (typeof window !== "undefined") {
 // else. "No card" may be said of this form, of the free plan, and of the
 // PUBLISHED RECORD (/scorecard, /daily-picks, per-ticker pages, CSV/JSON,
 // which need no account at all). It may NOT be said of, or next to, the trial
-// — the trial takes a card, $0 that day, first charge on day 14. Keep the two
+// — the trial takes a card, $0 that day, first charge on day 30. Keep the two
 // facts in separate sentences; a reader who merges them has been misled, and
 // the copy linter's Rule 10 fails the build on the merged phrasing.
 const FROM_COPY: Record<string, { h1: string; sub: string }> = {
@@ -422,7 +422,7 @@ function SignUpForm() {
       // upload to Google can later tie this subscriber back to the click.
       const gclid = getStoredGclid();
       // Meta click ID captured on landing. Stored on the User row: it carries
-      // the Conversions API's match quality, and because the 14-day trial
+      // the Conversions API's match quality, and because the 30-day trial
       // puts every first charge outside Meta's 7-day click window, joining it
       // to our own Stripe rows is the only honest way to count Meta payers.
       const fbclid = getStoredFbclid();
@@ -617,8 +617,8 @@ function SignUpForm() {
           )}
 
           {/* These three bullets describe PREMIUM, which is what the optional
-              14-day trial opens up — not what the free account includes. They
-              used to sit under a "Try Premium free for 14 days" H1 where that
+              30-day trial opens up — not what the free account includes. They
+              used to sit under a "Try Premium free for 30 days" H1 where that
               was implicit; with a free-account H1 it has to be said out loud,
               or the list quietly over-promises the free tier. */}
           <div className="mt-6 text-[11px] uppercase tracking-wider text-subtle">

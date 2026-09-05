@@ -151,6 +151,24 @@ function nearSecurityNoun(adjective) {
  * failing build tells the author WHICH constraint they hit and why.
  * ------------------------------------------------------------------ */
 /**
+ * The trial length, read from the ONE place that defines it.
+ *
+ * Not a literal here. A linter that hardcodes the number it is policing stops
+ * policing the moment the number moves, and would then have to be edited in
+ * lockstep with the thing it exists to guard — which is the same failure it is
+ * meant to catch.
+ */
+export const TRIAL_DAYS_IN_COPY = (() => {
+  try {
+    const src = readFileSync("frontend/lib/trial.ts", "utf8");
+    const m = src.match(/export const TRIAL_DAYS\s*=\s*(\d+)/);
+    return m ? Number(m[1]) : null;
+  } catch {
+    return null;
+  }
+})();
+
+/**
  * Substitute the interpolated constants that appear inside user-facing copy,
  * so proximity rules measure rendered length.
  *
@@ -162,11 +180,19 @@ function nearSecurityNoun(adjective) {
  * renders, never shorter.
  */
 export function expandKnownConstants(text) {
+  // Read from lib/trial.ts, NEVER written as a digit here. This table used to
+  // hardcode "14-day", so when the trial moved to 30 days the linter expanded
+  // every CORRECT `{TRIAL_LENGTH_LABEL}` into the OLD number and then flagged
+  // the pages that were right — while pages carrying a literal "14-day" were
+  // the ones actually wrong. A guard holding its own stale copy of the value
+  // it guards is worse than no guard: it reports the truth as the error.
+  const days = TRIAL_DAYS_IN_COPY == null ? "" : String(TRIAL_DAYS_IN_COPY);
+  if (!days) return text;
   return text
-    .replace(/\$\{TRIAL_LENGTH_LABEL\}/g, "14-day")
-    .replace(/\{TRIAL_LENGTH_LABEL\}/g, "14-day")
-    .replace(/\$\{TRIAL_DAYS\}/g, "14")
-    .replace(/\{TRIAL_DAYS\}/g, "14");
+    .replace(/\$\{TRIAL_LENGTH_LABEL\}/g, `${days}-day`)
+    .replace(/\{TRIAL_LENGTH_LABEL\}/g, `${days}-day`)
+    .replace(/\$\{TRIAL_DAYS\}/g, days)
+    .replace(/\{TRIAL_DAYS\}/g, days);
 }
 
 
@@ -282,8 +308,8 @@ export const RULES = [
     id: "card-free-trial",
     brief: "Rule 10 — never advertise the TRIAL as card-free",
     message:
-      "Card-free TRIAL claim. The 14-day Premium trial is card-required ($0 that " +
-      "day, first charge on day 14), so 'no credit card' next to 'trial' is false " +
+      "Card-free TRIAL claim. The Premium trial is card-required ($0 that day, " +
+      "first charge when it ends), so 'no credit card' next to 'trial' is false " +
       "advertising on a financial product. NARROWED 2026-08-30 (#683): the card " +
       "wall at first sign-in is gone, so a card-free claim about SIGNING UP or " +
       "about the FREE PLAN is now TRUE and no longer matches this rule — signing " +
@@ -315,6 +341,55 @@ export const RULES = [
       // ambiguous between the account (true) and the trial (false).
       /\bno\s+credit\s+card\s+(?:required|needed|necessary)\b/i,
     ],
+  },
+  {
+    id: "stale-trial-length",
+    brief: "The stated trial length must match the trial we actually run",
+    message:
+      "This states a trial length that is NOT the one the product runs. The " +
+      "trial length is a promise about when a customer's card gets charged, so " +
+      "a stale number here is a false statement about money, not a typo. It " +
+      "happened: moving the trial from 14 to 30 days left 165 claims of '14-day " +
+      "Premium trial' and 'first charge on day 14' across 72 files, and " +
+      "tapeline.io/signup advertised BOTH lengths on the same page. Read the " +
+      "number from lib/trial.ts (TRIAL_DAYS / TRIAL_LENGTH_LABEL) rather than " +
+      "writing a digit. For a dated historical entry (/changelog, /legal/refund " +
+      "supersession) use an inline copy-compliance-allow with a reason.",
+    patterns:
+      TRIAL_DAYS_IN_COPY == null
+        ? []
+        : [
+            // A trial LENGTH claim, not any sentence with a number near
+            // "trial". "3 days left on your trial" and "your trial ends in 3
+            // days" are correct copy about the pre-charge warning window, and
+            // an earlier version of this rule flagged both - a rule that cries
+            // wolf on true copy gets muted, and then it guards nothing.
+            //
+            // The leading \b is load-bearing: without it the engine can begin
+            // matching INSIDE the number, on the "0" of "30", so the negative
+            // lookahead trivially passes and correct copy gets flagged.
+            //
+            // Hyphenated form: "14-day Premium trial".
+            new RegExp(
+              String.raw`\b(?!${TRIAL_DAYS_IN_COPY}\b)\d{1,3}-days?\b[^.!?]{0,24}\btrial\b`,
+              "i",
+            ),
+            // "the trial runs 14 days" / "trial lasts 14 days" / "trial is 14 days".
+            new RegExp(
+              String.raw`\btrial\b[^.!?]{0,12}\b(?:runs|lasts|is|of)\s+(?!${TRIAL_DAYS_IN_COPY}\b)\d{1,3}\s+days\b`,
+              "i",
+            ),
+            // "Premium free for 14 days" / "free for 14 days".
+            new RegExp(
+              String.raw`\bfree for (?!${TRIAL_DAYS_IN_COPY}\b)\d{1,3}\s+days\b`,
+              "i",
+            ),
+            // The same promise phrased as a date: "first charge on day 14".
+            new RegExp(
+              String.raw`\bfirst charge (?:is )?on day (?!${TRIAL_DAYS_IN_COPY}\b)\d{1,3}\b`,
+              "i",
+            ),
+          ],
   },
   {
     id: "card-required-signup",

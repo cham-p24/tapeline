@@ -491,8 +491,8 @@ def _render_daily_digest(
         See your watchlist scored the same way. Set alerts when one of these
         composites crosses your threshold.
       </div>
-      <a href="{pricing_url}" style="display:inline-block;background:#fb923c;color:#0a0a0a;padding:11px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:14px;font-size:14px;">Start the 14-day Premium trial →</a>
-      <div style="color:#6b7280;font-size:11px;margin-top:8px;">Card required · $0 charged today · first charge on day 14 · cancel in one click · 30-day refund</div>
+      <a href="{pricing_url}" style="display:inline-block;background:#fb923c;color:#0a0a0a;padding:11px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-top:14px;font-size:14px;">Start the 30-day Premium trial →</a>
+      <div style="color:#6b7280;font-size:11px;margin-top:8px;">Card required · $0 charged today · first charge on day 30 · cancel in one click · 30-day refund</div>
     </div>
 
     <p style="margin:28px 0 0;padding-top:16px;border-top:1px solid #1f1f23;color:#6b7280;font-size:11px;line-height:1.55;">
@@ -518,8 +518,8 @@ def _render_daily_digest(
         f"Tapeline Daily Top 10 — {date_label}\n\n"
         f"{text_rows}\n\n"
         f"Full scorecard: {scorecard_url}\n"
-        f"Start your 14-day Premium trial (card required, $0 charged today, "
-        f"first charge on day 14, cancel in one click): {pricing_url}\n\n"
+        f"Start your 30-day Premium trial (card required, $0 charged today, "
+        f"first charge on day 30, cancel in one click): {pricing_url}\n\n"
         "Not investment advice. Unsubscribe: " + unsub_url + "\n"
     )
     return html, text

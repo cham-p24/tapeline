@@ -1759,7 +1759,7 @@ async def _downgrade_expired_trials() -> None:
     """
     End-of-trial enforcement.
 
-    Drops `tier` to 'free' for users whose 14-day trial expired AND who
+    Drops `tier` to 'free' for users whose 30-day trial expired AND who
     never added a Stripe customer (i.e. never started paying). Without
     this the trial silently converts to free-Premium-forever, killing
     conversion entirely.

@@ -176,7 +176,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Value Stocks — Quality Composite at Reasonable Multiples",
     metaTitle: "Best Value Stocks 2026 — Score Confluence | Tapeline",
     metaDescription:
-      "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 14-day Premium trial takes a card, $0 today.",
+      "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 30-day Premium trial takes a card, $0 today.",
     lede:
       "Value investing fails when you buy a stock just because it's cheap. The market is usually cheap-for-a-reason; the trick is separating temporarily cheap from structurally broken. Tapeline's composite is built on six factors, with Fundamentals carrying material — but not leading — weight; a strong fundamentals score combined with a constructive overall composite (score 55-75 — the upper-middle of the distribution, not the top) is where value setups actually live. Top of the distribution is already-priced-in; bottom is broken. The middle, filtered to quality, is the value-investor zone.",
     apiParams: { sort: "score", order: "desc", min_score: "55", limit: "30" },

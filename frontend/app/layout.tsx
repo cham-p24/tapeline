@@ -312,7 +312,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             channel that works and it depends on fast server-rendered HTML.
             PageView only: StartTrial and Purchase are sent server-side by
             services/meta_capi, which survives ad-blockers and the off-session
-            first charge 14 days after the click. */}
+            first charge 30 days after the click. */}
         {/* Scoped to marketing pages — MetaPixel refuses to render on /app/*.
             This layout is the only one carrying <html>, so an unscoped pixel
             here would run on the whole logged-in surface and report which

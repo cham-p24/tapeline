@@ -4,6 +4,9 @@
  * leak Premium-only features to Pro users.
  */
 import { describe, it, expect, vi } from "vitest";
+// Trial length read from lib/trial.ts. These assertions used to hardcode
+// 14 and so kept asserting a promise the product had stopped making.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { render, screen } from "@testing-library/react";
 import { Paywall, PaywallModal } from "@/components/Paywall";
 
@@ -84,7 +87,9 @@ describe("Paywall risk-reversal copy (trial truthfulness)", () => {
         <div>gated</div>
       </Paywall>
     );
-    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${TRIAL_DAYS}-day Premium trial — \\$0 today`, "i")),
+    ).toBeInTheDocument();
   });
 
   it("shows the money-back guarantee, never a trial, to signed-in users (trial consumed at signup)", () => {
@@ -94,7 +99,9 @@ describe("Paywall risk-reversal copy (trial truthfulness)", () => {
         <div>gated</div>
       </Paywall>
     );
-    expect(screen.queryByText(/14-day trial/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(new RegExp(`${TRIAL_DAYS}-day trial`, "i")),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/30-day money-back guarantee/i)).toBeInTheDocument();
   });
 });
@@ -137,7 +144,9 @@ describe("PaywallModal", () => {
     expect(screen.getByText("Your watchlist is full")).toBeInTheDocument();
     expect(screen.getByText(/Watchlist limit reached \(5 tickers on free\)/)).toBeInTheDocument();
     // Signed-in → no trial promise, real guarantee instead.
-    expect(screen.queryByText(/14-day trial/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(new RegExp(`${TRIAL_DAYS}-day trial`, "i")),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/30-day money-back guarantee/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Upgrade now/i })).toHaveAttribute("href", "/app/billing");
   });
@@ -146,6 +155,8 @@ describe("PaywallModal", () => {
     mockedUseUser.mockReturnValue(signedOut);
     render(<PaywallModal open onClose={() => {}} feature="squeeze" />);
     expect(screen.getByText(/Squeeze Watch is on Pro/)).toBeInTheDocument();
-    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${TRIAL_DAYS}-day Premium trial — \\$0 today`, "i")),
+    ).toBeInTheDocument();
   });
 });

@@ -363,12 +363,12 @@ async def test_mid_trial_card_add_still_forwards_the_remaining_trial(monkeypatch
     [
         # Already trialled under the NEW contract.
         ({"trial_started_at": datetime.now(UTC) - timedelta(days=40)},
-         "already used its 14-day trial"),
+         f"already used its {TRIAL_DAYS}-day trial"),
         # Legacy no-card auto-trial: trial_started_at was never written, so the
         # gate has to fall back to trial_ends_at or every pre-existing user
         # gets a second free window.
         ({"trial_ends_at": datetime.now(UTC) - timedelta(days=5)},
-         "already used its 14-day trial"),
+         f"already used its {TRIAL_DAYS}-day trial"),
         # Churned: kept their Stripe customer id, tier already dropped to free.
         # They can still BUY (test_billing_checkout_guard pins that) — they
         # just don't get a fresh free window.
@@ -475,7 +475,7 @@ async def test_trial_offer_explains_an_ineligible_account(monkeypatch):
     body = r.json()
     assert body["eligible"] is False
     assert body["ineligible_reason"] == "already_trialed"
-    assert "already used its 14-day trial" in body["message"]
+    assert f"already used its {TRIAL_DAYS}-day trial" in body["message"]
     assert body["first_charge_at"] is None, "nothing is going to be charged"
 
 

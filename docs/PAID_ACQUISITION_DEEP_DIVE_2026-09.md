@@ -170,7 +170,7 @@ All-in cost per carded trial = A$123.53 ÷ 2 = **A$61.77** (Ad B alone: A$58.44)
 
 The two monthly plans are not marginal — the first charge is less than half the cost of acquiring the trial. No creative, CPM, or funnel work closes a gap of that shape.
 
-**The benchmark band for card-required trials is 25–45%, centred 30–40%.** Upper anchor: RevenueCat (115,000+ apps) reports 42.5% for 17–32 day trials and 37.4% for 5–9 day, interpolating a 14-day trial to ~38–42% — but that is *app-store* card-on-file, not manual web card entry. Lower anchor: ChartMogul (surveyed January 2026, n=200) puts card-required free-to-paid at 30% median, band 25–35% — but on a B2B panel at $50–249 ARPU, above Tapeline's entire price sheet, and the card-required cut rests on roughly 23 self-reported products. **Shade to 20–30% for prosumer B2C and treat anything above as upside.**
+**The benchmark band for card-required trials is 25–45%, centred 30–40%.** Upper anchor: RevenueCat (115,000+ apps) reports 42.5% for 17–32 day trials and 37.4% for 5–9 day, interpolating a 30-day trial to ~38–42% — but that is *app-store* card-on-file, not manual web card entry. Lower anchor: ChartMogul (surveyed January 2026, n=200) puts card-required free-to-paid at 30% median, band 25–35% — but on a B2B panel at $50–249 ARPU, above Tapeline's entire price sheet, and the card-required cut rests on roughly 23 self-reported products. **Shade to 20–30% for prosumer B2C and treat anything above as upside.**
 
 At 20–30%, Premium annual still clears break-even. It does not clear 3:1.
 
@@ -423,7 +423,7 @@ Every line below is descriptive, states the card rule honestly, and avoids the b
 **Primary text options (test inside one ad):**
 - *Most stock tools show you a number and never mention it again. We publish every daily list we've produced and what it did the next day, against SPY. Misses included.*
 - *One 0-100 score per ticker. One sentence explaining what moved it. A public record you can read before you sign up for anything.*
-- *You can read the whole track record without an account. If you then want a 14-day Premium trial, it takes a card — $0 charged today, and we show you the first charge date before you enter it.*
+- *You can read the whole track record without an account. If you then want a 30-day Premium trial, it takes a card — $0 charged today, and we show you the first charge date before you enter it.*
 
 **Headlines (≤40 characters):**
 - *Read the record before you sign up*
@@ -471,17 +471,17 @@ The brief's framing — "7 AI signups, 0 cards, therefore it fails" — measures
 
 ### 7.2 The specific, checkable mechanism — and it is a legal exposure
 
-A live search-result summary of tapeline.io on 4 September 2026 stated the site offers *"a 14-day Premium trial with no card required,"* and separately quoted a 7-day refund against the real 30 days.
+A live search-result summary of tapeline.io on 4 September 2026 stated the site offers *"a 30-day Premium trial with no card required,"* and separately quoted a 7-day refund against the real 30 days.
 
-**The `/pricing` page itself is correct** — *"$0 is charged that day, the first charge is on day 14, and one click cancels before then."* The error is introduced by the summariser collapsing "signing up needs no card" and "the trial" into one sentence.
+**The `/pricing` page itself is correct** — *"$0 is charged that day, the first charge is on day 30, and one click cancels before then."* The error is introduced by the summariser collapsing "signing up needs no card" and "the trial" into one sentence.
 
 So AI-referred users arrive **primed for a card-free experience and meet a card gate.** That is an offer-mismatch, not a visitor-quality problem — and it compounds with Open Access Month handing them Pro-grade breadth for free until 8 September, which removes any reason to card at all.
 
-**This is the only finding in this document that is also a live legal exposure**, given the descriptive-only posture and the "never write 14-day trial, no credit card" rule.
+**This is the only finding in this document that is also a live legal exposure**, given the descriptive-only posture and the "never write 30-day trial, no credit card" rule.
 
 **The fix, one hour:** put both facts in a single adjacent sentence on the homepage, `/pricing`, and `llms.txt`, so no summariser can split them:
 
-> *Free account: no card, ever. 14-day Premium trial: card required, $0 charged today, first charge on day 14.*
+> *Free account: no card, ever. 30-day Premium trial: card required, $0 charged today, first charge on day 30.*
 
 Never let the two facts appear in separate paragraphs.
 

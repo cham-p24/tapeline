@@ -278,7 +278,7 @@ export default function HowItWorksPage() {
         <h2 className="text-3xl font-semibold">See the scores live.</h2>
         <p className="mt-3 text-muted">
           An email and a password puts you on the free plan, where every scan
-          returns its top ten scored rows, live. A card starts the 14-day
+          returns its top ten scored rows, live. A card starts the 30-day
           Premium trial &mdash; every matching row, $0 charged that day, first
           charge on day 14, one click to cancel.
         </p>

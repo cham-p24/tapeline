@@ -23,7 +23,7 @@ def _has_converted(u: User, now: datetime) -> bool:
 
     NOT `tier in PAID_TIERS and not u.trial_ends_at`, which is what this used
     to be. `trial_ends_at` is written once when the trial starts and is never
-    cleared, so a friend who took the 14-day trial and then converted keeps a
+    cleared, so a friend who took the 30-day trial and then converted keeps a
     non-null value forever — and showed on the referrer's page as "pending"
     for the rest of time, which is the one number the referral page exists to
     move.

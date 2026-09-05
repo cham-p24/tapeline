@@ -566,7 +566,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
 
       {/* Analyst ratings — Premium tier only. Finnhub aggregate consensus
           (US + UK / international ADRs). Trial users
-          see this for free since trial = Premium for 14 days; post-trial
+          see this for free since trial = Premium for 30 days; post-trial
           Free + Pro users see the Paywall instead. Mirrors how other
           Premium intelligence (Congress, insider Form 4) is gated. */}
       <div className="mt-6">

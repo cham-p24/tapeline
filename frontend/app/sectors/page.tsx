@@ -263,9 +263,9 @@ export default async function SectorsIndexPage() {
           <p className="mt-3 text-sm text-muted">
             Drill from any sector into its top-scoring names on the live scanner.
             An account takes an email and a password; the free plan returns the
-            top ten scored rows of any scan. A card starts the 14-day Premium
+            top ten scored rows of any scan. A card starts the 30-day Premium
             trial — every matching row across the full ~2,500-ticker universe,
-            $0 charged that day, first charge on day 14, one click to cancel.
+            $0 charged that day, first charge on day 30, one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">

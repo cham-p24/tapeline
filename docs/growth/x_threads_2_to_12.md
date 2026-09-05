@@ -27,8 +27,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -270,7 +270,7 @@ If you want live scanning across the full universe, Pro is $8.25/mo billed annua
 
 **Tweet 4** (~270 chars):
 ```
-The 14-day Premium trial gives the full live universe + Congressional trades + insider Form 4. It takes a card, charges $0 today, and cancels in one click.
+The 30-day Premium trial gives the full live universe + Congressional trades + insider Form 4. It takes a card, charges $0 today, and cancels in one click.
 
 I'd rather you understand what Tapeline does, decide it doesn't fit, and not pay than have you upgrade because the free tier was deliberately broken.
 ```

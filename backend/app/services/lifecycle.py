@@ -147,7 +147,7 @@ class LifecycleStage(StrEnum):
     """
 
     PAID = "paid"            # has a live Stripe subscription
-    TRIALING = "trialing"    # inside the no-card 14-day Premium trial
+    TRIALING = "trialing"    # inside the no-card 30-day Premium trial
     NEW = "new"              # signed up, no recorded activity yet
     ACTIVATED = "activated"  # has actually used the product
     DORMANT = "dormant"      # used it once, then went quiet for 14d+

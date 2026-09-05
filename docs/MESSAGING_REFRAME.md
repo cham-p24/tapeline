@@ -54,7 +54,7 @@ Replace the recommendation-flavored "picks" with score-flavored language everywh
 > # A scanner that shows its work.
 > Scan **~2,500 US tickers in under 60 seconds** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **every score we publish is back-checked against SPY and stays on the record — the misses too.**
 
-CTAs stay: **"Start the 14-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click") — the public record (no account, no card) is the only place the card-free line still belongs. Since the 2026-08-22 card gate there is no account tier a new user can reach without a card.
+CTAs stay: **"Start the 30-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click") — the public record (no account, no card) is the only place the card-free line still belongs. Since the 2026-08-22 card gate there is no account tier a new user can reach without a card.
 
 *Why:* leads with the concrete time-saving (the benefit a burned audience actually buys), keeps the transparency wedge, drops "every call" (prescriptive) for "every score we publish" (descriptive), and pre-frames the negative record as honesty ("the misses too") instead of letting a visitor discover it as a gotcha.
 
@@ -80,7 +80,7 @@ This is your strongest single line and it's nowhere on the site. It does double 
 
 **Current:** "One score. One sentence. One public record." / "See your watchlist scored the same way..."
 **Add one line under the subhead:**
-> No hype, no hidden track record, no "trust me." Just the method and the receipts — the public record with no account at all, or 14 days of Premium for $0 today (card required, first charge on day 14, one click to cancel).
+> No hype, no hidden track record, no "trust me." Just the method and the receipts — the public record with no account at all, or 14 days of Premium for $0 today (card required, first charge on day 30, one click to cancel).
 
 ### B5. Scorecard page (`/scorecard`) — frame the number honestly *before* the visitor reads it
 Add a one-line framing at the top of the scorecard:

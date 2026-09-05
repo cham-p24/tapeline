@@ -21,7 +21,7 @@
  * top ten scored rows of any scan, one saved screen, a five-symbol watchlist,
  * twelve ticker pages a day. So a card-free ACCOUNT is now an honest thing to
  * advertise, and this suite no longer forbids it. Two claims are still
- * policed, because both are still false: that the 14-day Premium trial is
+ * policed, because both are still false: that the Premium trial is
  * card-free (it is not — a card is exactly what starts it), and any promise
  * of permanence the product cannot keep.
  *
@@ -31,6 +31,8 @@
  * would not belong in the account-free list.
  */
 import { describe, it, expect } from "vitest";
+// Trial length from lib/trial.ts, never a literal.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PricingTable } from "@/components/PricingTable";
 import { ComparisonTable } from "@/components/ComparisonTable";
@@ -112,7 +114,11 @@ describe("PricingTable", () => {
     // this test exists to catch.
     const { container } = render(<PricingTable />);
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    expect(screen.getByText(/14-day Premium trial — \$0 today/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        new RegExp(`${TRIAL_DAYS}-day Premium trial — \\$0 today`, "i"),
+      ),
+    ).toBeInTheDocument();
     // CHANGED by #683. This block used to open "A new account adds a card at
     // first sign-in, and that starts the trial" — the first half described a
     // wall that no longer exists, and stating it here would tell a reader the

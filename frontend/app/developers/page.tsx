@@ -106,7 +106,7 @@ const FAQ = [
   },
   {
     q: "What's the rate limit?",
-    a: "1,000 requests per day on Premium. The 14-day Premium trial is capped lower (100/day) to keep the surface abuse-resistant. Call GET /api/v1/me any time to see your live remaining quota.",
+    a: "1,000 requests per day on Premium. The 30-day Premium trial is capped lower (100/day) to keep the surface abuse-resistant. Call GET /api/v1/me any time to see your live remaining quota.",
   },
   {
     q: "Is the scoring formula documented?",
@@ -114,7 +114,7 @@ const FAQ = [
   },
   {
     q: "Is there a free tier for the API?",
-    a: `The API itself is a Premium feature. Signing up costs nothing and takes an email and a password, but a free account issues no key: the free plan covers the in-app product (live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""}), not programmatic access. Adding a card starts a 14-day Premium trial — $0 that day, first charge on day 14, one click to cancel before then — and the trial issues a working key at 100 requests/day, so you can build and test against the real endpoints before deciding.`,
+    a: `The API itself is a Premium feature. Signing up costs nothing and takes an email and a password, but a free account issues no key: the free plan covers the in-app product (live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""}), not programmatic access. Adding a card starts a 30-day Premium trial — $0 that day, first charge on day 30, one click to cancel before then — and the trial issues a working key at 100 requests/day, so you can build and test against the real endpoints before deciding.`,
   },
 ];
 
@@ -157,7 +157,7 @@ export default function DevelopersPage() {
         </div>
         <p className="mt-3 text-xs text-subtle">
           Sign-up takes an email and a password. Keys are issued on Premium, so
-          the 14-day trial (started by adding a card, $0 that day) is the way to
+          the 30-day trial (started by adding a card, $0 that day) is the way to
           build against the API before you commit.
         </p>
 
@@ -252,7 +252,7 @@ export default function DevelopersPage() {
           <h2 className="text-2xl font-bold tracking-tight">Build on the tape.</h2>
           <p className="mt-3 text-sm text-muted">
             Premium includes the API, 1,000 requests/day, and everything else. An
-            account takes an email and a password; adding a card starts the 14-day
+            account takes an email and a password; adding a card starts the 30-day
             Premium trial and issues a key &mdash; $0 charged that day, first charge
             on day 14, one click to cancel.
           </p>

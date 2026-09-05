@@ -40,7 +40,7 @@ Rule 10 (ad trading vocabulary).
 ## B1 — "We email before we charge."
 
 **Primary text:**
-> The 14-day Premium trial takes a card and charges $0 on the day it starts. About three days before the first charge, we send an email saying so. The date itself is shown before you confirm, and one click on the billing page cancels any time before it.
+> The 30-day Premium trial takes a card and charges $0 on the day it starts. About three days before the first charge, we send an email saying so. The date itself is shown before you confirm, and one click on the billing page cancels any time before it.
 
 **Headline:** We email before we charge.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -53,7 +53,7 @@ Rule 10 (ad trading vocabulary).
 ## B2 — "$19.99. On a date we show you first."
 
 **Primary text:**
-> Premium is $19.99 a month, or $199 a year. The 14-day trial takes a card, charges $0 the day it starts, and shows the exact date and the exact amount of the first charge before you confirm anything. One click cancels before then.
+> Premium is $19.99 a month, or $199 a year. The 30-day trial takes a card, charges $0 the day it starts, and shows the exact date and the exact amount of the first charge before you confirm anything. One click cancels before then.
 
 **Headline:** $19.99. On a date we show you first.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -67,7 +67,7 @@ B states the date but never the number. This one states both.*
 ## B3 — "Read the record before signing up for anything."
 
 **Primary text:**
-> The track record is public and needs no account, no card and no email: summary stats live, per-day entries on a seven-day delay, raw CSV included. Read it first, and decide afterwards. The 14-day Premium trial takes a card, charges $0 on the day, and names the first-charge date before you confirm.
+> The track record is public and needs no account, no card and no email: summary stats live, per-day entries on a seven-day delay, raw CSV included. Read it first, and decide afterwards. The 30-day Premium trial takes a card, charges $0 on the day, and names the first-charge date before you confirm.
 
 **Headline:** Read the record before signing up for anything.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -81,7 +81,7 @@ Leads with the escape hatch B only mentions last.*
 ## B4 — "$0 today, and a 30-day backstop after that."
 
 **Primary text:**
-> Two things sit between a trial and an unwelcome surprise. The first-charge date is shown before you confirm and emailed about three days ahead. And a 30-day money-back window applies after that first charge. The 14-day Premium trial takes a card and charges $0 on the day it starts.
+> Two things sit between a trial and an unwelcome surprise. The first-charge date is shown before you confirm and emailed about three days ahead. And a 30-day money-back window applies after that first charge. The 30-day Premium trial takes a card and charges $0 on the day it starts.
 
 **Headline:** $0 today, and a 30-day backstop after that.
 **Description:** Informational only. Refund terms at tapeline.io/legal/refund.
@@ -96,7 +96,7 @@ prorated, not full - do not compress that clause into the primary text.*
 ## B5 — "Cancel in one click, from the billing page."
 
 **Primary text:**
-> Cancelling is one click on the billing page. The 14-day Premium trial takes a card, charges $0 the day it starts, shows the first-charge date before you confirm, and emails a reminder about three days out.
+> Cancelling is one click on the billing page. The 30-day Premium trial takes a card, charges $0 the day it starts, shows the first-charge date before you confirm, and emails a reminder about three days out.
 
 **Headline:** Cancel in one click, from the billing page.
 **Description:** Informational only. Descriptive scores, not recommendations.

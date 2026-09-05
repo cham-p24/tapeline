@@ -29,7 +29,7 @@ export function UtmCapture(): null {
     captureUtmFromLocation();
     captureGclidFromLocation();
     // Meta's click ID (`?fbclid`). Without it the Conversions API can only
-    // match on a hashed email, and — because the 14-day trial puts every
+    // match on a hashed email, and — because the 30-day trial puts every
     // first charge outside Meta's 7-day click window — there is no honest
     // way to count Meta payers at all.
     captureFbclidFromLocation();
