@@ -7,11 +7,11 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline Security: Encryption, Payments, Disclosure",
   description:
-    "How Tapeline handles your data: TLS in transit, encryption at rest, Argon2 password hashing, Stripe-vaulted payment data, and our public vulnerability disclosure process. We'd rather over-explain than make you guess.",
+    "How Tapeline handles your data: TLS in transit, encryption at rest, bcrypt password hashing, Stripe-vaulted payment data, and our public vulnerability disclosure process. We'd rather over-explain than make you guess.",
   path: "/security",
 });
 
-const VERIFIED_ON = "2026-05-04";
+const VERIFIED_ON = "2026-09-05";
 
 export default function SecurityPage() {
   return (
@@ -169,12 +169,12 @@ export default function SecurityPage() {
           />
           <Item
             label="Hosting + region"
-            body="Backend runs on Fly.io (Sydney region). Database is managed Postgres in AWS Sydney. Frontend is on Vercel's global edge network. All infrastructure is multi-zone within the region."
+            body="Backend and frontend both run on Fly.io in the Sydney region. The database is Neon managed Postgres, hosted on AWS ap-southeast-2 (Sydney). All infrastructure is multi-zone within the region."
           />
         </Section>
 
         <p className="mt-14 text-center text-[11px] text-subtle">
-          Last verified {VERIFIED_ON}. Re-verified quarterly. Spot something out of date?{" "}
+          Last verified {VERIFIED_ON}. Spot something out of date?{" "}
           <a href="mailto:security@tapeline.io" className="text-accent hover:underline">
             security@tapeline.io
           </a>

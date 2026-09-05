@@ -4,8 +4,10 @@
  * The synthesis moat, made visible.
  *
  * Shows each factor's 0–100 sub-score, listed in descending weight order.
- * NOT the weighted contribution: the exact weights are not disclosed (PR #342),
- * so the ordering plus the qualitative emphasis label is all this can show.
+ * NOT the weighted contribution: the marketing surfaces state the ordering
+ * rather than the constants (PR #342), so the ordering plus the qualitative
+ * emphasis label is all this component shows. A copy rule, not a secrecy
+ * claim - the repo is public.
  * Used as a hover popover on every scanner row + as a full panel on the
  * ticker detail page.
  *

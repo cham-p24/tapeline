@@ -15,6 +15,7 @@ const ITEMS: Item[] = [
   { slug: "/data-sources",  title: "Data sources",   desc: "Every feed that powers a score. Named, dated, linked.", emoji: "🗂️" },
   { slug: "/scorecard",     title: "Public scorecard", desc: "Every top-10, back-checked vs SPY next session.", emoji: "📈" },
   { slug: "/verify",        title: "Verify the record", desc: "Download the raw record as CSV or JSON and check it.", emoji: "🔎" },
+  { slug: "/limitations",   title: "Limitations",     desc: "What Tapeline is bad at, and what it cannot tell you.", emoji: "⚠️" },
   { slug: "/signals",       title: "All signals",    desc: "Every Tapeline-scored ticker, live universe view.", emoji: "📊" },
   { slug: "/status",        title: "System status",  desc: "Live API + worker uptime, refreshed every 30s.",   emoji: "🟢" },
   { slug: "/security",      title: "Security",       desc: "Encryption specifics + vulnerability disclosure.", emoji: "🔒" },

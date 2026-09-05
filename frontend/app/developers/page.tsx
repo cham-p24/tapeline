@@ -110,7 +110,7 @@ const FAQ = [
   },
   {
     q: "Is the scoring formula documented?",
-    a: "The six named factors and the ordering of their weights are public at /how-it-works — weighted most toward Trend and Relative Strength, least toward Momentum — with each factor's contribution shown per ticker. The exact numeric weights are not published. Scores are descriptive (a measurement), never prescriptive (not buy/sell advice).",
+    a: "The six named factors and the ordering of their weights are public at /how-it-works — weighted most toward Trend and Relative Strength, least toward Momentum — with each factor's contribution shown per ticker. Scores are descriptive (a measurement), never prescriptive (not buy/sell advice).",
   },
   {
     q: "Is there a free tier for the API?",
@@ -221,8 +221,7 @@ export default function DevelopersPage() {
               <strong className="text-fg">Scores are descriptive, not advice.</strong> The six named
               factors and the ordering of their weights are public at{" "}
               <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>{" "}
-              &mdash; weighted most toward Trend and Relative Strength, least toward Momentum. The
-              exact numeric weights are not published.
+              &mdash; weighted most toward Trend and Relative Strength, least toward Momentum.
             </li>
             <li>
               <strong className="text-fg">Stable contract.</strong> A 0&ndash;100 score, a descriptive

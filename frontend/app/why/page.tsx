@@ -11,8 +11,9 @@
  *   - engine built 2025 as a personal system, public SaaS 2026 — /press bio
  *   - the scorecard publishes losing days — /scorecard
  *   - the record to date is around a coin flip on a small sample — /scorecard
- *   - factor set and weight ordering are published, exact weights are not
- *     — /how-it-works, PR #342
+ *   - factor set and weight ordering are published — /how-it-works
+ *     (state what the page documents; make no claim about where else the
+ *      constants do or do not appear — the repo is public)
  *
  * NO origin-story embellishment. No "I lost money on a bad tip and swore
  * never again" narrative — that is unverifiable, and inventing biography on
@@ -132,12 +133,10 @@ export default function WhyPage() {
             <Link href="/how-it-works/momentum" className="link">
               Momentum
             </Link>
-            . I publish which factors count for more than others. I do not
-            publish the exact numeric weights or the equation, and I want to be
-            straight about why rather than dress it up: that specific piece is
-            the part a competitor could copy in an afternoon. You get the
+            . I publish which factors count for more than others. You get the
             mechanism, the ordering, each factor&rsquo;s contribution on every
-            ticker, and the full record. You do not get the constants.
+            ticker, and the full record &mdash; enough to judge whether the
+            reading is worth anything, and enough to catch me when it is not.
           </p>
 
           <p>

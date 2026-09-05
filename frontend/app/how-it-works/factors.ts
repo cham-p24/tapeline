@@ -25,8 +25,12 @@
  *
  * ── DISCLOSURE BOUNDARY (set in PR #342, "drop exact weights / equation /
  * indicator recipe") ─────────────────────────────────────────────────────
+ * This is a rule about what THESE PAGES restate. It is not a secrecy claim:
+ * the repository is public and the constants are readable there, so no copy
+ * may say the weights are unpublished, withheld or proprietary (2026-09-05).
+ *
  * These pages name each factor and explain what it MEASURES and, conceptually,
- * how the measurement becomes a reading. They deliberately do NOT publish:
+ * how the measurement becomes a reading. They do NOT restate:
  *   - the numeric weight of any factor in the composite,
  *   - the scoring equation,
  *   - the numeric mappings, thresholds and band edges.
@@ -365,7 +369,7 @@ export const FACTORS: Factor[] = [
     faq: [
       {
         q: "Why is Momentum weighted least?",
-        a: "Two reasons, both stated plainly: short-horizon rate of change reverses often enough to be a noisy input on its own, and one of its two components is an approximation rather than a direct measurement. The relative ordering of the six factor weights is published; the exact numeric weights are not.",
+        a: "Two reasons, both stated plainly: short-horizon rate of change reverses often enough to be a noisy input on its own, and one of its two components is an approximation rather than a direct measurement. The relative ordering of the six factor weights is published.",
       },
       {
         q: "Why does the Momentum reading change less than I expect day to day?",

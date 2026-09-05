@@ -250,21 +250,37 @@ function SignUpForm() {
   // and cannot differ between server and client markup.
   const [firstCharge] = useState(() => new Date(Date.now() + TRIAL_DAYS * 86_400_000));
   /**
-   * REQUIRED subscription-terms acknowledgement. Unchecked by default, and it
-   * blocks submit — both are the point.
+   * `firstCharge` is a HYPOTHETICAL, not this visitor's billing date.
    *
+   * It is today + TRIAL_DAYS, computed in the browser. Nothing about signing up
+   * schedules a charge: the account is created `tier="free", trial_ends_at=None`
+   * and no card is collected here. The real first-charge instant comes from
+   * Stripe's own `trial_end` when someone later chooses the card-required trial,
+   * and it is anchored to THAT day, not to today. So every use of this value
+   * must be phrased conditionally ("if you started the trial today ..."). It was
+   * previously stated as fact in three places.
+   *
+   * ── THE REMOVED ACKNOWLEDGEMENT, and the open question it leaves ─────────
+   * Until 2026-09-05 a REQUIRED checkbox here hard-gated account creation on
+   * "I understand my {TRIAL} Premium trial charges $0 today, then $19.99/month
+   * from <date>". That was false for every visitor who was not adding a card —
+   * which is all of them at this step — and it forced them to affirm a
+   * financial obligation they were not entering into, on a financial product.
+   * The founder ruled on 2026-09-05 to remove it.
+   *
+   * It existed for a real reason, recorded here so nobody re-adds it blindly:
    * Meta's Subscription Services standard prohibits, on a page where personal
-   * info is entered, "not including an unticked opt-in checkbox" — and names
-   * *no checkbox at all* as a failure equal to a pre-ticked one. Accepting terms
-   * implicitly by submitting, via a link, is the placement the same policy
-   * rejects. This page is the destination of the paid trial ad, so it is the
-   * page under review.
-   *
-   * DO NOT default this to true, and do not "simplify" it into the Terms link
-   * below it — that link is a different acknowledgement (Terms + Privacy) and
-   * does not state price, interval or cancellation anywhere in its label.
+   * info is entered, "not including an unticked opt-in checkbox", and the paid
+   * trial ad points at /signup?from=trial, so this page is the one under
+   * review. That standard governs pages where a SUBSCRIPTION is entered into,
+   * and this form enters into none — but whether Meta reads it that way is NOT
+   * settled and is on the open lawyer/Meta list. The price, interval,
+   * recurrence, cancellation path and a dated example all remain on the page,
+   * at `text-sm text-fg`, in the "What the card costs, and when" panel below.
+   * If a checkbox has to come back, it must acknowledge what this button
+   * actually does — create a free account — and never a charge that is not
+   * coming.
    */
-  const [subscriptionTermsAccepted, setSubscriptionTermsAccepted] = useState(false);
   // Self-reported attribution — optional, free text, never required (gap G2).
   // Deliberately NOT a dropdown: a fixed list can only count channels we
   // already thought of, and this field exists to surface the ones we cannot
@@ -372,17 +388,6 @@ function SignUpForm() {
         'input[name="cf-turnstile-response"]',
       );
       token = hidden?.value || "";
-    }
-    // The subscription-terms box is a hard gate, checked before the bot check
-    // so a user who missed it is told the real reason rather than being sent
-    // to solve a captcha first. Focus is moved to it, because it sits above the
-    // button and can be scrolled out of view on a short viewport.
-    if (!subscriptionTermsAccepted) {
-      setErr(
-        "Please confirm you understand the trial's price and billing before we create your account.",
-      );
-      document.getElementById("signup-subscription-terms")?.focus();
-      return;
     }
     if (TURNSTILE_SITE_KEY && !token) {
       // Instrument the friction: how often a real-looking submit is blocked
@@ -767,42 +772,6 @@ function SignUpForm() {
               />
             )}
 
-            {/* REQUIRED subscription acknowledgement — deliberately styled as a
-                bordered panel so it reads as a gate, not as one more optional
-                email box. The two above it are opt-ins; this one is not.
-
-                The terms are IN THE LABEL, not behind the Terms link below.
-                Meta's standard rejects price/interval that sit "behind a
-                separate link", and the acknowledgement has to be of the thing
-                being acknowledged — so the amount, the interval, the date and
-                the way out are all in the sentence the user ticks. */}
-            <div className="rounded-md border border-border bg-panel/40 p-3">
-              <label
-                className="flex cursor-pointer items-start gap-2.5 text-sm"
-                htmlFor="signup-subscription-terms"
-              >
-                <input
-                  id="signup-subscription-terms"
-                  type="checkbox"
-                  checked={subscriptionTermsAccepted}
-                  onChange={(e) => setSubscriptionTermsAccepted(e.target.checked)}
-                  aria-required="true"
-                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent"
-                />
-                <span className="text-fg">
-                  I understand my {TRIAL_LENGTH_LABEL} Premium trial charges{" "}
-                  <strong className="font-semibold">$0 today</strong>, then{" "}
-                  <strong className="font-semibold">
-                    {usd(PRICING.premium.monthly)}/month or{" "}
-                    {usdCompact(PRICING.premium.annual)}/year
-                  </strong>{" "}
-                  from <strong className="font-semibold">{longDate(firstCharge)}</strong>,
-                  recurring until I cancel &mdash; and that I can cancel in one click
-                  before then and pay nothing.
-                </span>
-              </label>
-            </div>
-
             <FormAlert message={err} />
 
             <button
@@ -812,13 +781,15 @@ function SignUpForm() {
             >
               {busy ? "Creating your account…" : "Create my account"}
             </button>
-            {/* Reassurance adjacent to the highest-intent click — kills the
-                "will I be charged?" objection right where hesitation happens,
-                not only in the H1 subhead far above. It must not say "no card":
-                this button does not collect one, but the very next screen does,
-                so the true reassurance is the AMOUNT, not the absence. */}
+            {/* Reassurance adjacent to the highest-intent click. This used to
+                read "$0 charged today — the first charge is on <date>", which
+                was written when the next screen was a card wall (#548). #683
+                removed that wall, so this button now creates a FREE account
+                that is never charged, and naming a first-charge date here was
+                simply false. State what this button does; the trial's price,
+                interval and charge date are disclosed in full below. */}
             <p className="text-center text-xs text-muted">
-              $0 charged today &mdash; the first charge is on {longDate(firstCharge)}
+              Free plan &mdash; nothing is charged, and no card is collected here.
             </p>
 
             <p className="text-xs text-subtle">
@@ -867,9 +838,11 @@ function SignUpForm() {
               </li>
               <li>
                 <strong className="font-semibold">
-                  Your first charge is on {longDate(firstCharge)}
+                  If you started the trial today, the first charge would be{" "}
+                  {longDate(firstCharge)}
                 </strong>{" "}
-                &mdash; {TRIAL_DAYS} days from today. We email you three days before it.
+                &mdash; {TRIAL_DAYS} days from the day the card goes on, not from
+                today's signup. We email you three days before it.
               </li>
               <li>
                 <strong className="font-semibold">Cancel in one click</strong> from
@@ -888,8 +861,9 @@ function SignUpForm() {
             <p className="mt-1.5">
               This form takes an email and a password, and no card. Adding a card later
               starts your <span className="text-fg">{TRIAL_LENGTH_LABEL} Premium trial</span>:{" "}
-              <span className="text-fg">$0 is charged today</span>, the first charge is on{" "}
-              <span className="text-fg">{longDate(firstCharge)}</span> at the plan you pick, we
+              <span className="text-fg">$0 on the day the card goes on</span>, with the first
+              charge {TRIAL_DAYS} days later at the plan you pick &mdash;{" "}
+              <span className="text-fg">{longDate(firstCharge)}</span> if that were today. We
               email you three days before, and one click ends it before then with nothing taken.
               Your bank may briefly show a $0 or $1 authorisation while it checks the card &mdash;
               a hold, not a charge, and it clears on its own.

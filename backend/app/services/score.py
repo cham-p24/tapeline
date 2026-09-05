@@ -7,10 +7,12 @@ column F "Score" verbatim and called it Tapeline's score. That meant:
      + 0.15*smart_money + 0.15*macro + 0.10*momentum` was marketing copy,
      not running code. /how-it-works spelled the equation out at the time
      and it wasn't actually applied — the score came from a different
-     (external, opaque) algorithm. PR #342 has since stripped the numbers
-     from the public site: the weights are internal and stay that way, and
-     the public methodology names the six factors and their weight ORDERING
-     only.
+     (external, opaque) algorithm. PR #342 stripped the numbers from the
+     MARKETING PAGES: the public methodology names the six factors and their
+     weight ORDERING only. That is a statement about what those pages say,
+     NOT a secrecy claim. This repository is public, so the constants below
+     are readable by anyone. Copy asserting the weights are unpublished,
+     withheld or proprietary is therefore false; see the WEIGHTS comment.
   2. The per-factor breakdown shown on /t/{symbol} pages was mostly empty
      because the sheet only populates `sub_rs` derivation data.
   3. Scores could leak above 100 (we observed 131-133 live) until clamped
@@ -31,10 +33,15 @@ a missing factor doesn't drag the composite toward zero. That's intentional:
 ETFs without P/E shouldn't be penalised on `sub_fundamentals` — they just
 get the average score on that axis.
 
-These weights are INTERNAL. /how-it-works documents the factor set and the
-weight ORDERING only — never the numbers (PR #342) — so changing them is not a
+/how-it-works documents the factor set and the weight ORDERING only — never the numbers (PR #342) — so changing them is not a
 public-disclosure change, but it does change every score the product has ever
 published and still needs a corresponding `/changelog` entry.
+
+NOT A SECRECY CLAIM. THIS REPOSITORY IS PUBLIC and the literal weights below
+are two clicks from /about, which links to it. Twelve marketing surfaces
+claimed the constants were unpublished until 2026-09-05; the founder chose to
+rewrite those claims rather than take the repo private, so no page may call
+these weights secret, withheld, proprietary or in-house again.
 """
 
 from __future__ import annotations
