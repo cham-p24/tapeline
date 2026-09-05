@@ -76,7 +76,7 @@ export default function RefundPolicyPage() {
           <p>
             Creating an account takes an email and a password. It does not take a card, and it
             does not start a trial &mdash; a new account sits on the free plan until you choose
-            otherwise. The 14-day Premium trial begins when you add a card. Nothing is charged on
+            otherwise. The 30-day Premium trial begins when you add a card. Nothing is charged on
             the day you add it. The first charge lands on day 14 at the plan price you picked, and
             we email you three days before that happens. Cancel any time before day 14 and you are
             never billed &mdash; there is nothing to refund, because no money moved.
@@ -85,7 +85,7 @@ export default function RefundPolicyPage() {
             A note on history, because it changes what people were told at sign-up: between
             22 August and 30 August 2026 a new account added a card at first sign-in. That
             requirement was removed on 30 August 2026. The trial terms themselves never changed
-            &mdash; $0 on the day the card goes on, first charge on day 14, one click to cancel
+            &mdash; $0 on the day the card goes on, first charge on day 30, one click to cancel
             before then &mdash; so nobody was billed for signing up under either arrangement.
             Trials that ran without a payment method simply ended and moved the account to the
             free plan, with nothing charged.

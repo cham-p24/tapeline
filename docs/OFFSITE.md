@@ -20,7 +20,7 @@ This doc is the operational checklist for creating each of those off-site profil
 > The four PNGs in `frontend/public/press/` were re-shot from the live site on
 > 2026-08-24 and carry the current terms. The batch they replaced was captured
 > 2026-08-20, two days before the card gate (`CARD_GATE_START = 2026-08-22`),
-> and had "Free forever tier — no card", "14-day Premium trial — no card,
+> and had "Free forever tier — no card", "30-day Premium trial — no card,
 > nothing charged" and "No credit card, no payment details, nothing charged"
 > baked into the pixels — where no linter, test or grep could see them. Sending
 > one to a journalist or a directory would have published a false claim about a

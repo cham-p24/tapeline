@@ -81,7 +81,7 @@ export default function CompareIndexPage() {
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             The same six-factor score on the live scanner. The published record is free
             to read with no account; an account is an email and a password, and opens the
-            scanner on the top ten scored rows of any scan. A card starts the 14-day
+            scanner on the top ten scored rows of any scan. A card starts the 30-day
             Premium trial — every matching row instead of the first ten, $0 today, one
             click to cancel.
           </p>

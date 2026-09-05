@@ -52,7 +52,7 @@ funnel cohorts. **Do not reintroduce a route wall on it.**
 Copy rule, and note it has **inverted** since #548: describing a new ACCOUNT as
 free and card-free is **true again** (#686 corrected 79 such claims across 42
 files back). What stays permanently false is describing the **trial** as
-card-free — the 14-day Premium trial genuinely requires a card.
+card-free — the 30-day Premium trial genuinely requires a card.
 
 ## Tiers
 
@@ -181,7 +181,7 @@ high tier.
 
 ## Trial / conversion
 
-- **14-day Premium trial, card required — but chosen, not forced.** Signup is
+- **30-day Premium trial, card required — but chosen, not forced.** Signup is
   email + password and lands on a working Free plan. Starting the trial is a
   deliberate step that runs Stripe Checkout (`mode=subscription` +
   `subscription_data.trial_end`). Since #683 nothing routes a new account into

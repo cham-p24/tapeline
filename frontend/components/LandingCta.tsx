@@ -15,14 +15,14 @@ import { PRICING, REFUND, usd } from "@/lib/pricing";
  * the top of the page.
  *
  * Renders three things, in reading order:
- *   1. A prominent primary CTA — "Try the live scanner — 14-day trial" →
+ *   1. A prominent primary CTA — "Try the live scanner — 30-day trial" →
  *      /signup?from=<from>. The signup page personalises its H1 on ?from=
  *      (finviz | screener | scorecard | compare), so each page passes the
  *      best-fitting existing slug for message-match. Secondary CTA links to
  *      the public /scorecard so a skeptical visitor can inspect the record
  *      before committing.
  *   2. A trust strip stating the offer plainly — the free public record (no
- *      account), the 14-day Premium trial ($0 today), the founding Pro price
+ *      account), the 30-day Premium trial ($0 today), the founding Pro price
  *      (pulled live from lib/pricing.ts so it can never drift from checkout),
  *      and the 30-day money-back guarantee.
  *   3. An optional live ScannerPreview (`showPreview`) so the visitor SEES
@@ -46,7 +46,7 @@ type Props = {
       (e.g. /compare/*, where the comparison table is the proof). */
   showPreview?: boolean;
   /** Primary CTA label. Defaults to the scanner-forward "Try the live scanner
-      — 14-day trial". Pages can override for tighter intent match. */
+      — 30-day trial". Pages can override for tighter intent match. */
   primaryLabel?: string;
   /** Secondary CTA href — defaults to the public scorecard. */
   secondaryHref?: string;
@@ -59,7 +59,7 @@ type Props = {
 export function LandingCta({
   from,
   showPreview = true,
-  primaryLabel = "Try the live scanner — 14-day trial",
+  primaryLabel = "Try the live scanner — 30-day trial",
   secondaryHref = "/scorecard",
   secondaryLabel = "See the public scorecard",
   className = "mt-6",
@@ -92,11 +92,11 @@ export function LandingCta({
           <Check /> The published record — free to read, no account
         </li>
         {/* The trial was previously unnamed here: the strip advertised the
-            free tier and the paid price, so the 14-day Premium trial — the
+            free tier and the paid price, so the 30-day Premium trial — the
             actual thing the primary CTA starts — was invisible until the
             signup page. Stated as fact, no deadline framing (R6). */}
         <li className="flex items-center gap-1.5">
-          <Check /> 14-day Premium trial — $0 today, cancel in one click
+          <Check /> 30-day Premium trial — $0 today, cancel in one click
         </li>
         <li className="flex items-center gap-1.5">
           <Check /> Pro from {usd(PRICING.pro.annualPerMonth)}/mo · {usd(PRICING.pro.annual)}/yr

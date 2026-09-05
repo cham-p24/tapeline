@@ -4,7 +4,7 @@
 >
 > From 2026-08-22 a **new account must put a card on file at first sign-in**
 > before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> 30-day Premium trial, first charge on day 30, one click to cancel before then).
 > Accounts created **before** that date are grandfathered: they keep the free
 > access they signed up for and are never asked for a card.
 >
@@ -56,7 +56,7 @@ version of "go get customers."
 | **Free** | $0 · **live scores, no delay** · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · full public scorecard |
 | **Pro** | **$9.99/mo** or **$8.25/mo billed annually** ($99/yr) · full ~2,500-ticker live scan · smart alerts · calendars · CSV |
 | **Premium** | **$19.99/mo** or **$16.58/mo billed annually** ($199/yr) · + Congress trades · + SEC Form 4 insider buys · + API 1,000/day |
-| **Trial** | 14 days of Premium, **card required** ($0 charged today, first charge on day 14, one-click cancel before then). A new account puts a card on file at first sign-in, which is what starts the trial. Accounts created before 2026-08-22 are grandfathered and never asked. The published record — daily Top 10, full scorecard, per-ticker pages, CSV/JSON export — needs no account and no card. |
+| **Trial** | 14 days of Premium, **card required** ($0 charged today, first charge on day 30, one-click cancel before then). A new account puts a card on file at first sign-in, which is what starts the trial. Accounts created before 2026-08-22 are grandfathered and never asked. The published record — daily Top 10, full scorecard, per-ticker pages, CSV/JSON export — needs no account and no card. |
 | **Scorecard** | **52 days on the record, 478 calls logged and never edited. ~47% have beaten SPY the next day** (below a coin flip — say so; the point is that it's auditable, not that it's magic). |
 | **Methodology** | 6-factor composite. `/how-it-works` names the six factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — and their weight **ordering** (heaviest Trend + Relative Strength, lightest Momentum). **The exact weights are not published — never put them in a post.** "Smart Money" = **SEC Form 4 insider buys**, not 13F lag. |
 
@@ -110,7 +110,7 @@ The scorecard is the part I actually want you to attack. Every market day I free
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — with the six factors and their weight ordering published at tapeline.io/how-it-works. "Smart Money" is SEC Form 4 insider buying, not 13F lag.
 
-Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed). The public record needs no account and no card. Creating an account puts a card on file at first sign-in and starts the 14-day Premium trial — $0 until day 14, one click cancels.
+Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed). The public record needs no account and no card. Creating an account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 until day 14, one click cancels.
 
 Drop a ticker in the comments and I'll post its current score + the six-factor breakdown. And tell me what's wrong with the methodology — that's the part I want to harden.
 ```
@@ -171,7 +171,7 @@ The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Sm
 
 The scorecard is the part I want HN to tear apart. It's 52 days and 478 calls deep, and the top-10 is currently beating SPY about 47% of the time — i.e. slightly worse than a coin flip. I'm posting that number on purpose. The transparency is the product; the early hit rate is not the pitch, and I expect it to move both directions as the sample grows.
 
-The published record is live (no delay) and needs no account: the daily Top 10, a page per scored ticker, the full scorecard and the raw CSV/JSON export. Pro is $8.25/mo billed annually for the full ~2,500-ticker live scan + alerts. Premium is $16.58/mo annually for + Congress trades + SEC Form 4. The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 14-day Premium trial — $0 today, first charge on day 14, one click to cancel.
+The published record is live (no delay) and needs no account: the daily Top 10, a page per scored ticker, the full scorecard and the raw CSV/JSON export. Pro is $8.25/mo billed annually for the full ~2,500-ticker live scan + alerts. Premium is $16.58/mo annually for + Congress trades + SEC Form 4. The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 today, first charge on day 30, one click to cancel.
 
 Built solo from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and which factor I'm under-weighting.
 ```

@@ -85,7 +85,7 @@ const PLANS = [
       "Email alerts (10/day) · daily briefing",
       "TradingView charts · CSV export",
     ],
-    cta: "Start 14-day Premium trial",
+    cta: "Start 30-day Premium trial",
     ctaHref: "/signup?plan=pro",
     // Pro is the highlighted protagonist — the realistic first purchase.
     // "Best value" is a factual framing (cheapest paid tier per feature),
@@ -115,7 +115,7 @@ const PLANS = [
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
       "Priority support · same-day reply",
     ],
-    cta: "Start 14-day Premium trial",
+    cta: "Start 30-day Premium trial",
     ctaHref: "/signup?plan=premium",
     highlight: false,
   },
@@ -313,7 +313,7 @@ export function PricingTable({ now }: { now?: Date } = {}) {
           No urgency, no deadline, no scarcity. */}
       <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-panel/60 px-4 py-3">
-          <div className="text-xs font-medium text-fg">14-day Premium trial — $0 today</div>
+          <div className="text-xs font-medium text-fg">30-day Premium trial — $0 today</div>
           <p className="mt-1 text-xs text-muted leading-relaxed">
             Adding a card is what starts the trial &mdash; nothing before it does.
             Stripe charges $0 that day and shows you the exact first-charge date

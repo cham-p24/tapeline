@@ -499,7 +499,7 @@ def effective_limit(user: User, key: str) -> int | None:
 #
 # WHAT IS TRUE NOW: signing up takes an email and a password and lands on a
 # working FREE plan — the live scanner at FREE_SCANNER_ROWS, one saved screen,
-# a watchlist, a daily ticker-page budget. A card starts the 14-day Premium
+# a watchlist, a daily ticker-page budget. A card starts the 30-day Premium
 # trial (Stripe Checkout, $0 that day, first charge at trial end, one click to
 # cancel before then) and is what turns on every matching row, a second saved
 # screen, alerts, export and the filings feeds.

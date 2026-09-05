@@ -42,7 +42,7 @@ const FACT_SHEET = [
       `Premium ${usdCompact(PRICING.premium.annual)}/yr (or ${usd(PRICING.premium.monthly)}/mo) · ` +
       `Trader ${usdCompact(PRICING.trader.annual)}/yr (concierge, sold by hand) — annual billing is the default`,
   },
-  { label: "Free trial",      value: "14-day Premium; card required, $0 charged today, first charge on day 14" },
+  { label: "Free trial",      value: "14-day Premium; card required, $0 charged today, first charge on day 30" },
   { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume, from the full liquid US universe)" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },

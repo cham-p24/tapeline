@@ -4,8 +4,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -110,7 +110,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   | Headquarters | Melbourne, Victoria, Australia |
   | Funding | Bootstrapped — no external investment |
   | Pricing | Public record free, no account required · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
-  | Free trial | 14-day Premium — a card starts it, $0 charged that day, first charge on day 14, one-click cancel. Signing up itself takes only an email and a password and opens the free plan. The published record (daily Top 10, full scorecard, raw CSV/JSON) needs no account at all |
+  | Free trial | 14-day Premium — a card starts it, $0 charged that day, first charge on day 30, one-click cancel. Signing up itself takes only an email and a password and opens the free plan. The published record (daily Top 10, full scorecard, raw CSV/JSON) needs no account at all |
   | Universe | ~2,500 active US tickers (top by daily $-volume) · 5,757 tracked |
   | Update cadence | Sub-60 seconds during US market hours |
   | Press contact | press@tapeline.io |
@@ -200,7 +200,7 @@ bottom of Part A.
 
   It's descriptive, not advice — six labels, no buy/sell language. The public
   record is the real product and is readable with no account and no card; the
-  signed-in product opens on the free plan with an email and a password; a card starts the 14-day Premium
+  signed-in product opens on the free plan with an email and a password; a card starts the 30-day Premium
   trial — $0 today, first charge at day 14, one click to cancel.
   Would genuinely
   love feedback on the scoring methodology: https://tapeline.io/how-it-works

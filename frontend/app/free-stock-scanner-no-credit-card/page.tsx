@@ -20,7 +20,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // email and a password again, onto a free plan that runs the live scanner.
 // So there are now TWO true statements to keep straight, and this page is the
 // one place on the site where getting either of them wrong is unforgivable:
-// the SIGN-UP needs no card; the 14-day Premium TRIAL still does.
+// the SIGN-UP needs no card; the 30-day Premium TRIAL still does.
 export const metadata = pageMeta({
   title: "Free Stock Scanner — No Credit Card, No Signup | Tapeline",
   description:
@@ -49,13 +49,13 @@ const SCANNERS: Scanner[] = [
     // Honest label. Reading Tapeline's output takes no account. Running the
     // scanner takes an account and still no card — same shape as TradingView's
     // row — which is why this reads "None (free tier)" from 2026-08-30. The
-    // 14-day Premium trial is the one thing here that does take a card, and
+    // 30-day Premium trial is the one thing here that does take a card, and
     // the summary says so in its own sentence rather than in a parenthesis.
     cardNeeded: "None (free tier)",
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     summary:
-      "The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Since 30 August 2026 you can also run the scanner yourself for nothing: signing up takes an email and a password, no card, and the free plan is live rather than delayed — the top ten scored rows of any scan you build, one saved screen, a five-symbol watchlist and twelve ticker deep-pages a day. What a card buys is every matching row instead of the first ten, a second saved screen, alerts by email and web push, CSV export, the 200-symbol watchlist and the congressional and insider filings. Adding one starts the 14-day Premium trial through Stripe Checkout — $0 charged that day, the exact first-charge date shown before you confirm, an email three days before it, and one click to cancel.",
+      "The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Since 30 August 2026 you can also run the scanner yourself for nothing: signing up takes an email and a password, no card, and the free plan is live rather than delayed — the top ten scored rows of any scan you build, one saved screen, a five-symbol watchlist and twelve ticker deep-pages a day. What a card buys is every matching row instead of the first ten, a second saved screen, alerts by email and web push, CSV export, the 200-symbol watchlist and the congressional and insider filings. Adding one starts the 30-day Premium trial through Stripe Checkout — $0 charged that day, the exact first-charge date shown before you confirm, an email three days before it, and one click to cancel.",
   },
   {
     name: "StockAnalysis.io",
@@ -99,7 +99,7 @@ const SCANNERS: Scanner[] = [
 const FAQ = [
   {
     q: "What's the best free stock scanner with no credit card?",
-    a: "It depends what you want to do with no card. To READ a scanner's output and its track record without an account, Tapeline — the daily Top 10, the whole scorecard and the raw CSV/JSON record are open to everyone, and it is the only one here that names every factor behind its score. To RUN your own screens with no card: StockAnalysis.io (no account at all), the free Finviz screener (no account), TradingView (a free account, no card), and since 30 August 2026 Tapeline's own free plan, which asks for an email and a password and shows you the top ten scored rows of any scan. The one thing on this page that still takes a card is a trial — Trade Ideas', and Tapeline's 14-day Premium trial.",
+    a: "It depends what you want to do with no card. To READ a scanner's output and its track record without an account, Tapeline — the daily Top 10, the whole scorecard and the raw CSV/JSON record are open to everyone, and it is the only one here that names every factor behind its score. To RUN your own screens with no card: StockAnalysis.io (no account at all), the free Finviz screener (no account), TradingView (a free account, no card), and since 30 August 2026 Tapeline's own free plan, which asks for an email and a password and shows you the top ten scored rows of any scan. The one thing on this page that still takes a card is a trial — Trade Ideas', and Tapeline's 30-day Premium trial.",
   },
   {
     q: "Which stock scanners genuinely need no signup?",
@@ -108,7 +108,7 @@ const FAQ = [
   {
     q: "Does Tapeline still have a free tier?",
     // copy-compliance-allow card-required-signup -- narrates the 22-30 Aug window in the past tense and states the current state first
-    a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the live scanner: the top ten scored rows of any scan, live data, one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 14-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and the filings feeds — $0 charged that day, the first charge on day 14 at the plan price you pick, and one click cancels before then.",
+    a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the live scanner: the top ten scored rows of any scan, live data, one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 30-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and the filings feeds — $0 charged that day, the first charge on day 30 at the plan price you pick, and one click cancels before then.",
   },
   {
     q: "Does the no-card record still show real results?",
@@ -116,7 +116,7 @@ const FAQ = [
   },
   {
     q: "How did you decide which scanners qualify?",
-    a: "On features only, never on returns: what you can reach with no credit card, whether the tool names the factors behind any score it shows, and whether it keeps a public track record. We list what still takes a card — Trade Ideas, and our own 14-day Premium trial — so the comparison is complete rather than cherry-picked. We never rank scanners by claimed performance; descriptive analytics only.",
+    a: "On features only, never on returns: what you can reach with no credit card, whether the tool names the factors behind any score it shows, and whether it keeps a public track record. We list what still takes a card — Trade Ideas, and our own 30-day Premium trial — so the comparison is complete rather than cherry-picked. We never rank scanners by claimed performance; descriptive analytics only.",
   },
 ];
 
@@ -349,7 +349,7 @@ export default function FreeStockScannerNoCreditCardPage() {
             <strong>what you can reach with no credit card</strong>; whether the tool{" "}
             <strong>names the factors</strong> behind any score it shows; and whether it
             keeps a <strong>public track record</strong>. We list what fails the first
-            test — Trade Ideas, and our own 14-day Premium trial — so the comparison is
+            test — Trade Ideas, and our own 30-day Premium trial — so the comparison is
             complete rather than cherry-picked.
           </p>
           <p className="mt-3 text-sm text-muted leading-relaxed">
@@ -360,8 +360,8 @@ export default function FreeStockScannerNoCreditCardPage() {
             live rather than delayed and shows the top ten scored rows of any scan.{" "}
             <strong>A card</strong> is the third step, and it buys the rest: every matching
             row instead of the first ten, a second saved screen, alerts, CSV export, the
-            200-symbol watchlist and the filings feeds. Adding one starts the 14-day Premium
-            trial — $0 that day, first charge on day 14, one click to cancel before then.
+            200-symbol watchlist and the filings feeds. Adding one starts the 30-day Premium
+            trial — $0 that day, first charge on day 30, one click to cancel before then.
             The raw filter screeners don&apos;t produce a composite score, so the
             factors and scorecard columns simply don&apos;t apply to them — a difference in
             design, not a criticism.
@@ -424,8 +424,8 @@ export default function FreeStockScannerNoCreditCardPage() {
             The picks, the scorecard and the raw CSV/JSON stay open to everyone, with
             nothing to sign up for. Running your own scan takes an email and a password
             and nothing else — the free plan is live, at the top ten scored rows a scan.
-            The 14-day Premium trial is the part that takes a card: $0 is charged that
-            day, the first charge is on day 14, and one click cancels before then. Pro is{" "}
+            The 30-day Premium trial is the part that takes a card: $0 is charged that
+            day, the first charge is on day 30, and one click cancels before then. Pro is{" "}
             {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr) with a
             30-day money-back guarantee.
           </p>

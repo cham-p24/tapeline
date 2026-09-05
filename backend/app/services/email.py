@@ -394,7 +394,7 @@ def render_watchlist_alert_email(
 # both work without it.
 _FREE_VS_TRIAL_FOOTNOTE = (
     "Your account took an email and a password, and there is nothing on file "
-    "to cancel. A card is the separate step that starts the 14-day Premium "
+    "to cancel. A card is the separate step that starts the 30-day Premium "
     "trial, on Stripe's own checkout page: $0 is charged that day, the first "
     "charge is at the end of day 14, and one click cancels before then with "
     "nothing taken. If you would rather not, the free plan keeps working, and "
@@ -494,7 +494,7 @@ def render_referral_referee_email(
         )
         + muted_paragraph(
             "Your free month lands on your first paid month, whenever you start "
-            "one — including if you start the 14-day Premium trial."
+            "one — including if you start the 30-day Premium trial."
         )
         + button("Open the scanner", "https://tapeline.io/app/scanner"),
         preheader="You earned 1 free month of Premium — applied at your next checkout.",
@@ -757,7 +757,7 @@ def render_trial_day11_email(
     return shell(
         h1("3 days left on your trial.")
         + lead(
-            f"{user_name}, you're 11 days into the 14-day Premium trial. "
+            f"{user_name}, you're 11 days into the 30-day Premium trial. "
             f"Here's what you've actually been using."
         )
         + _trial_summary_block(summary)
@@ -884,7 +884,7 @@ def render_trial_expired_email(
     return shell(
         h1("Your Tapeline trial ended.")
         + lead(
-            f"{user_name}, your 14-day Premium trial ended overnight. Your "
+            f"{user_name}, your 30-day Premium trial ended overnight. Your "
             f"account is now on the Free tier — still live data, but capped "
             f"at the top {FREE_SCANNER_ROWS} scanner rows and "
             f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with no smart "
@@ -2791,7 +2791,7 @@ def render_free_trial_invite_email(
             """
         )
         + paragraph(
-            "The trial runs 14 days and <strong>takes a card</strong>: "
+            "The trial runs 30 days and <strong>takes a card</strong>: "
             "<strong>$0 is charged today</strong>, the first charge lands 14 days "
             "later, and one click ends it before then with nothing taken. We email "
             "you three days before that date, so it cannot arrive unannounced. "
@@ -2841,7 +2841,7 @@ def render_free_trial_last_invite_email(user_name: str) -> str:
         )
         + button("Read the record", "https://tapeline.io/scorecard")
         + muted_paragraph(
-            "If it holds up for you, the 14-day Premium trial is on the billing "
+            "If it holds up for you, the 30-day Premium trial is on the billing "
             "page — card required, $0 today, one click to stop before the first "
             "charge. If not, nothing changes: the public record and the daily "
             "picks stay open to you either way, no account and no card."
@@ -4562,7 +4562,7 @@ async def run_activation_drip(
     # one-line change.
     #
     # Window: 2-10 days after signup. The lower bound gives the watchlist time
-    # to exist; the upper bound keeps it inside a 14-day trial and clear of the
+    # to exist; the upper bound keeps it inside a 30-day trial and clear of the
     # day-13 trial email.
     arm_users = (
         await session.execute(

@@ -787,7 +787,7 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <a href="/app/scanner">scanner</a> is the home for that — Free
       gets live scores for the top 10 rows plus 12 look-ups a day
       (unmetered for the first 24 hours), and an account is an email and a
-      password; the <a href="/signup">14-day Premium trial</a> — that step
+      password; the <a href="/signup">30-day Premium trial</a> — that step
       takes a card, $0 charged that day — opens the full real-time universe
       with unlimited look-ups.</p>
     `,
@@ -840,8 +840,8 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       pick ever made with its next-session result vs SPY, a page per scored
       ticker, and the raw CSV/JSON — no account, no card. A free account is
       an email and a password, and it opens the live scanner at the top ten
-      scored rows. The card belongs to the 14-day Premium trial, which is a
-      step you take on purpose ($0 that day, first charge on day 14, one
+      scored rows. The card belongs to the 30-day Premium trial, which is a
+      step you take on purpose ($0 that day, first charge on day 30, one
       click to cancel). Judge the product on the record before you decide
       whether to open an account.</p>
 
@@ -1116,7 +1116,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>Want to see RSI in context for every US ticker? The Tapeline
       composite blends RSI into a single 0–100 score along with five other
-      factors. <a href="/signup">Try the 14-day Premium trial</a> — starting
+      factors. <a href="/signup">Try the 30-day Premium trial</a> — starting
       it takes a card, $0 is charged that day, and one click cancels before
       the day-14 charge. If you'd rather not put a card down, a free account
       still gets the top ten scored rows live, and the
@@ -1385,8 +1385,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       is built to answer the first question. The second question
       mostly takes care of itself once the first one is settled.</p>
 
-      <p><a href="/signup">Try the 14-day Premium trial</a> — starting it
-      takes a card, $0 charged today, first charge on day 14, cancel in one
+      <p><a href="/signup">Try the 30-day Premium trial</a> — starting it
+      takes a card, $0 charged today, first charge on day 30, cancel in one
       click before then. The account itself is an email and a password. Read
       every score the same way our public scorecard does.</p>
     `,
@@ -1592,7 +1592,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <a href="/scorecard">scorecard</a> is the test. Read it. If the
       numbers don't hold up, we're not the right product for you. If
       they do, the
-      <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=best_scanner_under_30">14-day
+      <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=best_scanner_under_30">30-day
       Premium trial</a> is the way to see it from the inside — a card, $0
       charged today, and one click to cancel before the day-14 charge.</p>
     `,
@@ -1768,7 +1768,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       and surfaces it as both (1) a sub-score in the composite and
       (2) raw filtered transactions at /app/holdings.</p>
 
-      <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">14-day
+      <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">30-day
       Premium trial — $0 today</a>. Read 90 days of filtered Form 4
       activity across the full universe. The trial takes a card; the first
       charge is on day 14 and one click cancels before then.</p>
@@ -1946,7 +1946,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>Tapeline's pitch: we'd rather lose your business to a
       product that fits you better than win it via misleading
       claims. If the scorecard convinces you, the
-      <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">14-day
+      <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">30-day
       Premium trial</a> is the way to see the rest — starting it takes a card,
       $0 is charged today, and one click cancels before the day-14 charge. If
       it doesn't, that's useful

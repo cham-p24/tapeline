@@ -4,8 +4,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -177,7 +177,7 @@ For those narrow cases the original DM template (preserved in git history if nee
 | "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the live forward-test — every miss stays on the page."                                                                |
 | "What about $[other ticker]?"           | Run the curl, paste the breakdown in the thread. Be willing to spend 2-3 replies going deep on their actual ticker of interest before any soft CTA.                                   |
 | "Are you the founder?"                  | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula."                                                             |
-| "How do I try it?"                      | "The full record — daily Top 10, the whole scorecard, a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in scanner, an account is just an email and a password. A card is only for the 14-day Premium trial: $0 that day, first charge on day 14, one click cancels. tapeline.io if you want to give it a shot."                                      |
+| "How do I try it?"                      | "The full record — daily Top 10, the whole scorecard, a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in scanner, an account is just an email and a password. A card is only for the 30-day Premium trial: $0 that day, first charge on day 30, one click cancels. tapeline.io if you want to give it a shot."                                      |
 | Pushback / methodological critique      | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently."           |
 | Silence after the OP reads it           | Move on. The followers who saw the exchange got the value either way.                                                                                                                 |
 

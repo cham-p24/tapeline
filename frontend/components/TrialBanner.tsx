@@ -8,7 +8,7 @@ import { freeHasWatchlist } from "@/lib/pricing";
 
 /**
  * Premium-trial status banner. Shows on every /app page while the user's
- * 14-day Premium trial is running.
+ * 30-day Premium trial is running.
  *
  * COMPLIANCE — Rule 6 (docs/COMPLIANCE_COPY_RULES.md). A factual statement
  * about the user's OWN real trial expiry is the one permitted time statement,

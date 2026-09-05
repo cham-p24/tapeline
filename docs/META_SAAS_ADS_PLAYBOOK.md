@@ -131,7 +131,7 @@ Also banned in every creative and comment reply, from Meta's written policy (V):
    Headline: **"We publish the log, not the highlights."**
 
 9. **Persona: the trial-hesitant (card objection).** Format: plain-text static. Land: `/signup?from=trial`.
-   "The 14-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm. Cancelling takes one click, any time before that date. And the public scorecard needs no account at all."
+   "The 30-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm. Cancelling takes one click, any time before that date. And the public scorecard needs no account at all."
    Headline: **"$0 today. The charge date is on the page."**
    *(Sells the safety of the card trial rather than around it — the Blinkist transparency pattern, +23 % trial starts in their own A/B · D (single company, unreplicated — regraded from the draft’s A). Correction applied: only the claims the flow actually delivers — $0 today, exact first-charge date, one-click cancel. The pre-charge reminder **does** exist — `render_trial_precharge_reminder_email` (`backend/app/services/email.py:2786`), fired from `customer.subscription.trial_will_end` at T-3 (`backend/app/routers/webhooks.py:781-841`) — so the full transparency clause is usable: $0 today, the exact first-charge date, one-click cancel, and an email before the first charge. Re-run `node scripts/lint-copy-compliance.mjs` manually over any edit; CI does not lint `docs/**`.)*
 

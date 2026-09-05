@@ -102,7 +102,7 @@ async def notify_founder_new_signup(
     """Real-time ping to the founder on every new signup.
 
     Without this, signups (and the live trials they start) land silently in the
-    DB and the founder only finds out by manually querying — so a 14-day trial
+    DB and the founder only finds out by manually querying — so a 30-day trial
     can lapse unconverted before anyone reaches out.
     """
     te = trial_ends_at.date().isoformat() if trial_ends_at else "no trial"

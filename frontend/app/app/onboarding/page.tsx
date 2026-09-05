@@ -25,7 +25,7 @@
  *      pre-population survives, it just stops being conditional on an answer.
  *   2. The OAuth `sign_up` conversion, which fires nowhere else (OAuth
  *      signups never touch the /signup form). It used to fire PAIRED with
- *      `start_trial`, because account creation auto-granted a 14-day Premium
+ *      `start_trial`, because account creation auto-granted a 30-day Premium
  *      trial. It no longer does: since 2026-08 the trial is a separate,
  *      card-required opt-in through Stripe Checkout, so `start_trial` moved to
  *      the moment the user actually starts one (app/app/billing/page.tsx).

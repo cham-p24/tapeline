@@ -21,7 +21,7 @@ TWO AUDIENCES, BECAUSE THE TRUTH DIFFERS
 This is the part that matters most, and it is why this is not one query:
 
   A. **never_trialled** — free, no Stripe customer, and `_trial_ineligible_reason`
-     returns None. These accounts CAN start the card-required 14-day trial, so
+     returns None. These accounts CAN start the card-required 30-day trial, so
      the trial-invite copy is true for them.
 
   B. **legacy_trial** — free accounts carrying a LEGACY `trial_ends_at` from the
@@ -203,7 +203,7 @@ async def run(*, send: bool, limit: int | None) -> dict:
             if not users:
                 continue
             offer = (
-                "card-required 14-day trial"
+                "card-required 30-day trial"
                 if bucket == "never_trialled"
                 else "direct subscription (already trialled — cannot re-trial)"
             )

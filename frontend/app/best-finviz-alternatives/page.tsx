@@ -74,7 +74,7 @@ const TOOLS: Tool[] = [
     rank: 1,
     name: "Tapeline",
     bestFor: "Multi-factor composite scoring with public methodology + scorecard",
-    price: "Free · $8.25/mo Pro · $16.58/mo Premium (annual) · 14-day Premium trial, card required",
+    price: "Free · $8.25/mo Pro · $16.58/mo Premium (annual) · 30-day Premium trial, card required",
     rating: 5,
     capability: {
       composite: "yes",
@@ -405,7 +405,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Run both tools in parallel for two weeks",
-    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's free plan is built for exactly this: an email and a password opens the live scanner, and you see the top ten scored rows of whatever scan you build, plus one saved screen you can come back to. Add a card only if the parallel run tells you that you want every matching row, alerts and CSV export — that starts the 14-day Premium trial, $0 that day, first charge on day 14, one click cancels before then. TradingView and Stockanalysis.com both have free tiers too.",
+    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's free plan is built for exactly this: an email and a password opens the live scanner, and you see the top ten scored rows of whatever scan you build, plus one saved screen you can come back to. Add a card only if the parallel run tells you that you want every matching row, alerts and CSV export — that starts the 30-day Premium trial, $0 that day, first charge on day 30, one click cancels before then. TradingView and Stockanalysis.com both have free tiers too.",
   },
   {
     name: "Recreate your screener filters in the new tool",
@@ -621,7 +621,7 @@ export default function BestFinvizAlternativesPage() {
                 An email and a password
               </Link>{" "}
               opens the live scanner at ten rows a scan; a card is what shows every match and
-              starts the 14-day Premium trial — $0 today, one click to cancel. Pro is $8.25/mo
+              starts the 30-day Premium trial — $0 today, one click to cancel. Pro is $8.25/mo
               annual. The{" "}
               <Link href="/scorecard" className="text-accent hover:underline">
                 published record
@@ -967,7 +967,7 @@ export default function BestFinvizAlternativesPage() {
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner.</h2>
           <p className="mt-3 text-sm text-muted">
-            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 14-day Premium trial, $0 today, first charge on day 14, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 30-day Premium trial, $0 today, first charge on day 30, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Keep your
             existing Finviz subscription if you want — they solve different problems.
           </p>

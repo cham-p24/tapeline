@@ -17,7 +17,7 @@ import { freeHasWatchlist } from "@/lib/pricing";
  *     cap. Invites an account — inviting, not punitive — and states the
  *     mechanism plainly: since #683 (2026-08-30) an account is an email and a
  *     password, it lands on the free plan, and the card is what starts the
- *     14-day Premium trial later. What this variant must NOT promise is the
+ *     30-day Premium trial later. What this variant must NOT promise is the
  *     FULL scanner: free sees the top ten scored rows, and a card is what
  *     shows every matching one. The no-account path, the published record, is
  *     still offered in the footnote.
@@ -103,14 +103,14 @@ export function LookupWall({
               password and nothing else. So the ask can finally be small — but
               the copy has to stay exact in the other direction: an account
               opens the scanner at the TOP TEN rows, not the whole list, and the
-              14-day Premium trial still takes a card. Naming both is what keeps
+              30-day Premium trial still takes a card. Naming both is what keeps
               the small ask credible. The no-account path is the published
               record, which the footnote offers. */}
           <p className="mt-3 text-sm leading-relaxed text-muted">
             You&rsquo;ve reached {countPhrase} as a guest. An account is an email and a
             password, no card &mdash; it opens live scores, more look-ups each day
             {freeHasWatchlist() ? ", a watchlist," : ","} and the top ten scored rows of
-            any scan. Adding a card starts a 14-day Premium trial and shows every matching
+            any scan. Adding a card starts a 30-day Premium trial and shows every matching
             row instead of the first ten &mdash; $0 that day, one click to cancel before
             day 14.
           </p>

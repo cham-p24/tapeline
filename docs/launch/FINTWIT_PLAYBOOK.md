@@ -4,7 +4,7 @@
 >
 > From 2026-08-22 a **new account must put a card on file at first sign-in**
 > before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> 30-day Premium trial, first charge on day 30, one click to cancel before then).
 > Accounts created **before** that date are grandfathered: they keep the free
 > access they signed up for and are never asked for a card.
 >
@@ -137,9 +137,9 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > **12.**
 > The Tapeline Free tier shows the top 10 rows, live, plus 12 ticker
 > look-ups a day and the full scorecard. That's the entire free product.
-> No "free for 7 days then $99/mo." The published record has no clock and
+> No "free for 30 days then $99/mo." The published record has no clock and
 > no card — no account needed at all. An account puts a card on file and
-> starts the 14-day Premium trial: $0 that day, one click cancels.
+> starts the 30-day Premium trial: $0 that day, one click cancels.
 
 > **13.**
 > Best feedback I've gotten this week: "Your scorecard makes me trust
@@ -157,8 +157,8 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > Pricing test: Tapeline Pro is $8.25/mo annual ($99/yr).
 > Premium is $16.58/mo annual ($199/yr) and includes the full
 > live universe + Congressional trades + insider Form 4.
-> Both have a 14-day Premium trial. It takes a card — $0 charged
-> today, first charge on day 14, one click to cancel.
+> Both have a 30-day Premium trial. It takes a card — $0 charged
+> today, first charge on day 30, one click to cancel.
 > tapeline.io/pricing
 
 ---

@@ -14,7 +14,7 @@ users.signup_gclid / signup_gbraid / signup_wbraid at signup.
 WHAT COUNTS AS A CONVERSION
 ---------------------------
 A user who (1) carries a Google click id, and (2) has at least one Subscription
-in status 'active' — a 14-day trial flips 'trialing' -> 'active' on the first
+in status 'active' — a 30-day trial flips 'trialing' -> 'active' on the first
 real charge — and (3) has not been uploaded before
 (users.ads_conversion_uploaded_at IS NULL). One conversion per user; that
 timestamp is the idempotency key, so a daily run never double-counts.

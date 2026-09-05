@@ -649,21 +649,21 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering ~2,500 US tickers is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
           </p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~2,500-ticker real-time scanner with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4). A new account takes an email and a password and lands on the free plan — the top ten scored rows of any scan, live. The 14-day Premium trial is a separate step, and that step takes a card: $0 charged that day, first charge on day 14, cancel in one click before then.
+            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~2,500-ticker real-time scanner with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4). A new account takes an email and a password and lands on the free plan — the top ten scored rows of any scan, live. The 30-day Premium trial is a separate step, and that step takes a card: $0 charged that day, first charge on day 30, cancel in one click before then.
           </p>
         </section>
 
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
           <h2 className="text-xl font-semibold tracking-tight">See {t.symbol}'s live score now.</h2>
           <p className="mt-2 text-sm text-muted">
-            14-day Premium trial — starting it takes a card, $0 charged that day, cancel in one click before the day-14 charge. A free account is an email and a password and gets the top ten scored rows live. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
+            30-day Premium trial — starting it takes a card, $0 charged that day, cancel in one click before the day-14 charge. A free account is an email and a password and gets the top ten scored rows live. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/t/${t.symbol}`} className="btn-accent">
               Open the live {t.symbol} page &rarr;
             </Link>
             <Link href="/signup" className="btn-ghost">
-              Start the 14-day Premium trial
+              Start the 30-day Premium trial
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               See the public scorecard

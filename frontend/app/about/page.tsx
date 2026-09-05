@@ -238,8 +238,8 @@ export default function AboutPage() {
           <p className="mt-3 text-sm text-muted">
             The receipts are at /scorecard. The methodology is at /how-it-works. Signing up takes an
             email and a password and lands on the free plan, which runs the live scanner on the top
-            ten scored rows of any scan. Adding a card is what starts the 14-day Premium trial — $0
-            charged that day, first charge on day 14, one click to cancel.
+            ten scored rows of any scan. Adding a card is what starts the 30-day Premium trial — $0
+            charged that day, first charge on day 30, one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">

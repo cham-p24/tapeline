@@ -637,7 +637,7 @@ async def oauth_callback(
     is_new = user is None
     if user is None:
         # Mirrors the native-signup path in routers/auth.py: an account starts
-        # on FREE with no trial. The 14-day Premium trial is card-required and
+        # on FREE with no trial. The 30-day Premium trial is card-required and
         # is granted by the Stripe `trialing` webhook, so an OAuth signup must
         # NOT hand one out for free — otherwise Google/Microsoft/Apple is a
         # side door around the card requirement the email path enforces.

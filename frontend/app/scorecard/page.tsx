@@ -115,7 +115,7 @@ function ScorecardHero() {
       <LandingCta
         from="scorecard"
         showPreview={false}
-        primaryLabel="Start the 14-day trial"
+        primaryLabel="Start the 30-day trial"
         secondaryHref="/pricing"
         secondaryLabel="See full pricing"
       />

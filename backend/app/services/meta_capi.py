@@ -13,7 +13,7 @@ readable at all.
 Browser-only pixel events are not sufficient here, for three reasons specific
 to Tapeline:
 
-  - **The money event happens off-session.** The 14-day trial's first charge
+  - **The money event happens off-session.** The 30-day trial's first charge
     arrives via a Stripe webhook two weeks after the click, with no browser
     involved. A pixel can never see it.
   - **The audience blocks trackers.** Self-directed traders run ad-blockers

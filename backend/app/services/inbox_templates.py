@@ -110,7 +110,7 @@ async def render_pricing(_body: str) -> str:
         "for everything in Pro + congressional trades + insider Form 4 "
         "buys. Signing up is email and password and lands on the free tier: "
         "the top ten scored rows of any scan, live, no card. A card adds the "
-        "14-day Premium trial — $0 charged that day, first charge on day 14, "
+        "30-day Premium trial — $0 charged that day, first charge on day 30, "
         "one click to cancel before then. Full comparison at "
         "tapeline.io/pricing."
     )
@@ -119,7 +119,7 @@ async def render_pricing(_body: str) -> str:
 async def render_trial(_body: str) -> str:
     """Canonical trial answer."""
     return (
-        "There's a 14-day Premium trial. Signing up needs no card — you land "
+        "There's a 30-day Premium trial. Signing up needs no card — you land "
         "on the free tier and can run scans straight away; adding a card "
         "starts the trial and nothing is charged that day. The first charge is "
         "on day 14 and one click cancels before then. tapeline.io/signup. The full "

@@ -390,7 +390,7 @@ export default async function StockScreenerTrackRecordPage() {
         <div className="mt-12 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
           <h2 className="text-xl font-semibold">See the record, then the live scores</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Live six-factor scores on the full scanner, on a 14-day Premium trial &mdash; $0 today. The downloadable record stays
+            Live six-factor scores on the full scanner, on a 30-day Premium trial &mdash; $0 today. The downloadable record stays
             public either way.
           </p>
           <Link href="/signup" className="mt-5 inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">

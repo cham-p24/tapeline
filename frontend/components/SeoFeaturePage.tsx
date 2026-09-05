@@ -111,13 +111,13 @@ export function SeoFeaturePage({
   ]);
   const tierLabel = tier === "premium" ? "Premium" : "Pro";
   // Says what the reader gets, not what the tier is called. The previous
-  // Pro line ("14-day Premium trial that includes everything in Pro") was
+  // Pro line ("30-day Premium trial that includes everything in Pro") was
   // circular — it described the trial in terms of the tier and the tier in
   // terms of the trial, and made no argument at all.
   const tierCopy =
     tier === "premium"
-      ? "Included in Premium, and in the 14-day trial from day one."
-      : "Included in Pro, and in the 14-day Premium trial from day one.";
+      ? "Included in Premium, and in the 30-day trial from day one."
+      : "Included in Pro, and in the 30-day Premium trial from day one.";
 
   return (
     <main id="main" className="min-h-screen">
@@ -259,7 +259,7 @@ export function SeoFeaturePage({
           <p className="mt-3 text-sm text-muted">{tierCopy}</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href={`/signup?from=${signupFrom}`} className="btn-primary">
-              Start the 14-day Premium trial &rarr;
+              Start the 30-day Premium trial &rarr;
             </Link>
             <Link href="/scorecard" className="btn-ghost">
               Read the record first &rarr;

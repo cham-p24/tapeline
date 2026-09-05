@@ -52,7 +52,7 @@ const TIER_META = {
 type TierKey = keyof typeof TIER_META;
 
 /**
- * Length of the Premium trial. Mirrors the backend grant and every "14-day"
+ * Length of the Premium trial. Mirrors the backend grant and every "30-day"
  * figure on the pricing surfaces. The first-charge date shown on the offer
  * below is derived from this, so it is the same arithmetic the Stripe session
  * performs (`subscription_data.trial_end = now + TRIAL_DAYS`).
@@ -145,7 +145,7 @@ export default function BillingPage() {
   // resume button from "pick a plan" to one click back into the same checkout.
   const [cancelledTier, setCancelledTier] = useState<"pro" | "premium" | null>(null);
   // TRIAL-START INTENT (?trial=start). Set by the post-signup hand-off and by
-  // any surface that wants to present the 14-day Premium trial. It opens the
+  // any surface that wants to present the 30-day Premium trial. It opens the
   // picker pre-armed on Premium and renders the offer panel at the top of the
   // page — a two-option fork the user resolves themselves. It NEVER redirects
   // into Stripe on its own: the panel's button is the only thing that starts a
@@ -173,7 +173,7 @@ export default function BillingPage() {
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
     : 0;
   const isOnTrial = !!trialEndsAt && trialDaysLeft > 0;
-  // LEGACY no-card trial: accounts auto-granted a 14-day Premium trial at
+  // LEGACY no-card trial: accounts auto-granted a 30-day Premium trial at
   // signup, before the trial required a card (changed 2026-08). They hold
   // tier="premium" but own nothing, so the Premium card must stay CLICKABLE
   // for them (the old `disabled={tier === "premium"}` dead-ended every trial
@@ -267,7 +267,7 @@ export default function BillingPage() {
       // would report revenue that does not exist and feed Google Ads a
       // conversion worth $199 for a customer who has paid nothing yet. Fire
       // `start_trial` instead — the trial genuinely did start — and let the
-      // real `subscribe` fire when the first charge lands 14 days later.
+      // real `subscribe` fire when the first charge lands 30 days later.
       //
       // Two signals, either of which is enough: the URL param the backend
       // appends, and the local record this page wrote before redirecting. The
@@ -614,7 +614,7 @@ export default function BillingPage() {
       )}
 
       {/* ── Trial offer (?trial=start) ─────────────────────────────────────
-          The one place the 14-day Premium trial is actually offered. It is a
+          The one place the 30-day Premium trial is actually offered. It is a
           fork, not a funnel: two same-sized buttons, the full charge terms in
           plain body text above them, and no way for the page to walk into
           Stripe on its own. See TrialOfferPanel for the rules it has to obey. */}
@@ -784,7 +784,7 @@ export default function BillingPage() {
                   splits on whether they have ever held Premium: "Re-activate"
                   is nonsense to a brand-new free account that never had it. */}
               <button onClick={openPlanPicker} className="btn-accent text-sm">
-                {trialEligible ? "See plans and the 14-day trial →" : "Re-activate Premium →"}
+                {trialEligible ? "See plans and the 30-day trial →" : "Re-activate Premium →"}
               </button>
             </div>
           )}
@@ -1007,7 +1007,7 @@ export default function BillingPage() {
               ]}
               // THE P0 fix: trial users hold tier="premium" but own nothing —
               // the old disabled={tier === "premium"} rendered a dead
-              // "Current plan" button for the entire 14-day trial, so no
+              // "Current plan" button for the entire 30-day trial, so no
               // human could ever reach /api/billing/checkout. A cardless
               // trial keeps the button live with an add-a-card CTA; only a
               // genuinely-paid Premium sees the disabled Current state.
@@ -1162,7 +1162,7 @@ export default function BillingPage() {
 }
 
 /**
- * The 14-day Premium trial offer — the ONE surface that asks for a card in
+ * The 30-day Premium trial offer — the ONE surface that asks for a card in
  * exchange for a trial, and therefore the one that has to be beyond reproach.
  *
  * NON-NEGOTIABLES, all enforced by __tests__/TrialStartOffer.test.tsx:

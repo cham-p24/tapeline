@@ -16,6 +16,9 @@
  *      suppressed on pages that already show a data table above the fold.
  */
 import { describe, it, expect, vi } from "vitest";
+// Trial length read from lib/trial.ts. These assertions used to hardcode
+// 14 and so kept asserting a promise the product had stopped making.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { render, screen } from "@testing-library/react";
 import { LandingCta } from "@/components/LandingCta";
 import { PRICING, usd } from "@/lib/pricing";
@@ -33,7 +36,9 @@ vi.mock("@/components/ScannerPreview", () => ({
 describe("LandingCta", () => {
   it("renders a primary signup CTA with the scanner-forward, trial-terms copy", () => {
     render(<LandingCta from="screener" showPreview={false} />);
-    const primary = screen.getByRole("link", { name: /try the live scanner — 14-day trial/i });
+    const primary = screen.getByRole("link", {
+      name: new RegExp(`try the live scanner — ${TRIAL_DAYS}-day trial`, "i"),
+    });
     expect(primary).toBeInTheDocument();
     expect(primary).toHaveAttribute("href", "/signup?from=screener");
   });
@@ -56,7 +61,11 @@ describe("LandingCta", () => {
     // gate. The card-free claim now attaches ONLY to the published record, and
     // the trial bullet has to carry its own $0-today qualifier.
     expect(screen.getByText(/published record — free to read, no account/i)).toBeInTheDocument();
-    expect(screen.getByText(/14-day Premium trial — \$0 today, cancel in one click/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        new RegExp(`${TRIAL_DAYS}-day Premium trial — \\$0 today, cancel in one click`, "i"),
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText(/30-day money-back guarantee/i)).toBeInTheDocument();
     // Founding Pro price is read from the single source of truth, not
     // hardcoded. The price sits in its own <li> split across text nodes

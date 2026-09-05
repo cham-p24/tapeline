@@ -16,7 +16,7 @@ import { trackEvent } from "@/lib/gtag";
  * WHAT THIS COMPONENT IS FOR: capturing a card from a trial that does not have
  * one. That makes the card state a hard gate, not a copy detail.
  *
- *   cardOnFile === true  → renders NOTHING. Since 2026-08 the 14-day Premium
+ *   cardOnFile === true  → renders NOTHING. Since 2026-08 the 30-day Premium
  *       trial is started through Stripe Checkout, so the ordinary trialist
  *       already has a card on file and their first charge is already
  *       scheduled. Showing them "Add a card" would be asking for something

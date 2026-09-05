@@ -4,8 +4,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -108,7 +108,7 @@ What surprised me from two weeks of running this:
 
 3. Smart Money reads disclosed Form 4 transactions netted over a recent window — not 13F, and not Congressional disclosures, which are ingested and published as their own feed rather than folded into the sub-score. Whether that netting is the right construction is the thing I'd most like torn apart.
 
-The full record is readable with no account and no card. A free account is an email and a password — no card — and gets top-10 rows live plus 12 look-ups a day. Pro is $9.99/mo for the full ~2,500-ticker universe. A card is only for the 14-day Premium trial — $0 charged today, first charge on day 14, one click to cancel before then.
+The full record is readable with no account and no card. A free account is an email and a password — no card — and gets top-10 rows live plus 12 look-ups a day. Pro is $9.99/mo for the full ~2,500-ticker universe. A card is only for the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel before then.
 
 What signals or factors would you want me to add weight to? The weighting is versioned in the changelog so factor changes ship with a written rationale.
 ```

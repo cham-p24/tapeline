@@ -92,7 +92,7 @@ def categories_for_ui() -> list[PrefCategory]:
             key="trial_drip",
             bit=int(EmailPref.TRIAL_DRIP),
             label="Trial reminders",
-            description="The six emails sent during your 14-day Premium trial.",
+            description="The six emails sent during your 30-day Premium trial.",
         ),
         PrefCategory(
             key="re_engagement",

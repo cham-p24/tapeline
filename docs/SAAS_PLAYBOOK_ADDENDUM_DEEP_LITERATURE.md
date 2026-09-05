@@ -70,7 +70,7 @@ Source: "Designing the Ideal Bootstrapped Business", MicroConf 2013, via mtlynch
 | 8 | Aftermarket / ecosystem — the platform does the acquisition | **PARTIAL (corrected from FAIL):** MCP server + `/mcp` page shipped (#511/#516); API v1; badge/embed; extension (unlisted). Missing: the directory listing / marketplace placement that actually does the acquisition | **PARTIAL — the most actionable miss (§1 item 12)** |
 | 9 | Large market, multiple niches | Retail traders | **PASS** |
 | 10 | Validation: "20–30 customers waiting to pay you monthly before you even start building" | Built first; 0 interviews; 0 payers | **FAIL** |
-| 11 | "Offer a 60-day money-back guarantee" over free trials | 14-day no-card trial + 30-day money-back; trial is the primary mechanism | **PARTIAL** |
+| 11 | "Offer a 60-day money-back guarantee" over free trials | 30-day no-card trial + 30-day money-back; trial is the primary mechanism | **PARTIAL** |
 | 12 | Pricing math: "$10k / 150 customers = $66" | $10k/mo at $12–15 = 670–830 payers → 70–280k visits at plausible rates | **FAIL vs his shape** |
 
 **Tally: 2 PASS, 4 PARTIAL, 6 FAIL.** The two he weights most — B2B and predictable acquisition — both fail. His advice for that case is not "market harder"; it is "change the business design" (raise price to where acquisition becomes predictable, or attach to an ecosystem that does the acquisition). Caveats: 2013 talk; "never B2C" is read in the canon as "sell to people with a budget and an economic reason to buy"; WP Engine itself sold to solo bloggers.

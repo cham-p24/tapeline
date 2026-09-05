@@ -45,7 +45,7 @@ Downstream of that, the alert-creation form is a blank text box: `frontend/app/a
 
 **What it is, verified on `origin/main` today.** `frontend/app/page.tsx` hero: `btn-primary` = "See the track record →" → **`/scorecard`**; the paired outlined button = "Browse without an account" → `/daily-picks`; below them a small link "Or read the public record first →" → `/scorecard` again. **There is no signup or trial CTA above the fold at all.** `/scorecard`'s static server-rendered block (`frontend/app/scorecard/CitableRecord.tsx:47-55`) renders, in order: entries logged (638), **"Share that beat SPY next session (n = …)" = 46.7%**, median alpha = **−0.15%**. The page does carry the honest qualifier that at this sample size the values do not distinguish the ranking from chance — so it is not unframed, but the highest-intent visitor is still sent, one click from the hero, to two sub-coin-flip numbers with no price and no way to try anything.
 
-**Chronology matters, and it cuts against over-weighting this.** Commit `4446a1e` (2026-08-15, PR #488, "proof-first positioning") is what repointed the primary CTA from `/signup` "Start the 14-day trial" to `/scorecard`. It is **three days old**. All 17 signups and all 0 checkouts accrued under the *previous* trial-first hero. (An earlier fact-check of this analysis read the pre-`4446a1e` state from the `growth/research-dossier` branch and concluded the primary CTA was still `/signup`; `origin/main` is the deployed truth and it is not.)
+**Chronology matters, and it cuts against over-weighting this.** Commit `4446a1e` (2026-08-15, PR #488, "proof-first positioning") is what repointed the primary CTA from `/signup` "Start the 30-day trial" to `/scorecard`. It is **three days old**. All 17 signups and all 0 checkouts accrued under the *previous* trial-first hero. (An earlier fact-check of this analysis read the pre-`4446a1e` state from the `growth/research-dossier` branch and concluded the primary CTA was still `/signup`; `origin/main` is the deployed truth and it is not.)
 
 **Does it explain 0-of-20?** **No.** It post-dates the entire dataset. It is current drag, not historical cause — and the change removed the only above-fold path to the thing being sold.
 
@@ -88,7 +88,7 @@ This is also the one documented buyer objection in the review corpus: *actionabi
 |---|---|---|---|---|---|
 | 1 | Activation | Signup routes to a survey before the product (`signup/page.tsx:301`) | Blocker | 3 FH | Best candidate |
 | 2 | Activation | Alert form is a blank text box — no picker, no pre-armed default | Blocker | 3 FH | Best candidate |
-| 3 | Activation | Free watchlist cap auto-dropped to 0 on 2026-08-02 (`tier.py:125,137`), orphaning `FREE_WEB_PUSH_ALERTS = 2` | Drag | 1 FH | **No** — 16 days old, and every signup gets a 14-day *Premium* trial, so the Free cap never binds during activation. *(Superseded by #536/#548, 2026-08-21/22: signup no longer grants a trial, so the Free caps now bind from the first session for anyone who declines the card — re-assess this row.)* |
+| 3 | Activation | Free watchlist cap auto-dropped to 0 on 2026-08-02 (`tier.py:125,137`), orphaning `FREE_WEB_PUSH_ALERTS = 2` | Drag | 1 FH | **No** — 16 days old, and every signup gets a 30-day *Premium* trial, so the Free cap never binds during activation. *(Superseded by #536/#548, 2026-08-21/22: signup no longer grants a trial, so the Free caps now bind from the first session for anyone who declines the card — re-assess this row.)* |
 | 4 | Conversion | Mobile hides the "Why" sentence (`ScannerPreview.tsx:167`) | Blocker | 1 FH | Contributes |
 | 5 | Conversion | Hero row 1 clipped below the 812px fold | Drag | 0.5 FH | Contributes |
 | 6 | Conversion | Primary + tertiary above-fold CTAs both → `/scorecard`; no trial CTA on the fold | Drag | 1 FH | **No** — 3 days old |
@@ -164,7 +164,7 @@ Written down so it is not relitigated.
 
 ## Strengths worth pressing
 
-1. **Pre-account visibility of the real artefact.** All ten picks with reasons are free at `/daily-picks`, no signup. TrendSpider now charges $19–$49 just to look (paid 14-day trial, no free tier). Trade Ideas has no free trial and states all sales are final. Benzinga's real-time scanner starts at $197/mo. Tapeline is more open than every paid rival, and **the site never says so** — that is a one-line landing-page fix.
+1. **Pre-account visibility of the real artefact.** All ten picks with reasons are free at `/daily-picks`, no signup. TrendSpider now charges $19–$49 just to look (paid 30-day trial, no free tier). Trade Ideas has no free trial and states all sales are final. Benzinga's real-time scanner starts at $197/mo. Tapeline is more open than every paid rival, and **the site never says so** — that is a one-line landing-page fix.
 2. **The Free tier is genuinely live, not delayed.** `tier.py:110` — `FREE_DATA_DELAY_MINUTES = 0`. Trade Ideas' free tier is a single chart with limited scanning; Benzinga keeps real-time quotes and the real-time scanner behind the $197 plan. A live top-10 for $0 is a real, checkable claim.
 3. **The forward-logged, loss-inclusive record.** Not a moat yet. But it is the only artefact of its kind in the ICP's consideration set, and it is the only asset here that cannot be cloned retroactively.
 4. **Bundle density at $19.99.** Congressional trades + SEC Form 4 insider buys + unlimited email alerts + a public API at 1,000 req/day, against Benzinga Essential at $197/mo and Trade Ideas Premium at $178–254/mo.
@@ -205,7 +205,7 @@ Ordered by expected value per founder-hour. Ship the first block, then **stop bu
 - Trade Ideas is **$89/mo billed annually ($1,068/yr) or $127/mo monthly**; Premium $178 annual / $254 monthly. An earlier draft said "~$118–127/mo" — $118 appears nowhere.
 - TrendSpider has **no ~$107 plan** — Standard $54–82, Premium $91–137, Enhanced $122–183, Advanced $214–321, Business from $399.
 - Benzinga Pro Basic is **$37/mo ($29 billed yearly, $348/yr)**, not $27. Streamlined $147 ($117 annual); Essential $197.
-- WallStreetZen Premium is **$19.50/mo billed yearly** with a $1 14-day trial and a free Basic tier — roughly **2× Tapeline Pro, not below it**. The "Tapeline is mid-market" conclusion survives on Stock Rover $7.99 + free Finviz + free Zacks alone.
+- WallStreetZen Premium is **$19.50/mo billed yearly** with a $1 30-day trial and a free Basic tier — roughly **2× Tapeline Pro, not below it**. The "Tapeline is mid-market" conclusion survives on Stock Rover $7.99 + free Finviz + free Zacks alone.
 - The liquidity floor **exists** at $50k/day (`scanner.py:37`) — the defect is that it is set too low and lets unknown-volume rows through, not that it is missing.
 - Pre-renewal reminder emails **exist and are wired**.
 - Head-term SEO landing pages **exist and are correctly titled**.

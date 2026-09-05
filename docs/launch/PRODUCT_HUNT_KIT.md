@@ -4,7 +4,7 @@
 >
 > From 2026-08-22 a **new account must put a card on file at first sign-in**
 > before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 14-day Premium trial, first charge on day 14, one click to cancel before then).
+> 30-day Premium trial, first charge on day 30, one click to cancel before then).
 > Accounts created **before** that date are grandfathered: they keep the free
 > access they signed up for and are never asked for a card.
 >
@@ -96,7 +96,7 @@ So Tapeline does the opposite three ways:
 
 3. You can download the whole record and check my math (/verify).
 
-The published record is genuinely usable on its own (live scores, the daily Top 10, a page per ticker, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys). The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 14-day Premium trial — $0 charged today, first charge on day 14, one click to cancel.
+The published record is genuinely usable on its own (live scores, the daily Top 10, a page per ticker, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys). The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel.
 
 Built solo from Melbourne. I'd genuinely love for this crowd to tear apart the methodology — which factor am I under-weighting? What would make the back-check defensible over a 1-year horizon instead of 1-day?
 ```

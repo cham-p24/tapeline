@@ -9,7 +9,7 @@ import { FREE_LIMITS, PRICING, REFUND, annualSaving, usd, freeHasWatchlist, free
 
 /**
  * One-time blocking modal that fires the first time a user lands on /app
- * after their 14-day Premium trial has expired.
+ * after their 30-day Premium trial has expired.
  *
  * Catches the cohort that ignored the day-13 email and would otherwise
  * silently disappear into the Free tier with no further prompt. The
@@ -98,7 +98,7 @@ export function TrialEndedModal() {
           {daysSince === 0 ? "Trial ended overnight" : `Trial ended ${daysSince} day${daysSince === 1 ? "" : "s"} ago`}
         </div>
         <h2 className="mt-2 text-2xl font-bold tracking-tight">
-          Your 14-day Premium trial has ended.
+          Your 30-day Premium trial has ended.
         </h2>
         <p className="mt-3 text-sm text-muted">
           {cardOnFile === false && (

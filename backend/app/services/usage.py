@@ -4,7 +4,7 @@ A "lookup" = one detailed single-ticker score view: GET /api/ticker/{symbol},
 which powers the public /t/{symbol} page and the in-app ticker page. The
 freemium model caps how many of these a non-paying caller gets per UTC day:
 
-  - PRO / PREMIUM / active-14-day-trial users : UNLIMITED (never metered).
+  - PRO / PREMIUM / active-30-day-trial users : UNLIMITED (never metered).
   - Brand-new accounts (< tier.FREE_FIRST_SESSION_GRACE_HOURS old) : UNLIMITED
     for their first session, so a new user's first exploratory visit is never
     walled before they've found a ticker worth saving.
@@ -63,7 +63,7 @@ def _within_first_session_grace(user: User) -> bool:
 
 def _is_unmetered(user: User) -> bool:
     """True for callers who are never metered: any paid tier (Pro/Premium),
-    users currently inside their no-card 14-day Premium trial, AND any account
+    users currently inside their no-card 30-day Premium trial, AND any account
     still inside its first-session grace window (see _within_first_session_grace).
 
     Free users past the grace window — including a lapsed trial that dropped

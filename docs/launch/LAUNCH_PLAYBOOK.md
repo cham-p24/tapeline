@@ -4,8 +4,8 @@
 >
 > **Signing up takes an email and a password.** The account it makes lands on
 > the Free plan and opens the live scanner — the top ten scored rows of any
-> scan, one saved screen. **A card is what starts the 14-day Premium trial**
-> (Stripe Checkout, $0 charged that day, first charge on day 14, one click to
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
 > than the first ten, plus alerts, CSV export and the Congressional and insider
 > feeds.
@@ -78,7 +78,7 @@ The thing I care most about: a public scorecard. Every day I log the top 10 name
 Free tier: top-10 rows, live, 12 ticker look-ups a day, 5-name watchlist.
 Pro $9.99/mo: full 2,500-ticker live scan + watchlist with smart alerts.
 Premium $19.99/mo: + Congress trades, insider Form 4 activity.
-14-day Premium trial — a card starts it, $0 charged that day, first charge on day 14, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED. Deployed on Fly.io.
 
@@ -157,7 +157,7 @@ What costs $19.99/mo (Premium):
 - + Congress trades feed (House + Senate disclosed)
 - + Recent insider buys (SEC Form 4) across the active universe
 
-14-day Premium trial — a card starts it, $0 charged that day, first charge on day 14, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
 
 Try it on any ticker you like — `tapeline.io/t/AAPL`, `tapeline.io/t/NVDA`, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 
@@ -247,7 +247,7 @@ Pro $9.99/mo: full ~2,500-ticker live scan + smart watchlist alerts + IPO/earnin
 
 Premium $19.99/mo: + Congress trades + SEC Form 4 insider buys.
 
-14-day Premium trial — a card starts it, $0 charged that day, first charge on day 14, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
 
 5/ Three things I care about most:
 
@@ -491,7 +491,7 @@ market morning") and ship the worker quickly.
 | --- | --- | --- |
 | `signup_started` | /signup mount | Visitor opened the form |
 | `signup_completed` / `sign_up` | /signup submit | Account created |
-| `trial_started` / `start_trial` | Stripe Checkout success → `trialing` subscription webhook | 14-day Premium trial begins. **Not fired at /signup any more** — signup writes `tier="free", trial_ends_at=None` (see `frontend/app/signup/page.tsx`, the `start_trial` note) |
+| `trial_started` / `start_trial` | Stripe Checkout success → `trialing` subscription webhook | 30-day Premium trial begins. **Not fired at /signup any more** — signup writes `tier="free", trial_ends_at=None` (see `frontend/app/signup/page.tsx`, the `start_trial` note) |
 | `newsletter_subscribed` / `sign_up{method=newsletter}` | NewsletterCapture submit | Email captured |
 | `pricing_page_viewed` | /app/billing render | In-app upgrade view |
 | `trial_converted` | /app/billing on trial → paid | Conversion to paid Premium |

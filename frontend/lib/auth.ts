@@ -72,7 +72,7 @@ type SignupExtras = {
   // lib/utm.ts:getStoredFbclid(). Backend writes it once to
   // users.signup_fbclid. It carries the Conversions API's match quality (a
   // hashed email alone caps it) and is the only join key that can count Meta
-  // payers, since the 14-day trial puts every first charge outside Meta's
+  // payers, since the 30-day trial puts every first charge outside Meta's
   // 7-day click window. Optional — only paid Meta clicks carry it.
   fbclid?: string;
   // Meta's `_fbp` browser cookie, read at submit via

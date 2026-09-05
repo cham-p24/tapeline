@@ -616,7 +616,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected), and Premium adds Congressional-trade alerts. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 14-day Premium trial or a paid plan.`,
+      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, signal label changes, squeeze detected), and Premium adds Congressional-trade alerts. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 30-day Premium trial or a paid plan.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,
@@ -954,7 +954,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             read with no account at all. Signing up takes an email and a password: a free account
             runs the live scanner on the top {FREE_LIMITS.scannerRows}{" "}scored rows of any scan,
             keeps one saved screen{freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} and opens {FREE_LIMITS.dailyLookups}{" "}ticker deep-pages a day.
-            The card is what starts a 14-day Premium trial — $0 that day, the first charge on day 14
+            The card is what starts a 30-day Premium trial — $0 that day, the first charge on day 30
             at the plan you pick, one click to cancel before then — and that is what turns on every
             matching row instead of the first {FREE_LIMITS.scannerRows}, alerts, CSV export, the
             200-ticker watchlist, congressional trades and recent insider buys (SEC Form 4).

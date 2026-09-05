@@ -785,7 +785,7 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
 async def ticker_ratings(symbol: str, request: Request) -> dict:
     """Analyst ratings consensus + recent events for a ticker — Premium-only.
 
-    Trial users (Premium for the duration of the 14-day card-required trial)
+    Trial users (Premium for the duration of the 30-day card-required trial)
     and paid Premium subscribers see the widget. Free + Pro users hit the Paywall on the frontend; this
     endpoint also enforces the gate so the data can't be sniffed via direct
     API call.
