@@ -1,5 +1,5 @@
 /**
- * The 14-day Premium trial offer on /app/billing.
+ * The Premium trial offer on /app/billing (length from lib/trial.ts).
  *
  * This is the surface that asks for a card, so it is the surface with the
  * hardest rules. The founder's brief for the card-required trial makes four of
@@ -29,8 +29,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { PRICING, FREE_LIMITS, usd, usdCompact } from "@/lib/pricing";
-
-const TRIAL_DAYS = 14;
+// Read from the single source of truth. This file used to hardcode 14 and
+// passed for weeks against a page that ALSO hardcoded 14 while the backend
+// charged at day 30 — an assertion vouching for its own fixture. Never again.
+import { TRIAL_DAYS } from "@/lib/trial";
 
 const trackEventMock = vi.hoisted(() => vi.fn());
 const trackEventOnceMock = vi.hoisted(() => vi.fn((..._args: unknown[]) => true));
@@ -256,7 +258,7 @@ describe("trial offer — the decline is a real, equal choice", () => {
     seed();
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
-    const trial = within(panel).getByRole("button", { name: /start the 14-day trial/i });
+    const trial = within(panel).getByRole("button", { name: new RegExp(`start the ${TRIAL_DAYS}-day trial`, "i") });
     const decline = declineIn(panel);
 
     for (const cls of ["h-11", "flex-1", "text-sm", "font-medium", "rounded-md"]) {
@@ -320,7 +322,7 @@ describe("trial offer — the decline is a real, equal choice", () => {
       // A div pretending to be a button is not keyboard-operable by default.
       expect(el.tagName).not.toBe("DIV");
     }
-    const trial = within(panel).getByRole("button", { name: /start the 14-day trial/i });
+    const trial = within(panel).getByRole("button", { name: new RegExp(`start the ${TRIAL_DAYS}-day trial`, "i") });
     // Label-agnostic: the decline reads differently per cohort (see the
     // decline describe block), but it is an <a> in both.
     const decline = within(panel).getByRole("link", {
@@ -379,7 +381,7 @@ describe("trial offer — the mechanism", () => {
   it("POSTs start_trial to the existing checkout endpoint and redirects only on click", async () => {
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
-    fireEvent.click(within(panel).getByRole("button", { name: /start the 14-day trial/i }));
+    fireEvent.click(within(panel).getByRole("button", { name: new RegExp(`start the ${TRIAL_DAYS}-day trial`, "i") }));
 
     await waitFor(() => expect(checkoutBodies).toHaveLength(1));
     expect(checkoutBodies[0]).toMatchObject({
@@ -416,7 +418,7 @@ describe("trial offer — the mechanism", () => {
   it("marks the checkout-intent event as a trial start", async () => {
     await renderBilling("/app/billing?trial=start");
     const panel = await screen.findByTestId("trial-offer");
-    fireEvent.click(within(panel).getByRole("button", { name: /start the 14-day trial/i }));
+    fireEvent.click(within(panel).getByRole("button", { name: new RegExp(`start the ${TRIAL_DAYS}-day trial`, "i") }));
     await waitFor(() => {
       const call = trackEventMock.mock.calls.find((c) => c[0] === "begin_checkout");
       expect(call).toBeDefined();
@@ -465,7 +467,7 @@ describe("trial offer — eligibility", () => {
     // The picker is reachable without the offer panel, so the trial CTA there
     // must not be a bare button with the terms somewhere off-screen.
     await renderBilling("/app/billing");
-    const cta = await screen.findByRole("button", { name: /start the 14-day trial/i });
+    const cta = await screen.findByRole("button", { name: new RegExp(`start the ${TRIAL_DAYS}-day trial`, "i") });
     const note = cta.nextElementSibling;
     const text = (note?.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toMatch(/\$0 today/i);

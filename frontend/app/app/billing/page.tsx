@@ -16,6 +16,13 @@ import {
 import { userLocale } from "@/lib/datetime";
 import { handle401, errorMessage } from "@/lib/api";
 import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
+// The ONE source of truth for the trial length. This page used to carry its
+// own `const TRIAL_DAYS = 14` — the backend moved to 30 (routers/billing.py)
+// and lib/trial.ts followed, but this local copy did not, so the page that
+// actually STARTS a trial showed a first-charge date 16 days too early and
+// a button reading "Start the 14-day trial". Guarded by
+// __tests__/singleTrialLengthSource.test.ts.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 import { errorText } from "@/lib/errorText";
@@ -52,12 +59,10 @@ const TIER_META = {
 type TierKey = keyof typeof TIER_META;
 
 /**
- * Length of the Premium trial. Mirrors the backend grant and every "30-day"
- * figure on the pricing surfaces. The first-charge date shown on the offer
- * below is derived from this, so it is the same arithmetic the Stripe session
- * performs (`subscription_data.trial_end = now + TRIAL_DAYS`).
+ * The first-charge date shown on the offer below is derived from TRIAL_DAYS
+ * (imported above), so it is the same arithmetic the Stripe session performs
+ * (`subscription_data.trial_end = now + TRIAL_DAYS`).
  */
-const TRIAL_DAYS = 14;
 
 /**
  * Local record that the checkout we are about to leave for is a TRIAL start,
@@ -784,7 +789,7 @@ export default function BillingPage() {
                   splits on whether they have ever held Premium: "Re-activate"
                   is nonsense to a brand-new free account that never had it. */}
               <button onClick={openPlanPicker} className="btn-accent text-sm">
-                {trialEligible ? "See plans and the 30-day trial →" : "Re-activate Premium →"}
+                {trialEligible ? `See plans and the ${TRIAL_DAYS}-day trial →` : "Re-activate Premium →"}
               </button>
             </div>
           )}
@@ -1243,7 +1248,7 @@ function TrialOfferPanel({
         Start your {TRIAL_DAYS}-day Premium trial &mdash; or don&rsquo;t
       </h2>
       <p className="mt-1.5 text-sm text-muted">
-        Every Premium feature for {TRIAL_DAYS} days: the full ~2,500-ticker live
+        Every Premium feature for {TRIAL_DAYS} days: the full ~2,000-ticker live
         universe, score breakdowns, Congressional trades and insider buys,
         watchlist of 200 and unlimited email alerts. Starting the trial takes a
         card, because it becomes a paid subscription if you keep it. Here is
