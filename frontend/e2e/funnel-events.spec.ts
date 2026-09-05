@@ -251,10 +251,11 @@ test.describe("GA4 funnel events", () => {
     await page.fill('input[type="email"]', "test@example.com");
     await page.fill('input[type="password"]', "test1234password");
     await page.fill('input[autocomplete="name"]', "Test User");
-    // Required subscription acknowledgement — Meta's Subscription Services
-    // standard needs an unticked opt-in where PII is entered, and submit is
-    // gated on it, so the funnel events cannot fire without ticking it.
-    await page.check("#signup-subscription-terms");
+    // No acknowledgement step. The required subscription checkbox was removed
+    // on 2026-09-05: it asserted "my Premium trial charges $0 today, then
+    // $19.99/month from <date>" and hard-gated account creation on it, which is
+    // false for every visitor here — signup takes no card and schedules no
+    // charge. Email + password are the only required inputs.
     await page.click('button[type="submit"]');
     await page.waitForTimeout(800);
     const names = (await getEvents()).map((e) => e.name);
