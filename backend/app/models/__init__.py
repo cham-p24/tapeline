@@ -15,6 +15,7 @@ from app.models.newsletter import NewsletterSubscriber
 from app.models.password_reset_token import PasswordResetToken
 from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
+from app.models.scan_log import SCAN_LOG_TOP_N, ScanLog
 from app.models.scanner_preset import ScannerPreset
 from app.models.score_snapshot import ScoreSnapshot
 from app.models.scorecard import DailyScorecardEntry
@@ -30,6 +31,7 @@ from app.models.webhook_event import StripeWebhookEvent
 
 __all__ = [
     "FUNNEL_EVENTS",
+    "SCAN_LOG_TOP_N",
     "AlertEvent",
     "AlertRule",
     "ApiKey",
@@ -51,6 +53,7 @@ __all__ = [
     "PasswordResetToken",
     "RegimeState",
     "RoadmapVote",
+    "ScanLog",
     "ScannerPreset",
     "ScoreSnapshot",
     "SigninCode",

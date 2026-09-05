@@ -1,6 +1,7 @@
 """GET /api/scanner — paginated ticker list with filters + tier gating."""
 from __future__ import annotations
 
+import logging
 import time
 from datetime import timedelta
 
@@ -13,12 +14,15 @@ from app.models import Ticker, User
 from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
 from app.services.funnel_events import record_funnel_event
+from app.services.scan_log import record_scan_log
 from app.services.ticker_freshness import live_clauses
 from app.services.ticker_ordering import (
     ORDER_PATTERN,
     SORT_PATTERN,
     deterministic_order_by,
 )
+
+logger = logging.getLogger(__name__)
 from app.services.tier import Tier
 from app.services.tier import limit as tier_limit
 
@@ -148,7 +152,18 @@ async def list_scanner(
     order: str = Query("desc", pattern=ORDER_PATTERN),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    # Instrumentation only — never touches the query. Bare annotation, NOT
+    # Query(...): routers/mcp.py calls this handler as a plain function, and an
+    # omitted Query-defaulted argument arrives there as the Query OBJECT rather
+    # than its default (mcp.py:227-230 documents the trap). normalise_src also
+    # rejects anything outside the closed set, so a stray value degrades to
+    # "unknown" instead of poisoning the column.
+    src: str | None = None,
 ) -> dict:
+    # Handler-body wall time, for the scan log. Measures OUR work only — no
+    # network, no render — so it answers "was the backend slow", nothing more.
+    _t0 = time.perf_counter()
+
     # Tier gating — free users get a capped row count + stale timestamps
     tier = Tier(user.tier) if user else Tier.FREE
     # `authenticated` matters only during an open-access promo: anonymous callers
@@ -157,6 +172,12 @@ async def list_scanner(
     row_cap = tier_limit(  # free=10, pro/elite=1000
         tier, "scanner_rows", authenticated=user is not None,
     )
+    # Preserved before the clamps below rewrite them. Without this the scan log
+    # cannot tell "asked for 200, allowed 10" from "asked for 10" — and a Free
+    # user clicking to page 2 and silently getting page 1 back is a plausible
+    # five-minute-cancellation trigger that would otherwise leave no trace.
+    limit_requested, offset_requested = limit, offset
+
     if limit > row_cap:
         limit = row_cap
     # Offset scrape guard: only Pro/Premium may paginate. Without this, a Free
@@ -298,6 +319,64 @@ async def list_scanner(
     # traffic — see models/funnel_events.py.
     if user is not None:
         await record_funnel_event(user, "scan_run")
+
+        # ── WHAT THIS SCAN ACTUALLY WAS ─────────────────────────────────────
+        # record_funnel_event above answers "did they scan today". It cannot
+        # answer "what did they see" and was never meant to: it writes one row
+        # per user per event per UTC day, so scans two through ten of a day
+        # leave no trace in it at all.
+        #
+        # That gap made a real question unanswerable. In the first paying
+        # cohort, two of three cancellations landed within five minutes of a
+        # scan, and there was no record of what those scans returned — so
+        # whether people were leaving because the results were bad, empty, or
+        # simply not what they expected could not be established either way.
+        #
+        # The filter values recorded here are the endpoint's OWN parameters,
+        # read after every default has been applied and after the tier clamps
+        # above have rewritten `limit` and `offset`. That is deliberate: this
+        # describes the query that RAN, not the query the client asked for,
+        # and those differ for exactly the capped users whose experience is
+        # most in question.
+        #
+        # Fire-and-forget, on its own session: see services/scan_log.py.
+        #
+        # Guarded HERE as well as inside the recorder. That is deliberate
+        # belt-and-braces, not an oversight: this endpoint has already been
+        # taken down once by instrumentation (record_funnel_event rolling back
+        # inside the caller's session left it poisoned, and the next statement
+        # died with PendingRollbackError). The scan above has already produced
+        # a correct answer for the user; no bookkeeping about it is worth a
+        # 500, and this stays true even if the recorder is later changed in a
+        # way that lets something escape.
+        try:
+            await record_scan_log(
+                user,
+                filters={
+                    "min_score": min_score,
+                    "max_score": max_score,
+                    "min_price": min_price,
+                    "max_price": max_price,
+                    "min_dollar_volume": min_dollar_volume,
+                    "signal": signal,
+                    "sector": sector,
+                    "q": q,
+                    "sort": sort,
+                    "order": order,
+                    "limit": limit,
+                    "offset": offset,
+                    "limit_requested": limit_requested,
+                    "offset_requested": offset_requested,
+                },
+                rows=list(rows),
+                total_matched=total_matched,
+                row_cap=row_cap,
+                tier=tier.value,
+                src=src,
+                duration_ms=int((time.perf_counter() - _t0) * 1000),
+            )
+        except Exception:
+            logger.exception("scanner.scan_log_failed user=%s", user.id)
 
     if user is not None and tier is Tier.FREE and row_cap > 0 and len(rows) >= row_cap:
         await record_cap_hit(session, user.id, "scanner_rows", tier)

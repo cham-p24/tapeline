@@ -298,7 +298,13 @@ export default function ScannerPage() {
     return () => clearTimeout(id);
   }, [search]);
 
-  const load = useCallback(async () => {
+  // `src` is instrumentation only and never affects the query. It exists
+  // because this function is called from two places that mean completely
+  // different things: a human changing filters, and useLiveStream firing on
+  // every SSE tick. Without it the scan log cannot tell a scan someone ran
+  // from a background refetch of a tab nobody was looking at — see
+  // backend/app/models/scan_log.py.
+  const load = useCallback(async (src: "app" | "stream" = "app") => {
     try {
       // All of these map to EXISTING /api/scanner query params
       // (min_score, max_score, sector, signal, q, sort, order) — we wire to
@@ -311,6 +317,7 @@ export default function ScannerPage() {
         sort,
         order,
         limit: 100,
+        src,
       };
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
@@ -334,7 +341,11 @@ export default function ScannerPage() {
   }, [minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // Inline arrow rather than passing `load` directly, so the automatic
+  // refetch is labelled as such. Safe: useLiveStream keeps its callback in
+  // a ref refreshed every commit, so a new closure each render does not
+  // churn the EventSource.
+  const { status, lastUpdate } = useLiveStream(() => load("stream"));
 
   const canExportCsv = canUse(user, "csv_export");
 
