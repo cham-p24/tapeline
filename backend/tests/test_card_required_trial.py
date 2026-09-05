@@ -46,6 +46,7 @@ from sqlalchemy import delete, select
 
 from app.db import session_scope
 from app.main import app
+from app.routers.billing import TRIAL_DAYS
 from app.models import StripeWebhookEvent, Subscription, User
 from app.routers import billing as billing_router
 from app.routers import webhooks as webhooks_router
@@ -260,10 +261,10 @@ async def test_signup_referral_still_credits_the_referee(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_trial_start_checkout_sends_a_14_day_trial_end(monkeypatch):
+async def test_trial_start_checkout_sends_a_trial_end_matching_the_constant(monkeypatch):
     """`start_trial` opens a subscription that begins TRIALING, not charging.
 
-    The forwarded instant must be ~14 days out and comfortably past Stripe's
+    The forwarded instant must be ~TRIAL_DAYS out and comfortably past Stripe's
     documented 48h trial_end minimum — under that floor services/billing drops
     trial_end and the session silently becomes a charge-now purchase, which is
     precisely the surprise this flow exists to avoid.
@@ -285,8 +286,12 @@ async def test_trial_start_checkout_sends_a_14_day_trial_end(monkeypatch):
 
     forwarded = captured["trial_end"]
     assert forwarded is not None, "a trial checkout must carry a trial_end"
-    assert forwarded - before >= timedelta(days=14) - timedelta(seconds=30)
-    assert forwarded - before <= timedelta(days=14) + timedelta(seconds=30)
+    # Read from TRIAL_DAYS, never restated. This file hardcoded 14 in five
+    # places, so moving the trial to 30 days broke two tests that were
+    # asserting the OLD promise rather than the current one — exactly the
+    # drift the shared constant exists to prevent.
+    assert forwarded - before >= timedelta(days=TRIAL_DAYS) - timedelta(seconds=30)
+    assert forwarded - before <= timedelta(days=TRIAL_DAYS) + timedelta(seconds=30)
     assert forwarded - before > timedelta(hours=48), "must clear Stripe's minimum"
 
     # Same mechanism as the paid flow — no coupon paths are engaged for a
@@ -299,7 +304,7 @@ async def test_trial_start_checkout_sends_a_14_day_trial_end(monkeypatch):
     # confirmation UI cannot compute a second, different date.
     body = r.json()
     assert body["url"] == "https://stripe.test/session"
-    assert body["trial_days"] == 14
+    assert body["trial_days"] == TRIAL_DAYS
     assert body["trial_end"] == forwarded.isoformat()
 
 
@@ -436,7 +441,7 @@ async def test_trial_offer_states_the_charge(monkeypatch):
 
     assert body["eligible"] is True
     assert body["ineligible_reason"] is None
-    assert body["trial_days"] == 14
+    assert body["trial_days"] == TRIAL_DAYS
     assert body["amount_charged_today"] == 0
     assert body["cancel_in_one_click"] is True
     # The card is required for THE TRIAL. That has not changed and is the
@@ -455,8 +460,8 @@ async def test_trial_offer_states_the_charge(monkeypatch):
     assert body["current_trial_ends_at"] is None
 
     first_charge = datetime.fromisoformat(body["first_charge_at"])
-    assert first_charge - before >= timedelta(days=14) - timedelta(seconds=30)
-    assert first_charge - before <= timedelta(days=14) + timedelta(seconds=30)
+    assert first_charge - before >= timedelta(days=TRIAL_DAYS) - timedelta(seconds=30)
+    assert first_charge - before <= timedelta(days=TRIAL_DAYS) + timedelta(seconds=30)
 
 
 @pytest.mark.asyncio

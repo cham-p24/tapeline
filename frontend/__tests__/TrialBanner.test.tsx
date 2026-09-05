@@ -25,6 +25,12 @@
  * longer be made unconditionally.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// The banner switches to its START copy at TRIAL_DAYS - 1 days left, so
+// "a trial that just began" is a function of the trial length, not the
+// literal 14. These tests hardcoded 14 and silently stopped testing the
+// start phase at all when the trial moved to 30 days.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@/components/UserContext", () => ({
@@ -177,12 +183,12 @@ describe("TrialBanner — card on file", () => {
   });
 
   it("states nothing charged yet, the first-charge date, and the one-click exit", async () => {
-    const { container } = render_(14);
+    const { container } = render_(TRIAL_DAYS);
     await screen.findByText(/first charge is on/i);
     const text = container.textContent ?? "";
     expect(text).toMatch(/premium is active/i);
     expect(text).toMatch(/nothing has been charged/i);
-    expect(text).toMatch(new RegExp(`first charge is on ${endLabel(14)}`, "i"));
+    expect(text).toMatch(new RegExp(`first charge is on ${endLabel(TRIAL_DAYS)}`, "i"));
     expect(text).toMatch(/one click/i);
     expect(text).toMatch(/not charged at all/i);
   });
@@ -226,12 +232,12 @@ describe("TrialBanner — no card on file (legacy trial)", () => {
     stubCardOnFile(false);
   });
 
-  it("states that Premium is active, for 14 days, with no card taken", async () => {
-    const { container } = render_(14);
+  it("states that Premium is active, for the full trial, with no card taken", async () => {
+    const { container } = render_(TRIAL_DAYS);
     await screen.findByText(/no card was taken/i);
     const text = container.textContent ?? "";
     expect(text).toMatch(/premium is active/i);
-    expect(text).toMatch(/14 days/);
+    expect(text).toMatch(new RegExp(`${TRIAL_DAYS} days`));
     expect(text).toMatch(/nothing to cancel/i);
   });
 
@@ -263,11 +269,11 @@ describe("TrialBanner — no card on file (legacy trial)", () => {
 
 describe("TrialBanner — unknown card state", () => {
   it("asserts NEITHER story rather than defaulting to the no-card copy", () => {
-    const { container } = render_(14);
+    const { container } = render_(TRIAL_DAYS);
     const text = container.textContent ?? "";
     // Only what the session payload proves.
     expect(text).toMatch(/premium is active/i);
-    expect(text).toMatch(/14 days/);
+    expect(text).toMatch(new RegExp(`${TRIAL_DAYS} days`));
     // No claim in either direction.
     expect(text).not.toMatch(/no card (?:was taken|on file)/i);
     expect(text).not.toMatch(/nothing to cancel/i);
