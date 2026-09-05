@@ -60,7 +60,7 @@ _CANCEL_REASONS = frozenset(
 # first ten, a second saved screen, alerts on every channel, CSV export, the
 # 200-symbol watchlist, congressional and insider filings. We open the same
 # Stripe Checkout the paid flow uses, in mode=subscription with
-# subscription_data.trial_end 14 days out. Stripe charges $0 today, bills the first real amount at
+# subscription_data.trial_end TRIAL_DAYS out. Stripe charges $0 today, bills the first real amount at
 # trial_end, and the subscription is cancellable in one click from the
 # customer portal before then. That mechanism (rather than setup-mode + a
 # cron + SetupIntent → Subscription) is what keeps dunning, the portal and

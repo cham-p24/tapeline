@@ -77,8 +77,8 @@ export default function RefundPolicyPage() {
             Creating an account takes an email and a password. It does not take a card, and it
             does not start a trial &mdash; a new account sits on the free plan until you choose
             otherwise. The 30-day Premium trial begins when you add a card. Nothing is charged on
-            the day you add it. The first charge lands on day 14 at the plan price you picked, and
-            we email you three days before that happens. Cancel any time before day 14 and you are
+            the day you add it. The first charge lands on day 30 at the plan price you picked, and
+            we email you three days before that happens. Cancel any time before day 30 and you are
             never billed &mdash; there is nothing to refund, because no money moved.
           </p>
           <p>
@@ -139,7 +139,7 @@ export default function RefundPolicyPage() {
             <li>Monthly: 100% refund within 30 days, no questions.</li>
             <li>Annual: prorated refund within 30 days (we retain one month).</li>
             <li>Signing up takes an email and a password; the trial starts only when you add a card.</li>
-            <li>Trial: cancel before day 14 and you are never charged &mdash; nothing to refund.</li>
+            <li>Trial: cancel before day 30 and you are never charged &mdash; nothing to refund.</li>
             <li>Refunds go back to the original card/wallet, usually within a week.</li>
             <li>Email <a href="mailto:support@tapeline.io" className="text-accent">support@tapeline.io</a> rather than chargeback &mdash; we&rsquo;ll just refund you.</li>
           </ul>

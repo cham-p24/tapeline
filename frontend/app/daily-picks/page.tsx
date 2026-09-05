@@ -317,7 +317,7 @@ export default async function DailyPicksPage() {
             scanner on the top ten scored rows and holds a five-symbol
             watchlist. A card starts the 30-day Premium trial — every matching
             row, alerts and the 200-symbol watchlist, $0 charged that day, first
-            charge on day 14, one click to cancel. The daily email is free with
+            charge on day 30, one click to cancel. The daily email is free with
             no account and keeps coming either way.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
