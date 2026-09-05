@@ -17,7 +17,19 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scanSource, stripComments, globMatch, loadAllowlist } from "./lint-copy-compliance.mjs";
+import {
+  scanSource,
+  stripComments,
+  globMatch,
+  loadAllowlist,
+  TRIAL_DAYS_IN_COPY,
+} from "./lint-copy-compliance.mjs";
+
+// Sample copy in this file exists to exercise OTHER rules, so its trial
+// length must be the CURRENT one or `stale-trial-length` fires on the
+// fixtures themselves. Built from the same constant the linter reads, so
+// these never need editing when the trial moves again.
+const TD = TRIAL_DAYS_IN_COPY ?? 30;
 
 /** Rule ids fired by a snippet. */
 function rules(src, file = "frontend/app/demo/page.tsx") {
@@ -468,7 +480,7 @@ test("does NOT flag legitimate second person, workflow targeting, or Rule 8's re
     // Ordinary product second person.
     `<p>Your watchlist keeps the tickers you saved.</p>`,
     `<p>Your trial ends on the date shown above.</p>`,
-    `<p>Add your card to start the 14-day Premium trial.</p>`,
+    `<p>Add your card to start the ${TD}-day Premium trial.</p>`,
     `<p>Your account stays free forever.</p>`,
     // Live copy-bank variants that must survive.
     `<p>It never tells you what to do.</p>`,
@@ -505,7 +517,7 @@ test("every ad-copy variant in the shipped banks passes Rule 9", () => {
     "It never tells you what to do.",
     "I built the scanner I wanted on Sunday nights.",
     "If your process is fourteen browser tabs and a hand-built spreadsheet every Sunday night, Tapeline does the compression for you.",
-    "The 14-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm.",
+    "The ${TD}-day Premium trial takes a card, charges $0 today, and shows the exact date of the first charge before you confirm.",
     "Informational only. Descriptive scores, not recommendations.",
   ];
   for (const line of bank) {
@@ -523,9 +535,9 @@ test("every ad-copy variant in the shipped banks passes Rule 9", () => {
 
 test("catches card-free trial and account claims", () => {
   for (const src of [
-    `<p>14-day Premium trial available with no credit card.</p>`,
-    `<p>The 14-day Tapeline trial is no-credit-card so you can compare.</p>`,
-    `<p>Tapeline's 14-day no-credit-card trial makes it easy.</p>`,
+    `<p>${TD}-day Premium trial available with no credit card.</p>`,
+    `<p>The ${TD}-day Tapeline trial is no-credit-card so you can compare.</p>`,
+    `<p>Tapeline's ${TD}-day no-credit-card trial makes it easy.</p>`,
     `<p>Start a card-free trial today.</p>`,
     `<p>No credit card required to sign up.</p>`,
   ]) {
@@ -558,7 +570,7 @@ test("does NOT flag copy that RULES OUT a trial or denies a card-free tier", () 
 });
 
 test("does NOT flag the accurate card-required trial description", () => {
-  const src = `<p>14-day full Premium trial — card required, $0 charged today, first charge on day 14.</p>`;
+  const src = `<p>${TD}-day full Premium trial — card required, $0 charged today, first charge on day ${TD}.</p>`;
   assert.ok(!fires(src, "card-free-trial"), `false positive on: ${src}`);
 });
 
@@ -627,7 +639,7 @@ test("js/ts: block comments are still stripped (the md fix must not over-correct
 const BANNED_AD_LINES = [
   ["Find the winners before they run.", "ad-outcome-promise"],
   ["NVDA looks strong here.", "ad-ticker-adjective"],
-  ["Try Premium free for 14 days.", "ad-free-trial"],
+  [`Try Premium free for ${TD} days.`, "ad-free-trial"],
   ["Start free — no credit card required.", "ad-free-trial"],
   ["Plain-English signals for busy traders.", "ad-trading-vocabulary"],
   ["Still losing to the index?", "ad-financial-state"],
@@ -665,7 +677,7 @@ for (const [line, expectedRule] of BANNED_AD_LINES) {
 const COMPLIANT_AD_LINES = [
   "Every US-listed name, scored 0-100 on six factors, refreshed through the session.",
   "NVDA's Relative Strength factor reads 82/100 - it has outpaced its sector over the trailing three months.",
-  "Signing up takes an email and a password. A card is only needed if you start the 14-day Premium trial.",
+  "Signing up takes an email and a password. A card is only needed if you start the ${TD}-day Premium trial.",
   "Plain-English scores for busy traders. One number, one sentence, every US-listed name.",
   "If you screen 500 tickers by hand every weekend, this is one number instead.",
   "Read the public record before you decide anything about us - every score logged, misses included.",
