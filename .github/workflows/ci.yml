@@ -27,6 +27,29 @@ jobs:
       - name: Copy-compliance lint
         run: node scripts/lint-copy-compliance.mjs
 
+      # Ad creative, stricter pass. Separate step because it is a DIFFERENT
+      # ruleset, not a wider glob: `--ads` also bans "pick", "signal" and the
+      # score-band names, which are legitimate product vocabulary everywhere
+      # else (/daily-picks and /signals are real routes).
+      #
+      # This step exists because the one rule written for ad creative was
+      # scoped to docs/ads/** while the step above passes no paths and the
+      # include globs never covered docs/** — so from the day it was written
+      # until 2026-09-05 it never executed in CI even once. A "pick" burned
+      # into three ad images ran live for three days behind that gap.
+      #
+      # `|| true` on the glob: docs/ads/ may legitimately be empty.
+      - name: Copy-compliance lint (ad creative)
+        run: |
+          shopt -s nullglob globstar
+          files=(docs/ads/**/*.md docs/ads/**/*.txt docs/ads/**/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no ad creative files to lint"
+          else
+            node scripts/lint-copy-compliance.mjs --ads "${files[@]}"
+          fi
+        shell: bash
+
   backend:
     runs-on: ubuntu-latest
     defaults:

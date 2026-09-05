@@ -610,3 +610,101 @@ test("js/ts: block comments are still stripped (the md fix must not over-correct
     "a real JS block comment must still be ignored",
   );
 });
+
+/* ------------------------------------------------------------------ *
+ * AD MODE (--ads)
+ *
+ * Measured 2026-09-05: twelve lines a performance marketer writes
+ * reflexively — including docs/COMPLIANCE_COPY_RULES.md's OWN two flagship
+ * bad examples — all passed the default pass. 0 findings. The natural
+ * instruction to an external agency ("run the linter") was worthless.
+ *
+ * Both directions are asserted below, and the SECOND is the one that decides
+ * whether an agency keeps using the tool: a linter that cries wolf on
+ * compliant copy gets switched off, and then it protects nothing.
+ * ------------------------------------------------------------------ */
+
+const BANNED_AD_LINES = [
+  ["Find the winners before they run.", "ad-outcome-promise"],
+  ["NVDA looks strong here.", "ad-ticker-adjective"],
+  ["Try Premium free for 14 days.", "ad-free-trial"],
+  ["Start free — no credit card required.", "ad-free-trial"],
+  ["Plain-English signals for busy traders.", "ad-trading-vocabulary"],
+  ["Still losing to the index?", "ad-financial-state"],
+  ["Join thousands of retail traders.", "ad-social-proof"],
+  ["Pro from $8.25/mo.", "ad-detached-annual-price"],
+  ["Prices go up after launch.", "ad-urgency"],
+  ["DM us and we'll walk you through it.", "ad-dm-invite"],
+  ["Every top-10 pick, logged daily.", "ad-trading-vocabulary"],
+  ["HIGH CONVICTION names, updated through the session.", "ad-score-band-name"],
+];
+
+for (const [line, expectedRule] of BANNED_AD_LINES) {
+  test(`ad mode catches: ${line}`, () => {
+    const found = scanSource(line, "copy.md", { ads: true });
+    assert.ok(
+      found.length > 0,
+      `"${line}" produced no finding in ad mode — this line is a violation`,
+    );
+    assert.ok(
+      found.some((f) => f.rule === expectedRule),
+      `expected rule ${expectedRule}, got ${found.map((f) => f.rule).join(", ")}`,
+    );
+  });
+
+  test(`default pass is unchanged for: ${line}`, () => {
+    // Deliberate. The ad rules are a SECOND pass, not a retune of the first —
+    // "pick", "score" and "signal" are legitimate product vocabulary on the
+    // site (/daily-picks is a real route), and firing on them everywhere
+    // would bury the build in false positives. If one of these ever starts
+    // failing the default pass, that is a decision to make on purpose.
+    scanSource(line, "frontend/app/page.tsx", {});
+  });
+}
+
+const COMPLIANT_AD_LINES = [
+  "Every US-listed name, scored 0-100 on six factors, refreshed through the session.",
+  "NVDA's Relative Strength factor reads 82/100 - it has outpaced its sector over the trailing three months.",
+  "Signing up takes an email and a password. A card is only needed if you start the 14-day Premium trial.",
+  "Plain-English scores for busy traders. One number, one sentence, every US-listed name.",
+  "If you screen 500 tickers by hand every weekend, this is one number instead.",
+  "Read the public record before you decide anything about us - every score logged, misses included.",
+  "Every top-10 score, logged daily. The full record is public.",
+  "Pro $9.99/mo, Premium $19.99/mo. 30-day money back.",
+  "Pro: $8.25/mo billed annually ($99/yr), or $9.99 month-to-month.",
+  "Everything is on the pricing page - prices, what each plan includes, refund terms.",
+  "A 0-100 composite score with a plain-English label, updated through the session.",
+  "Roughly 2,500 US-listed names actively scored, refreshed through the session.",
+];
+
+for (const line of COMPLIANT_AD_LINES) {
+  test(`ad mode stays quiet on: ${line.slice(0, 52)}…`, () => {
+    const found = scanSource(line, "copy.md", { ads: true });
+    assert.deepStrictEqual(
+      found.map((f) => `${f.rule}: ${f.match}`),
+      [],
+      "false positive on compliant copy — an agency that sees these switches the linter off",
+    );
+  });
+}
+
+test("ad mode unmasks the score-band names that the site pass masks", () => {
+  const line = "STRONG SETUP names, refreshed daily.";
+  assert.deepStrictEqual(scanSource(line, "frontend/app/page.tsx", {}), []);
+  assert.ok(
+    scanSource(line, "copy.md", { ads: true }).some((f) => f.rule === "ad-score-band-name"),
+    "band names must fire in ad copy — cold, they read as recommendation strength",
+  );
+});
+
+test("a bare capitalised English word is not mistaken for a ticker", () => {
+  // The ticker rule keys on 1-5 capitals, so a sentence-initial or all-caps
+  // word could manufacture a false ticker. TICKER_STOPWORDS exists for this.
+  for (const line of ["THE SCORE IS STRONG EVIDENCE.", "OUR DAILY SCORE.", "A strong process."]) {
+    assert.deepStrictEqual(
+      scanSource(line, "copy.md", { ads: true }).filter((f) => f.rule === "ad-ticker-adjective"),
+      [],
+      `false ticker match in: ${line}`,
+    );
+  }
+});
