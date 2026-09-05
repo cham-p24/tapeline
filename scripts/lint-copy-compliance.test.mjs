@@ -17,7 +17,12 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { scanSource, stripComments, globMatch, loadAllowlist } from "./lint-copy-compliance.mjs";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Rule ids fired by a snippet. */
 function rules(src, file = "frontend/app/demo/page.tsx") {
@@ -707,4 +712,49 @@ test("a bare capitalised English word is not mistaken for a ticker", () => {
       `false ticker match in: ${line}`,
     );
   }
+});
+
+
+/* ------------------------------------------------------------------ *
+ * The ad-creative pass must actually run in CI.
+ *
+ * `--ads` is a different, stricter ruleset (it bans "pick", "signal" and the
+ * score-band names, which are legitimate product vocabulary everywhere else),
+ * so it cannot be folded into the include globs — it needs its own CI step.
+ *
+ * That step is the ONLY thing standing between ad copy and the platforms, and
+ * nothing pinned it. The rule it runs was scoped to docs/ads/** while the
+ * default step passes no paths and the include globs never covered docs/**, so
+ * from the day it was written until 2026-09-05 it never executed in CI once. A
+ * banned token burned into three ad images ran live for three days behind that
+ * gap, and an advertising review put twelve deliberately non-compliant lines
+ * through a clean run.
+ *
+ * Deleting the step would silently restore all of that. So assert it.
+ * ------------------------------------------------------------------ */
+
+test("CI runs the stricter --ads pass over ad creative", () => {
+  const ci = readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8");
+  assert.match(
+    ci,
+    /lint-copy-compliance\.mjs\s+--ads/,
+    "ci.yml no longer invokes the linter with --ads. Ad creative is then checked " +
+      "only by the default ruleset, which permits 'pick' and 'signal' because they " +
+      "are real product vocabulary — the exact gap that let a banned token ship.",
+  );
+  assert.match(
+    ci,
+    /docs\/ads\/\*\*/,
+    "the --ads step no longer collects docs/ads/** — nothing is passed to it.",
+  );
+});
+
+test("llms.txt stays inside the default lint scope", () => {
+  // Written to be read by AI summarisers, and outside the globs until
+  // 2026-09-04, which is how a card-required-signup violation survived in it.
+  const config = loadAllowlist();
+  assert.ok(
+    config.include.some((g) => globMatch(g, "frontend/public/llms.txt")),
+    "frontend/public/llms.txt matches no include glob, so CI does not scan it.",
+  );
 });
