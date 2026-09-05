@@ -563,6 +563,253 @@ function isAdCreativePath(filePath) {
   return AD_CREATIVE_PATH.test(String(filePath).replace(/\\/g, "/"));
 }
 
+/* ------------------------------------------------------------------ *
+ * AD MODE — `--ads`
+ *
+ * WHY THIS EXISTS, measured 2026-09-05
+ * ------------------------------------
+ * An external advertising team was handed this account. The natural
+ * instruction — "run the linter before you ship copy" — was tested first, on
+ * twelve lines a competent performance marketer writes reflexively. All
+ * twelve are violations. The linter reported:
+ *
+ *     copy-compliance: OK — 1 user-facing source files scanned, 0 blocking findings.
+ *
+ * Two of the twelve are docs/COMPLIANCE_COPY_RULES.md's OWN flagship bad
+ * examples ("Find the winners", "NVDA looks strong here"). That is not a bug
+ * in the rules below — the site rules are tuned to stop a templated phrase
+ * regressing across a 100k-line product codebase, where the surrounding words
+ * are known. Ad copy is the opposite: short, written by strangers, and read
+ * cold by someone with no product context.
+ *
+ * So `--ads` is a SECOND, stricter pass, not a re-tuning of the first:
+ *
+ *   1. It applies AD_VOCAB_RULE to any file given on the command line,
+ *      instead of only to docs/ads/**. The path gate was the reason the one
+ *      rule written for ad creative never ran in CI at all — CI's include
+ *      globs do not cover docs/**, and CI passes no paths.
+ *   2. It stops masking the score-band names. On the site "HIGH CONVICTION"
+ *      is an enum value in ~50 files and masking is correct; in an ad, read
+ *      by a stranger, a band name reads as a strength-of-recommendation
+ *      scale — exactly the prescriptive frame those labels were renamed to
+ *      escape.
+ *   3. It adds AD_ONLY_RULES below, each one written against a line that
+ *      currently passes.
+ *
+ * DELIBERATELY NOT DONE: these rules are not added to the default pass.
+ * "score", "pick" and "signal" are legitimate product vocabulary on the site
+ * (/daily-picks is a real route), and firing on them everywhere would produce
+ * hundreds of false positives, which is how a linter gets ignored.
+ * ------------------------------------------------------------------ */
+
+/**
+ * A bare ticker symbol: 1-5 capitals, standing alone.
+ *
+ * The site-wide evaluative-adjective rule keys off a list of security NOUNS
+ * (stock, ticker, share, name, position…). That catches "AAPL is a strong
+ * name" and misses "NVDA looks strong here" — the phrasing an ad actually
+ * uses, and the compliance doc's own example. A symbol is the noun in ad copy.
+ *
+ * Excludes common English words and product vocabulary that happen to be
+ * short and capitalised, so a sentence-initial "The" or an all-caps headline
+ * cannot manufacture a ticker.
+ */
+const TICKER_STOPWORDS = new Set([
+  "A", "I", "AN", "AS", "AT", "BE", "BY", "DO", "GO", "IF", "IN", "IS", "IT",
+  "MY", "NO", "OF", "ON", "OR", "SO", "TO", "UP", "US", "WE", "AND", "ARE",
+  "BUT", "CAN", "FOR", "GET", "HAS", "HOW", "ITS", "NEW", "NOT", "NOW", "ONE",
+  "OUR", "OUT", "SEE", "THE", "WHO", "WHY", "YOU", "ALL", "ANY", "DAY", "USD",
+  "AUD", "API", "CSV", "ETF", "SPY", "CEO", "PRO", "FREE", "PLUS", "THIS",
+  "THAT", "WITH", "FROM", "YOUR", "WHAT", "WHEN", "EVERY", "SCORE", "DAILY",
+]);
+
+const AD_EVAL_ADJECTIVES =
+  "strong|promising|attractive|compelling|undervalued|overvalued|bullish|bearish|" +
+  "hot|explosive|poised|primed|ready|due|cheap|expensive|solid|weak";
+
+/**
+ * Outcome nouns a performance claim hides behind when the security noun is
+ * absent. "Find the winners before they run" contains no banned bigram —
+ * the site rule needs "winning stocks" — but it is a promise about money.
+ */
+const AD_ONLY_RULES = [
+  {
+    id: "ad-outcome-promise",
+    brief: "Ads — no promise about what the reader will earn",
+    message:
+      "This promises an outcome rather than describing what the product " +
+      "measures. Tapeline holds no AFSL; its position is that it publishes " +
+      "general descriptive information. Rewrite as a fact about the " +
+      "mechanism: 'Six factors, one 0-100 score, one plain sentence per " +
+      "ticker.'",
+    patterns: [
+      // "find/spot/catch the winners", "the next winner", "tomorrow's winners"
+      /\b(?:find|finds|finding|spot|spots|catch|catches|uncover|uncovers|discover|discovers)\b[^.!?\n]{0,30}\b(?:the\s+|tomorrow'?s\s+|next\s+)?\bwinners?\b/i,
+      /\b(?:the\s+next|tomorrow'?s|this\s+week'?s)\s+(?:big\s+)?(?:winner|mover|runner|breakout)s?\b/i,
+      // "before they run/move/pop/take off"
+      /\bbefore\s+(?:they|it|the\s+\w+)\s+(?:run|runs|move|moves|pop|pops|take\s+off|takes\s+off|rip|rips|breakout|break\s+out)\b/i,
+      // "get ahead of the market", "stay ahead of the market"
+      /\b(?:get|stay|keep)\s+ahead\s+of\s+the\s+(?:market|street|crowd|index)\b/i,
+      // "make money", "grow your money/portfolio/account"
+      /\b(?:make|makes|making)\s+(?:you\s+)?(?:more\s+)?money\b/i,
+      /\bgrow\s+your\s+(?:money|portfolio|account|wealth|returns?)\b/i,
+      // "your edge" as a possession
+      /\b(?:your|the)\s+(?:unfair\s+|real\s+)?edge\b/i,
+    ],
+  },
+  {
+    id: "ad-free-trial",
+    brief: "Ads — 'free' and 'trial' must never touch",
+    message:
+      "Signing up is genuinely card-free; the 14-day Premium trial is NOT — " +
+      "it takes a card and bills in full on day 14. Merging them is false " +
+      "advertising on a financial product. Say: 'Signing up takes an email " +
+      "and a password. A card is only needed if you start the 14-day " +
+      "Premium trial.'",
+    patterns: [
+      /\bfree\b[^.!?\n]{0,24}\btrial\b/i,
+      /\btrial\b[^.!?\n]{0,24}\bfree\b/i,
+      /\brisk[-\s]free\b/i,
+      /\bno\s+(?:credit\s+)?card\s+(?:required|needed|necessary)\b/i,
+      /\btry\b[^.!?\n]{0,30}\bfree\b/i,
+    ],
+  },
+  {
+    id: "ad-financial-state",
+    brief: "Ads — never target by the reader's financial situation",
+    message:
+      "Asserting knowledge of the reader's finances is Meta's top finance " +
+      "rejection trigger, and under Australian law it is what turns general " +
+      "information into advice addressed to a person's circumstances. " +
+      "Qualify by WORKFLOW instead: 'If you screen 500 tickers by hand every " +
+      "weekend…'",
+    patterns: [
+      /\b(?:still\s+)?(?:losing|lost|lose)\b[^.!?\n]{0,24}\b(?:to\s+the\s+(?:index|market)|money|on\s+(?:bad|your))\b/i,
+      /\b(?:tired|sick|frustrated)\s+of\b[^.!?\n]{0,40}\b(?:losing|lagging|missing|underperform\w*|your\s+(?:portfolio|returns?|account))\b/i,
+      /\b(?:struggling|failing)\s+to\b[^.!?\n]{0,30}\b(?:keep\s+up|beat|match|grow)\b/i,
+      /\b(?:is|are)\s+your\s+(?:portfolio|returns?|account|investments?)\b[^.!?\n]{0,30}\?/i,
+      /\byour\s+(?:portfolio|account)\s+(?:lagging|behind|underperform\w*|shrinking)\b/i,
+      /\b(?:small|tiny|modest)\s+account\b/i,
+      // Collecting suitability information — the same failure, inbound.
+      /\b(?:tell\s+us|what'?s|how\s+much)\b[^.!?\n]{0,40}\b(?:portfolio\s+size|risk\s+tolerance|investment\s+goals?|to\s+invest|you\s+have\s+to\s+invest)\b/i,
+    ],
+  },
+  {
+    id: "ad-social-proof",
+    brief: "Ads — no user-count, testimonial or as-seen-in claims",
+    message:
+      "Tapeline has collected one invoice in its history. Any claim about " +
+      "how many people use it is unverifiable at best and false at worst — " +
+      "that is consumer-law exposure independent of the licensing question. " +
+      "Point at the public record instead; it is the honest proof.",
+    patterns: [
+      /\bjoin\s+(?:thousands|hundreds|\d[\d,]*\+?)\b/i,
+      /\b(?:thousands|hundreds|\d[\d,]{2,}\+?)\s+of\s+(?:traders|investors|users|subscribers|customers)\b/i,
+      /\btrusted\s+by\b/i,
+      /\bas\s+seen\s+(?:in|on)\b/i,
+      /\b(?:loved|used)\s+by\s+(?:thousands|hundreds|\d)/i,
+      /\b\d[\d,]*\+?\s+(?:happy\s+)?(?:traders|investors|users|subscribers)\b/i,
+    ],
+  },
+  {
+    id: "ad-urgency",
+    brief: "Ads — no manufactured urgency or scarcity",
+    message:
+      "No countdowns, no seat counts, no 'prices go up'. Note the site rule " +
+      "catches 'price goes up' and misses 'prices go up' — one character. " +
+      "State the price and the refund terms and stop.",
+    patterns: [
+      /\bprices?\s+(?:go(?:es)?|going|will\s+go|are\s+going)\s+up\b/i,
+      /\bprices?\s+(?:increase|increases|rise|rises|jump|jumps)\b/i,
+      /\b(?:only|just)\s+\d+\s+(?:seats?|spots?|places?|licen[cs]es?)\s+(?:left|remaining|available)\b/i,
+      /\b(?:limited|founding)\s+(?:seats?|spots?|places?|pricing|offer)\b/i,
+      /\b(?:ends|closes|expires)\s+(?:soon|tonight|today|tomorrow|in\s+\d)/i,
+      /\bdon'?t\s+miss\s+out\b/i,
+      /\blast\s+chance\b/i,
+    ],
+  },
+  {
+    id: "ad-dm-invite",
+    brief: "Ads — no direct-message or call-to-contact invitations",
+    message:
+      "Meta prohibits investment-product ads that invite direct messaging " +
+      "with the advertiser (the anti-'pig-butchering' clause). It covers the " +
+      "creative, the CTA, the destination AND comment replies on the ad " +
+      "post. Send people to the pricing page.",
+    patterns: [
+      /\bDM\s+(?:us|me)\b/i,
+      /\b(?:message|msg|inbox|whatsapp|telegram)\s+(?:us|me)\b/i,
+      /\b(?:send|drop)\s+(?:us|me)\s+a\s+(?:message|dm|note)\b/i,
+      /\breach\s+out\s+(?:to\s+us\s+)?(?:for|and)\b/i,
+      /\bbook\s+a\s+call\b/i,
+    ],
+  },
+  {
+    id: "ad-detached-annual-price",
+    brief: "Ads — an annual per-month price must carry 'billed annually'",
+    message:
+      "$8.25/mo and $16.58/mo are annual totals divided by twelve, charged " +
+      "as one payment of $99 or $199. Detached, they misdescribe the charge. " +
+      "Either write '$8.25/mo billed annually ($99/yr)' or use the " +
+      "month-to-month price ($9.99 / $19.99).",
+    patterns: [
+      // The two live annual-equivalent figures, without the qualifier nearby.
+      /\$\s?(?:8\.25|16\.58)\s*(?:\/|\s+(?:a|per)\s+)\s*(?:mo\b|month)(?![^.!?\n]{0,40}\b(?:billed\s+annually|annual|\/yr|per\s+year|a\s+year)\b)/i,
+    ],
+  },
+];
+
+/**
+ * Score-band names, unmasked in ad mode.
+ *
+ * On the site these are enum values and the mask is right. Cold, in an ad,
+ * "HIGH CONVICTION" reads as a strength-of-recommendation scale — the exact
+ * prescriptive frame the labels were renamed to escape (they replaced
+ * BUY NOW / STRONG ACCUMULATE / ACCUMULATE / HOLD / WATCH / AVOID).
+ */
+const AD_BAND_RULE = {
+  id: "ad-score-band-name",
+  brief: "Ads — no score-band names in cold copy",
+  message:
+    "A stranger reads a band name as a recommendation strength, which is " +
+    "what these labels exist to avoid. Say '0-100 composite score with a " +
+    "plain-English label' instead.",
+  patterns: [
+    /\bHIGH[-\s]CONVICTION\b/i,
+    /\bSTRONG[-\s]SETUP\b/i,
+    /\bCONSTRUCTIVE\b/,
+    /\bCAUTION\b/,
+  ],
+};
+
+/** Evaluative adjective sitting next to a bare ticker symbol. */
+function findTickerAdjectiveViolations(code) {
+  const out = [];
+  const near = new RegExp(
+    `\\b([A-Z]{1,5})\\b[^.!?<>\\n]{0,28}?\\b(?:${AD_EVAL_ADJECTIVES})\\b` +
+      `|\\b(?:${AD_EVAL_ADJECTIVES})\\b[^.!?<>\\n]{0,28}?\\b([A-Z]{1,5})\\b`,
+    "g",
+  );
+  let m;
+  while ((m = near.exec(code)) !== null) {
+    const symbol = m[1] || m[2] || "";
+    if (!symbol || TICKER_STOPWORDS.has(symbol)) continue;
+    out.push({ index: m.index, match: m[0] });
+    if (m[0].length === 0) near.lastIndex += 1;
+  }
+  return out;
+}
+
+const AD_TICKER_ADJ_RULE = {
+  id: "ad-ticker-adjective",
+  brief: "Ads — no evaluative adjective attached to a ticker",
+  message:
+    "A forward-looking judgement about a named real security. State the " +
+    "measured factor instead: \"NVDA's Relative Strength factor reads " +
+    "82/100 — it has outpaced its sector over the trailing three months.\" " +
+    "A fact about a past measurement is not a prediction.",
+};
+
 const AD_VOCAB_RULE = {
   id: "ad-trading-vocabulary",
   brief: "Playbook — no stock-tip vocabulary in ad creative (use 'score(s)')",
@@ -580,6 +827,14 @@ const AD_VOCAB_PATTERNS = [
   /\bcalls?\b/gi,
   /\bstock\s+tips?\b/gi,
   /\bhot\s+stocks?\b/gi,
+  // "signal" was missing until 2026-09-05, and it is arguably the most
+  // dangerous token of the set: Google's complex-speculative-products policy
+  // names trading signals explicitly, and Meta's classifier reads it as a
+  // stock-tip service. "Plain-English signals for busy traders" ran on Google
+  // once and was pulled — then passed this very rule when re-tested.
+  // Ad-mode only, so the product's own `signal` column and the /signals route
+  // are untouched.
+  /\bsignals?\b/gi,
 ];
 
 /* ------------------------------------------------------------------ *
@@ -854,6 +1109,10 @@ function excerpt(text, index, matchLength) {
 export function scanSource(text, filePath = "<input>", options = {}) {
   const allow = options.allow || [];
   const known = options.knownViolations || [];
+  // Ad mode: every file named on the command line is treated as ad creative,
+  // the stricter AD_ONLY_RULES run, and the score-band mask comes off. See
+  // the AD MODE block above for why this is a second pass and not a retune.
+  const adsMode = options.ads === true || isAdCreativePath(filePath);
   // Markdown is NOT JavaScript. `docs/**` contains the two characters `/*`,
   // which the JS state machine reads as an unterminated block comment and
   // uses to blank the entire rest of the file - silently reporting success
@@ -863,7 +1122,8 @@ export function scanSource(text, filePath = "<input>", options = {}) {
     : /\.mdx?$/i.test(filePath)
       ? "md"
       : "js";
-  const code = maskProductLexicon(stripComments(text, lang));
+  const stripped = stripComments(text, lang);
+  const code = adsMode ? stripped : maskProductLexicon(stripped);
   const inlineAllowed = inlineAllowedLines(text);
   const findings = [];
 
@@ -922,7 +1182,7 @@ export function scanSource(text, filePath = "<input>", options = {}) {
   // Rule 10 — stock-tip vocabulary, ad creative only. Scoped by path because
   // "picks" is legitimate site copy (/daily-picks) and only dangerous in a
   // paid financial ad unit. See AD_VOCAB_RULE above.
-  if (isAdCreativePath(filePath)) {
+  if (adsMode) {
     for (const pattern of AD_VOCAB_PATTERNS) {
       const re = new RegExp(pattern.source, pattern.flags);
       let m;
@@ -930,6 +1190,23 @@ export function scanSource(text, filePath = "<input>", options = {}) {
         push(AD_VOCAB_RULE, m.index, m[0]);
         if (m[0].length === 0) re.lastIndex += 1;
       }
+    }
+
+    // The stricter ad-only ruleset. Each rule was written against a line that
+    // passed the default pass — see the AD MODE block.
+    for (const rule of [...AD_ONLY_RULES, AD_BAND_RULE]) {
+      for (const pattern of rule.patterns) {
+        const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
+        let m;
+        while ((m = re.exec(code)) !== null) {
+          push(rule, m.index, m[0]);
+          if (m[0].length === 0) re.lastIndex += 1;
+        }
+      }
+    }
+
+    for (const hit of findTickerAdjectiveViolations(code)) {
+      push(AD_TICKER_ADJ_RULE, hit.index, hit.match);
     }
   }
 
@@ -988,6 +1265,10 @@ export function collectFiles(config, explicit = []) {
 
 function main(argv) {
   const asJson = argv.includes("--json");
+  // `--ads` turns on the stricter pass for ad copy written outside this repo.
+  // It only applies to files named explicitly, which is the normal way an
+  // advertiser runs it: `node scripts/lint-copy-compliance.mjs --ads copy.md`
+  const adsMode = argv.includes("--ads");
   const explicit = argv.filter((a) => !a.startsWith("--"));
 
   let config;
@@ -1026,6 +1307,7 @@ function main(argv) {
       ...scanSource(text, file, {
         allow: config.allow,
         knownViolations: config.knownViolations,
+        ads: adsMode,
       }),
     );
   }
