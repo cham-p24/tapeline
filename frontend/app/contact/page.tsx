@@ -22,6 +22,14 @@ export const metadata = pageMeta({
 
 const ADDRESSES: { label: string; email: string; desc: string }[] = [
   { label: "Support",     email: "support@tapeline.io", desc: "Help with your account, billing, signups, alerts." },
+  // Sales was missing until 2026-09-05, and it was the only route that
+  // mattered commercially. PricingTable advertises sales@tapeline.io for 5+
+  // seats, and the $59 Trader plan — the deliberate high anchor, sold by hand
+  // rather than self-serve — has "Talk to us" as its ONLY call to action,
+  // pointing here. So both of the highest-revenue paths on the site ended on
+  // a page that did not list the address they had just named. Anyone who
+  // wanted to spend the most money had nowhere to write.
+  { label: "Sales",       email: "sales@tapeline.io",   desc: "Team seats (5+), the Trader plan, and anything not on the pricing page." },
   { label: "Press",       email: "press@tapeline.io",   desc: "Media enquiries, interviews, fact sheet requests." },
   { label: "Legal",       email: "legal@tapeline.io",   desc: "Terms, copyright, DMCA, regulatory matters." },
   { label: "Privacy",     email: "privacy@tapeline.io", desc: "Data requests, GDPR / CCPA, deletion." },
