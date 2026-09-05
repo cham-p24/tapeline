@@ -47,6 +47,7 @@ from app.models import (
     ApiKey,
     NewsletterSubscriber,
     RoadmapVote,
+    ScanLog,
     ScannerPreset,
     Subscription,
     User,
@@ -78,6 +79,12 @@ async def purge_user_owned_rows(
     await session.execute(delete(WatchlistItem).where(WatchlistItem.user_id == user_id))
     await session.execute(delete(Watchlist).where(Watchlist.user_id == user_id))
     await session.execute(delete(ScannerPreset).where(ScannerPreset.user_id == user_id))
+    # Scan logs carry the user's OWN typed search text (the `q` filter), so an
+    # erasure request plainly covers them. This is a deliberate departure from
+    # cap_events and funnel_events, which are left in place as append-only
+    # analytics trails that outlive a deleted user: those record only that an
+    # anonymous-shaped event happened, never anything the person wrote.
+    await session.execute(delete(ScanLog).where(ScanLog.user_id == user_id))
     await session.execute(
         delete(WebPushSubscription).where(WebPushSubscription.user_id == user_id)
     )
