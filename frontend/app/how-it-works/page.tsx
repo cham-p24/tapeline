@@ -37,7 +37,10 @@ const HOW_FAQ = [
   },
 ];
 
-// Factors are listed in descending weight order. We publish the ordering
+// Factors are listed in descending weight order. This page states the
+// ordering rather than the constants - a choice about the page, not a secrecy
+// claim, because the repo is public. Never call the weights withheld.
+// We publish the ordering
 // (which factors matter most) and each factor's contribution per ticker, but
 // not the exact numeric weights — those are applied consistently to every name.
 // Each factor now has its own un-gated page at /how-it-works/{slug} explaining

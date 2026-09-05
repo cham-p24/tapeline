@@ -140,8 +140,7 @@ value at the time of the most recent refresh. Where Tapeline displays its own
 derived metric (the composite score, the sub-scores, the signal label, the
 plain-English "why" sentence), that's Tapeline's own analytical output computed
 via the published six-factor methodology at /how-it-works (the six factors are
-named there, along with which carry the most weight; the exact weights are not
-published).
+named there, along with which carry the most weight).
 
 Tapeline is not a registered investment adviser. Everything on the platform is
 descriptive analytics — see /legal/risk for the full disclosure.
