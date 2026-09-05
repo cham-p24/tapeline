@@ -21,6 +21,38 @@ from app.services.billing import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+#: Latch for the Resend bounce/complaint webhook's missing-secret warning.
+#
+# Once per process, not per request. Per-request is the log spam that got the
+# old 503 removed; never is what we had until 2026-09-05, when the docstring
+# on `resend_webhook` was found promising a module-load warning that had never
+# been written. Module scope rather than a function attribute so a test can
+# reset it explicitly.
+_resend_secret_warned = False
+
+
+def _warn_resend_secret_missing() -> None:
+    """Warn once per process that bounce/complaint handling is inert.
+
+    This endpoint is the only thing that marks an address undeliverable. With
+    no secret configured we keep mailing addresses that bounce, which quietly
+    burns the sending domain's reputation — a symptom that looks nothing like
+    its cause. The log names the fix so it is actionable from the line alone.
+    """
+    global _resend_secret_warned
+    if _resend_secret_warned:
+        return
+    _resend_secret_warned = True
+    logger.warning(
+        "resend.webhook_secret_missing — bounce/complaint events are being "
+        "accepted and DISCARDED. No address will be marked undeliverable "
+        "while this is unset, so hard-bouncing addresses keep receiving mail "
+        "and the sending domain's reputation degrades silently. "
+        "Fix: fly secrets set RESEND_WEBHOOK_SECRET=<signing secret> "
+        "-a tapeline-backend (Resend dashboard → Webhooks → signing secret). "
+        "Logged once per process.",
+    )
 settings = get_settings()
 
 # Tier precedence, mirroring services/tier.py:_ORDER. Used to pick which tier
@@ -1342,16 +1374,30 @@ async def resend_webhook(
     is the same terminal state the one-click unsubscribe link writes.
 
     Resend uses Svix for webhook signing — same library as Clerk above.
-    Without `RESEND_WEBHOOK_SECRET` configured the endpoint returns 204
-    No Content, which silently no-ops the webhook. The OLD behaviour
-    raised a 503, which was correct on paper (the request couldn't be
-    verified) but in practice Resend would retry with exponential
-    backoff, each retry would 503, Sentry would log every one of them,
-    and the operator would drown in spam from a config-not-set state
-    rather than a real bug. 204 is the right hand-off: Resend marks the
-    event delivered, no Sentry noise, and the only consequence is that
-    we miss bounce/complaint events until the secret is configured —
-    which is already the existing state when the secret is missing.
+    Without `RESEND_WEBHOOK_SECRET` configured the endpoint returns 200
+    with `{"ok": true, "skipped": ...}`, which no-ops the webhook. The OLD
+    behaviour raised a 503, which was correct on paper (the request
+    couldn't be verified) but in practice Resend would retry with
+    exponential backoff, each retry would 503, Sentry would log every one
+    of them, and the operator would drown in spam from a config-not-set
+    state rather than a real bug. A 200 is the right hand-off: Resend
+    marks the event delivered, no Sentry noise, and the only consequence
+    is that we miss bounce/complaint events until the secret is
+    configured — which is already the state when the secret is missing.
+
+    CORRECTED 2026-09-05. This paragraph previously claimed a 204 (it is a
+    200 with a body) and, more importantly, promised: "We log once per
+    process at module load (further down) instead of per-request so this
+    doesn't fall off the operator's radar entirely." **There was no such
+    log, anywhere in the file.** The no-op was completely silent, which is
+    the failure mode the sentence was written to prevent — and the
+    docstring was the only thing standing between that and someone
+    noticing. `_warn_resend_secret_missing()` below now actually does it.
+
+    Why it matters: this endpoint is the only thing that marks an address
+    undeliverable. Silently skipping it means we keep mailing addresses
+    that bounce, which is how a sending domain's reputation dies — and the
+    symptom (delivery quietly degrading) looks nothing like the cause.
 
     Events we handle:
       email.bounced     — set email_undeliverable_at to now(); unsubscribe
@@ -1365,9 +1411,10 @@ async def resend_webhook(
     reputation-protection job.
     """
     if not settings.resend_webhook_secret:
-        # Silent no-op rather than 503. See docstring above for the why.
-        # We log once per process at module load (further down) instead of
-        # per-request so this doesn't fall off the operator's radar entirely.
+        # No-op rather than 503 — see the docstring for why. But NOT silent:
+        # once per process, at WARNING, naming the fix. Per-request would be
+        # the log spam the 503 was removed to avoid.
+        _warn_resend_secret_missing()
         return {"ok": True, "skipped": "webhook_secret_not_configured"}
 
     body = await request.body()
