@@ -183,7 +183,7 @@ export function ComparisonTable() {
         Free is where a new account starts: an email and a password, no card. It is also
         where an account lands when a trial or subscription ends. Adding a card starts the
         30-day Premium trial, which turns on the Premium column &mdash; $0 that day, one
-        click to cancel before day 14. The public record &mdash; scorecard, daily picks,
+        click to cancel before day 30. The public record &mdash; scorecard, daily picks,
         ticker pages and exports &mdash; stays open with no account at all.
       </p>
       <div className="border-t border-border/60 px-5 py-3 text-right text-[10px] uppercase tracking-wider text-subtle">

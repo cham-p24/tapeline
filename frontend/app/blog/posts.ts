@@ -1771,7 +1771,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">30-day
       Premium trial — $0 today</a>. Read 90 days of filtered Form 4
       activity across the full universe. The trial takes a card; the first
-      charge is on day 14 and one click cancels before then.</p>
+      charge is on day 30 and one click cancels before then.</p>
     `,
   },
   {
@@ -1897,7 +1897,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>Tapeline's policy: signing up is an email and a password, and the
       account it makes is a working one — the top ten scored rows, live. The
-      trial is the part that takes a card, and it charges $0 until day 14;
+      trial is the part that takes a card, and it charges $0 until day 30;
       cancel from /app/billing in one click, 30-day refund window on monthly
       subscriptions. The published record — daily Top 10, scorecard,
       per-ticker pages, raw CSV/JSON — needs no account or card at all. We'd
@@ -1918,7 +1918,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Data freshness</td>
               <td>60s composite refresh; the public ticker pages show the same live score with no account</td></tr>
           <tr><td>Cancel friction</td>
-              <td>One-click cancel, 30-day refund. Signing up takes an email and a password; the trial is the part that takes a card, and charges $0 until day 14; the published record needs no account at all</td></tr>
+              <td>One-click cancel, 30-day refund. Signing up takes an email and a password; the trial is the part that takes a card, and charges $0 until day 30; the published record needs no account at all</td></tr>
         </tbody>
       </table>
 

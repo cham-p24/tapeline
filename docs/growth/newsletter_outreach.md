@@ -107,7 +107,7 @@ Christian
 ```
 Hi Finimize team,
 
-Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published methodology and a public scorecard. A free public record (no account, no card), $9.99/mo Pro, and a 30-day Premium trial that takes a card but charges $0 until day 14.
+Pitching Tapeline (tapeline.io) — a stock-scanning tool for retail traders with a published methodology and a public scorecard. A free public record (no account, no card), $9.99/mo Pro, and a 30-day Premium trial that takes a card but charges $0 until day 30.
 
 The reason it's a fit for Finimize: your audience is in the "I want to learn how investing works" cohort. Tapeline's positioning lands there — the entire product is built around showing you HOW each score is computed, not just giving you a verdict. The /how-it-works page is half the product.
 

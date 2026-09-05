@@ -110,7 +110,7 @@ The scorecard is the part I actually want you to attack. Every market day I free
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — with the six factors and their weight ordering published at tapeline.io/how-it-works. "Smart Money" is SEC Form 4 insider buying, not 13F lag.
 
-Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed). The public record needs no account and no card. Creating an account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 until day 14, one click cancels.
+Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed). The public record needs no account and no card. Creating an account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 until day 30, one click cancels.
 
 Drop a ticker in the comments and I'll post its current score + the six-factor breakdown. And tell me what's wrong with the methodology — that's the part I want to harden.
 ```

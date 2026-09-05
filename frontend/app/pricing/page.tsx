@@ -72,7 +72,7 @@ const FAQ_ITEMS = [
     // removed there is nothing to be sent back behind: a cancelled account
     // lands on the same free plan a brand-new account gets, which is why the
     // caps below are the same FREE_LIMITS quoted in the answer above.
-    a: `On day 14 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to the free plan, which keeps the live top-${FREE_LIMITS.scannerRows} scanner, a saved screen${freeHasWatchlist() ? `, the ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day. Your settings and anything you saved are kept, and the public record — the daily Top 10, the full scorecard, the raw CSV and JSON — stays open either way.`,
+    a: `On day 30 the plan you picked starts and your card is charged for the first time. Stripe shows you that exact date and amount before you enter the card, and your billing page shows it for as long as the trial runs. Cancel in one click any time before then and you are charged nothing — your account moves to the free plan, which keeps the live top-${FREE_LIMITS.scannerRows} scanner, a saved screen${freeHasWatchlist() ? `, the ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day. Your settings and anything you saved are kept, and the public record — the daily Top 10, the full scorecard, the raw CSV and JSON — stays open either way.`,
   },
   {
     q: "Can I switch plans later?",
@@ -123,7 +123,7 @@ export default function PricingPage() {
             account, no card. Signing up takes an email and a password, and puts
             you on the free plan with the live scanner running. A card is what
             starts the 30-day Premium trial: $0 is charged that day, the first
-            charge is on day 14, and one click cancels before then. Subscribers
+            charge is on day 30, and one click cancels before then. Subscribers
             keep their price for as long as the subscription stays active.
           </p>
         </div>

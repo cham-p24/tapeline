@@ -396,7 +396,7 @@ _FREE_VS_TRIAL_FOOTNOTE = (
     "Your account took an email and a password, and there is nothing on file "
     "to cancel. A card is the separate step that starts the 30-day Premium "
     "trial, on Stripe's own checkout page: $0 is charged that day, the first "
-    "charge is at the end of day 14, and one click cancels before then with "
+    "charge is at the end of day 30, and one click cancels before then with "
     "nothing taken. If you would rather not, the free plan keeps working, and "
     "the daily picks and the whole public scorecard stay readable at "
     "tapeline.io/scorecard without an account at all."
@@ -2519,7 +2519,7 @@ def render_activation_arm_alerts_email(
     with NO recorded activity, so the person who curated a seven-ticker
     watchlist and never armed an alert was excluded from all of them — despite
     being the highest-intent cohort in the trial. Alerts are the #1 pay-driver,
-    and someone who has never felt one arrive has nothing to miss at day 14.
+    and someone who has never felt one arrive has nothing to miss at day 30.
 
     RULE 7 (the banner above binds here — this is a 1:1 message to a named
     person about securities they self-selected): the ONLY personal fact quoted
@@ -4551,7 +4551,7 @@ async def run_activation_drip(
     # alert was excluded from EVERY behaviour-triggered email, because all of
     # them keyed off inactivity — while being the highest-intent cohort in the
     # trial. Alerts are the #1 pay-driver; someone who has never felt one has
-    # nothing to miss at day 14.
+    # nothing to miss at day 30.
     #
     # DELIBERATELY NOT in lifecycle.ACTIVATION_SERIES_TOKENS. That cap exists to
     # stop hammering people who never engaged; this fires only for people who

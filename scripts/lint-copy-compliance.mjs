@@ -384,9 +384,24 @@ export const RULES = [
               String.raw`\bfree for (?!${TRIAL_DAYS_IN_COPY}\b)\d{1,3}\s+days\b`,
               "i",
             ),
-            // The same promise phrased as a date: "first charge on day 14".
+            // The same promise phrased as a DAY NUMBER, in any of the ways the
+            // site actually phrased it. The first version of this rule only
+            // matched "first charge on day N" and therefore missed every one
+            // of these, which shipped live on /pricing and /legal/refund:
+            //   "On day 14 the plan you picked starts"
+            //   "If you cancel on day 14, we retain $9.99"
+            //   "The first charge lands on day 14"
+            //   "Cancel any time before day 14"
+            //
+            // Days 1-6 are excluded: "on day 1" and "by day 3" are ordinary
+            // narrative about a trial's early days, not a claim about its
+            // length, and flagging those would make the rule noise.
             new RegExp(
-              String.raw`\bfirst charge (?:is )?on day (?!${TRIAL_DAYS_IN_COPY}\b)\d{1,3}\b`,
+              String.raw`\b(?:trial|charge[sd]?|charging|cancel(?:led|ling)?|bill(?:ed|ing)?)\b[^.!?]{0,90}\bday (?!${TRIAL_DAYS_IN_COPY}\b)(?:[7-9]|[1-9]\d)\b`,
+              "i",
+            ),
+            new RegExp(
+              String.raw`\bday (?!${TRIAL_DAYS_IN_COPY}\b)(?:[7-9]|[1-9]\d)\b[^.!?]{0,90}\b(?:trial|charge[sd]?|charging|cancel(?:led|ling)?|bill(?:ed|ing)?)\b`,
               "i",
             ),
           ],

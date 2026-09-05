@@ -30,7 +30,7 @@ Gmail slaps on a Tapeline email costs trust forever.
 3. Draft + ship the **weekly digest** — Sunday-evening recap of top
    movers, the user's watchlist score changes, and the public
    scorecard's hit rate
-4. Draft the **trial-ended re-engagement series** — day 14 (for users
+4. Draft the **trial-ended re-engagement series** — day 30 (for users
    who cancelled before the first charge), day 21 (winback offer),
    day 35 (final delete-warning). See the post-#548 scope note in §4.
 5. Build a **cold outreach generator** — given a name + role + company,
@@ -136,7 +136,7 @@ Read the full scorecard at https://tapeline.io/scorecard.
 
 ### 4. Trial-ended re-engagement series
 
-Currently `render_trial_ended_email` fires once on day 14. Extend to
+Currently `render_trial_ended_email` fires once on day 30. Extend to
 3 emails:
 
 **Day 14 (existing, polish):** *"Your trial just ended"* — calm tone,
@@ -144,7 +144,7 @@ recap what they kept: the public record, the live top-10 scanner,
 12 look-ups per UTC day, a 5-ticker watchlist. One CTA: upgrade.
 
 > **Scope note (post-#548, 2026-08-22):** a card-required trial converts
-> to a paid subscription on day 14, so this whole Day 14/21/35 series
+> to a paid subscription on day 30, so this whole Day 14/21/35 series
 > applies only to users who **cancelled before the first charge**.
 > Everyone else gets billing copy, not win-back copy.
 
