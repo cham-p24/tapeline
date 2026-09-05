@@ -104,7 +104,6 @@ function fillAndSubmit(container: HTMLElement) {
   fireEvent.change(screen.getByLabelText(/password/i), {
     target: { value: "longenough-pass" },
   });
-  fireEvent.click(document.getElementById("signup-subscription-terms")!);
   fireEvent.submit(container.querySelector("form")!);
 }
 
@@ -212,15 +211,20 @@ describe("SignUpPage", () => {
     expect(text).toMatch(/adding a card[^.]{0,30}starts/i);
     expect(text).not.toMatch(/at first sign-in,? you add a card/i);
     expect(text).not.toMatch(/card (?:added|comes|goes on) at first sign-in/i);
-    expect(text).toMatch(/\$0 is charged today/i);
+    expect(text).toMatch(/\$0 on the day the card goes on/i);
     // A DATE, not a duration. The paid ad's headline is "$0 today. The charge
     // date is on the page", and Meta reviews the landing page against the ad —
     // "14 days later" left that literal promise unmet. Matched loosely on the
     // month name so the assertion does not break every day as the date rolls.
     expect(text).toMatch(
-      /first charge is on \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}/i,
+      /first charge[^.]{0,90}\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}/i,
     );
     expect(text).not.toMatch(/first charge is 14 days later/i);
+    // The date is now stated CONDITIONALLY. Signing up schedules no charge, so
+    // an unqualified "your first charge is on <date>" was false for everyone
+    // who was not adding a card — which is everyone at this step.
+    expect(text).not.toMatch(/your first charge is on/i);
+    expect(text).toMatch(/if (you started the trial today|that were today)/i);
     expect(text).toMatch(/one click ends it before then/i);
     // The advance warning is a promise the backend actually keeps (the
     // trial_will_end handler), so the page is allowed to make it.
@@ -623,35 +627,32 @@ describe("SignUpPage", () => {
   // plan, wrong interval. A misleading interval is a heavier failure than a
   // missing one, so the assertion is inverted: Pro's per-month-of-annual rate
   // must NOT be the headline price here.
-  // ── The required subscription acknowledgement ─────────────────────────────
-  // Meta's Subscription Services standard prohibits, on a page where personal
-  // info is entered: "not including an unticked opt-in checkbox" — and names
-  // *no checkbox at all* as a failure equal to a pre-ticked one. This page is
-  // the destination of the paid trial ad, so it is the page under review.
+  // ── The removed subscription acknowledgement ──────────────────────────────
+  // Until 2026-09-05 a REQUIRED checkbox hard-gated account creation on "I
+  // understand my Premium trial charges $0 today, then $19.99/month from
+  // <date>". Signing up takes no card and schedules no charge, so that was
+  // false for every visitor, and they could not create a free account without
+  // affirming it. The founder removed it.
+  //
+  // It was added for Meta's Subscription Services standard, which prohibits on
+  // a page where personal info is entered "not including an unticked opt-in
+  // checkbox". That standard governs pages where a SUBSCRIPTION is entered
+  // into; this form enters into none. Whether Meta reads it that way is open
+  // and is with the lawyer. What must NOT regress meanwhile is the disclosure
+  // itself: price, interval, recurrence, the exit and a dated example all stay
+  // on the page, at readable size, without a false acknowledgement.
 
-  it("renders the subscription checkbox UNTICKED, with the terms in its own label", () => {
+  it("has no acknowledgement checkbox gating account creation", () => {
     render(<SignUpPage />);
-    const box = document.getElementById("signup-subscription-terms") as HTMLInputElement;
-    expect(box).not.toBeNull();
-    expect(box.type).toBe("checkbox");
-    // Unticked by default. A pre-ticked box is explicitly a violation.
-    expect(box.checked).toBe(false);
-    expect(box.getAttribute("aria-required")).toBe("true");
-
-    // The terms must be IN THE LABEL, not behind the Terms link — the policy
-    // rejects price/interval that sit "behind a separate link".
-    const label = box.closest("label");
-    const text = (label?.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toContain(`${usd(PRICING.premium.monthly)}/month`);
-    expect(text).toContain(`${usdCompact(PRICING.premium.annual)}/year`);
-    expect(text).toMatch(/recurring until I cancel/i);
-    expect(text).toMatch(/\$0 today/i);
+    expect(document.getElementById("signup-subscription-terms")).toBeNull();
+    const required = Array.from(
+      document.querySelectorAll('input[type="checkbox"][aria-required="true"]'),
+    );
+    expect(required).toEqual([]);
   });
 
-  it("blocks submit until the subscription checkbox is ticked", async () => {
+  it("creates the account without any acknowledgement step", async () => {
     const { authApi } = await import("@/lib/auth");
-    // The module-level mock accumulates across the file, so clear it here —
-    // otherwise this asserts against earlier tests' calls, not this one's.
     vi.mocked(authApi.signup).mockClear();
     const { container } = render(<SignUpPage />);
 
@@ -661,16 +662,23 @@ describe("SignUpPage", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "longenough-pass" },
     });
-    // Deliberately NOT ticking the box.
     fireEvent.submit(container.querySelector("form")!);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(/confirm you understand the trial's price and billing/i),
-      ).toBeInTheDocument();
-    });
-    // The account must not have been created.
-    expect(authApi.signup).not.toHaveBeenCalled();
+    await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
+    // The old gate's error must never reappear.
+    expect(
+      screen.queryByText(/confirm you understand the trial's price and billing/i),
+    ).toBeNull();
+  });
+
+  it("keeps the full subscription disclosure on the page, not in fine print", () => {
+    const { container } = render(<SignUpPage />);
+    const text = (container.textContent ?? "").replace(/\s+/g, " ");
+    // Everything the acknowledgement used to carry must still be stated.
+    expect(text).toContain(`${usd(PRICING.premium.monthly)}/month`);
+    expect(text).toContain(`${usdCompact(PRICING.premium.annual)}/year`);
+    expect(text).toMatch(/recurring until you cancel/i);
+    expect(text).toMatch(/cancel in one click|one click ends it/i);
   });
 
   it("shows Premium's real price and interval, derived from PRICING", () => {
@@ -857,8 +865,6 @@ describe("SignUpPage", () => {
     fireEvent.blur(password);
     expect(screen.queryByRole("alert")).toBeNull();
 
-    // Required subscription acknowledgement — see the gate test above.
-    fireEvent.click(document.getElementById("signup-subscription-terms")!);
     fireEvent.submit(container.querySelector("form")!);
     await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
   });

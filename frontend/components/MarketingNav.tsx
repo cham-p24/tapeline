@@ -37,6 +37,7 @@ const PRODUCT_ITEMS = [
   { href: "/how-it-works", label: "How it works", desc: "The method behind every signal" },
   { href: "/scorecard", label: "Public scorecard", desc: "Every call, scored and public" },
   { href: "/verify", label: "Verify the record", desc: "Audit the track record yourself" },
+  { href: "/limitations", label: "Limitations", desc: "What it is bad at, in its own words" },
   { href: "/signals", label: "All signals", desc: "Browse the full signal feed" },
   { href: "/sectors", label: "Sectors", desc: "Signals grouped by sector" },
   { href: "/stocks", label: "Stock directory", desc: "Every ticker we cover" },

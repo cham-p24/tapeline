@@ -1,5 +1,28 @@
 # LinkedIn posts #4-15 — drafts ready to schedule
 
+> ## ⛔ HOLD — PENDING LEGAL. DO NOT POST FROM THIS FILE.
+>
+> Flagged 2026-09-05. This file contains a **first-person legal conclusion about
+> the author's own licensing status** — see the line beginning "The Australian
+> publisher exemption". Four live site pages assert the same exemption, but they
+> assert it about *Tapeline*; these drafts assert it as *"I can publish ...
+> without holding a financial services licence"*, in the founder's own voice.
+>
+> Two things make that worse than the site strings:
+> 1. `docs/LEGAL_CHECKLIST.md` §2, the only written reasoning behind the claim,
+>    argues entirely from **US** SEC and state investment-adviser law. The claim
+>    made here is **Australian**. Those are different doctrines.
+> 2. *ASIC v Scholz* [2022] FCA 1542 turned on the founder-persona channel. A
+>    first-person claim from a named individual is the aggravating shape, not
+>    the mitigating one.
+>
+> The claim has been sent to Holley Nethercote (2026-09-05, thread
+> `1a06d461fe5712c4`) as part of the open consult. **Do not edit or soften the
+> wording** — counsel needs the exact string that was drafted. Do not post any
+> part of this file until that answer arrives; the rest of the file cannot be
+> cherry-picked out, because posting from it is how the flagged line escapes.
+
+
 > **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
 >
 > **Signing up takes an email and a password.** The account it makes lands on

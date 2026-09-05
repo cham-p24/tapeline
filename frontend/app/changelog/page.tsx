@@ -42,6 +42,14 @@ type LogEntry = {
 
 const METHODOLOGY_LOG: LogEntry[] = [
   {
+    date: "2026-08-24",
+    kind: "correction",
+    title: "The published record was measured against an after-hours price, and has been restated",
+    body:
+      "The scorecard freezes each day's top ten at 21:15 UTC and records what the price did by the next close. The price captured at the freeze was the last trade INCLUDING extended hours, not the official close — and 21:15 UTC is 17:15 New York, inside after-hours. So one leg of every comparison was an after-hours print while the other, SPY's move, came from official daily closes. The measurement now reads the official close on both legs. This was not only fixed forward: every affected historical row was recomputed and republished with both legs rebased, rather than leaving the old numbers standing or quietly dropping them. 688 rows were rebased. The archive stayed append-only throughout — no entry was deleted, and the restatement is disclosed on the scorecard page and inside the citable export rather than only here.",
+    ref: "#643",
+  },
+  {
     date: "2026-08-23",
     kind: "scope",
     title: "Per-ticker pick history now applies the same 7-day publication delay",

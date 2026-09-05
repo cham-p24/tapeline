@@ -20,9 +20,14 @@
  * meta description, the H1 or an OG card — not even when the number improves.
  * That constraint is enforced in CI by scripts/lint-copy-compliance.mjs.
  *
- * Figures below are as of 2026-07-18 and are stated as a dated snapshot. The
- * live numbers are always on /scorecard; if these drift far enough to mislead,
- * update them here and log it in /changelog.
+ * ── FIGURES ARE READ LIVE, NOT TYPED ─────────────────────────────────────
+ * They used to be a dated snapshot, and the snapshot went stale: the page said
+ * "30 days tracked and 269 entries" against a live 79 / 790, understating the
+ * company's own record by 2.6x on the one page whose whole job is not to
+ * overstate. Hardcoding them again reintroduces that. The summary is fetched
+ * server-side from /api/scorecard (tier-invariant, computed over the FULL
+ * archive regardless of the `days` window) and a failed fetch renders the
+ * figure-free wording rather than a stale number.
  */
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
@@ -30,6 +35,48 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
+import type { CitableSummary } from "@/lib/scorecardCitation";
+import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+
+// Same fallback chain as app/scorecard/page.tsx.
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://api.tapeline.io";
+
+/**
+ * `days=1` keeps the per-day payload minimal; the summary is computed over ALL
+ * back-checked history regardless of the window. Any failure returns null so a
+ * slow or down API renders the figure-free copy instead of 500ing the page.
+ */
+async function fetchSummary(): Promise<CitableSummary | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/scorecard?days=1`, {
+      next: { revalidate: 1800 },
+      headers: ssrInternalHeaders(),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { summary?: CitableSummary };
+    return body?.summary ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The sample size, in words, from the live summary.
+ *
+ * `entries_logged` is optional: a cached response from before that field
+ * existed will not carry it, and in that case the copy must NOT call
+ * `entries_scored` "logged" — that understatement is the exact thing the field
+ * was added to fix. It says "back-checked" instead.
+ */
+function sampleClause(s: CitableSummary | null): string {
+  if (!s) return "a small public sample";
+  const logged = s.entries_logged;
+  return logged != null
+    ? `${s.days_tracked} days tracked, ${logged} entries logged and ${s.entries_scored} back-checked`
+    : `${s.days_tracked} days tracked and ${s.entries_scored} back-checked entries`;
+}
 
 export const metadata = pageMeta({
   title: "Tapeline Limitations — What This Product Is Not Good At",
@@ -38,20 +85,17 @@ export const metadata = pageMeta({
   path: "/limitations",
 });
 
-/** Date the snapshot figures below were taken. */
-const AS_OF = "2026-07-18";
-
 type Section = { heading: string; lede: string; points: string[] };
 
-const SECTIONS: Section[] = [
+const sections = (summary: CitableSummary | null): Section[] => [
   {
     heading: "The public record is small, and it is roughly a coin flip",
     lede:
       "The scorecard is the honest answer to 'does this work', and right now the honest answer is 'not enough evidence to say'.",
     points: [
-      `As of ${AS_OF} the scorecard covers 30 days tracked and 269 entries. That is a small sample by any standard, and a month of daily picks is nowhere near enough to separate method from luck.`,
+      `The scorecard currently covers ${sampleClause(summary)}. That is a small sample by any standard, and nowhere near enough to separate method from luck.`,
       "Over that sample the share of picks whose next-day move exceeded the benchmark's is a little over half, and the median one-day difference is a small fraction of a percent. That is about what a coin flip looks like. For several weeks the same figure sat below an even split.",
-      "Tapeline does not publish an annualised return. No Sharpe ratio, no hypothetical profit-and-loss, no backtest, no 'what you would have made'. Deriving a performance summary from a 269-entry sample would imply a precision the data does not support.",
+      "Tapeline does not publish an annualised return. No Sharpe ratio, no hypothetical profit-and-loss, no backtest, no 'what you would have made'. Deriving a performance summary from a sample this size would imply a precision the data does not support.",
       "The archive is append-only. Past entries are never edited or removed after the fact, which means the record includes every day the picks went nowhere.",
     ],
   },
@@ -105,10 +149,10 @@ const SECTIONS: Section[] = [
   },
 ];
 
-const FAQ = [
+const faq = (summary: CitableSummary | null) => [
   {
     q: "Does the Tapeline scorecard show that the method works?",
-    a: "No — the sample is too small to support that conclusion in either direction. The record covers 30 days and 269 entries, and the result over that sample is close to an even split. It is published so readers can judge it, not as evidence of success.",
+    a: `No — the sample is too small to support that conclusion in either direction. The record covers ${sampleClause(summary)}, and the result over that sample is close to an even split. It is published so readers can judge it, not as evidence of success.`,
   },
   {
     q: "Why is there no Sharpe ratio or annualised return anywhere on the site?",
@@ -124,7 +168,11 @@ const FAQ = [
   },
 ];
 
-export default function LimitationsPage() {
+export default async function LimitationsPage() {
+  const summary = await fetchSummary();
+  const SECTIONS = sections(summary);
+  const FAQ = faq(summary);
+
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Tapeline", url: "https://tapeline.io/" },
     { name: "Limitations", url: "https://tapeline.io/limitations" },
@@ -149,12 +197,11 @@ export default function LimitationsPage() {
             pay for anything.
           </p>
           <p className="mt-4 text-sm text-subtle">
-            Figures on this page are a dated snapshot as of {AS_OF}. The live
-            numbers are always on the{" "}
+            Figures on this page are read from the{" "}
             <Link href="/scorecard" className="link">
               public scorecard
-            </Link>
-            .
+            </Link>{" "}
+            when the page is built, not typed in by hand.
           </p>
         </div>
       </section>

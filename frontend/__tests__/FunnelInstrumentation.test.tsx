@@ -388,10 +388,11 @@ describe("signup funnel reaches GA4", () => {
     expect(email).toBeTruthy();
     fireEvent.change(email, { target: { value: "funnel@example.com" } });
     fireEvent.change(password, { target: { value: "correct-horse-battery-9" } });
-    // Required subscription acknowledgement (Meta Subscription Services
-    // standard) — submit is gated on it, so the funnel event cannot fire
-    // without it. See SignupForm.test.tsx for the gate's own coverage.
-    fireEvent.click(document.getElementById("signup-subscription-terms")!);
+    // No acknowledgement step: the required subscription checkbox was removed
+    // on 2026-09-05. It asserted "my Premium trial charges $0 today, then
+    // $19.99/month from <date>" and hard-gated account creation on it, which
+    // was false for every visitor — signup takes no card and schedules no
+    // charge. Email + password are now the only required inputs.
     fireEvent.submit(email.closest("form")!);
 
     await waitFor(() =>

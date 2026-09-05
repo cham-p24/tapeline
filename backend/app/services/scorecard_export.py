@@ -44,7 +44,7 @@ from app.models import DailyScorecardEntry
 # environment-derived URL would be useless the moment it leaves the host.
 METHODOLOGY_URL = "https://tapeline.io/how-it-works"
 WEB_VIEW_URL = "https://tapeline.io/scorecard"
-CORRECTIONS_URL = "https://tapeline.io/contact"
+CORRECTIONS_URL = "https://tapeline.io/changelog"
 CORRECTIONS_EMAIL = "support@tapeline.io"
 
 #: Dated restatements of already-published rows.
