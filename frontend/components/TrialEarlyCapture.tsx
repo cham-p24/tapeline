@@ -46,7 +46,7 @@ import { trackEvent } from "@/lib/gtag";
  * copy descriptive: say what happens, and what does not.
  *
  * There is deliberately no "urgent phase" — TrialBanner holds one calm,
- * constant treatment from day 14 to day 1 (see #362). Do not reintroduce
+ * constant treatment from day 30 to day 1 (see #362). Do not reintroduce
  * escalating styling or language here.
  *
  * Conditions to render, all required:

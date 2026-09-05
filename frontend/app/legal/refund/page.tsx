@@ -63,7 +63,7 @@ export default function RefundPolicyPage() {
           <p>
             Annual plans get a <strong className="text-fg">30-day prorated refund</strong>: the equivalent
             of one month&rsquo;s use of the monthly price is retained, the remainder is refunded. Example:
-            Pro Annual is $99 ($8.25/mo × 12). If you cancel on day 14, we retain $9.99
+            Pro Annual is $99 ($8.25/mo × 12). If you cancel on day 30, we retain $9.99
             (one month at the monthly price of $9.99) and refund $89.01.
           </p>
           <p>

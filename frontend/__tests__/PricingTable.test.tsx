@@ -109,7 +109,7 @@ describe("PricingTable", () => {
 
   it("states the card-required trial as a mechanism, not just a label", () => {
     // The trial takes a card, so the disclosure has to say WHAT is charged
-    // and WHEN — $0 today, first charge on day 14 — plus a real, unpunished
+    // and WHEN — $0 today, first charge when the trial ends — plus a real, unpunished
     // way out. A vague "free trial" label here would be the exact failure
     // this test exists to catch.
     const { container } = render(<PricingTable />);
@@ -126,7 +126,9 @@ describe("PricingTable", () => {
     // was always the point: a card is what starts the trial.
     expect(text).toMatch(/card[^.]{0,30}starts the trial/i);
     expect(text).not.toMatch(/(?:adds|adding) a card at first sign-in/i);
-    expect(text).toMatch(/day 14, at the plan and billing period you picked/i);
+    expect(text).toMatch(
+      new RegExp(`day ${TRIAL_DAYS}, at the plan and billing period you picked`, "i"),
+    );
     // The way out is a link to the free public record, not a dead sentence.
     expect(screen.getByRole("link", { name: /public record/i })).toHaveAttribute(
       "href",

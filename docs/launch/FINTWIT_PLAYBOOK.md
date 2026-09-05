@@ -221,7 +221,7 @@ to Tapeline so it doesn't read as generic "lessons learned" content.)
 
 > **3/** Mistake two: I launched with a no-card trial. Sounds
 > founder-friendly, but at low traffic volume it just means trial users
-> vanish silently at day 14. Fixed in August — a card goes on file at
+> vanish silently at day 30. Fixed in August — a card goes on file at
 > first sign-in, $0 charged that day, auto-cancel-anytime in one click.
 > Conversion data is finally readable.
 

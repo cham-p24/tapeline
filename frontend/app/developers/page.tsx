@@ -254,7 +254,7 @@ export default function DevelopersPage() {
             Premium includes the API, 1,000 requests/day, and everything else. An
             account takes an email and a password; adding a card starts the 30-day
             Premium trial and issues a key &mdash; $0 charged that day, first charge
-            on day 14, one click to cancel.
+            on day 30, one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/signup" className="btn-primary">
