@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { freeOpenAccess, FREE_LIMITS, PRO_SCANNER_ROWS } from "@/lib/pricing";
+import {
+  freeOpenAccess,
+  FREE_LIMITS,
+  PRO_SCANNER_ROWS,
+  PROMO_OPEN_ACCESS_UNTIL,
+} from "@/lib/pricing";
+import { HideAfter } from "@/components/HideAfter";
 
 /**
  * Open-access month strip — the on-site announcement of the backend promo
@@ -28,8 +34,13 @@ import { freeOpenAccess, FREE_LIMITS, PRO_SCANNER_ROWS } from "@/lib/pricing";
  *     urgency framing (compliance Rule 6).
  *
  * Date-gated via freeOpenAccess() so it auto-disappears after the window with
- * no deploy — within each page's ISR window (30 min homepage / 6 h pricing),
- * the same tolerance the pricing page already accepts for date-gated copy.
+ * no deploy. That gate runs when the PAGE renders, so it was only ever as
+ * fresh as the cache holding it — up to 6 h stale on /pricing, 30 min on the
+ * homepage. For that window a cached page would keep claiming signed-in Free
+ * accounts see 1,000 rows after the backend had already reverted them to 10.
+ * `HideAfter` closes it in the browser, where the clock is current, so the
+ * strip is correct on any page at any revalidate. The server gate stays: it is
+ * what keeps the strip out of the HTML entirely once a page does regenerate.
  * `now` is injectable for tests, mirroring the backend's `today` argument.
  */
 export function OpenAccessBanner({
@@ -41,6 +52,7 @@ export function OpenAccessBanner({
 }) {
   if (!freeOpenAccess(now ?? new Date())) return null;
   return (
+    <HideAfter at={PROMO_OPEN_ACCESS_UNTIL.toISOString()}>
     <aside
       data-testid="open-access-banner"
       className={`rounded-xl border border-accent/25 bg-accent/5 px-4 py-2.5 text-center text-xs leading-relaxed text-muted sm:text-sm ${className}`}
@@ -65,5 +77,6 @@ export function OpenAccessBanner({
       </Link>{" "}
       &mdash; an email and a password, no card.
     </aside>
+    </HideAfter>
   );
 }
