@@ -106,7 +106,21 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] **Warm re-engagement: Joe Sciammarella.** Replied 2026-07-25 from `joescam@hotmail.com` (not the address he was mailed at) calling Tapeline *"perfect… extremely helpful"* for finding day-trade candidates. Was answered with a thanks and never converted. One soft nudge only, then mark dormant
 - [ ] Video 1 — "reading a score in 60 seconds"
 - [ ] First AI-visibility panel — 20 prompts × ChatGPT / Copilot / Perplexity, including the collision prompt
-- [ ] Deliverability: SPF/DKIM/DMARC + seed-inbox test on the Resend domain
+- [x] **Deliverability: SPF + DKIM are CORRECT.** Audited 2026-09-05 by DNS lookup.
+  `tapeline.io` SPF is `v=spf1 include:_spf.google.com ~all`, and Resend sends via
+  its own subdomain — `send.tapeline.io` carries `include:amazonses.com`, and
+  `resend._domainkey.tapeline.io` carries the DKIM public key. That is Resend's
+  standard setup and it is right. No change needed.
+- [ ] **DMARC is published but inert — fix is one DNS record.** `_dmarc.tapeline.io`
+  reads exactly `v=DMARC1; p=none;`. Two problems: `p=none` enforces nothing, and
+  there is **no `rua=` address**, so nobody is collecting the reports that `p=none`
+  exists to produce. It neither protects the domain nor tells anyone what is being
+  sent in its name. It does clear the Gmail/Yahoo bulk-sender minimum, so this is
+  not urgent — but it is 5 minutes in Cloudflare DNS:
+  `v=DMARC1; p=none; rua=mailto:dmarc@tapeline.io; fo=1`, then move to
+  `p=quarantine` once a few weeks of reports come back clean.
+- [ ] Seed-inbox deliverability test on the Resend domain (still to do — needs
+  sending, so founder-gated)
 - [ ] GSC: indexed count + impressions per template, and the 5xx re-check that was scheduled for 2026-08-26 and needs a logged-in browser
 
 *Channel reality check, from Growth: most channels have not failed — they were never tried. Show HN dead, Product Hunt 1 point, **A$951 of Google ads → 0 signups and 0 gclid in the entire user table**, 8 roundup pitches → 0 replies, zero directories listed, the Reddit post never sent. The original 2026-05-12 brief excluded paid ads as "too expensive for the LTV at this tier"; that judgment was overridden and the data has since confirmed it.*
@@ -121,6 +135,37 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [x] **Catch-up mechanism BUILT** — `backend/app/scripts/catchup_send.py` + `tests/test_catchup_send.py` (shipped by a parallel session). Correctly a deliberate script, not an auto-firing task, and it splits the audience so nobody legacy-trialled is promised a trial they cannot take. **Running it is a send, so it is founder-only**
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
+
+# 9d — Shipped 2026-09-05, second pass
+
+Triggered by handing the ad account to an external team, which surfaced a
+compliance gap nobody had tested for.
+
+- [x] **The copy linter caught none of the ad copy it was supposed to** (#735) —
+  twelve lines a performance marketer writes reflexively, including
+  `COMPLIANCE_COPY_RULES.md`'s OWN two flagship bad examples, all passed:
+  `0 blocking findings`. So "run the linter before you ship" — the natural
+  instruction to an agency — was worthless. New `--ads` mode is a second,
+  stricter pass: it applies the ad-vocabulary rule to any file named on the
+  command line (the `docs/ads/**` path gate meant that rule had **never once
+  run in CI**), unmasks the score-band names, and adds eight rules. Result on
+  the same twelve lines: 12 findings across 10 rules. On fourteen compliant
+  rewrites: zero — that second number is what stops an agency switching it off.
+  `signals?` was missing from the vocabulary list entirely and is now added.
+- [x] **The Resend bounce webhook was silently inert** (#738) — its docstring
+  claimed "we log once per process at module load (further down)". There was no
+  such log anywhere in the file; the sentence describing the safeguard was the
+  entire safeguard. This endpoint is the only thing that marks an address
+  undeliverable, so inert it means we keep mailing hard-bouncing addresses and
+  the sending domain's reputation degrades invisibly. Now warns once per
+  process, naming the exact `fly secrets set` command.
+- [x] **Sales had no route on the contact page** (#738) — `PricingTable`
+  advertises `sales@tapeline.io` for 5+ seats and the $59 Trader plan's ONLY
+  CTA is "Talk to us" → `/contact`, which listed support, press, legal, privacy
+  and security. Both highest-revenue paths on the site ended on a page that did
+  not list the address they had just named.
+- [x] **Deliverability audited** (read-only DNS, no change needed to SPF/DKIM) —
+  see the new DMARC item below for the one thing that is actually wrong.
 
 # 9c — Shipped 2026-09-05
 
