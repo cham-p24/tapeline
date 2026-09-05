@@ -2721,8 +2721,12 @@ def render_free_trial_invite_email(
     1. **Do not claim the scanner is locked while open access is running.** Until
        PROMO_OPEN_ACCESS_UNTIL a signed-in Free user gets the same 1,000 scanner
        rows Pro does. "Upgrade to unlock the full scanner" is *false* for them
-       today and true again on Sept 9 — so the promo case says so plainly and
-       sells only what Premium genuinely adds on top.
+       today and true again on **Sept 8**, not Sept 9: the gate is
+       `d < PROMO_OPEN_ACCESS_UNTIL` and that constant IS 2026-09-08, so the
+       8th is already closed (last open day is the 7th; pinned by
+       tests/test_open_access_month.py::test_open_access_window_boundary).
+       The promo case says so plainly and sells only what Premium genuinely
+       adds on top.
     2. **State the trial terms here, not at the checkout.** The trial takes a
        card. Someone should learn that from us, in the email doing the asking,
        not discover it after clicking.
