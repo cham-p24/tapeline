@@ -122,7 +122,7 @@ async def render_trial(_body: str) -> str:
         "There's a 30-day Premium trial. Signing up needs no card — you land "
         "on the free tier and can run scans straight away; adding a card "
         "starts the trial and nothing is charged that day. The first charge is "
-        "on day 14 and one click cancels before then. tapeline.io/signup. The full "
+        "on day 30 and one click cancels before then. tapeline.io/signup. The full "
         "scored universe, scorecard, watchlist alerts, "
         "congressional/insider feeds — all included for the trial window. If "
         "you'd rather not put a card down, the daily top 10 and the published "

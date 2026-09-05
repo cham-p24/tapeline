@@ -153,7 +153,7 @@ function TickerDecisionMock() {
 function TrialMock() {
   const rows: [string, string][] = [
     ["Due today", "$0.00"],
-    ["First charge", "day 14 · the plan you pick"],
+    ["First charge", "day 30 · the plan you pick"],
     ["Reminder email", "three days before"],
   ];
   return (
@@ -444,7 +444,7 @@ export default function WhatsNewPage() {
               matching row, a second saved screen, alerts, CSV export and the filings feeds:{" "}
               <strong className="text-fg">$0 charged today</strong>, first charge on day 30 at the
               plan you pick. We email you <strong className="text-fg">three days before</strong> that
-              charge, and cancelling is one click on the first screen — cancel before day 14 and you
+              charge, and cancelling is one click on the first screen — cancel before day 30 and you
               are never charged. The published record stays free to read with no account.
             </>
           }

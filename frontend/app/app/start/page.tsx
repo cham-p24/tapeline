@@ -375,7 +375,7 @@ export default function CardGateStartPage() {
           <span>
             <strong className="font-semibold">Why a card for a free trial?</strong>{" "}
             So it is one trial per person rather than an endless supply, and so
-            nothing interrupts you on day 31 if you decide to stay. It is not
+            nothing is interrupted when it ends if you decide to stay. It is not
             charged before {chargeDate}, and you can remove it by cancelling.
           </span>
         </li>

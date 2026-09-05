@@ -108,7 +108,7 @@ export function TrialEndedModal() {
             /* CARD ON FILE. What actually happened to the money is NOT knowable
                here: `true` resolves from has_card_on_file / has_payment_method
                / has_subscription, and the last of those is literally
-               bool(stripe_customer_id) server-side. Cancelled before day 14,
+               bool(stripe_customer_id) server-side. Cancelled before day 30,
                a failed day-14 charge and a grandfathered account that once
                opened Checkout all look identical. So make no claim about a
                charge or a cancellation — point at the one surface that knows. */

@@ -145,8 +145,13 @@ const ENTRIES: Entry[] = [
     tag: "improvement",
     title: "Premium trial takes card details up front — $0 today, reminder email, one-click cancel",
     body: [
-      // copy-compliance-allow card-required-signup -- the 2026-08-22 entry itself; a changelog records what WAS true on its date
-      "From 22 August 2026, a new account adds a card at first sign-in and starts the 30-day Premium trial. $0 is charged on day 0; the first charge lands on day 14 at the plan picked at sign-up.",
+      // A sweep for the 30-day change rewrote "14-day" here. That was wrong:
+      // this entry is dated 22 August 2026, when the trial WAS 14 days and
+      // the card was taken at first sign-in. Restored. A changelog records
+      // what was true on its date; supersede it, never edit it.
+      // copy-compliance-allow * -- dated 2026-08-22 entry; on that date the card was taken at first sign-in and the trial was 14 days
+      "From 22 August 2026, a new account adds a card at first sign-in and starts the 14-day Premium trial. $0 is charged on day 0; the first charge lands on day 14 at the plan picked at sign-up.",
+      // copy-compliance-allow stale-trial-length -- same dated entry
       "A reminder email goes out three days before the first charge, and cancelling is one click on the first screen of the cancel flow — cancel before day 14 and no charge is ever made.",
       "Existing accounts are unaffected, and the published record — daily top 10, scorecard, CSV/JSON — stays free to read with no account.",
     ],

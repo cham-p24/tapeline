@@ -19,6 +19,7 @@ import pytest
 from sqlalchemy import select
 
 from app.db import SessionLocal
+from app.routers.billing import TRIAL_DAYS
 from app.models import InboundMessage
 from app.services import inbox_templates
 from app.services.inbox_router import handle_inbound, mark_sent
@@ -200,7 +201,11 @@ async def test_trial_template_discloses_the_card_and_the_first_charge():
     assert "no card" in lowered or "needs no card" in lowered
     assert "free tier" in lowered or "free plan" in lowered
     assert "nothing is charged" in lowered        # what happens that day
-    assert "day 14" in lowered or "14 days" in lowered   # when it does charge
+    # Read from the constant. This asserted "day 14" and so kept checking a
+    # promise the product had stopped making the moment the trial moved.
+    assert (
+        f"day {TRIAL_DAYS}" in lowered or f"{TRIAL_DAYS} days" in lowered
+    )  # when it does charge
     assert "cancel" in lowered                    # how to stop it
     # The genuinely card-free path — the public record — must still be offered,
     # because that claim is still true and it is the honest alternative.

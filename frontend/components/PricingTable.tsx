@@ -317,7 +317,7 @@ export function PricingTable({ now }: { now?: Date } = {}) {
           <p className="mt-1 text-xs text-muted leading-relaxed">
             Adding a card is what starts the trial &mdash; nothing before it does.
             Stripe charges $0 that day and shows you the exact first-charge date
-            before you confirm: day 14, at the plan and billing period you picked.
+            before you confirm: day 30, at the plan and billing period you picked.
             One click stops it before that date and you are charged nothing. If you
             would rather not put a card down, you don&rsquo;t have to: the free plan
             runs without one, and the{" "}

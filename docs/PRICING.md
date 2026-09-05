@@ -187,11 +187,11 @@ high tier.
   `subscription_data.trial_end`). Since #683 nothing routes a new account into
   that checkout before it can use the product.
 - Disclosed before the card is entered: $0 charged today, the exact
-  first-charge date (day 14), the amount, and one-click cancel before then.
+  first-charge date (day 30), the amount, and one-click cancel before then.
 - Declining is a normal outcome and must not be punished: the wall carries a
   link to the free public record and a sign-out. No auto-redirect into Stripe,
   nothing pre-ticked.
-- At day 14 the subscription starts and the card is charged, unless cancelled
+- At day 30 the subscription starts and the card is charged, unless cancelled
   first (one click in Billing) — in which case the account lands on Free and
   is never asked for a card again.
 - During trial the API cap is throttled 1,000 → 100/day

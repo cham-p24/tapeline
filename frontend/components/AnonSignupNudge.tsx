@@ -178,7 +178,7 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
                 watchlist and opens the live scanner &mdash; an email and a
                 password, no card. Being told when their scores move is the part
                 that takes one: a card starts the 30-day Premium trial, $0 that
-                day, one click to cancel before day 14. Or keep reading the
+                day, one click to cancel before day 30. Or keep reading the
                 published record with no account at all.
               </>
             ) : (
@@ -187,7 +187,7 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
                 scanner and raises how many you can look up in a day &mdash; an
                 email and a password, no card. A saved watchlist and score alerts
                 come with a card, which starts a 30-day Premium trial &mdash; $0
-                that day, one click to cancel before day 14. Or keep reading the
+                that day, one click to cancel before day 30. Or keep reading the
                 published record with no account at all.
               </>
             )}

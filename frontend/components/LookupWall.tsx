@@ -112,7 +112,7 @@ export function LookupWall({
             {freeHasWatchlist() ? ", a watchlist," : ","} and the top ten scored rows of
             any scan. Adding a card starts a 30-day Premium trial and shows every matching
             row instead of the first ten &mdash; $0 that day, one click to cancel before
-            day 14.
+            day 30.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link

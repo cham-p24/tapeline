@@ -201,7 +201,7 @@ bottom of Part A.
   It's descriptive, not advice — six labels, no buy/sell language. The public
   record is the real product and is readable with no account and no card; the
   signed-in product opens on the free plan with an email and a password; a card starts the 30-day Premium
-  trial — $0 today, first charge at day 14, one click to cancel.
+  trial — $0 today, first charge at day 30, one click to cancel.
   Would genuinely
   love feedback on the scoring methodology: https://tapeline.io/how-it-works
   ```
