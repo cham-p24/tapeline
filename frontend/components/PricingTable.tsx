@@ -77,7 +77,7 @@ const PLANS = [
     },
     highlights: [
       "Unlimited ticker look-ups",
-      "Real-time, full ~2,500-ticker scanner",
+      "Real-time, full ~2,000-ticker scanner",
       "Score + plain-English Why on every row",
       "Squeeze Watch · Regime · Heatmap",
       "IPOs · Earnings · News calendars",
@@ -109,7 +109,7 @@ const PLANS = [
     proPlus: true,
     highlights: [
       "Congressional trades feed (House + Senate)",
-      "Recent insider buys — live SEC Form 4 across ~2,500 tickers",
+      "Recent insider buys — live SEC Form 4 across ~2,000 tickers",
       "Email alerts · unlimited (Pro: 10/day)",
       "Public API access · 1,000 requests/day",
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",

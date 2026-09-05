@@ -337,7 +337,20 @@ const ENTRIES: Entry[] = [
     body: [
       "Telegram alert channel for Premium subscribers — paste a chat ID on the billing page, send a test, get hourly market-regime + watchlist digests plus per-rule alerts. Retired since: see the 12 August 2026 entry — alerts now run on email and browser push.",
       "32 commodity ETFs added to the scanner universe (gold, silver, oil, gas, agriculture, copper, uranium, miners) with a dedicated Commodities sector filter.",
-      "Pricing simplified to three tiers: Free, Pro $29/mo, Premium $49/mo (or $24.99 / $39.99 billed annually). Since repriced: see /pricing for the current figures.",
+      // The retired figures and the CURRENT ones must sit in the SAME sentence.
+      //
+      // This line used to end "Since repriced: see /pricing for the current
+      // figures." A pointer does not survive retrieval: an answer engine chunks
+      // the page, keeps the chunk containing "$29/mo", and never follows the
+      // link — so an assistant was observed quoting $29/$49 as Tapeline's
+      // current price while quoting a competitor's price correctly. That is
+      // worse than saying nothing, because the only channel that has ever
+      // produced a sale here is AI citation, and it was citing a price 3x too
+      // high on a product whose pitch is that it is cheap.
+      //
+      // Keep the history — it is a changelog and the entry is true as history.
+      // Just never let the dead number travel alone.
+      "Pricing simplified to three tiers: Free, Pro $29/mo, Premium $49/mo (or $24.99 / $39.99 billed annually). These 2026 figures are HISTORICAL and no longer apply — Tapeline now costs $9.99/mo for Pro ($99/yr) and $19.99/mo for Premium ($199/yr).",
     ],
   },
   {
