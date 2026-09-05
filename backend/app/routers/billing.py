@@ -70,7 +70,7 @@ _CANCEL_REASONS = frozenset(
 # their first-charge date (GET /trial-offer) and the endpoint that SENDS the
 # date to Stripe (POST /checkout) both read it, so the disclosed date cannot
 # drift from the billed date.
-TRIAL_DAYS = 14
+TRIAL_DAYS = 30
 
 # ── Floor on a NEW trial, and why it is not a preference ────────────────────
 #

@@ -46,7 +46,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
-import { TRIAL_DAYS } from "@/components/TrialBanner";
+// Straight from lib/trial.ts, NOT re-exported through <TrialBanner>. Routing
+// a constant through a React component means any test that mocks that
+// component silently substitutes its own trial length — which is exactly
+// what happened here: the card-gate tests mocked TrialBanner with
+// TRIAL_DAYS: 14 and kept passing against 14 after the real trial moved
+// to 30, while the page under test quoted the wrong first-charge date.
+import { TRIAL_DAYS } from "@/lib/trial";
 import { PRICING, DEFAULT_BILLING_PERIOD, usd, usdCompact, type BillingPeriod } from "@/lib/pricing";
 import { userLocale } from "@/lib/datetime";
 import { trackEvent } from "@/lib/gtag";
@@ -143,7 +149,14 @@ export default function CardGateStartPage() {
   const { user, loading, mustAddCard, refresh, signout } = useUser();
   const gated = mustAddCard === true;
 
-  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>(DEFAULT_BILLING_PERIOD);
+  // THE TRIAL IS MONTHLY. Not a default the user can change — the only plan
+  // a trial converts to. A 30-day trial ending in a $199 annual charge is the
+  // single most disputable shape a subscription can have: a month of free use,
+  // then the largest possible bill, from a company the customer has not paid
+  // before. $19.99 after the same month is a proportionate ask, and anyone who
+  // wants the annual saving can still buy it outright from /pricing or switch
+  // from the billing page once they are a customer.
+  const billingPeriod: BillingPeriod = "monthly";
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [awaitingStripe, setAwaitingStripe] = useState(false);
@@ -193,7 +206,7 @@ export default function CardGateStartPage() {
       current_tier: user?.tier ?? "free",
       start_trial: true,
       surface: "card_gate",
-      value: billingPeriod === "annual" ? PRICING.premium.annual : PRICING.premium.monthly,
+      value: PRICING.premium.monthly,
       currency: PRICING.currency,
     });
     try {
@@ -238,10 +251,7 @@ export default function CardGateStartPage() {
   if (loading || !gated) return null;
 
   const chargeDate = longDate(firstCharge);
-  const amount =
-    billingPeriod === "annual"
-      ? `${usdCompact(PRICING.premium.annual)} for the year`
-      : `${usd(PRICING.premium.monthly)} for the month`;
+  const amount = `${usd(PRICING.premium.monthly)} for the month`;
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
@@ -309,35 +319,6 @@ export default function CardGateStartPage() {
         anything.
       </p>
 
-      {/* Billing period. Nothing is pre-ticked beyond the site-wide default,
-          and switching it rewrites the amount in the disclosure below. */}
-      <div className="mt-7">
-        <div id="gate-period-label" className="text-[11px] uppercase tracking-wider text-muted">
-          Plan after the trial
-        </div>
-        <div
-          role="group"
-          aria-labelledby="gate-period-label"
-          className="mt-2 inline-flex rounded-full border border-border bg-surface p-1"
-        >
-          {(["annual", "monthly"] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              aria-pressed={billingPeriod === p}
-              onClick={() => setBillingPeriod(p)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${FOCUS} ${
-                billingPeriod === p ? "bg-fg text-background" : "text-muted hover:text-fg"
-              }`}
-            >
-              {p === "annual"
-                ? `Annual · ${usdCompact(PRICING.premium.annual)}/yr`
-                : `Monthly · ${usd(PRICING.premium.monthly)}/mo`}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* THE DISCLOSURE. Plain text, always visible, never collapsed. */}
       <ul data-testid="card-gate-terms" className="mt-6 space-y-2.5 text-sm text-fg">
         <li className="flex gap-2">
@@ -353,9 +334,7 @@ export default function CardGateStartPage() {
           <span aria-hidden="true" className="text-muted">·</span>
           <span>
             <strong className="font-semibold">Your first charge is on {chargeDate}</strong>{" "}
-            &mdash; {amount}, and then{" "}
-            {billingPeriod === "annual" ? "every year" : "every month"} until you
-            cancel.
+            &mdash; {amount}, and then every month until you cancel.
           </span>
         </li>
         <li className="flex gap-2">
@@ -378,6 +357,26 @@ export default function CardGateStartPage() {
           <span>
             Card details are entered on Stripe&rsquo;s own checkout page. Your
             card number never reaches a Tapeline server.
+          </span>
+        </li>
+        {/* WHY A CARD AT ALL. Not decoration — the single best-evidenced line
+            on this page. Conversion Rate Experts put Qualaroo on Crazy Egg's
+            trial signup and found the objection was not the price, it was the
+            card: visitors thought it "was unnecessary at least, and quite
+            possibly a scam". They did NOT drop the requirement. They put an
+            explanation directly under the button — no charge during the trial,
+            and the card stops one person taking endless free trials — and the
+            challenger page took 116% more signups.
+            https://conversion-rate-experts.com/crazy-egg-case-study/
+            Every other finding in that research is contested; this one is not.
+            Keep it adjacent to the ask, not on a separate terms page. */}
+        <li className="flex gap-2">
+          <span aria-hidden="true" className="text-muted">·</span>
+          <span>
+            <strong className="font-semibold">Why a card for a free trial?</strong>{" "}
+            So it is one trial per person rather than an endless supply, and so
+            nothing interrupts you on day 31 if you decide to stay. It is not
+            charged before {chargeDate}, and you can remove it by cancelling.
           </span>
         </li>
       </ul>

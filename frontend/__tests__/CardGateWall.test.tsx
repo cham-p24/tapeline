@@ -24,7 +24,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { PRICING, usd, usdCompact } from "@/lib/pricing";
 
-const TRIAL_DAYS = 14;
+// Imported, never restated. A local copy of the trial length keeps asserting
+// the OLD promise after the real one moves: this file said 14 while the page
+// it tests said 30, and the date assertion below passed against a first-charge
+// date no customer would ever be shown.
+import { TRIAL_DAYS } from "@/lib/trial";
 
 const trackEventMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/gtag", async (importOriginal) => {
@@ -61,9 +65,11 @@ vi.mock("next/navigation", () => ({
 // the gate. Stub the network-touching pieces so these tests exercise routing
 // and copy, not banners.
 vi.mock("@/components/GlobalSearch", () => ({ GlobalSearch: () => null }));
+// No TRIAL_DAYS here. The page now reads it from lib/trial directly, so a
+// mock cannot quietly pin these assertions to a trial length the product
+// no longer offers.
 vi.mock("@/components/TrialBanner", () => ({
   TrialBanner: () => null,
-  TRIAL_DAYS: 14,
 }));
 vi.mock("@/components/TrialEndedModal", () => ({ TrialEndedModal: () => null }));
 vi.mock("@/components/TrialEarlyCapture", () => ({ TrialEarlyCapture: () => null }));
@@ -305,10 +311,13 @@ describe("card gate — the terms, as real text, before the card", () => {
     expect(text).toContain(due.toLocaleDateString("en-US", { month: "long" }));
     expect(text).toContain(String(due.getDate()));
     expect(text).toContain(String(due.getFullYear()));
-    // Annual is the site-wide default period.
+    // MONTHLY, and only monthly. The trial no longer offers an annual
+    // conversion: a 30-day free run ending in a $199 charge is the most
+    // disputable shape a subscription can have.
     expect(text).toMatch(
-      new RegExp(`${usdCompact(PRICING.premium.annual).replace("$", "\\$")} for the year`, "i"),
+      new RegExp(`\\$${PRICING.premium.monthly} for the month`, "i"),
     );
+    expect(text).toMatch(/every month until you cancel/i);
     expect(text).toMatch(/cancel in one click/i);
     expect(text).toMatch(/never charged/i);
     expect(text).toMatch(/three days before/i);
@@ -323,14 +332,27 @@ describe("card gate — the terms, as real text, before the card", () => {
     expect((terms.textContent ?? "").length).toBeGreaterThan(200);
   });
 
-  it("rewrites the amount when the user picks monthly", async () => {
+  it("offers no annual option — the trial converts to monthly, full stop", async () => {
     await renderWall();
-    fireEvent.click(screen.getByRole("button", { name: /monthly/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId("card-gate-terms").textContent).toMatch(
-        new RegExp(`${usd(PRICING.premium.monthly).replace("$", "\\$")} for the month`, "i"),
-      ),
-    );
+    // The period toggle is gone on purpose. Its absence IS the assertion:
+    // re-adding an annual choice puts a $199 charge 30 days after a free
+    // signup, which is the shape that produces disputes.
+    expect(screen.queryByRole("button", { name: /annual/i })).toBeNull();
+    const t = (await screen.findByTestId("card-gate-terms")).textContent ?? "";
+    expect(t).not.toMatch(/for the year/i);
+    expect(t).not.toMatch(/every year/i);
+  });
+
+  it("explains WHY a card is needed, right next to the ask", async () => {
+    // The one uncontested finding in the free-trial literature: Conversion
+    // Rate Experts found Crazy Egg's signups were blocked by people thinking
+    // the card request "was unnecessary at least, and quite possibly a scam".
+    // Explaining it in place — rather than dropping the requirement — took
+    // the challenger page to 116% more signups.
+    await renderWall();
+    const t = (await screen.findByTestId("card-gate-terms")).textContent ?? "";
+    expect(t).toMatch(/why a card/i);
+    expect(t).toMatch(/one trial per person|endless supply/i);
   });
 
   it("puts the terms above the button that asks for the card", async () => {
@@ -438,7 +460,8 @@ describe("card gate — the mechanism", () => {
     await waitFor(() => expect(checkoutBodies).toHaveLength(1));
     expect(checkoutBodies[0]).toMatchObject({
       tier: "premium",
-      billing_period: "annual",
+      // Monthly, not annual: the trial converts to $19.99/mo by design.
+      billing_period: "monthly",
       start_trial: true,
     });
     // The return from a $0 checkout must never be booked as revenue, so the

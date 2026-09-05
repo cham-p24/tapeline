@@ -16,7 +16,7 @@
  *
  * To change the trial: edit the backend constant and this one. Nothing else.
  */
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 30;
 
-/** "14-day", for interpolation into copy. */
+/** "30-day", for interpolation into copy. */
 export const TRIAL_LENGTH_LABEL = `${TRIAL_DAYS}-day`;
