@@ -33,6 +33,7 @@ from app.models import (
 # is owned by the SPIKE INTELLIGENCE sheet tab (sheet_feed.upsert_spikes) and the
 # congress_trades table simply stops accruing rows until a real disclosure feed
 # is wired.
+from app.services.leverage import is_leveraged_fund
 from app.services.mock_feed import (
     fetch_congress_trades,
     fetch_squeezes,
@@ -1203,6 +1204,45 @@ from daily bars in compute_bar_stats, stable across the session) and fall back
 to the intraday figure only when that is missing."""
 
 
+_EXCLUDE_LEVERAGED_FROM_SCORECARD = True
+"""⚠️ CHANGES WHAT ENTERS THE PERMANENT PUBLIC RECORD, from 2026-09-07 forward.
+
+Leveraged and inverse funds no longer qualify for the daily top-10 freeze.
+The scorecard is append-only, so this does NOT touch the 27 geared rows across
+79 days already published (measured 2026-09-07: 790 rows total, so 3.4%) — it
+only changes what is added from here on. The series is therefore not
+homogeneous across this date, and any before/after comparison of hit rate or
+median alpha spans two entry definitions. That is the real cost of this gate
+and it is being paid deliberately.
+
+WHY, and the argument I did NOT use. The obvious case would be that a 2x
+product's next-day move is a geared version of the underlying's, so geared
+picks fatten both tails and distort the headline alpha. I checked that against
+the live record before writing this, and it is FALSE: the 26 back-checked
+geared rows have stdev 6.21 and |max| 14.65 against 104.89 and 2832.23 for the
+ungeared ones. They are the CALMER half of the published record. Do not
+reintroduce the variance argument — the data says the opposite.
+
+The argument that does hold is consistency, and it is the same one that raised
+_MIN_DOLLAR_VOLUME_FOR_SCORECARD to match SCANNER_MIN_DOLLAR_VOLUME on
+2026-08-30. As of today the ranked scanner — including the anonymous top 10 and
+the MCP `daily_picks` tool — excludes geared funds by default. The scorecard's
+whole job is to be the auditable record of what the scanner said. If the freeze
+kept picking from a universe the product refuses to show, the record would
+document claims no visitor ever saw, and "here is our published track record"
+would stop being checkable against the published list. A record that cannot be
+reconciled with the thing it is a record OF is worth less than no record.
+
+Second, and narrower: the six-factor composite reads trend, RS and momentum off
+a price series. On a daily-reset geared product that series is a derivative of
+another instrument's, so a high score there is a statement about the leverage.
+Freezing that into a permanent record labelled STRONG SETUP asserts something
+the model was not measuring.
+
+Set to False to restore the old behaviour; the scanner default is separate
+(routers/scanner.SCANNER_INCLUDE_LEVERAGED_DEFAULT) and unaffected."""
+
+
 def _macro_gate_active() -> bool:
     """The macro gate only applies when Ticker.sub_macro is the Tapeline
     composite's regime-derived value (set by sheet_feed.refresh_from_workbook).
@@ -1282,6 +1322,10 @@ async def _ensure_daily_scorecard(today: date) -> None:
     Also skips tickers with a missing/zero price (bad upstream data) — a $0
     flag price would cause divide-by-zero when computing return.
 
+    Since 2026-09-07 leveraged/inverse funds are also skipped, which CHANGED
+    what enters this permanent record — see _EXCLUDE_LEVERAGED_FROM_SCORECARD
+    for the argument and for the measurement that rules out the obvious one.
+
     Concentration controls (2026-06-01, fix 3 of SCORING_AUDIT_2026-06-01.md):
     - At most _MAX_PER_SECTOR picks from any single sector
     - Skip picks where sub_macro indicates FALLING regime (< _MIN_MACRO_FOR_INCLUSION)
@@ -1329,11 +1373,20 @@ async def _ensure_daily_scorecard(today: date) -> None:
         skipped_macro_hostile = 0
         skipped_sector_cap = 0
         skipped_illiquid = 0
+        skipped_leveraged = 0
         rank = 0
 
         for t in candidates.scalars().all():
             if rank >= 10:
                 break
+
+            # Leveraged/inverse gate. READ _EXCLUDE_LEVERAGED_FROM_SCORECARD
+            # before touching this — it changes what enters a permanent,
+            # append-only public record, and the reason is NOT the one you
+            # would guess.
+            if _EXCLUDE_LEVERAGED_FROM_SCORECARD and t.is_leveraged:
+                skipped_leveraged += 1
+                continue
 
             if not t.price or t.price <= 0:
                 # Don't poison the public record with $0-price entries — these
@@ -1414,9 +1467,9 @@ async def _ensure_daily_scorecard(today: date) -> None:
         logger.info(
             "scorecard.snapshot saved for %s rows=%d "
             "skipped_zero_price=%d skipped_macro_hostile=%d skipped_sector_cap=%d "
-            "skipped_illiquid=%d sector_mix=%s",
+            "skipped_illiquid=%d skipped_leveraged=%d sector_mix=%s",
             today, rank, skipped_zero_price, skipped_macro_hostile,
-            skipped_sector_cap, skipped_illiquid, sector_counts,
+            skipped_sector_cap, skipped_illiquid, skipped_leveraged, sector_counts,
         )
 
 
@@ -2209,19 +2262,31 @@ async def _backfill_sectors(cap: int = 2500) -> None:
         logger.info("sector_backfill.no_unknown_tickers")
         return
 
-    async def _flush(batch: list[tuple[str, str, str | None]]) -> int:
+    async def _flush(batch: list[tuple[str, str, str | None, str | None]]) -> int:
         """Write one small batch in its own short-lived transaction."""
         if not batch:
             return 0
         try:
             async with session_scope() as session:
-                for sym, target, name in batch:
-                    values: dict[str, str] = {"sector": target}
+                for sym, target, name, asset_class in batch:
+                    values: dict[str, object] = {"sector": target}
                     # Only ever ADD a name, never replace a real one — the
                     # sheet and Finnhub also write this column and may hold a
                     # better value than the profile endpoint does.
                     if name:
                         values["name"] = name
+                        # This pass is the LAST writer to fill a placeholder
+                        # name — every row it repairs went from "CONX" to
+                        # "Direxion Daily COIN Bull 2X ETF", which is the
+                        # first moment anything could tell the fund was
+                        # geared. Derive the flag in the same statement, or a
+                        # newly-named geared fund sits in the default ranked
+                        # view until the weekly universe pass happens to
+                        # touch it (and it will not: _refresh_universe only
+                        # writes `name` when it is still a placeholder).
+                        values["is_leveraged"] = is_leveraged_fund(
+                            name, asset_class,
+                        )
                     await session.execute(
                         update(Ticker).where(Ticker.symbol == sym)
                         .values(**values)
@@ -2237,7 +2302,7 @@ async def _backfill_sectors(cap: int = 2500) -> None:
     # uncommitted write txn open against Neon. Now the network work happens
     # unsessioned and results land in short batched transactions.
     backfilled = 0
-    pending: list[tuple[str, str, str | None]] = []
+    pending: list[tuple[str, str, str | None, str | None]] = []
     for sym, asset_class, stored_name in rows:
         try:
             profile = await fetch_company_profile(sym)
@@ -2256,7 +2321,9 @@ async def _backfill_sectors(cap: int = 2500) -> None:
             # the heatmap's render-time grouping. If Finnhub returned no
             # sector, canonical_sector still routes by asset_class (e.g.
             # ETFs → Funds & ETFs) instead of leaving "Unknown" in the DB.
-            pending.append((sym, canonical_sector(raw_sector, asset_class), new_name))
+            pending.append(
+                (sym, canonical_sector(raw_sector, asset_class), new_name, asset_class)
+            )
         except Exception:
             logger.exception("sector_backfill.fetch_failed symbol=%s", sym)
         await asyncio.sleep(1.1)
@@ -2498,13 +2565,22 @@ async def _refresh_universe() -> None:
         )
         existing = {r[0]: (r[1], r[2]) for r in existing_r.all()}
 
-    inserts: list[dict[str, str]] = []
-    edits: list[dict[str, str]] = []
+    inserts: list[dict[str, object]] = []
+    edits: list[dict[str, object]] = []
     added = renamed = retyped = 0
     for row in new_rows:
         sym = row["symbol"]
         if sym not in existing:
-            inserts.append(row)
+            # Derive the flag on the way in — discovery is the writer of both
+            # fields it depends on, so leaving it to the column default would
+            # mean every newly-listed geared fund entered the ranked view
+            # unflagged and stayed that way until someone renamed it.
+            inserts.append({
+                **row,
+                "is_leveraged": is_leveraged_fund(
+                    row.get("name"), row.get("asset_class"),
+                ),
+            })
             added += 1
             continue
 
@@ -2521,7 +2597,7 @@ async def _refresh_universe() -> None:
         # which silently drops them from the scanner's ETF filter and
         # renders "Equity" on their ticker pages.
         stored_name, stored_class = existing[sym]
-        updates: dict[str, str] = {}
+        updates: dict[str, object] = {}
 
         # asset_class: the vendor's instrument type is authoritative and
         # cheap to be sure about (CS vs ETF), so any disagreement is ours.
@@ -2539,6 +2615,15 @@ async def _refresh_universe() -> None:
             renamed += 1
 
         if updates:
+            # This pass is the ONLY thing that corrects a wrong asset_class,
+            # and a row promoted equity -> etf is precisely the row whose
+            # geared name was previously ignored (is_leveraged_fund refuses to
+            # look at a non-fund). Recompute from the post-edit values so the
+            # reclassification and the flag land in the same write.
+            updates["is_leveraged"] = is_leveraged_fund(
+                updates.get("name", stored_name),
+                updates.get("asset_class", stored_class),
+            )
             edits.append({"symbol": sym, **updates})
 
 
@@ -2557,7 +2642,7 @@ async def _refresh_universe() -> None:
     # single failure costs one batch instead of the entire pass.
     applied_i = applied_e = failed = 0
 
-    async def _flush_inserts(batch: list[dict[str, str]]) -> int:
+    async def _flush_inserts(batch: list[dict[str, object]]) -> int:
         try:
             async with session_scope() as s2:
                 for r in batch:
@@ -2567,7 +2652,7 @@ async def _refresh_universe() -> None:
             logger.exception("universe.insert_batch_failed size=%d", len(batch))
             return 0
 
-    async def _flush_edits(batch: list[dict[str, str]]) -> int:
+    async def _flush_edits(batch: list[dict[str, object]]) -> int:
         try:
             async with session_scope() as s2:
                 for r in batch:

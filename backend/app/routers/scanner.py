@@ -66,6 +66,31 @@ SCANNER_QUERY_TIMEOUT_MS = 8000
 # unaffected by this default. Pass min_dollar_volume=0 to disable entirely.
 SCANNER_MIN_DOLLAR_VOLUME = 1_000_000.0
 
+# Leveraged and inverse funds are OUT of the ranked view unless asked for.
+#
+# Measured on the live anonymous top 10 on 2026-09-07: rank 6 was CONX
+# ("Direxion Daily COIN Bull 2X ETF") and rank 8 BIB ("ProShares Ultra NASDAQ
+# Biotechnology"), both labelled STRONG SETUP. A first-time visitor's first
+# result was a 2x leveraged crypto-miner fund.
+#
+# The reason is the same one behind the liquidity floor above, one step
+# further on. That floor asks "could anyone actually trade this?"; this asks
+# "does the score mean what the reader will take it to mean?". The six-factor
+# composite reads trend, relative strength and momentum on a price series. On
+# a 2x daily-reset product that series is a geared, path-dependent derivative
+# of another instrument's series — so a high composite is a statement about
+# the LEVERAGE, not about anything the reader is being shown. Ranking the two
+# side by side, unlabelled, is the misleading part.
+#
+# Not a judgement, and not a ban: `include_leveraged=true` returns them, the
+# per-ticker pages and search were never gated, and every row carries the
+# `is_leveraged` fact so a client can label rather than hide. Nothing built on
+# this may call them risky or advise against them — see services/leverage.py.
+#
+# 825 of 11,781 live rows qualify (415 of the 7,417 scored), so this is a
+# meaningful slice of the ETF universe, not a rounding error.
+SCANNER_INCLUDE_LEVERAGED_DEFAULT = False
+
 # Module-level cache for /popular — recomputed every hour. The query is cheap
 # but we'd rather not run it on every empty-state render in /app/watchlist.
 _POPULAR_CACHE: dict[str, object] = {"ts": 0.0, "items": []}
@@ -154,6 +179,17 @@ async def list_scanner(
     # see the filter, and the CSV export ignored it entirely. Validated against
     # a pattern so an unknown bucket 422s instead of silently matching nothing.
     asset_class: str | None = Query(None, pattern=ASSET_CLASS_PATTERN),
+    # Leveraged/inverse funds — excluded by DEFAULT. Same shape and the same
+    # reasoning as min_dollar_volume above: a server-side default that keeps
+    # the ranked view honest, with an explicit opt-in for the caller who
+    # actually wants them. See SCANNER_INCLUDE_LEVERAGED_DEFAULT.
+    include_leveraged: bool = Query(
+        SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+        description=(
+            "Include leveraged and inverse funds (2x/3x, inverse, short) in "
+            "the results. Excluded by default."
+        ),
+    ),
     q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
     sort: str = Query("score", pattern=SORT_PATTERN),
     order: str = Query("desc", pattern=ORDER_PATTERN),
@@ -214,6 +250,13 @@ async def list_scanner(
     asset_clause = asset_bucket_clause(asset_class)
     if asset_clause is not None:
         stmt = stmt.where(asset_clause)
+    # Leveraged/inverse exclusion. Applied HERE, before filtered_stmt is
+    # snapshotted, so total_matched counts the same universe the page ranks —
+    # the asset_class bug (a client-side post-filter the count could not see)
+    # is exactly the mistake not to repeat. See
+    # SCANNER_INCLUDE_LEVERAGED_DEFAULT.
+    if not include_leveraged:
+        stmt = stmt.where(Ticker.is_leveraged.is_(False))
     # Symbol substring search. SQL LIKE with leading wildcard prevents index use
     # but the active universe is <2,500 rows so a full scan is fine; the query
     # still returns in <50ms in production. Uppercase the query to match how
@@ -373,6 +416,7 @@ async def list_scanner(
                     "signal": signal,
                     "sector": sector,
                     "asset_class": asset_class,
+                    "include_leveraged": include_leveraged,
                     "q": q,
                     "sort": sort,
                     "order": order,
@@ -414,6 +458,11 @@ async def list_scanner(
                 "name": r.name,
                 "sector": r.sector,
                 "asset_class": r.asset_class,
+                # Structural fact about the instrument, alongside asset_class.
+                # Shipped on every row (not only when true) so the frontend and
+                # the MCP server can label an opted-in result rather than
+                # inferring from the absence of a key.
+                "is_leveraged": r.is_leveraged,
                 "score": r.score,
                 "signal": r.signal,
                 "price": r.price,
