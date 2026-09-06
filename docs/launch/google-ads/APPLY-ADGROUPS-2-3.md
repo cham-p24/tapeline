@@ -55,7 +55,9 @@ reloads on 2026-06-01, while `/aw/overview` rendered live data normally.
 Editor uses a different backend that does not hit the web `ipl_status` 503.
 
 ## Landing pages — verified HTTP 200 (2026-06-01)
-- `/compare/finviz` ✓ — ad group 1 (live) destination
+- ~~`/compare/finviz`~~ — **REMOVED (#718) and now 404s.** Was ad group 1's
+  destination. Any campaign rebuilt from this file needs a live destination
+  chosen first; see docs/launch/google-ads/README.md.
 - `/scorecard` ✓ — ad group 2 destination
 - `/best-stock-scanners` ✓ — ad group 3 destination
 

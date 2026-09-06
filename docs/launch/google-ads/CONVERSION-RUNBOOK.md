@@ -35,5 +35,5 @@ A scanner needs **no** certification (not CFD/forex/broker). **Never** in ad cop
 
 ## 5. Live account facts (for reference)
 - Account **271-638-2397**; campaign **"Tapeline – Search Test (Jun 2026)"** `23891985522`; budget **A$21.24/day (~A$646/mo)**; bid **Maximize Clicks**.
-- 3 single-theme ad groups → matched pages: **Finviz Alternative** → `/compare/finviz`, **Track Record** → `/scorecard`, **Best Stock Screener** → `/best-stock-scanners`. 28 phrase negatives live.
+- 3 single-theme ad groups → matched pages: **Finviz Alternative** → ~~`/compare/finviz`~~ (**REMOVED #718, now 404s** — pick a live destination), **Track Record** → `/scorecard`, **Best Stock Screener** → `/best-stock-scanners`. 28 phrase negatives live.
 - Ads tag `AW-18169833652`; GA4 `G-YRK73W9NS9`. ⚠️ Do NOT accept the GA4 tag-overwrite prompt in Ads conversion setup (it clobbers the GA4 stream) — link GA4 as a data source instead.
