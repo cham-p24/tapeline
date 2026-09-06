@@ -37,6 +37,7 @@ import csv
 import io
 import logging
 import re
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import httpx
@@ -121,6 +122,26 @@ _ASSET_CLASS_MAP: dict[str, str] = {
     "etf":              "etf",
     "future_commodity": "commodity",
     "commodity":        "commodity",
+    # Market-cap buckets. The workbook's asset-class column was renamed to
+    # "Type" and its vocabulary changed with it: it now says "Small Cap",
+    # "Mid Cap", "Large Cap", "Penny (<$5)", "ETF", "Leveraged ETF" rather
+    # than "stock"/"etf". Every one of these is an equity or an ETF, and they
+    # MUST be classifiable — `is_unrecognised_asset_class` treats anything it
+    # cannot read as a refusal to publish, so leaving them out would not
+    # mislabel these rows, it would DROP them. Measured against the live
+    # workbook on 2026-09-07: 1,415 Small Cap + 812 Mid Cap + 556 Large Cap +
+    # 183 Penny = 2,966 rows, i.e. 72% of the sheet.
+    "small cap":        "equity",
+    "mid cap":          "equity",
+    "large cap":        "equity",
+    "mega cap":         "equity",
+    "micro cap":        "equity",
+    "nano cap":         "equity",
+    "small-cap":        "equity",
+    "mid-cap":          "equity",
+    "large-cap":        "equity",
+    "mega-cap":         "equity",
+    "micro-cap":        "equity",
 }
 
 
@@ -173,9 +194,14 @@ def normalize_asset_class(raw: Any) -> str | None:
         return None
     if s in _ASSET_CLASS_MAP:
         return _ASSET_CLASS_MAP[s]
-    # "* etf" (commodity etf, sector etf, bond etf, …) → etf
+    # "* etf" (commodity etf, sector etf, bond etf, leveraged etf, …) → etf
     if s.endswith(" etf") or s == "etf":
         return "etf"
+    # "penny (<$5)", "penny stock", "penny" → an equity, priced low. Matched by
+    # prefix because the workbook carries the threshold inside the label and
+    # the threshold is the sort of thing that gets edited.
+    if s.startswith("penny"):
+        return "equity"
     # Unrecognised is a no-read, not a vote for "equity".
     return None
 
@@ -359,6 +385,139 @@ def reset_csv_hash_cache() -> None:
     _CSV_HASH_CACHE.clear()
 
 
+# ── Column aliases + drift detection for the ALL SIGNALS tab ────────────────
+#
+# The workbook is the founder's, it gets restructured, and `csv.DictReader`
+# has no opinion about that: `raw.get("3M Return %")` on a sheet that now says
+# "3M %" returns None, which `_parse_float` turns into None, which the
+# composite treats as a missing factor and scores as NEUTRAL 50. A rename
+# degrades every score in silence and nothing anywhere says so.
+#
+# It has happened at least twice. The sheet-feed 400s in July were a
+# restructure. Measured against the live workbook on 2026-09-07, FIVE columns
+# this parser reads had already gone:
+#
+#   3M Return % / 6M Return % / 1Y Return %  ->  renamed to "3M %" / "6M %" / "1Y %"
+#   Asset Class                              ->  renamed to "Type"
+#   Conviction                               ->  removed outright
+#
+# `Asset Class` is the dangerous one. It is what the crypto fail-closed guard
+# in parse_all_signals_csv reads, and `raw.get` on an absent column returns
+# None, which that guard treats as "the sheet said nothing" — the one input it
+# lets through. So the guard added days earlier to stop a token's price being
+# published under a real company's ticker (SOL/Emeren, EOS/Eaton Vance,
+# BGB/Blackstone, LEO/BNY Mellon) was silently disarmed by a rename.
+#
+# Two mechanisms below. Aliases keep the parser reading through a rename, and
+# `audit_headers` makes the next one loud instead of silent. Aliases are the
+# fallback, never the override: a canonical header that is PRESENT wins even
+# when blank, because "the sheet said nothing" and "the sheet did not say" are
+# different facts and only the canonical column can express the first.
+#
+# When a column is genuinely gone with no successor, it belongs here with an
+# empty tuple so the audit still reports it. Silence is the failure mode.
+_ALL_SIGNALS_COLUMNS: dict[str, tuple[str, ...]] = {
+    "Ticker":           (),
+    "Score":            (),
+    "Price":            (),
+    "Market Regime":    (),
+    "Momentum Quality": (),
+    "Near 52W High %":  (),
+    "RS vs SPY 3M %":   (),
+    "RS vs SPY 6M %":   (),
+    "RS vs SPY 1Y %":   (),
+    "3M Return %":      ("3M %",),
+    "6M Return %":      ("6M %",),
+    "1Y Return %":      ("1Y %",),
+    # NOT aliased to each other, deliberately — see the guard in
+    # parse_all_signals_csv. "Asset Class" is an assertion about what an
+    # instrument IS; "Type" is a size bucket that happens to spend one of its
+    # values on "ETF". Measured against the live workbook 2026-09-07, treating
+    # Type as an asset class would have relabelled 114 real funds as equities,
+    # including BNO (Brent Oil Fund), CEF (Sprott Gold Trust), BAR (Gold
+    # Trust), BKCH (Blockchain ETF) and a row of single-stock leveraged ETFs —
+    # which is the defect #761 exists to prevent.
+    "Asset Class":      (),
+    "Type":             (),
+    # No successor in the current workbook. Listed so the audit keeps saying so.
+    "Conviction":       (),
+    "Strategy":         (),
+    # Column G in the original layout, distinct from column F "Score". The
+    # workbook now publishes only "Score", and aliasing the two would silently
+    # make raw_score and sheet_score the same number rather than admit one is
+    # gone.
+    "Raw Score":        (),
+}
+
+# Columns whose absence is not merely lossy.
+_SAFETY_CRITICAL_COLUMNS = frozenset({"Ticker"})
+
+# Every column that can carry a "this row is a token" signal. The crypto drop
+# is only armed while at least ONE of these is present: `raw.get` on an absent
+# column returns None, which the guard reads as "the sheet did not say" and
+# lets through. Losing all of them is not lossy, it is a disarmed safety
+# check, so it is reported separately from ordinary drift.
+_CLASS_SIGNAL_COLUMNS = ("Asset Class", "Type")
+
+
+def _cell(raw: Mapping[str, Any], column: str) -> Any:
+    """Read `column` from a CSV row, falling back to its known older spellings.
+
+    Returns the value of the FIRST spelling actually present as a header, even
+    if that value is blank — a present-but-empty cell is the sheet declining to
+    say, which several callers depend on (see `normalize_asset_class`).
+    """
+    for key in (column, *_ALL_SIGNALS_COLUMNS.get(column, ())):
+        if key in raw:
+            return raw[key]
+    return None
+
+
+def audit_headers(fieldnames: Iterable[str] | None) -> list[str]:
+    """Return the columns this parser needs that the sheet no longer has.
+
+    Absent under the canonical name AND every known alias. Pure; the caller
+    logs, so tests can assert the finding without reading log output.
+    """
+    present = {f.strip() for f in (fieldnames or []) if f}
+    return [
+        column
+        for column, aliases in _ALL_SIGNALS_COLUMNS.items()
+        if not any(name in present for name in (column, *aliases))
+    ]
+
+
+def _log_header_drift(fieldnames: Iterable[str] | None) -> list[str]:
+    """Audit + log. Returns the missing columns so callers can react."""
+    missing = audit_headers(fieldnames)
+    if not missing:
+        return missing
+    critical = [c for c in missing if c in _SAFETY_CRITICAL_COLUMNS]
+    # The crypto drop needs only one of these to work. Report the loss of the
+    # LAST one, not of either one — warning while the guard is still armed is
+    # how a real alarm gets tuned out.
+    if all(c in missing for c in _CLASS_SIGNAL_COLUMNS):
+        critical = [*critical, *_CLASS_SIGNAL_COLUMNS]
+    if critical:
+        logger.error(
+            "sheet.header_missing_critical columns=%s — the crypto drop reads "
+            "these; with none of them present every row looks unclassified, "
+            "which is the one input the guard lets through, so a token would "
+            "be published under a real company's ticker",
+            ", ".join(critical),
+        )
+    lossy = [c for c in missing if c not in critical]
+    if lossy:
+        logger.warning(
+            "sheet.header_missing columns=%s — the parser reads these by name "
+            "and the workbook no longer publishes them, so they arrive as None "
+            "and score as NEUTRAL 50. Add the new spelling to "
+            "_ALL_SIGNALS_COLUMNS or restore the column.",
+            ", ".join(lossy),
+        )
+    return missing
+
+
 def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     """Parse the ALL SIGNALS tab CSV into normalized ticker dicts.
 
@@ -378,8 +537,12 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     skipped_crypto = 0
     reader = csv.DictReader(io.StringIO(text))
+    # Once per parse, before any row: say out loud which columns the workbook
+    # stopped publishing. A rename is otherwise indistinguishable from a sheet
+    # full of blanks.
+    _log_header_drift(reader.fieldnames)
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _clean_symbol(_cell(raw, "Ticker"))
         # _clean_symbol drops the header, blanks, dividers, summary rows, and
         # emoji/space-decorated cells like "🏆 IVV". None → skip the row.
         if symbol is None:
@@ -398,25 +561,25 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # "sheet_score: 131" on a debug surface would confuse the support
         # team about whether something's broken. The 0-100 clamp is the
         # documented contract on /how-it-works.
-        sheet_score_raw = _parse_float(raw.get("Score"))
+        sheet_score_raw = _parse_float(_cell(raw, "Score"))
         sheet_score_clamped = (
             None if sheet_score_raw is None
             else max(0.0, min(100.0, sheet_score_raw))
         )
-        conviction = (raw.get("Conviction") or "").strip().upper()
+        conviction = (_cell(raw, "Conviction") or "").strip().upper()
 
         # Stage 1: build the row with raw inputs the composite needs
         row_for_composite = {
             "symbol":             symbol,
-            "change_pct_3m":      _parse_float(raw.get("3M Return %")),
-            "change_pct_6m":      _parse_float(raw.get("6M Return %")),
-            "change_pct_1y":      _parse_float(raw.get("1Y Return %")),
-            "rs_vs_spy_3m":       _parse_float(raw.get("RS vs SPY 3M %")),
-            "rs_vs_spy_6m":       _parse_float(raw.get("RS vs SPY 6M %")),
-            "rs_vs_spy_1y":       _parse_float(raw.get("RS vs SPY 1Y %")),
-            "market_regime":      (raw.get("Market Regime") or "").strip(),
-            "momentum_quality":   raw.get("Momentum Quality"),
-            "near_52w_high_pct":  _parse_float(raw.get("Near 52W High %")),
+            "change_pct_3m":      _parse_float(_cell(raw, "3M Return %")),
+            "change_pct_6m":      _parse_float(_cell(raw, "6M Return %")),
+            "change_pct_1y":      _parse_float(_cell(raw, "1Y Return %")),
+            "rs_vs_spy_3m":       _parse_float(_cell(raw, "RS vs SPY 3M %")),
+            "rs_vs_spy_6m":       _parse_float(_cell(raw, "RS vs SPY 6M %")),
+            "rs_vs_spy_1y":       _parse_float(_cell(raw, "RS vs SPY 1Y %")),
+            "market_regime":      (_cell(raw, "Market Regime") or "").strip(),
+            "momentum_quality":   _cell(raw, "Momentum Quality"),
+            "near_52w_high_pct":  _parse_float(_cell(raw, "Near 52W High %")),
         }
 
         # Stage 2: compute Tapeline's own composite from those inputs (the
@@ -458,21 +621,39 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # A blank cell still passes: sheet-governed ETFs legitimately leave
         # this column empty. "Said nothing" and "said something we do not
         # understand" are different facts; only the first is safe to ingest.
-        asset_class_raw = raw.get("Asset Class")
-        if (
-            normalize_asset_class(asset_class_raw) == "crypto"
-            or is_unrecognised_asset_class(asset_class_raw)
+        # The GUARD reads every column that carries a class signal; the
+        # stored VALUE reads only the authoritative one.
+        #
+        # They came apart when the workbook dropped "Asset Class" and kept
+        # "Type". For the guard that is fatal to ignore: `raw.get` on an absent
+        # column returns None, which reads as "the sheet did not say" — the one
+        # input the guard lets through — so a rename silently disarmed the
+        # crypto drop entirely. Whatever column the sheet uses to say "crypto",
+        # we have to be reading it.
+        #
+        # For the value it is the opposite: "Type" is a SIZE bucket
+        # ("Small Cap", "Mid Cap", "Penny (<$5)") that spends one value on
+        # "ETF". It does not assert that a row is not a fund, and taking it as
+        # one would relabel 114 real funds as equities (BNO, CEF, BAR, BKCH and
+        # a row of single-stock leveraged ETFs — measured 2026-09-07). The
+        # vendor's classification is better and already stored, so the sheet
+        # stays silent here and `upsert_tickers` leaves it alone.
+        declared_class = _cell(raw, "Asset Class")
+        class_signals = (declared_class, _cell(raw, "Type"))
+        if any(
+            normalize_asset_class(v) == "crypto" or is_unrecognised_asset_class(v)
+            for v in class_signals
         ):
             skipped_crypto += 1
             continue
 
         rows.append({
             "symbol":          symbol,
-            "asset_class":     normalize_asset_class(raw.get("Asset Class")),
+            "asset_class":     normalize_asset_class(declared_class),
             "score":           composite,                    # ← Tapeline's own composite
             "sheet_score":     sheet_score_clamped,          # kept for transparency / diff tracking
             "signal":          score_to_signal(composite),   # derived from Tapeline composite
-            "price":           _parse_float(raw.get("Price")),
+            "price":           _parse_float(_cell(raw, "Price")),
             "conviction":      conviction,
             "confidence_pct":  _CONVICTION_TO_CONFIDENCE.get(conviction),
             "change_pct_3m":   row_for_composite["change_pct_3m"],
@@ -482,8 +663,8 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
             "rs_vs_spy_6m":    row_for_composite["rs_vs_spy_6m"],
             "rs_vs_spy_1y":    row_for_composite["rs_vs_spy_1y"],
             "market_regime":   row_for_composite["market_regime"],
-            "strategy":        (raw.get("Strategy") or "").strip(),
-            "raw_score":       _parse_float(raw.get("Raw Score")),
+            "strategy":        (_cell(raw, "Strategy") or "").strip(),
+            "raw_score":       _parse_float(_cell(raw, "Raw Score")),
             # Sub-scores from the composite — writes into Ticker.sub_* columns
             "sub_trend":        subs["trend"],
             "sub_rs":           subs["rs"],
@@ -499,6 +680,20 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # and a sudden jump here means the sheet grew a label this module has
         # never seen, which is worth a look rather than a silent shrug.
         logger.info("sheet.crypto_rows_skipped count=%d", skipped_crypto)
+        # A handful of tokens is the intended case. Most of the workbook is
+        # not: that means the asset-class vocabulary moved under us and the
+        # fail-closed guard is now refusing real listings rather than tokens.
+        # Dropping 72% of the sheet in silence would look exactly like a quiet
+        # afternoon, so it gets its own line.
+        total_seen = len(rows) + skipped_crypto
+        if total_seen and skipped_crypto > total_seen // 2:
+            logger.critical(
+                "sheet.mass_drop skipped=%d of %d rows — the Asset Class "
+                "vocabulary no longer classifies; these are refusals to "
+                "publish, not tokens. Check _ASSET_CLASS_MAP against the "
+                "workbook's current values.",
+                skipped_crypto, total_seen,
+            )
     return rows
 
 
