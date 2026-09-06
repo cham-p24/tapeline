@@ -2766,6 +2766,12 @@ def render_free_trial_invite_email(
     # account stays exactly as it is" is true for everyone again, and it is the
     # more reassuring of the two, which matters in the sentence whose whole job
     # is to make declining safe.
+    # Both the duration and the first-charge offset come from the constant that
+    # POST /billing/checkout sends to Stripe, so this sentence cannot drift from
+    # the date money actually leaves the card. Imported inside the function:
+    # a service importing a router at module scope invites a cycle.
+    from app.routers.billing import TRIAL_DAYS
+
     decline_line = (
         "Say no and nothing changes — your Free account stays exactly as it is."
     )
@@ -2791,9 +2797,10 @@ def render_free_trial_invite_email(
             """
         )
         + paragraph(
-            "The trial runs 30 days and <strong>takes a card</strong>: "
-            "<strong>$0 is charged today</strong>, the first charge lands 14 days "
-            "later, and one click ends it before then with nothing taken. We email "
+            f"The trial runs {TRIAL_DAYS} days and <strong>takes a card</strong>: "
+            f"<strong>$0 is charged today</strong>, the first charge lands "
+            f"{TRIAL_DAYS} days later, and one click ends it before then with "
+            "nothing taken. We email "
             "you three days before that date, so it cannot arrive unannounced. "
             f"{decline_line}"
         )
@@ -2878,7 +2885,8 @@ def render_trial_started_email(
     return shell(
         h1(f"Your {tier_label} trial has started.")
         + lead(
-            f"{user_name}, everything is unlocked for the next 14 days. "
+            f"{user_name}, everything is unlocked until "
+            f"<strong>{charge_date_label}</strong>. "
             f"<strong>Nothing has been charged.</strong>"
         )
         + card(

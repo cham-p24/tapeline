@@ -8,7 +8,7 @@
  *      pass-through — only while CLOUDFLARE_TURNSTILE_SECRET_KEY is unset.
  *      The moment that Fly secret exists, Turnstile is ENFORCED, and a request
  *      arriving with no token gets `return False`.
- *   2. `app/signup/page.tsx` renders the widget only under
+ *   2. `app/signup/SignUpForm.tsx` renders the widget only under
  *      `{TURNSTILE_SITE_KEY && ...}`. With NEXT_PUBLIC_TURNSTILE_SITE_KEY blank
  *      no widget ships at all, so the browser can never mint a token.
  *
@@ -48,7 +48,7 @@ function siteKey(): string {
 }
 
 function signupSource(): string {
-  return readFileSync(resolve(__dirname, "../app/signup/page.tsx"), "utf8");
+  return readFileSync(resolve(__dirname, "../app/signup/SignUpForm.tsx"), "utf8");
 }
 
 describe("Turnstile site key", () => {
