@@ -1118,7 +1118,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       composite blends RSI into a single 0–100 score along with five other
       factors. <a href="/signup">Try the 30-day Premium trial</a> — starting
       it takes a card, $0 is charged that day, and one click cancels before
-      the day-14 charge. If you'd rather not put a card down, a free account
+      the day-30 charge. If you'd rather not put a card down, a free account
       still gets the top ten scored rows live, and the
       <a href="/scorecard">public record</a> and the daily Top 10 stay open
       with no account at all.</p>
@@ -1594,7 +1594,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       they do, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=best_scanner_under_30">30-day
       Premium trial</a> is the way to see it from the inside — a card, $0
-      charged today, and one click to cancel before the day-14 charge.</p>
+      charged today, and one click to cancel before the day-30 charge.</p>
     `,
   },
   {
@@ -1948,7 +1948,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       claims. If the scorecard convinces you, the
       <a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=evaluate_scanner">30-day
       Premium trial</a> is the way to see the rest — starting it takes a card,
-      $0 is charged today, and one click cancels before the day-14 charge. If
+      $0 is charged today, and one click cancels before the day-30 charge. If
       it doesn't, that's useful
       information too.</p>
     `,

@@ -18,6 +18,7 @@ import {
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
+import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
 
 const PLANS = [
   {
@@ -77,7 +78,7 @@ const PLANS = [
     },
     highlights: [
       "Unlimited ticker look-ups",
-      "Real-time, full ~2,000-ticker scanner",
+      `Real-time, full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker scanner`,
       "Score + plain-English Why on every row",
       "Squeeze Watch · Regime · Heatmap",
       "IPOs · Earnings · News calendars",
@@ -109,7 +110,7 @@ const PLANS = [
     proPlus: true,
     highlights: [
       "Congressional trades feed (House + Senate)",
-      "Recent insider buys — live SEC Form 4 across ~2,000 tickers",
+      `Recent insider buys — live SEC Form 4 across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
       "Email alerts · unlimited (Pro: 10/day)",
       "Public API access · 1,000 requests/day",
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
