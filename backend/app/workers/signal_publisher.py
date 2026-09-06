@@ -1673,6 +1673,7 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             run_free_trial_invite_drip,
             run_re_engagement_drip,
             run_referral_milestone_drip,
+            run_trial_precharge_drip,
             run_winback_drip,
         )
         from app.services.lifecycle import worker_governor
@@ -1694,6 +1695,19 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             act_counts = await run_activation_drip(drip_session, governor=governor)
             annual_counts = await run_annual_nudge_drip(drip_session, governor=governor)
             renewal_counts = await run_annual_renewal_reminder_drip(
+                drip_session, governor=governor,
+            )
+            # THE PRE-CHARGE NOTICE, at SEVEN days. Visa requires a reminder
+            # "at least 7 days before" a trial converts; Mastercard requires
+            # one between 3 and 7 days out. Seven is the only number that
+            # satisfies both, and Tapeline takes both cards.
+            #
+            # This used to ride on Stripe's `trial_will_end`, which fires at a
+            # fixed ~3 days: inside Mastercard's window, OUTSIDE Visa's. That
+            # webhook branch is now a BACKSTOP - it stands down when this drip
+            # has already sent, so a trialist gets exactly one notice, and
+            # still gets the 3-day one if this drip ever fails to run.
+            precharge_counts = await run_trial_precharge_drip(
                 drip_session, governor=governor,
             )
             # The card-required trial made run_daily_drip unreachable for new
@@ -1737,6 +1751,11 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             logger.info("drip.annual_nudge_sent annual_p=%d", annual_counts["annual_p"])
         if renewal_counts["renewal_reminder"]:
             logger.info("drip.renewal_reminder_sent renewal_reminder=%d", renewal_counts["renewal_reminder"])
+        if precharge_counts["trial_precharge"]:
+            logger.info(
+                "drip.trial_precharge_sent trial_precharge=%d",
+                precharge_counts["trial_precharge"],
+            )
         if ft_counts["founder_touch"]:
             logger.info("drip.founder_touch_sent founder_touch=%d", ft_counts["founder_touch"])
         if any(refm_counts.values()):

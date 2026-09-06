@@ -5206,6 +5206,124 @@ async def run_annual_renewal_reminder_drip(
     return counts
 
 
+async def run_trial_precharge_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
+    """The pre-charge notice for a card-required trial, sent SEVEN days out.
+
+    WHY SEVEN AND NOT THREE
+    -----------------------
+    No law requires this email. ROSCA's obligation is to disclose the terms at
+    the point of order, which the trial screen does in full, and the FTC rule
+    that would have mandated reminders was vacated by the Eighth Circuit in
+    July 2025. The requirement is the CARD NETWORKS', and it is mandatory for
+    any merchant offering a free trial:
+
+      * Visa       - a reminder "at least 7 days before initiating a recurring
+                     transaction if a trial period ... is about to expire",
+                     carrying a link to the online cancellation policy.
+      * Mastercard - "no less than three days and no more than seven days
+                     before the end of the trial period", with the steps to
+                     cancel, for trials longer than seven days on digital goods.
+
+    SEVEN IS THE ONLY NUMBER THAT SATISFIES BOTH. Visa wants >= 7, Mastercard
+    wants <= 7. Until now this notice rode on Stripe's
+    `customer.subscription.trial_will_end`, which fires at a fixed ~3 days —
+    inside Mastercard's window and OUTSIDE Visa's. Tapeline takes both.
+
+    A card-network breach is not a fine, it is the merchant account, which is a
+    worse outcome than an email.
+
+    Population: users inside a card-required trial whose `trial_ends_at` falls
+    in (now+6d, now+8d) and who have NOT already cancelled. A cancelled trial
+    is not about to be charged, and telling someone who cancelled that their
+    card is about to be billed is the complaint this notice exists to prevent.
+
+    Dedup is per TRIAL via a date-stamped token keyed on trial_ends_at, so a
+    second trial (a win-back a year later) gets its own notice.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import Subscription, User
+
+    now = datetime.now(UTC)
+    counts = {"trial_precharge": 0}
+    lower, upper = now + timedelta(days=6), now + timedelta(days=8)
+
+    rows = (
+        await session.execute(
+            select(User, Subscription)
+            .join(Subscription, Subscription.user_id == User.id)
+            .where(
+                Subscription.status == "trialing",
+                # Cancelled during the trial: no charge is coming, so there is
+                # nothing to warn about. Same guard as the webhook branch.
+                Subscription.cancel_at_period_end.is_(False),
+                User.trial_ends_at >= lower,
+                User.trial_ends_at < upper,
+            )
+        )
+    ).all()
+
+    any_sent = False
+    handled: set[str] = set()
+    for user, sub in rows:
+        if not user.email or user.id in handled:
+            continue
+        ends = user.trial_ends_at
+        if ends is None:
+            continue
+        if ends.tzinfo is None:
+            ends = ends.replace(tzinfo=UTC)
+        token = "pc7" + ends.strftime("%y%m%d")
+        sent_tokens = set((user.drip_state or "").split(",")) - {""}
+        if token in sent_tokens:
+            handled.add(user.id)
+            continue
+
+        tier = (sub.tier or user.tier or "premium").lower()
+        # The amount Stripe will actually charge, never the sticker price.
+        amount_label = await upcoming_renewal_amount_label(
+            user.stripe_customer_id, sub.id,
+        )
+        charge_date_label = f"{ends.strftime('%A, %B')} {ends.day}"
+
+        # SCHEDULED: a billing notice about a real, imminent charge.
+        if governor is not None and not governor.allows(user, SendClass.SCHEDULED):
+            continue
+        try:
+            html = render_trial_precharge_reminder_email(
+                user.name or "trader",
+                tier=tier,
+                amount_label=amount_label or "your plan's price",
+                charge_date_label=charge_date_label,
+            )
+            res = await send_email(
+                user.email,
+                f"Your Tapeline trial ends {charge_date_label}",
+                html,
+                persona="billing",
+                skip_if_undeliverable=False,
+            )
+            if not res.get("skipped", False):
+                sent_tokens.add(token)
+                user.drip_state = ",".join(sorted(sent_tokens))
+                await session.commit()
+                counts["trial_precharge"] += 1
+                any_sent = True
+                handled.add(user.id)
+                if governor is not None:
+                    governor.record(user, SendClass.SCHEDULED)
+        except Exception:
+            logger.exception("trial_precharge.send_failed user=%s", user.id)
+
+    if any_sent:
+        await session.commit()
+    return counts
+
+
 async def run_founder_touch_drip(
     session, *, governor: FrequencyGovernor | None = None,
 ) -> dict[str, int]:

@@ -1026,6 +1026,30 @@ async def stripe_webhook(
         # Skipped by falling through, NOT by returning early: the event-id
         # idempotency row is written at the very END of this handler, and a
         # `return` here would leave the delivery unrecorded.
+        # BACKSTOP ONLY. The compliant notice now goes at SEVEN days from
+        # services/email.run_trial_precharge_drip, because Visa requires "at
+        # least 7 days before" and this event fires at a fixed ~3. If that drip
+        # already sent for this trial it left a `pc7<YYMMDD>` token, and
+        # re-sending here would be two emails about one charge. If the drip did
+        # NOT run, this still fires and the customer is warned - late by Visa's
+        # rule, but warned, which is the outcome that matters to them.
+        already_warned = False
+        trial_end_ts = obj.get("trial_end")
+        if trial_end_ts:
+            _tok = "pc7" + datetime.fromtimestamp(
+                int(trial_end_ts), tz=UTC
+            ).strftime("%y%m%d")
+            _res = await session.execute(
+                select(User).where(User.stripe_customer_id == obj.get("customer"))
+            )
+            _u = _res.scalar_one_or_none()
+            if _u is not None and _tok in set((_u.drip_state or "").split(",")):
+                already_warned = True
+                logger.info(
+                    "stripe.trial_will_end_skipped_already_warned sub=%s",
+                    obj.get("id"),
+                )
+
         cancelled = bool(obj.get("cancel_at_period_end") or obj.get("canceled_at"))
         if cancelled:
             logger.info(
@@ -1038,7 +1062,7 @@ async def stripe_webhook(
             select(User).where(User.stripe_customer_id == customer_id)
         )
         user = result.scalar_one_or_none()
-        if user and user.email and not cancelled:
+        if user and user.email and not cancelled and not already_warned:
             try:
                 from datetime import datetime as _dt
 
