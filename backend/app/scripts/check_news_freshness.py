@@ -235,7 +235,15 @@ def main() -> int:
     parser.add_argument("--base", default=DEFAULT_BASE, help="API base URL")
     parser.add_argument(
         "--webhook",
-        help="Optional webhook URL to POST a JSON alert to on failure",
+        default=os.environ.get("NEWS_FRESHNESS_WEBHOOK", ""),
+        help=(
+            "Webhook URL to POST a JSON alert to on failure. PREFER the "
+            "NEWS_FRESHNESS_WEBHOOK environment variable: this URL carries a "
+            "bearer token in its query string, and a value passed on the "
+            "command line is echoed by the shell into CI logs. That is not "
+            "hypothetical — it leaked into world-readable GitHub Actions logs "
+            "on this public repo every 15 minutes from 2026-05-09."
+        ),
     )
     parser.add_argument(
         "--state-path",

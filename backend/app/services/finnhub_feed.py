@@ -72,6 +72,25 @@ def _api_key() -> str:
     return getattr(settings, "finnhub_api_key", "") or ""
 
 
+def auth_headers() -> dict[str, str]:
+    """Finnhub auth as a HEADER, never a query parameter.
+
+    Finnhub accepts either `?token=` or the `X-Finnhub-Token` header. Only the
+    header is safe here: httpx logs the full request URL at INFO, main.py and
+    signal_publisher.py both call logging.basicConfig(level=INFO) with no httpx
+    suppression, and HTTPStatusError embeds the URL — so a query-param key
+    reaches the application log, every stack trace and Sentry on every call.
+
+    This is the same mistake `polygon_feed.auth_headers()` exists to prevent,
+    and `tests/test_vendor_key_never_in_urls.py` already says in as many words
+    that the failure mode is not "polygon_feed regressed" but "a new outbound
+    integration copies the identical mistake". Finnhub was that integration:
+    eight call sites, never added to the guard's VENDOR_MODULES. It is now.
+    """
+    k = _api_key()
+    return {"X-Finnhub-Token": k} if k else {}
+
+
 def configured() -> bool:
     return bool(_api_key())
 
@@ -467,8 +486,8 @@ async def fetch_earnings_calendar(days_ahead: int = 14) -> list[dict[str, Any]] 
                     params={
                         "from": chunk_from.isoformat(),
                         "to": chunk_to.isoformat(),
-                        "token": _api_key(),
                     },
+                    headers=auth_headers(),
                 )
                 if resp.status_code != 200:
                     logger.warning(
@@ -559,10 +578,10 @@ async def fetch_ipo_calendar(days_ahead: int = 90) -> list[dict[str, Any]] | Non
 
     today = date.today()
     end = today + timedelta(days=days_ahead)
-    params = {"from": today.isoformat(), "to": end.isoformat(), "token": _api_key()}
+    params = {"from": today.isoformat(), "to": end.isoformat()}
     try:
         async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.get(f"{BASE_URL}/calendar/ipo", params=params)
+            r = await c.get(f"{BASE_URL}/calendar/ipo", params=params, headers=auth_headers())
             if r.status_code != 200:
                 logger.warning("finnhub.ipo_failed status=%s body=%s", r.status_code, r.text[:200])
                 return None
@@ -659,10 +678,10 @@ async def _fetch_metric_all(symbol: str) -> dict[str, Any] | None:
     if cached is not None:
         return cached or None  # {} = cached negative
 
-    params = {"symbol": sym, "metric": "all", "token": _api_key()}
+    params = {"symbol": sym, "metric": "all"}
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{BASE_URL}/stock/metric", params=params)
+            r = await c.get(f"{BASE_URL}/stock/metric", params=params, headers=auth_headers())
             if r.status_code != 200:
                 return None
             data = r.json()
@@ -879,10 +898,10 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
         _seed_market_cap_from_profile(sym, cached)
         return cached if cached else None  # may be {} for unknown tickers
 
-    params = {"symbol": sym, "token": _api_key()}
+    params = {"symbol": sym}
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{BASE_URL}/stock/profile2", params=params)
+            r = await c.get(f"{BASE_URL}/stock/profile2", params=params, headers=auth_headers())
             if r.status_code != 200:
                 return None
             data = r.json()
@@ -941,11 +960,10 @@ async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[d
         "symbol": sym,
         "from": start.isoformat(),
         "to": today.isoformat(),
-        "token": _api_key(),
     }
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{BASE_URL}/stock/insider-transactions", params=params)
+            r = await c.get(f"{BASE_URL}/stock/insider-transactions", params=params, headers=auth_headers())
             if r.status_code != 200:
                 return None
             data = r.json()
@@ -1019,11 +1037,10 @@ async def fetch_news_for_ticker(
         "symbol": sym,
         "from": start.isoformat(),
         "to": today.isoformat(),
-        "token": _api_key(),
     }
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{BASE_URL}/company-news", params=params)
+            r = await c.get(f"{BASE_URL}/company-news", params=params, headers=auth_headers())
             if r.status_code != 200:
                 return []
             data = r.json() if isinstance(r.json(), list) else []
@@ -1090,10 +1107,10 @@ async def fetch_market_news(limit: int = 40) -> list[dict[str, Any]]:
     if not configured():
         return []
 
-    params = {"category": "general", "token": _api_key()}
+    params = {"category": "general"}
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{BASE_URL}/news", params=params)
+            r = await c.get(f"{BASE_URL}/news", params=params, headers=auth_headers())
             if r.status_code != 200:
                 return []
             payload = r.json()
@@ -1155,7 +1172,7 @@ async def fetch_analyst_recommendations(symbol: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.get(
                 f"{BASE_URL}/stock/recommendation",
-                params={"symbol": sym, "token": _api_key()},
+                params={"symbol": sym}, headers=auth_headers(),
             )
             if r.status_code != 200:
                 return None

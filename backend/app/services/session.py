@@ -82,6 +82,12 @@ def issue_session_token(user_id: str, session_epoch: int | None = 0) -> str:
     return jwt.encode(payload, _session_secret(), algorithm="HS256")
 
 
+#: `purpose` values a FULL SESSION token may carry. A session minted before the
+#: claim existed has no `purpose` at all, which is why None is allowed
+#: separately — adding "session" here would not grandfather those in.
+_SESSION_PURPOSES = {"session"}
+
+
 def decode_session_token(token: str) -> tuple[str, int] | None:
     """Return (user_id, epoch_claim) if the cookie's signature + exp are good.
 
@@ -98,10 +104,25 @@ def decode_session_token(token: str) -> tuple[str, int] | None:
         payload = jwt.decode(token, _session_secret(), algorithms=["HS256"])
     except Exception:
         return None
-    # The 5-minute 2FA challenge token (services/mfa.issue_mfa_token) is signed
-    # with this same secret but carries purpose="mfa". It must never be accepted
-    # as a full session — defence-in-depth even though it's never set as a cookie.
-    if payload.get("purpose") == "mfa":
+    # PURPOSE ALLOWLIST, not a denylist.
+    #
+    # Several short-lived tokens are signed with this same secret and carry a
+    # `purpose` claim: the 5-minute 2FA challenge ("mfa",
+    # services/mfa.issue_mfa_token) and the 30-day trusted-device cookie
+    # ("trusted_device", services/signin_codes.issue_trusted_device_token).
+    #
+    # This used to reject only purpose == "mfa". Everything else fell through,
+    # so a trusted-device token — which carries `sub` and `epoch` exactly like a
+    # session — decoded as a FULL SESSION. Verified by running it:
+    #     decode_session_token(<device token>) -> ("user_123", 7)
+    # That token exists only to prove a browser already passed an emailed code;
+    # it is not a credential for the product, and it lives 30 days.
+    #
+    # A denylist has to be updated every time someone adds a purpose, and the
+    # cost of forgetting is silent privilege escalation. An allowlist fails the
+    # other way: a new purpose is rejected until someone deliberately adds it.
+    purpose = payload.get("purpose")
+    if purpose is not None and purpose not in _SESSION_PURPOSES:
         return None
     sub = payload.get("sub")
     if not isinstance(sub, str):
