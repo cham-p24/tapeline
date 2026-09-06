@@ -43,8 +43,8 @@ Revision ID kept short — `version_num` is VARCHAR(32).
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0065_factor_stamps"
-down_revision = "0064_scan_logs"
+revision = "0066_factor_stamps"
+down_revision = "0065_ticker_is_leveraged"
 branch_labels = None
 depends_on = None
 
