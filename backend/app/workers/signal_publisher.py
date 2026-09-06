@@ -44,6 +44,7 @@ from app.services.news_feed import fetch_latest_news
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_all_pending, is_trading_day
+from app.services.universe import refresh_active_universe
 
 logger = logging.getLogger(__name__)
 
@@ -3047,6 +3048,33 @@ async def main() -> None:
     # Before the first tick rather than lazily, because the first tick is
     # where both of those writes happen.
     await warm_factor_caches_from_db()
+
+    # Load the active universe BEFORE the first tick, for the same reason.
+    #
+    # `fetch_snapshots()` runs at the very top of tick() and reads
+    # `active_universe()`, which is a process-local cache. On a cold process
+    # that cache is empty, so it falls back to `mock_feed.TICKER_UNIVERSE` —
+    # 112 hardcoded symbols. The refresh that would fill it properly sits ~560
+    # lines further down the same tick.
+    #
+    # That ordering is only survivable if the tick reaches the bottom. On
+    # 2026-09-07, minutes after a deploy, it did not: the first cold tick does
+    # the calendar refresh, a 1.4MB sheet fetch and a 3,352-row earnings pull,
+    # hit `tick.timeout elapsed=60.0s limit=60s` and was killed — before the
+    # refresh. The next tick started cold again and did the same. Production
+    # sat writing snapshots for 112 tickers out of 7,417, with no error beyond
+    # the timeout line, and could not recover on its own.
+    #
+    # Doing it here costs one query on boot and makes the universe independent
+    # of whether any given tick finishes. The in-tick hourly refresh stays as
+    # the top-up for a long-running process.
+    try:
+        n = await refresh_active_universe()
+        logger.info("active_universe.warmed count=%d", n)
+    except Exception:
+        # Never block the worker on this: an empty cache degrades to the mock
+        # fallback, which is bad but survivable, whereas not starting is not.
+        logger.exception("active_universe.warm_failed — first tick will use the fallback")
 
     # Watchdog: a healthy tick completes in ~6s. If one ever stalls past
     # TICK_TIMEOUT_SECONDS we kill it and continue — better to drop one
