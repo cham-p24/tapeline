@@ -113,6 +113,13 @@ export type TapelineEvent =
                                  // NO value/currency and NO Ads label: `subscribe`
                                  // remains the one and only revenue conversion.
   | "trial_downgraded"           // Expired trial observed to have dropped to Free
+  // The two doors onto a paid plan, kept distinguishable. `begin_checkout`
+  // already carries `start_trial: false` on the direct path, but it carries
+  // false for every ordinary Pro upgrade too, so on its own it cannot answer
+  // "did anyone deliberately skip the trial?". GA4-only, no Ads label — the
+  // real conversion is still `subscribe` on the confirmed return from Stripe.
+  | "skip_trial_selected"        // "Or skip the trial and subscribe" clicked (surface: marketing | app)
+  | "trial_offer_dismissed"      // The trial offer panel was closed without taking it (surface: scanner)
   | "trial_early_capture_shown"  // Mid-trial add-a-card nudge became visible
   | "trial_early_capture_dismissed"
   | "trial_early_capture_clicked"

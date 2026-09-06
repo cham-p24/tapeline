@@ -214,15 +214,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <EmailVerificationBanner />
             {/* First-run coordination: while OnboardingTip is up, the promo/status
                 banners yield so a brand-new user gets a clean welcome. */}
+            {/* {children} is INSIDE the provider (2026-09-07). The scanner now
+                carries the Premium trial offer above its table
+                (components/ScannerTrialOffer.tsx), and that panel has to yield
+                to the welcome exactly like the banners above it do. Outside the
+                provider it would read the context's no-op default — tipVisible
+                permanently false — and stack a card ask on top of a brand-new
+                user's "three things to try first". Page content reading
+                tipVisible is fine; only OnboardingTip ever WRITES it. */}
             <FirstRunTipProvider>
               <TrialBanner />
               <UpgradeNudge />
               <BreakingNewsBar />
               <OnboardingTip />
+              {/* fade-in: key={pathname} remounts children per route so the CSS
+                  animation re-fires. Reduced-motion users get the final state. */}
+              <div key={pathname} className="fade-in">{children}</div>
             </FirstRunTipProvider>
-            {/* fade-in: key={pathname} remounts children per route so the CSS
-                animation re-fires. Reduced-motion users get the final state. */}
-            <div key={pathname} className="fade-in">{children}</div>
           </main>
 
           {/* Self-gating card-capture moments — render nothing unless their

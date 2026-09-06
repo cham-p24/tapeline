@@ -24,6 +24,7 @@ import { HoverCard } from "@/components/HoverCard";
 import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 import { ScannerPeek } from "@/components/ScannerPeek";
 import { ScannerLegend } from "@/components/ScannerLegend";
+import { ScannerTrialOffer } from "@/components/ScannerTrialOffer";
 import { TableSkeleton } from "@/components/Skeleton";
 import { RecentTickers } from "@/components/RecentTickers";
 import { ArmAlerts } from "@/components/ArmAlerts";
@@ -716,6 +717,14 @@ export default function ScannerPage() {
           <LiveBadge status={status} lastUpdate={lastUpdate} />
         </div>
       </div>
+
+      {/* The Premium trial offer, above the table. A new account now lands
+          HERE rather than on /app/billing?trial=start, so the offer travels to
+          the product instead of standing in front of it. Self-gating and
+          dismissible: it renders only for a free, never-trialled account, and
+          it yields to the first-run welcome through the shared FirstRunTip
+          context. Nothing on it navigates on its own. */}
+      <ScannerTrialOffer />
 
       <ScannerLegend />
 
