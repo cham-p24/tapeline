@@ -5,13 +5,20 @@ Add-Type -AssemblyName System.Drawing
 # meant regeneration silently wrote somewhere else and the committed PNGs went
 # stale while the source looked correct.
 $out = $PSScriptRoot
+# The trial length is read from the one constant the site uses
+# (frontend/lib/trial.ts), so a change there cannot leave the ad stating a
+# length that is no longer true. That is exactly what happened: the trial went
+# to 30 days on 5 Sep 2026 (#737) and this script still said 14.
+$trialTs   = Join-Path $PSScriptRoot "..\..\..\frontend\lib\trial.ts"
+$trialDays = [regex]::Match((Get-Content $trialTs -Raw), "TRIAL_DAYS = (\d+)").Groups[1].Value
+if (-not $trialDays) { throw "TRIAL_DAYS not found in $trialTs" }
 $concepts = @(
   @{ file = "concept-a-screener-1x1.png"
      head = @("Retire the", "Sunday-night", "spreadsheet.")
      sub  = @("One 0-100 score and one", "plain sentence per ticker.") },
   @{ file = "concept-b-trial-1x1.png"
      head = @("`$0 today.", "The charge date", "is on the page.")
-     sub  = @("14-day Premium trial.", "Card required. Cancel in one click.") },
+     sub  = @("$($trialDays)-day Premium trial.", "Card required. Cancel in one click.") },
   @{ file = "concept-c-record-1x1.png"
      head = @("We publish", "the record,", "misses included.")
      sub  = @("Top 10 scores, logged daily,", "measured against SPY.") }

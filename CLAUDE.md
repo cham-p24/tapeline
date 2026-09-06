@@ -62,15 +62,15 @@ Anchor offerings (custom-sold; all map to `premium` in the DB): **Team** $149/mo
   - **The grandfather clause is moot but stays.** Since #683 everyone has the "free, no card" deal, so the `created_at` comparison no longer separates two cohorts. It is kept because ripping a dated cutover out of a billing predicate is how you accidentally re-wall real people.
   - **The public surface was never gated and still isn't**: `/scorecard`, `/daily-picks`, the record CSV/JSON exports, per-ticker pages, marketing pages and the public API — no account, no card. Anonymous callers have no `User` row, so the predicate never runs for them.
 
-The 14-day **Premium** trial is a separate, explicitly-chosen, **card-required** step: `POST /api/billing/checkout {"start_trial": true}` opens a Stripe Checkout that collects a card, charges **$0 today**, and states the exact first-charge date. It's gated on never-having-trialled, and returns `trial_end` + `trial_days` so the confirmation UI restates the same instant Stripe was given. `tier` / `trial_ends_at` / `trial_started_at` are written by the `trialing` subscription webhook in `backend/app/routers/webhooks.py` from the subscription's own `trial_end` — never at signup. Declining the checkout leaves the account exactly as created.
+The 30-day **Premium** trial (30 days since #737 on 2026-09-05; it was 14 before that) is a separate, explicitly-chosen, **card-required** step: `POST /api/billing/checkout {"start_trial": true}` opens a Stripe Checkout that collects a card, charges **$0 today**, and states the exact first-charge date. It's gated on never-having-trialled, and returns `trial_end` + `trial_days` so the confirmation UI restates the same instant Stripe was given. `tier` / `trial_ends_at` / `trial_started_at` are written by the `trialing` subscription webhook in `backend/app/routers/webhooks.py` from the subscription's own `trial_end` — never at signup. Declining the checkout leaves the account exactly as created.
 
-**Never write "14-day trial, no credit card" in marketing, ad, or email copy.** This is a financial product and the TRIAL genuinely requires a card — that half of the rule is permanent.
+**Never write "30-day trial, no credit card" in marketing, ad, or email copy.** This is a financial product and the TRIAL genuinely requires a card — that half of the rule is permanent.
 
 **The other half has INVERTED, so re-read it before writing any copy.** From 2026-08-22 to 2026-08-30 "a new account is card-free" was false, and #548 rewrote 47 such claims across 30 files to say a card was needed. #683 then removed the wall and **#686 corrected 79 claims across 42 files back again**. So today:
 
   - **TRUE and safe:** signing up is email + password and lands on a working Free plan; the public record (scorecard, daily picks, exports, ticker pages, API) needs no account and no card.
   - **FALSE — this is now the claim that gets you in trouble:** "you need a card to sign up" / "card to sign in". Writing copy off the pre-#683 version of this file would reintroduce exactly what #686 just removed.
-  - Still true, and the reason the trial half stands: the 14-day **Premium** trial is card-required, $0 that day, first charge at trial end.
+  - Still true, and the reason the trial half stands: the 30-day **Premium** trial is card-required, $0 that day, first charge at trial end.
 
 The CARD HONESTY block in `frontend/app/signup/page.tsx` remains the canonical statement of the trial half of the rule. `TrialBanner.tsx` branches on card-on-file (first charge lands at trial end, one click cancels before then) vs the legacy card-free trial (nothing charged, the account just moves to Free) — never mix the two.
 
