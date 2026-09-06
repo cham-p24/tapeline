@@ -40,6 +40,58 @@ beforeEach(() => {
   }
 });
 
+describe("UpgradeNudge — after a trial has ended", () => {
+  // A free user who has already run a 30-day Premium trial is not a prospect
+  // who needs the features explained. They used them. Selling to them as if
+  // they had never seen the product is the one pitch that cannot land, so the
+  // server marks them and the banner says something different.
+  const POST_TRIAL_NUDGE = {
+    id: "post_trial_upgrade",
+    scanner_cap: 10,
+    delayed_hours: 24,
+    watchlist_cap: 0,
+    trial_ended_on: "2026-09-01",
+  };
+
+  it("tells a post-trial user what stopped and what restarting costs", async () => {
+    mockMe(POST_TRIAL_NUDGE);
+    render(<UpgradeNudge />);
+
+    expect(await screen.findByText(/your premium trial ended/i)).toBeInTheDocument();
+    const text = document.body.textContent ?? "";
+    // The WHY: named, specific, and things they actually had.
+    expect(text).toMatch(/every matching row/i);
+    expect(text).toMatch(/alerts when a screen changes/i);
+    expect(text).toMatch(/csv export/i);
+    // The price and the exit, together, so the ask is not open-ended.
+    expect(text).toMatch(/\$19\.99\/month/i);
+    expect(text).toMatch(/cancel in one click/i);
+  });
+
+  it("does not tell a never-trialled user that their trial ended", async () => {
+    // The false claim this whole server-side check exists to prevent.
+    mockMe({ ...POST_TRIAL_NUDGE, id: "free_upgrade", trial_ended_on: null });
+    render(<UpgradeNudge />);
+
+    await screen.findByText(/you.re on/i);
+    expect(document.body.textContent ?? "").not.toMatch(/trial ended/i);
+  });
+
+  it("still respects the dismiss cooldown", async () => {
+    // "Not now" has to mean not now, for a post-trial user too. Re-prompting
+    // on every page load is the behaviour the ACCC calls a dark pattern.
+    try {
+      localStorage.setItem(STORAGE_KEY, String(Date.now()));
+    } catch {
+      return;
+    }
+    mockMe(POST_TRIAL_NUDGE);
+    const { container } = render(<UpgradeNudge />);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    expect(container.textContent ?? "").not.toMatch(/trial ended/i);
+  });
+});
+
 describe("UpgradeNudge", () => {
   it("renders the nudge with Free-tier caps for a Free user", async () => {
     mockMe(FREE_NUDGE);

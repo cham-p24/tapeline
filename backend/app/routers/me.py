@@ -60,11 +60,34 @@ def _upgrade_nudge(user: User) -> dict[str, str | int] | None:
     """
     if user.tier != "free":
         return None
+
+    # HAS THIS PERSON ALREADY USED PREMIUM? A free user who has never trialled
+    # and one whose trial has ended are the same tier and nothing else. The
+    # second already knows what the paid product does — they used it for
+    # 30 days — so a generic "here is what you are missing" pitch is the one
+    # thing that cannot land. They need reminding what they had and what it
+    # costs, not selling from scratch.
+    #
+    # `trial_ends_at` alone cannot answer "have they ever trialled" (it stays
+    # set after the trial finishes and is null on legacy no-card trials), which
+    # is exactly why `trial_started_at` exists — see the comment on the column.
+    # Both are required here: started AND finished.
+    trial_ended_on: str | None = None
+    if user.trial_started_at is not None and user.trial_ends_at is not None:
+        ends = user.trial_ends_at
+        if ends.tzinfo is None:
+            ends = ends.replace(tzinfo=UTC)
+        if ends <= datetime.now(UTC):
+            trial_ended_on = ends.date().isoformat()
+
     return {
-        "id": "free_upgrade",
+        "id": "post_trial_upgrade" if trial_ended_on else "free_upgrade",
         "scanner_cap": limit(Tier.FREE, "scanner_rows"),
         "delayed_hours": limit(Tier.FREE, "data_delay_minutes") // 60,
         "watchlist_cap": limit(Tier.FREE, "watchlist_tickers"),
+        # Null unless the trial genuinely ran and finished. The frontend keys
+        # its whole message off this, so it must never be a guess.
+        "trial_ended_on": trial_ended_on,
     }
 
 
