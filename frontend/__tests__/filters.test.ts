@@ -12,8 +12,6 @@ import {
   matchesQuery,
   inRange,
   matchesSelect,
-  assetBucket,
-  matchesAssetBucket,
 } from "@/lib/filters";
 
 describe("matchesQuery", () => {
@@ -87,24 +85,3 @@ describe("matchesSelect", () => {
   });
 });
 
-describe("assetBucket / matchesAssetBucket", () => {
-  it("collapses fine-grained asset classes into coarse buckets", () => {
-    expect(assetBucket("equity")).toBe("equity");
-    expect(assetBucket("stock")).toBe("equity");
-    expect(assetBucket("etf")).toBe("etf");
-    expect(assetBucket("fund")).toBe("etf");
-    expect(assetBucket("future")).toBe("other");
-    expect(assetBucket(null)).toBe("");
-  });
-
-  it("matches everything when no bucket is selected", () => {
-    expect(matchesAssetBucket("", "future")).toBe(true);
-  });
-
-  it("filters to the selected bucket", () => {
-    expect(matchesAssetBucket("equity", "stock")).toBe(true);
-    expect(matchesAssetBucket("equity", "etf")).toBe(false);
-    expect(matchesAssetBucket("etf", "fund")).toBe(true);
-    expect(matchesAssetBucket("other", "future")).toBe(true);
-  });
-});

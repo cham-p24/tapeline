@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session, is_sqlite
 from app.models import Ticker, User, WatchlistItem
 from app.routers.scanner import SCANNER_MIN_DOLLAR_VOLUME, SCANNER_QUERY_TIMEOUT_MS
+from app.services.asset_class import ASSET_CLASS_PATTERN, asset_bucket_clause
 from app.services.auth import current_user_required
 from app.services.ticker_freshness import live_clauses
 from app.services.tier import Tier, has_feature
@@ -115,6 +116,10 @@ async def export_scanner_csv(
     min_dollar_volume: float = Query(SCANNER_MIN_DOLLAR_VOLUME, ge=0),
     signal: str | None = None,
     sector: str | None = None,
+    # Mirrors /api/scanner. Its ABSENCE here was a live bug: the scanner page
+    # filtered asset class client-side and never sent it to the export, so
+    # narrowing to "ETFs & funds" and clicking Export downloaded stocks.
+    asset_class: str | None = Query(None, pattern=ASSET_CLASS_PATTERN),
     q: str | None = Query(None, max_length=20),
     sort: str = Query("score", pattern="^(score|change_pct_1d|change_pct_5d|change_pct_1m|volume|symbol)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
@@ -137,6 +142,9 @@ async def export_scanner_csv(
         stmt = stmt.where(Ticker.price >= min_price)
     if max_price is not None:
         stmt = stmt.where(Ticker.price <= max_price)
+    asset_clause = asset_bucket_clause(asset_class)
+    if asset_clause is not None:
+        stmt = stmt.where(asset_clause)
     if signal:
         stmt = stmt.where(Ticker.signal == signal)
     if sector:

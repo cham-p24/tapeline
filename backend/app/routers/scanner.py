@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, is_sqlite
 from app.models import Ticker, User
+from app.services.asset_class import ASSET_CLASS_PATTERN, asset_bucket_clause
 from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
 from app.services.funnel_events import record_funnel_event
@@ -147,6 +148,12 @@ async def list_scanner(
     ),
     signal: str | None = None,
     sector: str | None = None,
+    # Asset-class bucket (equity | etf | other). Moved here from a client-side
+    # post-filter: filtering after the row cap meant a Free user asking for
+    # ETFs could be shown nothing while 1,637 existed, total_matched could not
+    # see the filter, and the CSV export ignored it entirely. Validated against
+    # a pattern so an unknown bucket 422s instead of silently matching nothing.
+    asset_class: str | None = Query(None, pattern=ASSET_CLASS_PATTERN),
     q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
     sort: str = Query("score", pattern=SORT_PATTERN),
     order: str = Query("desc", pattern=ORDER_PATTERN),
@@ -202,6 +209,11 @@ async def list_scanner(
         stmt = stmt.where(Ticker.signal == signal)
     if sector:
         stmt = stmt.where(Ticker.sector == sector)
+    # Applied BEFORE the row cap and inside filtered_stmt, so the ranked page
+    # and total_matched are built from the same predicate.
+    asset_clause = asset_bucket_clause(asset_class)
+    if asset_clause is not None:
+        stmt = stmt.where(asset_clause)
     # Symbol substring search. SQL LIKE with leading wildcard prevents index use
     # but the active universe is <2,500 rows so a full scan is fine; the query
     # still returns in <50ms in production. Uppercase the query to match how
@@ -360,6 +372,7 @@ async def list_scanner(
                     "min_dollar_volume": min_dollar_volume,
                     "signal": signal,
                     "sector": sector,
+                    "asset_class": asset_class,
                     "q": q,
                     "sort": sort,
                     "order": order,

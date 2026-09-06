@@ -74,26 +74,14 @@ export function matchesSelect(
 }
 
 /**
- * Map a raw `asset_class` column value to one of three coarse UI buckets.
- * The backend stores fine-grained classes ("equity", "etf", "future", …);
- * the scanner filter only needs Stocks / ETFs / Other, so collapse here.
- * There is no server-side asset_class param, so this drives a client-side
- * filter over the already-fetched scanner rows.
+ * The asset-class buckets the scanner filter offers.
+ *
+ * The VALUES are the wire contract: they are sent verbatim as the
+ * `asset_class` query param, and backend/app/services/asset_class.py owns the
+ * mapping onto raw `tickers.asset_class` values. The client-side
+ * `assetBucket()` / `matchesAssetBucket()` pair that used to live here is gone
+ * — filtering after the fetch spent a capped tier's rows on names the user had
+ * excluded, hid the real total_matched, and never reached the CSV export at
+ * all. One definition, server-side.
  */
 export type AssetBucket = "" | "equity" | "etf" | "other";
-
-export function assetBucket(assetClass: string | null | undefined): AssetBucket {
-  const a = (assetClass ?? "").toLowerCase();
-  if (a === "etf" || a === "fund") return "etf";
-  if (a === "equity" || a === "stock") return "equity";
-  if (!a) return "";
-  return "other";
-}
-
-export function matchesAssetBucket(
-  selected: AssetBucket,
-  assetClass: string | null | undefined,
-): boolean {
-  if (!selected) return true;
-  return assetBucket(assetClass) === selected;
-}

@@ -40,7 +40,7 @@ import {
   SelectFilter,
   NumberFilter,
 } from "@/components/FilterBar";
-import { matchesAssetBucket, type AssetBucket } from "@/lib/filters";
+import { type AssetBucket } from "@/lib/filters";
 
 type SortKey = "score" | "confidence_pct" | "change_pct_1d" | "change_pct_5d" | "change_pct_1m" | "volume" | "symbol";
 
@@ -71,9 +71,10 @@ const SIGNAL_OPTIONS = [
   { value: "WEAK", label: "Weak" },
 ];
 
-// Asset-class buckets. There is NO server-side asset_class param on
-// /api/scanner, so this filters the already-fetched rows client-side
-// (per the brief: client-side when no backend param exists).
+// Asset-class buckets. These values ARE the server's `asset_class` param
+// (backend/app/services/asset_class.py owns the mapping onto the raw
+// tickers.asset_class values) — the page sends the bucket and never
+// post-filters, so the row cap, total_matched and the CSV export all agree.
 const ASSET_OPTIONS: Array<{ value: AssetBucket; label: string }> = [
   { value: "", label: "All assets" },
   { value: "equity", label: "Stocks" },
@@ -319,6 +320,7 @@ export default function ScannerPage() {
         limit: 100,
         src,
       };
+      if (assetClass) params.asset_class = assetClass;
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
@@ -338,7 +340,7 @@ export default function ScannerPage() {
       });
     } catch (e) { console.error(e); setLoadError(true); }
     finally { setLoading(false); }
-  }, [minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
+  }, [minScore, maxScore, sort, order, sector, signal, assetClass, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
   // Inline arrow rather than passing `load` directly, so the automatic
@@ -367,6 +369,7 @@ export default function ScannerPage() {
         sort,
         order,
       };
+      if (assetClass) params.asset_class = assetClass;
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
@@ -380,12 +383,12 @@ export default function ScannerPage() {
     } finally {
       setExporting(false);
     }
-  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, debouncedSearch]);
+  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, assetClass, debouncedSearch]);
 
-  // Asset-class is the only client-side filter on this page (no backend
-  // param). Everything else is already applied server-side, so we only
-  // post-filter on the bucket here.
-  const visibleRows = rows.filter((r) => matchesAssetBucket(assetClass, r.asset_class));
+  // EVERY filter is server-side now, asset class included, so what came back
+  // is exactly what to show. Post-filtering here would spend the tier's row
+  // cap on rows the user had already excluded.
+  const visibleRows = rows;
 
   // ── Keyboard row navigation (j/k) + row "peek" slide-over ──────────────
   // `focusedIdx` is the visually-highlighted row (not DOM focus); -1 = none.
@@ -574,7 +577,7 @@ export default function ScannerPage() {
   // visibleRows.length and the two counts agree. (The server-side filters —
   // score/sector/signal/search — are all reflected in total_matched, so they
   // stay consistent and don't suppress the band.)
-  const showLockedRemainder = lockedRemainder > 0 && !assetClass;
+  const showLockedRemainder = lockedRemainder > 0;
 
   // Funnel: the locked-remainder band IS an upgrade prompt becoming visible.
   // Fire upgrade_prompt_shown when it first appears (keyed on the boolean so a
