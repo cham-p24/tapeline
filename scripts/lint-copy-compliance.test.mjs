@@ -624,6 +624,152 @@ test("js/ts: block comments are still stripped (the md fix must not over-correct
 });
 
 /* ------------------------------------------------------------------ *
+ * The ad-creative step's FILE LIST, not just its existence.
+ *
+ * A step that runs is not a step that reads anything. On 2026-09-06 the list
+ * was
+ *
+ *     files=(docs/ads/**\/*.md ... \n                 docs/launch/google-ads/**\/*.csv)
+ *
+ * with a literal backslash-n where a line continuation was meant. Bash split
+ * that into the filename `n`, the linter skipped the path it could not open
+ * without a word, and the step exited 0 — green over
+ * docs/launch/google-ads/*.md and *.txt, which it had never opened. Those
+ * files are paste-ready ad-account copy: a runbook that tells an operator
+ * what to paste is the same hazard class as the CSV it points at.
+ *
+ * So this asserts COVERAGE — every ad-copy file actually on disk is matched
+ * by some glob in the step — rather than the presence of a string. A rename,
+ * a new runbook, or another broken continuation all fail it.
+ *
+ * Deliberately complementary to the "CI runs the stricter --ads pass" test:
+ * that one pins that the step exists and invokes `--ads`; this one pins what
+ * the step is pointed at. Either can pass while the other fails.
+ * ------------------------------------------------------------------ */
+
+/** The bash array literal from ci.yml's ad-creative step, one glob per entry. */
+async function adCreativeGlobs() {
+  const { readFileSync } = await import("node:fs");
+  const { dirname, join, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const ci = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8").replace(/\r\n/g, "\n");
+  const step = ci.split(/- name: Copy-compliance lint \(ad creative\)/)[1];
+  assert.ok(step, "ci.yml has no 'Copy-compliance lint (ad creative)' step at all.");
+  const array = step.match(/files=\(([\s\S]*?)\)/);
+  assert.ok(array, "the ad-creative step no longer builds a `files=(...)` array.");
+  const globs = array[1]
+    .split("\n")
+    .map((line) => line.replace(/#.*$/, "").trim())
+    .filter(Boolean)
+    .flatMap((line) => line.split(/\s+/))
+    .filter(Boolean);
+  return { root, globs };
+}
+
+test("a path that does not exist fails the run instead of being skipped", async () => {
+  // The other half of the same bug. CI handed the linter the filename `n`;
+  // the linter could not open it, skipped it silently, and printed a success
+  // line. "Clean" and "never opened" have to be distinguishable, or the whole
+  // guard is decorative — so an explicitly-named unreadable path exits 2
+  // (linter/config error), and says which path.
+  const { execFileSync } = await import("node:child_process");
+  const { dirname, join, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const linter = join(root, "scripts/lint-copy-compliance.mjs");
+  const real = "scripts/lint-copy-compliance.test.mjs";
+
+  const run = (args) => {
+    try {
+      const stdout = execFileSync(process.execPath, [linter, ...args], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      return { status: 0, output: stdout };
+    } catch (err) {
+      return { status: err.status, output: `${err.stdout || ""}${err.stderr || ""}` };
+    }
+  };
+
+  const missing = run(["--ads", "docs/ads/no-such-file-4f2a.md", real]);
+  assert.equal(
+    missing.status,
+    2,
+    `a named path that cannot be read must exit 2, got ${missing.status}. ` +
+      `Exit 0 here is the CI bug: a green step over a file nobody opened.`,
+  );
+  assert.match(
+    missing.output,
+    /no-such-file-4f2a\.md/,
+    "the failure must name the path that could not be read, or the caller cannot fix their list.",
+  );
+
+  // And the guard must not fire on a list whose paths all exist. Asserted on
+  // the ERROR rather than on exit 0, so that a copy finding in the file used
+  // as the control cannot be mistaken for the guard misfiring.
+  const readable = run(["--ads", real]);
+  assert.notEqual(readable.status, 2, "a list of readable paths must not raise a linter error.");
+  assert.doesNotMatch(
+    readable.output,
+    /could not be read/,
+    "a file that exists must never be reported as unreadable.",
+  );
+});
+
+test("every glob in the CI ad-creative list is a real path pattern", async () => {
+  const { globs } = await adCreativeGlobs();
+  assert.ok(globs.length > 0, "the ad-creative file list is empty — the step lints nothing.");
+  for (const glob of globs) {
+    assert.match(
+      glob,
+      /^docs\/[A-Za-z0-9/*._-]+$/,
+      `"${glob}" is not a docs/ path glob. A stray token here is what a broken ` +
+        `line continuation looks like: bash turns \\n into the filename "n", ` +
+        `which is a path nothing will ever match.`,
+    );
+  }
+});
+
+test("the CI ad-creative list covers every ad-copy file in docs/ads and docs/launch/google-ads", async () => {
+  const { root, globs } = await adCreativeGlobs();
+  const { readdirSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+
+  // Extensions that carry words a human reads: import files AND the runbooks
+  // that say what to paste. Binary/image assets are deliberately not listed.
+  const COPY_EXT = /\.(md|txt|csv|json)$/i;
+  const DIRS = ["docs/ads", "docs/launch/google-ads"];
+
+  const walk = (rel, acc = []) => {
+    for (const name of readdirSync(join(root, rel))) {
+      const child = `${rel}/${name}`;
+      if (statSync(join(root, child)).isDirectory()) walk(child, acc);
+      else if (COPY_EXT.test(name)) acc.push(child);
+    }
+    return acc;
+  };
+
+  for (const dir of DIRS) {
+    const files = walk(dir);
+    assert.ok(
+      files.length > 0,
+      `${dir}/ holds no ad-copy files — if the directory moved, move this test with it.`,
+    );
+    for (const file of files) {
+      assert.ok(
+        globs.some((glob) => globMatch(glob, file)),
+        `${file} is ad-account copy that CI's --ads step does not lint: no glob in ` +
+          `ci.yml's file list matches it. Every file under ${dir}/ that a person ` +
+          `reads or pastes must be covered, or the step reports success over copy ` +
+          `it never opened.`,
+      );
+    }
+  }
+});
+
+/* ------------------------------------------------------------------ *
  * AD MODE (--ads)
  *
  * Measured 2026-09-05: twelve lines a performance marketer writes

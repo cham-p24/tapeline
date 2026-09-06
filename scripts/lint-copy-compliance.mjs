@@ -751,11 +751,16 @@ const AD_ONLY_RULES = [
     id: "ad-free-trial",
     brief: "Ads — 'free' and 'trial' must never touch",
     message:
-      "Signing up is genuinely card-free; the 14-day Premium trial is NOT — " +
-      "it takes a card and bills in full on day 14. Merging them is false " +
-      "advertising on a financial product. Say: 'Signing up takes an email " +
-      "and a password. A card is only needed if you start the 14-day " +
-      "Premium trial.'",
+      // The length is spelled from TRIAL_DAYS (frontend/lib/trial.ts), which
+      // #737 moved to 30 on 2026-09-05. This message is the remediation an
+      // advertiser copies verbatim, so a stale number here writes the stale
+      // number into the ad — the exact failure `stale-trial-length` exists to
+      // catch, arriving via the linter's own advice.
+      "Signing up is genuinely card-free; the 30-day Premium trial is NOT — " +
+      "it takes a card and bills in full when the 30 days end. Merging them " +
+      "is false advertising on a financial product. Say: 'Signing up takes " +
+      "an email and a password. A card is only needed if you start the " +
+      "30-day Premium trial.'",
     patterns: [
       /\bfree\b[^.!?\n]{0,24}\btrial\b/i,
       /\btrial\b[^.!?\n]{0,24}\bfree\b/i,
@@ -1371,12 +1376,34 @@ function main(argv) {
 
   const files = collectFiles(config, explicit);
   const findings = [];
+  /* ------------------------------------------------------------------ *
+   * A path this linter was TOLD to check and could not open is an error,
+   * not a clean file.
+   *
+   * This used to `continue` for every file, which made "clean" and "never
+   * opened" indistinguishable in both the exit code and the report. CI's
+   * ad-creative step built its file list with a literal `\n` where a line
+   * continuation was meant; bash read that as the filename `n`, handed it
+   * over, and the linter skipped it without a word. The step printed a
+   * success line and exited 0 over ad copy it had not read.
+   *
+   * The distinction is between the two ways a file can go missing:
+   *   - Named EXPLICITLY on the command line: somebody's list is wrong.
+   *     Fail loudly (exit 2 = linter/config error, not a copy finding), and
+   *     name every unreadable path — a caller passing a glob wants all of
+   *     them, not the first.
+   *   - Discovered by the repo walk: it existed a moment ago and was
+   *     deleted or replaced mid-run. That is a race, not a broken list, so
+   *     it keeps skipping quietly.
+   * ------------------------------------------------------------------ */
+  const unreadable = [];
   for (const file of files) {
     const abs = join(REPO_ROOT, file);
     let text;
     try {
       text = readFileSync(abs, "utf8");
-    } catch {
+    } catch (err) {
+      if (explicit.length) unreadable.push({ file, code: err.code || "unreadable" });
       continue;
     }
     // Scan what the page RENDERS, not what the source spells.
@@ -1400,6 +1427,20 @@ function main(argv) {
         ads: adsMode,
       }),
     );
+  }
+
+  if (unreadable.length) {
+    console.error(
+      `copy-compliance: ${unreadable.length} path(s) named on the command line ` +
+        `could not be read. Nothing was checked for them.\n` +
+        `A guard that cannot tell "clean" from "never opened" is not a guard — ` +
+        `fix the caller's file list.\n`,
+    );
+    for (const { file, code } of unreadable) {
+      console.error(`   ${file} — ${code}`);
+    }
+    console.error("");
+    return 2;
   }
 
   const blocking = findings.filter((f) => !f.known);
