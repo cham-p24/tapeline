@@ -42,7 +42,17 @@ jobs:
       - name: Copy-compliance lint (ad creative)
         run: |
           shopt -s nullglob globstar
-          files=(docs/ads/**/*.md docs/ads/**/*.txt docs/ads/**/*.json)
+          # docs/launch/google-ads/ holds paste-ready Google Ads import CSVs.
+          # It was outside this glob until 2026-09-05, and three files in it
+          # carried 16 banned-vocabulary hits and a stale trial length while
+          # pointing every ad at a page removed in #718. Import files are the
+          # highest-consequence copy in the repo: one upload publishes them.
+          # CSV only, NOT the .md runbooks beside them. The runbooks are prose
+          # ABOUT ads: they say "pick one" in ordinary English and quote banned
+          # phrases in order to forbid them. Running the ad-creative ruleset over
+          # them produces pure false positives, and a noisy linter gets disabled.
+          # The CSVs are the hazard class: one upload publishes them verbatim.
+          files=(docs/ads/**/*.md docs/ads/**/*.txt docs/ads/**/*.json \n                 docs/launch/google-ads/**/*.csv)
           if [ ${#files[@]} -eq 0 ]; then
             echo "no ad creative files to lint"
           else
