@@ -136,6 +136,78 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
 
+# 9f — Shipped 2026-09-06, third pass: the three fixes
+
+Founder said fix them. All three merged and deployed. Written in parallel
+worktrees, then verified together — which is where the interesting failure was.
+
+- [x] **Leveraged and inverse funds are out of the default view** (#761) —
+  yesterday's anonymous top ten had CONX (Direxion Daily COIN Bull 2X) at rank 7
+  and BIB (ProShares Ultra NASDAQ Biotech) at rank 8, both labelled STRONG SETUP.
+  Nothing in the codebase could detect a geared fund. New `services/leverage.py`
+  name predicate (seven rules, ETF-bucket gated, deliberately under-claiming),
+  `tickers.is_leveraged` column with a backfill that imports the shipping
+  predicate rather than reimplementing it in SQL, excluded by default from the
+  scanner, CSV export and MCP `daily_picks` with an `include_leveraged` opt-in.
+  **Verified live after deploy: zero leveraged rows in the top ten; DELL and
+  Marathon Petroleum took ranks 9-10** — the first recognisable large-caps that
+  list has carried. 140 new tests.
+- [x] **The scorecard scope change is disclosed on the site** (#761) — the branch
+  also stopped geared funds entering the permanent record and said so only in a
+  commit message and a code comment. The scorecard's whole value is that a reader
+  can check it, so that got a dated `scope` entry on /changelog, stating that
+  entries frozen before today stay exactly as recorded and that a comparison
+  spanning this date crosses two definitions of what could enter. Worth keeping:
+  the obvious justification is FALSE — geared rows are the *calmer* half of the
+  record (stdev 6.21 vs 104.89). The argument is consistency, not variance.
+- [x] **The ad-lint CI step was green over files it never opened** (#757) — its
+  file list ended a line with a literal `\n` where a continuation was meant, so
+  bash read it as the filename `n`, and `docs/launch/google-ads/*.md` and `*.txt`
+  were never linted while the step reported success. Counted the findings by hand
+  rather than trusting either prior claim: **11 findings, 6 false positives, 5
+  genuine across 3 real defects** — a runbook describing the removed card wall in
+  the present tense, a `"trial ends in 2 days"` countdown in a retargeting brief,
+  and a `"free trial"` merge on a card-required trial. #747 had called them "pure
+  false positives"; they were not. The linter now exits 2 on a path it was handed
+  and could not read — a guard that cannot tell *clean* from *never opened* is the
+  whole bug.
+- [x] **The composite was a four-factor score for 77% of the universe** (#762) —
+  see 9e for the measurement. Fixed as plumbing: warm both caches from the DB on
+  boot, gap-first selection with attempt-stamps so a restart resumes instead of
+  re-fetching the same rows, factor passes moved to the front of the chain, and
+  the API process warms too (it never runs the chain at all, so its caches were
+  empty for the life of the process and every sheet webhook blanked both factors).
+  Weights, NEUTRAL fallback and the composite floor all untouched. Dated
+  `methodology` entry on /changelog; **no scorecard row recomputed or removed.**
+- [x] **Two migrations, one head** — both branches independently added a migration
+  chained off `0064_scan_logs`. Each passed alone; together they are two heads and
+  CI asserts one. Caught on review, renumbered to `0066_factor_stamps` and
+  rechained onto `0065_ticker_is_leveraged`. **This is the standing hazard of
+  parallel worktrees: verify the combination, never just the branches.**
+  Full suite on the merged pair: 2,286 backend, 991 frontend, tsc, mypy, ruff,
+  copy linter — all green.
+
+- [ ] **Watch the factor coverage actually converge.** The plumbing is deployed and
+  test-verified; the fill is NOT done. NVDA/AAPL/MSFT/SPY still read null on both
+  factors minutes after deploy, which is expected — the pass moves ~2,500 rows a
+  day against ~11,800 symbols, so a first full sweep is roughly **5 days per
+  factor**, and only if the worker gets ~1.5h uninterrupted. What changed is that a
+  deploy no longer resets progress. **Check in a week:** the share of scored
+  tickers with both factors null should fall from 77%, and `/api/ticker/NVDA`
+  should stop returning `fund null / smart null`. If it has not moved by
+  2026-09-13, the gap query is not doing what its tests say and this needs
+  reopening. Expect the top ten to churn while it converges — that is the ceiling
+  coming off, not market movement.
+
+## Answered while checking the list — two items were already done
+
+- [x] **`/api/ticker/{symbol}/history` DOES carry the 7-day delay.** Verified live:
+  the anonymous response returns `delay_days: 7`. The open question was stale.
+- [x] **The Resend bounce webhook is no longer silent** (#738) — `_warn_resend_secret_missing`
+  is on main and fires once per process naming the exact `fly secrets set` command.
+  What remains is only the founder setting `RESEND_WEBHOOK_SECRET`, which is
+  recorded under §5 rather than as an engineering item.
+
 # 9e — 2026-09-06: the deep dive, and what it found under the floorboards
 
 A nine-angle competitor teardown (onboarding, retention, pricing, score
