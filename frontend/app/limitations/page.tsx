@@ -87,6 +87,22 @@ export const metadata = pageMeta({
 
 type Section = { heading: string; lede: string; points: string[] };
 
+/**
+ * The hit-rate sentence, from the live summary. Wording is descriptive on
+ * purpose: a share and a median, with the direction stated, and no return.
+ * Null (not yet back-checked) says so rather than inventing a number.
+ */
+function hitRateClause(summary: CitableSummary | null): string {
+  const rate = summary?.hit_rate_beat_spy;
+  const median = summary?.median_alpha_vs_spy;
+  if (rate == null) {
+    return "The share of picks whose next-day move exceeded the benchmark's has not been computed for this sample yet.";
+  }
+  const side = rate > 50 ? "above" : rate < 50 ? "below" : "at";
+  const medianClause = median == null ? "" : ` and the median one-day difference is ${median.toFixed(2)} percentage points`;
+  return `Over that sample the share of picks whose next-day move exceeded the benchmark's is ${rate.toFixed(1)}% — ${side} an even split —${medianClause}. That is about what a coin flip looks like, and it is published here rather than on the homepage for exactly that reason.`;
+}
+
 const sections = (summary: CitableSummary | null): Section[] => [
   {
     heading: "The public record is small, and it is roughly a coin flip",
@@ -94,7 +110,10 @@ const sections = (summary: CitableSummary | null): Section[] => [
       "The scorecard is the honest answer to 'does this work', and right now the honest answer is 'not enough evidence to say'.",
     points: [
       `The scorecard currently covers ${sampleClause(summary)}. That is a small sample by any standard, and nowhere near enough to separate method from luck.`,
-      "Over that sample the share of picks whose next-day move exceeded the benchmark's is a little over half, and the median one-day difference is a small fraction of a percent. That is about what a coin flip looks like. For several weeks the same figure sat below an even split.",
+      // Derived from the live summary — never hardcoded. This sentence used to say
+      // "a little over half" while the live figure was 45%: wrong in the flattering
+      // direction, on the page whose whole job is to be the unflattering one.
+      hitRateClause(summary),
       "Tapeline does not publish an annualised return. No Sharpe ratio, no hypothetical profit-and-loss, no backtest, no 'what you would have made'. Deriving a performance summary from a sample this size would imply a precision the data does not support.",
       "The archive is append-only. Past entries are never edited or removed after the fact, which means the record includes every day the picks went nowhere.",
     ],
