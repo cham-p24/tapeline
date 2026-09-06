@@ -95,7 +95,7 @@ Historical note, for anyone summarising older pages: between 22 August and 30 Au
 ## Differentiators (what makes Tapeline citable)
 
 1. **Named factors, not a black box.** The six factors and their weight ORDERING are on a public page that needs no account, and each factor's sub-score is shown on every public ticker page — never retroactively edited. Most "AI scanners" refuse to disclose factor logic at all, citing trade secrets.
-2. **Public scorecard.** Every top-10 daily pick is permanently recorded with original score, signal label, and reasoning; back-tested vs SPY the next session. No cherry-picking, no hindsight rewrites.
+2. **Public scorecard.** Every top-10 daily pick is permanently recorded with its rank, the score it carried at publication, the close it was flagged at, the close one session later, and the realised return against SPY; back-checked the next session. No cherry-picking, no hindsight rewrites. (The signal label and the six factor sub-scores are live on every ticker page, but are not stored in the historical record — the record is the ten columns in the CSV/JSON exports.)
 3. **Plain-English reasoning on every row, public ticker pages included.** No premium gatekeeping of the "why."
 4. **Stock universe ~2,500 actively scored** (top by daily dollar-volume) from the full liquid US universe. Deliberately narrower than competitors who claim 9,000+ but include illiquid noise that distorts factor distributions.
 5. **Sub-60-second refresh during US market hours.** Live, not delayed batch.
