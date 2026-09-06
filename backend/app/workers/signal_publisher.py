@@ -65,6 +65,22 @@ logger = logging.getLogger(__name__)
 CACHE_DERIVED_COLUMNS: tuple[str, ...] = (
     # Vendor profile / daily-bar caches
     "market_cap", "week52_high", "week52_low", "avg_volume_30d",
+    # From the SAME get_cached_bar_stats() dict as the three above
+    # (polygon_feed.py:346-358 reads all five from one lookup), but these two
+    # were left out — so on a cache miss the tick wrote NULL over the last good
+    # value every 60 seconds while its three siblings were protected.
+    #
+    # Live effect, measured 2026-09-06 on /api/public/signals: 14 of 40 ranked
+    # rows had null 5D and 1M while change_pct_1d was populated on all 40. Both
+    # are offered as scanner sort keys and two public SEO landing pages sort on
+    # them, so sorting by 5D ranked whatever handful of rows happened to be
+    # warm.
+    #
+    # Safe to COALESCE, unlike the factor columns warned about below: these are
+    # display/export fields (main.py, api_v1.py, export.py) and feed nothing in
+    # the composite, so a stale one cannot desynchronise a score from its own
+    # published factors.
+    "change_pct_5d", "change_pct_1m",
 )
 
 #: The six factors, in composite-weight order.
