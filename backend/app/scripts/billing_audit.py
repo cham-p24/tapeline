@@ -159,6 +159,12 @@ async def _audit() -> None:
     findings: dict[str, list[str]] = defaultdict(list)
     now = datetime.now(UTC)
     emails_by_customer: dict[str, str] = {}
+    # Live subscriptions already set to stop. NOT a "finding": nothing is
+    # broken and there is nothing to reconcile. It is the single most important
+    # fact about the business in this table, and this script reported "No
+    # discrepancies" on 2026-09-03 while THREE OF FIVE customers were on their
+    # way out — including the only one who has ever paid. Correct, and useless.
+    churn: list[tuple[str, str, str, datetime | None]] = []
 
     for u in users:
         who = _mask_email(getattr(u, "email", None))
@@ -207,6 +213,21 @@ async def _audit() -> None:
                 pid = str(_f(_f(it, "price"), "id", ""))
                 stripe_tier = _price_to_tier(pid) or stripe_tier
 
+        for sub in live:
+            if _f(sub, "cancel_at_period_end"):
+                ends_ts = _f(sub, "cancel_at") or _f(sub, "current_period_end")
+                if not ends_ts:
+                    # API 2025-04-30.basil moved current_period_end onto the
+                    # subscription ITEM. Same shape that caused #639.
+                    items = _f(_f(sub, "items"), "data", []) or []
+                    ends_ts = _f(items[0], "current_period_end") if items else None
+                ends = (
+                    datetime.fromtimestamp(int(ends_ts), UTC)
+                    if isinstance(ends_ts, (int, float)) and not isinstance(ends_ts, bool)
+                    else None
+                )
+                churn.append((who, str(_f(sub, "status", "?")), local_tier, ends))
+
         if any(str(_f(s, "status", "")) == "past_due" for s in live):
             findings["PAST_DUE"].append(f"{who} {cust} — Stripe cannot collect")
 
@@ -238,6 +259,24 @@ async def _audit() -> None:
                 f"{_mask_email(em)} -> {len(cids)} customers: {', '.join(cids)}"
             )
 
+    logger.info("")
+    logger.info("=" * 66)
+    logger.info("CANCELLING — live subscriptions already set to stop")
+    if churn:
+        for who, status, tier_, ends in sorted(
+            churn, key=lambda c: c[3] or datetime.max.replace(tzinfo=UTC)
+        ):
+            when = f"{ends:%Y-%m-%d}" if ends else "date unknown"
+            days = f" ({(ends - now).days:+d}d)" if ends else ""
+            logger.warning(
+                "  %-26s %-8s %-9s access ends %s%s", who, tier_, status, when, days
+            )
+        logger.warning(
+            "  %d of %d subscription(s) will not renew.",
+            len(churn), sum(1 for u in users if getattr(u, "stripe_customer_id", None)),
+        )
+    else:
+        logger.info("  none — every live subscription is set to renew.")
     logger.info("")
     logger.info("=" * 66)
     # Worst first: being charged without receiving the product outranks

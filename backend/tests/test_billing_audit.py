@@ -195,3 +195,65 @@ def test_shared_accessor_never_raises_on_a_get_less_object():
     assert not hasattr(obj, "get")
     assert stripe_field(obj, "a") == 1
     assert stripe_field(obj, "nope") is None
+
+
+class _Sub:
+    """A StripeObject-shaped subscription: subscriptable, no .get()."""
+
+    def __init__(self, data):
+        self._d = data
+
+    def __getitem__(self, k):
+        return self._d[k]
+
+
+def test_the_audit_reports_cancellations():
+    """The gap this closes.
+
+    On 2026-09-03 this script printed "No discrepancies. Every account's local
+    tier agrees with Stripe." while THREE of five customers — including the only
+    one who had ever paid — had cancel_at_period_end set. Every word of that
+    output was true and it told the founder the opposite of what was happening.
+
+    A cancellation is not a discrepancy: local tier and Stripe agree perfectly,
+    because the person IS still entitled until the period ends. So no existing
+    finding category could ever have caught it, and adding one would have been
+    wrong. It needs its own section.
+    """
+    code = _code()
+    assert "cancel_at_period_end" in code, "the audit still cannot see a cancellation"
+    assert "CANCELLING" in code, "cancellations are not reported as their own section"
+
+
+def test_cancellation_reporting_is_not_a_finding():
+    """It must not be shoved into `findings`. Nothing is broken, so a
+    reconciliation failure would be a false alarm — and the founder would learn
+    to ignore it."""
+    code = _code()
+    for wrong in ('findings["CANCELLING"]', 'findings["CHURN"]', 'findings["CANCELLED"]'):
+        assert wrong not in code, "a cancellation is not a data discrepancy"
+
+
+def test_it_reads_the_period_end_from_both_shapes():
+    """current_period_end moved off the Subscription onto the subscription ITEM
+    in Stripe API 2025-04-30.basil — the exact shape change behind #639. An
+    audit that only reads the old location prints "date unknown" for every
+    cancelling customer on the current API version."""
+    code = _code()
+    # Precise, because the loose version was VACUOUS: `"items" in code` is
+    # satisfied by the unrelated price-item loop that derives stripe_tier, so
+    # deleting the fallback left the test green. Watched it stay green against
+    # the mutation, which is the only reason this is written out longhand.
+    assert code.count("current_period_end") >= 2, (
+        "only one read of current_period_end — the subscription-level and the "
+        "item-level shapes are both needed (API 2025-04-30.basil moved it)"
+    )
+    assert "items[0]" in code, "the item-level fallback is missing"
+
+
+def test_the_accessor_survives_a_subscription_without_get():
+    """The churn read goes through the shared accessor, not .get()."""
+    sub = _Sub({"cancel_at_period_end": True, "status": "active"})
+    assert not hasattr(sub, "get")
+    assert stripe_field(sub, "cancel_at_period_end") is True
+    assert stripe_field(sub, "cancel_at", None) is None
