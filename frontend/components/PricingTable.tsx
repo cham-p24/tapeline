@@ -139,7 +139,9 @@ const PLANS = [
       // docs/launch/LAWYER_CONSULT_EMAIL.md. Selling a feature that is switched
       // off at every tier is the kind of claim the copy linter exists to stop.
       "Per-factor attribution on every score",
-      "Get your data out — API, bulk export & webhooks",
+      // "webhooks" was removed 2026-09-06: no webhook dispatch exists in
+      // services/alerts.py or routers/alerts.py. Promise only what ships.
+      "Get your data out — API & bulk export",
       "Desk-grade watchlists, scans & alerts",
       "A hand in what we build next",
     ],

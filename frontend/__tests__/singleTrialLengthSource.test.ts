@@ -119,4 +119,33 @@ describe("one source of truth for the trial length", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  it("no user-facing literal names a trial length other than TRIAL_DAYS", () => {
+    // The press page said "14-day Premium … first charge on day 30" on one line.
+    // The billing-page check above only covers the billing page; this is the
+    // same rule for every file, honouring the same inline-allow marker.
+    const trialTs = readFileSync(join(ROOT, "lib/trial.ts"), "utf8");
+    const days = Number(/export const TRIAL_DAYS\s*=\s*(\d+)/.exec(trialTs)?.[1]);
+    expect(days).toBeGreaterThan(0);
+
+    const offenders: string[] = [];
+    for (const f of files) {
+      const raw = readFileSync(f, "utf8");
+      const allowed = new Set<number>();
+      raw.split("\n").forEach((l, i) => {
+        if (/copy-compliance-allow (?:\*|stale-trial-length)/.test(l)) {
+          allowed.add(i);
+          allowed.add(i + 1);
+        }
+      });
+      code(raw).split("\n").forEach((l, i) => {
+        const m = /\b(\d+)-day (?:Premium(?: trial)?|trial)\b/i.exec(l);
+        if (m && Number(m[1]) !== days && !allowed.has(i)) {
+          const rel = f.replace(ROOT, "").replace(/\\/g, "/");
+          offenders.push(`${rel}:${i + 1} — "${m[0]}" but TRIAL_DAYS is ${days}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
 });

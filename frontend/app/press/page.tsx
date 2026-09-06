@@ -16,6 +16,7 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript, pressContactPageJsonLd } from "@/lib/jsonld";
 import { PRICING, usd, usdCompact } from "@/lib/pricing";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 export const metadata = pageMeta({
   title: "Tapeline Press Kit — Logos, Fact Sheet, Founder Bio",
@@ -42,7 +43,9 @@ const FACT_SHEET = [
       `Premium ${usdCompact(PRICING.premium.annual)}/yr (or ${usd(PRICING.premium.monthly)}/mo) · ` +
       `Trader ${usdCompact(PRICING.trader.annual)}/yr (concierge, sold by hand) — annual billing is the default`,
   },
-  { label: "Free trial",      value: "14-day Premium; card required, $0 charged today, first charge on day 30" },
+  // "Premium trial", never "Free trial": the trial is the one thing that takes a card,
+  // and its length comes from lib/trial.ts so this line cannot say two numbers at once again.
+  { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
   { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume, from the full liquid US universe)" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
