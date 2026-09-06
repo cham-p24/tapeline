@@ -15,8 +15,25 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run news freshness check
+        # The webhook URL carries a bearer token for /api/internal/alert,
+        # which emails support@tapeline.io. It now moves through `env:` from
+        # a SECRET rather than through the `run:` line from a `vars:`, for
+        # two independent reasons:
+        #
+        #   1. `vars.*` are NOT masked - GitHub documents them as
+        #      non-sensitive by design - while `secrets.*` are redacted.
+        #   2. A value interpolated into `run:` is rendered into the command
+        #      the log echoes, so it shows even where masking would apply.
+        #
+        # Both were true here: the token sat in vars.NEWS_FRESHNESS_WEBHOOK
+        # AND was spliced into the run line, so it printed in full into
+        # world-readable Actions logs on this PUBLIC repo every 15 minutes
+        # from 2026-05-09. Moving it is only half the fix - the token must
+        # be ROTATED, because what is already published cannot be unpublished.
+        env:
+          NEWS_FRESHNESS_WEBHOOK: ${{ secrets.NEWS_FRESHNESS_WEBHOOK }}
         run: |
-          # Standalone — no deps, no venv, just stdlib + urllib.
+          # Standalone - no deps, no venv, just stdlib + urllib.
+          # --webhook is deliberately NOT passed; the script reads the env var.
           python backend/app/scripts/check_news_freshness.py \
-            --base "${{ vars.TAPELINE_API_BASE || 'https://api.tapeline.io' }}" \
-            ${{ vars.NEWS_FRESHNESS_WEBHOOK && format('--webhook "{0}"', vars.NEWS_FRESHNESS_WEBHOOK) || '' }}
+            --base "${{ vars.TAPELINE_API_BASE || 'https://api.tapeline.io' }}"

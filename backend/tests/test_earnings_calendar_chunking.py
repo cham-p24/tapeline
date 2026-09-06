@@ -42,7 +42,13 @@ class _FakeClient:
     async def __aexit__(self, *_exc):
         return False
 
-    async def get(self, _url: str, params: dict):
+    async def get(self, _url: str, params: dict, headers=None):
+        # The credential travels in the HEADER, never in `params`. Finnhub
+        # shipped it as `?token=` on all eight call sites until 2026-09-06,
+        # which put it in the httpx INFO log and Sentry on every call. Asserting
+        # it here means this fake cannot go back to accepting the old shape
+        # silently.
+        assert "token" not in params, "the Finnhub key is back in the query string"
         self._calls.append((params["from"], params["to"]))
         # One synthetic row dated on the window's first day, so a dropped chunk
         # is visible as a missing date rather than a smaller count.

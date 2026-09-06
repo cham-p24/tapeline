@@ -35,7 +35,18 @@ import pytest
 SERVICES = pathlib.Path(__file__).resolve().parents[1] / "app" / "services"
 
 #: Every module that talks to the Massive/Polygon HTTP API.
-VENDOR_MODULES = ["polygon_feed.py", "historical_bars.py", "news_feed.py"]
+# finnhub_feed.py added 2026-09-06. This list existed, and its own comment
+# below already said the failure mode is not "polygon_feed regressed" but
+# "a new outbound integration copies the identical mistake". Finnhub WAS
+# that integration and was never added: eight call sites shipped the key as
+# `?token=` into the httpx INFO log and Sentry. The guard was right about
+# what would happen and was not pointed at the place it happened.
+VENDOR_MODULES = [
+    "polygon_feed.py",
+    "historical_bars.py",
+    "news_feed.py",
+    "finnhub_feed.py",
+]
 
 
 def _strip_docstrings(tree: ast.AST) -> ast.AST:
@@ -84,6 +95,68 @@ def test_no_module_puts_the_key_in_a_url_or_query_param(module):
     )
 
 
+def _key_call_nodes(tree: ast.AST) -> list[ast.Call]:
+    """Every call that returns a vendor credential, by NAME not by vendor.
+
+    `_api_key()`, `settings.finnhub_api_key`, `_token()` — the point is to be
+    vendor-agnostic, because the failure this suite exists for is always "a NEW
+    integration copies the mistake", never "the old one regressed".
+    """
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = getattr(node.func, "id", None) or getattr(node.func, "attr", None) or ""
+        if "api_key" in name or name in {"_key", "_token", "_api_key"}:
+            out.append(node)
+    return out
+
+
+@pytest.mark.parametrize("module", VENDOR_MODULES)
+def test_no_module_puts_a_key_into_a_params_dict(module):
+    """Vendor-AGNOSTIC. The string check above only ever matched "apiKey",
+    which is Polygon's parameter name — so when finnhub_feed.py was added to
+    VENDOR_MODULES it changed nothing, because Finnhub calls the parameter
+    "token" and the assertion could never fire for it. Eight Finnhub call sites
+    shipped the key in the query string with the module sitting in the list.
+
+    This walks the AST instead: any call returning a credential, used as a VALUE
+    inside a dict that is passed as `params=`, is the defect regardless of what
+    the vendor names the field.
+    """
+    tree = _strip_docstrings(ast.parse((SERVICES / module).read_text(encoding="utf-8")))
+    key_calls = {id(n) for n in _key_call_nodes(tree)}
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        for kw in node.keywords:
+            if kw.arg != "params":
+                continue
+            for sub in ast.walk(kw.value):
+                if id(sub) in key_calls:
+                    offenders.append(f"line {getattr(sub, 'lineno', '?')}")
+
+    # Also catch the indirection: `params = {..., "token": _api_key()}` on one
+    # line and `params=params` on another. Any dict literal in the module whose
+    # values include a credential call is the same leak one step removed.
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        for value in node.values:
+            for sub in ast.walk(value):
+                if id(sub) in key_calls:
+                    offenders.append(f"dict at line {getattr(node, 'lineno', '?')}")
+
+    assert not offenders, (
+        f"{module} puts a vendor credential into a query-parameter dict "
+        f"({', '.join(sorted(set(offenders)))}). Send it as a header — httpx "
+        f"logs full URLs at INFO, so a query-param key reaches the log, every "
+        f"stack trace, Sentry, and any workflow that streams stdout."
+    )
+
+
 def test_the_shared_helper_sends_a_bearer_header():
     from app.services.polygon_feed import auth_headers
 
@@ -106,9 +179,9 @@ def test_the_paging_cursor_no_longer_splices_the_key_back_in():
     """`discover_active_us_tickers` walks Polygon's paged reference endpoint.
     It used to re-append `apiKey=` to every `next_url`, which is how a single
     universe refresh could emit the key hundreds of times."""
-    from app.services import polygon_feed
-
     import textwrap
+
+    from app.services import polygon_feed
 
     code = ast.unparse(
         _strip_docstrings(
