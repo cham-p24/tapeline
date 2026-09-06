@@ -250,6 +250,57 @@ export function RangeFilter({
 }
 
 /**
+ * A labelled on/off checkbox filter, in the same `card` chrome as
+ * SelectFilter so it sits in the bar without looking bolted on.
+ *
+ * Exists for filters whose whole state is "is this class of row in or out"
+ * — the first is the scanner's leveraged/inverse fund toggle, where a
+ * two-option dropdown would be more chrome than the choice deserves.
+ *
+ * `hint` is rendered as the control's title + as its accessible description,
+ * for filters whose default is a server-side exclusion the user has not
+ * asked for and would otherwise have no way to discover.
+ */
+export function ToggleFilter({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  hint?: string;
+}) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  return (
+    <div className="card px-3 py-2">
+      <label
+        htmlFor={id}
+        className="flex cursor-pointer items-center gap-2 text-base"
+        title={hint}
+      >
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-describedby={hint ? hintId : undefined}
+          className="h-3.5 w-3.5"
+        />
+        <span>{label}</span>
+      </label>
+      {hint && (
+        <span id={hintId} className="sr-only">
+          {hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * A small "Reset filters" link. Rendered by pages when any filter is active.
  */
 export function ResetFiltersButton({ onClick }: { onClick: () => void }) {

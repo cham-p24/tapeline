@@ -45,6 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models import Ticker
+from app.services.leverage import is_leveraged_fund
 from app.services.score import compute_tapeline_composite
 
 # Symbol-shape validation is shared with the serving layer (routers.ticker),
@@ -597,6 +598,12 @@ async def upsert_tickers(
         # discovery had corrected them.
         if r["asset_class"]:
             t.asset_class = r["asset_class"]
+        # is_leveraged is a pure function of (name, asset_class), so recompute
+        # it here unconditionally rather than only when asset_class moved.
+        # This upsert can flip a row from equity to etf, and a stale False on
+        # a newly-reclassified geared fund would put it back in the default
+        # ranked view — the exact failure this flag exists to stop.
+        t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
         # Clamp to the documented 0-100 composite AT THE COLUMN BOUNDARY. The
         # composite already clamps in score.compute_tapeline_composite, but
         # guarding the write itself means no future scorer change or new write
@@ -971,6 +978,11 @@ async def upsert_etfs(
             if r["sector"]:
                 t.sector = r["sector"]
             updated += 1
+
+        # Both branches above have just written name + asset_class, so derive
+        # the flag from them. Same rule everywhere: whoever writes the name
+        # owns the flag. See services/leverage.py.
+        t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
 
         # Same 0-100 column-boundary clamp as the equity upsert above.
         t.score = None if r["score"] is None else max(0.0, min(100.0, r["score"]))

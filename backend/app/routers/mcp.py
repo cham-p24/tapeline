@@ -219,7 +219,11 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
 
 
 async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
-    from app.routers.scanner import SCANNER_MIN_DOLLAR_VOLUME, list_scanner
+    from app.routers.scanner import (
+        SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+        SCANNER_MIN_DOLLAR_VOLUME,
+        list_scanner,
+    )
 
     try:
         limit = int(args.get("limit") or 10)
@@ -248,6 +252,12 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         signal=None,
         sector=None,
         asset_class=None,
+        # Leveraged/inverse funds stay out, exactly as they do for the
+        # anonymous web top 10 this tool republishes. Passed explicitly for
+        # the reason stated in note 1 above — omitting it would hand the
+        # handler the Query object, which is truthy, and the assistant would
+        # be citing "today's picks" that the website does not show.
+        include_leveraged=SCANNER_INCLUDE_LEVERAGED_DEFAULT,
         q=None,
         sort="score",
         order="desc",

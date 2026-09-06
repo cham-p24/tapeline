@@ -206,6 +206,15 @@ export type ScannerRow = {
   name: string;
   sector: string | null;
   asset_class: string;
+  // Structural fact about the instrument, alongside asset_class: true for a
+  // leveraged (2x/3x) or inverse fund. Derived server-side from the fund name
+  // (backend/app/services/leverage.py) because no vendor exposes a gearing
+  // field. Shipped on EVERY row, not only the true ones, so a client can
+  // label an opted-in result rather than inferring from a missing key.
+  //
+  // Optional in the type only so a response from a backend deployed before
+  // this column existed still parses; the live API always sends it.
+  is_leveraged?: boolean;
   score: number;
   signal: string;
   price: number;

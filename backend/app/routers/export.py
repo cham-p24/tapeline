@@ -29,7 +29,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, is_sqlite
 from app.models import Ticker, User, WatchlistItem
-from app.routers.scanner import SCANNER_MIN_DOLLAR_VOLUME, SCANNER_QUERY_TIMEOUT_MS
+from app.routers.scanner import (
+    SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+    SCANNER_MIN_DOLLAR_VOLUME,
+    SCANNER_QUERY_TIMEOUT_MS,
+)
 from app.services.asset_class import ASSET_CLASS_PATTERN, asset_bucket_clause
 from app.services.auth import current_user_required
 from app.services.ticker_freshness import live_clauses
@@ -48,7 +52,12 @@ EXPORT_ROW_CAP = 2500
 _GATE_DETAIL = "CSV export is a Pro feature"
 
 _SCANNER_HEADERS = [
-    "symbol", "name", "sector", "asset_class", "score", "signal", "price",
+    # is_leveraged sits beside asset_class because it is the same kind of
+    # thing: a structural fact about the instrument. It matters most in the
+    # export a caller asked for WITH include_leveraged=true — without the
+    # column that CSV would mix geared and ordinary funds with nothing to
+    # separate them.
+    "symbol", "name", "sector", "asset_class", "is_leveraged", "score", "signal", "price",
     "change_pct_1d", "change_pct_5d", "change_pct_1m", "volume",
     "confidence_pct", "sub_trend", "sub_rs", "sub_fundamentals",
     "sub_momentum", "sub_macro", "sub_smart_money", "reason", "updated_at",
@@ -120,6 +129,10 @@ async def export_scanner_csv(
     # filtered asset class client-side and never sent it to the export, so
     # narrowing to "ETFs & funds" and clicking Export downloaded stocks.
     asset_class: str | None = Query(None, pattern=ASSET_CLASS_PATTERN),
+    # Mirrors /api/scanner. Its absence here would be the asset_class bug
+    # again: filter the on-screen scanner to exclude geared funds, click
+    # Export, and download a CSV that silently contains them.
+    include_leveraged: bool = Query(SCANNER_INCLUDE_LEVERAGED_DEFAULT),
     q: str | None = Query(None, max_length=20),
     sort: str = Query("score", pattern="^(score|change_pct_1d|change_pct_5d|change_pct_1m|volume|symbol)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
@@ -145,6 +158,10 @@ async def export_scanner_csv(
     asset_clause = asset_bucket_clause(asset_class)
     if asset_clause is not None:
         stmt = stmt.where(asset_clause)
+    # Same default exclusion as /api/scanner — see
+    # SCANNER_INCLUDE_LEVERAGED_DEFAULT in routers/scanner.py.
+    if not include_leveraged:
+        stmt = stmt.where(Ticker.is_leveraged.is_(False))
     if signal:
         stmt = stmt.where(Ticker.signal == signal)
     if sector:
@@ -189,7 +206,7 @@ async def export_scanner_csv(
 
     csv_rows: list[list[object]] = [
         [
-            r.symbol, r.name, r.sector, r.asset_class, r.score, r.signal,
+            r.symbol, r.name, r.sector, r.asset_class, r.is_leveraged, r.score, r.signal,
             r.price, r.change_pct_1d, r.change_pct_5d, r.change_pct_1m,
             r.volume, r.confidence_pct, r.sub_trend, r.sub_rs,
             r.sub_fundamentals, r.sub_momentum, r.sub_macro,
