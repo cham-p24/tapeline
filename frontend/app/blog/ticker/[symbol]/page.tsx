@@ -24,6 +24,7 @@ import { pageMeta, SITE_URL } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { TICKERS, findTicker, type TickerPost } from "../tickers";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 // Refresh per-page live data every 30 minutes. Long-tail SEO pages don't
 // need sub-minute freshness; longer cache = fewer API hits on each crawl.
@@ -656,7 +657,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
           <h2 className="text-xl font-semibold tracking-tight">See {t.symbol}'s live score now.</h2>
           <p className="mt-2 text-sm text-muted">
-            30-day Premium trial — starting it takes a card, $0 charged that day, cancel in one click before the day-14 charge. A free account is an email and a password and gets the top ten scored rows live. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
+            30-day Premium trial — starting it takes a card, $0 charged that day, cancel in one click before the day-{TRIAL_DAYS} charge. A free account is an email and a password and gets the top ten scored rows live. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/t/${t.symbol}`} className="btn-accent">

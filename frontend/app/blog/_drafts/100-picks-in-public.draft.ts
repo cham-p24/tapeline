@@ -147,7 +147,7 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
     <p>If you want to be there for the next 100 picks before the receipts
     look this good in public, the 30-day Premium trial is at
     <a href="/signup">/signup</a> — starting it takes a card, $0 is charged
-    that day, and one click cancels before the day-14 charge. Signing up
+    that day, and one click cancels before the day-30 charge. Signing up
     itself is an email and a password, and lands on the free plan. The full
     scorecard is and always will be free to read at
     <a href="/scorecard">/scorecard</a>, with no account.</p>

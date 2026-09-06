@@ -6,6 +6,7 @@ import { findPost, POSTS } from "../posts";
 import { pageMeta } from "@/lib/seo";
 import { articleJsonLd, breadcrumbJsonLd, howToJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { autoLinkTickers } from "@/lib/autoLinkTickers";
+import { TRIAL_DAYS } from "@/lib/trial";
 
 export async function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -120,7 +121,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           <h2 className="text-xl font-semibold tracking-tight">See it live.</h2>
           <p className="mt-2 text-sm text-muted">
             30-day Premium trial — starting it takes a card, $0 is charged
-            that day, and one click cancels before the day-14 charge. Signing
+            that day, and one click cancels before the day-{TRIAL_DAYS} charge. Signing
             up is an email and a password, and lands you on the free plan. Or
             read the public record instead: the daily Top 10, the full
             scorecard and the raw CSV/JSON need no account at all. The

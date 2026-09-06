@@ -108,8 +108,8 @@ describe("one source of truth for the trial length", () => {
         // the inverted "On day N the plan starts and your card is charged" —
         // the pricing FAQ used the second and slipped past the first.
         const m =
-          /\b(?:charge(?:s|d)?[^.\n]{0,40}?|until )day (\d+)\b/i.exec(l) ||
-          /\bday (\d+)\b[^.\n]{0,70}?\bcharg/i.exec(l);
+          /\b(?:charge(?:s|d)?[^.\n]{0,40}?|until )day[-\s]+(\d+)\b/i.exec(l) ||
+          /\bday[-\s]+(\d+)\b[^.\n]{0,70}?\bcharg/i.exec(l);
         // "day 0" is the trial START ("$0 is charged on day 0"), never a
         // charge date — it is the one number that is always right.
         if (m && Number(m[1]) !== 0 && Number(m[1]) !== days && !allowedLines.has(i)) {

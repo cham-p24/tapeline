@@ -26,6 +26,7 @@ import { TRIAL_DAYS } from "@/lib/trial";
 import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 import { errorText } from "@/lib/errorText";
+import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -983,7 +984,7 @@ export default function BillingPage() {
               price={billingPeriod === "annual" ? usd(TIER_META.pro.annualMonthly) : usd(TIER_META.pro.monthly)}
               note={billingPeriod === "annual" ? `${usd(TIER_META.pro.annual)}/yr · billed annually · save $${annualSaving(TIER_META.pro)}${isCardlessTrial ? ` · or ${usd(TIER_META.pro.monthly)}/mo monthly` : ""}` : "billed monthly"}
               items={[
-                "Full ~2,500 ticker universe, live",
+                `Full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} ticker universe, live`,
                 "Score breakdown + Why on every row",
                 "Squeeze Watch + Regime + Heatmap",
                 "Watchlist (50) with smart alerts",
@@ -1005,7 +1006,7 @@ export default function BillingPage() {
               proPlus
               items={[
                 "Congressional trades feed (House + Senate)",
-                "Recent insider buys — live SEC Form 4 across ~2,500 tickers",
+                `Recent insider buys — live SEC Form 4 across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
                 "Email alerts · unlimited (Pro: 10/day)",
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
                 "Priority support · same-day reply",
@@ -1248,7 +1249,7 @@ function TrialOfferPanel({
         Start your {TRIAL_DAYS}-day Premium trial &mdash; or don&rsquo;t
       </h2>
       <p className="mt-1.5 text-sm text-muted">
-        Every Premium feature for {TRIAL_DAYS} days: the full ~2,000-ticker live
+        Every Premium feature for {TRIAL_DAYS} days: the full ~{ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker live
         universe, score breakdowns, Congressional trades and insider buys,
         watchlist of 200 and unlimited email alerts. Starting the trial takes a
         card, because it becomes a paid subscription if you keep it. Here is
