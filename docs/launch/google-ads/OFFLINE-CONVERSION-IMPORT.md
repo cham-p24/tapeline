@@ -3,7 +3,7 @@
 *The code is built (2026-07-29). This is the founder-only setup: get the Google Ads API credentials, create/confirm the conversion action, drop 7 secrets into the backend, run once in dry-run, then go live. Until you do, the job runs in DRY-RUN and does nothing.*
 
 ## Why this matters (the one-line version)
-Your paid conversion happens ~14+ days after the ad click (the free trial), off-session — so no browser pixel can see it. This job reports each paying subscriber's stored Google click id back to Google Ads with the first-charge value, so **Smart Bidding optimises on real payers instead of free-trial signups.** It's the single biggest bidding lever left. (See `PAID_ADS_PATHWAY.md` Step 1.4 and `CONVERSION-RUNBOOK.md` §2.4.)
+Your paid conversion happens ~30+ days after the ad click, off-session — so no browser pixel can see it. The Premium trial runs 30 days (`TRIAL_DAYS`, #737) and takes a card up front, charging $0 that day, so the first real charge lands a month after the click with no browser session attached. This job reports each paying subscriber's stored Google click id back to Google Ads with the first-charge value, so **Smart Bidding optimises on people who actually paid rather than on signups.** It's the single biggest bidding lever left. (See `PAID_ADS_PATHWAY.md` Step 1.4 and `CONVERSION-RUNBOOK.md` §2.4.)
 
 ## What's already built (you don't touch code)
 - **Click-id capture:** `frontend/lib/utm.ts` stores `gclid/gbraid/wbraid` on landing; `backend/app/routers/auth.py` writes them to `users.signup_gclid/gbraid/wbraid` at signup.
