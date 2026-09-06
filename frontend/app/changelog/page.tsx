@@ -50,6 +50,14 @@ const METHODOLOGY_LOG: LogEntry[] = [
     ref: "#761",
   },
   {
+    date: "2026-09-06",
+    kind: "methodology",
+    title: "Most tickers were being scored on four of the six factors, and now are not",
+    body:
+      "Two of the six factors — fundamentals and recent insider activity — are gathered by a daily pass over the tracked list. Where a factor has no reading for a ticker, the composite treats that factor as neutral, so it neither helps nor hurts. That fallback is deliberate and is unchanged. What was wrong was how often it applied. The daily pass kept its progress only in memory, so every deployment of the site restarted it from the beginning; it also chose which tickers to fetch by ranking the whole list rather than by asking which tickers were still missing, so each restart re-fetched the same names instead of continuing on. Measured before this change, 5,697 of 7,417 scored tickers — 77 per cent — had no reading for either of those two factors, including 1,001 of the 1,035 scored tickers valued above ten billion dollars. Those two factors together carry a fixed share of the composite, so a ticker missing both had a ceiling on the score it could reach, and the tickers that reached the published top ten were therefore drawn from the covered minority rather than from the whole list. That was an artefact of how the data was collected. It is not a statement about the companies that were missing, and it was not a judgement the method intended to make. Three things changed. The pass now records which tickers it has already attempted, so a restart resumes instead of repeating, and a ticker the data provider simply has nothing for stops being asked again forever. It now selects the tickers still missing a reading, most-traded and largest first, instead of re-ranking the whole list. And it runs ahead of the passes that fill in display-only fields, because those can wait and a missing factor cannot. Separately, both readings are now restored from stored data when a process starts, rather than starting empty. Expect scores across a large part of the list to move as coverage fills in over the following days, and expect which tickers qualify for the top ten to change with them. No entry in the historical record was altered: that archive is append-only and every past day stands exactly as it was recorded.",
+    ref: "#762",
+  },
+  {
     date: "2026-08-24",
     kind: "correction",
     title: "The published record was measured against an after-hours price, and has been restated",

@@ -555,12 +555,17 @@ async def upsert_tickers(
       RS-vs-SPY blend  → sub_rs
       conviction grade → confidence_pct (via _CONVICTION_TO_CONFIDENCE)
 
-    Other Ticker columns (sub_trend, sub_fundamentals, sub_momentum,
-    sub_macro, sub_smart_money, sector, name) are left alone for the
-    existing flow to fill — _backfill_sectors handles sector, the
-    Finnhub-driven fundamentals pre-fetch fills sub_fundamentals, etc.
-    Phase 2 will wire SMART MONEY & CONGRESS into sub_smart_money and
-    MARKET INTELLIGENCE into sub_macro from the same workbook.
+    `sector` and `name` are left alone for the existing flow to fill —
+    _backfill_sectors handles both.
+
+    ALL SIX sub-scores are written, not left alone. That sentence used to say
+    the opposite and it was years out of date: the loop at the bottom of this
+    function setattr's every `sub_*` column from the composite, INCLUDING None.
+    See the comment there for why None must be written rather than skipped, and
+    `finnhub_feed.warm_factor_caches_from_db` for the consequence — a process
+    whose Finnhub factor caches are cold blanks `sub_fundamentals` and
+    `sub_smart_money` on every sheet-governed row and re-scores it with the
+    NEUTRAL fallback in both slots.
     """
     inserted = updated = 0
     for r in rows:

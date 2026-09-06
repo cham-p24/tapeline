@@ -152,6 +152,34 @@ class Ticker(Base):
     last_aggregates_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
+    # When the daily Finnhub passes last ATTEMPTED this symbol's fundamentals
+    # and insider (Form 4) data. NULL = never attempted.
+    #
+    # Same job `last_aggregates_at` does for bars, for the two factors that
+    # carry 30% of the composite between them. Both passes used to select the
+    # top ACTIVE_UNIVERSE_SIZE rows by coalesce(volume * price, -1) DESC — a
+    # ranking, not a gap query — and their completion latches are in-memory
+    # globals, so every deploy restarted the serial chain and both passes
+    # re-fetched the same top rows. Measured 2026-09-07: 5,697 of 7,417 scored
+    # rows had BOTH factors NULL, including 1,001 of the 1,035 rows over $10B.
+    #
+    # STAMPED ON ATTEMPT, NOT ON SUCCESS — deliberately. Many ETFs have no
+    # fundamentals for the vendor to return. Without a stamp those rows are
+    # indistinguishable from never-fetched, so they would monopolise the gap
+    # query forever and starve everything behind them. "We have tried this one"
+    # is what a converging pass needs to record; whether the vendor had
+    # anything to say is already recorded in sub_fundamentals /
+    # sub_smart_money themselves.
+    #
+    # `updated_at` cannot serve this purpose: the 60s scoring tick writes every
+    # scored row, so it says when the row was last touched, not when its
+    # factors were last fetched.
+    last_fundamentals_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    last_smart_money_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

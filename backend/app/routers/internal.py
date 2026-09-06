@@ -72,7 +72,25 @@ async def _run_sheet_refresh(tab: str | None) -> None:
     """
     # Local import avoids loading the heavy sheet_feed module at app boot.
     from app.db import SessionLocal
+    from app.services.finnhub_feed import warm_factor_caches_from_db
     from app.services.sheet_feed import refresh_all_tabs, reset_csv_hash_cache
+
+    # The refresh below recomputes each sheet-governed row's composite and
+    # writes all six sub-scores, INCLUDING None (sheet_feed.upsert_tickers is
+    # deliberate about that). Two of those six come from process-local Finnhub
+    # dicts that only the WORKER's daily chain ever fills — and this task runs
+    # in the API process, where that chain never runs at all. So without this
+    # line the caches are empty for the entire life of the process, and every
+    # sheet-changed webhook blanks `sub_fundamentals` and `sub_smart_money` on
+    # every sheet-governed row and re-scores it with NEUTRAL 50 in both slots,
+    # which is 30% of the composite.
+    #
+    # Warmed HERE and not at app startup: it belongs to the one code path that
+    # needs it, it cannot then add a cold-Neon read to boot (the API machine
+    # has wedged on exactly that before), and it cannot race a webhook that
+    # arrives while a background warm is still in flight. Cost is one narrow
+    # query on a debounced, human-triggered path.
+    await warm_factor_caches_from_db()
     reset_csv_hash_cache()
     async with SessionLocal() as session:
         try:
