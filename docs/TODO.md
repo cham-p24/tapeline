@@ -136,6 +136,87 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
 
+# 9e — 2026-09-06: the deep dive, and what it found under the floorboards
+
+A nine-angle competitor teardown (onboarding, retention, pricing, score
+presentation, content, distribution, trust, community, core UX), each angle's
+adaptable claims re-verified against the live competitor sites, then synthesised.
+Three findings below are not "adapt from a competitor" items at all — they are
+things the teardown tripped over in Tapeline itself, each verified by hand.
+
+- [x] **The billing page showed a first-charge date sixteen days early** (#745,
+  after #744 from another session fixed the /pricing and /legal/refund copies).
+  `app/app/billing/page.tsx` — the page that STARTS a trial — kept its own
+  `const TRIAL_DAYS = 14` after the backend moved to 30. It computed and rendered
+  the first-charge date as now + 14, labelled the CTA "Start the 14-day trial",
+  and its test hardcoded 14 too, so the assertion vouched for its own fixture.
+  Nine more "charge on day 14" claims survived the sweep (pricing FAQ, refund
+  policy ×3, how-it-works, daily-picks, whats-new ×2, three blog posts). A dated
+  22-Aug changelog entry had been rewritten to "30-day trial … first charge on
+  day 14" — restored. Guard: `__tests__/singleTrialLengthSource.test.ts`.
+
+- [ ] **P1 — The composite is a FOUR-factor score for ~77% of the universe, and
+  that — not the market — is why the record has zero mega-caps.** Verified
+  2026-09-06 by read-only SQL + live API. `_FUND_SCORE_CACHE` and
+  `_SMART_MONEY_SCORE_CACHE` are in-process dicts filled by stages 3–4 of the
+  ~2-hour serial Finnhub chain (`_serial_finnhub_refreshes`); the latches are
+  in-memory too, so **every deploy wipes both caches and restarts the chain
+  from stage one** (its own comment: stages four and five "were NEVER reached").
+  The fundamentals stage selects by dollar volume, not `WHERE … IS NULL`, so a
+  restart re-fetches the same rows instead of resuming. `composite_from_factors`
+  substitutes NEUTRAL 50 per missing factor (deliberate), so with 30% of the
+  weight pinned the max reachable score is 85, and to clear today's cutoff of
+  81.1 the four live factors must average 94.4.
+  Measured: 7,316 scored tickers, **77% with both factors null**; of 1,033
+  scored names ≥ $10B, **1,001 (97%)**; highest score any both-null ticker has
+  EVER reached: **80.2**, below the cutoff, while all 16 above it have full
+  coverage. Even on the exact 2,500 rows the pass targets, fundamentals are
+  filled for 36% and for 22 of 364 mega-caps. AAPL/NVDA/MSFT/AMZN/META/TSLA/SPY
+  all null on both; sheet-governed DSX/PLX full. `percentile.py` documents
+  "~15% coverage" as intended for the *percentile* display; the composite
+  ceiling is the undocumented consequence.
+  **The fix is plumbing, not methodology** — weights unchanged, inputs that were
+  always meant to be filled get filled: (1) warm both caches from
+  `Ticker.sub_fundamentals` / `sub_smart_money` on boot, or persist them;
+  (2) make stages 3–4 self-gating on NULL like stages 1–2 so restarts resume;
+  (3) spread the 2,500 cap over days. It changes published scores for ~5,600
+  tickers → **needs a `/changelog` entry**; the record stays append-only. ~1 day.
+  This supersedes the "second cap-filtered record" idea from the 05-Sep sweep:
+  a cap-filtered list built on four-factor scores would be honest only if
+  labelled as such. Fix the inputs first. Memory:
+  `tapeline_factor_cache_wiped_by_deploys.md`.
+
+- [ ] **Two leveraged ETFs in today's anonymous top 10, labelled STRONG SETUP.**
+  Rows 7–8 on 2026-09-06: CONX (Direxion Daily COIN Bull **2X**) and BIB
+  (ProShares **Ultra** NASDAQ Biotech). A first-time visitor's first result is
+  a 2× leveraged crypto-miner fund. No leveraged/inverse detection exists
+  anywhere in `backend/app` (grep: only mock_feed names). Cheapest fix: a
+  name-pattern flag (`\b(2X|3X|Ultra|UltraShort|Bull|Bear|Daily .* Bull)\b`)
+  excluded from the default anonymous view with an "include leveraged" toggle,
+  same shape as the existing liquidity-floor toggle. Also row 1 (DSX) renders
+  sector "Uncategorized". Hours.
+
+- [ ] **A brand-new account is routed to the trial-offer fork before it ever
+  sees the scanner.** Verified from source: `signup/page.tsx` `postAuthNext`
+  defaults to `/app/billing?trial=start` (via `/app/onboarding`) when there is
+  no `?next=` and no plan intent — on both the email and OAuth paths. Every
+  competitor with a free plan (Stock Rover, Simply Wall St, Stock Unlock,
+  TradingView, Danelfin, Koyfin) drops a new account straight into the product;
+  none interposes a payment decision before the first result. Fix: default to
+  `/app/scanner` and render the existing `TrialOfferPanel` as a dismissible
+  panel above the table (the `FirstRunTip` context already coordinates banner
+  yielding); keep `?plan=` routing for /pricing intent. Hours. Compliance:
+  none — the disclosure moves, its wording does not change.
+
+- [ ] **The anonymous visitor cannot touch the scanner at all** —
+  `/app/scanner` 307s to `/signin`. Finviz, TradingView, StockAnalysis, Simply
+  Wall St and WallStreetZen all open their screener logged-out on a
+  recognisable universe with a live match count. Serve the route logged-out
+  with the top 10 open and rows 11–25 masked Danelfin-style (symbol hidden,
+  scores shown), and show "Showing 10 of 1,987 matching" instead of the cap.
+  Days. Depends on the two items above for the first ten rows to be names a
+  visitor recognises.
+
 # 9d — Shipped 2026-09-05, second pass
 
 Triggered by handing the ad account to an external team, which surfaced a
